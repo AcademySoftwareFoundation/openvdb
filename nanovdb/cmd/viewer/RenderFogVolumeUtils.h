@@ -11,13 +11,14 @@
 	\brief General C++ implementation of the FogVolume rendering code.
 */
 
+#pragma once
+
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/HDDA.h>
 #include <nanovdb/util/Ray.h>
+#include <nanovdb/util/SampleFromVoxels.h>
 #include "RenderConstants.h"
 #include "RenderUtils.h"
-
-#define NANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION
 
 namespace render {
 namespace fogvolume {
@@ -30,112 +31,173 @@ inline __hostdev__ ValueT valueToScalar(const ValueT& v)
 
 inline __hostdev__ float valueToScalar(const nanovdb::Vec3f& v)
 {
-    return (v[0] + v[1] + v[2]) / 3.0f;
+    return luminance<float>(v);
 }
 
 inline __hostdev__ double valueToScalar(const nanovdb::Vec3d& v)
 {
-    return (v[0] + v[1] + v[2]) / 3.0;
+    return luminance<double>(v);
+}
+
+template<typename ValueT>
+inline __hostdev__ nanovdb::Vec3f colorFromTemperature(const ValueT& v, float scale)
+{
+    float r = v;
+    float g = r * r;
+    float b = g * g;
+    return scale * nanovdb::Vec3f(r * r * r, g * g * g, b * b * b);
 }
 
 struct HeterogenousMedium
 {
-    float densityFactor;
-    float densityMin;
-    float densityMax;
-    float hgMeanCosine;
+    int                       maxPathDepth;
+    float                     densityScale;
+    float                     densityMin;
+    float                     densityMax;
+    float                     hgMeanCosine;
+    float                     temperatureScale;
+    VolumeTransmittanceMethod transmittanceMethod;
+    float                     transmittanceThreshold;
+    float                     albedo;
 };
 
-template<typename RayT, typename AccT>
-inline __hostdev__ float deltaTracking(RayT& ray, AccT& acc, float densityMax, float densityFactor, uint32_t& seed)
+template<typename VecT, typename SamplerT>
+inline __hostdev__ float sampleDensity(const SamplerT& sampler, const VecT& pos, const HeterogenousMedium& medium)
 {
-    if (!ray.clip(acc.root().bbox()))
-        return -1;
-    float densityMaxInv = 1.0f / densityMax;
-    float t = ray.t0();
+    auto densityValue = sampler(pos);
+    return valueToScalar(densityValue) * medium.densityScale;
+}
+
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float deltaTracking(RayT& ray, SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    const float densityMaxInv = 1.0f / medium.densityMax;
+    float       t = ray.t0();
     do {
-        t += -logf(randomf(seed++)) * densityMaxInv;
-    } while (t < ray.t1() && valueToScalar(acc.getValue(nanovdb::Coord::Floor(ray(t)))) * densityFactor * densityMaxInv < randomf(seed++));
+        t += -logf(randomXorShift(seed)) * densityMaxInv;
+    } while (t < ray.t1() && sampleDensity(sampler, ray(t), medium) * densityMaxInv < randomXorShift(seed));
     return t;
 }
 
-template<typename RayT, typename AccT>
-inline __hostdev__ float getTransmittance(RayT& ray, AccT& acc, const HeterogenousMedium& medium, uint32_t& seed)
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceRiemannSum(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
 {
-    if (!ray.clip(acc.root().bbox()))
-        return 1.0f;
+    //const float& kTransmittanceThreshold = medium.transmittanceThreshold;
+    static constexpr float kTransmittanceThreshold = 0.001f;
+    static constexpr float kTransmittanceReimannSumDeltaStep = 0.5f;
+
+    float transmittance = 1.f;
+    float t = ray.t0() - randomXorShift(seed) * kTransmittanceReimannSumDeltaStep;
+    for (; t < ray.t1(); t += kTransmittanceReimannSumDeltaStep) {
+        float sigmaT = sampleDensity(sampler, ray(t), medium);
+        transmittance *= expf(-sigmaT * kTransmittanceReimannSumDeltaStep);
+        if (transmittance < kTransmittanceThreshold) {
+            return 0.f;
+        }
+    }
+    return transmittance;
+}
 
 #if 0
-    float      transmittance = 1.f;
-    nanovdb::HDDA<RayT> dda(ray, 1);
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceDDA(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    float              transmittance = 1.f;
+    nanovdb::DDA<RayT> dda(ray);
+    float              t = 0.0f;
+    auto               ijk = dda.voxel();
+    float              sigmaT = sampleDensity(sampler, ijk, medium);
     while (dda.step()) {
-        auto  densityValue = acc.getValue(dda.voxel());
-        float densityScalar = valueToScalar(densityValue) * medium.densityFactor;
-        densityScalar = nanovdb::Clamp(densityScalar, medium.densityMin, medium.densityMax); // just in case these are soft extrema
-
-        transmittance *= 1.f - densityScalar;
-
-        if (transmittance < 0.01f)
+        float dt = dda.time() - t;
+        transmittance *= expf(-sigmaT * dt);
+        t = dda.time();
+        sigmaT = sampleDensity(sampler, dda.voxel(), medium);
+        if (transmittance < medium.transmittanceThreshold) {
             return transmittance;
+        }
     }
     return transmittance;
-#elif 0
-    float       transmittance = 1.f;
-    const float dt = 0.5f;
-    for (float t = ray.t0(); t < ray.t1(); t += dt) {
-        auto  densityValue = acc.getValue(nanovdb::Coord::Floor(ray(t)));
-        float densityScalar = valueToScalar(densityValue) * medium.densityFactor;
-        densityScalar = nanovdb::Clamp(densityScalar, medium.densityMin, medium.densityMax); // just in case these are soft extrema
+}
 
-        transmittance *= 1.f - densityScalar;
-
-        if (transmittance < 0.01f)
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceHDDA(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    float               transmittance = 1.f;
+    nanovdb::HDDA<RayT> dda(ray, 1);
+    float               t = dda.time();
+    while (dda.step()) {
+        float dt = dda.time() - t;
+        t = dda.time();
+        float sigmaT = sampleDensity(sampler, dda.voxel(), medium);
+        transmittance *= expf(-sigmaT * dt);
+        if (transmittance < medium.transmittanceThreshold) {
             return transmittance;
+        }
     }
     return transmittance;
-#elif !defined(NANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION)
+}
+#endif
+
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceDeltaTracking(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
     // delta tracking.
-    // faster due to earlier termination, but we need multiple samples
-    // to reduce variance.
+    // faster due to earlier termination, but we need multiple samples to reduce variance.
     const float densityMaxInv = 1.0f / medium.densityMax;
     const int   nSamples = 2;
     float       transmittance = 0.f;
     for (int n = 0; n < nSamples; n++) {
         float t = ray.t0();
         while (true) {
-            t -= logf(randomf(seed++)) * densityMaxInv;
-
+            t -= logf(randomXorShift(seed)) * densityMaxInv;
             if (t >= ray.t1()) {
                 transmittance += 1.0f;
                 break;
             }
-
-            auto density = acc.getValue(nanovdb::Coord::Floor(ray(t))) * medium.densityFactor;
-            density = nanovdb::Clamp(density, medium.densityMin, medium.densityMax); // just in case these are soft extrema
-
-            if (density * densityMaxInv >= randomf(seed++))
+            if (sampleDensity(sampler, ray(t), medium) * densityMaxInv >= randomXorShift(seed))
                 break;
         }
     }
     return transmittance / nSamples;
-#elif 0
+}
+
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceRatioTracking(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    //const float& kTransmittanceThreshold = medium.transmittanceThreshold;
+    static constexpr float kTransmittanceThreshold = 0.001f;
+
     // ratio tracking.
     // slower due to no early termination, but better estimation.
     float densityMaxInv = 1.0f / medium.densityMax;
     float transmittance = 1.f;
     float t = ray.t0();
     while (true) {
-        t -= logf(randomf(seed++)) * densityMaxInv;
+        t -= logf(randomLCG(seed)) * densityMaxInv;
         if (t >= ray.t1())
             break;
-        auto density = acc.getValue(nanovdb::Coord::Floor(ray(t))) * medium.densityFactor;
-        density = nanovdb::Clamp(density, medium.densityMin, medium.densityMax); // just in case these are soft extrema
-
-        transmittance *= 1.0f - density * densityMaxInv;
+        float sigmaT = sampleDensity(sampler, ray(t), medium);
+        transmittance *= 1.0f - sigmaT * densityMaxInv;
+        /*
+        // Russian roulette.
+        const float prob = 1.f - transmittance;
+        if (randomf(seed++) < prob)
+            return 0.f;
+        transmittance /= 1.f - prob;
+        */
+        if (transmittance < kTransmittanceThreshold)
+            return 0.f;
     }
     return transmittance;
-#elif 1
-        // residual ratio tracking.
+}
+
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittanceResidualRatioTracking(const RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    //const float& kTransmittanceThreshold = medium.transmittanceThreshold;
+    static constexpr float kTransmittanceThreshold = 0.001f;
+
+    // residual ratio tracking.
 #if 1
     // control is minimum.
     const float controlDensity = medium.densityMin;
@@ -153,124 +215,206 @@ inline __hostdev__ float getTransmittance(RayT& ray, AccT& acc, const Heterogeno
     const float residualDensityMax = fmaxf(0.001f, fabsf(residualDensityMax1));
 #endif
     const float residualDensityMaxInv = 1.0f / residualDensityMax;
-    float controlTransmittance = expf(-controlDensity * (ray.t1() - ray.t0()));
-    float residualTransmittance = 1.f;
-    float t = ray.t0() - logf(randomf(seed++)) * residualDensityMaxInv;
+    float       controlTransmittance = expf(-controlDensity * (ray.t1() - ray.t0()));
+    float       residualTransmittance = 1.f;
+    float       t = ray.t0() - logf(randomXorShift(seed)) * residualDensityMaxInv;
     while (t < ray.t1()) {
-        const auto densityValue = acc.getValue(nanovdb::Coord::Floor(ray(t)));
-        float densityScalar = valueToScalar(densityValue) * medium.densityFactor;
-        densityScalar = nanovdb::Clamp(densityScalar, medium.densityMin, medium.densityMax); // just in case these are soft extrema
+        float sigmaT = sampleDensity(sampler, ray(t), medium);
 
-        auto residualDensity = densityScalar - controlDensity;
+        auto residualDensity = sigmaT - controlDensity;
         residualTransmittance *= 1.0f - residualDensity / residualDensityMax1;
-        t -= logf(randomf(seed++)) * residualDensityMaxInv;
+        t -= logf(randomXorShift(seed)) * residualDensityMaxInv;
+
+        if (residualTransmittance * controlTransmittance < kTransmittanceThreshold)
+            return 0.f;
     }
     return residualTransmittance * controlTransmittance;
-#endif // NANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION
+}
+
+template<typename RayT, typename SamplerT>
+inline __hostdev__ float getTransmittance(RayT& ray, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    if (!ray.clip(sampler.accessor().root().bbox()))
+        return 1.0f;
+
+    switch (medium.transmittanceMethod) {
+    case VolumeTransmittanceMethod::kResidualRatioTracking: return getTransmittanceResidualRatioTracking(ray, sampler, medium, seed);
+    case VolumeTransmittanceMethod::kRatioTracking: return getTransmittanceRatioTracking(ray, sampler, medium, seed);
+    case VolumeTransmittanceMethod::kDeltaTracking: return getTransmittanceDeltaTracking(ray, sampler, medium, seed);
+    case VolumeTransmittanceMethod::kRiemannSum: return getTransmittanceRiemannSum(ray, sampler, medium, seed);
+    //case VolumeTransmittanceMethod::kHDDA: return getTransmittanceHDDA(ray, sampler, medium, seed);
+    //case VolumeTransmittanceMethod::kDDA: return getTransmittanceDDA(ray, sampler, medium, seed);
+    default: return 1.f;
+    }
 }
 
 inline __hostdev__ float henyeyGreenstein(float g, float cosTheta)
 {
-    // phase function pdf.
-#if 1
-    // isotropic.
-    return 1.0f / (3.14159265359f * 4.f);
-#else
-    float denom = 1.f + g * g - 2.f * g * cosTheta;
-    return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
-#endif
+    if (g == 0) {
+        return 1.0f / (3.14159265359f * 4.f);
+    } else {
+        float denom = nanovdb::Max(0.001f, 1.f + g * g - 2.f * g * cosTheta);
+        return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
+    }
 }
 
-inline __hostdev__ nanovdb::Vec3f sampleHG(float g, float e1, float e2)
+inline __hostdev__ nanovdb::Vec3f sampleHG(const nanovdb::Vec3f& dir, float g, float e1, float e2)
 {
-    // phase function.
-#if 1
-    // isotropic
-    const float phi = (float)(2.0f * 3.14165f) * e1;
-    const float cosTheta = 1.0f - 2.0f * e2;
-    const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
-#else
-    const float phi = (float)(2.0f * 3.14159265359f) * e2;
-    const float s = 2.0f * e1 - 1.0f;
-    const float denom = nanovdb::Max(0.001f, (1.0f + g * s));
-    const float f = (1.0f - g * g) / denom;
-    const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
-    const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
-#endif
-    return nanovdb::Vec3f(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+    if (g == 0) {
+        const float phi = (float)(2.0f * 3.14165f) * e1;
+        const float cosTheta = 1.0f - 2.0f * e2;
+        const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
+        return nanovdb::Vec3f(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+    } else {
+        const float phi = 2.0f * 3.14159265359f * e2;
+        const float s = 2.0f * e1 - 1.0f;
+        const float denom = nanovdb::Max(0.001f, (1.0f + g * s));
+        const float f = (1.0f - g * g) / denom;
+        const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
+        const float sinTheta = nanovdb::Sqrt(1.0f - cosTheta * cosTheta);
+        const auto  phase = nanovdb::Vec3f(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+        // tangent frame.
+        const auto tangent = perpStark(dir);
+        const auto bitangent = dir.cross(tangent);
+        return (phase[0] * tangent + phase[1] * bitangent + phase[2] * dir).normalize();
+    }
 }
 
-template<typename Vec3T, typename AccT>
-inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& dir, const AccT& acc, const HeterogenousMedium& medium, uint32_t& seed, const Vec3T& lightDir)
+template<typename Vec3T, typename SamplerT>
+inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& dir, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed, const Vec3T& lightDir)
 {
     const Vec3T lightRadiance = Vec3T(1) * 1.f;
     auto        shadowRay = nanovdb::Ray<float>(pos, lightDir);
-    auto        transmittance = getTransmittance(shadowRay, acc, medium, seed);
-    float       pdf = 1.0f;//henyeyGreenstein(medium.hgMeanCosine, dir.dot(lightDir));
+    auto        transmittance = getTransmittance(shadowRay, sampler, medium, seed);
+    float       pdf = 1.0f; //henyeyGreenstein(medium.hgMeanCosine, dir.dot(lightDir));
     return pdf * lightRadiance * transmittance;
 }
 
-template<typename RayT, typename AccT>
-inline __hostdev__ nanovdb::Vec3f traceVolume(RayT& ray, AccT& acc, const HeterogenousMedium& medium, uint32_t& seed, const nanovdb::Vec3f& lightDir)
+template<typename Vec3T, typename SamplerT>
+inline __hostdev__ Vec3T estimateBlackbodyEmission(const Vec3T& pos, const SamplerT& temperatureSampler, const HeterogenousMedium& medium, uint32_t& seed)
+{
+    const auto value = temperatureSampler(pos);
+    return colorFromTemperature(value, medium.temperatureScale);
+}
+
+template<typename DensitySamplerT>
+inline __hostdev__ nanovdb::Vec3f traceFogVolume(float& throughput, bool& isFullyAbsorbed, nanovdb::Ray<float>& ray, const DensitySamplerT& densitySampler, const HeterogenousMedium& medium, uint32_t& seed, const SceneRenderParameters& sceneParams, const nanovdb::Vec3f& lightDir)
 {
     using namespace nanovdb;
-    using Vec3T = typename RayT::Vec3T;
-    float throughput = 1.0f;
 
-    float albedo = 0.8f;
+    throughput = 1.0f;
+    isFullyAbsorbed = false;
 
-    int max_interactions = 40;
-    int num_interactions = 0;
-
-    if (!ray.clip(acc.root().bbox())) {
+    if (!ray.clip(densitySampler.accessor().root().bbox())) {
         return Vec3f(0.0f);
     }
 
-    RayT pathRay = ray;
+    // Fix the path depth for performance...
+    //const int            kMaxPathDepth = medium.maxPathDepth;
+    static constexpr int kMaxPathDepth = 4;
 
     Vec3f radiance = Vec3f(0.f);
+    auto  pathRay = ray;
+    int   numInteractions = 0;
 
-    while (true) {
-        float s = deltaTracking(pathRay, acc, medium.densityMax, medium.densityFactor, seed);
-        if (s >= pathRay.t1())
+    while (numInteractions++ < kMaxPathDepth) {
+        float s = deltaTracking(pathRay, densitySampler, medium, seed);
+        if (s >= pathRay.t1()) {
             break;
-
-        if (s < 0)
-            return Vec3f(0.0f);
-
-        if (num_interactions++ >= max_interactions)
-            return Vec3f(0.0f);
+        }
 
         auto pos = pathRay(s);
 
-        // sample key light.
-        radiance = radiance + throughput * estimateLight(pos, pathRay.dir(), acc, medium, seed, lightDir);
+        if (sceneParams.useLighting) {
+            radiance += throughput * estimateLight(pos, pathRay.dir(), densitySampler, medium, seed, lightDir);
+        }
 
-        throughput *= albedo;
+        throughput *= medium.albedo;
 
         // Russian roulette absorption.
         if (throughput < 0.2f) {
-            auto r1 = randomf(seed++);
-            if (r1 > throughput * 5.0f)
-                return Vec3f(0.0f); // full absorbtion.
-            throughput = 0.2f; // unbias.
+            auto r1 = randomXorShift(seed);
+            if (r1 > throughput * 5.0f) {
+                isFullyAbsorbed = true;
+                return Vec3f(0.0f);
+            }
+            throughput = 0.2f;
         }
 
         // modify ray using phase function.
-        auto r2 = randomf(seed++);
-        auto r3 = randomf(seed++);
-        pathRay = RayT(pos, sampleHG(medium.hgMeanCosine, r2, r3));
+        auto r2 = randomXorShift(seed);
+        auto r3 = randomXorShift(seed);
+        pathRay = Ray<float>(pos, sampleHG(pathRay.dir(), medium.hgMeanCosine, r2, r3));
 
-        if (!pathRay.clip(acc.root().bbox()))
+        if (!pathRay.clip(densitySampler.accessor().root().bbox())) {
             return Vec3f(0.0f);
+        }
     }
-    /*
-	const float f = (0.5f + 0.5f * ray.dir()[1]) * throughput;
-	radiance = radiance + Vec3f(f);*/
 
     return radiance;
 }
 
+template<typename DensitySamplerT, typename EmissionSamplerT>
+inline __hostdev__ nanovdb::Vec3f traceBlackbodyVolume(float& throughput, bool& isFullyAbsorbed, nanovdb::Ray<float>& ray, const DensitySamplerT& densitySampler, const EmissionSamplerT& emissionSampler, const HeterogenousMedium& medium, uint32_t& seed, const SceneRenderParameters& sceneParams, const nanovdb::Vec3f& lightDir)
+{
+    using namespace nanovdb;
+    throughput = 1.0f;
+
+    int numInteractions = 0;
+
+    if (!ray.clip(densitySampler.accessor().root().bbox())) {
+        return Vec3f(0.0f);
+    }
+
+    auto& pathRay = ray;
+
+    Vec3f radiance = Vec3f(0.f);
+    isFullyAbsorbed = false;
+
+    // Fix the path depth for performance...
+    //const int            kMaxPathDepth = medium.maxPathDepth;
+    static constexpr int kMaxPathDepth = 4;
+
+    while (numInteractions++ < kMaxPathDepth) {
+        float s = deltaTracking(pathRay, densitySampler, medium, seed);
+        if (s >= pathRay.t1()) {
+            break;
+        }
+
+        auto pos = pathRay(s);
+
+        if (sceneParams.useLighting) {
+            radiance += throughput * estimateLight(pos, pathRay.dir(), densitySampler, medium, seed, lightDir);
+        }
+
+        radiance += throughput * estimateBlackbodyEmission(pos, emissionSampler, medium, seed);
+
+        throughput *= medium.albedo;
+
+        // Russian roulette absorption.
+        if (throughput < 0.2f) {
+            auto r1 = randomXorShift(seed);
+            if (r1 > throughput * 5.0f) {
+                isFullyAbsorbed = true;
+                return Vec3f(0.0f); // full absorbtion.
+            }
+            throughput = 0.2f; // unbias.
+        }
+
+        // modify ray using phase function.
+        auto r2 = randomXorShift(seed);
+        auto r3 = randomXorShift(seed);
+        pathRay = Ray<float>(pos, sampleHG(pathRay.dir(), medium.hgMeanCosine, r2, r3));
+
+        if (!pathRay.clip(densitySampler.accessor().root().bbox())) {
+            return Vec3f(0.0f);
+        }
+    }
+
+    return radiance;
+}
+
+template<typename ValueT, int InterpolationOrder>
 struct RenderVolumeRgba32fFn
 {
     using RealT = float;
@@ -278,115 +422,269 @@ struct RenderVolumeRgba32fFn
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    template<typename ValueT>
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, Camera<float> camera, const nanovdb::NanoGrid<ValueT>* grid, int numAccumulations, const RenderConstants params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
+        float  color[4] = {0, 0, 0, 0};
 
-        const auto& tree = grid->tree();
+        if (!densityGrid) {
+            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
 
-        const Vec3T wLightDir = Vec3T(0, 1, 0);
-        const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
+            auto envRadiance = traceEnvironment(wRay, sceneParams);
 
-        auto acc = tree.getAccessor();
+            color[0] = envRadiance;
+            color[1] = envRadiance;
+            color[2] = envRadiance;
 
-        HeterogenousMedium medium;
-        medium.densityFactor = params.volumeDensity;
-        medium.densityMin = valueToScalar(grid->tree().root().valueMin()) * medium.densityFactor;
-        medium.densityMax = medium.densityFactor; //grid->tree().root().valueMax() * medium.densityFactor;
-        medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
-        medium.hgMeanCosine = 0.f;
+        } else {
+            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
-        float color[4] = {0, 0, 0, 0};
+            const auto& densityTree = densityGrid->tree();
+            const auto  densityAcc = densityTree.getAccessor();
+            const auto  densitySampler = nanovdb::createSampler<InterpolationOrder, decltype(densityAcc), false>(densityAcc);
 
-        for (int sampleIndex = 0; sampleIndex < params.samplesPerPixel; ++sampleIndex) {
-            uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * params.samplesPerPixel)) ^ hash(ix, iy);
+            HeterogenousMedium medium;
+            medium.densityScale = params.volumeDensityScale;
+            medium.densityMin = valueToScalar(densityGrid->tree().root().valueMin()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityGrid->tree().root().valueMax()) * medium.densityScale;
+            medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
+            medium.hgMeanCosine = params.phase;
+            medium.temperatureScale = params.volumeTemperatureScale;
+            medium.transmittanceMethod = params.transmittanceMethod;
+            medium.transmittanceThreshold = params.transmittanceThreshold;
+            medium.maxPathDepth = params.maxPathDepth;
+            medium.albedo = params.volumeAlbedo;
 
-            float u = ix + 0.5f;
-            float v = iy + 0.5f;
+            for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
+                uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ hash(ix, iy);
 
-            if (numAccumulations > 0 || params.samplesPerPixel > 0) {
-#if 1
-                float jitterX, jitterY;
-                cmj(jitterX, jitterY, (sampleIndex + (numAccumulations + 1) * params.samplesPerPixel) % 64, 8, 8, pixelSeed);
-                u += jitterX - 0.5f;
-                v += jitterY - 0.5f;
-#else
-                float randVar1 = randomf(pixelSeed + 0);
-                float randVar2 = randomf(pixelSeed + 1);
-                u += randVar1 - 0.5f;
-                v += randVar2 - 0.5f;
-#endif
+                RayT wRay = getRayFromPixelCoord(ix, iy, width, height, numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
+
+                RayT iRay = wRay.worldToIndexF(*densityGrid);
+
+                bool  isFullyAbsorbed = false;
+                float pathThroughput = 1.0f;
+                Vec3T radiance = traceFogVolume(pathThroughput, isFullyAbsorbed, iRay, densitySampler, medium, pixelSeed, sceneParams, iLightDir);
+
+                if (!isFullyAbsorbed && sceneParams.useBackground && pathThroughput > 0.0f) {
+                    float bgIntensity = 0.0f;
+                    float groundIntensity = 0.0f;
+                    float groundMix = 0.0f;
+
+                    // BUG: this causes trouble.
+                    //wRay = iRay.indexToWorldF(*densityGrid);
+
+                    if (sceneParams.useGround) {
+                        // intersect with ground plane and draw checker if camera is above...
+                        float wGroundT = (sceneParams.groundHeight - wRay.eye()[1]) / wRay.dir()[1];
+                        if (wRay.dir()[1] != 0 && wGroundT > 0.f) {
+                            Vec3T wGroundPos = wRay(wGroundT);
+                            groundIntensity = evalGroundMaterial(wGroundT, sceneParams.groundFalloff, wGroundPos, wRay.dir()[1], groundMix);
+
+                            if (sceneParams.useLighting && sceneParams.useShadows) {
+                                Vec3T iGroundPos = densityGrid->worldToIndexF(wGroundPos);
+                                RayT  iShadowRay(iGroundPos, iLightDir);
+                                float shadowTransmittance = getTransmittance(iShadowRay, densitySampler, medium, pixelSeed);
+                                groundIntensity *= shadowTransmittance;
+                            }
+                        }
+                    }
+
+                    float skyIntensity = evalSkyMaterial(wRay.dir());
+                    bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+                    radiance += nanovdb::Vec3f(pathThroughput * bgIntensity);
+                }
+
+                color[0] += radiance[0];
+                color[1] += radiance[1];
+                color[2] += radiance[2];
             }
 
-            u /= width;
-            v /= height;
+            for (int k = 0; k < 3; ++k)
+                color[k] = color[k] / sceneParams.samplesPerPixel;
+        }
 
-            RayT wRay = camera.getRay(u, v);
-            RayT iRay = wRay.worldToIndexF(*grid);
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
+    }
+};
 
-            Vec3T iRayDir = iRay.dir();
-            Vec3T wRayDir = wRay.dir();
-            Vec3T wRayEye = wRay.eye();
+template<typename ValueT, int InterpolationOrder>
+struct RenderBlackBodyVolumeRgba32fFn
+{
+    using RealT = float;
+    using Vec3T = nanovdb::Vec3<RealT>;
+    using CoordT = nanovdb::Coord;
+    using RayT = nanovdb::Ray<RealT>;
 
-            Vec3T radiance = Vec3T(0);
-            if (params.useLighting > 0) {
-                radiance = traceVolume(iRay, acc, medium, pixelSeed, iLightDir);
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const nanovdb::NanoGrid<ValueT>* temperatureGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    {
+        float* outPixel = &imgBuffer[4 * (ix + width * iy)];
+        float  color[4] = {0, 0, 0, 0};
+
+        if (!densityGrid || !temperatureGrid) {
+            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+
+            auto envRadiance = traceEnvironment(wRay, sceneParams);
+
+            color[0] = envRadiance;
+            color[1] = envRadiance;
+            color[2] = envRadiance;
+
+        } else {
+            const auto& densityTree = densityGrid->tree();
+            const auto& temperatureTree = temperatureGrid->tree();
+            const auto  densityAcc = densityTree.getAccessor();
+            const auto  temperatureAcc = temperatureTree.getAccessor();
+            const auto  densitySampler = nanovdb::createSampler<InterpolationOrder, decltype(densityAcc), false>(densityAcc);
+            const auto  temperatureSampler = nanovdb::createSampler<InterpolationOrder, decltype(temperatureAcc), false>(temperatureAcc);
+
+            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
+
+            HeterogenousMedium medium;
+            medium.densityScale = params.volumeDensityScale;
+            medium.densityMin = valueToScalar(densityTree.root().valueMin()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityTree.root().valueMax()) * medium.densityScale;
+            medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
+            medium.hgMeanCosine = params.phase;
+            medium.temperatureScale = params.volumeTemperatureScale;
+            medium.transmittanceMethod = params.transmittanceMethod;
+            medium.transmittanceThreshold = params.transmittanceThreshold;
+            medium.maxPathDepth = params.maxPathDepth;
+            medium.albedo = params.volumeAlbedo;
+
+            for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
+                uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ hash(ix, iy);
+
+                RayT wRay = getRayFromPixelCoord(ix, iy, width, height, numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
+
+                RayT iRay = wRay.worldToIndexF(*densityGrid);
+
+                bool  isFullyAbsorbed = false;
+                float pathThroughput = 1.0f;
+                Vec3T radiance = traceBlackbodyVolume(pathThroughput, isFullyAbsorbed, iRay, densitySampler, temperatureSampler, medium, pixelSeed, sceneParams, iLightDir);
+
+                if (!isFullyAbsorbed && sceneParams.useBackground && pathThroughput > 0.0f) {
+                    float bgIntensity = 0.0f;
+                    float groundIntensity = 0.0f;
+                    float groundMix = 0.0f;
+
+                    // BUG: this causes trouble.
+                    //wRay = iRay.indexToWorldF(*densityGrid);
+
+                    if (sceneParams.useGround) {
+                        // intersect with ground plane and draw checker if camera is above...
+                        float wGroundT = (sceneParams.groundHeight - wRay.eye()[1]) / wRay.dir()[1];
+                        if (wRay.dir()[1] != 0 && wGroundT > 0.f) {
+                            Vec3T wGroundPos = wRay(wGroundT);
+                            groundIntensity = evalGroundMaterial(wGroundT, sceneParams.groundFalloff, wGroundPos, wRay.dir()[1], groundMix);
+
+                            if (sceneParams.useLighting && sceneParams.useShadows) {
+                                Vec3T iGroundPos = densityGrid->worldToIndexF(wGroundPos);
+                                RayT  iShadowRay(iGroundPos, iLightDir);
+                                float shadowTransmittance = getTransmittance(iShadowRay, densitySampler, medium, pixelSeed);
+                                groundIntensity *= shadowTransmittance;
+                            }
+                        }
+                    }
+
+                    float skyIntensity = evalSkyMaterial(wRay.dir());
+                    bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+                    radiance += nanovdb::Vec3f(pathThroughput * bgIntensity);
+                }
+
+                color[0] += radiance[0];
+                color[1] += radiance[1];
+                color[2] += radiance[2];
             }
 
-            float transmittance = getTransmittance(iRay, acc, medium, pixelSeed);
+            for (int k = 0; k < 3; ++k)
+                color[k] = color[k] / sceneParams.samplesPerPixel;
+        }
 
-            if (transmittance > 0.01f) {
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
+    }
+};
+
+struct FogVolumeFastRenderFn
+{
+    using RealT = float;
+    using Vec3T = nanovdb::Vec3<RealT>;
+    using CoordT = nanovdb::Coord;
+    using RayT = nanovdb::Ray<RealT>;
+
+    template<typename ValueT>
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    {
+        float* outPixel = &imgBuffer[4 * (ix + width * iy)];
+        float  color[4] = {0, 0, 0, 0};
+
+        if (!densityGrid) {
+            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+
+            auto envRadiance = traceEnvironment(wRay, sceneParams);
+
+            color[0] = envRadiance;
+            color[1] = envRadiance;
+            color[2] = envRadiance;
+
+        } else {
+            auto&              densityTree = densityGrid->tree();
+            HeterogenousMedium medium;
+            medium.densityScale = params.volumeDensityScale;
+            medium.densityMin = valueToScalar(densityTree.root().valueMin()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityTree.root().valueMax()) * medium.densityScale;
+            medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
+            medium.transmittanceMethod = params.transmittanceMethod;
+            medium.transmittanceThreshold = params.transmittanceThreshold;
+
+            uint32_t pixelSeed = hash((numAccumulations + 1)) ^ hash(ix, iy);
+
+            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+
+            RayT iRay = wRay.worldToIndexF(*densityGrid);
+
+            const auto densityAcc = densityTree.getAccessor();
+            const auto densitySampler = nanovdb::createSampler<0, decltype(densityAcc), false>(densityAcc);
+
+            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
+
+            float radiance = 0;
+            float pathThroughput = getTransmittance(iRay, densitySampler, medium, pixelSeed);
+
+            if (sceneParams.useBackground && pathThroughput > 0.0f) {
+                float bgIntensity = 0.0f;
                 float groundIntensity = 0.0f;
                 float groundMix = 0.0f;
-
-                if (params.useGround > 0) {
+                if (sceneParams.useGround) {
                     // intersect with ground plane and draw checker if camera is above...
-
-                    float wGroundT = (params.groundHeight - wRayEye[1]) / wRayDir[1];
-
+                    float wGroundT = (sceneParams.groundHeight - wRay.eye()[1]) / wRay.dir()[1];
                     if (wGroundT > 0.f) {
-                        Vec3T wGroundPos = wRayEye + wGroundT * wRayDir;
-                        Vec3T iGroundPos = grid->worldToIndexF(wGroundPos);
+                        Vec3T wGroundPos = wRay(wGroundT);
+                        groundIntensity = evalGroundMaterial(wGroundT, sceneParams.groundFalloff, wGroundPos, wRay.dir()[1], groundMix);
 
-                        rayTraceGround(wGroundT, params.groundFalloff, wGroundPos, wRayDir[1], groundIntensity, groundMix);
-
-                        if (params.useShadows > 0) {
+                        if (sceneParams.useLighting && sceneParams.useShadows) {
+                            Vec3T iGroundPos = densityGrid->worldToIndexF(wGroundPos);
                             RayT  iShadowRay(iGroundPos, iLightDir);
-                            float shadowTransmittance = getTransmittance(iShadowRay, acc, medium, pixelSeed);
+                            float shadowTransmittance = getTransmittance(iShadowRay, densitySampler, medium, pixelSeed);
                             groundIntensity *= shadowTransmittance;
                         }
                     }
                 }
 
-                float skyIntensity = 0.75f + 0.25f * wRayDir[1];
-
-                radiance = radiance + nanovdb::Vec3f(transmittance * ((1.f - groundMix) * skyIntensity + groundMix * groundIntensity));
+                float skyIntensity = evalSkyMaterial(wRay.dir());
+                bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+                radiance += pathThroughput * bgIntensity;
             }
 
-            color[0] += radiance[0];
-            color[1] += radiance[1];
-            color[2] += radiance[2];
+            color[0] += radiance;
+            color[1] += radiance;
+            color[2] += radiance;
         }
 
-        for (int k = 0; k < 3; ++k)
-            color[k] = color[k] / params.samplesPerPixel;
-
-        if (numAccumulations > 1) {
-            float oldLinearPixel[3];
-            if (params.useTonemapping)
-                invTonemapReinhard(oldLinearPixel, outPixel, params.tonemapWhitePoint);
-            else
-                invTonemapPassthru(oldLinearPixel, outPixel);
-            for (int k = 0; k < 3; ++k)
-                color[k] = oldLinearPixel[k] + (color[k] - oldLinearPixel[k]) * (1.0f / numAccumulations);
-        }
-
-        if (params.useTonemapping)
-            tonemapReinhard(outPixel, color, params.tonemapWhitePoint);
-        else
-            tonemapPassthru(outPixel, color);
-        outPixel[3] = 1.0;
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
     }
 };
 }

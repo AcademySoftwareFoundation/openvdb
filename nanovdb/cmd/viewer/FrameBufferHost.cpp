@@ -67,7 +67,7 @@ bool FrameBufferHost::cleanup()
 
 bool FrameBufferHost::setup(int w, int h, InternalFormat format)
 {
-    mElementSize = getElementSizeForFormat(format);
+    mElementSize = formatGetElementSize(format);
     mWidth = w;
     mHeight = h;
     mSize = w * h * mElementSize;

@@ -29,7 +29,8 @@
 BatchRenderer::BatchRenderer(const RendererParams& params)
     : RendererBase(params)
 {
-    mParams.mUseAccumulation = false;
+    mParams.mUseAccumulation = true;
+    mPendingSceneFrame = params.mFrameStart;
 }
 
 bool initializeEGL(const RendererParams& params, void** glContext, void** glDisplay)
@@ -146,13 +147,17 @@ void BatchRenderer::open()
     mFrameBuffer.reset(new FrameBufferHost());
 #endif
 
-    resize(mParams.mWidth, mParams.mHeight);
-
-    printHelp();
+    resizeFrameBuffer(mParams.mWidth, mParams.mHeight);
+    resetCamera();
 }
 
 void BatchRenderer::run()
 {
+    if (mSelectedSceneNodeIndex < 0) {
+        logError("Nothing to render");
+        return;
+    }
+
     int breakWidth = 80;
 
     auto printBreak = [breakWidth] {
@@ -162,46 +167,75 @@ void BatchRenderer::run()
         std::cout.fill(' ');
     };
 
-    mFrame = 0;
-
-    bool isSingleFrame = (mParams.mFrameCount <= 0);
+    bool isSingleFrame = (mParams.mFrameEnd <= mParams.mFrameStart);
     bool isComputingPSNR = (!mParams.mGoldPrefix.empty());
 
     FrameBufferHost goldImageBuffer;
 
     auto loadGoldImage = [&](int frame) -> bool {
-        std::stringstream ss;
-        if (!isSingleFrame) {
-            ss << mParams.mGoldPrefix << '.' << std::setfill('0') << std::setw(4) << frame << std::setfill('\0') << ".pfm";
-        } else {
-            ss << mParams.mGoldPrefix << ".pfm";
-        }
-        return goldImageBuffer.load(ss.str().c_str());
+        return goldImageBuffer.load(updateFilePathWithFrame(mParams.mGoldPrefix, frame).c_str(), "pfm");
     };
 
-    int   count = (isSingleFrame) ? 1 : mParams.mFrameCount;
+    std::stringstream ss;
+    if (isSingleFrame) {
+        ss << "Rendering frame " << mParams.mFrameStart;
+    } else {
+        ss << "Rendering frames " << mParams.mFrameStart << " - " << mParams.mFrameEnd;
+    }
+    if (mParams.mOutputFilePath.length()) {
+        ss << " to " << mParams.mOutputFilePath;
+        if (mParams.mOutputExtension.length()) {
+            ss << " as " << mParams.mOutputExtension;
+        }
+    }
+    logInfo(ss.str());
+
+    int   count = (isSingleFrame) ? 1 : (mParams.mFrameEnd - mParams.mFrameStart + 1);
     float totalDuration = 0;
     float totalPSNR = 0;
+    int   frame = mParams.mFrameStart;
 
-    for (int i = 0; i < count; ++i) {
-        if (mRenderGroupIndex < mGridGroups.size()) {
-            auto group = mGridGroups[mRenderGroupIndex];
-            setGridIndex(mRenderGroupIndex, ++group->mCurrentGridIndex);
+    // go to the first frame and ensure it is loaded to get the bounds.
+    // we use this for the bounds for resetCamera.
+    setSceneFrame(mParams.mFrameStart);
+
+    bool hasError = !updateNodeAttachmentRequests(mSceneNodes[mSelectedSceneNodeIndex], true, mIsDumpingLog);
+    if (hasError) {
+        logError("Some assets have errors. Unable to render frame " + std::to_string(frame) + "; bad asset");
+        return;
+    }
+
+    // reset the camera to home.
+    // TODO: we should allow setting the camera in the command-line arguments.
+    resetCamera();
+
+    for (; frame <= mParams.mFrameEnd; ++frame) {
+        setSceneFrame(frame);
+
+        hasError = !updateNodeAttachmentRequests(mSceneNodes[mSelectedSceneNodeIndex], true, mIsDumpingLog);
+        if (hasError) {
+            logError("Unable to render frame " + std::to_string(frame) + "; bad asset");
+            break;
         }
 
-        render(mFrame);
+        updateScene();
+
+        for (int i=(mParams.mUseAccumulation)?mParams.mMaxProgressiveSamples:1;i>0;--i) {
+            render(frame);
+        }
+
         float renderDuration = mRenderStats.mDuration;
 
         float renderPSNR = -1;
         if (isComputingPSNR) {
-            if (loadGoldImage(mFrame)) {
+            if (loadGoldImage(frame)) {
                 renderPSNR = computePSNR(goldImageBuffer);
             }
         }
 
         printBreak();
         if (!isSingleFrame) {
-            std::cout << "Frame    : " << mFrame << "/" << count << std::endl;
+            std::cout << "Frame    : " << frame << std::endl;
         }
         std::cout << "Duration : " << renderDuration << " ms" << std::endl;
         if (isComputingPSNR) {
@@ -210,11 +244,21 @@ void BatchRenderer::run()
 
         renderViewOverlay();
 
-        saveFrameBuffer(!isSingleFrame, mFrame);
+        if (mParams.mOutputFilePath.empty() == false) {
+            hasError = (saveFrameBuffer(frame) == false);
+            if (hasError) {
+                break;
+            }
+        }
 
-        ++mFrame;
         totalDuration += renderDuration;
         totalPSNR += renderPSNR;
+    }
+
+    if (hasError == false) {
+        logInfo("Rendering complete.");
+    } else {
+        logError("Rendering failed.");
     }
 
     if (!isSingleFrame) {

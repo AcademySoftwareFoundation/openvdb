@@ -348,6 +348,9 @@ TEST_F(TestOpenVDB, Grid)
 
 } // Grid
 
+// The unit-test below is disabled because it has been replaced by the OpenToNanoVDB
+// class and hence is out of date and ultimately irrelevant
+/*
 TEST_F(TestOpenVDB, Conversion)
 {
     using SrcGridT = openvdb::FloatGrid;
@@ -949,10 +952,11 @@ TEST_F(TestOpenVDB, Conversion)
             auto dstAcc = dstGrid->getAccessor();
             auto srcAcc = srcGrid->getUnsafeAccessor(); // not registered
             for (auto it = bbox.begin(); it; ++it) {
+                const nanovdb::Coord ijk(it->data());
                 DstGridT::ValueType srcV = srcAcc.getValue(*it), dstV;
                 EXPECT_EQ(srcV, dstAcc.getValue(*it));
-                EXPECT_EQ(srcAcc.isValueOn(*it), dstAcc.isActive(*it));
-                EXPECT_EQ(srcAcc.isValueOn(*it), dstAcc.probeValue(*it, dstV));
+                EXPECT_EQ(srcAcc.isValueOn(*it), dstAcc.isActive(ijk));
+                EXPECT_EQ(srcAcc.isValueOn(*it), dstAcc.probeValue(ijk, dstV));
                 EXPECT_EQ(srcV, dstV);
             }
         };
@@ -960,7 +964,7 @@ TEST_F(TestOpenVDB, Conversion)
     }
     mTimer.stop();
 } // Conversion
-
+*/
 TEST_F(TestOpenVDB, OpenToNanoVDB)
 {
     auto srcGrid = this->getSrcGrid();

@@ -9,6 +9,7 @@
 #include <algorithm> // for std::is_sorted
 #define _USE_MATH_DEFINES
 #include <cmath>
+#include <cstdlib> 
 
 #include "gtest/gtest.h"
 
@@ -647,6 +648,31 @@ TEST_F(TestNanoVDB, Extrema)
         EXPECT_EQ(nanovdb::Vec3f(1.0f, 1.0f, 1.0f), e.max());
     }
 }
+
+TEST_F(TestNanoVDB, RayEmptyBBox)
+{
+    using RealT = float;
+    using Vec3T = nanovdb::Vec3<RealT>;
+    using CoordT = nanovdb::Coord;
+    using CoordBBoxT = nanovdb::BBox<CoordT>;
+    using BBoxT = nanovdb::BBox<Vec3T>;
+    using RayT = nanovdb::Ray<RealT>;
+
+    // test bbox clip
+    const Vec3T dir(1.0, 0.0, 0.0);
+    const Vec3T eye(-1.0, 0.5, 0.5);
+    RealT       t0 = 0.0, t1 = 10000.0;
+    RayT        ray(eye, dir, t0, t1);
+    
+    const CoordBBoxT bbox1;
+    EXPECT_TRUE(bbox1.empty());
+    EXPECT_FALSE(ray.intersects(bbox1, t0, t1));
+
+    const BBoxT bbox2;
+    EXPECT_TRUE(bbox2.empty());
+    EXPECT_FALSE(ray.intersects(bbox2, t0, t1));
+}
+
 TEST_F(TestNanoVDB, RayBasic)
 {
     using RealT = float;
@@ -2498,7 +2524,71 @@ TEST_F(TestNanoVDB, GridValidator)
     EXPECT_FALSE(nanovdb::isValid(*grid, true, false));
 } // GridValidator
 
-TEST_F(TestNanoVDB, ReadAccessor)
+TEST_F(TestNanoVDB, RandomReadAccessor)
+{
+    const float background = 0.0f;
+    const int voxelCount = 512, min = -10000, max = 10000;
+    std::srand(98765);
+    auto op = [&](){return rand() % (max - min) + min;};
+
+    for (int i=0; i<10; ++i) {
+        nanovdb::GridBuilder<float> builder(background);
+        auto acc = builder.getAccessor();
+        std::vector<nanovdb::Coord> voxels(voxelCount);
+        for (int j=0; j<voxelCount; ++j) {
+            auto &ijk = voxels[j];
+            ijk[0] = op();
+            ijk[1] = op();
+            ijk[2] = op();
+            acc.setValue(ijk, 1.0f*j);
+        }
+        auto gridHdl = builder.getHandle<>();
+        EXPECT_TRUE(gridHdl);
+        auto grid = gridHdl.grid<float>();
+        EXPECT_TRUE(grid);
+        const auto &root = grid->tree().root();
+#if 1
+        auto acc0a = nanovdb::createAccessor<>(root);// no node caching
+        auto acc1a = nanovdb::createAccessor<0>(root);// cache leaf node only
+        auto acc1b = nanovdb::createAccessor<1>(root);// cache lower internal node only
+        auto acc1c = nanovdb::createAccessor<2>(root);// cache upper internal node only
+        auto acc2a = nanovdb::createAccessor<0, 1>(root);// cache leaf and lower internal nodes
+        auto acc2b = nanovdb::createAccessor<1, 2>(root);// cache lower and upper internal nodes
+        auto acc2c = nanovdb::createAccessor<0, 2>(root);// cache leaf and upper internal nodes
+        auto acc3a = nanovdb::createAccessor<0, 1, 2>(root);// cache leaf and both intern node levels
+        auto acc3b = root.getAccessor();// same as the one above where all levels are cached
+        auto acc3c = nanovdb::DefaultReadAccessor<float>(root);// same as the one above where all levels are cached
+#else
+        // Alternative (more verbose) way to create accessors
+        auto acc0a = nanovdb::ReadAccessor<float>(root);// no node caching
+        auto acc1a = nanovdb::ReadAccessor<float, 0>(root);// cache leaf node only
+        auto acc1b = nanovdb::ReadAccessor<float, 1>(root);// cache lower internal node only
+        auto acc1c = nanovdb::ReadAccessor<float, 2>(root);// cache upper internal node only
+        auto acc2a = nanovdb::ReadAccessor<float, 0, 1>(root);// cache leaf and lower internal nodes
+        auto acc2b = nanovdb::ReadAccessor<float, 1, 2>(root);// cache lower and upper internal nodes
+        auto acc2c = nanovdb::ReadAccessor<float, 0, 2>(root);// cache leaf and upper internal nodes
+        auto acc3a = nanovdb::ReadAccessor<float, 0, 1, 2>(root);// cache leaf and both intern node levels
+        auto acc3b = nanovdb::DefaultReadAccessor<float>(root);// same as the one above where all levels are cached
+#endif
+        for (int j=0; j<voxelCount; ++j) {
+            const float v = 1.0f * j;
+            const auto &ijk = voxels[j];
+            //if (j<5) std::cerr << ijk << std::endl;
+            EXPECT_EQ( v, acc0a.getValue(ijk) );
+            EXPECT_EQ( v, acc1a.getValue(ijk) );
+            EXPECT_EQ( v, acc1b.getValue(ijk) );
+            EXPECT_EQ( v, acc1c.getValue(ijk) );
+            EXPECT_EQ( v, acc2a.getValue(ijk) );
+            EXPECT_EQ( v, acc2b.getValue(ijk) );
+            EXPECT_EQ( v, acc2c.getValue(ijk) );
+            EXPECT_EQ( v, acc3a.getValue(ijk) );
+            EXPECT_EQ( v, acc3b.getValue(ijk) );
+            EXPECT_EQ( v, acc3c.getValue(ijk) );
+        }
+    }
+}
+
+TEST_F(TestNanoVDB, StandardDeviation)
 {
     nanovdb::GridBuilder<float> builder(0.5f);
 
@@ -2517,28 +2607,18 @@ TEST_F(TestNanoVDB, ReadAccessor)
     nanovdb::gridStats(*grid);
 
     auto acc  = grid->tree().getAccessor();
-    auto acc3 = nanovdb::createAccessor<>(*grid);
-    auto acc0 = nanovdb::createAccessor<0>(*grid);
     {
         EXPECT_EQ( 1.0f,  acc.getValue(nanovdb::Coord(-1)) );
         EXPECT_EQ( 2.0f,  acc.getValue(nanovdb::Coord( 0)) );
         EXPECT_EQ( 3.0f,  acc.getValue(nanovdb::Coord( 1)) );
         EXPECT_EQ( 0.0f,  acc.getValue(nanovdb::Coord( 2)) );
-        EXPECT_EQ( 1.0f, acc3.getValue(nanovdb::Coord(-1)) );
-        EXPECT_EQ( 2.0f, acc3.getValue(nanovdb::Coord( 0)) );
-        EXPECT_EQ( 3.0f, acc3.getValue(nanovdb::Coord( 1)) );
-        EXPECT_EQ( 0.0f, acc3.getValue(nanovdb::Coord( 2)) );
-        EXPECT_EQ( 1.0f, acc0.getValue(nanovdb::Coord(-1)) );
-        EXPECT_EQ( 2.0f, acc0.getValue(nanovdb::Coord( 0)) );
-        EXPECT_EQ( 3.0f, acc0.getValue(nanovdb::Coord( 1)) );
-        EXPECT_EQ( 0.0f, acc0.getValue(nanovdb::Coord( 2)) );
-        auto nodeInfo = acc3.getNodeInfo(nanovdb::Coord(-1));
+        auto nodeInfo = acc.getNodeInfo(nanovdb::Coord(-1));
         EXPECT_EQ(nodeInfo.mAverage, 1.f);
         EXPECT_EQ(nodeInfo.mLevel, 0u);
         EXPECT_EQ(nodeInfo.mDim, 8u);
     }
     {
-        auto nodeInfo = acc3.getNodeInfo(nanovdb::Coord(1));
+        auto nodeInfo = acc.getNodeInfo(nanovdb::Coord(1));
         EXPECT_EQ(nodeInfo.mAverage, (2.0f + 3.0f) / 3.0f);
         auto getStdDev = [&](int n, float a, float b, float c) {
             float m = (a + b + c) / n;

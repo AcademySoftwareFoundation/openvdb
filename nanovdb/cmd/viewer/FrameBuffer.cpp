@@ -17,10 +17,16 @@
 #include <string>
 #include <iomanip>
 #include <cmath>
+#include <vector>
+#include <cstring>
+#include <algorithm>
+
+#define STB_IMAGE_WRITE_IMPLEMENTATION
+#include <stb/stb_image_write.h>
 
 // Save a PFM file.
 // http://netpbm.sourceforge.net/doc/pfm.html
-static bool savePFM(const float* buffer, int width, int height, FrameBufferBase::InternalFormat format, const char* filePath)
+static bool savePFM(const float* buffer, int numComponents, int width, int height, const char* filePath)
 {
     std::fstream file(filePath, std::ios::out | std::ios::binary);
     if (!file.is_open()) {
@@ -34,28 +40,8 @@ static bool savePFM(const float* buffer, int width, int height, FrameBufferBase:
         return result;
     };
 
-    int numComponents = 0;
-
-    switch (format) {
-    case FrameBufferBase::InternalFormat::DEPTH_COMPONENT32F:
-    case FrameBufferBase::InternalFormat::DEPTH_COMPONENT32:
-    case FrameBufferBase::InternalFormat::R32F:
-        numComponents = 1;
-        break;
-    case FrameBufferBase::InternalFormat::RGBA32F:
-        numComponents = 4;
-        break;
-    case FrameBufferBase::InternalFormat::RGB32F:
-        numComponents = 3;
-    case FrameBufferBase::InternalFormat::RGBA8UI:
-        numComponents = 4;
-        break;
-    default:
-        numComponents = 0;
-    }
-
     if (numComponents == 0) {
-        std::cerr << "Unable to save PFM file due to unrecognized type: " << (int)format << std::endl;
+        std::cerr << "Unable to save PFM file due to invalid number of components: " << (int)numComponents << std::endl;
         return false;
     }
 
@@ -66,13 +52,6 @@ static bool savePFM(const float* buffer, int width, int height, FrameBufferBase:
     float scale = 1.0f;
     if (isLittleEndian())
         scale = -scale;
-    /*
-    auto applyColorProfile = [](float x) -> float {
-        return (x <= 0.04045f)
-                   ? (x / 12.92f)
-                   : (powf((x + 0.055f) / 1.055f, 2.4f));
-    };
-    */
     file << method << "\n"
          << width << "\n"
          << height << "\n"
@@ -90,12 +69,7 @@ static bool savePFM(const float* buffer, int width, int height, FrameBufferBase:
             for (int x = 0; x < width; ++x) {
                 float v0 = buffer[(x + y * width) * numComponents + 0];
                 float v1 = buffer[(x + y * width) * numComponents + 1];
-                float v2 = buffer[(x + y * width) * numComponents + 2];
-#if 0
-                v0 = applyColorProfile(v0);
-                v1 = applyColorProfile(v1);
-                v2 = applyColorProfile(v2);
-#endif
+                float v2 = (numComponents <= 2) ? 0.f : buffer[(x + y * width) * numComponents + 2];
                 file.write((char*)&v0, sizeof(float));
                 file.write((char*)&v1, sizeof(float));
                 file.write((char*)&v2, sizeof(float));
@@ -108,7 +82,7 @@ static bool savePFM(const float* buffer, int width, int height, FrameBufferBase:
 
 // Load a PFM file.
 // http://netpbm.sourceforge.net/doc/pfm.html
-static bool loadPFM(const char* filePath, FrameBufferBase::InternalFormat format, int& outWidth, int& outHeight, float* buffer)
+static bool loadPFM(const char* filePath, int numComponents, int& outWidth, int& outHeight, float* buffer)
 {
     std::fstream file(filePath, std::ios::in | std::ios::binary);
     if (!file.is_open()) {
@@ -121,35 +95,10 @@ static bool loadPFM(const char* filePath, FrameBufferBase::InternalFormat format
         static bool result = reinterpret_cast<uint8_t*>(&x)[0] == 1;
         return result;
     };
-    
-    auto applyColorProfile = [](float x) -> float {
-        return (x <= 0.0031308f)
-                   ? (12.92f * x)
-                   : (1.055f * powf(x, 1.0f / 2.4f) - 0.055f);
-    };
     */
-    int numComponents = 0;
-
-    switch (format) {
-    case FrameBufferBase::InternalFormat::DEPTH_COMPONENT32F:
-    case FrameBufferBase::InternalFormat::DEPTH_COMPONENT32:
-    case FrameBufferBase::InternalFormat::R32F:
-        numComponents = 1;
-        break;
-    case FrameBufferBase::InternalFormat::RGBA32F:
-        numComponents = 4;
-        break;
-    case FrameBufferBase::InternalFormat::RGB32F:
-        numComponents = 3;
-    case FrameBufferBase::InternalFormat::RGBA8UI:
-        numComponents = 4;
-        break;
-    default:
-        numComponents = 0;
-    }
 
     if (numComponents == 0) {
-        std::cerr << "Unable to load PFM file due to unrecognized type: " << (int)format << std::endl;
+        std::cerr << "Unable to load PFM file due to invalid number of components: " << (int)numComponents << std::endl;
         return false;
     }
 
@@ -185,14 +134,10 @@ static bool loadPFM(const char* filePath, FrameBufferBase::InternalFormat format
                     file.read((char*)&v0, sizeof(float));
                     file.read((char*)&v1, sizeof(float));
                     file.read((char*)&v2, sizeof(float));
-#if 0
-                    v0 = applyColorProfile(v0);
-                    v1 = applyColorProfile(v1);
-                    v2 = applyColorProfile(v2);
-#endif
                     buffer[(x + y * srcWidth) * numComponents + 0] = v0;
                     buffer[(x + y * srcWidth) * numComponents + 1] = v1;
-                    buffer[(x + y * srcWidth) * numComponents + 2] = v2;
+                    if (numComponents > 2)
+                        buffer[(x + y * srcWidth) * numComponents + 2] = v2;
                 }
             }
         }
@@ -204,32 +149,107 @@ static bool loadPFM(const char* filePath, FrameBufferBase::InternalFormat format
     return true;
 }
 
-bool FrameBufferBase::save(const char* filename)
+bool FrameBufferBase::save(const char* filename, const char* fileformat, int quality)
 {
     auto buffer = map(AccessType::READ_ONLY);
     if (!buffer)
         return false;
-    std::cout << "Saving framebuffer(" << mWidth << "x" << mHeight << ") to file: " << filename << " ..." << std::endl;
-    savePFM((const float*)buffer, mWidth, mHeight, mInternalFormat, filename);
-    unmap();
-    return true;
+    //std::cout << "Saving framebuffer(" << mWidth << "x" << mHeight << ") to file: " << filename << " ..." << std::endl;
+
+    std::string fn(filename);
+    std::string ext(fileformat);
+
+    bool targetIsFloat = false;
+    if (ext == "pfm" || ext == "hdr") {
+        targetIsFloat = true;
+    }
+
+    int                  numComponents = formatGetNumComponents(mInternalFormat);
+    int                  typeSize = formatGetElementSize(mInternalFormat) / numComponents;
+    std::vector<uint8_t> tmpBuffer;
+
+    void* srcBuffer = buffer;
+
+    auto byteToFloatFn = [](uint8_t in) -> float { return in / 255.f; };
+    auto floatToByteFn = [](float in) -> uint8_t { return std::min(255, int(in * 255)); };
+
+    if (targetIsFloat == false && formatIsFloat(mInternalFormat)) {
+        tmpBuffer.resize(sizeof(uint8_t) * mWidth * mHeight * numComponents);
+        for (int y = 0; y < mHeight; ++y) {
+            auto* src = ((const float*)buffer) + ((mHeight - 1) - y) * mWidth * numComponents;
+            auto* dst = ((uint8_t*)tmpBuffer.data()) + y * mWidth * numComponents;
+            for (int i = 0; i < mWidth * numComponents; ++i) {
+                dst[i] = floatToByteFn(src[i]);
+            }
+        }
+        srcBuffer = tmpBuffer.data();
+    } else if (targetIsFloat == true && formatIsFloat(mInternalFormat) == false) {
+        tmpBuffer.resize(sizeof(float) * mWidth * mHeight * numComponents);
+        for (int y = 0; y < mHeight; ++y) {
+            auto* src = ((const uint8_t*)buffer) + ((mHeight - 1) - y) * mWidth * numComponents;
+            auto* dst = ((float*)tmpBuffer.data()) + y * mWidth * numComponents;
+            for (int i = 0; i < mWidth * numComponents; ++i) {
+                dst[i] = byteToFloatFn(src[i]);
+            }
+        }
+        srcBuffer = tmpBuffer.data();
+    } else {
+        // no type conversion.
+        tmpBuffer.resize(typeSize * mWidth * mHeight * numComponents);
+        for (int y = 0; y < mHeight; ++y) {
+            auto* src = ((const uint8_t*)buffer) + ((mHeight - 1) - y) * mWidth * numComponents * typeSize;
+            auto* dst = ((uint8_t*)tmpBuffer.data()) + y * mWidth * numComponents * typeSize;
+            std::memcpy(dst, src, typeSize * numComponents * mWidth);
+        }
+        srcBuffer = tmpBuffer.data();
+    }
+
+    if (srcBuffer != buffer)
+        unmap();
+
+    bool hasError = false;
+
+    if (ext == "pfm") {
+        savePFM((const float*)srcBuffer, numComponents, mWidth, mHeight, filename);
+    } else if (ext == "hdr") {
+        stbi_write_hdr(fn.c_str(), mWidth, mHeight, numComponents, (const float*)srcBuffer);
+    } else if (ext == "png") {
+        stbi_write_png(fn.c_str(), mWidth, mHeight, numComponents, srcBuffer, mWidth * numComponents);
+    } else if (ext == "bmp") {
+        stbi_write_bmp(fn.c_str(), mWidth, mHeight, numComponents, srcBuffer);
+    } else if (ext == "tga") {
+        stbi_write_tga(fn.c_str(), mWidth, mHeight, numComponents, srcBuffer);
+    } else if (ext == "jpg") {
+        stbi_write_jpg(fn.c_str(), mWidth, mHeight, numComponents, srcBuffer, quality);
+    } else {
+        hasError = true;
+    }
+
+    if (srcBuffer == buffer)
+        unmap();
+    return hasError == false;
 }
 
-bool FrameBufferBase::load(const char* filename)
+bool FrameBufferBase::load(const char* filename, const char* fileformat)
 {
-    std::cout << "Loading framebuffer from file: " << filename << " ..." << std::endl;
+    std::string ext(fileformat);
 
-    int w, h;
-    if (loadPFM(filename, InternalFormat::RGBA32F, w, h, nullptr)) {
-        bool rc = setup(w, h, InternalFormat::RGBA32F);
-        if (rc) {
-            auto buffer = map(AccessType::WRITE_ONLY);
-            if (!buffer)
-                return false;
+    // TODO: only pfm support at the momemt. support other formats.
+    
+    if(ext == "pfm") {
+        int numComponents = formatGetNumComponents(InternalFormat::RGBA32F);
+        int w, h;
+        if (loadPFM(filename, numComponents, w, h, nullptr)) {
+            bool rc = setup(w, h, InternalFormat::RGBA32F);
+            if (rc) {
+                auto buffer = map(AccessType::WRITE_ONLY);
+                if (!buffer)
+                    return false;
 
-            loadPFM(filename, InternalFormat::RGBA32F, w, h, (float*)buffer);
-            unmap();
-            return true;
+                loadPFM(filename, numComponents, w, h, (float*)buffer);
+                unmap();
+                return true;
+            }
         }
     }
     return false;

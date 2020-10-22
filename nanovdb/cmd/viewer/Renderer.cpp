@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-	\file RendererBase.cpp
+	\file Renderer.cpp
 
 	\author Wil Braithwaite
 
@@ -12,6 +12,7 @@
 */
 
 #define _USE_MATH_DEFINES
+#include <cstring>
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -19,66 +20,25 @@
 #include <cassert>
 #include <chrono>
 #include <cmath>
+#include <unordered_set>
 
+#include "StringUtils.h"
 #include "Renderer.h"
 #include "RenderLauncher.h"
 
-#include <nanovdb/util/IO.h> // for NanoVDB file import
-#include <nanovdb/util/GridBuilder.h>
-#if defined(NANOVDB_USE_OPENVDB)
-#include <nanovdb/util/OpenToNanoVDB.h>
-#endif
-
-static nanovdb::GridHandle<> createInternalGrid(std::string internalName)
-{
-    if (internalName == "ls_sphere_100") {
-        return nanovdb::createLevelSetSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "ls_torus_100") {
-        return nanovdb::createLevelSetTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "ls_box_100") {
-        return nanovdb::createLevelSetBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "fog_sphere_100") {
-        return nanovdb::createFogVolumeSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "fog_torus_100") {
-        return nanovdb::createFogVolumeTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "fog_box_100") {
-        return nanovdb::createFogVolumeBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "points_sphere_100") {
-        return nanovdb::createPointSphere(1, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "points_torus_100") {
-        return nanovdb::createPointTorus(1, 100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "points_box_100") {
-        return nanovdb::createPointBox(1, 100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), internalName);
-    } else if (internalName == "ls_bbox_100") {
-        return nanovdb::createLevelSetBBox(100.0f, 100.0f, 100.0f, 10.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), internalName);
-    } else {
-        return nanovdb::GridHandle<>();
-    }
-}
-
 RendererParams::RendererParams()
 {
-    mOptions.useLighting = 1;
-    mOptions.useGround = 1;
-    mOptions.useOcclusion = 0;
-    mOptions.useShadows = 1;
-    mOptions.useGroundReflections = 0;
-    mOptions.samplesPerPixel = 1;
-    mOptions.volumeDensity = 0.5f;
-    mOptions.tonemapWhitePoint = 1.5f;
-    mOptions.useTonemapping = true;
+    mSceneParameters = makeSceneRenderParameters();
 }
 
 RendererBase::RendererBase(const RendererParams& params)
     : mParams(params)
 {
-#if defined(NANOVDB_USE_OPENVDB)
-    openvdb::initialize();
-#endif
+    mGridManager.initialize();
 
     setRenderPlatform(0);
 
-    mFrame = 0;
+    mPendingSceneFrame = 0;
 }
 
 void RendererBase::close()
@@ -113,143 +73,348 @@ void RendererBase::renderViewOverlay()
 {
 }
 
-void RendererBase::resize(int width, int height)
+void RendererBase::resizeFrameBuffer(int width, int height)
 {
     mFrameBuffer->setup(width, height, FrameBufferBase::InternalFormat::RGBA32F);
     resetAccumulationBuffer();
 }
 
-void RendererBase::addGrid(std::string groupName, std::string fileName)
+SceneNode::Ptr RendererBase::ensureSceneNode(const std::string& nodeName)
 {
-    if (fileName.find("internal://", 0) != std::string::npos) {
-        groupName = "__internal";
+    if (nodeName.empty())
+        return nullptr;
+
+    SceneNode::Ptr sceneNode = nullptr;
+
+    // find existing sceneNode...
+    for (auto& it : mSceneNodes) {
+        if (it->mName == nodeName) {
+            sceneNode = it;
+        }
     }
 
-    if (groupName == "__internal") {
-        auto internalGridName = fileName;
-        if (fileName.find("internal://", 0) != std::string::npos) {
-            internalGridName = fileName.substr(11);
+    if (!sceneNode) {
+        logInfo("Creating sceneNode[" + nodeName + "]");
+
+        sceneNode = std::make_shared<SceneNode>();
+        sceneNode->mMaterialClass = mParams.mMaterialOverride;
+        sceneNode->mName = nodeName;
+        sceneNode->mIndex = mSceneNodes.size();
+        sceneNode->mMaterialParameters = makeMaterialParameters();
+        mSceneNodes.push_back(sceneNode);
+
+        // we currently only support 2 grid attachments.
+        // if more are needed, then add them here.
+        static constexpr int kMaxAttachments = 2;
+
+        for (int i = 0; i < kMaxAttachments; ++i) {
+            auto attachment = std::make_shared<SceneNodeGridAttachment>();
+            attachment->mStatus = GridManager::AssetGridStatus::kUnknown;
+            attachment->mIndex = i;
+            sceneNode->mAttachments.push_back(attachment);
         }
-        addGrid(groupName, groupName, internalGridName);
-    } else if (fileName.substr(fileName.find_last_of(".") + 1) == "vdb") {
-#if defined(NANOVDB_USE_OPENVDB)
-        openvdb::io::File file(fileName);
-        file.open(true);
-        auto grids = file.getGrids();
-        for (auto& grid : *grids) {
-            addGrid(groupName, fileName, grid->getName());
-        }
-#else
-        throw std::runtime_error("OpenVDB is not supported in this build. Please recompile with OpenVDB support.");
-#endif
-    } else {
-        // load all the grids in the file...
-        auto list = nanovdb::io::readGridMetaData(fileName);
-        for (auto& m : list)
-            addGrid(groupName, fileName, m.gridName);
     }
+
+    // if no nodes are selected, then select this.
+    // this will make the viewer to show the first created node by default.
+    if (mSelectedSceneNodeIndex < 0)
+        mSelectedSceneNodeIndex = mSceneNodes.size() - 1;
+
+    return sceneNode;
 }
 
-void RendererBase::addGrid(std::string groupName, std::string fileName, std::string gridName)
+SceneNode::Ptr RendererBase::findNode(const std::string& name)
 {
-    // check it is not already resident!
-    std::shared_ptr<GridGroup> group = nullptr;
-    for (auto& it : mGridGroups) {
-        if (it->mName == groupName) {
-            group = it;
+    for (int i = 0; i < mSceneNodes.size(); ++i) {
+        if (mSceneNodes[i]->mName == name) {
+            return mSceneNodes[i];
         }
     }
+    return nullptr;
+}
 
-    if (!group) {
-        group = std::make_shared<GridGroup>();
-        group->mRenderMethod = RenderMethod::AUTO;
-        group->mName = groupName;
-        mGridGroups.push_back(group);
-        //std::cout << "Creating group[" << groupName << "]" << std::endl;
+std::string RendererBase::nextUniqueNodeId(const std::string& name)
+{
+    // find name in the scene graph
+    int  index = 0;
+    auto prefix = name;
+    if (prefix.empty())
+        prefix = "node";
+    std::ostringstream ss(prefix);
+    while (findNode(ss.str())) {
+        // add index to name...
+        ss.str("");
+        ss.clear();
+        ss << prefix << index++;
+    }
+    return ss.str();
+}
 
-    } else {
-        for (auto& it : group->mInstances) {
-            if (it->mFileName == fileName && it->mGridName == gridName) {
-                throw std::runtime_error("Grid already loaded.");
+GridManager::AssetGridStatus RendererBase::updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNode::Ptr sceneNode, SceneNodeGridAttachment::Ptr attachment)
+{
+    bool isBlocking = false;
+
+    auto assetUrl = attachment->mAssetUrl;
+    if (!assetUrl)
+        return GridManager::AssetGridStatus::kUnknown;
+
+    auto assetIt = residentAssetMap.find(url);
+    if (assetIt == residentAssetMap.end()) {
+        return GridManager::AssetGridStatus::kUnknown;
+    }
+
+    // if we got this far then the asset exists.
+    // we need to check the asset contains the grid-asset...
+
+    auto assetInfo = assetIt->second;
+    if (assetInfo.first) {
+        // the asset had an error.
+        return GridManager::AssetGridStatus::kError;
+    }
+
+    auto gridName = assetUrl.gridName();
+    if (gridName.empty() && assetInfo.second.size() > 0)
+        gridName = assetInfo.second.begin()->first;
+
+    // if sceneNode gridname is specified, then find status of this asset & grid...
+    GridManager::AssetGridStatus gridStatus = GridManager::AssetGridStatus::kUnknown;
+
+    auto git = assetInfo.second.find(gridName);
+    if (git != assetInfo.second.end())
+        gridStatus = git->second;
+
+    return gridStatus;
+}
+
+bool RendererBase::updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSyncing, bool isPrinting, bool* isSelectedNodePending)
+{
+    if (!node)
+        return false;
+
+    // collect the latest resident assets and grids.
+    auto residentAssetMap = mGridManager.getGridNameStatusInfo();
+
+    bool hasErrors = false;
+
+    // build request-list for selected nodes' attachments...
+    std::vector<std::tuple<std::string, std::string>> urlRequests;
+
+    for (auto& attachment : node->mAttachments) {
+        auto assetUrl = attachment->mAssetUrl;
+        if (!assetUrl)
+            continue;
+
+        auto url = attachment->mAssetUrl.updateUrlWithFrame(mPendingSceneFrame);
+        auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, node, attachment);
+        updateAttachment(node, attachment.get(), url, assetUrl.gridName(), gridAssetStatus);
+
+        // we ignore any assets that have errored or loaded, so we don't keep trying every frame.
+        // NOTE: to reload an asset which has errored, we must remove the asset from the gridmanager.
+        if (gridAssetStatus == GridManager::AssetGridStatus::kUnknown) {
+            urlRequests.push_back({url, assetUrl.gridName()});
+        }
+
+        hasErrors |= (gridAssetStatus == GridManager::AssetGridStatus::kError);
+    }
+
+    if (isSelectedNodePending && urlRequests.size())
+        *isSelectedNodePending = true;
+
+    // submit selected nodes' attachment requests...
+    for (auto& request : urlRequests) {
+        mGridManager.addGrid(std::get<0>(request), std::get<1>(request));
+    }
+
+    if (isSyncing) {
+        do {
+            updateEventLog(isPrinting);
+
+            // we collect the latest resident assets and grids.
+            auto residentAssetMap = mGridManager.getGridNameStatusInfo();
+
+            // for each node, update the attachments...
+            for (auto& attachment : node->mAttachments) {
+                auto assetUrl = attachment->mAssetUrl;
+                if (!assetUrl)
+                    continue;
+
+                auto url = assetUrl.updateUrlWithFrame(mPendingSceneFrame);
+                auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, node, attachment);
+                hasErrors |= (gridAssetStatus == GridManager::AssetGridStatus::kError);
+
+                updateAttachment(node, attachment.get(), url, assetUrl.gridName(), gridAssetStatus);
+            }
+
+        } while (isSyncing && mGridManager.poll()); // optionally loop while any asset requests are in flight...
+    }
+
+    updateEventLog(isPrinting);
+
+    return !hasErrors;
+}
+
+void RendererBase::updateAttachment(SceneNode::Ptr sceneNode, SceneNodeGridAttachment* attachment, const std::string& frameUrl, const std::string& gridName, GridManager::AssetGridStatus gridStatus)
+{
+    attachment->mStatus = gridStatus;
+
+    // update given the asset's status...
+
+    auto gridHdlPtr = std::get<1>(mGridManager.getGrid(frameUrl, gridName));
+    if (!gridHdlPtr || gridStatus != GridManager::AssetGridStatus::kLoaded) {
+        return;
+    }
+
+    // the first time we find a loaded grid instance, we perform setup...
+    if (attachment->mFrameUrl != frameUrl) {
+        // the grid is now ready...
+        // each new frame of this grid may require setup if it has changed.
+
+        resetAccumulationBuffer();
+        /*
+        std::ostringstream ss;
+        ss << "sceneNode[" << sceneNode->mName << "].attachment[" << frameUrl << "#" << gridName << "] is now ready.";
+        logDebug(ss.str());
+*/
+        attachment->mFrameUrl = frameUrl;
+
+        auto& gridHdl = *gridHdlPtr;
+        auto* meta = gridHdl.gridMetaData();
+
+        // update the grid instance's attribute map...
+        if (gridHdl.gridMetaData()->isPointData()) {
+            auto grid = gridHdl.grid<uint32_t>();
+            assert(grid);
+
+            char** names;
+            int    n = grid->blindDataCount();
+            names = new char*[n];
+
+            // set defaults...
+            for (int i = 0; i < (int)nanovdb::GridBlindDataSemantic::End; ++i) {
+                attachment->attributeSemanticMap[i].attribute = -1;
+                attachment->attributeSemanticMap[i].gain = 1.0f;
+                attachment->attributeSemanticMap[i].offset = 0.0f;
+            }
+            attachment->attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius].offset = 0.5f;
+
+            for (int i = 0; i < n; ++i) {
+                auto meta = grid->blindMetaData(i);
+                attachment->attributeSemanticMap[(int)meta.mSemantic].attribute = i;
+                attachment->attributeSemanticMap[(int)meta.mSemantic].gain = 1.0f;
+                attachment->attributeSemanticMap[(int)meta.mSemantic].offset = 0.0f;
+            }
+        }
+
+        attachment->mGridClassOverride = meta->gridClass();
+
+        // this modifies the sceneNode's bounds.
+
+        if (sceneNode->mBounds.empty()) {
+            //std::cout << "initializing sceneNode bounds...\n";
+            if (meta->activeVoxelCount() > 0) {
+                sceneNode->mBounds = meta->worldBBox();
+            }
+        } else {
+            //std::cout << "expanding sceneNode bounds...\n";
+            if (meta->activeVoxelCount() > 0) {
+                sceneNode->mBounds.expand(meta->worldBBox().max());
+                sceneNode->mBounds.expand(meta->worldBBox().min());
             }
         }
     }
+}
 
-    nanovdb::GridHandle<> gridHdl;
+void RendererBase::updateEventLog(bool isPrinting)
+{
+    std::vector<GridManager::EventMessage> eventMessages;
+    mLastEventIndex += mGridManager.getEventMessages(eventMessages, mLastEventIndex);
+    for (int i = 0; i < eventMessages.size(); ++i) {
+        if (isPrinting) {
+            const auto& e = eventMessages[i];
+            if (e.mType == GridManager::EventMessage::Type::kError)
+                std::cout << "[ERR]: ";
+            else if (e.mType == GridManager::EventMessage::Type::kDebug)
+                std::cout << "[DBG]: ";
+            else if (e.mType == GridManager::EventMessage::Type::kWarning)
+                std::cout << "[WRN]: ";
+            else if (e.mType == GridManager::EventMessage::Type::kInfo)
+                std::cout << "[INF]: ";
+            std::cout << e.mMessage << std::endl;
+        }
 
-    if (groupName == "__internal") {
-        auto internalName = gridName;
-        gridHdl = createInternalGrid(internalName);
-    } else if (fileName.substr(fileName.find_last_of(".") + 1) == "vdb") {
-#if defined(NANOVDB_USE_OPENVDB)
-        openvdb::io::File file(fileName);
-        file.open(false); //disable delayed loading
-        auto grid = file.readGrid(gridName);
-        std::cout << "Importing OpenVDB grid[" << grid->getName() << "]...\n";
-        gridHdl = nanovdb::openToNanoVDB(grid);
-#endif
+        mEventMessages.emplace_back(std::move(eventMessages[i]));
+    }
+}
+
+std::string RendererBase::updateFilePathWithFrame(const std::string& url, int frame) const
+{
+    if (url.find('%') != std::string::npos) {
+        std::string tmp = url;
+        char        fileNameBuf[FILENAME_MAX];
+        while (1) {
+            auto pos = tmp.find_last_of('%');
+            if (pos == std::string::npos)
+                break;
+            auto segment = tmp.substr(pos);
+            sprintf(fileNameBuf, segment.c_str(), frame);
+            segment.assign(fileNameBuf);
+            tmp = tmp.substr(0, pos) + segment;
+        }
+        return tmp;
+    }
+    return url;
+}
+
+void RendererBase::logDebug(const std::string& msg)
+{
+    mGridManager.addEventMessage(GridManager::EventMessage{GridManager::EventMessage::Type::kDebug, msg});
+    updateEventLog(true);
+}
+
+void RendererBase::logError(const std::string& msg)
+{
+    mGridManager.addEventMessage(GridManager::EventMessage{GridManager::EventMessage::Type::kError, msg});
+    updateEventLog(true);
+}
+
+void RendererBase::logInfo(const std::string& msg)
+{
+    mGridManager.addEventMessage(GridManager::EventMessage{GridManager::EventMessage::Type::kInfo, msg});
+    updateEventLog(true);
+}
+
+std::string RendererBase::addSceneNode(const std::string& nodeName)
+{
+    auto newName = nextUniqueNodeId(nodeName);
+    ensureSceneNode(newName);
+    return newName;
+}
+
+void RendererBase::setSceneNodeGridAttachment(const std::string& nodeName, int attachmentIndex, const GridAssetUrl& url)
+{
+    auto node = ensureSceneNode(nodeName);
+    if (node) {
+        logInfo(nodeName + " attaching grid: " + url.fullname());
+        if (node->mAttachments[attachmentIndex]->mAssetUrl != url) {
+            node->mAttachments[attachmentIndex]->mAssetUrl = url;
+            node->mAttachments[attachmentIndex]->mStatus = GridManager::AssetGridStatus::kUnknown;
+            node->mAttachments[attachmentIndex]->mFrameUrl = "";
+            node->mAttachments[attachmentIndex]->mGridClassOverride = nanovdb::GridClass::Unknown;
+            // clear the bounds
+            node->mBounds = nanovdb::BBoxR();
+        }
+    }
+}
+
+void RendererBase::addGridAsset(const GridAssetUrl& url)
+{
+    if (url.isSequence()) {
+        // request the pending frame.
+        auto frameUrl = url.updateUrlWithFrame(mPendingSceneFrame);
+        mGridManager.addGrid(frameUrl, url.gridName());
     } else {
-        std::cout << "Importing NanoVDB grid[" << gridName << "]...\n";
-        if (gridName.length() > 0)
-            gridHdl = nanovdb::io::readGrid<>(fileName, gridName);
-        else
-            gridHdl = nanovdb::io::readGrid<>(fileName);
+        mGridManager.addGrid(url.url(), url.gridName());
     }
-
-    if (!gridHdl) {
-        std::stringstream ss;
-        ss << "Unable to read " << gridName << " from " << fileName;
-        throw std::runtime_error(ss.str());
-    }
-
-    auto* meta = gridHdl.gridMetaData();
-
-    auto gridInstance = std::make_shared<GridInstance>();
-
-    // update the grid instance's attribute map...
-    if (gridHdl.gridMetaData()->isPointData()) {
-        auto grid = gridHdl.grid<uint32_t>();
-        assert(grid);
-
-        char** names;
-        int    n = grid->blindDataCount();
-        names = new char*[n];
-
-        // set defaults...
-        for (int i = 0; i < (int)nanovdb::GridBlindDataSemantic::End; ++i) {
-            gridInstance->attributeSemanticMap[i].attribute = -1;
-            gridInstance->attributeSemanticMap[i].gain = 1.0f;
-            gridInstance->attributeSemanticMap[i].offset = 0.0f;
-        }
-        gridInstance->attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius].offset = 0.5f;
-
-        for (int i = 0; i < n; ++i) {
-            auto meta = grid->blindMetaData(i);
-            gridInstance->attributeSemanticMap[(int)meta.mSemantic].attribute = i;
-            gridInstance->attributeSemanticMap[(int)meta.mSemantic].gain = 1.0f;
-            gridInstance->attributeSemanticMap[(int)meta.mSemantic].offset = 0.0f;
-        }
-    }
-
-    gridInstance->mGridHandle = std::move(gridHdl);
-    gridInstance->mFileName = fileName.substr(fileName.find_last_of('/') + 1).substr(fileName.find_last_of('\\') + 1);
-    gridInstance->mFilePath = fileName;
-    gridInstance->mGridName = meta->gridName();
-    gridInstance->mGridClassOverride = meta->gridClass();
-
-    if (meta->activeVoxelCount() > 0) {
-        group->mBounds.expand(meta->worldBBox().max());
-        group->mBounds.expand(meta->worldBBox().min());
-    }
-
-    group->mCurrentGridIndex = int(group->mInstances.size());
-
-    group->mInstances.emplace_back(gridInstance);
-
-    //std::cout << "Added instance[" << fileName << "] to group[" << group->mName << "]" << std::endl;
-
-    setGridIndex(int(mGridGroups.size()) - 1, int(group->mInstances.size()) - 1);
-    resetCamera();
 }
 
 void RendererBase::resetAccumulationBuffer()
@@ -293,101 +458,106 @@ bool RendererBase::CameraState::update()
     return true;
 }
 
-void RendererBase::render(int frame)
+bool RendererBase::render(int frame)
 {
-    if (mGridGroups.size() == 0) {
-        return;
+    if (mSceneNodes.size() == 0) {
+        return false;
     }
 
-    bool hasCameraChanged = updateCamera(frame);
+    auto sceneNode = mSceneNodes[mSelectedSceneNodeIndex];
+    assert(sceneNode->mAttachments.size() >= 0);
+
+    bool hasCameraChanged = updateCamera();
 
     if (hasCameraChanged) {
         resetAccumulationBuffer();
     }
 
-    auto        group = mGridGroups[mRenderGroupIndex];
-    auto        instance = group->mInstances[group->mCurrentGridIndex];
-    const auto& gridHdl = instance->mGridHandle;
+    auto attachment = sceneNode->mAttachments[0];
 
-    size_t gridByteSize = gridHdl.size();
-    assert(gridByteSize);
+    // modify MaterialParameters...
+    auto materialParameters = sceneNode->mMaterialParameters;
+    std::memcpy(materialParameters.attributeSemanticMap, attachment->attributeSemanticMap, sizeof(RendererAttributeParams) * size_t(nanovdb::GridBlindDataSemantic::End));
 
-    // modify RenderConstants...
-    auto renderConstants = mParams.mOptions;
-    renderConstants.useGroundReflections = false;
-
-    auto wBbox = group->mBounds;
-    auto wBboxSize = wBbox.max() - wBbox.min();
-    renderConstants.groundHeight = wBbox.min()[1];
-    renderConstants.groundFalloff = 1000.f * float(wBboxSize.length());
     int w = mFrameBuffer->width();
     int h = mFrameBuffer->height();
     int numAccumulations = (mParams.mUseAccumulation) ? ++mNumAccumulations : 0;
 
-    Camera<float> camera(mCurrentCameraState->eye(), mCurrentCameraState->target(), mCurrentCameraState->V(), mCurrentCameraState->mFovY, float(w) / h);
+    // build scene render parameters...
+    auto wBbox = sceneNode->mBounds;
+    if (wBbox.empty()) {
+        // an invalid bounds will cause issues, so fixup.
+        wBbox = nanovdb::BBoxR(nanovdb::Vec3R(0), nanovdb::Vec3R(1));
+    }
+    auto wBboxSize = wBbox.max() - wBbox.min();
+    auto sceneParameters = mParams.mSceneParameters;
+    sceneParameters.groundHeight = wBbox.min()[1];
+    sceneParameters.groundFalloff = 1000.f * float(wBboxSize.length());
+    sceneParameters.camera = Camera(mParams.mSceneParameters.camera.lensType(), mCurrentCameraState->eye(), mCurrentCameraState->target(), mCurrentCameraState->V(), mCurrentCameraState->mFovY, float(w) / h);
+    sceneParameters.camera.ipd() = mParams.mSceneParameters.camera.ipd();
 
     bool renderRc = false;
 
-    auto renderMethod = group->mRenderMethod;
-    if (renderMethod == RenderMethod::AUTO) {
-        if (instance->mGridClassOverride == nanovdb::GridClass::FogVolume)
-            renderMethod = RenderMethod::FOG_VOLUME;
-        else if (instance->mGridClassOverride == nanovdb::GridClass::LevelSet)
-            renderMethod = RenderMethod::LEVELSET;
-        else if (instance->mGridClassOverride == nanovdb::GridClass::PointData)
-            renderMethod = RenderMethod::POINTS;
-        else if (instance->mGridClassOverride == nanovdb::GridClass::PointIndex)
-            renderMethod = RenderMethod::POINTS;
+    // update the material type based on the grid class and preset the values.
+    auto materialClass = sceneNode->mMaterialClass;
+    if (materialClass == MaterialClass::kAuto) {
+        if (attachment->mGridClassOverride == nanovdb::GridClass::FogVolume)
+            materialClass = MaterialClass::kFogVolumePathTracer;
+        else if (attachment->mGridClassOverride == nanovdb::GridClass::LevelSet)
+            materialClass = MaterialClass::kLevelSetFast;
+        else if (attachment->mGridClassOverride == nanovdb::GridClass::PointData)
+            materialClass = MaterialClass::kPointsFast;
+        else if (attachment->mGridClassOverride == nanovdb::GridClass::PointIndex)
+            materialClass = MaterialClass::kPointsFast;
         else
-            renderMethod = RenderMethod::GRID;
+            materialClass = MaterialClass::kGrid;
     }
 
-    renderRc = mRenderLauncher.render(renderMethod, w, h, mFrameBuffer.get(), camera, gridHdl, numAccumulations, renderConstants, &mRenderStats);
+    // collect the grid pointers...
+    std::vector<GridRenderParameters> gridsAttachmentPtrs;
+    for (int i = 0; i < sceneNode->mAttachments.size(); ++i) {
+        auto attachment = sceneNode->mAttachments[i];
+        auto url = attachment->mAssetUrl.updateUrlWithFrame(frame);
+        auto gridName = attachment->mAssetUrl.gridName();
+        auto gridAssetData = mGridManager.getGrid(url, gridName);
+        gridsAttachmentPtrs.push_back(GridRenderParameters{std::get<0>(gridAssetData), std::get<1>(gridAssetData).get()});
+    }
+
+    renderRc = mRenderLauncher.render(materialClass, w, h, mFrameBuffer.get(), numAccumulations, gridsAttachmentPtrs.size(), gridsAttachmentPtrs.data(), sceneParameters, materialParameters, &mRenderStats);
+    return renderRc;
 }
 
-void RendererBase::setGridIndex(int groupIndex, int gridIndex)
+bool RendererBase::selectSceneNodeByIndex(int nodeIndex)
 {
-    if (mGridGroups.size() > 0) {
-        if (groupIndex < 0)
-            groupIndex = int(mGridGroups.size()) - 1;
-        else if (groupIndex > int(mGridGroups.size()) - 1)
-            groupIndex = 0;
-    }
+    bool hasChanged = false;
 
-    if (groupIndex < 0) {
-        mRenderGroupIndex = groupIndex;
+    if (mSceneNodes.size() == 0) {
+        mSelectedSceneNodeIndex = -1;
         resetAccumulationBuffer();
-        return;
+        return true;
     }
 
-    auto group = mGridGroups[groupIndex];
+    // clamp sceneNode index to valid range...
+    if (mSceneNodes.size() > 0) {
+        if (nodeIndex < 0)
+            nodeIndex = int(mSceneNodes.size()) - 1;
+        else if (nodeIndex > int(mSceneNodes.size()) - 1)
+            nodeIndex = 0;
 
-    if (gridIndex < 0)
-        gridIndex = int(group->mInstances.size()) - 1;
-    else if (gridIndex > int(group->mInstances.size()) - 1)
-        gridIndex = 0;
-
-    if (group->mCurrentGridIndex == gridIndex && mRenderGroupIndex == groupIndex) {
-        // no change!
-        return;
+        if (mSelectedSceneNodeIndex != nodeIndex) {
+            hasChanged = true;
+            mSelectedSceneNodeIndex = nodeIndex;
+        }
     }
 
-    mRenderGroupIndex = groupIndex;
-    group->mCurrentGridIndex = gridIndex;
+    if (hasChanged) {
+        resetAccumulationBuffer();
+    }
 
-    //std::cout << "Selecting group[" << groupIndex << "].instance[" << gridIndex << "]\n";
-
-    if (gridIndex < 0)
-        return;
-
-    // update the attribute map...
-    auto instance = group->mInstances[gridIndex];
-    memcpy(mParams.mOptions.attributeSemanticMap, instance->attributeSemanticMap, sizeof(RendererAttributeParams) * size_t(nanovdb::GridBlindDataSemantic::End));
-
-    resetAccumulationBuffer();
+    return hasChanged;
 }
 
-void RendererBase::removeGridIndices(std::vector<int> indices)
+void RendererBase::removeSceneNodes(std::vector<int> indices)
 {
     if (indices.size() == 0)
         return;
@@ -396,74 +566,199 @@ void RendererBase::removeGridIndices(std::vector<int> indices)
     std::reverse(indices.begin(), indices.end());
 
     for (int i = 0; i < indices.size(); ++i) {
-        mGridGroups.erase(mGridGroups.begin() + indices[i]);
+        mSceneNodes.erase(mSceneNodes.begin() + indices[i]);
     }
 
-    int i = mRenderGroupIndex;
-    if (i >= int(mGridGroups.size()))
-        i = int(mGridGroups.size()) - 1;
+    int i = mSelectedSceneNodeIndex;
+    if (i >= int(mSceneNodes.size()))
+        i = int(mSceneNodes.size()) - 1;
 
-    setGridIndex(i, 0);
+    selectSceneNodeByIndex(i);
 }
 
-void RendererBase::printHelp() const
+void RendererBase::printHelp(std::ostream& s) const
 {
-    std::cout << "-------------------------------------\n";
-    std::cout << "- Renderer-platform     = (" << mRenderLauncher.getNameForPlatformIndex(mParams.mRenderLauncherType) << ")\n";
-    std::cout << "- Render Group          = (" << (mRenderGroupIndex) << ")\n";
-    std::cout << "- Render Progressive    = (" << (mParams.mUseAccumulation ? "ON" : "OFF") << ")\n";
-    std::cout << "- Render Lighting       = (" << (mParams.mOptions.useLighting ? "ON" : "OFF") << ")\n";
-    std::cout << "- Render Shadows        = (" << (mParams.mOptions.useShadows ? "ON" : "mFrameBufferOFF") << ")\n";
-    std::cout << "- Render Ground-plane   = (" << (mParams.mOptions.useGround ? "ON" : "OFF") << ")\n";
-    std::cout << "- Render Occlusion      = (" << (mParams.mOptions.useOcclusion ? "ON" : "OFF") << ")\n";
-    std::cout << "-------------------------------------\n";
-    std::cout << "\n";
+    s << "-------------------------------------\n";
+    s << "- Renderer-platform     = (" << mRenderLauncher.getNameForPlatformIndex(mParams.mRenderLauncherType) << ")\n";
+    s << "- Render Group          = (" << (mSelectedSceneNodeIndex) << ")\n";
+    s << "- Render Progressive    = (" << (mParams.mUseAccumulation ? "ON" : "OFF") << ")\n";
+    s << "-------------------------------------\n";
+    s << "\n";
 }
 
 void RendererBase::resetCamera()
 {
-    if (mRenderGroupIndex < 0) {
-        return;
+    nanovdb::BBox<nanovdb::Vec3R> bbox(nanovdb::Vec3R(-100), nanovdb::Vec3R(100));
+
+    if (mSelectedSceneNodeIndex >= 0) {
+        if (!mSceneNodes[mSelectedSceneNodeIndex]->mBounds.empty()) {
+            bbox = mSceneNodes[mSelectedSceneNodeIndex]->mBounds;
+        }
     }
 
-    // calculate camera target and distance.
+    // calculate camera target and distance...
+    auto  bboxSize = (bbox.max() - bbox.min());
+    float halfWidth = 0.5f * nanovdb::Max(1.0f, float(bboxSize.length()));
 
-    auto bbox = mGridGroups[mRenderGroupIndex]->mBounds;
+    if (mParams.mSceneParameters.camera.lensType() == Camera::LensType::kSpherical ||
+        mParams.mSceneParameters.camera.lensType() == Camera::LensType::kODS) {
+        mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
+        mCurrentCameraState->mCameraDistance = halfWidth;
+        mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(0, 0, 0);
+        mCurrentCameraState->mCameraLookAt[1] = 0;
+    } else {
+        mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
+        mCurrentCameraState->mCameraDistance = halfWidth / tanf(mCurrentCameraState->mFovY * 0.5f * (3.142f / 180.f));
+        mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(M_PI / 8, (M_PI) / 4, 0);
+    }
 
-    auto bboxSize = (bbox.max() - bbox.min());
-    mCurrentCameraState->mCameraDistance = nanovdb::Max(1.0f, float(bboxSize.length()) * 30.f);
-    mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
-    mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(M_PI / 8, (M_PI) / 4, 0);
     mCurrentCameraState->mIsViewChanged = true;
     mCurrentCameraState->update();
 }
 
-bool RendererBase::updateCamera(int frame)
+void RendererBase::setSceneFrame(int frame)
 {
-    if (mParams.mUseTurntable) {
-        int count = (mParams.mFrameCount == 0) ? 1 : mParams.mFrameCount;
-        mCurrentCameraState->mCameraRotation[1] = (frame * 2.0f * M_PI) / count;
-        mCurrentCameraState->mIsViewChanged = true;
+    // wrap requested frame into valid range...
+    int frameCount = (mParams.mFrameEnd - mParams.mFrameStart + 1);
+    if (frame > mParams.mFrameEnd) {
+        if (mParams.mFrameLoop) {
+            frame -= mParams.mFrameStart;
+            frame = frame % frameCount;
+            frame += mParams.mFrameStart;
+        } else
+            frame = mParams.mFrameEnd;
+    } else if (frame < mParams.mFrameStart) {
+        if (mParams.mFrameLoop) {
+            frame -= mParams.mFrameStart;
+            frame = (frame % frameCount + frameCount) % frameCount;
+            frame += mParams.mFrameStart;
+        } else
+            frame = mParams.mFrameStart;
     }
-    return mCurrentCameraState->update();
+
+    mPendingSceneFrame = frame;
+    mLastSceneFrame = mPendingSceneFrame - 1;
 }
 
-bool RendererBase::saveFrameBuffer(bool useFrame, int frame)
+int RendererBase::getSceneFrame() const
+{
+    return mLastSceneFrame;
+}
+
+bool RendererBase::updateScene()
+{
+    if (mPendingSceneFrame == mLastSceneFrame)
+        return false;
+    mLastSceneFrame = mPendingSceneFrame;
+    return true;
+}
+
+void RendererBase::renderSequence()
+{
+    if (mSelectedSceneNodeIndex < 0)
+        return;
+
+    auto oldFrame = getSceneFrame();
+
+    bool isSingleFrame = (mParams.mFrameEnd <= mParams.mFrameStart);
+
+    std::stringstream ss;
+    if (isSingleFrame) {
+        ss << "Rendering frame " << mParams.mFrameStart;
+    } else {
+        ss << "Rendering frames " << mParams.mFrameStart << " - " << mParams.mFrameEnd;
+    }
+    if (mParams.mOutputFilePath.length()) {
+        ss << " to " << mParams.mOutputFilePath;
+        if (mParams.mOutputExtension.length()) {
+            ss << " as " << mParams.mOutputExtension;
+        }
+    }
+    logInfo(ss.str());
+
+    bool hasError = false;
+
+    for (int frame = mParams.mFrameStart; frame <= mParams.mFrameEnd; ++frame) {
+        setSceneFrame(frame);
+
+        // sync the grid manager.
+        bool areAttachmentsReady = updateNodeAttachmentRequests(mSceneNodes[mSelectedSceneNodeIndex], true, mIsDumpingLog);
+        if (areAttachmentsReady == false) {
+            hasError = true;
+            logError("Unable to render frame " + ss.str() + "; bad asset");
+            break;
+        }
+
+        updateScene();
+
+        for (int i = (mParams.mUseAccumulation) ? mParams.mMaxProgressiveSamples : 1; i > 0; --i) {
+            render(frame);
+        }
+
+        if (mParams.mOutputFilePath.empty() == false) {
+            hasError = (saveFrameBuffer(frame) == false);
+            if (hasError) {
+                break;
+            }
+        }
+    }
+
+    if (hasError == false) {
+        logInfo("Rendering complete.");
+    } else {
+        logError("Rendering failed.");
+    }
+
+    setSceneFrame(oldFrame);
+}
+
+bool RendererBase::updateCamera()
+{
+    int  sceneFrame = getSceneFrame();
+    bool isChanged = false;
+
+    if (mCurrentCameraState->mFrame != sceneFrame) {
+        isChanged = true;
+        mCurrentCameraState->mFrame = sceneFrame;
+    }
+
+    if (mParams.mUseTurntable && isChanged) {
+        int count = (mParams.mFrameEnd - mParams.mFrameStart + 1);
+        mCurrentCameraState->mCameraRotation[1] = ((float(sceneFrame) * 2.0f * float(M_PI)) / count) / std::max(mParams.mTurntableRate, 1.0f);
+        mCurrentCameraState->mIsViewChanged = true;
+    }
+
+    isChanged |= mCurrentCameraState->update();
+    return isChanged;
+}
+
+bool RendererBase::saveFrameBuffer(int frame)
 {
     assert(mFrameBuffer);
 
-    if (mParams.mOutputPrefix.empty()) {
-        //std::cerr << "Output prefix must be specified on command-line to take screenshots." << std::endl;
+    if (mParams.mOutputFilePath.empty()) {
+        logError("Output filename must be specified for framebuffer export.");
         return false;
     }
 
-    std::stringstream ss;
-    if (useFrame) {
-        ss << mParams.mOutputPrefix << '.' << std::setfill('0') << std::setw(4) << frame << std::setfill('\0') << ".pfm";
-    } else {
-        ss << mParams.mOutputPrefix << ".pfm";
+    auto ext = mParams.mOutputExtension;
+    if (ext.empty()) {
+        ext = urlGetPathExtension(mParams.mOutputFilePath);
     }
-    return mFrameBuffer->save(ss.str().c_str());
+
+    if (ext.empty()) {
+        logError("File format can not be determined from output filename, \"" + mParams.mOutputFilePath + "\"");
+        return false;
+    }
+
+    auto filename = updateFilePathWithFrame(mParams.mOutputFilePath, frame);
+    logDebug("Exporting framebuffer to " + filename);
+
+    if (mFrameBuffer->save(filename.c_str(), ext.c_str(), 80) == false) {
+        logError("Unable to export framebuffer to filename \"" + filename + "\" as \"" + ext + "\"");
+        return false;
+    }
+    return true;
 }
 
 float RendererBase::computePSNR(FrameBufferBase& other)

@@ -35,38 +35,56 @@ namespace nanovdb {
 template<typename BufferT = HostBuffer>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::GridBase::Ptr& base,
-              StatsMode sMode = StatsMode::Default,
-              ChecksumMode cMode = ChecksumMode::Default,
-              bool mortonSort = false,
-              int verbose = 0);
+              StatsMode                     sMode = StatsMode::Default,
+              ChecksumMode                  cMode = ChecksumMode::Default,
+              bool                          mortonSort = false,
+              int                           verbose = 0);
 
 /// @brief Forward declaration of free-standing function that converts a typed OpenVDB Grid into a NanoVDB GridHandle
 template<typename BufferT = HostBuffer, typename SrcTreeT = openvdb::FloatTree>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid,
-              StatsMode sMode = StatsMode::Default,
-              ChecksumMode cMode = ChecksumMode::Default,
-              bool mortonSort = false,
-              int verbose = 0);
+              StatsMode                      sMode = StatsMode::Default,
+              ChecksumMode                   cMode = ChecksumMode::Default,
+              bool                           mortonSort = false,
+              int                            verbose = 0);
 
 /// @brief Converts OpenVDB types to NanoVDB types
 template<typename T>
-struct TypeConverter { using Type = T; };
+struct TypeConverter
+{
+    using Type = T;
+};
 
 template<>
-struct TypeConverter<openvdb::math::Coord> { using Type = nanovdb::Coord; };
+struct TypeConverter<openvdb::math::Coord>
+{
+    using Type = nanovdb::Coord;
+};
 
 template<>
-struct TypeConverter<openvdb::math::CoordBBox> { using Type = nanovdb::CoordBBox; };
+struct TypeConverter<openvdb::math::CoordBBox>
+{
+    using Type = nanovdb::CoordBBox;
+};
 
 template<typename T>
-struct TypeConverter<openvdb::math::BBox<T>> { using Type = nanovdb::BBox<T>; };
+struct TypeConverter<openvdb::math::BBox<T>>
+{
+    using Type = nanovdb::BBox<T>;
+};
 
 template<typename T>
-struct TypeConverter<openvdb::math::Vec3<T> > { using Type = nanovdb::Vec3<T>; };
+struct TypeConverter<openvdb::math::Vec3<T>>
+{
+    using Type = nanovdb::Vec3<T>;
+};
 
 template<typename T>
-struct TypeConverter<openvdb::math::Vec4<T> > { using Type = nanovdb::Vec4<T>; };
+struct TypeConverter<openvdb::math::Vec4<T>>
+{
+    using Type = nanovdb::Vec4<T>;
+};
 
 namespace { // unnamed namespace
 
@@ -91,11 +109,11 @@ public:
 
     /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpneVDB grid
     GridHandle<BufferT> operator()(const openvdb::Grid<SrcTreeT>& grid,
-                                   StatsMode sMode = StatsMode::Default,
-                                   ChecksumMode mode = ChecksumMode::Default,
-                                   bool mortonSort = false,
-                                   int verbose = 0,
-                                   const BufferT& allocator = BufferT());
+                                   StatsMode                      sMode = StatsMode::Default,
+                                   ChecksumMode                   mode = ChecksumMode::Default,
+                                   bool                           mortonSort = false,
+                                   int                            verbose = 0,
+                                   const BufferT&                 allocator = BufferT());
 
 private:
     static_assert(SrcTreeT::DEPTH == 4, "Converter assumes an OpenVDB tree of depth 4 (which is the default configuration)");
@@ -397,6 +415,41 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
                                           *p++ = posHandle.get(*iter);
                                   }
                               });
+        } else if (b.typeName == "int64") {
+            meta.mDataType = GridType::Int64;
+            if (b.name == "id") {
+                meta.mSemantic = GridBlindDataSemantic::PointId;
+            } else {
+                meta.mSemantic = GridBlindDataSemantic::Unknown;
+            }
+            using T = int64_t;
+            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
+            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
+                              [&](const tbb::blocked_range<uint64_t>& r) {
+                                  for (auto i = r.begin(); i != r.end(); ++i) {
+                                      auto*                               leaf = array[i];
+                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
+                                      T*                                  p = ptr + data[i].mMinimum;
+                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
+                                          *p++ = posHandle.get(*iter);
+                                  }
+                              });
+        } else if (b.typeName == "float") {
+            meta.mDataType = GridType::Float;
+            meta.mSemantic = GridBlindDataSemantic::Unknown;
+
+            using T = float;
+            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
+            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
+                              [&](const tbb::blocked_range<uint64_t>& r) {
+                                  for (auto i = r.begin(); i != r.end(); ++i) {
+                                      auto*                               leaf = array[i];
+                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
+                                      T*                                  p = ptr + data[i].mMinimum;
+                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
+                                          *p++ = posHandle.get(*iter);
+                                  }
+                              });
         } else {
             std::stringstream ss;
             ss << "Unsupported point attribute type: \"" << b.typeName << "\"";
@@ -420,19 +473,19 @@ OpenToNanoVDB<SrcTreeT, BufferT>::setFlag(const T& min, const T& max, FlagT& fla
 template<typename SrcTreeT, typename BufferT>
 GridHandle<BufferT>
 OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcGrid,
-                                             StatsMode sMode,
-                                             ChecksumMode cMode,
-                                             bool mortonSort,
-                                             int verbose,
-                                             const BufferT& allocator)
+                                             StatsMode                      sMode,
+                                             ChecksumMode                   cMode,
+                                             bool                           mortonSort,
+                                             int                            verbose,
+                                             const BufferT&                 allocator)
 {
     openvdb::util::CpuTimer timer;
-    auto startTimer = [&](const std::string &s){
+    auto                    startTimer = [&](const std::string& s) {
         if (verbose > 1) {
             timer.start(s);
         }
     };
-    auto stopTimer = [&](){
+    auto stopTimer = [&]() {
         if (verbose > 1) {
             timer.stop();
         }
@@ -549,13 +602,14 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     startTimer("Post-processing points");
     this->postProcessPoints(array0);
     stopTimer();
-    
+
     using NanoValueT = typename TypeConverter<ValueT>::Type;
-    auto *nanoGrid = reinterpret_cast<NanoGrid<NanoValueT>*>(mData);
+    auto* nanoGrid = reinterpret_cast<NanoGrid<NanoValueT>*>(mData);
 
     // Since point grids already mde use of min/max we should not re-compute them
     if (std::is_same<ValueT, openvdb::PointIndex32>::value ||
-        std::is_same<ValueT, openvdb::PointDataIndex32>::value) sMode = StatsMode::BBox;
+        std::is_same<ValueT, openvdb::PointDataIndex32>::value)
+        sMode = StatsMode::BBox;
 
     startTimer("GridStats");
     gridStats(*nanoGrid, sMode);
@@ -786,10 +840,10 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
 template<typename BufferT, typename SrcTreeT>
 GridHandle<BufferT>
 openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid,
-              StatsMode sMode,
-              ChecksumMode cMode,
-              bool mortonSort,
-              int verbose)
+              StatsMode                      sMode,
+              ChecksumMode                   cMode,
+              bool                           mortonSort,
+              int                            verbose)
 {
     OpenToNanoVDB<SrcTreeT, BufferT> s;
     return s(grid, sMode, cMode, mortonSort, verbose);
@@ -797,11 +851,11 @@ openToNanoVDB(const openvdb::Grid<SrcTreeT>& grid,
 
 template<typename BufferT>
 GridHandle<BufferT>
-openToNanoVDB(const openvdb::GridBase::Ptr& base, 
-              StatsMode sMode,
-              ChecksumMode cMode,
-              bool mortonSort,
-              int verbose)
+openToNanoVDB(const openvdb::GridBase::Ptr& base,
+              StatsMode                     sMode,
+              ChecksumMode                  cMode,
+              bool                          mortonSort,
+              int                           verbose)
 {
     if (auto grid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
         return openToNanoVDB<BufferT, openvdb::FloatTree>(*grid, sMode, cMode, mortonSort, verbose);

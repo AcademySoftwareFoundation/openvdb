@@ -125,9 +125,7 @@ static std::string fileToString(std::string filename)
     if (!file) {
         std::stringstream msg;
         msg << "Unable to load code: " << filename;
-        //throw std::runtime_error(msg.str().c_str());
-        std::cerr << "Error: " << msg.str() << std::endl;
-        return "";
+        throw std::runtime_error(msg.str().c_str());
     }
 
     std::string str;
@@ -141,7 +139,7 @@ static std::string fileToString(std::string filename)
     return str;
 }
 
-bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& resource, std::string valueType, RenderMethod method)
+bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& resource, std::string valueType, MaterialClass method)
 {
     if (resource->mUniformBufferId)
         glDeleteBuffers(1, &resource->mUniformBufferId);
@@ -169,19 +167,28 @@ bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& re
     std::string includeFilePath = std::string(__FILE__);
     includeFilePath = includeFilePath.substr(0, includeFilePath.find_last_of('/')).substr(0, includeFilePath.find_last_of('\\')) + "/";
 
-    ss << fileToString(includeFilePath + g_kKernelString_Platform_h);
-    ss << fileToString(includeFilePath + g_kKernelString_HDDA_h);
-    ss << fileToString(includeFilePath + g_kKernelString_NanoVDB_h);
-    ss << fileToString(includeFilePath + g_kKernelString_Platform_c);
-    ss << fileToString(includeFilePath + g_kKernelString_NanoVDB_c);
-    ss << fileToString(includeFilePath + g_kKernelString_HDDA_c);
-    ss << fileToString(includeFilePath + g_kKernelString_renderCommon_h);
-    if (method == RenderMethod::LEVELSET) {
-        ss << fileToString(includeFilePath + g_kKernelString_renderLevelSet_c);
-    } else if (method == RenderMethod::FOG_VOLUME) {
-        ss << fileToString(includeFilePath + g_kKernelString_renderFogVolume_c);
-    } else {
-        ss << fileToString(includeFilePath + g_kKernelString_renderGrid_c);
+    try {
+        ss << fileToString(includeFilePath + g_kKernelString_Platform_h);
+        ss << fileToString(includeFilePath + g_kKernelString_HDDA_h);
+        ss << fileToString(includeFilePath + g_kKernelString_NanoVDB_h);
+        ss << fileToString(includeFilePath + g_kKernelString_Platform_c);
+        ss << fileToString(includeFilePath + g_kKernelString_NanoVDB_c);
+        ss << fileToString(includeFilePath + g_kKernelString_HDDA_c);
+        ss << fileToString(includeFilePath + g_kKernelString_renderCommon_h);
+        if (method == MaterialClass::kLevelSetFast) {
+            ss << fileToString(includeFilePath + g_kKernelString_renderLevelSet_c);
+        } else if (method == MaterialClass::kFogVolumePathTracer) {
+            ss << fileToString(includeFilePath + g_kKernelString_renderFogVolume_c);
+        } else {
+            ss << fileToString(includeFilePath + g_kKernelString_renderGrid_c);
+        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "GLSL error: " << e.what() << std::endl;
+        return false;
+    }
+    catch (...) {
+        return false;
     }
 
     auto codeStr = new char[ss.str().length() + 1];
@@ -237,7 +244,7 @@ bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& re
     return true;
 }
 
-std::shared_ptr<RenderLauncherGL::Resource> RenderLauncherGL::ensureResource(const nanovdb::GridHandle<>& gridHdl, void* glContext, void* glDisplay, RenderMethod method)
+std::shared_ptr<RenderLauncherGL::Resource> RenderLauncherGL::ensureResource(const nanovdb::GridHandle<>& gridHdl, void* glContext, void* glDisplay, MaterialClass method)
 {
     std::shared_ptr<Resource> resource;
     auto                      it = mResources.find(&gridHdl);
@@ -249,7 +256,7 @@ std::shared_ptr<RenderLauncherGL::Resource> RenderLauncherGL::ensureResource(con
         resource = std::make_shared<Resource>();
         mResources.insert(std::make_pair(&gridHdl, resource));
         resource->mMethod = method;
-        
+
         if (glContext == nullptr || glDisplay == nullptr) {
             return resource;
         }
@@ -266,8 +273,13 @@ std::shared_ptr<RenderLauncherGL::Resource> RenderLauncherGL::ensureResource(con
     return resource;
 }
 
-bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+bool RenderLauncherGL::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
+    if (grids[0].gridHandle == nullptr)
+        return false;
+
+    auto& gridHdl = *reinterpret_cast<const nanovdb::GridHandle<>*>(grids[0].gridHandle);
+
     void* contextGL = nullptr;
     void* displayGL = nullptr;
     auto  imgBufferGL = dynamic_cast<FrameBufferGL*>(imgBuffer);
@@ -293,10 +305,10 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
 
     // prepare data...
 
-    nanovdb::Vec3f cameraP = camera.P();
-    nanovdb::Vec3f cameraU = camera.U();
-    nanovdb::Vec3f cameraV = camera.V();
-    nanovdb::Vec3f cameraW = camera.W();
+    nanovdb::Vec3f cameraP = sceneParams.camera.P();
+    nanovdb::Vec3f cameraU = sceneParams.camera.U();
+    nanovdb::Vec3f cameraV = sceneParams.camera.V();
+    nanovdb::Vec3f cameraW = sceneParams.camera.W();
 
     // launch GL render...
 
@@ -309,12 +321,15 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
         int   width;
         int   height;
         int   numAccumulations;
-        float useGround;
-        float useShadows;
-        float useGroundReflections;
-        float useLighting;
+        int   useBackground;
+        int   useGround;
+        int   useShadows;
+        int   useGroundReflections;
+        int   useLighting;
         float useOcclusion;
-        float volumeDensity;
+        float volumeDensityScale;
+        float volumeAlbedo;
+        int   useTonemapping;
         float tonemapWhitePoint;
         int   samplesPerPixel;
         float groundHeight;
@@ -323,6 +338,8 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
         float cameraUx, cameraUy, cameraUz;
         float cameraVx, cameraVy, cameraVz;
         float cameraWx, cameraWy, cameraWz;
+        float cameraAspect;
+        float cameraFovY;
     };
 
     auto args = (ArgUniforms*)glMapBuffer(GL_UNIFORM_BUFFER, GL_WRITE_ONLY);
@@ -331,16 +348,21 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
         uniforms.width = width;
         uniforms.height = height;
         uniforms.numAccumulations = numAccumulations;
-        uniforms.useShadows = params.useShadows;
-        uniforms.useGround = params.useGround;
-        uniforms.useGroundReflections = params.useGroundReflections;
-        uniforms.useLighting = params.useLighting;
-        uniforms.useOcclusion = params.useOcclusion;
-        uniforms.volumeDensity = params.volumeDensity;
-        uniforms.tonemapWhitePoint = params.tonemapWhitePoint;
-        uniforms.samplesPerPixel = params.samplesPerPixel;
-        uniforms.groundHeight = params.groundHeight;
-        uniforms.groundFalloff = params.groundFalloff;
+
+        uniforms.useShadows = sceneParams.useShadows;
+        uniforms.useGroundReflections = sceneParams.useGroundReflections;
+        uniforms.useLighting = sceneParams.useLighting;
+        uniforms.useOcclusion = materialParams.useOcclusion;
+        uniforms.volumeDensityScale = materialParams.volumeDensityScale;
+        uniforms.volumeAlbedo = materialParams.volumeAlbedo;
+
+        uniforms.samplesPerPixel = sceneParams.samplesPerPixel;
+        uniforms.useBackground = sceneParams.useBackground;
+        uniforms.useGround = sceneParams.useGround;
+        uniforms.useTonemapping = sceneParams.useTonemapping;
+        uniforms.tonemapWhitePoint = sceneParams.tonemapWhitePoint;
+        uniforms.groundHeight = sceneParams.groundHeight;
+        uniforms.groundFalloff = sceneParams.groundFalloff;
         uniforms.cameraPx = cameraP[0];
         uniforms.cameraPy = cameraP[1];
         uniforms.cameraPz = cameraP[2];
@@ -353,6 +375,9 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
         uniforms.cameraWx = cameraW[0];
         uniforms.cameraWy = cameraW[1];
         uniforms.cameraWz = cameraW[2];
+        uniforms.cameraAspect = sceneParams.camera.aspect();
+        uniforms.cameraFovY = sceneParams.camera.fov();
+
         glUnmapBuffer(GL_UNIFORM_BUFFER);
     }
 
@@ -380,9 +405,9 @@ bool RenderLauncherGL::render(RenderMethod method, int width, int height, FrameB
     if (stats) {
         glFinish();
         auto t1 = ClockT::now();
-        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count()/1000.f;
+        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
     }
-    
+
     return true;
 }
 

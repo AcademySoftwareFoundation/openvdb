@@ -176,13 +176,13 @@ struct is_floating_point
 ///        given in the second template parameter.
 ///
 /// @details is_specialization<Vec3<float>, Vec3>::value == true;
-template<typename T, template<typename...> class Template>
+template<typename AnyType, template<typename...> class TemplateType>
 struct is_specialization
 {
     static const bool value = false;
 };
-template<typename... Args, template<typename...> class Template>
-struct is_specialization<Template<Args...>, Template>
+template<typename... Args, template<typename...> class TemplateType>
+struct is_specialization<TemplateType<Args...>, TemplateType>
 {
     static const bool value = true;
 };
@@ -534,6 +534,11 @@ public:
     /// @brief Initializes coordinate to the given signed integers.
     __hostdev__ Coord(ValueType i, ValueType j, ValueType k)
         : mVec{i, j, k}
+    {
+    }
+
+    __hostdev__ Coord(ValueType *ptr)
+        : mVec{ptr[0], ptr[1], ptr[2]}
     {
     }
 
@@ -1136,8 +1141,8 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
     {
     }
     __hostdev__ bool  empty() const { return mCoord[0][0] >= mCoord[1][0] ||
-                                            mCoord[0][1] >= mCoord[1][1] ||
-                                            mCoord[0][2] >= mCoord[1][2]; }
+                                             mCoord[0][1] >= mCoord[1][1] ||
+                                             mCoord[0][2] >= mCoord[1][2]; }
     __hostdev__ Vec3T dim() const { return this->empty() ? Vec3T(0) : this->max() - this->min(); }
     __hostdev__ bool  isInside(const Vec3T& p) const
     {
@@ -1217,8 +1222,8 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
                                                    mCoord[0][2] < mCoord[1][2]; }
     /// @brief Return true if this bounding box is empty, i.e. uninitialized
     __hostdev__ bool   empty() const { return mCoord[0][0] > mCoord[1][0] ||
-                                            mCoord[0][1] > mCoord[1][1] ||
-                                            mCoord[0][2] > mCoord[1][2]; }
+                                              mCoord[0][1] > mCoord[1][1] ||
+                                              mCoord[0][2] > mCoord[1][2]; }
     __hostdev__ CoordT dim() const { return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1); }
     __hostdev__ bool   isInside(const CoordT& p) const { return !(CoordT::lessThan(p, this->min()) || CoordT::lessThan(this->max(), p)); }
     __hostdev__ bool   isInside(const BBox& b) const
@@ -1743,8 +1748,11 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
 }; // GridData
 
 // Forward decleration of accelerated random access class
-template<typename, int = 3>
+template <typename ValueT, int LEVEL0 = -1, int LEVEL1 = -1, int LEVEL2 = -1>
 class ReadAccessor;
+
+template <typename ValueT>
+using DefaultReadAccessor = ReadAccessor<ValueT, 0, 1, 2>;
 
 /// @brief Highest level of the data structure. Contains a tree and a world->index
 ///        transform (that currenrtly only supports uniform scaling and translation).
@@ -1758,7 +1766,7 @@ public:
     using DataType = GridData;
     using ValueType = typename TreeT::ValueType;
     using CoordType = typename TreeT::CoordType;
-    using AccessorType = ReadAccessor<typename TreeT::RootType>;
+    using AccessorType = DefaultReadAccessor<ValueType>;
 
     //static constexpr bool IgnoreValues = TreeT::IgnoreValues;
 
@@ -1786,7 +1794,7 @@ public:
     __hostdev__ TreeT& tree() { return *reinterpret_cast<TreeT*>(this->treePtr()); }
 
     /// @brief Return a new instance of a ReadAccessor used to access values in this grid
-    __hostdev__ AccessorType getAccessor() const { return ReadAccessor<typename TreeT::RootType>(this->tree().root()); }
+    __hostdev__ AccessorType getAccessor() const { return AccessorType(this->tree().root()); }
 
     /// @brief Return a const reference to the size of a voxel in world units
     __hostdev__ const Vec3R& voxelSize() const { return DataType::mVoxelSize; }
@@ -1922,28 +1930,32 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
 
 /// @brief Struct to derive node type from its level in a given tree
 template<typename TreeT, int LEVEL>
-struct Node;
+struct TreeNode;
 
 // Partial template specialization of above Node struct
-template<typename T>
-struct Node<T, 0>
+template<typename TreeT>
+struct TreeNode<TreeT, 0>
 {
-    using type = typename T::LeafNodeType;
+    static_assert(TreeT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using type = typename TreeT::LeafNodeType;
 };
-template<typename T>
-struct Node<T, 1>
+template<typename TreeT>
+struct TreeNode<TreeT, 1>
 {
-    using type = typename T::RootType::ChildNodeType::ChildNodeType;
+    static_assert(TreeT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using type = typename TreeT::RootType::ChildNodeType::ChildNodeType;
 };
-template<typename T>
-struct Node<T, 2>
+template<typename TreeT>
+struct TreeNode<TreeT, 2>
 {
-    using type = typename T::RootType::ChildNodeType;
+    static_assert(TreeT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using type = typename TreeT::RootType::ChildNodeType;
 };
-template<typename T>
-struct Node<T, 3>
+template<typename TreeT>
+struct TreeNode<TreeT, 3>
 {
-    using type = typename T::RootType;
+    static_assert(TreeT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using type = typename TreeT::RootType;
 };
 
 /// @brief VDB Tree, which is a thin wrapper around a RootNode.
@@ -1961,13 +1973,21 @@ public:
     using LeafNodeType = typename RootT::LeafNodeType;
     using ValueType = typename RootT::ValueType;
     using CoordType = typename RootT::CoordType;
-    using AccessorType = ReadAccessor<RootT>;
+    using AccessorType = DefaultReadAccessor<ValueType>;
+
+    using Node3 = RootT;
+    using Node2 = typename RootT::ChildNodeType;
+    using Node1 = typename Node2::ChildNodeType;
+    using Node0 = LeafNodeType;
+
     template<int LEVEL>
-    using NodeType = typename Node<Tree, LEVEL>::type;
+    using TreeNodeT = typename TreeNode<Tree, LEVEL>::type;
 
     //static constexpr bool IgnoreValues = RootT::IgnoreValues;
-    static_assert(is_same<NodeType<0>, LeafNodeType>::value, "NodeType<0> error");
-    static_assert(is_same<NodeType<3>, RootType>::value, "NodeType<3> error");
+    static_assert(is_same<TreeNodeT<0>, Node0>::value, "TreeNodeT<0> error");
+    static_assert(is_same<TreeNodeT<1>, Node1>::value, "TreeNodeT<1> error");
+    static_assert(is_same<TreeNodeT<2>, Node2>::value, "TreeNodeT<2> error");
+    static_assert(is_same<TreeNodeT<3>, Node3>::value, "TreeNodeT<3> error");
 
     /// @brief This class cannot be constructed or deleted
     Tree() = delete;
@@ -1986,7 +2006,7 @@ public:
 
     __hostdev__ const RootT& root() const { return *reinterpret_cast<const RootT*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[RootT::LEVEL]); }
 
-    __hostdev__ AccessorType getAccessor() const { return ReadAccessor<RootT>(this->root()); }
+    __hostdev__ AccessorType getAccessor() const { return AccessorType(this->root()); }
 
     /// @brief Return the value of the given voxel (regardless of state or location in the tree.)
     __hostdev__ const ValueType& getValue(const CoordType& ijk) const { return this->root().getValue(ijk); }
@@ -2021,13 +2041,13 @@ public:
     __hostdev__ const NodeT* getNode(uint32_t i) const;
 
     template<int LEVEL>
-    __hostdev__ const NodeType<LEVEL>* getNode(uint32_t i) const;
+    __hostdev__ const TreeNodeT<LEVEL>* getNode(uint32_t i) const;
 
     template<typename NodeT>
     __hostdev__ NodeT* getNode(uint32_t i);
 
     template<int LEVEL>
-    __hostdev__ NodeType<LEVEL>* getNode(uint32_t i);
+    __hostdev__ TreeNodeT<LEVEL>* getNode(uint32_t i);
 
     /// @brief Returns the linear index, i.e. 0 -> ( # of nodes of type NodeT - 1), of the specified node
     template<typename NodeT>
@@ -2057,41 +2077,41 @@ template<typename RootT>
 template<typename NodeT>
 const NodeT* Tree<RootT>::getNode(uint32_t i) const
 {
-    static_assert(is_same<NodeType<NodeT::LEVEL>, NodeT>::value, "Tree::getNode: unvalid node type");
+    static_assert(is_same<TreeNodeT<NodeT::LEVEL>, NodeT>::value, "Tree::getNode: unvalid node type");
     assert(i < DataType::mCount[NodeT::LEVEL]);
     return reinterpret_cast<const NodeT*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[NodeT::LEVEL]) + i;
 }
 
 template<typename RootT>
 template<int LEVEL>
-const typename Node<Tree<RootT>, LEVEL>::type* Tree<RootT>::getNode(uint32_t i) const
+const typename TreeNode<Tree<RootT>, LEVEL>::type* Tree<RootT>::getNode(uint32_t i) const
 {
     assert(i < DataType::mCount[LEVEL]);
-    return reinterpret_cast<const NodeType<LEVEL>*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[LEVEL]) + i;
+    return reinterpret_cast<const TreeNodeT<LEVEL>*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[LEVEL]) + i;
 }
 
 template<typename RootT>
 template<typename NodeT>
 NodeT* Tree<RootT>::getNode(uint32_t i)
 {
-    static_assert(is_same<NodeType<NodeT::LEVEL>, NodeT>::value, "Tree::getNode: unvalid node type");
+    static_assert(is_same<TreeNodeT<NodeT::LEVEL>, NodeT>::value, "Tree::getNode: unvalid node type");
     assert(i < DataType::mCount[NodeT::LEVEL]);
     return reinterpret_cast<NodeT*>(reinterpret_cast<uint8_t*>(this) + DataType::mBytes[NodeT::LEVEL]) + i;
 }
 
 template<typename RootT>
 template<int LEVEL>
-typename Node<Tree<RootT>, LEVEL>::type* Tree<RootT>::getNode(uint32_t i)
+typename TreeNode<Tree<RootT>, LEVEL>::type* Tree<RootT>::getNode(uint32_t i)
 {
     assert(i < DataType::mCount[LEVEL]);
-    return reinterpret_cast<NodeType<LEVEL>*>(reinterpret_cast<uint8_t*>(this) + DataType::mBytes[LEVEL]) + i;
+    return reinterpret_cast<TreeNodeT<LEVEL>*>(reinterpret_cast<uint8_t*>(this) + DataType::mBytes[LEVEL]) + i;
 }
 
 template<typename RootT>
 template<typename NodeT>
 uint32_t Tree<RootT>::getNodeID(const NodeT& node) const
 {
-    static_assert(is_same<NodeType<NodeT::LEVEL>, NodeT>::value, "Tree::getNodeID: unvalid node type");
+    static_assert(is_same<TreeNodeT<NodeT::LEVEL>, NodeT>::value, "Tree::getNodeID: unvalid node type");
     const NodeT* first = reinterpret_cast<const NodeT*>(reinterpret_cast<const uint8_t*>(this) + DataType::mBytes[NodeT::LEVEL]);
     assert(&node >= first);
     return static_cast<uint32_t>(&node - first); //we know that there can never be more than 2^32 nodes of any type
@@ -2205,6 +2225,7 @@ public:
     using ValueType = typename ChildT::ValueType;
     using FloatType = typename ChildT::FloatType;
     using CoordType = typename ChildT::CoordType;
+    using AccessorType = DefaultReadAccessor<ValueType>;
     using Tile = typename DataType::Tile;
 
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
@@ -2215,6 +2236,8 @@ public:
     RootNode(const RootNode&) = delete;
     RootNode& operator=(const RootNode&) = delete;
     ~RootNode() = delete;
+
+    __hostdev__ AccessorType getAccessor() const { return AccessorType(*this); }
 
     __hostdev__ DataType* data() { return reinterpret_cast<DataType*>(this); }
 
@@ -2296,8 +2319,9 @@ private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData) is misaligned");
     static_assert(sizeof(typename DataType::Tile) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData::Tile) is misaligned");
 
-    template<typename, int>
+    template<typename, int, int, int>
     friend class ReadAccessor;
+
     template<typename>
     friend class Tree;
 
@@ -2601,8 +2625,9 @@ private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(InternalData) is misaligned");
     //static_assert(offsetof(DataType, mTable) % 32 == 0, "InternalData::mTable is misaligned");
 
-    template<typename, int>
+    template<typename, int, int, int>
     friend class ReadAccessor;
+
     template<typename>
     friend class RootNode;
     template<typename, uint32_t>
@@ -2910,8 +2935,9 @@ private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(LeafData) is misaligned");
     //static_assert(offsetof(DataType, mValues) % 32 == 0, "LeafData::mValues is misaligned");
 
-    template<typename, int>
+    template<typename, int, int, int>
     friend class ReadAccessor;
+
     template<typename>
     friend class RootNode;
     template<typename, uint32_t>
@@ -2978,6 +3004,41 @@ inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
     update(FindLowestOn(static_cast<uint32_t>(byte)), FindHighestOn(static_cast<uint32_t>(byte)), 2);
 }
 
+// --------------------------> Template specializations and traits <------------------------------------
+
+/// @brief Template specializations to the default configuration used in OpenVDB:
+///        Root->32^3->16^3->8^3
+template<typename ValueT>
+using NanoLeaf = LeafNode<ValueT, Coord, Mask, 3>;
+template<typename ValueT>
+using NanoNode1 = InternalNode<NanoLeaf<ValueT>, 4>;
+template<typename ValueT>
+using NanoNode2 = InternalNode<NanoNode1<ValueT>, 5>;
+template<typename ValueT>
+using NanoRoot = RootNode<NanoNode2<ValueT>>;
+template<typename ValueT>
+using NanoTree = Tree<NanoRoot<ValueT>>;
+template<typename ValueT>
+using NanoGrid = Grid<NanoTree<ValueT>>;
+
+using FloatTree  = NanoTree<float>;
+using DoubleTree = NanoTree<double>;
+using Int32Tree  = NanoTree<int32_t>;
+using UInt32Tree = NanoTree<uint32_t>;
+using Int64Tree  = NanoTree<int64_t>;
+using Vec3fTree  = NanoTree<Vec3f>;
+using Vec3dTree  = NanoTree<Vec3d>;
+using MaskTree   = NanoTree<ValueMask>;
+
+using FloatGrid  = Grid<FloatTree>;
+using DoubleGrid = Grid<DoubleTree>;
+using Int32Grid  = Grid<Int32Tree>;
+using UInt32Grid = Grid<UInt32Tree>;
+using Int64Grid  = Grid<Int64Tree>;
+using Vec3fGrid  = Grid<Vec3fTree>;
+using Vec3dGrid  = Grid<Vec3dTree>;
+using MaskGrid   = Grid<MaskTree>;
+
 // --------------------------> ReadAccessor <------------------------------------
 
 /// @brief A read-only value acessor with three levels of node caching. This allows for
@@ -2999,18 +3060,19 @@ inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
 ///          O(1) random access operations by means of inverse tree traversal,
 ///          which amortizes the non-const time complexity of the root node.
 
-template<typename RootT>
-class ReadAccessor<RootT, 3>
+template <typename ValueT>
+class ReadAccessor<ValueT, -1, -1, -1>
 {
-public:
-    using ValueType = typename RootT::ValueType;
+    using RootT  = NanoRoot<ValueT>; // root node
     using FloatType = typename RootT::FloatType;
-    using CoordType = typename RootT::CoordType;
     using CoordValueType = typename RootT::CoordType::ValueType;
-    using NodeT3 = const RootT; //                    root node
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper internal node
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower internal node
-    using NodeT0 = typename NodeT1::ChildNodeType; // Leaf node
+
+    mutable const RootT* mRoot; // 8 bytes (mutable to allow for access methods to be const)
+public:
+    using ValueType = ValueT;
+    using CoordType = typename RootT::CoordType;
+
+    static const int CacheLevels = 0;
 
     struct NodeInfo {
         uint32_t  mLevel; //   4B
@@ -3024,20 +3086,443 @@ public:
     };
 
     /// @brief Constructor from a root node
+    __hostdev__ ReadAccessor(const RootT& root) : mRoot{&root} {}
+
+    __hostdev__ const RootT& root() const { return *mRoot; }
+
+    /// @brief Defaults constructors
+    ReadAccessor(const ReadAccessor&) = default;
+    ~ReadAccessor() = default;
+    ReadAccessor& operator=(const ReadAccessor&) = default;
+
+    __hostdev__ const ValueType& getValue(const CoordType& ijk) const
+    {
+        return mRoot->getValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
+    {
+        return mRoot->getNodeInfoAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool isActive(const CoordType& ijk) const
+    {
+        return mRoot->isActiveAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
+    {
+        return mRoot->probeValueAndCache(ijk, v, *this);
+    }
+
+    __hostdev__ const NanoLeaf<ValueT>* probeLeaf(const CoordType& ijk) const
+    {
+        return mRoot->probeLeafAndCache(ijk, *this);
+    }
+
+    template<typename RayT>
+    __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
+    {        
+        return mRoot->getDimAndCache(ijk, ray, *this);
+    }
+
+private:
+    /// @brief Allow nodes to insert themselves into the cache.
+    template<typename>
+    friend class RootNode;
+    template<typename, uint32_t>
+    friend class InternalNode;
+    template<typename, typename, template<uint32_t> class, uint32_t>
+    friend class LeafNode;
+
+    /// @brief No-op
+    template<typename NodeT>
+    __hostdev__ void insert(const CoordType&, const NodeT*) const {}
+}; // ReadAccessor<ValueT, -1, -1, -1> class
+
+/// @brief Node caching at a single tree level
+template <typename ValueT, int LEVEL0>
+class ReadAccessor<ValueT, LEVEL0, -1, -1>// 0, 1, 2
+{
+    static_assert(LEVEL0 >= 0 && LEVEL0 <= 2, "LEVEL0 should be 0, 1, 2");
+
+    using TreeT  = NanoTree<ValueT>;
+    using RootT  = NanoRoot<ValueT>; //  root node
+    using LeafT  = NanoLeaf< ValueT>; // Leaf node
+    using NodeT  = typename TreeNode<TreeT, LEVEL0>::type;
+    using CoordT = typename RootT::CoordType;
+
+    using FloatType = typename RootT::FloatType;
+    using CoordValueType = typename RootT::CoordT::ValueType;
+
+    // All member data are mutable to allow for access methods to be const
+    mutable CoordT       mKey; // 3*4 = 12 bytes
+    mutable const RootT* mRoot; // 8 bytes
+    mutable const NodeT* mNode; // 8 bytes
+
+public:
+    using ValueType = ValueT;
+    using CoordType = CoordT;
+
+    static const int CacheLevels = 1;
+
+    using NodeInfo = typename ReadAccessor<ValueT, -1, -1, -1>::NodeInfo;
+
+    /// @brief Constructor from a root node
+    __hostdev__ ReadAccessor(const RootT& root)
+        : mKey(CoordType::max())
+        , mRoot(&root)
+        , mNode(nullptr)
+    {
+    }
+
+    __hostdev__ const RootT& root() const { return *mRoot; }
+
+    /// @brief Defaults constructors
+    ReadAccessor(const ReadAccessor&) = default;
+    ~ReadAccessor() = default;
+    ReadAccessor& operator=(const ReadAccessor&) = default;
+
+    __hostdev__ bool isCached(const CoordType& ijk) const
+    {
+        return (ijk[0] & int32_t(~NodeT::MASK)) == mKey[0] && 
+               (ijk[1] & int32_t(~NodeT::MASK)) == mKey[1] && 
+               (ijk[2] & int32_t(~NodeT::MASK)) == mKey[2];
+    }
+
+    __hostdev__ const ValueType& getValue(const CoordType& ijk) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->getValueAndCache(ijk, *this);
+        }
+        return mRoot->getValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->getNodeInfoAndCache(ijk, *this);
+        }
+        return mRoot->getNodeInfoAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool isActive(const CoordType& ijk) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->isActiveAndCache(ijk, *this);
+        }
+        return mRoot->isActiveAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->probeValueAndCache(ijk, *this);
+        }
+        return mRoot->probeValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->probeLeafAndCache(ijk, *this);
+        }
+        return mRoot->probeLeafAndCache(ijk, *this);
+    }
+
+    template<typename RayT>
+    __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
+    {
+        if (this->isCached(ijk)) {
+            return mNode->getDimAndCache(ijk, *this);
+        }
+        return mRoot->getDimAndCache(ijk, *this);
+    }
+
+private:
+    /// @brief Allow nodes to insert themselves into the cache.
+    template<typename>
+    friend class RootNode;
+    template<typename, uint32_t>
+    friend class InternalNode;
+    template<typename, typename, template<uint32_t> class, uint32_t>
+    friend class LeafNode;
+
+    /// @brief Inserts a leaf node and key pair into this ReadAccessor
+    __hostdev__ void insert(const CoordType& ijk, const NodeT* node) const
+    {
+        mKey = ijk & ~NodeT::MASK;
+        mNode = node;
+    }
+
+    // no-op
+    template<typename OtherNodeT>
+    __hostdev__ void insert(const CoordType&, const OtherNodeT*) const {}
+
+}; // ReadAccessor<ValueT, LEVEL0>
+
+template <typename ValueT, int LEVEL0, int LEVEL1>
+class ReadAccessor<ValueT, LEVEL0, LEVEL1, -1>// (0,1), (1,2), (0,2)
+{
+    static_assert(LEVEL0 >=0 && LEVEL0 <=2, "LEVEL0 must be 0, 1, 2");
+    static_assert(LEVEL1 >=0 && LEVEL1 <=2, "LEVEL1 must be 0, 1, 2");
+    static_assert(LEVEL0 < LEVEL1, "Level 0 must be lower than level 1");                              
+    using TreeT  = NanoTree<ValueT>;
+    using RootT  = NanoRoot<ValueT>;
+    using LeafT  = NanoLeaf<ValueT>;
+    using Node1T = typename TreeNode<TreeT, LEVEL0>::type;
+    using Node2T = typename TreeNode<TreeT, LEVEL1>::type;
+    using CoordT = typename RootT::CoordType;
+    
+    using FloatType = typename RootT::FloatType;
+    using CoordValueType = typename RootT::CoordT::ValueType;
+
+    // All member data are mutable to allow for access methods to be const
+#ifdef USE_SINGLE_ACCESSOR_KEY // 44 bytes total
+    mutable CoordT mKey; // 3*4 = 12 bytes
+#else // 68 bytes total
+    mutable CoordT mKeys[2]; // 2*3*4 = 24 bytes
+#endif
+    mutable const RootT*  mRoot;
+    mutable const Node1T* mNode1;
+    mutable const Node2T* mNode2;
+
+public:
+    using ValueType = ValueT;
+    using CoordType = CoordT;
+
+    static const int CacheLevels = 2;
+
+    using NodeInfo = typename ReadAccessor<ValueT,-1,-1,-1>::NodeInfo;
+
+    /// @brief Constructor from a root node
     __hostdev__ ReadAccessor(const RootT& root)
 #ifdef USE_SINGLE_ACCESSOR_KEY
         : mKey(CoordType::max())
 #else
-        : mKeys
-    {
-        CoordType::max(), CoordType::max(), CoordType::max()
-    }
+        : mKeys{CoordType::max(), CoordType::max()}
 #endif
-        , mNode{nullptr, nullptr, nullptr, &root}
+        , mRoot(&root)
+        , mNode1(nullptr)
+        , mNode2(nullptr)
     {
     }
 
-    __hostdev__ const RootT& root() const { return *(NodeT3*)mNode[3]; }
+    __hostdev__ const RootT& root() const { return *mRoot; }
+
+    /// @brief Defaults constructors
+    ReadAccessor(const ReadAccessor&) = default;
+    ~ReadAccessor() = default;
+    ReadAccessor& operator=(const ReadAccessor&) = default;
+
+#ifdef USE_SINGLE_ACCESSOR_KEY
+    __hostdev__ bool isCached1(CoordValueType dirty) const
+    {
+        if (!mNode1)
+            return false;
+        if (dirty & int32_t(~Node1T::MASK)) {
+            mNode1 = nullptr;
+            return false;
+        }
+        return true;
+    }
+    __hostdev__ bool isCached2(CoordValueType dirty) const
+    {
+        if (!mNode2)
+            return false;
+        if (dirty & int32_t(~Node2T::MASK)) {
+            mNode2 = nullptr;
+            return false;
+        }
+        return true;
+    }
+    __hostdev__ CoordValueType computeDirty(const CoordType& ijk) const
+    {
+        return (ijk[0] ^ mKey[0]) | (ijk[1] ^ mKey[1]) | (ijk[2] ^ mKey[2]);
+    }
+#else
+    __hostdev__ bool isCached1(const CoordType& ijk) const
+    {
+        return (ijk[0] & int32_t(~Node1T::MASK)) == mKeys[0][0] && 
+               (ijk[1] & int32_t(~Node1T::MASK)) == mKeys[0][1] && 
+               (ijk[2] & int32_t(~Node1T::MASK)) == mKeys[0][2];
+    }
+    __hostdev__ bool isCached2(const CoordType& ijk) const
+    {
+        return (ijk[0] & int32_t(~Node2T::MASK)) == mKeys[1][0] && 
+               (ijk[1] & int32_t(~Node2T::MASK)) == mKeys[1][1] && 
+               (ijk[2] & int32_t(~Node2T::MASK)) == mKeys[1][2];
+    }
+#endif
+
+    __hostdev__ const ValueType& getValue(const CoordType& ijk) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->getValueAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->getValueAndCache(ijk, *this);
+        }
+        return mRoot->getValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->getNodeInfoAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->getNodeInfoAndCache(ijk, *this);
+        }
+        return mRoot->getNodeInfoAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool isActive(const CoordType& ijk) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->isActiveAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->isActiveAndCache(ijk, *this);
+        }
+        return mRoot->isActiveAndCache(ijk, *this);
+    }
+
+    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->probeValueAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->probeValueAndCache(ijk, *this);
+        }
+        return mRoot->probeValueAndCache(ijk, *this);
+    }
+
+    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->probeLeafAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->probeLeafAndCache(ijk, *this);
+        }
+        return mRoot->probeLeafAndCache(ijk, *this);
+    }
+
+    template<typename RayT>
+    __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        const CoordValueType dirty = this->computeDirty(ijk);
+#else
+        auto&& dirty = ijk;
+#endif
+        if (this->isCached1(dirty)) {
+            return mNode1->getDimAndCache(ijk, *this);
+        } else if (this->isCached2(dirty)) {
+            return mNode2->getDimAndCache(ijk, *this);
+        }
+        return mRoot->getDimAndCache(ijk, *this);
+    }
+
+private:
+    /// @brief Allow nodes to insert themselves into the cache.
+    template<typename>
+    friend class RootNode;
+    template<typename, uint32_t>
+    friend class InternalNode;
+    template<typename, typename, template<uint32_t> class, uint32_t>
+    friend class LeafNode;
+
+    /// @brief Inserts a leaf node and key pair into this ReadAccessor
+    __hostdev__ void insert(const CoordType& ijk, const Node1T* node) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        mKey = ijk;
+#else
+        mKeys[0] = ijk & ~NodeT::MASK;
+#endif
+        mNode1 = node;
+    }
+    __hostdev__ void insert(const CoordType& ijk, const Node2T* node) const
+    {
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        mKey = ijk;
+#else
+        mKeys[1] = ijk & ~NodeT::MASK;
+#endif
+        mNode2 = node;
+    }
+    template <typename OtherNodeT>
+    __hostdev__ void insert(const CoordType&, const OtherNodeT*) const {}
+}; // ReadAccessor<ValueT, LEVEL0, LEVEL1>
+
+
+/// @brief Node caching at all (three) tree levels
+template <typename ValueT>
+class ReadAccessor<ValueT, 0, 1, 2>
+{
+    using TreeT  = NanoTree<ValueT>;
+    using RootT  = NanoRoot<ValueT>; //  root node
+    using NodeT2 = NanoNode2<ValueT>; // upper internal node
+    using NodeT1 = NanoNode1<ValueT>; // lower internal node
+    using LeafT  = NanoLeaf< ValueT>; // Leaf node
+    using CoordT = typename RootT::CoordType;
+
+    using FloatType = typename RootT::FloatType;
+    using CoordValueType = typename RootT::CoordT::ValueType;
+
+    // All member data are mutable to allow for access methods to be const
+#ifdef USE_SINGLE_ACCESSOR_KEY // 44 bytes total
+    mutable CoordT mKey; // 3*4 = 12 bytes
+#else // 68 bytes total
+    mutable CoordT mKeys[3]; // 3*3*4 = 36 bytes
+#endif
+    mutable const RootT* mRoot;
+    mutable const void* mNode[3]; // 4*8 = 32 bytes
+
+public:
+    using ValueType = ValueT;
+    using CoordType = CoordT;
+
+    static const int CacheLevels = 3;
+
+    using NodeInfo = typename ReadAccessor<ValueT, -1, -1, -1>::NodeInfo;
+
+    /// @brief Constructor from a root node
+    __hostdev__ ReadAccessor(const RootT& root)
+#ifdef USE_SINGLE_ACCESSOR_KEY
+        : mKey(CoordType::max())
+#else
+        : mKeys{CoordType::max(), CoordType::max(), CoordType::max()}
+#endif
+        , mRoot(&root)  
+        , mNode{nullptr, nullptr, nullptr}
+    {
+    }
+
+    __hostdev__ const RootT& root() const { return *mRoot; }
 
     /// @brief Defaults constructors
     ReadAccessor(const ReadAccessor&) = default;
@@ -3050,7 +3535,7 @@ public:
     template<typename NodeT>
     __hostdev__ const NodeT* getNode() const
     {
-        using T = typename Node<Tree<RootT>, NodeT::LEVEL>::type;
+        using T = typename TreeNode<TreeT, NodeT::LEVEL>::type;
         static_assert(is_same<T, NodeT>::value, "ReadAccessor::getNode: Invalid node type");
         return reinterpret_cast<const T*>(mNode[NodeT::LEVEL]);
     }
@@ -3087,14 +3572,14 @@ public:
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0])->getValue(ijk);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->getValue(ijk);
         } else if (this->isCached<NodeT1>(dirty)) {
             return ((NodeT1*)mNode[1])->getValueAndCache(ijk, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
             return ((NodeT2*)mNode[2])->getValueAndCache(ijk, *this);
         }
-        return ((NodeT3*)mNode[3])->getValueAndCache(ijk, *this);
+        return mRoot->getValueAndCache(ijk, *this);
     }
 
     __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
@@ -3104,14 +3589,14 @@ public:
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->getNodeInfoAndCache(ijk, *this);
         } else if (this->isCached<NodeT1>(dirty)) {
-            return ((NodeT1*)mNode[1])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+            return ((NodeT1*)mNode[1])->getNodeInfoAndCache(ijk, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
-            return ((NodeT2*)mNode[2])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+            return ((NodeT2*)mNode[2])->getNodeInfoAndCache(ijk, *this);
         }
-        return ((NodeT3*)mNode[3])->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
+        return mRoot->getNodeInfoAndCache(ijk, *this);
     }
 
     __hostdev__ bool isActive(const CoordType& ijk) const
@@ -3121,14 +3606,14 @@ public:
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0])->isActive(ijk);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->isActive(ijk);
         } else if (this->isCached<NodeT1>(dirty)) {
             return ((NodeT1*)mNode[1])->isActiveAndCache(ijk, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
             return ((NodeT2*)mNode[2])->isActiveAndCache(ijk, *this);
         }
-        return ((NodeT3*)mNode[3])->isActiveAndCache(ijk, *this);
+        return mRoot->isActiveAndCache(ijk, *this);
     }
 
     __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
@@ -3138,31 +3623,31 @@ public:
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0])->probeValue(ijk, v);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->probeValue(ijk, v);
         } else if (this->isCached<NodeT1>(dirty)) {
             return ((NodeT1*)mNode[1])->probeValueAndCache(ijk, v, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
             return ((NodeT2*)mNode[2])->probeValueAndCache(ijk, v, *this);
         }
-        return ((NodeT3*)mNode[3])->probeValueAndCache(ijk, v, *this);
+        return mRoot->probeValueAndCache(ijk, v, *this);
     }
 
-    __hostdev__ const NodeT0* probeLeaf(const CoordType& ijk) const
+    __hostdev__ const LeafT* probeLeaf(const CoordType& ijk) const
     {
 #ifdef USE_SINGLE_ACCESSOR_KEY
         const CoordValueType dirty = this->computeDirty(ijk);
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0]);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0]);
         } else if (this->isCached<NodeT1>(dirty)) {
             return ((NodeT1*)mNode[1])->probeLeafAndCache(ijk, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
             return ((NodeT2*)mNode[2])->probeLeafAndCache(ijk, *this);
         }
-        return ((NodeT3*)mNode[3])->probeLeafAndCache(ijk, *this);
+        return mRoot->probeLeafAndCache(ijk, *this);
     }
 
     template<typename RayT>
@@ -3173,14 +3658,14 @@ public:
 #else
         auto&& dirty = ijk;
 #endif
-        if (this->isCached<NodeT0>(dirty)) {
-            return ((NodeT0*)mNode[0])->getDimAndCache(ijk, ray, *this);
+        if (this->isCached<LeafT>(dirty)) {
+            return ((LeafT*)mNode[0])->getDimAndCache(ijk, ray, *this);
         } else if (this->isCached<NodeT1>(dirty)) {
             return ((NodeT1*)mNode[1])->getDimAndCache(ijk, ray, *this);
         } else if (this->isCached<NodeT2>(dirty)) {
             return ((NodeT2*)mNode[2])->getDimAndCache(ijk, ray, *this);
         }
-        return ((NodeT3*)mNode[3])->getDimAndCache(ijk, ray, *this);
+        return mRoot->getDimAndCache(ijk, ray, *this);
     }
 
 private:
@@ -3203,140 +3688,41 @@ private:
 #endif
         mNode[NodeT::LEVEL] = node;
     }
+}; // ReadAccessor<ValueT, 0, 1, 2>
 
-    // All member data are mutable to allow for access methods to be const
-#ifdef USE_SINGLE_ACCESSOR_KEY // 44 bytes total
-    mutable CoordType mKey; // 3*4 = 12 bytes
-#else // 68 bytes total
-    mutable CoordType mKeys[3]; // 3*3*4 = 36 bytes
-#endif
-    mutable const void* mNode[4]; // 4*8 = 32 bytes
-}; // ReadAccessor<T, 3> class
+//////////////////////////////////////////////////
 
-/// @brief ReadAccessor with NO node caching
-template<typename RootT>
-class ReadAccessor<RootT, 0>
-{
-public:
-    using ValueType = typename RootT::ValueType;
-    using FloatType = typename RootT::FloatType;
-    using CoordType = typename RootT::CoordType;
-    using CoordValueType = typename RootT::CoordType::ValueType;
-    using NodeT3 = const RootT; //                    root node
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper internal node
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower internal node
-    using NodeT0 = typename NodeT1::ChildNodeType; // Leaf node
+/// @brief Free-standing function for convenient creation of a ReadAccessor with
+///        optional and customizable node caching.
+///
+/// @details createAccessor<>(grid):  No caching of nodes and hence it's thread-safe but slow
+///          createAccessor<0>(grid): Caching of leaf nodes only
+///          createAccessor<1>(grid): Caching of lower internal nodes only
+///          createAccessor<2>(grid): Caching of upper internal nodes only
+///          createAccessor<0,1>(grid): Caching of leaf and lower internal nodes
+///          createAccessor<0,2>(grid): Caching of leaf and upper internal nodes
+///          createAccessor<1,2>(grid): Caching of lower and upper internal nodes
+///          createAccessor<0,1,0>(grid): Caching of all nodes at all tree levels
 
-    using NodeInfo = typename ReadAccessor<RootT, 3>::NodeInfo;
-
-    /// @brief Constructor from a root node
-    __hostdev__ ReadAccessor(const RootT& root) : mRoot{&root} {}
-
-    __hostdev__ const RootT& root() const { return *mRoot; }
-
-    /// @brief Defaults constructors
-    ReadAccessor(const ReadAccessor&) = default;
-    ~ReadAccessor() = default;
-    ReadAccessor& operator=(const ReadAccessor&) = default;
-
-    __hostdev__ const ValueType& getValue(const CoordType& ijk) const
-    {
-        return mRoot->getValueAndCache(ijk, *this);
-    }
-
-    __hostdev__ NodeInfo getNodeInfo(const CoordType& ijk) const
-    {
-
-        return mRoot->template getNodeInfoAndCache<ReadAccessor>(ijk, *this);
-    }
-
-    __hostdev__ bool isActive(const CoordType& ijk) const
-    {
-        return mRoot->isActiveAndCache(ijk, *this);
-    }
-
-    __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
-    {
-        return mRoot->probeValueAndCache(ijk, v, *this);
-    }
-
-    __hostdev__ const NodeT0* probeLeaf(const CoordType& ijk) const
-    {
-        return mRoot->probeLeafAndCache(ijk, *this);
-    }
-
-    template<typename RayT>
-    __hostdev__ uint32_t getDim(const CoordType& ijk, const RayT& ray) const
-    {        
-        return mRoot->getDimAndCache(ijk, ray, *this);
-    }
-
-private:
-    /// @brief Allow nodes to insert themselves into the cache.
-    template<typename>
-    friend class RootNode;
-    template<typename, uint32_t>
-    friend class InternalNode;
-    template<typename, typename, template<uint32_t> class, uint32_t>
-    friend class LeafNode;
-
-    /// @brief No-op
-    template<typename NodeT>
-    __hostdev__ void insert(const CoordType&, const NodeT*) const {}
-
-    // All member data are mutable to allow for access methods to be const
-    mutable const RootT* mRoot; // 8 bytes
-}; // ReadAccessor<T, 0> class
-
-/// @brief Default configuration used in OpenVDB: Root->32^3->16^3->8^3
-template<typename ValueT>
-using NanoLeaf = LeafNode<ValueT, Coord, Mask, 3>;
-template<typename ValueT>
-using NanoNode1 = InternalNode<NanoLeaf<ValueT>, 4>;
-template<typename ValueT>
-using NanoNode2 = InternalNode<NanoNode1<ValueT>, 5>;
-template<typename ValueT>
-using NanoRoot = RootNode<NanoNode2<ValueT>>;
-template<typename ValueT>
-using NanoTree = Tree<NanoRoot<ValueT>>;
-template<typename ValueT>
-using NanoGrid = Grid<NanoTree<ValueT>>;
-
-template <int CacheLevels = 3, typename ValueT = float>
-ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoGrid<ValueT> &grid)
+template <int LEVEL0 = -1, int LEVEL1 = -1, int LEVEL2 = -1, typename ValueT = float>
+ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2> createAccessor(const NanoGrid<ValueT> &grid)
 { 
-    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(grid.tree().root());
+    return ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2>(grid.tree().root());
 }
 
-template <int CacheLevels = 3, typename ValueT = float>
-ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoTree<ValueT> &tree)
+template <int LEVEL0 = -1, int LEVEL1 = -1, int LEVEL2 = -1, typename ValueT = float>
+ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2> createAccessor(const NanoTree<ValueT> &tree)
 { 
-    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(tree.root());
+    return ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2>(tree().root());
 }
 
-template <int CacheLevels = 3, typename ValueT = float>
-ReadAccessor<NanoRoot<ValueT>, CacheLevels> createAccessor(const NanoRoot<ValueT> &root)
+template <int LEVEL0 = -1, int LEVEL1 = -1, int LEVEL2 = -1, typename ValueT = float>
+ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2> createAccessor(const NanoRoot<ValueT> &root)
 { 
-    return ReadAccessor<NanoRoot<ValueT>, CacheLevels>(root);
+    return ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2>(root);
 }
 
-using FloatTree = NanoTree<float>;
-using DoubleTree = NanoTree<double>;
-using Int32Tree = NanoTree<int32_t>;
-using UInt32Tree = NanoTree<uint32_t>;
-using Int64Tree = NanoTree<int64_t>;
-using Vec3fTree = NanoTree<Vec3f>;
-using Vec3dTree = NanoTree<Vec3d>;
-using MaskTree = NanoTree<ValueMask>;
-
-using FloatGrid = Grid<FloatTree>;
-using DoubleGrid = Grid<DoubleTree>;
-using Int32Grid = Grid<Int32Tree>;
-using UInt32Grid = Grid<UInt32Tree>;
-using Int64Grid = Grid<Int64Tree>;
-using Vec3fGrid = Grid<Vec3fTree>;
-using Vec3dGrid = Grid<Vec3dTree>;
-using MaskGrid = Grid<MaskTree>;
+//////////////////////////////////////////////////
 
 /// @brief This is a convenient class that allows for access to grid meta-data
 ///        that are independent of the value type of a grid. That is, this calls
@@ -3377,9 +3763,9 @@ public:
 
 /// @brief Class to access points at a specefic voxel location
 template<typename AttT>
-class PointAccessor : public ReadAccessor<NanoRoot<uint32_t>>
+class PointAccessor : public DefaultReadAccessor<uint32_t>
 {
-    using AccT = ReadAccessor<NanoRoot<uint32_t>>;
+    using AccT = DefaultReadAccessor<uint32_t>;
     const UInt32Grid* mGrid;
     const AttT*       mData;
 
@@ -3424,7 +3810,7 @@ public:
         auto* leaf = this->probeLeaf(ijk);
         if (leaf == nullptr)
             return 0;
-        const uint32_t offset = NodeT0::CoordToOffset(ijk);
+        const uint32_t offset = LeafNodeType::CoordToOffset(ijk);
         if (leaf->isActive(offset)) {
             auto* p = mData + leaf->valueMin();
             begin = p + (offset == 0 ? 0 : leaf->getValue(offset - 1));

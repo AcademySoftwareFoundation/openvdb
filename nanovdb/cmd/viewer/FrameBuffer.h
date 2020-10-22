@@ -60,7 +60,7 @@ public:
     //! return the internal texture format.
     InternalFormat internalFormat() const { return mInternalFormat; }
 
-    static int getElementSizeForFormat(InternalFormat format)
+    static int formatGetElementSize(InternalFormat format)
     {
         switch (format) {
         case InternalFormat::RGBA32F:
@@ -80,9 +80,41 @@ public:
         }
     }
 
+    static bool formatIsFloat(InternalFormat format)
+    {
+        switch (format) {
+        case InternalFormat::DEPTH_COMPONENT32F:
+        case InternalFormat::R32F:
+        case InternalFormat::RGBA32F:
+        case InternalFormat::RGB32F:
+            return true;
+        case InternalFormat::DEPTH_COMPONENT32:
+        case InternalFormat::RGBA8UI:
+        default:
+            return false;
+        }
+    }
+
+    static int formatGetNumComponents(InternalFormat format)
+    {
+        switch (format) {
+        case InternalFormat::RGBA32F:
+        case InternalFormat::RGBA8UI:
+            return 4;
+        case InternalFormat::RGB32F:
+            return 3;
+        case InternalFormat::DEPTH_COMPONENT32F:
+        case InternalFormat::DEPTH_COMPONENT32:
+        case InternalFormat::R32F:
+            return 1;
+        default:
+            return 0;
+        }
+    }
+
     void  invalidate() const { ++mBufferUpdateId; }
-    bool  save(const char* filename);
-    bool  load(const char* filename);
+    bool  save(const char* filename, const char* fileformat, int quality = 80);
+    bool  load(const char* filename, const char* fileformat);
     float computePSNR(FrameBufferBase& other);
 
     virtual void* map(AccessType access) = 0;

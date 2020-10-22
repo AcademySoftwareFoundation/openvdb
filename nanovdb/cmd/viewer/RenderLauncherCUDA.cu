@@ -52,38 +52,78 @@ __global__ void launchRenderKernel(int width, int height, FnT fn, Args... args)
     fn(ix, iy, width, height, args...);
 }
 
-template<typename FnT, typename... Args>
-static void launchRender(int width, int height, FnT fn, Args... args)
+struct CudaLauncher
 {
-    auto       divRoundUp = [](int a, int b) { return (a + b - 1) / b; };
-    const dim3 threadsPerBlock(8, 8), numBlocks(divRoundUp(width, threadsPerBlock.x), divRoundUp(height, threadsPerBlock.y));
-    launchRenderKernel<<<numBlocks, threadsPerBlock, 0, 0>>>(width, height, fn, args...);
-    auto code = cudaGetLastError();
-    if (code != cudaSuccess) {
-        std::cerr << "launchRenderCuda CUDA error: " << cudaGetErrorString(code) << std::endl;
-        exit(code);
+    RenderLauncherCUDA* mOwner;
+
+    CudaLauncher(RenderLauncherCUDA* owner)
+        : mOwner(owner)
+    {
     }
-}
+
+    template<typename ValueT>
+    const nanovdb::NanoGrid<ValueT>* grid(const void* gridPtr)
+    {
+        auto gridHdl = reinterpret_cast<const nanovdb::GridHandle<>*>(gridPtr);
+
+        if (!gridHdl)
+            return nullptr;
+
+        auto resource = mOwner->ensureGridResource(gridHdl);
+        if (!resource || !resource->mInitialized) {
+            return nullptr;
+        }
+        return reinterpret_cast<const nanovdb::NanoGrid<ValueT>*>(resource->mDeviceGrid);
+    }
+
+    template<typename FnT, typename... Args>
+    bool render(int width, int height, const FnT& fn, Args... args) const
+    {
+        auto       divRoundUp = [](int a, int b) { return (a + b - 1) / b; };
+        const dim3 threadsPerBlock(8, 8), numBlocks(divRoundUp(width, threadsPerBlock.x), divRoundUp(height, threadsPerBlock.y));
+        launchRenderKernel<<<numBlocks, threadsPerBlock, 0, 0>>>(width, height, fn, args...);
+        auto code = cudaGetLastError();
+        if (code != cudaSuccess) {
+            std::cerr << "launchRenderCuda CUDA error: " << cudaGetErrorString(code) << std::endl;
+            return false;
+        }
+        return true;
+    }
+};
 
 RenderLauncherCUDA::~RenderLauncherCUDA()
 {
-    for (auto& it : mResources) {
+    for (auto& it : mGridResources) {
         cudaFree(it.second->mDeviceGrid);
     }
-    mResources.clear();
+    mGridResources.clear();
 }
 
-std::shared_ptr<RenderLauncherCUDA::Resource> RenderLauncherCUDA::ensureResource(const nanovdb::GridHandle<>* gridHdl)
+std::shared_ptr<RenderLauncherCUDA::ImageResource> RenderLauncherCUDA::ensureImageResource()
 {
-    std::shared_ptr<Resource> resource;
-    auto                      it = mResources.find(gridHdl);
-    if (it != mResources.end()) {
+    std::shared_ptr<ImageResource> resource;
+    if (mImageResource) {
+        resource = mImageResource;
+    } else {
+        std::cout << "Initializing CUDA image resource..." << std::endl;
+        resource = std::make_shared<ImageResource>();
+        mImageResource = resource;
+        resource->mInitialized = true;
+    }
+
+    return resource;
+}
+std::shared_ptr<RenderLauncherCUDA::GridResource> RenderLauncherCUDA::ensureGridResource(const nanovdb::GridHandle<>* gridHdl)
+{
+    std::shared_ptr<GridResource> resource;
+    auto                      it = mGridResources.find(gridHdl);
+    if (it != mGridResources.end()) {
         resource = it->second;
     } else {
-        std::cout << "Initializing CUDA renderer..." << std::endl;
+        std::cout << "Initializing CUDA grid["<< gridHdl->gridMetaData()->gridName() <<"] resource..." << std::endl;
 
-        resource = std::make_shared<Resource>();
-        mResources.insert(std::make_pair(gridHdl, resource));
+        resource = std::make_shared<GridResource>();
+        mGridResources.insert(std::make_pair(gridHdl, resource));
 
         NANOVDB_CUDA_SAFE_CALL(cudaMalloc((void**)&resource->mDeviceGrid, gridHdl->size()));
         NANOVDB_CUDA_SAFE_CALL(cudaMemcpy(resource->mDeviceGrid, gridHdl->data(), gridHdl->size(), cudaMemcpyHostToDevice));
@@ -97,10 +137,11 @@ std::shared_ptr<RenderLauncherCUDA::Resource> RenderLauncherCUDA::ensureResource
         resource->mInitialized = true;
     }
 
+    resource->mLastUsedTime = std::chrono::steady_clock::now();
     return resource;
 }
 
-void RenderLauncherCUDA::unmapCUDA(const std::shared_ptr<Resource>& resource, FrameBufferBase* imgBuffer, void* stream)
+void RenderLauncherCUDA::unmapCUDA(const std::shared_ptr<ImageResource>& resource, FrameBufferBase* imgBuffer, void* stream)
 {
 #if defined(NANOVDB_USE_OPENGL)
     auto imgBufferGL = dynamic_cast<FrameBufferGL*>(imgBuffer);
@@ -118,7 +159,7 @@ void RenderLauncherCUDA::unmapCUDA(const std::shared_ptr<Resource>& resource, Fr
     imgBuffer->invalidate();
 }
 
-void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& resource, FrameBufferBase* imgBuffer, void* stream)
+void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<ImageResource>& resource, FrameBufferBase* imgBuffer, void* stream)
 {
     if (!imgBuffer->size()) {
         return nullptr;
@@ -127,11 +168,10 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& r
 #if defined(NANOVDB_USE_OPENGL)
     auto imgBufferGL = dynamic_cast<FrameBufferGL*>(imgBuffer);
     if (imgBufferGL) {
-
         if (resource->mGlTextureResourceCUDAError)
             return nullptr;
 
-        auto     accessGL = FrameBufferBase::AccessType(access);
+        auto accessGL = FrameBufferBase::AccessType(access);
 
         uint32_t accessCUDA = cudaGraphicsMapFlagsNone;
         if (accessGL == FrameBufferBase::AccessType::READ_ONLY) {
@@ -201,91 +241,35 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<Resource>& r
     return imgBuffer->cudaMap(FrameBufferBase::AccessType(access));
 }
 
-bool RenderLauncherCUDA::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+bool RenderLauncherCUDA::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
-    auto resource = ensureResource(&gridHdl);
-    if (!resource || !resource->mInitialized) {
-        return false;
-    }
-
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
 
+    auto imageResource = ensureImageResource();
+    if (!imageResource || imageResource->mInitialized == false)
+        return false;
+
     float* imgPtr = (float*)mapCUDA(
         (int)((numAccumulations > 0) ? FrameBufferBase::AccessType::READ_WRITE : FrameBufferBase::AccessType::WRITE_ONLY),
-        resource,
+        imageResource,
         imgBuffer);
 
     if (!imgPtr) {
         return false;
     }
 
-    if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Float) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<float>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::LEVELSET) {
-            launchRender(width, height, render::levelset::RenderLevelSetRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Double) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<double>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::LEVELSET) {
-            launchRender(width, height, render::levelset::RenderLevelSetRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::UInt32) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<uint32_t>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::POINTS) {
-            launchRender(width, height, render::points::RenderPointsRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Vec3f) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<nanovdb::Vec3f>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Vec3d) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<nanovdb::Vec3d>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Int64) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<int64_t>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Int32) {
-        auto deviceGrid = reinterpret_cast<const nanovdb::NanoGrid<int32_t>*>(resource->mDeviceGrid);
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, deviceGrid, numAccumulations, params);
-        }
-    }
-
-    unmapCUDA(resource, imgBuffer);
+    CudaLauncher methodLauncher(this);    
+    launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
+    
+    unmapCUDA(imageResource, imgBuffer);
 
     if (stats) {
-        cudaDeviceSynchronize();
+        NANOVDB_CUDA_SAFE_CALL(cudaDeviceSynchronize());
         auto t1 = ClockT::now();
-        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count()/1000.f;
+        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
     }
-    
+
     return true;
 }
 

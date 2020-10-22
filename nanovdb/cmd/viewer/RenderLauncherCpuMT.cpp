@@ -27,131 +27,89 @@
 #endif
 #include <iostream>
 
-template<typename FnT, typename... Args>
-static void launchRender(int width, int height, const FnT& fn, Args... args)
+struct Launcher
 {
-#if defined(NANOVDB_USE_TBB)
-    auto kernel2D = [&](const tbb::blocked_range2d<int>& r) {
-        for (int iy = r.cols().begin(); iy < r.cols().end(); ++iy) {
-            for (int ix = r.rows().begin(); ix < r.rows().end(); ++ix) {
-                fn(ix, iy, width, height, args...);
-            }
-        }
-    };
-    tbb::blocked_range2d<int> range2D(0, width, 0, height);
-    tbb::parallel_for(range2D, kernel2D);
-#else
-
-    const int blockSize = 8;
-    const int nBlocksX = (width + (blockSize - 1)) / blockSize;
-    const int nBlocksY = (height + (blockSize - 1)) / blockSize;
-    const int nBlocks = nBlocksX * nBlocksY;
-
-    auto renderBlock = [=](int i) {
-        const int blockOffsetX = blockSize * (i % nBlocksX);
-        const int blockOffsetY = blockSize * (i / nBlocksY);
-
-        for (int iy = 0; iy < blockSize; ++iy) {
-            for (int ix = 0; ix < blockSize; ++ix) {
-                fn(ix + blockOffsetX, iy + blockOffsetY, width, height, args...);
-            }
-        }
-    };
-
-    unsigned                 numCores = std::thread::hardware_concurrency();
-    std::vector<std::thread> threads(numCores);
-    std::atomic<int>         tileCounter(0);
-
-    for (int i = 0; i < threads.size(); ++i) {
-        threads[i] = std::thread([&tileCounter, nBlocks, i, renderBlock] {
-            for (;;) {
-                const int blockIndex = tileCounter++;
-                if (blockIndex >= nBlocks) {
-                    break;
-                }
-                renderBlock(blockIndex);
-            }
-        });
+    template<typename ValueT>
+    const nanovdb::NanoGrid<ValueT>* grid(const void* gridPtr) const
+    {
+        auto gridHdl = reinterpret_cast<const nanovdb::GridHandle<>*>(gridPtr);
+        if (!gridHdl)
+            return nullptr;
+        return gridHdl->grid<ValueT>();        
     }
 
-    for (auto& t : threads)
-        t.join();
-#endif
-}
+    template<typename FnT, typename... Args>
+    bool render(int width, int height, const FnT& fn, Args... args) const
+    {
+#if defined(NANOVDB_USE_TBB)
+        auto kernel2D = [&](const tbb::blocked_range2d<int>& r) {
+            for (int iy = r.cols().begin(); iy < r.cols().end(); ++iy) {
+                for (int ix = r.rows().begin(); ix < r.rows().end(); ++ix) {
+                    fn(ix, iy, width, height, args...);
+                }
+            }
+        };
+        tbb::blocked_range2d<int> range2D(0, width, 0, height);
+        tbb::parallel_for(range2D, kernel2D);
+#else
 
-bool RenderLauncherCpuMT::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+        const int blockSize = 8;
+        const int nBlocksX = (width + (blockSize - 1)) / blockSize;
+        const int nBlocksY = (height + (blockSize - 1)) / blockSize;
+        const int nBlocks = nBlocksX * nBlocksY;
+
+        auto renderBlock = [=](int i) {
+            const int blockOffsetX = blockSize * (i % nBlocksX);
+            const int blockOffsetY = blockSize * (i / nBlocksY);
+
+            for (int iy = 0; iy < blockSize; ++iy) {
+                for (int ix = 0; ix < blockSize; ++ix) {
+                    fn(ix + blockOffsetX, iy + blockOffsetY, width, height, args...);
+                }
+            }
+        };
+
+        unsigned                 numCores = std::thread::hardware_concurrency();
+        std::vector<std::thread> threads(numCores);
+        std::atomic<int>         tileCounter(0);
+
+        for (int i = 0; i < threads.size(); ++i) {
+            threads[i] = std::thread([&tileCounter, nBlocks, i, renderBlock] {
+                for (;;) {
+                    const int blockIndex = tileCounter++;
+                    if (blockIndex >= nBlocks) {
+                        break;
+                    }
+                    renderBlock(blockIndex);
+                }
+            });
+        }
+
+        for (auto& t : threads)
+            t.join();
+#endif
+        return true;
+    }
+};
+
+bool RenderLauncherCpuMT::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
-    
+
     float* imgPtr = (float*)imgBuffer->map((numAccumulations > 0) ? FrameBufferBase::AccessType::READ_WRITE : FrameBufferBase::AccessType::WRITE_ONLY);
     if (!imgPtr) {
         return false;
     }
 
-    if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Float) {
-        auto grid = gridHdl.grid<float>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::LEVELSET) {
-            launchRender(width, height, render::levelset::RenderLevelSetRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Double) {
-        auto grid = gridHdl.grid<double>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::LEVELSET) {
-            launchRender(width, height, render::levelset::RenderLevelSetRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::UInt32) {
-        auto grid = gridHdl.grid<uint32_t>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::POINTS) {
-            launchRender(width, height, render::points::RenderPointsRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Vec3f) {
-        auto grid = gridHdl.grid<nanovdb::Vec3f>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Vec3d) {
-        auto grid = gridHdl.grid<nanovdb::Vec3d>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Int64) {
-        auto grid = gridHdl.grid<int64_t>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } 
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Int32) {
-        auto grid = gridHdl.grid<int32_t>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } 
-    } 
+    Launcher methodLauncher;
+    launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
 
     imgBuffer->unmap();
 
     if (stats) {
         auto t1 = ClockT::now();
-        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count()/1000.f;
+        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
     }
 
     return true;

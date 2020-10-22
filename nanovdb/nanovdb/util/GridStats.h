@@ -658,16 +658,27 @@ void GridStats<ValueT, StatsT>::
         data.mWorldBBox = BBox<Vec3R>();
         data.setBBoxOn(false);
     } else {
+        // Note that below max is offset by one since CoordBBox.max is inclusive
+        // while bbox<Vec3R>.max is exclusive. However, min is inclusive in both
+        // CoordBBox and BBox<Vec3R>. This also guarantees that a grid with a single
+        // active voxel, does not have an empty world bbox! E.g. if a grid with a
+        // unit index-to-world transformation only contains the active voxel (0,0,0)
+        // then indeBBox = (0,0,0) -> (0,0,0) and then worldBBox = (0.0, 0.0, 0.0)
+        // -> (1.0, 1.0, 1.0). This is a consequence of the different definitions
+        // of index and world bounding boxes inherited from OpenVDB!
+        const Coord min = indexBBox[0];
+        const Coord max = indexBBox[1] + Coord(1);
+        
+        auto& worldBBox = data.mWorldBBox;
         const auto& map = mGrid->map();
-        auto&       worldBBox = data.mWorldBBox;
-        worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(indexBBox[0][0], indexBBox[0][1], indexBBox[0][2]));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[0][0], indexBBox[0][1], indexBBox[1][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[0][0], indexBBox[1][1], indexBBox[0][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[0][1], indexBBox[0][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[1][1], indexBBox[0][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[0][1], indexBBox[1][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[0][0], indexBBox[1][1], indexBBox[1][2])));
-        worldBBox.expand(map.applyMap(Vec3d(indexBBox[1][0], indexBBox[1][1], indexBBox[1][2])));
+        worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
+        worldBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
+        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
+        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], min[2])));
+        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], min[2])));
+        worldBBox.expand(map.applyMap(Vec3d(max[0], min[1], max[2])));
+        worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], max[2])));
+        worldBBox.expand(map.applyMap(Vec3d(max[0], max[1], max[2])));
         data.setBBoxOn(true);
     }
 

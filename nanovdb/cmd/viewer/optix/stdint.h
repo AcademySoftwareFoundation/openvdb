@@ -54,6 +54,20 @@
     #define PTRDIFF_MIN INTPTR_MIN
     #define PTRDIFF_MAX INTPTR_MAX
     #define SIZE_MAX    UINT64_MAX
+
+    #define INT8_C(x)    (x)
+    #define INT16_C(x)   (x)
+    #define INT32_C(x)   (x)
+    #define INT64_C(x)   (x ## LL)
+
+    #define UINT8_C(x)   (x)
+    #define UINT16_C(x)  (x)
+    #define UINT32_C(x)  (x ## U)
+    #define UINT64_C(x)  (x ## ULL)
+
+    #define INTMAX_C(x)  INT64_C(x)
+    #define UINTMAX_C(x) UINT64_C(x)
+
     } // namespace __jitify_stdint_ns
     namespace std { using namespace __jitify_stdint_ns; }
     using namespace __jitify_stdint_ns;;

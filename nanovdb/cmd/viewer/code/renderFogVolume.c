@@ -12,13 +12,14 @@
 #line 12
 #endif
 
-#define CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION 1
+//#define CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION 1
 
 CNANOVDB_DECLARE_STRUCT_BEGIN(HeterogenousMedium)
-    float densityFactor;
+    float densityScale;
     float densityMin;
     float densityMax;
     float hgMeanCosine;
+    float albedo;
 CNANOVDB_DECLARE_STRUCT_END(HeterogenousMedium)
 
 /////////////////////////
@@ -26,17 +27,11 @@ CNANOVDB_DECLARE_STRUCT_END(HeterogenousMedium)
 CNANOVDB_INLINE float
 deltaTracking(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed)
 {
-    boolean hit = nanovdb_Ray_clip(ray,
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min),
-                                   nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max));
-    if (!hit)
-        return -1.f;
-
     float densityMaxInv = 1.0f / medium.densityMax;
     float t = CNANOVDB_DEREF(ray).mT0;
     do {
         t += -logf(randomf(CNANOVDB_DEREF(seed)++)) * densityMaxInv;
-    } while (t < CNANOVDB_DEREF(ray).mT1 && nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityFactor * densityMaxInv < randomf(CNANOVDB_DEREF(seed)++));
+    } while (t < CNANOVDB_DEREF(ray).mT1 && nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityScale * densityMaxInv < randomf(CNANOVDB_DEREF(seed)++));
     return t;
 }
 
@@ -49,48 +44,7 @@ getTransmittance(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_R
     if (!hit)
         return 1.0f;
 
-#if !defined(CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION)
-    // delta tracking.
-    // faster due to earlier termination, but we need multiple samples
-    // to reduce variance.
-    float     densityMaxInv = 1.0f / medium.densityMax;
-    const int nSamples = 2;
-    float     transmittance = 0.f;
-    for (int n = 0; n < nSamples; n++) {
-        float t = CNANOVDB_DEREF(ray).mT0;
-        while (CNANOVDB_TRUE) {
-            t -= logf(randomf(CNANOVDB_DEREF(seed)++)) * densityMaxInv;
-
-            if (t >= CNANOVDB_DEREF(ray).mT1) {
-                transmittance += 1.0f;
-                break;
-            }
-
-            float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityFactor;
-            density = fmin(fmax(density, medium.densityMin), medium.densityMax); // just in case these are soft extrema
-
-            if (density * densityMaxInv >= randomf(CNANOVDB_DEREF(seed)++))
-                break;
-        }
-    }
-    return transmittance / nSamples;
-#elif 0
-    // ratio tracking.
-    // slower due to no early termination, but better estimation.
-    float densityMaxInv = 1.0f / medium.densityMax;
-    float transmittance = 1.f;
-    float t = CNANOVDB_DEREF(ray).mT0;
-    while (CNANOVDB_TRUE) {
-        t -= logf(randomf(CNANOVDB_DEREF(seed)++)) * densityMaxInv;
-        if (t >= CNANOVDB_DEREF(ray).mT1)
-            break;
-        float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityFactor;
-        density = fmin(fmax(density, medium.densityMin), medium.densityMax); // just in case these are soft extrema
-
-        transmittance *= 1.0f - density * densityMaxInv;
-    }
-    return transmittance;
-#elif 1
+#if defined(CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION)
         // residual ratio tracking.
 #if 1
     // control is minimum.
@@ -109,52 +63,93 @@ getTransmittance(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_R
     const float residualDensityMax = fmaxf(0.001f, fabsf(residualDensityMax1));
 #endif
     const float residualDensityMaxInv = 1.0f / residualDensityMax;
-    float controlTransmittance = expf(-controlDensity * (CNANOVDB_DEREF(ray).mT1 - CNANOVDB_DEREF(ray).mT0));
-    float residualTransmittance = 1.f;
-    float t = CNANOVDB_DEREF(ray).mT0;
+    float       controlTransmittance = expf(-controlDensity * (CNANOVDB_DEREF(ray).mT1 - CNANOVDB_DEREF(ray).mT0));
+    float       residualTransmittance = 1.f;
+    float       t = CNANOVDB_DEREF(ray).mT0;
     while (CNANOVDB_TRUE) {
         t -= logf(randomf(CNANOVDB_DEREF(seed)++)) * residualDensityMaxInv;
         if (t >= CNANOVDB_DEREF(ray).mT1)
             break;
-        float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityFactor;
-        density = fmin(fmax(density, medium.densityMin), medium.densityMax); // just in case these are soft extrema
+        float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityScale;
+        //density = fmin(fmax(density, medium.densityMin), medium.densityMax); // just in case these are soft extrema
 
         float residualDensity = density - controlDensity;
         residualTransmittance *= 1.0f - residualDensity / residualDensityMax1;
     }
     return residualTransmittance * controlTransmittance;
+#elif 1
+    // ratio tracking.
+    // slower due to no early termination, but better estimation.
+    float densityMaxInv = 1.0f / medium.densityMax;
+    float transmittance = 1.f;
+    float t = CNANOVDB_DEREF(ray).mT0;
+    while (CNANOVDB_TRUE) {
+        t -= logf(randomf(CNANOVDB_DEREF(seed)++)) * densityMaxInv;
+        if (t >= CNANOVDB_DEREF(ray).mT1)
+            break;
+        float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityScale;
+
+        transmittance *= 1.0f - density * densityMaxInv;
+        if (transmittance < 0.01f)
+            return 0.f;
+    }
+    return transmittance;
+#elif 1
+
+    // delta tracking.
+    // faster due to earlier termination, but we need multiple samples
+    // to reduce variance.
+    float     densityMaxInv = 1.0f / medium.densityMax;
+    const int nSamples = 2;
+    float     transmittance = 0.f;
+    for (int n = 0; n < nSamples; n++) {
+        float t = CNANOVDB_DEREF(ray).mT0;
+        while (CNANOVDB_TRUE) {
+            t -= logf(randomf(CNANOVDB_DEREF(seed)++)) * densityMaxInv;
+
+            if (t >= CNANOVDB_DEREF(ray).mT1) {
+                transmittance += 1.0f;
+                break;
+            }
+
+            float density = nanovdb_ReadAccessor_getValue(cxt, acc, nanovdb_Vec3fToCoord(nanovdb_Ray_eval(ray, t))) * medium.densityScale;
+
+            if (density * densityMaxInv >= randomf(CNANOVDB_DEREF(seed)++))
+                break;
+        }
+    }
+    return transmittance / nSamples;
 #endif // CNANOVDB_VIEWER_USE_RATIO_TRACKED_TRANSMISSION
 }
 
 CNANOVDB_INLINE float henyeyGreenstein(float g, float cosTheta)
 {
-    // phase function pdf.
-#if 1
-    // isotropic.
-    return 1.0f / (3.14159265359f * 4.f);
-#else
-    float denom = 1.f + g * g - 2.f * g * cosTheta;
-    return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
-#endif
+    if (g == 0) {
+        return 1.0f / (3.14159265359f * 4.f);
+    } else {
+        float denom = fmax(0.001f, 1.f + g * g - 2.f * g * cosTheta);
+        return (1.0f / (3.14159265359f * 4.f)) * (1.f - g * g) / (denom * sqrtf(denom));
+    }
 }
 
 CNANOVDB_INLINE vec3 sampleHG(float g, float e1, float e2)
 {
     // phase function.
-#if 1
-    // isotropic
-    const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e1;
-    const float cosTheta = 1.0f - 2.0f * e2;
-    const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
-#else
-    const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e2;
-    const float s = 2.0f * e1 - 1.0f;
-    const float denom = nanovdb::Max(0.001f, (1.0f + g * s));
-    const float f = (1.0f - g * g) / denom;
-    const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
-    const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
-#endif
-    return CNANOVDB_MAKE_VEC3(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+    if (g == 0) {
+        // isotropic
+        const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e1;
+        const float cosTheta = 1.0f - 2.0f * e2;
+        const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
+        return CNANOVDB_MAKE_VEC3(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+    } else {
+        const float phi = CNANOVDB_MAKE(float)(2.0f * 3.14159265359f) * e2;
+        const float s = 2.0f * e1 - 1.0f;
+        const float denom = fmax(0.001f, (1.0f + g * s));
+        const float f = (1.0f - g * g) / denom;
+        const float cosTheta = 0.5f * (1.0f / g) * (1.0f + g * g - f * f);
+        const float sinTheta = sqrtf(1.0f - cosTheta * cosTheta);
+        return CNANOVDB_MAKE_VEC3(cosf(phi) * sinTheta, sinf(phi) * sinTheta, cosTheta);
+    }
 }
 
 CNANOVDB_INLINE Vec3T estimateLight(CNANOVDB_CONTEXT cxt, Vec3T pos, Vec3T dir, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed, Vec3T lightDir)
@@ -167,18 +162,16 @@ CNANOVDB_INLINE Vec3T estimateLight(CNANOVDB_CONTEXT cxt, Vec3T pos, Vec3T dir, 
     shadowRay.mT1 = MaxFloat;
 
     float transmittance = getTransmittance(cxt, CNANOVDB_ADDRESS(shadowRay), acc, medium, seed);
-    float pdf = 1.0f;//henyeyGreenstein(medium.hgMeanCosine, vec3_dot(dir, lightDir));
+    float pdf = 1.0f; //henyeyGreenstein(medium.hgMeanCosine, vec3_dot(dir, lightDir));
     return vec3_fmul(pdf * transmittance, lightRadiance);
 }
 
-CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed, nanovdb_Vec3f lightDir)
+CNANOVDB_INLINE nanovdb_Vec3f traceFogVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(float) outThroughput, int useLighting, CNANOVDB_REF(nanovdb_Ray) ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc, HeterogenousMedium medium, CNANOVDB_REF(uint32_t) seed, nanovdb_Vec3f lightDir)
 {
     float throughput = 1.0f;
 
-    float albedo = 0.8f;
-
-    int max_interactions = 40;
-    int num_interactions = 0;
+    int kMaxPathDepth = 4;
+    int numInteractions = 0;
 
     if (!nanovdb_Ray_clip(ray, nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max))) {
         return CNANOVDB_MAKE_VEC3(0, 0, 0);
@@ -188,29 +181,32 @@ CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nan
 
     nanovdb_Vec3f radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
 
-    while (CNANOVDB_TRUE) {
+    while (numInteractions++ < kMaxPathDepth) {
         float s = deltaTracking(cxt, CNANOVDB_ADDRESS(pathRay), acc, medium, seed);
         if (s >= pathRay.mT1)
             break;
 
-        if (s < 0)
-            return CNANOVDB_MAKE_VEC3(0, 0, 0);
-
-        if (num_interactions++ >= max_interactions)
-            return CNANOVDB_MAKE_VEC3(0, 0, 0);
+        if (s < 0) {
+            radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
+            break;
+        }
 
         nanovdb_Vec3f pos = nanovdb_Ray_eval(CNANOVDB_ADDRESS(pathRay), s);
 
         // sample key light.
-        radiance = vec3_add(radiance, vec3_fmul(throughput, estimateLight(cxt, pos, pathRay.mDir, acc, medium, seed, lightDir)));
-
-        throughput *= albedo;
+        if (useLighting > 0) {
+            radiance = vec3_add(radiance, vec3_fmul(throughput, estimateLight(cxt, pos, pathRay.mDir, acc, medium, seed, lightDir)));
+        }
+        
+        throughput *= medium.albedo;
 
         // Russian roulette absorption.
         if (throughput < 0.2f) {
             float r1 = randomf(CNANOVDB_DEREF(seed)++);
-            if (r1 > throughput * 5.0f)
-                return CNANOVDB_MAKE_VEC3(0, 0, 0); // full absorbtion.
+            if (r1 > throughput * 5.0f) {
+                radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
+                break;
+            }
             throughput = 0.2f; // unbias.
         }
 
@@ -222,13 +218,13 @@ CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nan
         pathRay.mT0 = DeltaFloat;
         pathRay.mT1 = MaxFloat;
 
-        if (!nanovdb_Ray_clip(CNANOVDB_ADDRESS(pathRay), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max)))
-            return CNANOVDB_MAKE_VEC3(0, 0, 0);
+        if (!nanovdb_Ray_clip(CNANOVDB_ADDRESS(pathRay), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_min), nanovdb_CoordToVec3f(CNANOVDB_ROOTDATA(cxt).mBBox_max))) {
+            radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
+            break;
+        }
     }
-    /*
-	const float f = (0.5f + 0.5f * ray.dir()[1]) * throughput;
-	radiance = radiance + Vec3f(f);*/
 
+    CNANOVDB_DEREF(outThroughput) = throughput;
     return radiance;
 }
 
@@ -236,13 +232,11 @@ CNANOVDB_INLINE nanovdb_Vec3f traceVolume(CNANOVDB_CONTEXT cxt, CNANOVDB_REF(nan
 
 #if defined(CNANOVDB_COMPILER_GLSL)
 
-layout(rgba32f, binding = 0) uniform image2D outImage;
-
 layout(local_size_x = 8, local_size_y = 8, local_size_z = 1) in;
 void main()
 {
-    int cxt;
-
+    int   cxt;
+    int   outImage;
     ivec2 threadId = getThreadId();
 
 #elif defined(__OPENCL_VERSION__)
@@ -316,32 +310,18 @@ CNANOVDB_KERNEL void renderFogVolume(
     vec3                 color = CNANOVDB_MAKE_VEC3(0, 0, 0);
 
     HeterogenousMedium medium;
-    medium.densityFactor = kArgs.volumeDensity;
-    medium.densityMin = CNANOVDB_ROOTDATA(cxt).mValueMin * medium.densityFactor;
-    medium.densityMax = medium.densityFactor; //grid->tree().root().valueMax() * medium.densityFactor;
+    medium.densityScale = kArgs.volumeDensityScale;
+    medium.densityMin = CNANOVDB_ROOTDATA(cxt).mValueMin * medium.densityScale;
+    medium.densityMax = medium.densityScale; //grid->tree().root().valueMax() * medium.densityScale;
     medium.densityMax = fmax(medium.densityMin, fmax(medium.densityMax, 0.001f));
     medium.hgMeanCosine = 0.f;
+    medium.albedo = kArgs.volumeAlbedo;
 
-    
     for (int sampleIndex = 0; sampleIndex < kArgs.samplesPerPixel; ++sampleIndex) {
         uint32_t pixelSeed = hash1(sampleIndex + kArgs.numAccumulations * kArgs.samplesPerPixel ^ hash2(ix, iy));
 
-        float u = CNANOVDB_MAKE(float)(ix) + 0.5f;
-        float v = CNANOVDB_MAKE(float)(iy) + 0.5f;
+        vec3 wRayDir = getRayDirFromPixelCoord(ix, iy, kArgs.width, kArgs.height, kArgs.numAccumulations, kArgs.samplesPerPixel, pixelSeed, cameraU, cameraV, cameraW, kArgs.cameraFovY, kArgs.cameraAspect);
 
-        float randVar1 = randomf(pixelSeed + 0);
-        float randVar2 = randomf(pixelSeed + 1);
-
-        if (kArgs.numAccumulations > 0) {
-            u += randVar1 - 0.5f;
-            v += randVar2 - 0.5f;
-        }
-
-        u /= CNANOVDB_MAKE(float)(kArgs.width);
-        v /= CNANOVDB_MAKE(float)(kArgs.height);
-
-        // get camera ray...
-        vec3        wRayDir = vec3_sub(vec3_add(vec3_fmul(u, cameraU), vec3_fmul(v, cameraV)), cameraW);
         vec3        wRayEye = cameraP;
         nanovdb_Ray wRay;
         wRay.mEye = wRayEye;
@@ -353,26 +333,26 @@ CNANOVDB_KERNEL void renderFogVolume(
         vec3        iRayDir = iRay.mDir;
 
         Vec3T radiance = CNANOVDB_MAKE_VEC3(0, 0, 0);
+        float pathThroughput = 1.0f;
 
-        if (kArgs.useLighting > 0) {
-            radiance = traceVolume(cxt, CNANOVDB_ADDRESS(iRay), CNANOVDB_ADDRESS(acc), medium, CNANOVDB_ADDRESS(pixelSeed), iLightDir);
-        }
+        radiance = traceFogVolume(cxt, CNANOVDB_ADDRESS(pathThroughput), kArgs.useLighting, CNANOVDB_ADDRESS(iRay), CNANOVDB_ADDRESS(acc), medium, CNANOVDB_ADDRESS(pixelSeed), iLightDir);
 
-        float transmittance = getTransmittance(cxt, CNANOVDB_ADDRESS(iRay), CNANOVDB_ADDRESS(acc), medium, CNANOVDB_ADDRESS(pixelSeed));
+        //float pathThroughput = getTransmittance(cxt, CNANOVDB_ADDRESS(iRay), CNANOVDB_ADDRESS(acc), medium, CNANOVDB_ADDRESS(pixelSeed));
 
-        if (transmittance > 0.01f) {
+        if (kArgs.useBackground > 0 && pathThroughput > 0.0f) {
+            float bgIntensity = 0.0f;
             float groundIntensity = 0.0f;
             float groundMix = 0.0f;
 
             if (kArgs.useGround > 0) {
                 float wGroundT = (kArgs.groundHeight - wRayEye.y) / wRayDir.y;
-                if (wGroundT > 0.f) {
+                if (wRayDir.y != 0 && wGroundT > 0.f) {
                     vec3 wGroundPos = vec3_add(wRayEye, vec3_fmul(wGroundT, wRayDir));
                     vec3 iGroundPos = nanovdb_Grid_worldToIndexF(CNANOVDB_GRIDDATA(cxt), wGroundPos);
 
-                    rayTraceGround(wGroundT, kArgs.groundFalloff, wGroundPos, wRayDir.y, CNANOVDB_ADDRESS(groundIntensity), CNANOVDB_ADDRESS(groundMix));
+                    groundIntensity = evalGroundMaterial(wGroundT, kArgs.groundFalloff, wGroundPos, wRayDir.y, CNANOVDB_ADDRESS(groundMix));
 
-                    if (kArgs.useShadows > 0) {
+                    if (kArgs.useLighting > 0 && kArgs.useShadows > 0) {
                         nanovdb_Ray iShadowRay;
                         iShadowRay.mEye = iGroundPos;
                         iShadowRay.mDir = iLightDir;
@@ -385,10 +365,11 @@ CNANOVDB_KERNEL void renderFogVolume(
                 }
             }
 
-            float skyIntensity = 0.75f + 0.25f * wRayDir.y;
-
-            float radianceIntensity = transmittance * ((1.f - groundMix) * skyIntensity + groundMix * groundIntensity);
-            radiance = vec3_add(radiance, CNANOVDB_MAKE_VEC3(radianceIntensity, radianceIntensity, radianceIntensity));
+            float skyIntensity = evalSkyMaterial(wRayDir);
+            bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+            bgIntensity *= pathThroughput;
+            
+            radiance = vec3_add(radiance, CNANOVDB_MAKE_VEC3(bgIntensity, bgIntensity, bgIntensity));
         }
 
         color = vec3_add(color, radiance);
@@ -398,15 +379,6 @@ CNANOVDB_KERNEL void renderFogVolume(
     color.y /= kArgs.samplesPerPixel;
     color.z /= kArgs.samplesPerPixel;
 
-    if (kArgs.numAccumulations > 1) {
-        vec4 prevOutput = imageLoadPixel(outImage, kArgs.width, threadId);
-        vec3 prevColor = CNANOVDB_MAKE_VEC3(prevOutput.x, prevOutput.y, prevOutput.z);
-        vec3 oldLinearPixel;
-        invTonemapReinhard(CNANOVDB_ADDRESS(oldLinearPixel), prevColor, kArgs.tonemapWhitePoint);
-        color = vec3_add(oldLinearPixel, vec3_fmul((1.0f / CNANOVDB_MAKE(float)(kArgs.numAccumulations)), vec3_sub(color, oldLinearPixel)));
-    }
-
-    tonemapReinhard(CNANOVDB_ADDRESS(color), color, kArgs.tonemapWhitePoint);
-    imageStorePixel(outImage, kArgs.width, threadId, CNANOVDB_MAKE_VEC4(color.x, color.y, color.z, 1.0f));
+    compositeFn(outImage, kArgs.width, threadId, color, kArgs.numAccumulations, kArgs.useTonemapping, kArgs.tonemapWhitePoint);
 }
 ////////////////////////////////////////////////////////

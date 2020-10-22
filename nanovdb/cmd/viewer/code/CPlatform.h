@@ -75,11 +75,14 @@ CNANOVDB_INLINE ivec2 getThreadId()
 {
     return (ivec2)(get_global_id(0), get_global_id(1));
 }
-CNANOVDB_INLINE vec4 imageLoadPixel(__global const vec4* image, int w, ivec2 p)
+
+#define CNANOVDB_IMAGE_TYPE __global vec4*
+
+CNANOVDB_INLINE vec4 imageLoadPixel(const CNANOVDB_IMAGE_TYPE image, int w, ivec2 p)
 {
     return image[p.x + w * p.y];
 }
-CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 color)
+CNANOVDB_INLINE void imageStorePixel(CNANOVDB_IMAGE_TYPE image, int w, ivec2 p, vec4 color)
 {
     image[p.x + w * p.y] = color;
 }
@@ -88,6 +91,7 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 #define logf(x) log(x)
 #define cosf(x) cos(x)
 #define sinf(x) sin(x)
+#define tanf(x) tan(x)
 #define sqrtf(x) sqrt(x)
 #define fmin(a, b) min(a, b)
 #define fmax(a, b) max(a, b)
@@ -164,6 +168,7 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 #define logf(x) log(x)
 #define cosf(x) cos(x)
 #define sinf(x) sin(x)
+#define tanf(x) tan(x)
 #define sqrtf(x) sqrt(x)
 #define fabs(x) abs(x)
 #define fmod(a, b) mod(a, b)
@@ -186,8 +191,9 @@ CNANOVDB_INLINE void imageStorePixel(__global vec4* image, int w, ivec2 p, vec4 
 #define vec4_add(a, b) ((a) + (b))
 #define vec4_fmul(a, b) ((a) * (b))
 
-#define imageLoadPixel(img, w, p) imageLoad(img, p);
-#define imageStorePixel(img, w, p, color) imageStore(img, p, color)
+#define CNANOVDB_IMAGE_TYPE int
+#define imageLoadPixel(img, w, p) imageLoad(kOutImage, p);
+#define imageStorePixel(img, w, p, color) imageStore(kOutImage, p, color)
 
 #elif defined(__cplusplus)
 
@@ -345,11 +351,14 @@ CNANOVDB_INLINE ivec2 getThreadId()
 {
     return ivec2{0, 0};
 }
-CNANOVDB_INLINE vec4 imageLoadPixel(const vec4* image, int w, ivec2 p)
+
+#define CNANOVDB_IMAGE_TYPE vec4*
+
+CNANOVDB_INLINE vec4 imageLoadPixel(const CNANOVDB_IMAGE_TYPE image, int w, ivec2 p)
 {
     return image[p.x + w * p.y];
 }
-CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
+CNANOVDB_INLINE void imageStorePixel(CNANOVDB_IMAGE_TYPE image, int w, ivec2 p, vec4 color)
 {
     image[p.x + w * p.y] = color;
 }
@@ -509,11 +518,14 @@ CNANOVDB_INLINE ivec2 getThreadId()
 {
     return (ivec2){0, 0};
 }
-CNANOVDB_INLINE vec4 imageLoadPixel(const vec4* image, int w, ivec2 p)
+
+#define CNANOVDB_IMAGE_TYPE vec4*
+
+CNANOVDB_INLINE vec4 imageLoadPixel(const CNANOVDB_IMAGE_TYPE image, int w, ivec2 p)
 {
     return image[p.x + w * p.y];
 }
-CNANOVDB_INLINE void imageStorePixel(vec4* image, int w, ivec2 p, vec4 color)
+CNANOVDB_INLINE void imageStorePixel(CNANOVDB_IMAGE_TYPE image, int w, ivec2 p, vec4 color)
 {
     image[p.x + w * p.y] = color;
 }

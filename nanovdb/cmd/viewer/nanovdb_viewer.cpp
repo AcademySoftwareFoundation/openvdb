@@ -14,113 +14,133 @@
 #if defined(NANOVDB_USE_GLFW)
 #include "Viewer.h"
 #endif
+
 #include "BatchRenderer.h"
+#include "StringUtils.h"
 
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
+#include <iomanip>
+#include <numeric>
+
+static std::string makeStringCsv(const char* const* strs, int n)
+{
+    std::string str;
+    if (n > 0) {
+        str = strs[0];
+        for (int i = 1; i < n; ++i) {
+            str += ',' + strs[i];
+        }
+    }
+    return str;
+}
+
+struct ParamInfo
+{
+    std::string type;
+    std::string description;
+};
+
+static const std::map<std::string, ParamInfo> kRenderParamMap{
+    {"width", {"integer", "framebuffer width"}},
+    {"height", {"integer", "framebuffer height"}},
+    {"start", {"integer", "start frame"}},
+    {"end", {"integer", "end frame"}},
+    {"background", {"boolean", "use background"}},
+    {"lighting", {"boolean", "use lighting"}},
+    {"shadows", {"boolean", "use shadows"}},
+    {"ground", {"boolean", "use ground-plane"}},
+    {"ground-reflections", {"boolean", "use ground-plane reflections"}},
+    {"tonemapping", {"boolean", "use tonemapping"}},
+    {"tonemapping-whitepoint", {"scalar", "tonemapping whitepoint"}},
+    {"camera-samples", {"integer", "camera samples per ray"}},
+    {"camera-turntable", {"boolean", "use camera turntable"}},
+    {"camera-turntable-rate", {"scalar", "camera turntable revolutions per frame-sequence"}},
+    {"material-override", {"string", "the render method override: {" + makeStringCsv(kMaterialClassTypeStrings, (int)MaterialClass::kNumTypes) + "}"}},
+    {"camera-lens", {"string", "the camera lens type: {" + makeStringCsv(kCameraLensTypeStrings, (int)Camera::LensType::kNumTypes) + "}"}},
+    {"iterations", {"integer", "number of proressive iterations per frame."}},
+    {"gold", {"filename", "The input filename (e.g. \"./reference/gold.%04d.png\""}},
+    {"output", {"filename", "The output filename (e.g. \"output.%04d.jpg\""}},
+    {"output-format", {"string", "the output format override: {png, jpg, tga, bmp, hdr, pfm}"}},
+};
 
 void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAILURE)
 {
     std::cerr << "\n"
-              << "Usage: " << progName << " [options] *.nvdb\n"
-              << "Description: Render grids from one or more NanoVDB files\n"
+              << "Usage: " << progName << " [options] <url>...\n"
               << "\n"
-              << "Options:\n"
+              << "Where URL is:\n"
+              << "(<nodename>=)<url>(#<gridname>)([<start>-<end>])\n"
+              << "\n"
+              << "Render grids from one or more NanoVDB files\n"
+              << "\n"
+              << "--- General Options ---\n"
               << "-h,--help\tPrints this message\n"
-              << "-g,--grid name\tView all grids matching the specified string name\n"
               << "-b,--batch\tUse headless batch render\n"
-              << "-p,--render-platform\tThe rendering platform to use by name\n"
-              << "-o,--output\tThe output filename prefix (format = ./<output>.frame.ext)\n"
-              << "-l,--render-platform-list\tList the available rendering platforms\n"
-              << "-n,--count\trender <count> frames\n"
-              << "--turntable\tRender a 360 turntable within the frame count\n"
-              << "--width\tThe render width\n"
-              << "--height\tThe render height\n"
-              << "--samples\tThe render sample count\n"
+              << "-p,--platform\tThe rendering platform to use by name\n"
+              << "-l,--platform-list\tList the available rendering platforms\n"
               << "\n"
-              << "Examples:\n"
-              << "* Render temperature grid using CUDA with 32 samples:\n"
-              << "\t" << progName << " -p cuda --grid temperature --samples 32 explosion.0023.vdb\n"
-              << "* Render density grid sequence:\n"
-              << "\t" << progName << " --grid density explosion.%04d.vdb:0-100\n"
-              << "\n";
+              << "--- Render Options ---\n";
+
+    for (auto& param : kRenderParamMap) {
+        std::cerr << std::left << "--render-" << std::setw(16) << param.first << "\t" << std::setw(12) << param.second.type << "\t" << param.second.description << "\n";
+    }
+
+    std::cerr
+        << "\n"
+        << "--- Examples ---\n"
+        << "* Render temperature grid using CUDA with 32 samples:\n"
+        << "\t"
+        << progName
+        << " -p cuda --render-camera-samples 32 explosion.0023.vdb#temperature\n"
+        << "* Render density grid sequence of frames 1-10:\n"
+        << "\t"
+        << progName
+        << " explosion.%04d.vdb#density[0-10]\n"
+        << "* Render single grid sequence of frames 1-5:\n"
+        << "\t"
+        << progName
+        << " explosion.%04d.vdb#[0-5]\n"
+        << "\n";
     exit(exitStatus);
+}
+
+void printPlatformList()
+{
+    RenderLauncher renderLauncher;
+    auto           names = renderLauncher.getPlatformNames();
+    for (const auto& it : names) {
+        std::cout << it << std::endl;
+    }
 }
 
 int main(int argc, char* argv[])
 {
-    int exitStatus = EXIT_SUCCESS;
+    std::string                                       platformName;
+    std::vector<std::pair<std::string, GridAssetUrl>> urls;
+    RendererParams                                    rendererParams;
 
-    std::string                                      platformName;
-    std::string                                      gridName;
-    std::vector<std::pair<std::string, std::string>> fileNames;
-    RendererParams                                   rendererParams;
-    bool                                             batch = false;
+    bool batch = false;
+
+    // make an invalid range.
+    rendererParams.mFrameStart = 0;
+    rendererParams.mFrameEnd = -1;
+
+    StringMap renderStringParams;
+
+    // make an invalid range.
+    rendererParams.mFrameStart = 0;
+    rendererParams.mFrameEnd = -1;
 
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
             if (arg == "-h" || arg == "--help") {
                 usage(argv[0], EXIT_SUCCESS);
-            } else if (arg == "-g" || arg == "--grid") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected a grid name to follow the -g,--grid option\n";
-                    usage(argv[0]);
-                } else {
-                    gridName.assign(argv[++i]);
-                }
             } else if (arg == "-l" || arg == "--list") {
-                RenderLauncher renderLauncher;
-                auto           names = renderLauncher.getPlatformNames();
-                for (const auto& it : names) {
-                    std::cout << it << std::endl;
-                }
+                printPlatformList();
                 return 0;
             } else if (arg == "-b" || arg == "--batch") {
                 batch = true;
-            } else if (arg == "-o" || arg == "--output") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected a filename to follow the -o,--output option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mOutputPrefix.assign(argv[++i]);
-                }
-            } else if (arg == "--gold") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected a filename to follow the --gold option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mGoldPrefix.assign(argv[++i]);
-                }
-            } else if (arg == "--samples") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected an integer to follow the --samples option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mOptions.samplesPerPixel = atoi(argv[++i]);
-                }
-            } else if (arg == "--width") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected an integer to follow the --width option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mWidth = atoi(argv[++i]);
-                }
-            } else if (arg == "--height") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected an integer to follow the --height option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mHeight = atoi(argv[++i]);
-                }
-            } else if (arg == "-n" || arg == "--count") {
-                if (i + 1 == argc) {
-                    std::cerr << "\nExpected an integer to follow the -n,--count option\n";
-                    usage(argv[0]);
-                } else {
-                    rendererParams.mFrameCount = atoi(argv[++i]);
-                }
-            } else if (arg == "--turntable") {
-                rendererParams.mUseTurntable = true;
             } else if (arg == "-p" || arg == "--platform") {
                 if (i + 1 == argc) {
                     std::cerr << "\nExpected a string to follow the -p,--platform option\n";
@@ -128,52 +148,72 @@ int main(int argc, char* argv[])
                 } else {
                     platformName.assign(argv[++i]);
                 }
+            } else if (arg.substr(0, 9) == "--render-") {
+                // collect render options...
+                for (auto& param : kRenderParamMap) {
+                    if (arg.substr(9) == param.first) {
+                        if (i + 1 == argc) {
+                            std::cerr << "\nExpected a " << param.second.type << " to follow --render-" << param.first << "\n";
+                            usage(argv[0]);
+                        } else {
+                            renderStringParams.set(param.first, argv[++i]);
+                        }
+                    }
+                }
             } else {
                 std::cerr << "\nUnrecognized option: \"" << arg << "\"\n";
                 usage(argv[0]);
             }
         } else if (!arg.empty()) {
-            // check for sequence...
-            if (arg.find("%", 0) != std::string::npos) {
-                auto pos = arg.find_last_of(':');
-                auto range = arg.substr(pos + 1);
-                auto filename = arg.substr(0, pos);
+            // <nodeName>=<GridAssetUrl>
+            std::string urlStr = arg;
+            std::string nodeName = "";
+            auto        pos = arg.find('=');
+            if (pos != std::string::npos) {
+                urlStr = arg.substr(pos + 1);
+                nodeName = arg.substr(0, pos);
+            }
 
-                int start = 0, end = rendererParams.mFrameCount;
+            GridAssetUrl url(urlStr);
+            urls.push_back(std::make_pair(nodeName, url));
 
-                if ((pos = range.find('-', 0)) != std::string::npos) {
-                    start = atoi(range.substr(0, pos).c_str());
-                    end = atoi(range.substr(pos + 1).c_str());
+            // update frame range...
+            if (url.isSequence()) {
+                if (rendererParams.mFrameEnd < rendererParams.mFrameStart) {
+                    rendererParams.mFrameStart = url.frameStart();
+                    rendererParams.mFrameEnd = url.frameEnd();
                 }
-
-                if (end - start == 0) {
-                    std::cerr << "Invalid filename range\n";
-                    exit(1);
-                }
-
-                char fileNameBuf[FILENAME_MAX];
-                for (int i = start; i < end; ++i) {
-                    sprintf(fileNameBuf, filename.c_str(), i);
-                    //std::cout << "filename: " << fileNameBuf << "\n";
-                    fileNames.push_back(std::make_pair(arg, fileNameBuf));
-                }
-            } else {
-                fileNames.push_back(std::make_pair(arg, arg));
             }
         }
     }
 
-    if (fileNames.size() == 0) {
-        fileNames.push_back(std::make_pair("__internal", "internal://points_sphere_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://points_box_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://points_torus_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://fog_sphere_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://fog_box_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://fog_torus_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://ls_sphere_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://ls_box_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://ls_bbox_100"));
-        fileNames.push_back(std::make_pair("__internal", "internal://ls_torus_100"));
+    // collect the final parameters...
+    rendererParams.mFrameStart = renderStringParams.get<int>("start", rendererParams.mFrameStart);
+    rendererParams.mFrameEnd = renderStringParams.get<int>("end", rendererParams.mFrameEnd);
+    rendererParams.mWidth = renderStringParams.get<int>("width", rendererParams.mWidth);
+    rendererParams.mHeight = renderStringParams.get<int>("height", rendererParams.mHeight);
+    rendererParams.mOutputFilePath = renderStringParams.get<std::string>("output", rendererParams.mOutputFilePath);
+    rendererParams.mOutputExtension = renderStringParams.get<std::string>("output-format", rendererParams.mOutputExtension);
+    rendererParams.mGoldPrefix = renderStringParams.get<std::string>("gold", rendererParams.mGoldPrefix);
+    rendererParams.mMaterialOverride = renderStringParams.getEnum<MaterialClass>("material-override", kMaterialClassTypeStrings, (int)MaterialClass::kNumTypes, rendererParams.mMaterialOverride);
+
+    rendererParams.mSceneParameters.samplesPerPixel = renderStringParams.get<int>("camera-samples", rendererParams.mSceneParameters.samplesPerPixel);
+    rendererParams.mSceneParameters.useBackground = renderStringParams.get<bool>("background", rendererParams.mSceneParameters.useBackground);
+    rendererParams.mSceneParameters.useLighting = renderStringParams.get<bool>("lighting", rendererParams.mSceneParameters.useLighting);
+    rendererParams.mSceneParameters.useShadows = renderStringParams.get<bool>("shadows", rendererParams.mSceneParameters.useShadows);
+    rendererParams.mSceneParameters.useGround = renderStringParams.get<bool>("ground", rendererParams.mSceneParameters.useGround);
+    rendererParams.mSceneParameters.useGroundReflections = renderStringParams.get<bool>("ground-reflections", rendererParams.mSceneParameters.useGroundReflections);
+    rendererParams.mSceneParameters.useTonemapping = renderStringParams.get<bool>("tonemapping", rendererParams.mSceneParameters.useTonemapping);
+    rendererParams.mSceneParameters.tonemapWhitePoint = renderStringParams.get<float>("tonemapping-whitepoint", rendererParams.mSceneParameters.tonemapWhitePoint);
+    rendererParams.mSceneParameters.camera.lensType() = renderStringParams.getEnum<Camera::LensType>("camera-lens", kCameraLensTypeStrings, (int)Camera::LensType::kNumTypes, rendererParams.mSceneParameters.camera.lensType());
+    rendererParams.mUseTurntable = renderStringParams.get<bool>("camera-turntable", rendererParams.mUseTurntable);
+    rendererParams.mTurntableRate = renderStringParams.get<float>("camera-turntable-rate", rendererParams.mTurntableRate);
+    rendererParams.mMaxProgressiveSamples = renderStringParams.get<int>("iterations", rendererParams.mMaxProgressiveSamples);
+
+    // if range still invalid, then make a default frame range...
+    if (rendererParams.mFrameEnd < rendererParams.mFrameStart) {
+        rendererParams.mFrameStart = 0;
+        rendererParams.mFrameEnd = 0;
     }
 
 #if defined(__EMSCRIPTEN__)
@@ -185,56 +225,63 @@ int main(int argc, char* argv[])
     rendererParams.mHeight = 64;
 #endif
 
-    std::unique_ptr<RendererBase> renderer;
-
-    if (batch) {
-        renderer.reset(new BatchRenderer(rendererParams));
-    } else {
+    try {
+        std::unique_ptr<RendererBase> renderer;
+        if (batch) {
+            renderer.reset(new BatchRenderer(rendererParams));
+        } else {
 #if defined(NANOVDB_USE_GLFW)
-        renderer.reset(new Viewer(rendererParams));
+            renderer.reset(new Viewer(rendererParams));
 #else
-        std::cerr << "Warning: GLFW was not enabled in your build configuration. Using batch mode.\n";
-        renderer.reset(new BatchRenderer(rendererParams));
+            std::cerr << "Warning: GLFW was not enabled in your build configuration. Using batch mode.\n";
+            renderer.reset(new BatchRenderer(rendererParams));
 #endif
-    }
-
-    if (platformName.empty() == false) {
-        if (renderer->setRenderPlatformByName(platformName) == false) {
-            std::cerr << "Unrecognized platform: " << platformName << std::endl;
-            return exitStatus;
         }
-    }
 
-    const auto nameKey = nanovdb::io::stringHash(gridName);
-
-    try {
-        for (auto& file : fileNames) {
-            if (gridName.empty())
-                renderer->addGrid(file.first, file.second);
-            else
-                renderer->addGrid(file.first, file.second, gridName);
+        if (platformName.empty() == false) {
+            if (renderer->setRenderPlatformByName(platformName) == false) {
+                std::cerr << "Unrecognized platform: " << platformName << std::endl;
+                return EXIT_FAILURE;
+            }
         }
-    }
-    catch (const std::exception& e) {
-        std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
-        return 1;
-    }
-    catch (...) {
-        std::cerr << "Exception of unexpected type caught" << std::endl;
-        return 1;
-    }
 
-    try {
+        if (urls.size() > 0) {
+            // ensure only one node is made for each specified node name.
+            std::map<std::string, std::vector<GridAssetUrl>> nodeGridMap;
+            for (auto& nodeUrlPairs : urls) {
+                nodeGridMap[nodeUrlPairs.first].push_back(nodeUrlPairs.second);
+            }
+
+            // attach the grids.
+            for (auto& it : nodeGridMap) {
+                auto nodeId = renderer->addSceneNode(it.first);
+                for (int i = 0; i < it.second.size(); ++i) {
+                    renderer->addGridAsset(it.second[i]);
+                    renderer->setSceneNodeGridAttachment(nodeId, i, it.second[i]);
+                }
+#if 1
+                // waiting for load will enable the frameing to work when we reset the camera!
+                if (!renderer->updateNodeAttachmentRequests(renderer->findNode(nodeId), true, true)) {
+                    throw std::runtime_error("Some assets have errors. Unable to render scene node " + it.first + "; bad asset");
+                }
+#endif
+                renderer->selectSceneNodeByIndex(0);
+                renderer->resetCamera();
+            }
+        }
+
         renderer->open();
         renderer->run();
         renderer->close();
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
+        return EXIT_FAILURE;
     }
     catch (...) {
         std::cerr << "Exception of unexpected type caught" << std::endl;
+        return EXIT_FAILURE;
     }
 
-    return exitStatus;
+    return EXIT_SUCCESS;
 }

@@ -11,6 +11,8 @@
 	\brief General C++ implementation of the Grid rendering code.
 */
 
+#pragma once
+
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/HDDA.h>
 #include <nanovdb/util/Ray.h>
@@ -81,7 +83,7 @@ struct RenderPointsRgba32fFn
     }
 
     template<typename GridT, typename AccT>
-    inline __hostdev__ static float getTransmittance(RayT& ray, const GridT& grid, AccT& acc, const PointCloud& geometry, uint32_t& seed, const nanovdb::Vec3f& lightDir, const RenderConstants params)
+    inline __hostdev__ static float getTransmittance(RayT& ray, const GridT& grid, AccT& acc, const PointCloud& geometry, uint32_t& seed, const nanovdb::Vec3f& lightDir, const MaterialParameters params)
     {
         using namespace nanovdb;
 
@@ -90,9 +92,10 @@ struct RenderPointsRgba32fFn
         const RendererAttributeParams radiusAttribute = params.attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius];
         const RendererAttributeParams positionAttribute = params.attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointPosition];
 
-        nanovdb::TreeMarcher<typename AccT::NodeT0, RayT, AccT> marcher(acc);
+        using TreeT = typename GridT::TreeType;
+        nanovdb::TreeMarcher<typename TreeT::LeafNodeType, RayT, AccT> marcher(acc);
         if (marcher.init(ray)) {
-            const typename AccT::NodeT0* node;
+            const typename TreeT::LeafNodeType* node;
             float                        t0 = 0, t1 = 0;
 
             while (marcher.step(&node, t0, t1)) {
@@ -118,7 +121,7 @@ struct RenderPointsRgba32fFn
                             int i = beginIndex + j;
 
                             const float radius = sampleAttribute<float>(grid, ijk, i, radiusAttribute);
-                            const Vec3T pos = sampleAttribute<Vec3T>(grid, ijk, i, positionAttribute) + Vec3T(0.5f);
+                            const Vec3T pos = sampleAttribute<Vec3T>(grid, ijk, i, positionAttribute);
 
                             // distance to point from ray.
                             float s = ray.dir().cross(pos - ray.eye()).lengthSqr();
@@ -139,7 +142,7 @@ struct RenderPointsRgba32fFn
     }
 
     template<typename GridT, typename AccT>
-    inline __hostdev__ static Vec3T traceGeometry(RayT& ray, const GridT& grid, AccT& acc, const PointCloud& geometry, uint32_t& seed, const nanovdb::Vec3f& lightDir, float& transmittance, const RenderConstants params)
+    inline __hostdev__ static Vec3T traceGeometry(RayT& ray, const GridT& grid, AccT& acc, const PointCloud& geometry, uint32_t& seed, const nanovdb::Vec3f& lightDir, float& transmittance, const MaterialParameters params)
     {
         using namespace nanovdb;
 
@@ -150,9 +153,10 @@ struct RenderPointsRgba32fFn
         Vec3T radiance(0);
         transmittance = 1.0f;
 
-        nanovdb::TreeMarcher<typename AccT::NodeT0, RayT, AccT> marcher(acc);
+        using TreeT = typename GridT::TreeType;
+        nanovdb::TreeMarcher<typename TreeT::LeafNodeType, RayT, AccT> marcher(acc);
         if (marcher.init(ray)) {
-            const typename AccT::NodeT0* node;
+            const typename TreeT::LeafNodeType* node;
             float                        t0 = 0, t1 = 0;
 
             while (marcher.step(&node, t0, t1)) {
@@ -178,7 +182,7 @@ struct RenderPointsRgba32fFn
                             int i = beginIndex + j;
 
                             const float radius = sampleAttribute<float>(grid, ijk, i, radiusAttribute);
-                            const Vec3T pos = sampleAttribute<Vec3T>(grid, ijk, i, positionAttribute) + Vec3T(0.5f);
+                            const Vec3T pos = sampleAttribute<Vec3T>(grid, ijk, i, positionAttribute);
 
                             // distance to point from ray.
                             float s = ray.dir().cross(pos - ray.eye()).lengthSqr();
@@ -188,7 +192,7 @@ struct RenderPointsRgba32fFn
 
                                 float shadowTransmittance = 1.0f;
 #if 0
-								if (params.useShadows > 0)
+								if (sceneParams.useShadows)
 								{
 									RayT iShadowRay(pos + lightDir * 0.1f, lightDir);
 									shadowTransmittance = getTransmittance(iShadowRay, grid, acc, geometry, seed, lightDir);
@@ -210,99 +214,82 @@ struct RenderPointsRgba32fFn
     }
 
     template<typename ValueType>
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, Camera<float> camera, const nanovdb::NanoGrid<ValueType>* grid, int numAccumulations, const RenderConstants params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::NanoGrid<ValueType>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
 
-        const auto& tree = grid->tree();
-
-        const Vec3T wLightDir = Vec3T(0, 1, 0);
-        const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
-
-        auto acc = tree.getAccessor();
-
-        PointCloud geometry;
-        geometry.density = params.volumeDensity;
-
         float color[4] = {0, 0, 0, 0};
 
-        for (int sample = 0; sample < params.samplesPerPixel; ++sample) {
-            uint32_t pixelSeed = hash(sample + numAccumulations * params.samplesPerPixel ^ hash(ix, iy));
+        if (!grid) {
+            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
 
-            float u = ix + 0.5f;
-            float v = iy + 0.5f;
+            auto envRadiance = traceEnvironment(wRay, sceneParams);
 
-            float randVar1 = randomf(pixelSeed + 0);
-            float randVar2 = randomf(pixelSeed + 1);
+            color[0] = envRadiance;
+            color[1] = envRadiance;
+            color[2] = envRadiance;
 
-            if (numAccumulations > 0) {
-#if 1
-                float jitterX, jitterY;
-                cmj(jitterX, jitterY, numAccumulations % 64, 8, 8, pixelSeed);
-                u += jitterX - 0.5f;
-                v += jitterY - 0.5f;
-#else
-                u += randVar1 - 0.5f;
-                v += randVar2 - 0.5f;
-#endif
-            }
-            u /= width;
-            v /= height;
+        } else {
+            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
 
-            RayT wRay = camera.getRay(u, v);
-            RayT iRay = wRay.worldToIndexF(*grid);
+            const auto& tree = grid->tree();
+            const auto  acc = tree.getAccessor();
+            const auto  sampler = nanovdb::createSampler<0, decltype(acc), false>(acc);
 
-            Vec3T iRayDir = iRay.dir();
-            Vec3T wRayDir = wRay.dir();
-            Vec3T wRayEye = wRay.eye();
+            PointCloud geometry;
+            geometry.density = params.volumeDensityScale;
 
-            float transmittance = 1.0f;
-            Vec3T radiance = traceGeometry(iRay, *grid, acc, geometry, pixelSeed, iLightDir, transmittance, params);
+            for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
+                uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ hash(ix, iy);
 
-            if (transmittance > 0.01f) {
-                float groundIntensity = 0.0f;
-                float groundMix = 0.0f;
+                RayT wRay = getRayFromPixelCoord(ix, iy, width, height, numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
 
-                if (params.useGround > 0) {
-                    // intersect with ground plane and draw checker if camera is above...
+                RayT  iRay = wRay.worldToIndexF(*grid);
+                Vec3T iRayDir = iRay.dir();
 
-                    float wGroundT = (params.groundHeight - wRayEye[1]) / wRayDir[1];
+                float pathThroughput = 1.0f;
+                Vec3T radiance = traceGeometry(iRay, *grid, acc, geometry, pixelSeed, iLightDir, pathThroughput, params);
 
-                    if (wGroundT > 0.f) {
-                        Vec3T wGroundPos = wRayEye + wGroundT * wRayDir;
-                        Vec3T iGroundPos = grid->worldToIndexF(wGroundPos);
+                if (pathThroughput > 0.0f) {
+                    float bgIntensity = 0;
 
-                        rayTraceGround(wGroundT, params.groundFalloff, wGroundPos, wRayDir[1], groundIntensity, groundMix);
+                    if (sceneParams.useBackground) {
+                        float groundIntensity = 0.0f;
+                        float groundMix = 0.0f;
 
-                        if (params.useShadows > 0) {
-                            RayT  iShadowRay(iGroundPos, iLightDir);
-                            float shadowTransmittance = getTransmittance(iShadowRay, *grid, acc, geometry, pixelSeed, iLightDir, params);
-                            groundIntensity *= shadowTransmittance;
+                        if (sceneParams.useLighting && sceneParams.useGround) {
+                            // intersect with ground plane and draw checker if camera is above...
+                            float wGroundT = (sceneParams.groundHeight - wRay.eye()[1]) / wRay.dir()[1];
+                            if (wRay.dir()[1] != 0 && wGroundT > 0.f) {
+                                Vec3T wGroundPos = wRay(wGroundT);
+                                Vec3T iGroundPos = grid->worldToIndexF(wGroundPos);
+
+                                groundIntensity = evalGroundMaterial(wGroundT, sceneParams.groundFalloff, wGroundPos, wRay.dir()[1], groundMix);
+
+                                if (sceneParams.useShadows) {
+                                    RayT  iShadowRay(iGroundPos, iLightDir);
+                                    float shadowTransmittance = getTransmittance(iShadowRay, *grid, acc, geometry, pixelSeed, iLightDir, params);
+                                    groundIntensity *= shadowTransmittance;
+                                }
+                            }
                         }
+                        float skyIntensity = evalSkyMaterial(wRay.dir());
+                        bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
                     }
+                    radiance += nanovdb::Vec3f(pathThroughput * bgIntensity);
                 }
 
-                float skyIntensity = 0.75f + 0.25f * wRayDir[1];
-
-                radiance = radiance + nanovdb::Vec3f(transmittance * ((1.f - groundMix) * skyIntensity + groundMix * groundIntensity));
+                color[0] += radiance[0];
+                color[1] += radiance[1];
+                color[2] += radiance[2];
             }
 
-            color[0] += radiance[0];
-            color[1] += radiance[1];
-            color[2] += radiance[2];
-        }
-
-        for (int k = 0; k < 3; ++k)
-            color[k] = color[k] / params.samplesPerPixel;
-
-        if (numAccumulations > 1) {
             for (int k = 0; k < 3; ++k)
-                color[k] = outPixel[k] + (color[k] - outPixel[k]) * (1.0f / numAccumulations);
+                color[k] = color[k] / sceneParams.samplesPerPixel;
         }
 
-        for (int k = 0; k < 3; ++k)
-            outPixel[k] = color[k];
-        outPixel[3] = 1.0;
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
     }
 };
 
