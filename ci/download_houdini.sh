@@ -45,6 +45,7 @@ cp -r dsolib/libbz2* ../hou/dsolib/.
 cp -r dsolib/libtbb* ../hou/dsolib/.
 cp -r dsolib/libHalf* ../hou/dsolib/.
 cp -r dsolib/libjemalloc* ../hou/dsolib/.
+cp -r dsolib/liblzma* ../hou/dsolib/.
 
 # needed for < H18.0 (due to sesitag)
 if [ "$HOUDINI_MAJOR" == "17.0" ] || [ "$HOUDINI_MAJOR" == "17.5" ]; then
