@@ -451,7 +451,7 @@ bool FrameBufferGL::genPixelPackBufferGL(int w, int h, GLenum internalFormatGL, 
     mInternalFormat = formatFromGL(internalFormatGL);
     mBufferTypeGL = bufferType;
 
-    mElementSize = getElementSizeForFormat(mInternalFormat);
+    mElementSize = formatGetElementSize(mInternalFormat);
 
     if (mElementSize == 0) {
         std::stringstream msg;

@@ -22,7 +22,7 @@ if [[ ! -z "${GIT_BRANCH}" ]]; then
     popd
 else
     pushd ${REPO_DIR}
-    tar --exclude="data" --exclude="out" --exclude=".git" --exclude="__*" -cvf ${DIST_DIR}/repo.tar .
+    tar --exclude="data" --exclude="out" --exclude=".git" --exclude="build" --exclude="__*" -cvf ${DIST_DIR}/repo.tar .
     popd
 fi
 

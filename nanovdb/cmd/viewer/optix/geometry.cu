@@ -11,7 +11,7 @@
 //#define OPTIX_PERF_USE_LEAF_DDA
 
 extern "C" {
-__constant__ Params params;
+__constant__ Params constantParams;
 }
 
 __device__ inline bool

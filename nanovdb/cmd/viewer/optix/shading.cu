@@ -8,7 +8,6 @@
 
 #include "NanoVDB_optix.h"
 #include "helpers.h"
-//#include "random.h"
 
 #include "RenderFogVolumeUtils.h"
 #include "RenderUtils.h"
@@ -16,7 +15,7 @@
 #include <nanovdb/util/Ray.h>
 
 extern "C" {
-__constant__ Params params;
+__constant__ Params constantParams;
 }
 
 // -----------------------------------------------------------------------------
@@ -24,54 +23,93 @@ extern "C" __global__ void __miss__levelset_radiance()
 {
     const MissData* sbt_data = (MissData*)optixGetSbtDataPointer();
 
+    const auto& sceneParams = constantParams.sceneConstants;
+
     const float3 wRayEye = optixGetWorldRayOrigin();
     const float3 wRayDir = optixGetWorldRayDirection();
-
-    float groundIntensity = 0.0f;
-    float groundMix = 0.0f;
 
     using Vec3T = nanovdb::Vec3f;
     using RayT = nanovdb::Ray<float>;
 
-    if (params.constants.useGround > 0) {
-        // intersect with ground plane and draw checker if camera is above...
+    float bgIntensity = 0.0f;
 
-        float wGroundT = (params.constants.groundHeight - wRayEye.y) / wRayDir.y;
+    if (sceneParams.useBackground) {
+        float groundIntensity = 0.0f;
+        float groundMix = 0.0f;
 
-        if (wGroundT > 0.f) {
-            auto wGroundPos = wRayEye + wGroundT * wRayDir;
+        if (sceneParams.useGround) {
+            // intersect with ground plane and draw checker if camera is above...
 
-            render::rayTraceGround(wGroundT, params.constants.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundIntensity, groundMix);
+            float wGroundT = (sceneParams.groundHeight - wRayEye.y) / wRayDir.y;
 
-            if (params.constants.useShadows > 0) {
-                const float3 wLightDir = make_float3(0.0f, 1.0f, 0.0f);
-                float        attenuation = 0.0f;
+            if (wRayDir.y != 0 && wGroundT > 0.f) {
+                auto wGroundPos = wRayEye + wGroundT * wRayDir;
 
-                optixTrace(
-                    params.handle,
-                    reinterpret_cast<const float3&>(wGroundPos),
-                    wLightDir,
-                    0.01f,
-                    1e16f,
-                    0.0f,
-                    OptixVisibilityMask(1),
-                    OPTIX_RAY_FLAG_DISABLE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT,
-                    RAY_TYPE_OCCLUSION,
-                    RAY_TYPE_COUNT,
-                    RAY_TYPE_OCCLUSION,
-                    reinterpret_cast<uint32_t&>(attenuation));
+                groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
 
-                groundIntensity *= attenuation;
+                if (sceneParams.useLighting && sceneParams.useShadows) {
+                    const float3 wLightDir = make_float3(0.0f, 1.0f, 0.0f);
+                    float        attenuation = 0.0f;
+
+                    optixTrace(
+                        constantParams.handle,
+                        reinterpret_cast<const float3&>(wGroundPos),
+                        wLightDir,
+                        0.01f,
+                        1e16f,
+                        0.0f,
+                        OptixVisibilityMask(1),
+                        OPTIX_RAY_FLAG_DISABLE_ANYHIT | OPTIX_RAY_FLAG_TERMINATE_ON_FIRST_HIT | OPTIX_RAY_FLAG_DISABLE_CLOSESTHIT,
+                        RAY_TYPE_OCCLUSION,
+                        RAY_TYPE_COUNT,
+                        RAY_TYPE_OCCLUSION,
+                        reinterpret_cast<uint32_t&>(attenuation));
+
+                    groundIntensity *= attenuation;
+                }
             }
         }
+
+        float skyIntensity = render::evalSkyMaterial(nanovdb::Vec3f(wRayDir.x, wRayDir.y, wRayDir.z));
+        bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
     }
 
-    float skyIntensity = 0.75f + 0.25f * wRayDir.y;
-    auto  radiance = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+    optixSetPayload_0(float_as_int(bgIntensity));
+    optixSetPayload_1(float_as_int(bgIntensity));
+    optixSetPayload_2(float_as_int(bgIntensity));
+}
 
-    optixSetPayload_0(float_as_int(radiance));
-    optixSetPayload_1(float_as_int(radiance));
-    optixSetPayload_2(float_as_int(radiance));
+// -----------------------------------------------------------------------------
+extern "C" __global__ void __miss__env_radiance()
+{
+    using Vec3T = nanovdb::Vec3f;
+    using RayT = nanovdb::Ray<float>;
+
+    const MissData* sbt_data = (MissData*)optixGetSbtDataPointer();
+    const float3 wRayEye = optixGetWorldRayOrigin();
+    const float3 wRayDir = optixGetWorldRayDirection();
+
+    const auto& sceneParams = constantParams.sceneConstants;
+
+    float bgIntensity = 0.0f;
+    if (sceneParams.useBackground) {
+        float groundIntensity = 0.0f;
+        float groundMix = 0.0f;
+        if (sceneParams.useGround) {
+            // intersect with ground plane and draw checker if camera is above...
+            float wGroundT = (sceneParams.groundHeight - wRayEye.y) / wRayDir.y;
+            if (wRayDir.y != 0 && wGroundT > 0.f) {
+                auto wGroundPos = wRayEye + wGroundT * wRayDir;
+                groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
+            }
+        }
+        float skyIntensity = render::evalSkyMaterial(nanovdb::Vec3f(wRayDir.x, wRayDir.y, wRayDir.z));
+        bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+    }
+
+    optixSetPayload_0(float_as_int(bgIntensity));
+    optixSetPayload_1(float_as_int(bgIntensity));
+    optixSetPayload_2(float_as_int(bgIntensity));
 }
 
 extern "C" __global__ void __miss__occlusion()
@@ -86,6 +124,9 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
 {
     using RayT = nanovdb::Ray<float>;
     using Vec3T = nanovdb::Vec3f;
+
+    const auto& sceneParams = constantParams.sceneConstants;
+    const auto& params = constantParams.materialConstants;
 
     const VolumeGeometry* volume = reinterpret_cast<VolumeGeometry*>(optixGetSbtDataPointer());
     const auto*           grid = reinterpret_cast<const nanovdb::FloatGrid*>(volume->grid);
@@ -110,12 +151,11 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
     auto wNormal = make_float3(grid->indexToWorldDirF(iNormal).normalize());
 
     const float3 wLightDir = {0.0f, 1.0f, 0.0f};
-    float        useLighting = params.constants.useLighting;
     float        intensity = 1.0f;
     float        occlusion = 0.0f;
     float        voxelUniformSize = float(grid->voxelSize()[0]);
 
-    if (params.constants.useOcclusion > 0) {
+    if (params.useOcclusion > 0) {
         float attenuation = 0.0f;
         auto  pixelSeed = render::hash(float_as_int(wRayDir.x), float_as_int(wRayDir.y));
         float randVar1 = render::randomf(pixelSeed + 0);
@@ -123,7 +163,7 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
         auto  occDir = render::lambertNoTangent(reinterpret_cast<const Vec3T&>(wNormal), randVar1, randVar2);
 
         optixTrace(
-            params.handle,
+            constantParams.handle,
             wSurfacePos - 0.01f * wRayDir,
             make_float3(occDir),
             1e-3f,
@@ -137,12 +177,12 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
             reinterpret_cast<uint32_t&>(attenuation));
 
         if (attenuation < 1)
-            occlusion = params.constants.useOcclusion;
+            occlusion = 1;
 
         intensity = 1.0f - occlusion;
     }
 
-    if (useLighting > 0) {
+    if (sceneParams.useLighting) {
         float ambient = 1.0f;
         float shadowFactor = 0.0f;
 
@@ -152,11 +192,11 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
         float       diffuseKey = fmaxf(0.0f, (dot(wNormal, wLightDir) + diffuseWrap) / (1.0f + diffuseWrap));
         float       diffuseFill = fmaxf(0.0f, -dot(wNormal, wRayDir));
 
-        if (params.constants.useShadows > 0) {
+        if (sceneParams.useShadows) {
             float attenuation = 0.0f;
 
             optixTrace(
-                params.handle,
+                constantParams.handle,
                 wSurfacePos - 0.01f * wRayDir,
                 wLightDir,
                 1e-3f,
@@ -170,11 +210,10 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
                 reinterpret_cast<uint32_t&>(attenuation));
 
             if (attenuation < 1)
-                shadowFactor = params.constants.useShadows;
+                shadowFactor = 1;
         }
 
-        intensity = useLighting * ((1.0f - shadowFactor) * ((shadowKey * 0.2f) + (diffuseKey * 0.8f)) + (1.0f - occlusion) * (diffuseFill * 0.2f + (ambient * 0.1f)));
-        intensity = intensity + ((1.0f - useLighting) * (1.0f - occlusion));
+        intensity = ((1.0f - shadowFactor) * ((shadowKey * 0.2f) + (diffuseKey * 0.8f)) + (1.0f - occlusion) * (diffuseFill * 0.2f + (ambient * 0.1f)));
     }
 
     optixSetPayload_0(float_as_int(intensity));
@@ -191,22 +230,31 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_radiance()
     using RayT = nanovdb::Ray<float>;
     using Vec3T = nanovdb::Vec3f;
 
+    const auto& sceneParams = constantParams.sceneConstants;
+    const auto& params = constantParams.materialConstants;
+
     const HitGroupData* sbt_data = (HitGroupData*)optixGetSbtDataPointer();
 
-    const auto* grid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
-    const auto& tree = grid->tree();
+    const auto* densityGrid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
 
     const Vec3T wLightDir = Vec3T(0, 1, 0);
-    const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
+    const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
-    auto acc = tree.getAccessor();
+    const auto& densityTree = densityGrid->tree();
+    const auto  densityAcc = densityTree.getAccessor();
+    const auto  densitySampler = nanovdb::createSampler<0, decltype(densityAcc), false>(densityAcc);
 
     HeterogenousMedium medium;
-    medium.densityFactor = params.constants.volumeDensity;
-    medium.densityMin = grid->tree().root().valueMin() * medium.densityFactor;
-    medium.densityMax = medium.densityFactor; //grid->tree().root().valueMax() * medium.densityFactor;
+    medium.densityScale = params.volumeDensityScale;
+    medium.densityMin = valueToScalar(densityGrid->tree().root().valueMin()) * medium.densityScale;
+    medium.densityMax = valueToScalar(densityGrid->tree().root().valueMax()) * medium.densityScale;
     medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
-    medium.hgMeanCosine = 0.f;
+    medium.hgMeanCosine = params.phase;
+    medium.temperatureScale = params.volumeTemperatureScale;
+    medium.transmittanceMethod = params.transmittanceMethod;
+    medium.transmittanceThreshold = params.transmittanceThreshold;
+    medium.maxPathDepth = params.maxPathDepth;
+    medium.albedo = params.volumeAlbedo;
 
     const float3 wRayEye = optixGetWorldRayOrigin();
     const float3 wRayDir = optixGetWorldRayDirection();
@@ -218,24 +266,23 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_radiance()
                            reinterpret_cast<const Vec3T&>(wRayDir),
                            t0,
                            t1);
-    RayT       iRay = wRay.worldToIndexF(*grid);
+    RayT       iRay = wRay.worldToIndexF(*densityGrid);
 
     const uint3    idx = optixGetLaunchIndex();
     const uint3    dim = optixGetLaunchDimensions();
-    const uint32_t offset = params.width * idx.y + idx.x;
+    const uint32_t offset = constantParams.width * idx.y + idx.x;
 
-    auto pixelSeed = render::hash(offset + params.width * params.height * params.numAccumulations);
+    auto pixelSeed = render::hash(offset + constantParams.width * constantParams.height * constantParams.numAccumulations);
 
     Vec3T radiance = Vec3T(0);
-    if (params.constants.useLighting) {
-        iRay.setTimes();
-        radiance = traceVolume(iRay, acc, medium, pixelSeed, iLightDir);
-    }
-
+    
     iRay.setTimes();
-    float  transmittance = getTransmittance(iRay, acc, medium, pixelSeed);
+    float throughput;
+    bool  isFullyAbsorbed;
+    radiance = traceFogVolume(throughput, isFullyAbsorbed, iRay, densitySampler, medium, pixelSeed, sceneParams, iLightDir);
+
     float3 sceneRadiance = {0.0f, 0.0f, 0.0f};
-    if (transmittance > 0.01f) {
+    if (throughput > 0 && isFullyAbsorbed == false) {
         optixTrace(0, // only run miss program
                    wRayEye,
                    wRayDir,
@@ -250,7 +297,7 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_radiance()
                    float3_as_args(sceneRadiance));
     }
 
-    float3 result = sceneRadiance * transmittance + make_float3(radiance);
+    float3 result = sceneRadiance * throughput + make_float3(radiance);
 
     optixSetPayload_0(float_as_int(result.x));
     optixSetPayload_1(float_as_int(result.y));
@@ -263,17 +310,23 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_occlusion()
     using RayT = nanovdb::Ray<float>;
     using Vec3T = nanovdb::Vec3f;
 
+    const auto& sceneParams = constantParams.sceneConstants;
+    const auto& params = constantParams.materialConstants;
+
     const HitGroupData* sbt_data = (HitGroupData*)optixGetSbtDataPointer();
 
-    const auto* grid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
-    auto        acc = grid->tree().getAccessor();
+    const auto* densityGrid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
+    const auto& densityTree = densityGrid->tree();
+    const auto  densityAcc = densityTree.getAccessor();
+    const auto  densitySampler = nanovdb::createSampler<0, decltype(densityAcc), false>(densityAcc);
 
     HeterogenousMedium medium;
-    medium.densityFactor = params.constants.volumeDensity;
-    medium.densityMin = grid->tree().root().valueMin() * medium.densityFactor;
-    medium.densityMax = medium.densityFactor; //grid->tree().root().valueMax() * medium.densityFactor;
+    medium.densityScale = params.volumeDensityScale;
+    medium.densityMin = densityGrid->tree().root().valueMin() * medium.densityScale;
+    medium.densityMax = densityGrid->tree().root().valueMax() * medium.densityScale;
     medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
     medium.hgMeanCosine = 0.f;
+    medium.albedo = params.volumeAlbedo;
 
     const float3 wRayEye = optixGetWorldRayOrigin();
     const float3 wRayDir = optixGetWorldRayDirection();
@@ -285,22 +338,24 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_occlusion()
                            reinterpret_cast<const Vec3T&>(wRayDir),
                            t0,
                            t1);
-    RayT       iRay = wRay.worldToIndexF(*grid);
+    RayT       iRay = wRay.worldToIndexF(*densityGrid);
     Vec3T      radiance = Vec3T(0);
 
     const uint3    idx = optixGetLaunchIndex();
     const uint3    dim = optixGetLaunchDimensions();
-    const uint32_t offset = params.width * idx.y + idx.x;
-    auto           pixelSeed = render::hash(offset + params.width * params.height * params.numAccumulations);
+    const uint32_t offset = constantParams.width * idx.y + idx.x;
+    auto           pixelSeed = render::hash(offset + constantParams.width * constantParams.height * constantParams.numAccumulations);
 
     iRay.setTimes();
-    float transmittance = getTransmittance(iRay, acc, medium, pixelSeed);
+    float transmittance = getTransmittance(iRay, densitySampler, medium, pixelSeed);
     optixSetPayload_0(float_as_int(transmittance));
 }
 
 extern "C" __global__ void __miss__fogvolume_radiance()
 {
     const MissData* sbtData = (MissData*)optixGetSbtDataPointer();
+
+    const auto& sceneParams = constantParams.sceneConstants;
 
     const float3 wRayEye = optixGetWorldRayOrigin();
     const float3 wRayDir = optixGetWorldRayDirection();
@@ -313,17 +368,17 @@ extern "C" __global__ void __miss__fogvolume_radiance()
 
     float wT = 1e16f;
 
-    if (params.constants.useGround > 0) {
+    if (sceneParams.useBackground) {
         // intersect with ground plane and draw checker if camera is above...
 
-        float wGroundT = (params.constants.groundHeight - wRayEye.y) / wRayDir.y;
+        float wGroundT = (sceneParams.groundHeight - wRayEye.y) / wRayDir.y;
 
-        if (wGroundT > 0.f) {
+        if (wRayDir.y != 0 && wGroundT > 0.f) {
             float3 wGroundPos = wRayEye + wGroundT * wRayDir;
 
-            render::rayTraceGround(wGroundT, params.constants.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundIntensity, groundMix);
+            groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
 
-            if (params.constants.useShadows > 0) {
+            if (sceneParams.useLighting && sceneParams.useShadows > 0) {
                 const float3 wLightDir = {0.0f, 1.0f, 0.0f};
 
                 // HACK: temporrary hack to ensure the ray is not within the volume.
@@ -331,7 +386,7 @@ extern "C" __global__ void __miss__fogvolume_radiance()
 
                 float attenuation = 0.0f;
                 optixTrace(
-                    params.handle,
+                    constantParams.handle,
                     wGroundPos,
                     wLightDir,
                     0.01f,
@@ -349,7 +404,7 @@ extern "C" __global__ void __miss__fogvolume_radiance()
         }
     }
 
-    float skyIntensity = 0.75f + 0.25f * wRayDir.y;
+    float skyIntensity = render::evalSkyMaterial(nanovdb::Vec3f(wRayDir.x, wRayDir.y, wRayDir.z));
 
     auto radiance = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
 

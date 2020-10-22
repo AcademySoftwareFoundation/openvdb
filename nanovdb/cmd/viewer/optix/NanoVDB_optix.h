@@ -13,11 +13,13 @@ enum RayType { RAY_TYPE_RADIANCE = 0,
 
 struct Params
 {
-    uint32_t        numAccumulations;
-    float4*         imgBuffer;
-    uint32_t        width;
-    uint32_t        height;
-    RenderConstants constants;
+    uint32_t              numAccumulations;
+    float4*               imgBuffer;
+    uint32_t              width;
+    uint32_t              height;
+
+    MaterialParameters    materialConstants;
+    SceneRenderParameters sceneConstants;
 
     int   maxDepth;
     float sceneEpsilon;

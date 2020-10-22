@@ -9,7 +9,7 @@
 #include "RenderUtils.h"
 
 extern "C" {
-__constant__ Params params;
+__constant__ Params constantParams;
 }
 
 extern "C" __global__ void __raygen__nanovdb_camera()
@@ -23,45 +23,22 @@ extern "C" __global__ void __raygen__nanovdb_camera()
     const uint3    dim = optixGetLaunchDimensions();
     int            ix = idx.x;
     int            iy = idx.y;
-    const uint32_t offset = params.width * idx.y + idx.x;
-    auto&          camera = *(const Camera<float>*)optixGetSbtDataPointer();
+    const uint32_t offset = constantParams.width * idx.y + idx.x;
+    const auto&    sceneParams = constantParams.sceneConstants;
 
     float3 color = {0, 0, 0};
 
-    for (int sampleIndex = 0; sampleIndex < params.constants.samplesPerPixel; ++sampleIndex) {
-        uint32_t pixelSeed = render::hash((sampleIndex + (params.numAccumulations + 1) * params.constants.samplesPerPixel)) ^ render::hash(ix, iy);
+    for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
+        uint32_t pixelSeed = render::hash((sampleIndex + (constantParams.numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ render::hash(ix, iy);
 
-        float u = ix + 0.5f;
-        float v = iy + 0.5f;
-
-        if (params.numAccumulations > 0 || params.constants.samplesPerPixel > 0) {
-#if 1
-            float jitterX, jitterY;
-            render::cmj(jitterX, jitterY, (sampleIndex + (params.numAccumulations + 1) * params.constants.samplesPerPixel) % 64, 8, 8, pixelSeed);
-            u += jitterX - 0.5f;
-            v += jitterY - 0.5f;
-#else
-            float randVar1 = render::randomf(pixelSeed + 0);
-            float randVar2 = render::randomf(pixelSeed + 1);
-            u += randVar1 - 0.5f;
-            v += randVar2 - 0.5f;
-#endif
-        }
-
-        u /= params.width;
-        v /= params.height;
-
-        //if (ix == params.width/2 && iy == params.height/2)
-        //    printf("pixel(%d, %d, %d, %d, %f, %f)\n", ix, iy, pixelSeed, sampleIndex, u, v);
-
-        RayT wRay = camera.getRay(u, v);
+        RayT wRay = render::getRayFromPixelCoord(ix, iy, constantParams.width, constantParams.height, constantParams.numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
 
         float3 result;
         optixTrace(
-            params.handle,
+            constantParams.handle,
             make_float3(wRay.eye()),
             make_float3(wRay.dir()),
-            params.sceneEpsilon,
+            constantParams.sceneEpsilon,
             1e16f,
             0.0f,
             OptixVisibilityMask(1),
@@ -74,19 +51,22 @@ extern "C" __global__ void __raygen__nanovdb_camera()
         color += result;
     }
 
-    color /= (float)params.constants.samplesPerPixel;
+    color /= (float)sceneParams.samplesPerPixel;
 
-    if (params.numAccumulations > 1) {
-        float3 prevPixel = make_float3(params.imgBuffer[offset]);
+    if (constantParams.numAccumulations > 1) {
+        float3 prevPixel = make_float3(constantParams.imgBuffer[offset]);
 
         float3 oldLinearPixel;
-        if (params.constants.useTonemapping)
-            render::invTonemapReinhard(*(nanovdb::Vec3f*)&oldLinearPixel, *(nanovdb::Vec3f*)&prevPixel, params.constants.tonemapWhitePoint);
-        color = oldLinearPixel + (color - oldLinearPixel) * (1.0f / params.numAccumulations);
+        if (sceneParams.useTonemapping)
+            render::invTonemapReinhard(*(nanovdb::Vec3f*)&oldLinearPixel, *(nanovdb::Vec3f*)&prevPixel, sceneParams.tonemapWhitePoint);
+        else
+            render::invTonemapPassthru(*(nanovdb::Vec3f*)&oldLinearPixel, *(nanovdb::Vec3f*)&prevPixel);
+
+        color = oldLinearPixel + (color - oldLinearPixel) * (1.0f / constantParams.numAccumulations);
     }
 
-    if (params.constants.useTonemapping)
-        render::tonemapReinhard(*(nanovdb::Vec3f*)&color, *(nanovdb::Vec3f*)&color, params.constants.tonemapWhitePoint);
+    if (sceneParams.useTonemapping)
+        render::tonemapReinhard(*(nanovdb::Vec3f*)&color, *(nanovdb::Vec3f*)&color, sceneParams.tonemapWhitePoint);
 
-    params.imgBuffer[offset] = make_float4(color, 1.f);
+    constantParams.imgBuffer[offset] = make_float4(color, 1.f);
 }

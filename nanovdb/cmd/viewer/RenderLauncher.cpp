@@ -19,6 +19,9 @@
 #include "FrameBuffer.h"
 #include "RenderLauncherImpl.h"
 
+const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes] = {"Auto", "LevelSetFast", "FogVolumePathTracer", "Grid", "PointsFast", "BlackBodyVolumePathTracer", "FogVolumeFast", "CameraDiagnostic"};
+const char* kCameraLensTypeStrings[(int)Camera::LensType::kNumTypes] = {"PinHole", "Spherical", "ODS"};
+
 RenderLauncher::RenderLauncher()
     : mIndex(0)
 {
@@ -79,53 +82,50 @@ std::string RenderLauncher::name() const
     return mImpls[mIndex]->name();
 }
 
-template<typename FnT, typename... Args>
-static void launchRender(int width, int height, const FnT& fn, Args... args)
+struct Launcher
 {
-    for (int iy = 0; iy < height; ++iy) {
-        for (int ix = 0; ix < width; ++ix) {
-            fn(ix, iy, width, height, args...);
-        }
+    template<typename ValueT>
+    const nanovdb::NanoGrid<ValueT>* grid(const void* gridPtr)
+    {
+        auto gridHdl = reinterpret_cast<const nanovdb::GridHandle<>*>(gridPtr);
+        if (!gridHdl)
+            return nullptr;
+        return gridHdl->grid<ValueT>();
     }
-}
 
-bool RenderLauncherCpu::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+    template<typename FnT, typename... Args>
+    bool render(int width, int height, const FnT& fn, Args... args) const
+    {
+        for (int iy = 0; iy < height; ++iy) {
+            for (int ix = 0; ix < width; ++ix) {
+                fn(ix, iy, width, height, args...);
+            }
+        }
+
+        return true;
+    }
+};
+
+bool RenderLauncherCpu::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
-    
+
     float* imgPtr = (float*)imgBuffer->map((numAccumulations > 0) ? FrameBufferBase::AccessType::READ_WRITE : FrameBufferBase::AccessType::WRITE_ONLY);
-    
+
     if (!imgPtr) {
         return false;
     }
 
-    if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::Float) {
-        auto grid = gridHdl.grid<float>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::FOG_VOLUME) {
-            launchRender(width, height, render::fogvolume::RenderVolumeRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::LEVELSET) {
-            launchRender(width, height, render::levelset::RenderLevelSetRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    } else if (gridHdl.gridMetaData()->gridType() == nanovdb::GridType::UInt32) {
-        auto grid = gridHdl.grid<uint32_t>();
-
-        if (method == RenderMethod::GRID) {
-            launchRender(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        } else if (method == RenderMethod::POINTS) {
-            launchRender(width, height, render::points::RenderPointsRgba32fFn(), imgPtr, camera, grid, numAccumulations, params);
-        }
-    }
+    Launcher methodLauncher;
+    launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
 
     imgBuffer->unmap();
 
     if (stats) {
         auto t1 = ClockT::now();
-        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1-t0).count()/1000.f;
+        stats->mDuration = std::chrono::duration_cast<std::chrono::microseconds>(t1 - t0).count() / 1000.f;
     }
-    
+
     return true;
 }

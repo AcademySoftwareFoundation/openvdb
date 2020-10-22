@@ -26,8 +26,13 @@ extern "C" {
 
 extern "C" void launchRender(int method, int width, int height, vec4* imgPtr, const nanovdb_Node0_float* node0Level, const nanovdb_Node1_float* node1Level, const nanovdb_Node2_float* node2Level, const nanovdb_RootData_float* rootData, const nanovdb_RootData_Tile_float* rootDataTiles, const nanovdb_GridData* gridData, const ArgUniforms* uniforms);
 
-bool RenderLauncherC99::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+bool RenderLauncherC99::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
+    if (grids[0].gridHandle == nullptr)
+        return false;
+
+    auto& gridHdl = *reinterpret_cast<const nanovdb::GridHandle<>*>(grids[0].gridHandle);
+
     float* imgPtr = (float*)imgBuffer->map((numAccumulations > 0) ? FrameBufferBase::AccessType::READ_WRITE : FrameBufferBase::AccessType::WRITE_ONLY);
     if (!imgPtr) {
         return false;
@@ -54,10 +59,10 @@ bool RenderLauncherC99::render(RenderMethod method, int width, int height, Frame
         auto rootData = &grid->tree().root();
         auto gridData = grid;
 
-        nanovdb::Vec3f cameraP = camera.P();
-        nanovdb::Vec3f cameraU = camera.U();
-        nanovdb::Vec3f cameraV = camera.V();
-        nanovdb::Vec3f cameraW = camera.W();
+        nanovdb::Vec3f cameraP = sceneParams.camera.P();
+        nanovdb::Vec3f cameraU = sceneParams.camera.U();
+        nanovdb::Vec3f cameraV = sceneParams.camera.V();
+        nanovdb::Vec3f cameraW = sceneParams.camera.W();
 
         // launch render...
 
@@ -66,16 +71,18 @@ bool RenderLauncherC99::render(RenderMethod method, int width, int height, Frame
         uniforms.width = width;
         uniforms.height = height;
         uniforms.numAccumulations = numAccumulations;
-        uniforms.useShadows = params.useShadows;
-        uniforms.useGround = params.useGround;
-        uniforms.useGroundReflections = params.useGroundReflections;
-        uniforms.useLighting = params.useLighting;
-        uniforms.useOcclusion = params.useOcclusion;
-        uniforms.volumeDensity = params.volumeDensity;
-        uniforms.tonemapWhitePoint = params.tonemapWhitePoint;
-        uniforms.samplesPerPixel = params.samplesPerPixel;
-        uniforms.groundHeight = params.groundHeight;
-        uniforms.groundFalloff = params.groundFalloff;
+
+        uniforms.useShadows = sceneParams.useShadows;
+        uniforms.useGroundReflections = sceneParams.useGroundReflections;
+        uniforms.useLighting = sceneParams.useLighting;
+        uniforms.useOcclusion = materialParams.useOcclusion;
+        uniforms.volumeDensityScale = materialParams.volumeDensityScale;
+
+        uniforms.samplesPerPixel = sceneParams.samplesPerPixel;
+        uniforms.useBackground = sceneParams.useBackground;
+        uniforms.tonemapWhitePoint = sceneParams.tonemapWhitePoint;
+        uniforms.groundHeight = sceneParams.groundHeight;
+        uniforms.groundFalloff = sceneParams.groundFalloff;
         uniforms.cameraPx = cameraP[0];
         uniforms.cameraPy = cameraP[1];
         uniforms.cameraPz = cameraP[2];
@@ -88,6 +95,8 @@ bool RenderLauncherC99::render(RenderMethod method, int width, int height, Frame
         uniforms.cameraWx = cameraW[0];
         uniforms.cameraWy = cameraW[1];
         uniforms.cameraWz = cameraW[2];
+        uniforms.cameraAspect = sceneParams.camera.aspect();
+        uniforms.cameraFovY = sceneParams.camera.fov();
 
         launchRender((int)method, width, height, (vec4*)imgPtr, (nanovdb_Node0_float*)node0Level, (nanovdb_Node1_float*)node1Level, (nanovdb_Node2_float*)node2Level, (nanovdb_RootData_float*)rootData, (nanovdb_RootData_Tile_float*)(rootData + 1), (nanovdb_GridData*)gridData, &uniforms);
     }

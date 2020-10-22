@@ -37,6 +37,8 @@ layout(std430, binding = 4) readonly buffer nanovdb_Grid_Block
 }
 kGridData;
 
+layout(rgba32f, binding = 0) uniform image2D kOutImage;
+
 #else
 struct nanovdb_Node0_Block
 {

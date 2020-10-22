@@ -10,17 +10,15 @@ if [ -d "__release_core/${NAME}/bin" ]; then
 	mkdir -p ${OUT_PATH}
 
 	# make gold image.
-	./bin/nanovdb_viewer -b -o ${OUT_PATH}/gold -p host-mt --count 1 --turntable
-	mogrify -format png ${OUT_PATH}/gold.0000.pfm
+	./bin/nanovdb_viewer -b --render-start 0 --render-end 0 --render-output ${OUT_PATH}/gold.%04d.png -p host-mt --render-camera-turntable 1 internal://#ls_box_100
 
 	# test against other platforms...
-
-	./bin/nanovdb_viewer -b --gold ${OUT_PATH}/gold -o ${OUT_PATH}/test-cuda -p cuda -n 1 --turntable
-	./bin/nanovdb_viewer -b --gold ${OUT_PATH}/gold -o ${OUT_PATH}/test-c99 -p host-c99 -n 1 --turntable
-	./bin/nanovdb_viewer -b --gold ${OUT_PATH}/gold -o ${OUT_PATH}/test-glsl -p glsl -n 1 --turntable
-	./bin/nanovdb_viewer -b --gold ${OUT_PATH}/gold -o ${OUT_PATH}/test-opencl -p opencl -n 1 --turntable
-	./bin/nanovdb_viewer -b --gold ${OUT_PATH}/gold -o ${OUT_PATH}/test-optix -p optix -n 1 --turntable
-
-	#compare -verbose -metric MAE ../../__output/gold.0000.pfm ../../__output/test-glsl.0000.pfm null: 2>&1
-	#compare -verbose -metric MAE ../../__output/gold.0000.pfm ../../__output/test-opencl.0000.pfm null: 2>&1
+if false; then
+	./bin/nanovdb_viewer -b --render-end 0 --render-gold ${OUT_PATH}/gold.%04d.png --render-output ${OUT_PATH}/test-cuda.%04d.png -p cuda --render-camera-turntable 1 internal://#ls_box_100
+	./bin/nanovdb_viewer -b --render-end 0 --render-gold ${OUT_PATH}/gold.%04d.png --render-output ${OUT_PATH}/test-c99.%04d.png -p host-c99 --render-camera-turntable 1 internal://#ls_box_100
+	./bin/nanovdb_viewer -b --render-end 0 --render-gold ${OUT_PATH}/gold.%04d.png --render-output ${OUT_PATH}/test-glsl.%04d.png -p glsl --render-camera-turntable 1 internal://#ls_box_100
+	./bin/nanovdb_viewer -b --render-end 0 --render-gold ${OUT_PATH}/gold.%04d.png --render-output ${OUT_PATH}/test-opencl.%04d.png -p opencl --render-camera-turntable 1 internal://#ls_box_100
+	./bin/nanovdb_viewer -b --render-end 0 --render-gold ${OUT_PATH}/gold.%04d.png --render-output ${OUT_PATH}/test-optix.%04d.png -p optix --render-camera-turntable 1 internal://#ls_box_100
+	
+fi
 fi

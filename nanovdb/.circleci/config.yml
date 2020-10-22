@@ -45,7 +45,7 @@ jobs:
             - run:
                 name: build-msvc
                 command: |
-                    ./ci/build_core_toolchain.sh msvc16 ~/repo/ci/wine-toolchain.cmake Release -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_TBB=OFF -DNANOVDB_USE_ZLIB=OFF -DNANOVDB_USE_BLOSC=OFF -DNANOVDB_BUILD_TOOLS=ON -DNANOVDB_BUILD_UNITTESTS=OFF -DNANOVDB_USE_OPTIX=OFF -DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_INTRINSICS=OFF
+                    ./ci/build_core.sh msvc16 msvc 10.2 Release -DNANOVDB_USE_OPENVDB=OFF -DNANOVDB_USE_TBB=OFF -DNANOVDB_USE_ZLIB=OFF -DNANOVDB_USE_BLOSC=OFF -DNANOVDB_BUILD_TOOLS=ON -DNANOVDB_BUILD_UNITTESTS=OFF -DNANOVDB_USE_OPTIX=OFF -DNANOVDB_USE_CUDA=OFF
             - store_test_results:
                 path: test-results
 workflows:

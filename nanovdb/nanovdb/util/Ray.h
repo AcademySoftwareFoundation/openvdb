@@ -371,8 +371,12 @@ public:
     {
         mTimeSpan.get(t0, t1);
         for (int i = 0; i < 3; ++i) {
-            RealT a = (RealT(bbox.min()[i]    ) - mEye[i]) * mInvDir[i];
-            RealT b = (RealT(bbox.max()[i] + 1) - mEye[i]) * mInvDir[i];
+            RealT a = RealT(bbox.min()[i]), b = RealT(bbox.max()[i] + 1);
+            if (a >= b) { // empty bounding box
+                return false;
+            } 
+            a = (a - mEye[i]) * mInvDir[i];
+            b = (b - mEye[i]) * mInvDir[i];
             if (a > b) {
                 RealT tmp = a;
                 a = b;
@@ -393,14 +397,18 @@ public:
     /// @brief Returns true if this ray intersects a floating-point bounding box.
     ///        If the return value is true t0 and t1 are set to the intersection
     ///        times along the ray.
-    template<typename Vec3T>
-    __hostdev__ bool intersects(const BBox<Vec3T>& bbox, RealT& t0, RealT& t1) const
+    template<typename OtherVec3T>
+    __hostdev__ bool intersects(const BBox<OtherVec3T>& bbox, RealT& t0, RealT& t1) const
     {
-        static_assert(is_floating_point<typename Vec3T::ValueType>::value, "Ray::intersects: Expected a floating point coordinate");
+        static_assert(is_floating_point<typename OtherVec3T::ValueType>::value, "Ray::intersects: Expected a floating point coordinate");
         mTimeSpan.get(t0, t1);
         for (int i = 0; i < 3; ++i) {
-            RealT a = (bbox.min()[i] - mEye[i]) * mInvDir[i];
-            RealT b = (bbox.max()[i] - mEye[i]) * mInvDir[i];
+            RealT a = RealT(bbox.min()[i]), b = RealT(bbox.max()[i]);
+            if (a >= b) { // empty bounding box
+                return false;
+            }
+            a = (a - mEye[i]) * mInvDir[i];
+            b = (b - mEye[i]) * mInvDir[i];
             if (a > b) {
                 RealT tmp = a;
                 a = b;

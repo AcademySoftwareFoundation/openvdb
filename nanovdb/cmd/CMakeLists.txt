@@ -119,7 +119,7 @@ if(NANOVDB_BUILD_INTERACTIVE_RENDERER)
       FetchContent_Declare(
         imgui
         GIT_REPOSITORY https://github.com/ocornut/imgui.git
-        GIT_TAG v1.79)
+        GIT_TAG docking)
 
       FetchContent_GetProperties(imgui)
       if(NOT imgui_POPULATED)
@@ -130,13 +130,12 @@ if(NANOVDB_BUILD_INTERACTIVE_RENDERER)
         list(
           APPEND
           IMGUI_SOURCE_FILES
-          # ${imgui_SOURCE_DIR}/imgui_demo.cpp
           ${imgui_SOURCE_DIR}/imgui.cpp
           ${imgui_SOURCE_DIR}/imgui_draw.cpp
           ${imgui_SOURCE_DIR}/imgui_widgets.cpp
-          ${imgui_SOURCE_DIR}/examples/imgui_impl_glfw.cpp
-          ${imgui_SOURCE_DIR}/examples/imgui_impl_opengl3.h
-          ${imgui_SOURCE_DIR}/examples/imgui_impl_opengl3.cpp)
+          ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+          ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.h
+          ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp)
 
         add_library(imgui ${IMGUI_SOURCE_FILES})
 
@@ -173,6 +172,10 @@ if(TRUE)
     viewer/nanovdb_viewer
     viewer/RenderLauncherC99impl.c
     viewer/nanovdb_viewer.cpp
+    viewer/StringUtils.h
+    viewer/StringUtils.cpp
+    viewer/GridAssetUrl.h
+    viewer/GridAssetUrl.cpp
     viewer/FrameBuffer.h
     viewer/FrameBuffer.cpp
     viewer/FrameBufferHost.cpp
@@ -192,7 +195,13 @@ if(TRUE)
     viewer/RenderLauncher.cpp
     viewer/RenderLauncherCpuMT.cpp
     viewer/AgnosticNanoVDB.h
-    viewer/RenderLauncherC99.cpp)
+    viewer/RenderLauncherC99.cpp
+    viewer/GridManager.h
+    viewer/GridManager.cpp
+    viewer/AssetLoader.h
+    viewer/AssetLoader.cpp
+    viewer/CallbackPool.h
+    viewer/CallbackPool.cpp)
 
   if(NOT (NANOVDB_GLFW_LINK_LIBRARY AND NANOVDB_GLAD_LINK_LIBRARY)
      AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
@@ -237,6 +246,7 @@ if(TRUE)
   target_include_directories(
     nanovdb_viewer
     PRIVATE ${NANOVDB_INCLUDE_DIR}
+            ${NanoVDB_TOP_LEVEL_DIR}/external
             ${TBB_INCLUDE_DIRECTORY} # optional
             ${CUDA_INCLUDE_DIRECTORY} # optional
             ${OPENCL_INCLUDE_DIRECTORY} # optional
@@ -263,6 +273,7 @@ if(TRUE)
             "-D${NANOVDB_USE_ZLIB_FLAG}"
             "-D${NANOVDB_USE_OPENVDB_FLAG}"
             "-D${NANOVDB_USE_IMGUI_FLAG}"
+            "-DNANOVDB_USE_IMGUI_DOCKING"
             "-D${NANOVDB_USE_OPENGL_FLAG}"
             "-D${NANOVDB_USE_EGL_FLAG}"
             "-D${NANOVDB_VIEWER_USE_GLES_FLAG}"

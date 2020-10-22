@@ -61,6 +61,12 @@ inline __hostdev__ void invTonemapReinhard(Vec3T1& out, Vec3T2& in, const float 
     out[2] = invReinhardFn(in[2] * w);
 }
 
+template<typename ValueT, typename Vec3T>
+inline __hostdev__ ValueT luminance(Vec3T v)
+{
+    return ValueT(v[0] * ValueT(0.2126) + v[1] * ValueT(0.7152) + v[2] * ValueT(0.0722));
+}
+
 template<typename Vec3T>
 inline __hostdev__ void tonemapACES(Vec3T& out, const Vec3T& in)
 {
@@ -75,6 +81,22 @@ inline __hostdev__ void tonemapACES(Vec3T& out, const Vec3T& in)
     out[0] = nanovdb::Max(nanovdb::Min(r, 1.0f), 0.0f);
     out[1] = nanovdb::Max(nanovdb::Min(g, 1.0f), 0.0f);
     out[2] = nanovdb::Max(nanovdb::Min(b, 1.0f), 0.0f);
+}
+
+// LCG values from Numerical Recipes
+inline __hostdev__ float randomLCG(uint32_t& seed)
+{
+    seed = 1664525 * seed + 1013904223;
+    return seed / float(0xffffffffu);
+}
+
+// Xorshift algorithm from George Marsaglia
+inline __hostdev__ float randomXorShift(uint32_t& seed)
+{
+    seed ^= (seed << 13);
+    seed ^= (seed >> 17);
+    seed ^= (seed << 5);
+    return seed / float(0xffffffffu);
 }
 
 // http://www.burtleburtle.net/bob/hash/doobs.html
@@ -118,20 +140,91 @@ inline __hostdev__ void cmj(float& outX, float& outY, int s, int w, int h, int s
     outY = (s / w + sx) / h;
 }
 
-inline __hostdev__ void rayTraceGround(float groundT, float falloffDistance, const nanovdb::Vec3f& pos, float rayDirY, float& outIntensity, float& outMix)
+inline __hostdev__ nanovdb::Ray<float> getRayFromPixelCoord(int ix, int iy, int width, int height, const SceneRenderParameters& sceneParams)
 {
-    const float checkerScale = 1.0f / 1024.0f;
+    float u = ix + 0.5f;
+    float v = iy + 0.5f;
+    return sceneParams.camera.getRay(u / width, v / height);
+}
 
-    auto iu = floorf(pos[0] * checkerScale);
-    auto iv = floorf(pos[2] * checkerScale);
-    outIntensity = fabsf(fmodf(iu + iv, 2.f));
+inline __hostdev__ nanovdb::Ray<float> getRayFromPixelCoord(int ix, int iy, int width, int height, int numAccumulations, int samplesPerPixel, uint32_t& pixelSeed, const SceneRenderParameters& sceneParams)
+{
+    float u = ix + 0.5f;
+    float v = iy + 0.5f;
+
+    if (numAccumulations > 0 || samplesPerPixel > 0) {
+#if 1
+        float jitterX, jitterY;
+        cmj(jitterX, jitterY, numAccumulations % 64, 8, 8, pixelSeed);
+        u += jitterX - 0.5f;
+        v += jitterY - 0.5f;
+#else
+        float randVar1 = randomf(pixelSeed + 0);
+        float randVar2 = randomf(pixelSeed + 1);
+        u += randVar1 - 0.5f;
+        v += randVar2 - 0.5f;
+#endif
+    }
+
+    return sceneParams.camera.getRay(u / width, v / height);
+}
+
+inline __hostdev__ float evalGroundMaterial(float groundT, float falloffDistance, const nanovdb::Vec3f& pos, float rayDirY, float& outMix)
+{
+    static constexpr float checkerScale = 1.0f / 1024.0f;
+    auto                   iu = floorf(pos[0] * checkerScale);
+    auto                   iv = floorf(pos[2] * checkerScale);
+    float                  outIntensity = fabsf(fmodf(iu + iv, 2.f));
     outIntensity = 0.25f + outIntensity * 0.5f;
-    //float m = expf( -wGroundT / falloffDistance );// * -rayDirY;
-    float m = (1.0f - groundT / falloffDistance) * -rayDirY;
-    outMix = fmaxf(0.f, m);
+    outMix = fmaxf(0.f, (1.0f - groundT / falloffDistance) * -(rayDirY));
+    return outIntensity;
+}
+
+inline __hostdev__ float evalSkyMaterial(const nanovdb::Vec3f& dir)
+{
+    return 0.75f + 0.25f * dir[1];
+}
+
+__hostdev__ inline float traceEnvironment(const nanovdb::Ray<float>& wRay, const SceneRenderParameters& sceneParams)
+{
+    if (!sceneParams.useBackground)
+        return 0.0f;
+
+    float skyIntensity = evalSkyMaterial(wRay.dir());
+
+    if (!sceneParams.useGround)
+        return skyIntensity;
+
+    float groundIntensity = 0.0f;
+    float groundMix = 0.0f;
+    if (sceneParams.useGround) {
+        float wGroundT = (sceneParams.groundHeight - wRay.eye()[1]) / wRay.dir()[1];
+        if (wRay.dir()[1] != 0 && wGroundT > 0.f) {
+            nanovdb::Vec3f wGroundPos = wRay.eye() + wGroundT * wRay.dir();
+            groundIntensity = evalGroundMaterial(wGroundT, sceneParams.groundFalloff, wGroundPos, wRay.dir()[1], groundMix);
+        }
+    }
+    float bgIntensity = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
+    return bgIntensity;
+}
+
+// algorithm adapted from: https://github.com/NVIDIAGameWorks/Falcor/blob/master/Source/Falcor/Utils/Math/MathHelpers.slang
+// Generate a vector that is orthogonal to the input vector.
+inline __hostdev__ nanovdb::Vec3f perpStark(const nanovdb::Vec3f& u)
+{
+    auto a = nanovdb::Vec3f(nanovdb::Abs(u[0]), nanovdb::Abs(u[1]), nanovdb::Abs(u[2]));
+    auto uyx = (a[0] - a[1]) < 0 ? 1 : 0;
+    auto uzx = (a[0] - a[2]) < 0 ? 1 : 0;
+    auto uzy = (a[1] - a[2]) < 0 ? 1 : 0;
+    auto xm = uyx & uzx;
+    auto ym = (1 ^ xm) & uzy;
+    auto zm = 1 ^ (xm | ym); // 1 ^ (xm & ym)
+    auto v = u.cross(nanovdb::Vec3f(float(xm), float(ym), float(zm)));
+    return v;
 }
 
 // algorithm taken from: http://amietia.com/lambertnotangent.html
+// Return a vector in the cosine distribution.
 inline __hostdev__ nanovdb::Vec3f lambertNoTangent(nanovdb::Vec3f normal, float u, float v)
 {
     float theta = 6.283185f * u;
@@ -140,5 +233,61 @@ inline __hostdev__ nanovdb::Vec3f lambertNoTangent(nanovdb::Vec3f normal, float 
     auto  spherePoint = nanovdb::Vec3f(d * cosf(theta), d * sinf(theta), v);
     return (normal + spherePoint).normalize();
 }
+
+inline __hostdev__ void compositeFn(float* outPixel, float* color, int numAccumulations, const SceneRenderParameters& sceneParams)
+{
+    if (numAccumulations > 1) {
+        float oldLinearPixel[3];
+        if (sceneParams.useTonemapping)
+            invTonemapReinhard(oldLinearPixel, outPixel, sceneParams.tonemapWhitePoint);
+        else
+            invTonemapPassthru(oldLinearPixel, outPixel);
+        for (int k = 0; k < 3; ++k)
+            color[k] = oldLinearPixel[k] + (color[k] - oldLinearPixel[k]) * (1.0f / numAccumulations);
+    }
+
+    if (sceneParams.useTonemapping)
+        tonemapReinhard(outPixel, color, sceneParams.tonemapWhitePoint);
+    else
+        tonemapPassthru(outPixel, color);
+    outPixel[3] = 1.0;
+}
+
+struct RenderEnvRgba32fFn
+{
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const SceneRenderParameters sceneParams, const MaterialParameters materialParams) const
+    {
+        auto wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+        auto envRadiance = traceEnvironment(wRay, sceneParams);
+
+        float color[4];
+        color[0] = envRadiance;
+        color[1] = envRadiance;
+        color[2] = envRadiance;
+
+        auto outPixel = &imgBuffer[4 * (ix + width * iy)];
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
+    }
+};
+
+struct CameraDiagnosticRenderer
+{
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const SceneRenderParameters sceneParams, const MaterialParameters materialParams) const
+    {
+        auto outPixel = &imgBuffer[4 * (ix + width * iy)];
+        auto wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+
+        float color[4];
+        color[0] = wRay.dir()[0];
+        color[1] = wRay.dir()[1];
+        color[2] = wRay.dir()[2];
+        color[3] = 1;
+
+        outPixel[0] = color[0];
+        outPixel[1] = color[1];
+        outPixel[2] = color[2];
+        outPixel[3] = color[3];
+    }
+};
 
 } // namespace render

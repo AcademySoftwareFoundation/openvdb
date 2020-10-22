@@ -25,12 +25,18 @@
 
 class FrameBufferBase;
 
-enum class RenderMethod { AUTO = 0,
-                          LEVELSET = 1,
-                          FOG_VOLUME = 2,
-                          GRID = 3,
-                          POINTS = 4,
-                          COUNT = 5 };
+enum class MaterialClass { kAuto = 0,
+                           kLevelSetFast,
+                           kFogVolumePathTracer,
+                           kGrid,
+                           kPointsFast,
+                           kBlackBodyVolumePathTracer,
+                           kFogVolumeFast,
+                           kCameraDiagnostic,
+                           kNumTypes };
+
+extern const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes];
+extern const char* kCameraLensTypeStrings[(int)Camera::LensType::kNumTypes];
 
 class RenderLauncherImplBase
 {
@@ -41,7 +47,7 @@ public:
 
     virtual int getPriority() const { return 0; }
 
-    virtual bool render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats = nullptr) = 0;
+    virtual bool render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats = nullptr) = 0;
 };
 
 class RenderLauncher
@@ -53,11 +59,11 @@ public:
 
     void setPlatform(int index) { mIndex = std::max(std::min(index, (int)mImpls.size() - 1), 0); }
 
-    bool render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& grid, int numAccumulations, const RenderConstants& params, RenderStatistics* stats);
+    bool render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats);
 
     int size() const { return (int)mImpls.size(); }
 
-    int getPlatformIndexFromName(std::string name) const;
+    int         getPlatformIndexFromName(std::string name) const;
     std::string getNameForPlatformIndex(int i) const;
 
     std::vector<std::string> getPlatformNames() const;
@@ -67,9 +73,7 @@ private:
     std::vector<std::shared_ptr<RenderLauncherImplBase>> mImpls;
 };
 
-inline bool RenderLauncher::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+inline bool RenderLauncher::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
-    if (gridHdl.gridMetaData()->activeVoxelCount() == 0)
-        return false;
-    return mImpls[mIndex]->render(method, width, height, imgBuffer, camera, gridHdl, numAccumulations, params, stats);
+    return mImpls[mIndex]->render(method, width, height, imgBuffer, numAccumulations, numGrids, grids, sceneParams, materialParams, stats);
 }

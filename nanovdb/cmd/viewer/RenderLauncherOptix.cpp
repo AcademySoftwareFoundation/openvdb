@@ -57,9 +57,9 @@ struct Record
     T data;
 };
 
-typedef Record<Camera<float>> RayGenRecord;
-typedef Record<MissData>      MissRecord;
-typedef Record<HitGroupData>  HitGroupRecord;
+typedef Record<Camera>       RayGenRecord;
+typedef Record<MissData>     MissRecord;
+typedef Record<HitGroupData> HitGroupRecord;
 
 struct RenderState
 {
@@ -467,7 +467,7 @@ static void createCameraProgram(RenderState& state, std::vector<OptixProgramGrou
     state.raygen_prog_group = cam_prog_group;
 }
 
-static void createVolumeProgram(RenderMethod renderMethod, RenderState& state, std::vector<OptixProgramGroup>& program_groups)
+static void createVolumeProgram(MaterialClass renderMethod, RenderState& state, std::vector<OptixProgramGroup>& program_groups)
 {
     char   log[2048];
     size_t sizeof_log = sizeof(log);
@@ -481,11 +481,11 @@ static void createVolumeProgram(RenderMethod renderMethod, RenderState& state, s
         radiance_prog_group_desc.hitgroup.moduleCH = state.shading_module;
         radiance_prog_group_desc.hitgroup.moduleAH = nullptr;
 
-        if (renderMethod == RenderMethod::LEVELSET) {
+        if (renderMethod == MaterialClass::kLevelSetFast) {
             radiance_prog_group_desc.hitgroup.entryFunctionNameIS = "__intersection__nanovdb_levelset";
             radiance_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__nanovdb_levelset_radiance";
             radiance_prog_group_desc.hitgroup.entryFunctionNameAH = nullptr;
-        } else if (renderMethod == RenderMethod::FOG_VOLUME) {
+        } else if (renderMethod == MaterialClass::kFogVolumePathTracer) {
             radiance_prog_group_desc.hitgroup.entryFunctionNameIS = "__intersection__nanovdb_fogvolume";
             radiance_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__nanovdb_fogvolume_radiance";
             radiance_prog_group_desc.hitgroup.entryFunctionNameAH = nullptr;
@@ -518,13 +518,13 @@ static void createVolumeProgram(RenderMethod renderMethod, RenderState& state, s
         occlusion_prog_group_desc.hitgroup.entryFunctionNameCH = nullptr;
         occlusion_prog_group_desc.hitgroup.entryFunctionNameAH = nullptr;
 
-        if (renderMethod == RenderMethod::LEVELSET) {
+        if (renderMethod == MaterialClass::kLevelSetFast) {
             occlusion_prog_group_desc.hitgroup.entryFunctionNameIS = "__intersection__nanovdb_levelset";
-        } else if (renderMethod == RenderMethod::FOG_VOLUME) {
+        } else if (renderMethod == MaterialClass::kFogVolumePathTracer) {
             occlusion_prog_group_desc.hitgroup.entryFunctionNameIS = "__intersection__nanovdb_fogvolume";
             occlusion_prog_group_desc.hitgroup.moduleCH = state.shading_module;
             occlusion_prog_group_desc.hitgroup.entryFunctionNameCH = "__closesthit__nanovdb_fogvolume_occlusion";
-        } else if (renderMethod == RenderMethod::GRID) {
+        } else {
             occlusion_prog_group_desc.hitgroup.entryFunctionNameIS = "__intersection__nanovdb_grid";
         }
 
@@ -536,7 +536,7 @@ static void createVolumeProgram(RenderMethod renderMethod, RenderState& state, s
     }
 }
 
-static void createMissProgram(RenderMethod renderMethod, RenderState& state, std::vector<OptixProgramGroup>& program_groups)
+static void createMissProgram(MaterialClass renderMethod, RenderState& state, std::vector<OptixProgramGroup>& program_groups)
 {
     char   log[2048];
     size_t sizeof_log = sizeof(log);
@@ -553,10 +553,12 @@ static void createMissProgram(RenderMethod renderMethod, RenderState& state, std
 
         miss_prog_group_desc.kind = OPTIX_PROGRAM_GROUP_KIND_MISS;
         miss_prog_group_desc.miss.module = state.shading_module;
-        if (renderMethod == RenderMethod::LEVELSET || renderMethod == RenderMethod::GRID) {
+        if (renderMethod == MaterialClass::kLevelSetFast || renderMethod == MaterialClass::kGrid) {
             miss_prog_group_desc.miss.entryFunctionName = "__miss__levelset_radiance";
-        } else if (renderMethod == RenderMethod::FOG_VOLUME) {
+        } else if (renderMethod == MaterialClass::kFogVolumeFast || renderMethod == MaterialClass::kFogVolumePathTracer || renderMethod == MaterialClass::kBlackBodyVolumePathTracer) {
             miss_prog_group_desc.miss.entryFunctionName = "__miss__fogvolume_radiance";
+        } else {
+            miss_prog_group_desc.miss.entryFunctionName = "__miss__env_radiance";
         }
 
         OPTIX_CHECK_LOG(optixProgramGroupCreate(state.context,
@@ -592,7 +594,7 @@ static void createMissProgram(RenderMethod renderMethod, RenderState& state, std
     }
 }
 
-void createPipeline(RenderMethod renderMethod, RenderState& state)
+void createPipeline(MaterialClass renderMethod, RenderState& state)
 {
     std::vector<OptixProgramGroup> program_groups;
 
@@ -602,7 +604,7 @@ void createPipeline(RenderMethod renderMethod, RenderState& state)
     state.pipeline_compile_options.numPayloadValues = 3;
     state.pipeline_compile_options.numAttributeValues = 6;
     state.pipeline_compile_options.exceptionFlags = OPTIX_EXCEPTION_FLAG_NONE;
-    state.pipeline_compile_options.pipelineLaunchParamsVariableName = "params";
+    state.pipeline_compile_options.pipelineLaunchParamsVariableName = "constantParams";
 
     // Prepare program groups
     createModules(state);
@@ -627,7 +629,7 @@ void createPipeline(RenderMethod renderMethod, RenderState& state)
                                         &state.pipeline));
 }
 
-void syncCameraDataToSbt(RenderState& state, const Camera<float>& camera)
+void syncCameraDataToSbt(RenderState& state, const Camera& camera)
 {
     RayGenRecord rg_sbt;
 
@@ -713,7 +715,6 @@ void initLaunchParams(RenderState& state)
     state.params.numAccumulations = 0u;
     state.params.maxDepth = g_sMaxTrace;
     state.params.sceneEpsilon = 1.e-4f;
-    state.params.constants = RenderConstants();
 
     NANOVDB_CUDA_SAFE_CALL(cudaStreamCreate(&state.stream));
     NANOVDB_CUDA_SAFE_CALL(cudaMalloc(reinterpret_cast<void**>(&state.d_params), sizeof(Params)));
@@ -732,39 +733,24 @@ RenderLauncherOptix::Resource::~Resource()
     cudaFree(mDeviceGrid);
 }
 
-std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResource(const nanovdb::GridHandle<>& gridHdl, RenderMethod renderMethod)
+std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResource(const nanovdb::GridHandle<>& gridHdl, MaterialClass renderMethod)
 {
-    auto realRenderMethod = renderMethod;
-    if (renderMethod == RenderMethod::AUTO) {
-        if (gridHdl.gridMetaData()->isFogVolume())
-            renderMethod = RenderMethod::FOG_VOLUME;
-        else if (gridHdl.gridMetaData()->isLevelSet())
-            renderMethod = RenderMethod::LEVELSET;
-        else if (gridHdl.gridMetaData()->isPointIndex())
-            renderMethod = RenderMethod::POINTS;
-        else if (gridHdl.gridMetaData()->isPointData())
-            renderMethod = RenderMethod::POINTS;
-        else
-            renderMethod = RenderMethod::GRID;
-    }
+    assert(renderMethod != MaterialClass::kAuto);
 
     std::shared_ptr<Resource> resource;
     auto                      it = mResources.find(&gridHdl);
-    if (it != mResources.end() && it->second->mRenderMethod == realRenderMethod) {
+    if (it != mResources.end() && it->second->mMaterialClass == renderMethod) {
         resource = it->second;
     } else {
         std::cout << "Initializing OptiX renderer..." << std::endl;
 
         resource = std::make_shared<Resource>();
-        resource->mRenderMethod = realRenderMethod;
+        resource->mMaterialClass = renderMethod;
 
         if (it != mResources.end())
             mResources.erase(it);
 
         mResources.insert(std::make_pair(&gridHdl, resource));
-
-        if (!(gridHdl.gridMetaData()->isLevelSet() || gridHdl.gridMetaData()->isFogVolume()))
-            return nullptr;
 
         NANOVDB_CUDA_SAFE_CALL(cudaMalloc((void**)&resource->mDeviceGrid, gridHdl.size()));
         NANOVDB_CUDA_SAFE_CALL(cudaMemcpy(resource->mDeviceGrid, gridHdl.data(), gridHdl.size(), cudaMemcpyHostToDevice));
@@ -840,12 +826,14 @@ std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResour
         std::cout << "BVH contains " << aabbs.size() << " AABBs" << std::endl;
 
         createContext(state);
-        createGeometry(aabbs, d_boundingBoxes, state);
+
+        if (aabbs.size() > 0) {
+            createGeometry(aabbs, d_boundingBoxes, state);
+        }
+
         createPipeline(renderMethod, state);
         createSBT(volume_geometry, volume_material, state);
-
         initLaunchParams(state);
-
         resource->mOptixRenderState = rs;
         resource->mInitialized = true;
     }
@@ -944,8 +932,13 @@ void* RenderLauncherOptix::mapCUDA(int access, const std::shared_ptr<Resource>& 
     return imgBuffer->cudaMap(FrameBufferBase::AccessType(access));
 }
 
-bool RenderLauncherOptix::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+bool RenderLauncherOptix::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
+    if (grids[0].gridHandle == nullptr)
+        return false;
+
+    auto& gridHdl = *reinterpret_cast<const nanovdb::GridHandle<>*>(grids[0].gridHandle);
+
     auto resource = ensureResource(gridHdl, method);
     if (!resource || !resource->mInitialized)
         return false;
@@ -963,13 +956,14 @@ bool RenderLauncherOptix::render(RenderMethod method, int width, int height, Fra
 
     auto& optixRenderState = *reinterpret_cast<RenderState*>(resource->mOptixRenderState);
 
-    syncCameraDataToSbt(optixRenderState, camera);
+    syncCameraDataToSbt(optixRenderState, sceneParams.camera);
 
     optixRenderState.params.width = width;
     optixRenderState.params.height = height;
     optixRenderState.params.imgBuffer = (float4*)imgPtr;
     optixRenderState.params.numAccumulations = numAccumulations;
-    optixRenderState.params.constants = params;
+    optixRenderState.params.materialConstants = materialParams;
+    optixRenderState.params.sceneConstants = sceneParams;
 
     NANOVDB_CUDA_SAFE_CALL(cudaMemcpyAsync(
         reinterpret_cast<void*>(optixRenderState.d_params), &optixRenderState.params, sizeof(Params), cudaMemcpyHostToDevice, optixRenderState.stream));

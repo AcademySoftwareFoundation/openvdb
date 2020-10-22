@@ -11,7 +11,7 @@ mkdir -p __build_core/${NAME}
 pushd __build_core/${NAME}
 
 # print version
-cmake --version
+#cmake --version
 
 cmake \
     -DCMAKE_TOOLCHAIN_FILE=${TOOLCHAIN_FILE} \

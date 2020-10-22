@@ -15,10 +15,40 @@
 
 #include <string>
 #include <vector>
+#include <queue>
+#include <mutex>
 
+#include "GridAssetUrl.h"
 #include "FrameBuffer.h"
 #include <nanovdb/util/GridHandle.h>
 #include "RenderLauncher.h"
+#include "GridManager.h"
+
+// struct representing a scene graph node's grid attachment.
+struct SceneNodeGridAttachment
+{
+    using Ptr = std::shared_ptr<SceneNodeGridAttachment>;
+
+    int                          mIndex;
+    GridManager::AssetGridStatus mStatus;
+    std::string                  mFrameUrl;
+    GridAssetUrl                 mAssetUrl;
+    nanovdb::GridClass           mGridClassOverride;
+    RendererAttributeParams      attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::End];
+};
+
+// struct representing a scene graph node.
+struct SceneNode
+{
+    using Ptr = std::shared_ptr<SceneNode>;
+
+    int                                       mIndex;
+    std::string                               mName;
+    std::vector<SceneNodeGridAttachment::Ptr> mAttachments;
+    nanovdb::BBox<nanovdb::Vec3d>             mBounds;
+    MaterialClass                             mMaterialClass = MaterialClass::kAuto;
+    MaterialParameters                        mMaterialParameters;
+};
 
 inline std::string getStringForBlindDataSemantic(nanovdb::GridBlindDataSemantic semantic)
 {
@@ -38,16 +68,22 @@ struct RendererParams
 {
     RendererParams();
 
-    int         mWidth = 512;
-    int         mHeight = 512;
-    std::string mOutputPrefix;
-    std::string mGoldPrefix;
-    bool        mUseTurntable = false;
-    bool        mUseAccumulation = true;
-    int         mRenderLauncherType = 0;
-    //RenderMethod    mRenderMethod = RenderMethod::AUTO;
-    int             mFrameCount = 0;
-    RenderConstants mOptions;
+    int                   mWidth = 512;
+    int                   mHeight = 512;
+    std::string           mOutputFilePath;
+    std::string           mOutputExtension;
+    int                   mOutputPadding = 4;
+    std::string           mGoldPrefix;
+    bool                  mUseTurntable = false;
+    float                 mTurntableRate = 1;
+    MaterialClass         mMaterialOverride = MaterialClass::kAuto;
+    bool                  mUseAccumulation = true;
+    int                   mRenderLauncherType = 0;
+    int                   mFrameStart = 0;
+    int                   mFrameEnd = 99;
+    bool                  mFrameLoop = true;
+    int                   mMaxProgressiveSamples = 1;
+    SceneRenderParameters mSceneParameters;
 };
 
 class RendererBase
@@ -60,33 +96,59 @@ public:
 
     virtual void   open() = 0;
     virtual void   close();
-    virtual void   render(int frame);
-    virtual void   resize(int width, int height);
+    virtual bool   render(int frame);
+    virtual void   resizeFrameBuffer(int width, int height);
     virtual void   renderViewOverlay();
     virtual double getTime();
-    virtual bool   updateCamera(int frame);
-    virtual void   printHelp() const;
+    bool           updateScene();
+    void           setSceneFrame(int frame);
+    int            getSceneFrame() const;
+    virtual bool   updateCamera();
+    virtual void   printHelp(std::ostream& s) const;
+    void           renderSequence();
+    bool           updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSyncing, bool isPrinting, bool* isSelectedNodePending = nullptr);
+
+    std::string    addSceneNode(const std::string& nodeName = "");
+    void           setSceneNodeGridAttachment(const std::string& nodeName, int attachmentIndex, const GridAssetUrl& url);
+    void           addGridAsset(const GridAssetUrl& url);
+    std::string    updateFilePathWithFrame(const std::string& filePath, int frame) const;
+    SceneNode::Ptr findNode(const std::string& name);
+
+    GridManager::AssetGridStatus updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNode::Ptr node, SceneNodeGridAttachment::Ptr attachment);
+
+    std::string nextUniqueNodeId(const std::string& prefix = "");
+
+    void logError(const std::string& msg);
+    void logInfo(const std::string& msg);
+    void logDebug(const std::string& msg);
 
     void  resetAccumulationBuffer();
-    void  addGrid(std::string groupName, std::string fileName);
-    void  addGrid(std::string groupName, std::string fileName, std::string gridName);
     bool  setRenderPlatformByName(std::string name);
-    bool  saveFrameBuffer(bool useFrame, int frame = 0);
+    bool  saveFrameBuffer(int frame = 0);
     float computePSNR(FrameBufferBase& other);
+
+    void resetCamera();
+    bool selectSceneNodeByIndex(int nodeIndex);
 
 protected:
     void setRenderPlatform(int platform);
-    void setGridIndex(int groupIndex, int gridIndex);
-    void removeGridIndices(std::vector<int> indices);
-    void resetCamera();
+    
+    void removeSceneNodes(std::vector<int> indices);    
+    void updateEventLog(bool isPrinting = false);
 
+    GridManager                            mGridManager;
+    bool                                   mIsDumpingLog = true;
+    int                                    mLastEventIndex = 0;
+    std::vector<GridManager::EventMessage> mEventMessages;
     std::unique_ptr<class FrameBufferBase> mFrameBuffer;
     int                                    mNumAccumulations = 0;
     RenderLauncher                         mRenderLauncher;
     RendererParams                         mParams;
-    int                                    mRenderGroupIndex = -1;
-    int                                    mFrame = 0;
+    int                                    mSelectedSceneNodeIndex = -1;
+    int                                    mPendingSceneFrame = 0;
+    int                                    mLastSceneFrame = 0;
     RenderStatistics                       mRenderStats;
+    uint32_t                               mNextUniqueId = 0;
 
     class CameraState
     {
@@ -95,7 +157,8 @@ protected:
         float          mCameraDistance = 1000.0f;
         nanovdb::Vec3f mCameraLookAt = nanovdb::Vec3f(0);
         nanovdb::Vec3f mCameraRotation = nanovdb::Vec3f(0, 3.142f / 2, 0);
-        float          mFovY = 90.0f * 3.142f / 180.f;
+        float          mFovY = 60.0f;
+        float          mFrame = 0;
 
         nanovdb::Vec3f U() const { return mCameraAxis[0]; }
         nanovdb::Vec3f V() const { return mCameraAxis[1]; }
@@ -106,30 +169,14 @@ protected:
         bool update();
 
     private:
-        nanovdb::Vec3f mCameraPosition;
-        nanovdb::Vec3f mCameraAxis[3];
+        nanovdb::Vec3f mCameraPosition = nanovdb::Vec3f{0,0,0};
+        nanovdb::Vec3f mCameraAxis[3] = {{1,0,0},{0,1,0},{0,0,1}};
     };
 
-    struct GridInstance
-    {
-        nanovdb::GridHandle<> mGridHandle;
-        std::string           mFileName;
-        std::string           mFilePath;
-        std::string           mGridName;
-        nanovdb::GridClass    mGridClassOverride;
-        RendererAttributeParams attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::End];
-    };
+    SceneNode::Ptr ensureSceneNode(const std::string& nodeName);
+    void           updateAttachment(SceneNode::Ptr sceneNode, SceneNodeGridAttachment* attachment, const std::string& frameUrl, const std::string& gridName, GridManager::AssetGridStatus gridStatus);
 
-    struct GridGroup
-    {
-        std::vector<std::shared_ptr<GridInstance>> mInstances;
-        std::string                                mName;
-        int                                        mCurrentGridIndex;
-        nanovdb::BBox<nanovdb::Vec3d>              mBounds;
-        RenderMethod                               mRenderMethod;
-    };
-
-    std::vector<std::shared_ptr<GridGroup>> mGridGroups;
+    std::vector<SceneNode::Ptr> mSceneNodes;
 
     CameraState  mDefaultCameraState;
     CameraState* mCurrentCameraState = &mDefaultCameraState;

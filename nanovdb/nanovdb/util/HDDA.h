@@ -143,8 +143,15 @@ private:
     template<int axis>
     __hostdev__ bool step()
     {
+#if 0
         mT0 = mNext[axis];
         mNext[axis] += mDim * mDelta[axis];
+#else
+        //if (mNext[axis] <= mT0) mNext[axis] += mT0 - mNext[axis] + fmaxf(mNext[axis]*1.0e-6f, 1.0e-6f);
+        if (mNext[axis] <= mT0) mNext[axis] += mT0 - mNext[axis] + (mNext[axis] + 1.0f)*1.0e-6f;
+        mT0 = mNext[axis];
+        mNext[axis] += mDim * mDelta[axis];
+#endif
         mVoxel[axis] += mDim * mStep[axis];
         return mT0 <= mT1;
     }
@@ -158,14 +165,14 @@ private:
 /////////////////////////////////////////// ZeroCrossing ////////////////////////////////////////////
 
 template<typename RayT, typename AccT>
-inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, float& v, float& t)
+inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
 {
     if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20)
         return false; // clip ray to bbox
     static const float Delta = 1.0001f;
     ijk = RoundDown<Coord>(ray.start()); // first hit of bbox
     HDDA<RayT, Coord> hdda(ray, acc.getDim(ijk, ray));
-    const float       v0 = acc.getValue(ijk);
+    const auto       v0 = acc.getValue(ijk);
     while (hdda.step()) {
         ijk = RoundDown<Coord>(ray(hdda.time() + Delta));
         hdda.update(ray, acc.getDim(ijk, ray));

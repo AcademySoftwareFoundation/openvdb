@@ -473,29 +473,29 @@ std::shared_ptr<RenderLauncherCL::Resource> RenderLauncherCL::ensureResource(con
                 uint32_t(RootT::memUsage(0)),
                 uint32_t(GridT::memUsage())};
 
-            auto node0Level = grid->tree().getNode<Node0T>(0);
-            auto node1Level = grid->tree().getNode<Node1T>(0);
-            auto node2Level = grid->tree().getNode<Node2T>(0);
-            auto rootData = &grid->tree().root();
-            auto gridData = grid;
+            auto gridData = uintptr_t(grid);
+            auto rootData = uintptr_t(&grid->tree().root());
+            auto node2Level = (counts[2] > 0) ? uintptr_t(grid->tree().getNode<Node2T>(0)) : rootData + RootT::memUsage(0);
+            auto node1Level = (counts[1] > 0) ? uintptr_t(grid->tree().getNode<Node1T>(0)) : node2Level;
+            auto node0Level = (counts[0] > 0) ? uintptr_t(grid->tree().getNode<Node0T>(0)) : node1Level;
 
-            uintptr_t gridBaseAddr = uintptr_t(grid);
-           // uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
-            uint32_t  offsets[] = {
-                uint32_t(uintptr_t(node0Level) - gridBaseAddr),
-                uint32_t(uintptr_t(node1Level) - gridBaseAddr),
-                uint32_t(uintptr_t(node2Level) - gridBaseAddr),
-                uint32_t(uintptr_t(rootData) - gridBaseAddr + RootT::memUsage(0)),
-                uint32_t(uintptr_t(rootData) - gridBaseAddr),
-                uint32_t(uintptr_t(gridData) - gridBaseAddr)};
+            uint32_t offsets[] = {
+                uint32_t(node0Level - gridData),
+                uint32_t(node1Level - gridData),
+                uint32_t(node2Level - gridData),
+                uint32_t(rootData - gridData + RootT::memUsage(0)),
+                uint32_t(rootData - gridData),
+                uint32_t(gridData - gridData)};
 
-            cl_mem nodeLevelBuffers[6];
+            cl_mem nodeLevelBuffers[6] = {nullptr};
             for (int i = 0; i < 6; ++i) {
-                cl_buffer_region region;
-                region.origin = offsets[i];
-                region.size = counts[i];
-                nodeLevelBuffers[i] = clCreateSubBuffer(gridbuffer, CL_MEM_READ_ONLY, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
-                NANOVDB_CL_SAFE_CALL(err);
+                if (counts[i] > 0) {
+                    cl_buffer_region region;
+                    region.origin = offsets[i];
+                    region.size = counts[i];
+                    nodeLevelBuffers[i] = clCreateSubBuffer(gridbuffer, CL_MEM_READ_ONLY, CL_BUFFER_CREATE_TYPE_REGION, &region, &err);
+                    NANOVDB_CL_SAFE_CALL(err);
+                }
             }
 
             resource->mQueueCl = queue;
@@ -625,8 +625,13 @@ void* RenderLauncherCL::mapCL(int access, const std::shared_ptr<Resource>& resou
     return buffer;
 }
 
-bool RenderLauncherCL::render(RenderMethod method, int width, int height, FrameBufferBase* imgBuffer, Camera<float> camera, const nanovdb::GridHandle<>& gridHdl, int numAccumulations, const RenderConstants& params, RenderStatistics* stats)
+bool RenderLauncherCL::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
+    if (grids[0].gridHandle == nullptr)
+        return false;
+
+    auto& gridHdl = *reinterpret_cast<const nanovdb::GridHandle<>*>(grids[0].gridHandle);
+
     void* contextGL = nullptr;
     void* displayGL = nullptr;
 #if defined(NANOVDB_USE_OPENGL)
@@ -656,24 +661,20 @@ bool RenderLauncherCL::render(RenderMethod method, int width, int height, FrameB
 
     // prepare data...
 
-    nanovdb::Vec3f cameraP = camera.P();
-    nanovdb::Vec3f cameraU = camera.U();
-    nanovdb::Vec3f cameraV = camera.V();
-    nanovdb::Vec3f cameraW = camera.W();
-
-    // launch GL render...
-
     struct Uniforms
     {
         cl_int         width;
         cl_int         height;
         cl_int         numAccumulations;
-        float          useGround;
-        float          useShadows;
-        float          useGroundReflections;
-        float          useLighting;
+        cl_int         useBackground;
+        cl_int         useGround;
+        cl_int         useShadows;
+        cl_int         useGroundReflections;
+        cl_int         useLighting;
         float          useOcclusion;
-        float          volumeDensity;
+        float          volumeDensityScale;
+        float          volumeAlbedo;
+        int            useTonemapping;
         float          tonemapWhitePoint;
         int            samplesPerPixel;
         float          groundHeight;
@@ -682,33 +683,44 @@ bool RenderLauncherCL::render(RenderMethod method, int width, int height, FrameB
         nanovdb::Vec3f cameraU;
         nanovdb::Vec3f cameraV;
         nanovdb::Vec3f cameraW;
+        float          cameraAspect;
+        float          cameraFovY;
     };
 
     Uniforms uniforms;
     uniforms.width = width;
     uniforms.height = height;
     uniforms.numAccumulations = numAccumulations;
-    uniforms.useGround = params.useGround;
-    uniforms.useShadows = params.useShadows;
-    uniforms.useGroundReflections = params.useGroundReflections;
-    uniforms.useLighting = params.useLighting;
-    uniforms.useOcclusion = params.useOcclusion;
-    uniforms.volumeDensity = params.volumeDensity;
-    uniforms.tonemapWhitePoint = params.tonemapWhitePoint;
-    uniforms.samplesPerPixel = params.samplesPerPixel;
-    uniforms.groundHeight = params.groundHeight;
-    uniforms.groundFalloff = params.groundFalloff;
-    uniforms.cameraP = cameraP;
-    uniforms.cameraU = cameraU;
-    uniforms.cameraV = cameraV;
-    uniforms.cameraW = cameraW;
+
+    uniforms.useOcclusion = materialParams.useOcclusion;
+    uniforms.volumeDensityScale = materialParams.volumeDensityScale;
+    uniforms.volumeAlbedo = materialParams.volumeAlbedo;
+
+    uniforms.samplesPerPixel = sceneParams.samplesPerPixel;
+    uniforms.useGround = sceneParams.useGround;
+    uniforms.useShadows = sceneParams.useShadows;
+    uniforms.useGroundReflections = sceneParams.useGroundReflections;
+    uniforms.useLighting = sceneParams.useLighting;
+    uniforms.useBackground = sceneParams.useBackground;
+    uniforms.useTonemapping = sceneParams.useTonemapping;
+    uniforms.tonemapWhitePoint = sceneParams.tonemapWhitePoint;
+    uniforms.groundHeight = sceneParams.groundHeight;
+    uniforms.groundFalloff = sceneParams.groundFalloff;
+    uniforms.cameraP = sceneParams.camera.P();
+    uniforms.cameraU = sceneParams.camera.U();
+    uniforms.cameraV = sceneParams.camera.V();
+    uniforms.cameraW = sceneParams.camera.W();
+    uniforms.cameraAspect = sceneParams.camera.aspect();
+    uniforms.cameraFovY = sceneParams.camera.fov();
+
+    // launch GL render...
 
     cl_kernel kernelCl = nullptr;
-    if (method == RenderMethod::LEVELSET) {
+    if (method == MaterialClass::kLevelSetFast) {
         kernelCl = (cl_kernel)resource->mKernelLevelSetCl;
-    } else if (method == RenderMethod::FOG_VOLUME) {
+    } else if (method == MaterialClass::kFogVolumePathTracer) {
         kernelCl = (cl_kernel)resource->mKernelFogVolumeCl;
-    }
+    } 
 
     if (!kernelCl)
         return false;

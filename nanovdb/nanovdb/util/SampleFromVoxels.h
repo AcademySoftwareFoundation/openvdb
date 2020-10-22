@@ -329,7 +329,7 @@ class SampleFromVoxels<TreeOrAccT, 1, true> : public TrilinearSampler<TreeOrAccT
     mutable ValueT mVal[2][2][2];
 
     template<typename RealT, template<typename...> class Vec3T>
-    void cache(Vec3T<RealT>& xyz) const;
+    __hostdev__ void cache(Vec3T<RealT>& xyz) const;
 public:
 
     /// @brief Construction from a Tree or ReadAccessor
@@ -597,7 +597,7 @@ class SampleFromVoxels<TreeOrAccT, 2, true> : public TriquadraticSampler<TreeOrA
     mutable ValueT mVal[3][3][3];
 
     template<typename RealT, template<typename...> class Vec3T>
-    void cache(Vec3T<RealT>& xyz) const;
+    __hostdev__ void cache(Vec3T<RealT>& xyz) const;
 public:
 
     /// @brief Construction from a Tree or ReadAccessor
@@ -909,7 +909,7 @@ class SampleFromVoxels<TreeOrAccT, 3, true> : public TricubicSampler<TreeOrAccT>
     mutable ValueT mC[64];
 
     template<typename RealT, template<typename...> class Vec3T>
-    void cache(Vec3T<RealT>& xyz) const;
+    __hostdev__ void cache(Vec3T<RealT>& xyz) const;
 
 public:
     /// @brief Construction from a Tree or ReadAccessor
