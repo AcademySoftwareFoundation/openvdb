@@ -23,99 +23,69 @@ on:
     - cron:  '0 0 * * 2'
 
 jobs:
-  linux-ax-full-vfx:
+  linux-ax-vfx:
     runs-on: ubuntu-16.04
-    name: linux-ax-full-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-${{ matrix.build }}
+    name: linux-ax-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-${{ matrix.build }}
     container:
       image: aswf/ci-openvdb:${{ matrix.image }}
     env:
       CXX: ${{ matrix.compiler }}
-      LLVM_DIR: /github/home/llvm-8.0.0-${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2019', '2020']
-        compiler: ['clang++']
+        image: ['2019-clang8', '2020-clang7', '2021-clang10']
+        compiler: ['clang++', 'g++']
         build: ['Release']
         # Extra builds
         include:
-          - image: '2020'
-            compiler: 'g++'
-            build: 'Release'
-          - image: '2020'
+          - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
-      # Setup
-      - name: llvm_cache
-        id: llvm_cache
-        uses: actions/cache@v2
-        with:
-          key: ${{ env.LLVM_DIR }}
-          path: ${{ env.LLVM_DIR }}
-      - name: install_llvm
-        if: steps.llvm_cache.outputs.cache-hit != 'true'
-        run: ./ci/install_llvm.sh 8.0.0 ${{ env.LLVM_DIR }}
-      - name: install_libedit
-        run: yum -y install libedit-devel
       # Build
       - name: build
         run: |
           ./ci/build.sh ${{ matrix.build }} None ON None "core,axcore,axbin,axtest" \
-            -DOPENVDB_CXX_STRICT=ON \
-            -DLLVM_DIR=${{ env.LLVM_DIR }}
+            -DOPENVDB_CXX_STRICT=ON
       # Tests
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
 
-  linux-ax-vfx:
+  linux-ax-standalone-vfx:
     runs-on: ubuntu-16.04
-    name: linux-ax-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    name: linux-ax-standalone-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
     container:
-      image: aswf/ci-vfxall:${{ matrix.image }}
+      image: aswf/ci-openvdb:${{ matrix.image }}
     env:
       CXX: ${{ matrix.compiler }}
-      LLVM_DIR: /github/home/llvm-${{ matrix.llvm }}-${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2019', '2020']
+        image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
         compiler: ['clang++']
         build: ['Release']
-        llvm: ['6.0.0','7.0.0','8.0.0','9.0.0','10.0.0']
         # Extra builds
         include:
-          - image: '2020'
+          - image: '2020-clang7'
             compiler: 'g++'
             build: 'Release'
-            llvm: '8.0.0'
-          - image: '2020'
+          - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
-            llvm: '8.0.0'
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
-      # Setup
-      - name: llvm_cache
-        id: llvm_cache
-        uses: actions/cache@v2
-        with:
-          key: ${{ env.LLVM_DIR }}
-          path: ${{ env.LLVM_DIR }}
-      - name: install_llvm
-        if: steps.llvm_cache.outputs.cache-hit != 'true'
-        run: ./ci/install_llvm.sh ${{ matrix.llvm }} ${{ env.LLVM_DIR }}
-      - name: install_libedit
-        run: yum -y install libedit-devel
       # Build
+      - name: vdb
+        run: |
+          ./ci/build.sh ${{ matrix.build }} None ON None "core" -DOPENVDB_CXX_STRICT=ON
+          rm -rf build
       - name: build
         run: |
           ./ci/build.sh ${{ matrix.build }} None ON None "axcore,axbin,axtest" \
-            -DOPENVDB_CXX_STRICT=ON \
-            -DLLVM_DIR=${{ env.LLVM_DIR }}
+            -DOPENVDB_CXX_STRICT=ON
       # Tests
       - name: test
         run: cd build && ctest -V
@@ -131,7 +101,7 @@ jobs:
       matrix:
         compiler: ['clang++']
         build: ['Release']
-        llvm: ['6','7','8','9','10']
+        llvm: ['7','8','9','10']
         # Extra builds
         include:
           - compiler: 'g++'
