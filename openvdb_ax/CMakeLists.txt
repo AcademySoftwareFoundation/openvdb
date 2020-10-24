@@ -221,9 +221,7 @@ if(OPENVDB_AX_STATIC)
     target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
   endif()
 
-  target_include_directories(openvdb_ax_static
-    PUBLIC ../ PRIVATE .
-  )
+  target_include_directories(openvdb_ax_static PUBLIC . )
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -255,9 +253,7 @@ if(OPENVDB_AX_SHARED)
     target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
   endif()
 
-  target_include_directories(openvdb_ax_shared
-    PUBLIC ../ PRIVATE .
-  )
+  target_include_directories(openvdb_ax_shared PUBLIC . )
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -306,7 +302,7 @@ if(OPENVDB_AX_SHARED)
   endif()
 endif()
 
-install(FILES openvdb_ax/ax.h openvdb_ax/Exceptions.h openvdb_ax/version.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
+install(FILES openvdb_ax/ax.h openvdb_ax/Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
 install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
 install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
 install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
