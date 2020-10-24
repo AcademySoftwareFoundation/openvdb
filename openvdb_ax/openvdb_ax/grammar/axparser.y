@@ -8,25 +8,31 @@
 /// @brief  OpenVDB AX Grammar Rules
 ///
 
-%{
+%code top {
     #include <stdio.h>
     #include <vector>
 
     #include <openvdb/Platform.h> // for OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+
     #include "openvdb_ax/ast/AST.h"
+    #include "openvdb_ax/ast/Parse.h"
     #include "openvdb_ax/ast/Tokens.h"
+
+    #include "openvdb_ax/compiler/Logger.h"
 
     /// @note  Bypasses bison conversion warnings in yyparse
     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
 
     extern int axlex();
+    extern openvdb::ax::Logger* axlog;
 
     using namespace openvdb::ax::ast;
+    using namespace openvdb::ax;
 
-    void yyerror(Tree** tree, const char* s);
+    void axerror(Tree** tree, const char* s);
 
     using ExpList = std::vector<openvdb::ax::ast::Expression*>;
-%}
+}
 
 /* Option 'parse.error verbose' tells bison to output verbose parsing errors
  * as a char* array to yyerror (axerror). Note that this is in lieu of doing
@@ -75,8 +81,21 @@
     ExpList* explist;
 }
 
+
+%code {
+
+    template<typename T, typename... Args>
+    T* newNode(YYLTYPE* loc, const Args&... args) {
+        T* ptr = new T(args...);
+        assert(axlog);
+        axlog->addNodeLocation(ptr, {loc->first_line, loc->first_column});
+        return ptr;
+    }
+}
+
 /* AX token type names/terminal symbols
  */
+
 %token TRUE FALSE
 %token SEMICOLON AT DOLLAR
 %token IF ELSE
@@ -178,6 +197,7 @@
 /*  The start token from AX for bison, represents a fully constructed AST.
  */
 %parse-param {openvdb::ax::ast::Tree** tree}
+
 %start tree
 
 /* Begin grammar
@@ -185,15 +205,23 @@
 %%
 
 tree:
-    /*empty*/    { *tree = new Tree(); $$ = *tree; }
-    | body       { *tree = new Tree($1); $$ = *tree; }
+    /*empty*/    {  *tree = newNode<Tree>(&@$);
+                    $$ = *tree;
+                 }
+    | body       {  *tree = newNode<Tree>(&@1, $1);
+                    $$ = *tree;
+                 }
 ;
 
 body:
       body statement  { $1->addStatement($2); $$ = $1; }
     | body block      { $1->addStatement($2); $$ = $1; }
-    | statement       { $$ = new Block(); $$->addStatement($1); }
-    | block           { $$ = new Block(); $$->addStatement($1); }
+    | statement       { $$ = newNode<Block>(&@$);
+                        $$->addStatement($1);
+                      }
+    | block           { $$ = newNode<Block>(&@$);
+                        $$->addStatement($1);
+                      }
 ;
 
 block:
@@ -208,11 +236,10 @@ statement:
     | declarations SEMICOLON  { $$ = $1; }
     | conditional_statement   { $$ = $1; }
     | loop                    { $$ = $1; }
-    | RETURN SEMICOLON        { $$ = new Keyword(tokens::RETURN); }
-    | BREAK SEMICOLON         { $$ = new Keyword(tokens::BREAK); }
-    | CONTINUE SEMICOLON      { $$ = new Keyword(tokens::CONTINUE); }
+    | RETURN SEMICOLON        { $$ = newNode<Keyword>(&@$, tokens::RETURN); }
+    | BREAK SEMICOLON         { $$ = newNode<Keyword>(&@$, tokens::BREAK); }
+    | CONTINUE SEMICOLON      { $$ = newNode<Keyword>(&@$, tokens::CONTINUE); }
     | SEMICOLON               { $$ = nullptr; }
-;
 
 expressions:
       expression      { $$ = $1; }
@@ -243,37 +270,34 @@ expression:
 
 /// @brief  Syntax for the declaration of supported local variable types
 declaration:
-      type IDENTIFIER    { $$ = new DeclareLocal(static_cast<tokens::CoreType>($1), new Local($2)); free(const_cast<char*>($2)); }
-    | type IDENTIFIER EQUALS expression  { $$ = new DeclareLocal(static_cast<tokens::CoreType>($1),
-                                                                new Local($2),
-                                                                $4); free(const_cast<char*>($2)); }
+      type IDENTIFIER                    { $$  = newNode<DeclareLocal>(&@1, static_cast<tokens::CoreType>($1), newNode<Local>(&@2, $2));
+                                            free(const_cast<char*>($2)); }
+    | type IDENTIFIER EQUALS expression  { $$ = newNode<DeclareLocal>(&@1, static_cast<tokens::CoreType>($1), newNode<Local>(&@2, $2), $4);
+                                            free(const_cast<char*>($2)); }
 ;
 
 /// @brief  A declaration list of at least size 2
 declaration_list:
-     declaration COMMA IDENTIFIER EQUALS expression         { $$ = new StatementList($1);
+     declaration COMMA IDENTIFIER EQUALS expression         { $$ = newNode<StatementList>(&@$, $1);
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>($1)->type();
-                                                              $$->addStatement(
-                                                                  new DeclareLocal(type, new Local($3), $5));
+                                                              $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3), $5));
                                                               free(const_cast<char*>($3));
                                                             }
-    | declaration COMMA IDENTIFIER                          { $$ = new StatementList($1);
+    | declaration COMMA IDENTIFIER                          { $$ = newNode<StatementList>(&@$, $1);
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>($1)->type();
-                                                              $$->addStatement(new DeclareLocal(type, new Local($3)));
+                                                              $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3)));
                                                               free(const_cast<char*>($3));
                                                             }
     | declaration_list COMMA IDENTIFIER EQUALS expression   { const auto firstNode = $1->child(0);
                                                               assert(firstNode);
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>(firstNode)->type();
-                                                              $$->addStatement(
-                                                                  new DeclareLocal(type, new Local($3), $5));
-                                                              free(const_cast<char*>($3));
+                                                              $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3), $5));
                                                               $$ = $1;
                                                             }
     | declaration_list COMMA IDENTIFIER                     { const auto firstNode = $1->child(0);
                                                               assert(firstNode);
                                                               const tokens::CoreType type =  static_cast<const DeclareLocal*>(firstNode)->type();
-                                                              $$->addStatement(new DeclareLocal(type, new Local($3)));
+                                                              $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3)));
                                                               free(const_cast<char*>($3));
                                                               $$ = $1;
                                                             }
@@ -288,14 +312,14 @@ declarations:
 /// @brief  A single line scope or a scoped block
 block_or_statement:
       block     { $$ = $1; }
-    | statement { $$ = new Block(); $$->addStatement($1); }
+    | statement { $$ = newNode<Block>(&@$); $$->addStatement($1); }
 ;
 
 /// @brief  Syntax for a conditional statement, capable of supporting a single if
 ///         and an optional single else. Multiple else ifs are handled by this.
 conditional_statement:
-      IF LPARENS expressions RPARENS block_or_statement %prec LOWER_THAN_ELSE   { $$ = new ConditionalStatement($3, $5); }
-    | IF LPARENS expressions RPARENS block_or_statement ELSE block_or_statement { $$ = new ConditionalStatement($3, $5, $7); }
+      IF LPARENS expressions RPARENS block_or_statement %prec LOWER_THAN_ELSE   { $$ = newNode<ConditionalStatement>(&@$, $3, $5); }
+    | IF LPARENS expressions RPARENS block_or_statement ELSE block_or_statement { $$ = newNode<ConditionalStatement>(&@$, $3, $5, $7); }
 ;
 
 /// @brief  A loop condition statement, either an initialized declaration or a list of expressions
@@ -325,94 +349,94 @@ loop_iter:
 /// @brief  For loops, while loops and do-while loops.
 loop:
       FOR LPARENS loop_init SEMICOLON loop_condition_optional SEMICOLON loop_iter RPARENS block_or_statement
-                                                                    { $$ = new Loop(tokens::FOR, ($5 ? $5 : new Value<bool>(true)), $9, $3, $7); }
-    | DO block_or_statement WHILE LPARENS loop_condition RPARENS    { $$ = new Loop(tokens::DO, $5, $2); }
-    | WHILE LPARENS loop_condition RPARENS block_or_statement       { $$ = new Loop(tokens::WHILE, $3, $5); }
+                                                                    { $$ = newNode<Loop>(&@$, tokens::FOR, ($5 ? $5 : newNode<Value<bool>>(&@$, true)), $9, $3, $7); }
+    | DO block_or_statement WHILE LPARENS loop_condition RPARENS    { $$ = newNode<Loop>(&@$, tokens::DO, $5, $2); }
+    | WHILE LPARENS loop_condition RPARENS block_or_statement       { $$ = newNode<Loop>(&@$, tokens::WHILE, $3, $5); }
 ;
 
 /// @brief  Beginning/builder syntax for function calls with arguments
 function_start_expression:
-      IDENTIFIER LPARENS expression               { $$ = new FunctionCall($1); $$->append($3); free(const_cast<char*>($1)); }
+      IDENTIFIER LPARENS expression               { $$ = newNode<FunctionCall>(&@1, $1); $$->append($3); free(const_cast<char*>($1)); }
     | function_start_expression COMMA expression  { $1->append($3); $$ = $1; }
 ;
 
 /// @brief  A function call, taking zero or a comma separated list of arguments
 function_call_expression:
-      IDENTIFIER LPARENS RPARENS              { $$ = new FunctionCall($1); free(const_cast<char*>($1)); }
+      IDENTIFIER LPARENS RPARENS              { $$ = newNode<FunctionCall>(&@1, $1); free(const_cast<char*>($1)); }
     | function_start_expression RPARENS       { $$ = $1; }
-    | scalar_type LPARENS expression RPARENS  { $$ = new Cast($3, static_cast<tokens::CoreType>($1)); }
+    | scalar_type LPARENS expression RPARENS  { $$ = newNode<Cast>(&@1, $3, static_cast<tokens::CoreType>($1)); }
 ;
 
 /// @brief  Assign expressions for attributes and local variables
 assign_expression:
-      variable_reference EQUALS expression            { $$ = new AssignExpression($1, $3); }
-    | variable_reference PLUSEQUALS expression        { $$ = new AssignExpression($1, $3, tokens::PLUS); }
-    | variable_reference MINUSEQUALS expression       { $$ = new AssignExpression($1, $3, tokens::MINUS); }
-    | variable_reference MULTIPLYEQUALS expression    { $$ = new AssignExpression($1, $3, tokens::MULTIPLY); }
-    | variable_reference DIVIDEEQUALS expression      { $$ = new AssignExpression($1, $3, tokens::DIVIDE); }
-    | variable_reference MODULOEQUALS expression      { $$ = new AssignExpression($1, $3, tokens::MODULO); }
-    | variable_reference BITANDEQUALS expression      { $$ = new AssignExpression($1, $3, tokens::BITAND); }
-    | variable_reference BITXOREQUALS expression      { $$ = new AssignExpression($1, $3, tokens::BITXOR); }
-    | variable_reference BITOREQUALS expression       { $$ = new AssignExpression($1, $3, tokens::BITOR); }
-    | variable_reference SHIFTLEFTEQUALS expression   { $$ = new AssignExpression($1, $3, tokens::SHIFTLEFT); }
-    | variable_reference SHIFTRIGHTEQUALS expression  { $$ = new AssignExpression($1, $3, tokens::SHIFTRIGHT); }
+      variable_reference EQUALS expression            { $$ = newNode<AssignExpression>(&@1, $1, $3); }
+    | variable_reference PLUSEQUALS expression        { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::PLUS); }
+    | variable_reference MINUSEQUALS expression       { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::MINUS); }
+    | variable_reference MULTIPLYEQUALS expression    { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::MULTIPLY); }
+    | variable_reference DIVIDEEQUALS expression      { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::DIVIDE); }
+    | variable_reference MODULOEQUALS expression      { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::MODULO); }
+    | variable_reference BITANDEQUALS expression      { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::BITAND); }
+    | variable_reference BITXOREQUALS expression      { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::BITXOR); }
+    | variable_reference BITOREQUALS expression       { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::BITOR); }
+    | variable_reference SHIFTLEFTEQUALS expression   { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::SHIFTLEFT); }
+    | variable_reference SHIFTRIGHTEQUALS expression  { $$ = newNode<AssignExpression>(&@1, $1, $3, tokens::SHIFTRIGHT); }
 ;
 
 /// @brief  A binary expression which takes a left and right hand side expression
 ///         and returns an expression
 binary_expression:
-      expression PLUS expression             { $$ = new BinaryOperator($1, $3, tokens::PLUS); }
-    | expression MINUS expression            { $$ = new BinaryOperator($1, $3, tokens::MINUS); }
-    | expression MULTIPLY expression         { $$ = new BinaryOperator($1, $3, tokens::MULTIPLY); }
-    | expression DIVIDE expression           { $$ = new BinaryOperator($1, $3, tokens::DIVIDE); }
-    | expression MODULO expression           { $$ = new BinaryOperator($1, $3, tokens::MODULO); }
-    | expression SHIFTLEFT expression        { $$ = new BinaryOperator($1, $3, tokens::SHIFTLEFT); }
-    | expression SHIFTRIGHT expression       { $$ = new BinaryOperator($1, $3, tokens::SHIFTRIGHT); }
-    | expression BITAND expression           { $$ = new BinaryOperator($1, $3, tokens::BITAND); }
-    | expression BITOR expression            { $$ = new BinaryOperator($1, $3, tokens::BITOR); }
-    | expression BITXOR expression           { $$ = new BinaryOperator($1, $3, tokens::BITXOR); }
-    | expression AND expression              { $$ = new BinaryOperator($1, $3, tokens::AND); }
-    | expression OR expression               { $$ = new BinaryOperator($1, $3, tokens::OR); }
-    | expression EQUALSEQUALS expression     { $$ = new BinaryOperator($1, $3, tokens::EQUALSEQUALS); }
-    | expression NOTEQUALS expression        { $$ = new BinaryOperator($1, $3, tokens::NOTEQUALS); }
-    | expression MORETHAN expression         { $$ = new BinaryOperator($1, $3, tokens::MORETHAN); }
-    | expression LESSTHAN expression         { $$ = new BinaryOperator($1, $3, tokens::LESSTHAN); }
-    | expression MORETHANOREQUAL expression  { $$ = new BinaryOperator($1, $3, tokens::MORETHANOREQUAL); }
-    | expression LESSTHANOREQUAL expression  { $$ = new BinaryOperator($1, $3, tokens::LESSTHANOREQUAL); }
+      expression PLUS expression             { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::PLUS); }
+    | expression MINUS expression            { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::MINUS); }
+    | expression MULTIPLY expression         { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::MULTIPLY); }
+    | expression DIVIDE expression           { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::DIVIDE); }
+    | expression MODULO expression           { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::MODULO); }
+    | expression SHIFTLEFT expression        { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::SHIFTLEFT); }
+    | expression SHIFTRIGHT expression       { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::SHIFTRIGHT); }
+    | expression BITAND expression           { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::BITAND); }
+    | expression BITOR expression            { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::BITOR); }
+    | expression BITXOR expression           { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::BITXOR); }
+    | expression AND expression              { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::AND); }
+    | expression OR expression               { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::OR); }
+    | expression EQUALSEQUALS expression     { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::EQUALSEQUALS); }
+    | expression NOTEQUALS expression        { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::NOTEQUALS); }
+    | expression MORETHAN expression         { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::MORETHAN); }
+    | expression LESSTHAN expression         { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::LESSTHAN); }
+    | expression MORETHANOREQUAL expression  { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::MORETHANOREQUAL); }
+    | expression LESSTHANOREQUAL expression  { $$ = newNode<BinaryOperator>(&@1, $1, $3, tokens::LESSTHANOREQUAL); }
 ;
 
 ternary_expression:
-      expression QUESTION expression COLON expression { $$ = new TernaryOperator($1, $3, $5); }
-    | expression QUESTION COLON expression            { $$ = new TernaryOperator($1, nullptr, $4); }
+      expression QUESTION expression COLON expression { $$ = newNode<TernaryOperator>(&@1, $1, $3, $5); }
+    | expression QUESTION COLON expression            { $$ = newNode<TernaryOperator>(&@1, $1, nullptr, $4); }
 ;
 
 /// @brief  A unary expression which takes an expression and returns an expression
 unary_expression:
-      PLUS expression        { $$ = new UnaryOperator($2, tokens::PLUS); }
-    | MINUS expression       { $$ = new UnaryOperator($2, tokens::MINUS); }
-    | BITNOT expression      { $$ = new UnaryOperator($2, tokens::BITNOT); }
-    | NOT expression         { $$ = new UnaryOperator($2, tokens::NOT); }
+      PLUS expression        { $$ = newNode<UnaryOperator>(&@1, $2, tokens::PLUS); }
+    | MINUS expression       { $$ = newNode<UnaryOperator>(&@1, $2, tokens::MINUS); }
+    | BITNOT expression      { $$ = newNode<UnaryOperator>(&@1, $2, tokens::BITNOT); }
+    | NOT expression         { $$ = newNode<UnaryOperator>(&@1, $2, tokens::NOT); }
 ;
 
 pre_crement:
-      PLUSPLUS variable_reference    { $$ = new Crement($2, Crement::Increment, /*post*/false); }
-    | MINUSMINUS variable_reference  { $$ = new Crement($2, Crement::Decrement, /*post*/false); }
+      PLUSPLUS variable_reference    { $$ = newNode<Crement>(&@1, $2, Crement::Increment, /*post*/false); }
+    | MINUSMINUS variable_reference  { $$ = newNode<Crement>(&@1, $2, Crement::Decrement, /*post*/false); }
 ;
 
 post_crement:
-      variable_reference PLUSPLUS    { $$ = new Crement($1, Crement::Increment, /*post*/true); }
-    | variable_reference MINUSMINUS  { $$ = new Crement($1, Crement::Decrement, /*post*/true); }
+      variable_reference PLUSPLUS    { $$ = newNode<Crement>(&@1, $1, Crement::Increment, /*post*/true); }
+    | variable_reference MINUSMINUS  { $$ = newNode<Crement>(&@1, $1, Crement::Decrement, /*post*/true); }
 ;
 
 /// @brief  Syntax which can return a valid variable lvalue
 variable_reference:
       variable                                              { $$ = $1; }
     | pre_crement                                           { $$ = $1; }
-    | variable DOT_X                                        { $$ = new ArrayUnpack($1, new Value<int32_t>(0)); }
-    | variable DOT_Y                                        { $$ = new ArrayUnpack($1, new Value<int32_t>(1)); }
-    | variable DOT_Z                                        { $$ = new ArrayUnpack($1, new Value<int32_t>(2)); }
-    | variable LSQUARE expression RSQUARE                   { $$ = new ArrayUnpack($1, $3); }
-    | variable LSQUARE expression COMMA expression RSQUARE  { $$ = new ArrayUnpack($1, $3, $5); }
+    | variable DOT_X                                        { $$ = newNode<ArrayUnpack>(&@1, $1, newNode<Value<int32_t>>(&@2, 0));  }
+    | variable DOT_Y                                        { $$ = newNode<ArrayUnpack>(&@1, $1, newNode<Value<int32_t>>(&@2, 1)); }
+    | variable DOT_Z                                        { $$ = newNode<ArrayUnpack>(&@1, $1, newNode<Value<int32_t>>(&@2, 2));  }
+    | variable LSQUARE expression RSQUARE                   { $$ = newNode<ArrayUnpack>(&@1, $1, $3); }
+    | variable LSQUARE expression COMMA expression RSQUARE  { $$ = newNode<ArrayUnpack>(&@1, $1, $3, $5);  }
 ;
 
 /// @brief  Terminating syntax for containers
@@ -424,7 +448,7 @@ variable_reference:
 ///         This requires it to take in a comma_operator which is temporarily
 ///         represented as an vector of non-owned expressions.
 array:
-      LCURLY comma_operator RCURLY { $$ = new ArrayPack(*$2); }
+      LCURLY comma_operator RCURLY { $$ = newNode<ArrayPack>(&@1, *$2); }
 ;
 
 /// @brief  Objects which are assignable are considered variables. Importantly,
@@ -436,45 +460,45 @@ variable:
 
 /// @brief  Syntax for supported attribute access
 attribute:
-      type AT IDENTIFIER     { $$ = new Attribute($3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
-    | I_AT IDENTIFIER        { $$ = new Attribute($2, tokens::INT); free(const_cast<char*>($2)); }
-    | F_AT IDENTIFIER        { $$ = new Attribute($2, tokens::FLOAT); free(const_cast<char*>($2)); }
-    | V_AT IDENTIFIER        { $$ = new Attribute($2, tokens::VEC3F); free(const_cast<char*>($2)); }
-    | S_AT IDENTIFIER        { $$ = new Attribute($2, tokens::STRING); free(const_cast<char*>($2)); }
-    | M3F_AT IDENTIFIER      { $$ = new Attribute($2, tokens::MAT3F); free(const_cast<char*>($2)); }
-    | M4F_AT IDENTIFIER      { $$ = new Attribute($2, tokens::MAT4F); free(const_cast<char*>($2)); }
-    | AT IDENTIFIER          { $$ = new Attribute($2, tokens::FLOAT, true); free(const_cast<char*>($2)); }
+      type AT IDENTIFIER     { $$ = newNode<Attribute>(&@$, $3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
+    | I_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::INT); free(const_cast<char*>($2)); }
+    | F_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::FLOAT); free(const_cast<char*>($2)); }
+    | V_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::VEC3F); free(const_cast<char*>($2)); }
+    | S_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::STRING); free(const_cast<char*>($2)); }
+    | M3F_AT IDENTIFIER      { $$ = newNode<Attribute>(&@$, $2, tokens::MAT3F); free(const_cast<char*>($2)); }
+    | M4F_AT IDENTIFIER      { $$ = newNode<Attribute>(&@$, $2, tokens::MAT4F); free(const_cast<char*>($2)); }
+    | AT IDENTIFIER          { $$ = newNode<Attribute>(&@$, $2, tokens::FLOAT, true); free(const_cast<char*>($2)); }
 ;
 
 /// @brief  Syntax for supported external variable access
 external:
-      type DOLLAR IDENTIFIER  { $$ = new ExternalVariable($3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
-    | I_DOLLAR IDENTIFIER     { $$ = new ExternalVariable($2, tokens::INT); free(const_cast<char*>($2)); }
-    | F_DOLLAR IDENTIFIER     { $$ = new ExternalVariable($2, tokens::FLOAT); free(const_cast<char*>($2)); }
-    | V_DOLLAR IDENTIFIER     { $$ = new ExternalVariable($2, tokens::VEC3F); free(const_cast<char*>($2)); }
-    | S_DOLLAR IDENTIFIER     { $$ = new ExternalVariable($2, tokens::STRING); free(const_cast<char*>($2)); }
-    | DOLLAR IDENTIFIER       { $$ = new ExternalVariable($2, tokens::FLOAT); free(const_cast<char*>($2)); }
+      type DOLLAR IDENTIFIER  { $$ = newNode<ExternalVariable>(&@$, $3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
+    | I_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::INT); free(const_cast<char*>($2)); }
+    | F_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::FLOAT); free(const_cast<char*>($2)); }
+    | V_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::VEC3F); free(const_cast<char*>($2)); }
+    | S_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::STRING); free(const_cast<char*>($2)); }
+    | DOLLAR IDENTIFIER       { $$ = newNode<ExternalVariable>(&@$, $2, tokens::FLOAT); free(const_cast<char*>($2)); }
 ;
 
 /// @brief  Syntax for text identifiers which resolves to a local. Types have
 ///         have their own tokens which do not evaluate to a local variable
 /// @note   Anything which uses an IDENTIFIER must free the returned char array
 local:
-    IDENTIFIER  { $$ = new Local($1); free(const_cast<char*>($1)); }
+    IDENTIFIER  { $$ = newNode<Local>(&@$, $1); free(const_cast<char*>($1)); }
 ;
 
 /// @brief  Syntax numerical and boolean literal values
 /// @note   Anything which uses one of the below tokens must free the returned char
 ///         array (aside from TRUE and FALSE tokens)
 literal:
-      L_SHORT         { $$ = new Value<int16_t>($1); free(const_cast<char*>($1)); }
-    | L_INT           { $$ = new Value<int32_t>($1); free(const_cast<char*>($1)); }
-    | L_LONG          { $$ = new Value<int64_t>($1); free(const_cast<char*>($1)); }
-    | L_FLOAT         { $$ = new Value<float>($1); free(const_cast<char*>($1)); }
-    | L_DOUBLE        { $$ = new Value<double>($1); free(const_cast<char*>($1)); }
-    | L_STRING        { $$ = new Value<std::string>($1); free(const_cast<char*>($1)); }
-    | TRUE            { $$ = new Value<bool>(true); }
-    | FALSE           { $$ = new Value<bool>(false); }
+      L_SHORT         { $$ = newNode<Value<int16_t>>(&@1, $1); free(const_cast<char*>($1)); }
+    | L_INT           { $$ = newNode<Value<int32_t>>(&@1, $1); free(const_cast<char*>($1)); }
+    | L_LONG          { $$ = newNode<Value<int64_t>>(&@1, $1); free(const_cast<char*>($1)); }
+    | L_FLOAT         { $$ = newNode<Value<float>>(&@1, $1); free(const_cast<char*>($1)); }
+    | L_DOUBLE        { $$ = newNode<Value<double>>(&@1, $1); free(const_cast<char*>($1)); }
+    | L_STRING        { $$ = newNode<Value<std::string>>(&@1, $1); free(const_cast<char*>($1)); }
+    | TRUE            { $$ = newNode<Value<bool>>(&@1, true); }
+    | FALSE           { $$ = newNode<Value<bool>>(&@1, false); }
 ;
 
 type:

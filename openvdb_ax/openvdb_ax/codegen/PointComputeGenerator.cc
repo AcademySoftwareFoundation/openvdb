@@ -62,8 +62,8 @@ std::string PointRangeKernel::getDefaultName() { return "ax.compute.pointrange";
 PointComputeGenerator::PointComputeGenerator(llvm::Module& module,
                                              const FunctionOptions& options,
                                              FunctionRegistry& functionRegistry,
-                                             std::vector<std::string>* const warnings)
-    : ComputeGenerator(module, options, functionRegistry, warnings) {}
+                                             Logger& logger)
+    : ComputeGenerator(module, options, functionRegistry, logger) {}
 
 AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
 {
@@ -183,8 +183,9 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
     }
 
     // full code generation
+    // errors can stop traversal, but dont always, so check the log
 
-    this->traverse(&tree);
+    if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
 
     // insert set code
 
@@ -192,6 +193,8 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
     for (const AttributeRegistry::AccessData& access : registry->data()) {
         if (access.writes()) write.emplace_back(&access);
     }
+    // if it doesn't write to any externally accessible data (i.e attributes)
+    // then early exit
     if (write.empty()) return registry;
 
     for (auto block = mFunction->begin(); block != mFunction->end(); ++block) {
@@ -253,7 +256,6 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
             function->execute(args, mBuilder);
         }
     }
-
     return registry;
 }
 
@@ -344,12 +346,9 @@ llvm::Value* PointComputeGenerator::attributeHandleFromToken(const std::string& 
     return mBuilder.CreateLoad(handlePtr);
 }
 
-///////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////
 
-
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 

@@ -12,9 +12,11 @@
 #ifndef OPENVDB_AX_AST_TOKENS_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AST_TOKENS_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include "../version.h"
 #include "../Exceptions.h"
+
+#include <openvdb/version.h>
+#include <openvdb/Types.h>
+
 #include <stdexcept>
 
 namespace openvdb {
@@ -274,7 +276,7 @@ inline OperatorToken operatorTokenFromName(const std::string& name)
     if (name == "&=")   return BITANDEQUALS;
     if (name == "^=")   return BITXOREQUALS;
     if (name == "|=")   return BITOREQUALS;
-    OPENVDB_THROW(AXSyntaxError, "Unsupported op \"" + name + "\"");
+    OPENVDB_THROW(AXTokenError, "Unsupported op \"" + name + "\"");
 }
 
 inline std::string operatorNameFromToken(const OperatorToken token)
@@ -312,7 +314,7 @@ inline std::string operatorNameFromToken(const OperatorToken token)
         case BITXOREQUALS      : return "^=";
         case BITOREQUALS       : return "|=";
         default                :
-            OPENVDB_THROW(AXSyntaxError, "Unsupported op");
+            OPENVDB_THROW(AXTokenError, "Unsupported op");
     }
 }
 
@@ -330,7 +332,7 @@ inline std::string loopNameFromToken(const LoopToken loop)
         case DO       : return "do";
         case WHILE    : return "while";
         default       :
-            OPENVDB_THROW(AXSyntaxError, "Unsupported loop");
+            OPENVDB_THROW(AXTokenError, "Unsupported loop");
     }
 }
 
@@ -348,17 +350,17 @@ inline std::string keywordNameFromToken(const KeywordToken keyw)
         case BREAK       : return "break";
         case CONTINUE    : return "continue";
         default          :
-            OPENVDB_THROW(AXSyntaxError, "Unsupported keyword");
+            OPENVDB_THROW(AXTokenError, "Unsupported keyword");
     }
 }
 
 
-}
+} // namespace tokens
 
-}
-}
-}
-}
+} // namespace ast
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_AST_TOKENS_HAS_BEEN_INCLUDED
 

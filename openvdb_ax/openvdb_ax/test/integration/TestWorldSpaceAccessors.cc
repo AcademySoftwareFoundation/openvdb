@@ -3,7 +3,7 @@
 
 #include "TestHarness.h"
 
-#include "../ax.h"
+#include <openvdb_ax/ax.h>
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointGroup.h>

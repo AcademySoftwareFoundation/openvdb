@@ -6,8 +6,8 @@
 
 #include "../test/util.h"
 
-#include "../compiler/CustomData.h"
-#include "../Exceptions.h"
+#include <openvdb_ax/compiler/CustomData.h>
+#include <openvdb_ax/Exceptions.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 

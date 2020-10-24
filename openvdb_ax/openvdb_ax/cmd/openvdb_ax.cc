@@ -9,17 +9,19 @@
 ///   run and analyze AX code.
 ///
 
-#include "../ast/AST.h"
-#include "../ast/Scanners.h"
-#include "../ast/PrintTree.h"
-#include "../codegen/Functions.h"
-#include "../compiler/Compiler.h"
-#include "../compiler/AttributeRegistry.h"
-#include "../compiler/CompilerOptions.h"
-#include "../compiler/PointExecutable.h"
-#include "../compiler/VolumeExecutable.h"
+#include <openvdb_ax/ast/AST.h>
+#include <openvdb_ax/ast/Scanners.h>
+#include <openvdb_ax/ast/PrintTree.h>
+#include <openvdb_ax/codegen/Functions.h>
+#include <openvdb_ax/compiler/Compiler.h>
+#include <openvdb_ax/compiler/AttributeRegistry.h>
+#include <openvdb_ax/compiler/CompilerOptions.h>
+#include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/compiler/VolumeExecutable.h>
+#include <openvdb_ax/compiler/Logger.h>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/version.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/points/PointDelete.h>
@@ -42,6 +44,8 @@ void usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
     "    -f file.txt      execute text file containing a code snippet on the input.vdb file\n" <<
     "    -v               verbose (print timing and diagnostics)\n" <<
     "    --opt level      set an optimization level on the generated IR [NONE, O0, O1, O2, Os, Oz, O3]\n" <<
+    "    --werror         set warnings as errors\n" <<
+    "    --max-errors n   sets the maximum number of error messages to n, a value of 0 (default) allows all error messages\n" <<
     "    analyze          parse the provided code and enter analysis mode\n" <<
     "      --ast-print       descriptive print the abstract syntax tree generated\n" <<
     "      --re-print        re-interpret print of the provided code after ast traversal\n" <<
@@ -66,6 +70,10 @@ struct ProgOptions
     enum Compilation { All, Points, Volumes };
 
     Mode mMode = Execute;
+
+    // Compilation options
+    size_t mMaxErrors = 0;
+    bool mWarningsAsErrors = false;
 
     // Execute options
     std::unique_ptr<std::string> mInputCode = nullptr;
@@ -313,6 +321,10 @@ main(int argc, char *argv[])
                 loadSnippetFile(argv[i], *opts.mInputCode);
             } else if (parser.check(i, "-v", 0)) {
                 opts.mVerbose = true;
+            } else if (parser.check(i, "--max-errors")) {
+                opts.mMaxErrors = atoi(argv[++i]);
+            } else if (parser.check(i, "--werror", 0)) {
+                opts.mWarningsAsErrors = true;
             } else if (parser.check(i, "--list", 0)) {
                 opts.mFunctionList = true;
                 opts.mInitCompile = true; // need to intialize llvm
@@ -382,7 +394,7 @@ main(int argc, char *argv[])
     }
 
     if (opts.mVerbose) {
-        axlog("OpenVDB AX " << openvdb::ax::getLibraryVersionString() << '\n');
+        axlog("OpenVDB AX " << openvdb::getLibraryVersionString() << '\n');
         axlog("----------------\n");
         axlog("Inputs\n");
         axlog("  mode    : " << modeString(opts.mMode));
@@ -491,13 +503,27 @@ main(int argc, char *argv[])
         return EXIT_SUCCESS;
     }
 
+    // set up logger
+
+    openvdb::ax::Logger
+        logs([](const std::string& msg) { std::cerr << msg << std::endl; },
+             [](const std::string& msg) { std::cerr << msg << std::endl; });
+    logs.setMaxErrors(opts.mMaxErrors);
+    logs.setWarningsAsErrors(opts.mWarningsAsErrors);
+    logs.setPrintLines(true);
+    logs.setNumberedOutput(true);
+
     // parse
 
     axtimer();
     axlog("[INFO] Parsing input code" << std::flush);
+
     const openvdb::ax::ast::Tree::ConstPtr syntaxTree =
-        openvdb::ax::ast::parse(opts.mInputCode->c_str());
+        openvdb::ax::ast::parse(opts.mInputCode->c_str(), logs);
         axlog(": " << axtime() << '\n');
+    if (!syntaxTree) {
+        return EXIT_FAILURE;
+    }
 
     if (opts.mMode == ProgOptions::Analyze) {
         axlog("[INFO] Running analysis options\n" << std::flush);
@@ -561,22 +587,24 @@ main(int argc, char *argv[])
             opts.mCompileFor == ProgOptions::Compilation::Points) {
             axtimer();
             axlog("[INFO] Compiling for VDB Points\n" << std::flush);
-            std::vector<std::string> warnings;
-            try { compiler->compile<openvdb::ax::PointExecutable>(*syntaxTree, customData, &warnings); }
+            try {
+                compiler->compile<openvdb::ax::PointExecutable>(*syntaxTree, logs, customData);
+                if (logs.hasError()) {
+                    axlog("[INFO] Compilation error(s)!\n");
+                    psuccess = false;
+                }
+             }
             catch (std::exception& e) {
                 psuccess = false;
-                axlog("[INFO] Compilation error!\n");
+                axlog("[INFO] Fatal error!\n");
                 OPENVDB_LOG_ERROR(e.what());
             }
+            const bool hasWarning = logs.hasWarning();
             if (psuccess) {
                 axlog("[INFO] | Compilation successful");
-                if (!warnings.empty()) axlog(" with warnings");
-                axlog('\n' << std::flush)
+                if (hasWarning) axlog(" with warning(s)\n");
             }
             axlog("[INFO] | " << axtime() << '\n' << std::flush);
-            for (const std::string& warning : warnings) {
-                OPENVDB_LOG_WARN(warning);
-            }
         }
 
         bool vsuccess = true;
@@ -585,22 +613,24 @@ main(int argc, char *argv[])
             opts.mCompileFor == ProgOptions::Compilation::Volumes) {
             axtimer();
             axlog("[INFO] Compiling for VDB Volumes\n" << std::flush);
-            std::vector<std::string> warnings;
-            try { compiler->compile<openvdb::ax::VolumeExecutable>(*syntaxTree, customData, &warnings); }
+            try {
+                compiler->compile<openvdb::ax::VolumeExecutable>(*syntaxTree, logs, customData);
+                if (logs.hasError()) {
+                    axlog("[INFO] Compilation error(s)!\n");
+                    vsuccess = false;
+                }
+            }
             catch (std::exception& e) {
                 vsuccess = false;
-                axlog("[INFO] Compilation error!\n");
+                axlog("[INFO] Fatal error!\n");
                 OPENVDB_LOG_ERROR(e.what());
             }
+            const bool hasWarning = logs.hasWarning();
             if (vsuccess) {
                 axlog("[INFO] | Compilation successful");
-                if (!warnings.empty()) axlog(" with warnings");
-                axlog('\n');
+                if (hasWarning) axlog(" with warning(s)\n");
             }
             axlog("[INFO] | " << axtime() << '\n' << std::flush);
-            for (const std::string& warning : warnings) {
-                OPENVDB_LOG_WARN(warning);
-            }
         }
 
         return ((vsuccess && psuccess) ? EXIT_SUCCESS : EXIT_FAILURE);
@@ -613,23 +643,29 @@ main(int argc, char *argv[])
 
         axlog("[INFO] VDB PointDataGrids Found\n" << std::flush);
 
-        std::vector<std::string> warnings;
-        openvdb::ax::PointExecutable::Ptr pointExecutable;
+        openvdb::ax::PointExecutable::Ptr pointExe;
 
         axtimer();
         try {
             axlog("[INFO] Compiling for VDB Points\n" << std::flush);
-            pointExecutable = compiler->compile<openvdb::ax::PointExecutable>(*syntaxTree, customData, &warnings);
+            pointExe = compiler->compile<openvdb::ax::PointExecutable>(*syntaxTree, logs, customData);
         } catch (std::exception& e) {
-            OPENVDB_LOG_FATAL("Compilation error!\nErrors:\n" << e.what());
+            OPENVDB_LOG_FATAL("Fatal error!\nErrors:\n" << e.what());
             return EXIT_FAILURE;
         }
 
-        for (const std::string& warning : warnings) {
-            OPENVDB_LOG_WARN(warning);
+        if (pointExe) {
+            axlog("[INFO] | Compilation successful");
+            if (logs.hasWarning()) {
+                axlog(" with warning(s)\n");
+            }
         }
-
-        axlog("[INFO] | Compilation success.\n");
+        else {
+            if (logs.hasError()) {
+                axlog("[INFO] Compilation error(s)!\n");
+            }
+            return EXIT_FAILURE;
+        }
         axlog("[INFO] | " << axtime() << '\n' << std::flush);
 
         size_t total = 0, count = 1;
@@ -650,7 +686,7 @@ main(int argc, char *argv[])
             ++count;
 
             try {
-                pointExecutable->execute(*points);
+                pointExe->execute(*points);
                 if (openvdb::ax::ast::callsFunction(*syntaxTree, "deletepoint")) {
                     openvdb::points::deleteFromGroup(points->tree(), "dead", false, false);
                 }
@@ -672,23 +708,26 @@ main(int argc, char *argv[])
 
         axlog("[INFO] VDB Volumes Found\n" << std::flush);
 
-        std::vector<std::string> warnings;
-        openvdb::ax::VolumeExecutable::Ptr volumeExecutable;
-
-        axtimer();
+        openvdb::ax::VolumeExecutable::Ptr volumeExe;
         try {
-            axlog("[INFO] Compiling for VDB Volumes\n" << std::flush);
-            volumeExecutable = compiler->compile<openvdb::ax::VolumeExecutable>(*syntaxTree, customData, &warnings);
+            axlog("[INFO] Compiling for VDB Points\n" << std::flush);
+            volumeExe = compiler->compile<openvdb::ax::VolumeExecutable>(*syntaxTree, logs, customData);
         } catch (std::exception& e) {
-            OPENVDB_LOG_FATAL("Compilation error!\nErrors:\n" << e.what());
+            OPENVDB_LOG_FATAL("Fatal error!\nErrors:\n" << e.what());
             return EXIT_FAILURE;
         }
 
-        for (const std::string& warning : warnings) {
-            OPENVDB_LOG_WARN(warning);
+        if (volumeExe) {
+            axlog("[INFO] | Compilation successful");
+            if (logs.hasWarning()) {
+                axlog(" with warning(s)\n");            }
         }
-
-        axlog("[INFO] | Compilation success.\n");
+        else {
+            if (logs.hasError()) {
+                axlog("[INFO] Compilation error(s)!\n");
+            }
+            return EXIT_FAILURE;
+        }
         axlog("[INFO] | " << axtime() << '\n' << std::flush);
 
         if (opts.mVerbose) {
@@ -703,7 +742,7 @@ main(int argc, char *argv[])
             axlog(std::flush);
         }
 
-        try { volumeExecutable->execute(*grids); }
+        try { volumeExe->execute(*grids); }
         catch (std::exception& e) {
             OPENVDB_LOG_FATAL("Execution error!\nErrors:\n" << e.what());
             return EXIT_FAILURE;

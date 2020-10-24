@@ -4,15 +4,14 @@
 /// @file compiler/PointExecutable.cc
 
 #include "PointExecutable.h"
-
-#include <openvdb/Types.h>
+#include "LeafLocalData.h"
 
 #include "../Exceptions.h"
-
 // @TODO refactor so we don't have to include PointComputeGenerator.h,
 // but still have the functions defined in one place
 #include "../codegen/PointComputeGenerator.h"
-#include "../compiler/LeafLocalData.h"
+
+#include <openvdb/Types.h>
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointAttribute.h>
@@ -487,7 +486,7 @@ void appendMissingAttributes(points::PointDataGrid& grid,
 
             if (typetoken != iter.type() &&
                 !(type.second == "str" && iter.type() == ast::tokens::STRING)) {
-                OPENVDB_THROW(TypeError, "Mismatching attributes types. \"" + name +
+                OPENVDB_THROW(AXExecutionError, "Mismatching attributes types. \"" + name +
                     "\" exists of type \"" + type.first + "\" but has been "
                     "accessed with type \"" + ast::tokens::typeStringFromToken(iter.type()) + "\"");
             }
@@ -512,7 +511,7 @@ void checkAttributesExist(const points::PointDataGrid& grid,
         const std::string& name = iter.name();
         const size_t pos = desc.find(name);
         if (pos == points::AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(openvdb::LookupError, "Attribute \"" + name +
+            OPENVDB_THROW(AXExecutionError, "Attribute \"" + name +
                 "\" does not exist on grid \"" + grid.getName() + "\"");
         }
     }
@@ -721,7 +720,7 @@ const std::string& PointExecutable::getGroupExecution() const
     return mSettings->mGroup;
 }
 
-}
-}
-}
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 

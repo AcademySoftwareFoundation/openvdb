@@ -4,7 +4,6 @@
 /// @file codegen/ComputeGenerator.cc
 
 #include "ComputeGenerator.h"
-
 #include "FunctionRegistry.h"
 #include "FunctionTypes.h"
 #include "Types.h"
@@ -35,6 +34,50 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace codegen {
 
+namespace {
+
+inline void
+printType(const llvm::Type* type, llvm::raw_os_ostream& stream, const bool axTypes)
+{
+    const ast::tokens::CoreType token =
+        axTypes ? tokenFromLLVMType(type) : ast::tokens::UNKNOWN;
+    if (token == ast::tokens::UNKNOWN) type->print(stream);
+    else stream << ast::tokens::typeStringFromToken(token);
+}
+
+inline void
+printTypes(llvm::raw_os_ostream& stream,
+           const std::vector<llvm::Type*>& types,
+           const std::vector<const char*>& names = {},
+           const std::string sep = "; ",
+           const bool axTypes = true)
+{
+    if (types.empty()) return;
+    auto typeIter = types.cbegin();
+    std::vector<const char*>::const_iterator nameIter;
+    if (!names.empty()) nameIter = names.cbegin();
+
+    for (; typeIter != types.cend() - 1; ++typeIter) {
+        printType(*typeIter, stream, axTypes);
+        if (!names.empty() && nameIter != names.cend()) {
+            if (*nameIter && (*nameIter)[0] != '\0') {
+                stream << ' ' << *nameIter;
+            }
+            ++nameIter;
+        }
+        stream << sep;
+    }
+
+    printType(*typeIter, stream, axTypes);
+    if (!names.empty() && nameIter != names.cend()) {
+        if (*nameIter && (*nameIter)[0] != '\0') {
+            stream << ' ' << *nameIter;
+        }
+    }
+}
+
+}
+
 const std::array<std::string, ComputeKernel::N_ARGS>&
 ComputeKernel::getArgumentKeys()
 {
@@ -55,7 +98,7 @@ std::string ComputeKernel::getDefaultName() { return "ax.compute"; }
 ComputeGenerator::ComputeGenerator(llvm::Module& module,
                                    const FunctionOptions& options,
                                    FunctionRegistry& functionRegistry,
-                                   std::vector<std::string>* const warnings)
+                                   Logger& logger)
     : mModule(module)
     , mContext(module.getContext())
     , mBuilder(llvm::IRBuilder<>(module.getContext()))
@@ -63,9 +106,9 @@ ComputeGenerator::ComputeGenerator(llvm::Module& module,
     , mBreakContinueStack()
     , mScopeIndex(1)
     , mSymbolTables()
-    , mWarnings(warnings)
     , mFunction(nullptr)
     , mOptions(options)
+    , mLog(logger)
     , mFunctionRegistry(functionRegistry) {}
 
 bool ComputeGenerator::generate(const ast::Tree& tree)
@@ -92,7 +135,9 @@ bool ComputeGenerator::generate(const ast::Tree& tree)
         "entry_" + ComputeKernel::getDefaultName(), mFunction);
     mBuilder.SetInsertPoint(entry);
 
-    return this->traverse(&tree);
+    // if traverse is false, log should have error, but can error
+    // without stopping traversal, so check both
+    return this->traverse(&tree) && !mLog.hasError();
 }
 
 bool ComputeGenerator::visit(const ast::CommaOperator* comma)
@@ -299,8 +344,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                 }
             }
             else {
-                OPENVDB_THROW(LLVMCastError,
-                    "Unsupported implicit cast in ternary operation.");
+                if (!mLog.error("unsupported implicit cast in ternary operation.", tern)) return false;
             }
         }
     }
@@ -336,6 +380,11 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     llvm::BasicBlock* postBodyBlock = conditionBlock;
 
     const ast::tokens::LoopToken loopType = loop->loopType();
+    assert((loopType == ast::tokens::LoopToken::FOR ||
+            loopType == ast::tokens::LoopToken::WHILE ||
+            loopType == ast::tokens::LoopToken::DO) &&
+            "Unsupported loop type");
+
     if (loopType == ast::tokens::LoopToken::FOR) {
         // init -> condition -> body -> iter -> condition ... continue
 
@@ -362,9 +411,6 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     else if (loopType == ast::tokens::LoopToken::WHILE) {
         //  condition -> body -> condition ... continue
         mBuilder.CreateBr(conditionBlock);
-    }
-    else { // unrecognised loop type
-        OPENVDB_THROW(LLVMCastError, "Unsupported loop type.");
     }
 
     // store the destinations for break and continue
@@ -401,6 +447,11 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
 bool ComputeGenerator::visit(const ast::Keyword* node)
 {
     const ast::tokens::KeywordToken keyw = node->keyword();
+    assert((keyw == ast::tokens::KeywordToken::RETURN ||
+            keyw == ast::tokens::KeywordToken::BREAK  ||
+            keyw == ast::tokens::KeywordToken::CONTINUE) &&
+            "Unsupported keyword");
+
     if (keyw == ast::tokens::KeywordToken::RETURN) {
         mBuilder.CreateRetVoid();
     }
@@ -417,25 +468,22 @@ bool ComputeGenerator::visit(const ast::Keyword* node)
             parentLoop = child->parent();
         }
         if (!parentLoop) {
-            OPENVDB_THROW(LLVMSyntaxError, "Keyword \"" +
-                ast::tokens::keywordNameFromToken(keyw) + "\" used outside of loop.");
+            if (!mLog.error("keyword \"" + ast::tokens::keywordNameFromToken(keyw)
+                    + "\" used outside of loop.", node)) return false;
         }
+        else {
+            const std::pair<llvm::BasicBlock*, llvm::BasicBlock*>
+                breakContinue = mBreakContinueStack.top();
 
-        const std::pair<llvm::BasicBlock*, llvm::BasicBlock*>
-            breakContinue = mBreakContinueStack.top();
-
-        if (keyw == ast::tokens::KeywordToken::BREAK) {
-            assert(breakContinue.first);
-            mBuilder.CreateBr(breakContinue.first);
+            if (keyw == ast::tokens::KeywordToken::BREAK) {
+                assert(breakContinue.first);
+                mBuilder.CreateBr(breakContinue.first);
+            }
+            else if (keyw == ast::tokens::KeywordToken::CONTINUE) {
+                assert(breakContinue.second);
+                mBuilder.CreateBr(breakContinue.second);
+            }
         }
-        else if (keyw == ast::tokens::KeywordToken::CONTINUE) {
-            assert(breakContinue.second);
-            mBuilder.CreateBr(breakContinue.second);
-        }
-    }
-    else {
-        OPENVDB_THROW(LLVMKeywordError, "Unsupported keyword '\"" +
-            ast::tokens::keywordNameFromToken(keyw) + "\"'" );
     }
 
     llvm::BasicBlock* nullBlock = llvm::BasicBlock::Create(mContext, "null", mFunction);
@@ -449,10 +497,10 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
 {
     llvm::Value* rhs = mValues.top(); mValues.pop();
     llvm::Value* lhs = mValues.top(); mValues.pop();
-    llvm::Value* result = this->binaryExpression(lhs, rhs, node->operation());
+    llvm::Value* result = nullptr;
+    if (!this->binaryExpression(result, lhs, rhs, node->operation(), node)) return false;
 
-    assert(result);
-    mValues.push(result);
+    if (result) mValues.push(result);
     return true;
 }
 
@@ -467,8 +515,9 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
     if (token != ast::tokens::MINUS &&
         token != ast::tokens::BITNOT &&
         token != ast::tokens::NOT) {
-        OPENVDB_THROW(LLVMUnaryOperationError, "Unrecognised unary operator \"" +
-            ast::tokens::operatorNameFromToken(token) + "\"");
+        if (!mLog.error("unrecognised unary operator \"" +
+                ast::tokens::operatorNameFromToken(token) + "\"", node)) return false;
+        return true;
     }
 
     llvm::Value* value = mValues.top(); mValues.pop();
@@ -500,8 +549,8 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         if (token == ast::tokens::MINUS)         result = mBuilder.CreateFNeg(value);
         else if (token == ast::tokens::NOT)      result = mBuilder.CreateFCmpOEQ(value, llvm::ConstantFP::get(type, 0));
         else if (token == ast::tokens::BITNOT) {
-            OPENVDB_THROW(LLVMUnaryOperationError, "Unable to perform operation \""
-                + ast::tokens::operatorNameFromToken(token) + "\" on floating points values");
+            if (!mLog.error("unable to perform operation \""
+                    + ast::tokens::operatorNameFromToken(token) + "\" on floating points values", node)) return false;
         }
     }
     else if (type->isArrayTy()) {
@@ -536,25 +585,21 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
             }
             else {
                 //@todo support NOT?
-                OPENVDB_THROW(LLVMUnaryOperationError, "Unable to perform operation \""
-                    + ast::tokens::operatorNameFromToken(token) +
-                    "\" on floating point vector/matrices");
+                if (!mLog.error("unable to perform operation \""
+                        + ast::tokens::operatorNameFromToken(token) + "\" on arrays/vectors", node)) return false;
             }
         }
         else {
-            OPENVDB_THROW(LLVMUnaryOperationError,
-                "Unrecognised array element type");
+            if (!mLog.error("unrecognised array element type", node)) return false;
         }
 
         result = arrayPack(elements, mBuilder);
     }
     else {
-        OPENVDB_THROW(LLVMUnaryOperationError,
-            "Value is not a scalar, vector or matrix.");
+        if (!mLog.error("value is not a scalar or vector", node)) return false;
     }
 
-    assert(result);
-    mValues.push(result);
+    if (result) mValues.push(result);
     return true;
 }
 
@@ -566,10 +611,13 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
 
     llvm::Type* rhsType = rhs->getType();
     if (assign->isCompound()) {
-        rhs = this->binaryExpression(lhs, rhs, assign->operation());
-        rhsType = rhs->getType();
+        llvm::Value* rhsValue = nullptr;
+        if (!this->binaryExpression(rhsValue, lhs, rhs, assign->operation(), assign)) return false;
+        if (rhsValue) {
+            rhs = rhsValue;
+            rhsType = rhs->getType();
+        }
     }
-
     // rhs must be loaded for assignExpression() if it's a scalar
     if (rhsType->isPointerTy()) {
         rhsType = rhsType->getPointerElementType();
@@ -578,38 +626,41 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
         }
     }
 
-    this->assignExpression(lhs, rhs);
+    if (!this->assignExpression(lhs, rhs, assign)) return false;
+
     return true;
 }
 
 bool ComputeGenerator::visit(const ast::Crement* node)
 {
-    llvm::Value* value = mValues.top(); mValues.pop();
-
+    llvm::Value* value = mValues.top();
     if (!value->getType()->isPointerTy()) {
-        OPENVDB_THROW(LLVMBinaryOperationError, "Unable to assign to an rvalue");
+        if (!mLog.error("unable to assign to an rvalue", node)) return false;
+        return true;
     }
-
+    mValues.pop();
     llvm::Value* rvalue = mBuilder.CreateLoad(value);
     llvm::Type* type = rvalue->getType();
 
     if (type->isIntegerTy(1) || (!type->isIntegerTy() && !type->isFloatingPointTy())) {
-        OPENVDB_THROW(LLVMTypeError, "Variable is an unsupported type for "
-            "crement. Must be a non-boolean scalar.");
+        if (!mLog.error("variable is an unsupported type for "
+                "crement. Must be a non-boolean scalar.", node)) return false;
+        return true;
     }
+    else {
+        llvm::Value* crement = nullptr;
+        assert((node->increment() || node->decrement()) && "unrecognised crement operation");
+        if (node->increment())      crement = LLVMType<int32_t>::get(mContext, 1);
+        else if (node->decrement()) crement = LLVMType<int32_t>::get(mContext, -1);
 
-    llvm::Value* crement = nullptr;
-    if (node->increment())      crement = LLVMType<int32_t>::get(mContext, 1);
-    else if (node->decrement()) crement = LLVMType<int32_t>::get(mContext, -1);
-    else OPENVDB_THROW(LLVMTokenError, "Unrecognised crement operation token");
+        crement = arithmeticConversion(crement, type, mBuilder);
+        if (type->isIntegerTy())       crement = mBuilder.CreateAdd(rvalue, crement);
+        if (type->isFloatingPointTy()) crement = mBuilder.CreateFAdd(rvalue, crement);
 
-    crement = arithmeticConversion(crement, type, mBuilder);
-    if (type->isIntegerTy())       crement = mBuilder.CreateAdd(rvalue, crement);
-    if (type->isFloatingPointTy()) crement = mBuilder.CreateFAdd(rvalue, crement);
+        mBuilder.CreateStore(crement, value);
 
-    mBuilder.CreateStore(crement, value);
-
-    // decide what to put on the expression stack
+        // decide what to put on the expression stack
+    }
 
     if (node->post()) mValues.push(rvalue);
     else              mValues.push(value);
@@ -618,43 +669,90 @@ bool ComputeGenerator::visit(const ast::Crement* node)
 
 bool ComputeGenerator::visit(const ast::FunctionCall* node)
 {
+
     const FunctionGroup::Ptr function = this->getFunction(node->name());
-    const size_t args = node->children();
-    assert(mValues.size() >= args);
+    if (!function) {
+        if (!mLog.error("unable to locate function \"" + node->name() + "\".", node)) return false;
+    }
+    else {
+        const size_t args = node->children();
+        assert(mValues.size() >= args);
 
-    // initialize arguments. scalars are always passed by value, arrays
-    // and strings always by pointer
-    llvm::Type* strType = LLVMType<AXString>::get(mContext);
+        // initialize arguments. scalars are always passed by value, arrays
+        // and strings always by pointer
 
-    std::vector<llvm::Value*> arguments;
-    arguments.resize(args);
+        std::vector<llvm::Value*> arguments;
+        arguments.resize(args);
 
-    for (auto r = arguments.rbegin(); r != arguments.rend(); ++r) {
-        llvm::Value* arg = mValues.top(); mValues.pop();
-        llvm::Type* type = arg->getType();
-        if (type->isPointerTy()) {
-            type = type->getPointerElementType();
-            if (type->isIntegerTy() || type->isFloatingPointTy()) {
-                // pass by value
-                arg = mBuilder.CreateLoad(arg);
+        for (auto r = arguments.rbegin(); r != arguments.rend(); ++r) {
+            llvm::Value* arg = mValues.top(); mValues.pop();
+            llvm::Type* type = arg->getType();
+            if (type->isPointerTy()) {
+                type = type->getPointerElementType();
+                if (type->isIntegerTy() || type->isFloatingPointTy()) {
+                    // pass by value
+                    arg = mBuilder.CreateLoad(arg);
+                }
             }
-            else if (type->isArrayTy()) {/*pass by pointer*/}
-            else if (type == strType) {/*pass by pointer*/}
+            else {
+                // arrays should never be loaded
+                assert(!type->isArrayTy() && type != LLVMType<AXString>::get(mContext));
+                if (type->isIntegerTy() || type->isFloatingPointTy()) {
+                    /*pass by value*/
+                }
+            }
+            *r = arg;
+        }
+
+        std::vector<llvm::Type*> inputTypes;
+        valuesToTypes(arguments, inputTypes);
+
+        Function::SignatureMatch match;
+        const Function::Ptr target = function->match(inputTypes, mContext, &match);
+
+        if (!target) {
+            assert(!function->list().empty()
+                   && "FunctionGroup has no function declarations");
+
+            std::ostringstream os;
+            if (match == Function::SignatureMatch::None) {
+                os << "wrong number of arguments. \"" << node->name() << "\""
+                   << " was called with: (";
+                llvm::raw_os_ostream stream(os);
+                printTypes(stream, inputTypes);
+                stream << ")";
+            }
+            else {
+                // match == Function::SignatureMatch::Size
+                os << "no matching function for ";
+                printSignature(os, inputTypes,
+                    LLVMType<void>::get(mContext),
+                    node->name().c_str(), {}, true);
+                os << ".";
+            }
+
+            os << " \ncandidates are: ";
+            for (const auto& sig : function->list()) {
+                os << std::endl;
+                sig->print(mContext, os, node->name().c_str());
+            }
+            if (!mLog.error(os.str(), node)) return false;
         }
         else {
-            // arrays should never be loaded
-            assert(!type->isArrayTy());
-            assert(type != strType);
-            if (type->isIntegerTy() || type->isFloatingPointTy()) {
-                /*pass by value*/
+            llvm::Value* result = nullptr;
+            if (match == Function::SignatureMatch::Implicit) {
+                if (!mLog.warning("implicit conversion in function call", node)) return false;
+                result = target->call(arguments, mBuilder, /*cast=*/true);
             }
-        }
-        *r = arg;
-    }
+            else {
+                // match == Function::SignatureMatch::Explicit
+                result = target->call(arguments, mBuilder, /*cast=*/false);
+            }
 
-    llvm::Value* result = function->execute(arguments, mBuilder);
-    assert(result);
-    mValues.push(result);
+            assert(result && "Function has been invoked with no valid llvm Value return");
+            mValues.push(result);
+        }
+    }
     return true;
 }
 
@@ -667,28 +765,30 @@ bool ComputeGenerator::visit(const ast::Cast* node)
         value->getType();
 
     if (!type->isIntegerTy() && !type->isFloatingPointTy()) {
-        OPENVDB_THROW(LLVMTypeError, "Unable to cast non scalar values");
-    }
-
-    // If the value to cast is already the correct type, return
-    llvm::Type* targetType = llvmTypeFromToken(node->type(), mContext);
-    if (type == targetType) return true;
-
-    mValues.pop();
-
-    if (value->getType()->isPointerTy()) {
-        value = mBuilder.CreateLoad(value);
-    }
-    if (targetType->isIntegerTy(1)) {
-        // if target is bool, perform standard boolean conversion (*not* truncation).
-        value = boolComparison(value, mBuilder);
-        assert(value->getType()->isIntegerTy(1));
+        if (!mLog.error("unable to cast non scalar values", node)) return false;
     }
     else {
-        value = arithmeticConversion(value, targetType, mBuilder);
+        // If the value to cast is already the correct type, return
+        llvm::Type* targetType = llvmTypeFromToken(node->type(), mContext);
+        if (type == targetType) return true;
+
+        mValues.pop();
+
+        if (value->getType()->isPointerTy()) {
+            value = mBuilder.CreateLoad(value);
+        }
+
+        if (targetType->isIntegerTy(1)) {
+            // if target is bool, perform standard boolean conversion (*not* truncation).
+            value = boolComparison(value, mBuilder);
+            assert(value->getType()->isIntegerTy(1));
+        }
+        else {
+            value = arithmeticConversion(value, targetType, mBuilder);
+        }
+        mValues.push(value);
     }
 
-    mValues.push(value);
     return true;
 }
 
@@ -711,18 +811,18 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
     }
 
     SymbolTable* current = mSymbolTables.getOrInsert(mScopeIndex);
+
     const std::string& name = node->local()->name();
     if (!current->insert(name, value)) {
-        OPENVDB_THROW(LLVMDeclarationError, "Local variable \"" + name +
-            "\" has already been declared!");
+        if (!mLog.error("local variable \"" + name +
+                "\" has already been declared!", node)) return false;
     }
 
-    if (mWarnings) {
-        if (mSymbolTables.find(name, mScopeIndex - 1)) {
-            mWarnings->emplace_back("Declaration of variable \"" + name
-                + "\" shadows a previous declaration.");
-        }
+    if (mSymbolTables.find(name, mScopeIndex - 1)) {
+        if (!mLog.warning("declaration of variable \"" + name
+                + "\" shadows a previous declaration.", node)) return false;
     }
+
 
     // do this to ensure all AST nodes are visited
     if (!this->traverse(node->local())) return false;
@@ -741,10 +841,11 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
             }
         }
 
-        this->assignExpression(value, init);
+        if (!this->assignExpression(value, init, node)) return false;
+
         // note that loop conditions allow uses of initialized declarations
         // and so require the value
-        mValues.push(value);
+        if (value) mValues.push(value);
     }
 
     return true;
@@ -773,8 +874,10 @@ bool ComputeGenerator::visit(const ast::Local* node)
         mValues.push(value);
     }
     else {
-        OPENVDB_THROW(LLVMDeclarationError, "Variable \"" + node->name() +
-            "\" hasn't been declared!");
+        if (!mLog.error("variable \"" + node->name() + "\" hasn't been declared!", node)) return false;
+        // if not a fatal error, add a dummy to use in subsequent codegen
+        llvm::Value* dummy = insertStaticAlloca(mBuilder, LLVMType<float>::get(mContext));
+        mValues.push(dummy);
     }
     return true;
 }
@@ -799,17 +902,19 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     llvm::Type* type = value->getType();
     if (!type->isPointerTy() ||
         !type->getPointerElementType()->isArrayTy()) {
-        OPENVDB_THROW(LLVMArrayError,
-            "Variable is not a valid type for component access.");
+        if (!mLog.error("variable is not a valid type for component access.", node)) return false;
+        return true;
     }
 
     // type now guaranteed to be an array type
     type = type->getPointerElementType();
     const size_t size = type->getArrayNumElements();
     if (component1 && size <= 4) {
-        OPENVDB_THROW(LLVMArrayError,
-            "Attribute or Local variable is not a compatible matrix type "
-            "for [,] indexing.");
+        {
+            if (!mLog.error("attribute or Local variable is not a compatible matrix type "
+                "for [,] indexing.", node)) return false;
+            return true;
+        }
     }
 
     if (component0->getType()->isPointerTy()) {
@@ -829,9 +934,11 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
             component1->getType()->print(stream);
         }
         stream.flush();
-        OPENVDB_THROW(LLVMArrayError,
-            "Unable to index into array with a non integer value. Types are ["
-            + os.str() + "]");
+        {
+            if (!mLog.error("unable to index into array with a non integer value. Types are ["
+                    + os.str() + "]", node)) return false;
+            return true;
+        }
     }
 
     llvm::Value* zero = LLVMType<int32_t>::get(mContext, 0);
@@ -937,10 +1044,6 @@ FunctionGroup::Ptr ComputeGenerator::getFunction(const std::string &identifier,
                                                 const bool allowInternal)
 {
     FunctionGroup::Ptr function = mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
-    if (!function) {
-        OPENVDB_THROW(LLVMFunctionError,
-            "Unable to locate function \"" + identifier + "\".");
-    }
     return function;
 }
 
@@ -952,16 +1055,14 @@ ComputeGenerator::visit(const ast::Value<ValueType>* node)
 
     const ValueType literal = static_cast<ValueType>(node->value());
 
-    if (mWarnings) {
-        static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
-        if (node->text()) {
-            mWarnings->emplace_back("Integer constant is too large to be represented: " + *(node->text())
-                + " will be converted to \"" + std::to_string(literal) + "\"");
-        }
-        else if (node->asContainerType() > max) {
-            mWarnings->emplace_back("Signed integer overflow: " + std::to_string(node->asContainerType())
-                + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>() + "'");
-        }
+    static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
+    if (node->text()) {
+        if (!mLog.warning("integer constant is too large to be represented: " + *(node->text())
+                + " will be converted to \"" + std::to_string(literal) + "\"", node)) return false;
+    }
+    else if (node->asContainerType() > max) {
+        if (!mLog.warning("signed integer overflow " + std::to_string(node->asContainerType())
+                + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>() + "'", node)) return false;
     }
 
     llvm::Constant* value = LLVMType<ValueType>::get(mContext, literal);
@@ -978,17 +1079,15 @@ ComputeGenerator::visit(const ast::Value<ValueType>* node)
     assert(std::isinf(node->value()) || node->value() >= static_cast<ContainerT>(0.0));
     const ValueType literal = static_cast<ValueType>(node->value());
 
-    if (mWarnings) {
-        static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
-        if (node->text()) {
-            mWarnings->emplace_back("Floating constant exceeds range of double: " + *(node->text())
-                + ". Converted to inf.");
-        }
-        else if (node->asContainerType() > max) {
-            mWarnings->emplace_back("Floating point overflow: " + std::to_string(node->asContainerType())
-                + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>()
-                + "'. Converted to \"" + std::to_string(literal) + "\"");
-        }
+    static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
+    if (node->text()) {
+        if (!mLog.warning("floating constant exceeds range of double: " + *(node->text())
+                + " will be converted to inf.", node)) return false;
+    }
+    else if (node->asContainerType() > max) {
+        if (!mLog.warning("floating point overflow " + std::to_string(node->asContainerType())
+            + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>()
+            + "' and will be converted to \"" + std::to_string(literal) + "\"", node)) return false;
     }
 
     llvm::Constant* value = LLVMType<ValueType>::get(mContext, literal);
@@ -1028,14 +1127,13 @@ bool ComputeGenerator::visit(const ast::Tree*)
 
 bool ComputeGenerator::visit(const ast::Attribute*)
 {
-    OPENVDB_THROW(LLVMContextError,
-        "Base ComputeGenerator attempted to generate code for an Attribute. "
+    assert(false && "Base ComputeGenerator attempted to generate code for an Attribute. "
         "PointComputeGenerator or VolumeComputeGenerator should be used for "
         "attribute accesses.");
     return false;
 }
 
-void ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs)
+bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, const ast::Node* node)
 {
     llvm::Type* strtype = LLVMType<AXString>::get(mContext);
 
@@ -1043,7 +1141,8 @@ void ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs)
     llvm::Type* rtype = rhs->getType();
 
     if (!ltype->isPointerTy()) {
-        OPENVDB_THROW(LLVMBinaryOperationError, "Unable to assign to an rvalue");
+        if (!mLog.error("unable to assign to an rvalue", node)) return false;
+        return true;
     }
 
     ltype = ltype->getPointerElementType();
@@ -1070,14 +1169,16 @@ void ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs)
 
     if (lsize != rsize) {
         if (lsize > 1 && rsize > 1) {
-            OPENVDB_THROW(LLVMArrayError, "Unable to assign vector/array "
-                "attributes with mismatching sizes");
+            if (!mLog.error("unable to assign vector/array "
+                "attributes with mismatching sizes", node)) return false;
+            return true;
         }
         else if (lsize == 1) {
             assert(rsize > 1);
-            OPENVDB_THROW(LLVMArrayError, "Cannot assign a scalar value "
+            if (!mLog.error("cannot assign a scalar value "
                 "from a vector or matrix. Consider using the [] operator to "
-                "get a particular element.");
+                "get a particular element.", node)) return false;
+            return true;
         }
     }
 
@@ -1101,10 +1202,11 @@ void ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs)
         // i.e. if rhs is anything but zero, lhs is true
         // @todo zeroval should be at rhstype
         if (opprec->isIntegerTy(1)) {
-            rhs = this->binaryExpression(rhs,
-                    LLVMType<int32_t>::get(mContext, 0),
-                    ast::tokens::NOTEQUALS);
-            assert(rhs->getType()->isIntegerTy(1));
+            llvm::Value* newRhs = nullptr;
+            if (!this->binaryExpression(newRhs, LLVMType<int32_t>::get(mContext, 0), rhs, ast::tokens::NOTEQUALS, node)) return false;
+            if (!newRhs) return true;
+            rhs = newRhs;
+            assert(newRhs->getType()->isIntegerTy(1));
         }
 
         for (size_t i = 0; i < resultsize; ++i) {
@@ -1160,12 +1262,13 @@ void ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs)
         mBuilder.CreateStore(size, lsize);
     }
     else {
-        OPENVDB_THROW(LLVMCastError, "Unsupported implicit cast in assignment.");
+        if (!mLog.error("unsupported implicit cast in assignment.", node)) return false;
     }
+    return true;
 }
 
-llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* rhs,
-    const ast::tokens::OperatorToken op)
+bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
+    const ast::tokens::OperatorToken op, const ast::Node* node)
 {
     llvm::Type* strtype = LLVMType<AXString>::get(mContext);
 
@@ -1208,8 +1311,7 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
     //
 
     const ast::tokens::OperatorType opType = ast::tokens::operatorType(op);
-    llvm::Value* result = nullptr;
-
+    result = nullptr;
     // Handle custom matrix operators
 
     if (lsize >= 9 || rsize >= 9)
@@ -1233,8 +1335,9 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
                 result = this->getFunction("transform")->execute({lhs, rhs}, mBuilder);
             }
             else {
-                OPENVDB_THROW(LLVMBinaryOperationError, "Unsupported * operator on "
-                    "vector/matrix sizes");
+                if (!mLog.error("unsupported * operator on "
+                    "vector/matrix sizes", node)) return false;
+                return true;
             }
         }
         else if (op == ast::tokens::MORETHAN ||
@@ -1245,9 +1348,10 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
                  op == ast::tokens::MODULO || // no % support for mats
                  opType == ast::tokens::LOGICAL ||
                  opType == ast::tokens::BITWISE) {
-            OPENVDB_THROW(LLVMBinaryOperationError, "Call to unsupported operator \""
+            if (!mLog.error("call to unsupported operator \""
                 + ast::tokens::operatorNameFromToken(op) +
-                "\" with a vector/matrix argument");
+                "\" with a vector/matrix argument", node)) return false;
+            return true;
         }
     }
 
@@ -1255,8 +1359,9 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
         // Handle matrix/vector ops of mismatching sizes
         if (lsize > 1 || rsize > 1) {
             if (lsize != rsize && (lsize > 1 && rsize > 1)) {
-                OPENVDB_THROW(LLVMArrayError, "Unsupported binary operator on vector/matrix "
-                    "arguments of mismatching sizes.");
+                if (!mLog.error("unsupported binary operator on vector/matrix "
+                    "arguments of mismatching sizes.", node)) return false;
+                return true;
             }
             if (op == ast::tokens::MORETHAN ||
                 op == ast::tokens::LESSTHAN ||
@@ -1264,18 +1369,20 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
                 op == ast::tokens::LESSTHANOREQUAL ||
                 opType == ast::tokens::LOGICAL ||
                 opType == ast::tokens::BITWISE) {
-                OPENVDB_THROW(LLVMBinaryOperationError, "Call to unsupported operator \""
+                if (!mLog.error("call to unsupported operator \""
                     + ast::tokens::operatorNameFromToken(op) +
-                    "\" with a vector/matrix argument");
+                    "\" with a vector/matrix argument", node)) return false;
+                return true;
             }
         }
 
         // Handle invalid floating point ops
         if (rtype->isFloatingPointTy() || ltype->isFloatingPointTy()) {
             if (opType == ast::tokens::BITWISE) {
-                OPENVDB_THROW(LLVMBinaryOperationError, "Call to unsupported operator \""
+                if (!mLog.error("call to unsupported operator \""
                     + ast::tokens::operatorNameFromToken(op) +
-                    "\" with a floating point argument");
+                    "\" with a floating point argument", node)) return false;
+                return true;
             }
         }
     }
@@ -1341,7 +1448,6 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
         }
 
         // handle vec/mat results
-
         if (resultsize > 1) {
             if (op == ast::tokens::EQUALSEQUALS || op == ast::tokens::NOTEQUALS) {
                 const ast::tokens::OperatorToken reductionOp =
@@ -1372,8 +1478,9 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
     if (string)
     {
         if (op != ast::tokens::PLUS) {
-            OPENVDB_THROW(LLVMBinaryOperationError, "Unsupported string operation \""
-                + ast::tokens::operatorNameFromToken(op) + "\"");
+            if (!mLog.error("unsupported string operation \""
+                + ast::tokens::operatorNameFromToken(op) + "\"", node)) return false;
+            return true;
         }
 
         auto& B = mBuilder;
@@ -1446,16 +1553,15 @@ llvm::Value* ComputeGenerator::binaryExpression(llvm::Value* lhs, llvm::Value* r
     }
 
     if (!result) {
-        OPENVDB_THROW(LLVMBinaryOperationError,
-            "Unsupported implicit cast in binary op.");
+        if (!mLog.error("unsupported implicit cast in binary op.", node)) return false;
     }
 
-    return result;
+    return true;
 }
 
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 

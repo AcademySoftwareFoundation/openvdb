@@ -12,9 +12,9 @@
 #ifndef OPENVDB_AX_AST_PRINT_TREE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AST_PRINT_TREE_HAS_BEEN_INCLUDED
 
-#include "../version.h"
+#include <openvdb/version.h>
 
-#include <iostream>
+#include <ostream>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -52,7 +52,7 @@ void reprint(const ast::Node& node,
 } // namespace ast
 } // namespace ax
 
-}
+} // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
 #endif // OPENVDB_AX_AST_PRINT_TREE_HAS_BEEN_INCLUDED

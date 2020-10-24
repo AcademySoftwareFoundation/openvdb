@@ -12,7 +12,7 @@
 #ifndef OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 
-#include "../version.h"
+#include <openvdb/version.h>
 
 #include <llvm/IR/Value.h>
 
@@ -222,10 +222,10 @@ private:
     MapType mTables;
 };
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_CODEGEN_SYMBOL_TABLE_HAS_BEEN_INCLUDED
 

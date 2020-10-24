@@ -20,7 +20,7 @@
 #ifndef OPENVDB_AX_MATH_OPEN_SIMPLEX_NOISE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_MATH_OPEN_SIMPLEX_NOISE_HAS_BEEN_INCLUDED
 
-#include "../version.h"
+#include <openvdb/version.h>
 #include <cstdint>
 
 namespace openvdb {

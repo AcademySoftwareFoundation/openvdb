@@ -19,6 +19,7 @@
 #define OPENVDB_AX_AX_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/version.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -29,8 +30,6 @@ namespace ax {
 /// @details  Must be called before any AX compilation or execution is performed.
 ///           Can be safely called from multiple threads. Cannot be called after
 ///           uninitialize has been called.
-/// @note   The implementation for the initialize methods can be found in
-///         compiler/Compiler.cc
 void initialize();
 
 /// @brief  Check to see if OpenVDB AX components have been initialized.
@@ -88,8 +87,8 @@ void run(const char* ax, openvdb::GridBase& grid);
 /// @param  grids  The grids to which to apply the compiled AX function
 void run(const char* ax, openvdb::GridPtrVec& grids);
 
-}
-}
-}
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_AX_HAS_BEEN_INCLUDED

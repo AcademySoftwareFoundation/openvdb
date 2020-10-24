@@ -18,6 +18,9 @@
 #include "../ast/AST.h"
 #include "../ast/Visitor.h"
 #include "../compiler/CompilerOptions.h"
+#include "../compiler/Logger.h"
+
+#include <openvdb/version.h>
 
 #include <llvm/Analysis/TargetLibraryInfo.h>
 #include <llvm/IR/BasicBlock.h>
@@ -67,7 +70,7 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
     ComputeGenerator(llvm::Module& module,
                      const FunctionOptions& options,
                      FunctionRegistry& functionRegistry,
-                     std::vector<std::string>* const warnings = nullptr);
+                     Logger& logger);
 
     virtual ~ComputeGenerator() = default;
 
@@ -176,9 +179,9 @@ protected:
     FunctionGroup::Ptr getFunction(const std::string& identifier,
             const bool allowInternal = false);
 
-    llvm::Value* binaryExpression(llvm::Value* lhs, llvm::Value* rhs,
-        const ast::tokens::OperatorToken op);
-    void assignExpression(llvm::Value* lhs, llvm::Value*& rhs);
+    bool binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
+        const ast::tokens::OperatorToken op, const ast::Node* node);
+    bool assignExpression(llvm::Value* lhs, llvm::Value*& rhs, const ast::Node* node);
 
     llvm::Module& mModule;
     llvm::LLVMContext& mContext;
@@ -196,22 +199,21 @@ protected:
     // The map of scope number to local variable names to values
     SymbolTableBlocks mSymbolTables;
 
-    // Warnings that are generated during code generation
-    std::vector<std::string>* const mWarnings;
-
     // The function used as the base code block
     llvm::Function* mFunction;
 
     const FunctionOptions mOptions;
 
+    Logger& mLog;
+
 private:
     FunctionRegistry& mFunctionRegistry;
 };
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_COMPUTE_GENERATOR_HAS_BEEN_INCLUDED
 

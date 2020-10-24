@@ -46,13 +46,12 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
   find_package(FLEX REQUIRED)
   find_package(BISON 3.0 REQUIRED)
 
-  # @note CMake lists don't seem to work with these options
-  SET(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Werror")
+  set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Werror")
 
   if(OPENVDB_AX_GRAMMAR_NO_LINES)
     # Suppress #line directives
-    SET(FLEX_COMPILE_FLAGS "${FLEX_COMPILE_FLAGS} -L")
-    SET(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
+    set(FLEX_COMPILE_FLAGS "${FLEX_COMPILE_FLAGS} -L")
+    set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
   endif()
 
   FLEX_TARGET(openvdb_ax_lexer openvdb_ax/grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
@@ -69,16 +68,7 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
     COMMENT "Re-generate the AX language files."
     DEPENDS
       ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
-      ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
-  )
-else()
-  file(COPY
-    openvdb_ax/grammar/generated/axlexer.cc
-    openvdb_ax/grammar/generated/axparser.cc
-    openvdb_ax/grammar/generated/axparser.h
-  DESTINATION
-    ${OPENVDB_AX_GRAMMAR_DIR}
-  )
+      ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
 endif()
 
 #########################################################################
@@ -123,9 +113,7 @@ find_package(Boost REQUIRED COMPONENTS random)
 #########################################################################
 
 set(OPENVDB_AX_LIBRARY_SOURCE_FILES
-  ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
-  ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
-  openvdb_ax/ast/AST.cc
+  openvdb_ax/ast/Parse.cc
   openvdb_ax/ast/PrintTree.cc
   openvdb_ax/ast/Scanners.cc
   openvdb_ax/ax.cc
@@ -140,11 +128,23 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   openvdb_ax/compiler/Compiler.cc
   openvdb_ax/compiler/PointExecutable.cc
   openvdb_ax/compiler/VolumeExecutable.cc
+  openvdb_ax/compiler/Logger.cc
   openvdb_ax/math/OpenSimplexNoise.cc
-  )
+)
+
+if(OPENVDB_BUILD_AX_GRAMMAR)
+  list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
+    ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+    ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
+else()
+  list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
+    openvdb_ax/grammar/generated/axlexer.cc
+    openvdb_ax/grammar/generated/axparser.cc)
+endif()
 
 set(OPENVDB_AX_AST_INCLUDE_FILES
   openvdb_ax/ast/AST.h
+  openvdb_ax/ast/Parse.h
   openvdb_ax/ast/Literals.h
   openvdb_ax/ast/PrintTree.h
   openvdb_ax/ast/Scanners.h
@@ -174,6 +174,7 @@ set(OPENVDB_AX_COMPILER_INCLUDE_FILES
   openvdb_ax/compiler/PointExecutable.h
   openvdb_ax/compiler/AttributeRegistry.h
   openvdb_ax/compiler/VolumeExecutable.h
+  openvdb_ax/compiler/Logger.h
 )
 
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
@@ -216,17 +217,25 @@ set(OPENVDB_AX_CORE_DEPENDENT_LIBS
 
 if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PUBLIC ${LLVM_DEFINITIONS})
-  if(NOT MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_static PRIVATE -DOPENVDB_AX_NO_MATRIX)
+  if(OPENVDB_HAS_MATRIX_SUPPORT)
+    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
   endif()
 
   target_include_directories(openvdb_ax_static
-    PUBLIC .
-    PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    PUBLIC ../ PRIVATE .
   )
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
+
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    target_include_directories(openvdb_ax_static
+      PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    )
+    target_compile_definitions(openvdb_ax_static
+      PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
+    )
+  endif()
 
   set_target_properties(openvdb_ax_static
     PROPERTIES OUTPUT_NAME openvdb_ax
@@ -242,17 +251,25 @@ endif()
 
 if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PUBLIC ${LLVM_DEFINITIONS})
-  if(NOT MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_shared PRIVATE -DOPENVDB_AX_NO_MATRIX)
+  if(OPENVDB_HAS_MATRIX_SUPPORT)
+    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
   endif()
 
   target_include_directories(openvdb_ax_shared
-    PUBLIC .
-    PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    PUBLIC ../ PRIVATE .
   )
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
+
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    target_include_directories(openvdb_ax_shared
+      PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    )
+    target_compile_definitions(openvdb_ax_shared
+      PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
+    )
+  endif()
 
   # @TODO - Use a similar system to vdb to extract the version number from version.h
 

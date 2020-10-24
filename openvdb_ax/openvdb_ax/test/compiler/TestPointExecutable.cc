@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "../compiler/Compiler.h"
-#include "../compiler/PointExecutable.h"
+#include <openvdb_ax/compiler/Compiler.h>
+#include <openvdb_ax/compiler/PointExecutable.h>
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
@@ -21,11 +21,13 @@ public:
     CPPUNIT_TEST(testConstructionDestruction);
     CPPUNIT_TEST(testCreateMissingAttributes);
     CPPUNIT_TEST(testGroupExecution);
+    CPPUNIT_TEST(testCompilerCases);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
     void testCreateMissingAttributes();
     void testGroupExecution();
+    void testCompilerCases();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointExecutable);
@@ -93,9 +95,10 @@ TestPointExecutable::testCreateMissingAttributes()
     openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
     openvdb::ax::PointExecutable::Ptr executable =
         compiler->compile<openvdb::ax::PointExecutable>("@a=v@b.x;");
+    CPPUNIT_ASSERT(executable);
 
     executable->setCreateMissing(false);
-    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
 
     executable->setCreateMissing(true);
     executable->execute(*grid);
@@ -160,6 +163,7 @@ TestPointExecutable::testGroupExecution()
     openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
     openvdb::ax::PointExecutable::Ptr executable =
         compiler->compile<openvdb::ax::PointExecutable>("i@a=1;");
+    CPPUNIT_ASSERT(executable);
 
     const std::string group = "test";
 
@@ -179,5 +183,115 @@ TestPointExecutable::testGroupExecution()
     // true group
     executable->execute(*grid);
     checkValues(1);
+}
+
+void
+TestPointExecutable::testCompilerCases()
+{
+    openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
+    CPPUNIT_ASSERT(compiler);
+    {
+        // with string only
+        CPPUNIT_ASSERT(static_cast<bool>(compiler->compile<openvdb::ax::PointExecutable>("int i;")));
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i;"), openvdb::AXCompilerError);
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i"), openvdb::AXCompilerError);
+        // with AST only
+        auto ast = openvdb::ax::ast::parse("i;");
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>(*ast), openvdb::AXCompilerError);
+    }
+
+    openvdb::ax::Logger logger([](const std::string&) {});
+
+    // using string and logger
+    {
+        openvdb::ax::PointExecutable::Ptr executable =
+        compiler->compile<openvdb::ax::PointExecutable>("", logger); // empty
+        CPPUNIT_ASSERT(executable);
+    }
+    logger.clear();
+    {
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("i;", logger); // undeclared variable error
+        CPPUNIT_ASSERT(!executable);
+        CPPUNIT_ASSERT(logger.hasError());
+        logger.clear();
+        openvdb::ax::PointExecutable::Ptr executable2 =
+            compiler->compile<openvdb::ax::PointExecutable>("i", logger); // expected ; error (parser)
+        CPPUNIT_ASSERT(!executable2);
+        CPPUNIT_ASSERT(logger.hasError());
+    }
+    logger.clear();
+    {
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("int i = 1e200000000;", logger); // warning
+        CPPUNIT_ASSERT(executable);
+        CPPUNIT_ASSERT(logger.hasWarning());
+    }
+
+    // using syntax tree and logger
+    logger.clear();
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
+        CPPUNIT_ASSERT(tree);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // empty
+        CPPUNIT_ASSERT(executable);
+        logger.clear(); // no tree for line col numbers
+        openvdb::ax::PointExecutable::Ptr executable2 =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // empty
+        CPPUNIT_ASSERT(executable2);
+    }
+    logger.clear();
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
+        CPPUNIT_ASSERT(tree);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // undeclared variable error
+        CPPUNIT_ASSERT(!executable);
+        CPPUNIT_ASSERT(logger.hasError());
+        logger.clear(); // no tree for line col numbers
+        openvdb::ax::PointExecutable::Ptr executable2 =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // undeclared variable error
+        CPPUNIT_ASSERT(!executable2);
+        CPPUNIT_ASSERT(logger.hasError());
+    }
+    logger.clear();
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 1e200000000;", logger);
+        CPPUNIT_ASSERT(tree);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // warning
+        CPPUNIT_ASSERT(executable);
+        CPPUNIT_ASSERT(logger.hasWarning());
+        logger.clear(); // no tree for line col numbers
+        openvdb::ax::PointExecutable::Ptr executable2 =
+            compiler->compile<openvdb::ax::PointExecutable>(*tree, logger); // warning
+        CPPUNIT_ASSERT(executable2);
+        CPPUNIT_ASSERT(logger.hasWarning());
+    }
+    logger.clear();
+
+    // with copied tree
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // empty
+        CPPUNIT_ASSERT(executable);
+    }
+    logger.clear();
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // undeclared variable error
+        CPPUNIT_ASSERT(!executable);
+    }
+    logger.clear();
+    {
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 1e200000000;", logger);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // warning
+        CPPUNIT_ASSERT(executable);
+    }
+    logger.clear();
 }
 
