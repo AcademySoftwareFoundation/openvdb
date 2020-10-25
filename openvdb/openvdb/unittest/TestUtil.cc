@@ -233,10 +233,10 @@ TestUtil::testPagedArray()
 #endif
 
     {//serial PagedArray::push_back (check return value)
-        openvdb::util::PagedArray<int, 8UL> d;
+        openvdb::util::PagedArray<int> d;
         CPPUNIT_ASSERT(d.isEmpty());
         CPPUNIT_ASSERT_EQUAL(size_t(0), d.size());
-        CPPUNIT_ASSERT_EQUAL(size_t(8), d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(size_t(10), d.log2PageSize());
         CPPUNIT_ASSERT_EQUAL(size_t(1)<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL(size_t(0), d.pageCount());
         CPPUNIT_ASSERT_EQUAL(size_t(0), d.capacity());
@@ -346,11 +346,11 @@ TestUtil::testPagedArray()
 
 
     }
-    {//parallel PagedArray::push_back with a page size of 2^7 = 128
-        using ArrayT = openvdb::util::PagedArray<size_t, 7UL>;
+    {//parallel PagedArray::push_back with a default page size of 2^10 = 1024
+        using ArrayT = openvdb::util::PagedArray<size_t>;
         ArrayT d;
 #ifdef BENCHMARK_PAGED_ARRAY
-        timer.start("4: Parallel PagedArray::push_back with page size of 2^7 = 128");
+        timer.start("4: Parallel PagedArray::push_back with page size of 2^10 = 1024");
 #endif
         {// for some reason this:
             ArrayPushBack<ArrayT> tmp(d);
@@ -362,7 +362,7 @@ TestUtil::testPagedArray()
 #ifdef BENCHMARK_PAGED_ARRAY
         timer.stop();
 #endif
-        CPPUNIT_ASSERT_EQUAL(size_t(7), d.log2PageSize());
+        CPPUNIT_ASSERT_EQUAL(size_t(10), d.log2PageSize());
         CPPUNIT_ASSERT_EQUAL(size_t(1)<<d.log2PageSize(), d.pageSize());
         CPPUNIT_ASSERT_EQUAL(problemSize, d.size());
         // pageCount - 1 = max index >> log2PageSize
