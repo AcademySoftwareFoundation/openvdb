@@ -156,6 +156,7 @@ template<typename ValueT, size_t Log2PageSize = 10UL>
 class PagedArray
 {
 private:
+    static_assert(Log2PageSize >= 7UL, "Expected Log2PageSize >= 7");
     class Page;
 
     // must allow mutiple threads to call operator[] as long as only one thread calls push_back
