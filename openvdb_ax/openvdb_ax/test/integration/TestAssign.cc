@@ -6,8 +6,8 @@
 
 #include "../test/util.h"
 
-#include "../compiler/CustomData.h"
-#include "../Exceptions.h"
+#include <openvdb_ax/compiler/CustomData.h>
+#include <openvdb_ax/Exceptions.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -1533,9 +1533,8 @@ float@test1 = var;
 
     const auto names = unittest_util::nameSequence("test", 7);
     mHarness.addAttributes<float>(names, {30.0f, 1.0f, -10.0f, -15.0f, 50.0f, 50.0f, 1.0f});
+    this->execute("assign_scoped.float.ax");
 
-    std::vector<std::string> warnings;
-    this->execute("assign_scoped.float.ax", nullptr, &warnings, false);
-    CPPUNIT_ASSERT(!warnings.empty());
+    CPPUNIT_ASSERT(mHarness.mLogger.hasWarning());
 }
 

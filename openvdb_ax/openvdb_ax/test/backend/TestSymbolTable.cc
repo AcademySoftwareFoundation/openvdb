@@ -3,7 +3,7 @@
 
 #include "util.h"
 
-#include "../codegen/SymbolTable.h"
+#include <openvdb_ax/codegen/SymbolTable.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 

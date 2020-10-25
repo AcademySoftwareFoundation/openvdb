@@ -19,6 +19,8 @@
 
 #include "../compiler/AttributeRegistry.h"
 
+#include <openvdb/version.h>
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -85,12 +87,11 @@ struct PointComputeGenerator : public ComputeGenerator
     /// @param options          Options for the function registry behaviour
     /// @param functionRegistry Function registry object which will be used when generating IR
     ///                         for function calls
-    /// @param warnings         Vector which will hold compiler warnings.  If null, no warnings will
-    ///                         be stored.
+    /// @param logger           Logger for collecting logical errors and warnings
     PointComputeGenerator(llvm::Module& module,
        const FunctionOptions& options,
        FunctionRegistry& functionRegistry,
-       std::vector<std::string>* const warnings = nullptr);
+       Logger& logger);
 
     ~PointComputeGenerator() override = default;
 
@@ -105,10 +106,10 @@ private:
     void getAttributeValue(const std::string& globalName, llvm::Value* location);
 };
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_POINT_COMPUTE_GENERATOR_HAS_BEEN_INCLUDED
 

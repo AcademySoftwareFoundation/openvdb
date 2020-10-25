@@ -561,9 +561,9 @@ void linearize(const ast::Node& node, std::vector<const ast::Node*>& list)
     collectNodeType<ast::Node>(node, list);
 }
 
-}
-}
-}
-}
+} // namespace ast
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 

@@ -1,17 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <iostream>
-#include <cstdlib>
-#include <cmath>
-
 #include "TestHarness.h"
 
 #include "../test/util.h"
-#include "../compiler/CustomData.h"
-#include "../math/OpenSimplexNoise.h"
-#include "../compiler/PointExecutable.h"
-#include "../compiler/VolumeExecutable.h"
+
+#include <openvdb_ax/compiler/CustomData.h>
+#include <openvdb_ax/math/OpenSimplexNoise.h>
+#include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/compiler/VolumeExecutable.h>
 
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/util/CpuTimer.h>
@@ -21,6 +18,10 @@
 #include <boost/functional/hash.hpp>
 #include <boost/random/mersenne_twister.hpp>
 #include <boost/random/uniform_01.hpp>
+
+#include <iostream>
+#include <cstdlib>
+#include <cmath>
 
 using namespace openvdb::points;
 using namespace openvdb::ax;
@@ -70,6 +71,7 @@ public:
     CPPUNIT_TEST(pretransform);
     CPPUNIT_TEST(print);
     CPPUNIT_TEST(rand);
+    CPPUNIT_TEST(sign);
     CPPUNIT_TEST(signbit);
     CPPUNIT_TEST(simplexnoise);
     CPPUNIT_TEST(sinh);
@@ -114,6 +116,7 @@ public:
     void pretransform();
     void print();
     void rand();
+    void sign();
     void signbit();
     void simplexnoise();
     void sinh();
@@ -833,6 +836,14 @@ TestStandardFunctions::rand()
     mHarness.addAttributes<double>({"test0", "test1", "test2", "test3"},
         {expected1, expected1, expected2, expected3});
     testFunctionOptions(mHarness, "rand");
+}
+
+void
+TestStandardFunctions::sign()
+{
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("test", 13),
+        { 0,0,0,0,0,0,0, -1,-1,-1, 1,1,1 });
+    testFunctionOptions(mHarness, "sign");
 }
 
 void

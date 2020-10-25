@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "../ast/AST.h"
-#include "../ast/Scanners.h"
-#include "../ast/PrintTree.h"
-#include "../Exceptions.h"
-#include "../test/util.h"
+#include <openvdb_ax/ast/AST.h>
+#include <openvdb_ax/ast/Scanners.h>
+#include <openvdb_ax/ast/PrintTree.h>
+#include <openvdb_ax/Exceptions.h>
+#include <openvdb_ax/test/util.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -135,7 +135,7 @@ void TestArrayPack::testASTNode()
     for (const auto& test : tests) {
         const std::string& code = test.first;
         const Node* expected = test.second.get();
-        const Tree::Ptr tree = parse(code.c_str());
+        const Tree::ConstPtr tree = parse(code.c_str());
         CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("No AST returned", code), static_cast<bool>(tree));
 
         // get the first statement

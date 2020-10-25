@@ -17,7 +17,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tools/Prune.h>
 
-#ifdef OPENVDB_AX_NO_MATRIX
+#ifndef OPENVDB_HAS_MATRIX_SUPPORT
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -36,7 +36,7 @@ MATRIX_OPS(Mat4<float>)
 }
 }
 }
-#endif // OPENVDB_AX_NO_MATRIX
+#endif // OPENVDB_HAS_MATRIX_SUPPORT
 
 namespace unittest_util
 {

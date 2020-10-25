@@ -66,9 +66,11 @@
 #ifndef OPENVDB_AX_CODEGEN_FUNCTION_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_FUNCTION_TYPES_HAS_BEEN_INCLUDED
 
-#include "../codegen/Types.h"
-#include "../codegen/Utils.h" // isValidCast
-#include "../codegen/ConstantFolding.h"
+#include "Types.h"
+#include "Utils.h" // isValidCast
+#include "ConstantFolding.h"
+
+#include <openvdb/version.h>
 
 #include <llvm/IR/Constants.h>
 #include <llvm/IR/IRBuilder.h>
@@ -715,7 +717,7 @@ protected:
         std::string source, target;
         if (result) llvmTypeToString(result, source);
         llvmTypeToString(expected, target);
-        OPENVDB_THROW(LLVMFunctionError, "Function \"" + std::string(this->symbol()) +
+        OPENVDB_THROW(AXCodeGenError, "Function \"" + std::string(this->symbol()) +
             "\" has been invoked with a mismatching return type. Expected: \"" +
             target + "\", got \"" + source + "\".");
     }
@@ -1110,10 +1112,10 @@ private:
     Settings::Ptr mCurrentSettings = nullptr;
 };
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_CODEGEN_FUNCTION_TYPES_HAS_BEEN_INCLUDED
 

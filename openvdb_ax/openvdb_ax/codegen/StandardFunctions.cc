@@ -11,15 +11,14 @@
 ///   intrinsics.
 
 #include "Functions.h"
+#include "FunctionTypes.h"
+#include "Types.h"
+#include "Utils.h"
 
-#include "../version.h"
 #include "../Exceptions.h"
 #include "../math/OpenSimplexNoise.h"
 #include "../compiler/CompilerOptions.h"
 #include "../compiler/CustomData.h"
-#include "../codegen/FunctionTypes.h"
-#include "../codegen/Types.h"
-#include "../codegen/Utils.h"
 
 #include <boost/functional/hash.hpp>
 #include <boost/random/mersenne_twister.hpp>
@@ -541,6 +540,7 @@ inline FunctionGroup::Ptr axmin(const FunctionOptions& op)
     return FunctionBuilder("min")
         .addSignature<double(double,double)>(generate, (double(*)(double,double))(min))
         .addSignature<float(float,float)>(generate, (float(*)(float,float))(min))
+        .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(min))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(min))
         .setArgumentNames({"a", "b"})
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
@@ -571,6 +571,7 @@ inline FunctionGroup::Ptr axmax(const FunctionOptions& op)
     return FunctionBuilder("max")
         .addSignature<double(double,double)>(generate, (double(*)(double,double))(max))
         .addSignature<float(float,float)>(generate, (float(*)(float,float))(max))
+        .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(max))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(max))
         .setArgumentNames({"a", "b"})
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
@@ -597,10 +598,12 @@ inline FunctionGroup::Ptr axclamp(const FunctionOptions& op)
     using ClampD = double(double, double, double);
     using ClampF = float(float, float, float);
     using ClampI = int32_t(int32_t, int32_t, int32_t);
+    using ClampL = int64_t(int64_t, int64_t, int64_t);
 
     return FunctionBuilder("clamp")
         .addSignature<ClampD>(generate, &openvdb::math::Clamp<double>)
         .addSignature<ClampF>(generate, &openvdb::math::Clamp<float>)
+        .addSignature<ClampL>(generate, &openvdb::math::Clamp<int64_t>)
         .addSignature<ClampI>(generate, &openvdb::math::Clamp<int32_t>)
         .addDependency("min")
         .addDependency("max")
@@ -682,11 +685,13 @@ inline FunctionGroup::Ptr axfit(const FunctionOptions& op)
 
     using FitD = double(double, double, double, double, double);
     using FitF = float(float, float, float, float, float);
+    using FitL = double(int64_t, int64_t, int64_t, int64_t, int64_t);
     using FitI = double(int32_t, int32_t, int32_t, int32_t, int32_t);
 
     return FunctionBuilder("fit")
         .addSignature<FitD>(generate)
         .addSignature<FitF>(generate)
+        .addSignature<FitL>(generate)
         .addSignature<FitI>(generate)
         .addDependency("clamp")
         .setArgumentNames({"value", "omin", "omax", "nmin", "nmax"})
@@ -788,6 +793,52 @@ inline FunctionGroup::Ptr axrand(const FunctionOptions& op)
         .get();
 }
 
+inline FunctionGroup::Ptr axsign(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+            llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        // int r = (T(0) < val) - (val < T(0));
+        assert(args.size() == 1);
+        llvm::Value* arg = args.front();
+        llvm::Type* type = arg->getType();
+        llvm::Value* zero;
+        if (type->isIntegerTy()) {
+            zero = llvm::ConstantInt::get(type, static_cast<uint64_t>(0), /*signed*/true);
+        }
+        else {
+            assert(type->isFloatingPointTy());
+            zero = llvm::ConstantFP::get(type, static_cast<double>(0.0));
+        }
+
+        llvm::Value* c1 = binaryOperator(zero, arg, ast::tokens::LESSTHAN, B);
+        c1 = arithmeticConversion(c1, LLVMType<int32_t>::get(B.getContext()), B);
+        llvm::Value* c2 = binaryOperator(arg, zero, ast::tokens::LESSTHAN, B);
+        c2 = arithmeticConversion(c2, LLVMType<int32_t>::get(B.getContext()), B);
+        llvm::Value* r = binaryOperator(c1, c2, ast::tokens::MINUS, B);
+        return arithmeticConversion(r, LLVMType<int32_t>::get(B.getContext()), B);
+    };
+
+    return FunctionBuilder("sign")
+        .addSignature<int32_t(double)>(generate)
+        .addSignature<int32_t(float)>(generate)
+        .addSignature<int32_t(int64_t)>(generate)
+        .addSignature<int32_t(int32_t)>(generate)
+        .setArgumentNames({"n"})
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Implements signum, determining if the input is negative, zero "
+            "or positive. Returns -1 for a negative number, 0 for the number zero, and +1 "
+            "for a positive number. Note that this function does not check the sign of "
+            "floating point +/-0.0 values. See signbit().")
+        .get();
+}
+
 inline FunctionGroup::Ptr axsignbit(const FunctionOptions& op)
 {
     return FunctionBuilder("signbit")
@@ -800,7 +851,9 @@ inline FunctionGroup::Ptr axsignbit(const FunctionOptions& op)
         .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Determines if the given floating point number input is negative.")
+        .setDocumentation("Determines if the given floating point number input is negative. "
+            "Returns true if arg is negative, false otherwise. Will return true for -0.0, "
+            "false for +0.0")
         .get();
 }
 
@@ -1162,8 +1215,9 @@ inline FunctionGroup::Ptr axpolardecompose(const FunctionOptions& op)
         .addFunctionAttribute(llvm::Attribute::NoUnwind)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Decompose an invertible 3x3 matrix into its orthogonal matrix "
-            "and symmetric matrix components.")
+        .setDocumentation("Decompose an invertible 3x3 matrix into its orthogonal (unitary) "
+            "matrix and symmetric matrix components. If the determinant of the unitary matrix "
+            "is 1 it is a rotation, otherwise if it is -1 there is some part reflection.")
         .get();
 }
 
@@ -1730,6 +1784,7 @@ inline FunctionGroup::Ptr axprint(const FunctionOptions& op)
     return FunctionBuilder("print")
         .addSignature<void(double)>((void(*)(double))(print))
         .addSignature<void(float)>((void(*)(float))(print))
+        .addSignature<void(int64_t)>((void(*)(int64_t))(print))
         .addSignature<void(int32_t)>((void(*)(int32_t))(print))
             .setArgumentNames({"n"})
             .addFunctionAttribute(llvm::Attribute::ReadOnly)
@@ -1773,7 +1828,7 @@ inline FunctionGroup::Ptr ax_external(const FunctionOptions& op)
     {
         using ValueType = typename std::remove_pointer<decltype(out)>::type;
         const ax::CustomData* const customData =
-            static_cast<const ax::CustomData* const>(data);
+            static_cast<const ax::CustomData*>(data);
         const std::string nameStr(name->ptr, name->size);
         const TypedMetadata<ValueType>* const metaData =
             customData->getData<TypedMetadata<ValueType>>(nameStr);
@@ -1921,6 +1976,7 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("min", axmin);
     add("normalize", axnormalize);
     add("rand", axrand);
+    add("sign", axsign);
     add("signbit", axsignbit);
 
     // matrix math
@@ -1975,8 +2031,8 @@ void insertStandardFunctions(FunctionRegistry& registry,
 }
 
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
