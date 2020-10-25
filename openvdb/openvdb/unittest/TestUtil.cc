@@ -233,7 +233,7 @@ TestUtil::testPagedArray()
 #endif
 
     {//serial PagedArray::push_back (check return value)
-        openvdb::util::PagedArray<int, size_t(8)> d;
+        openvdb::util::PagedArray<int, 8UL> d;
         CPPUNIT_ASSERT(d.isEmpty());
         CPPUNIT_ASSERT_EQUAL(size_t(0), d.size());
         CPPUNIT_ASSERT_EQUAL(size_t(8), d.log2PageSize());
