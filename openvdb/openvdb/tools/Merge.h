@@ -25,14 +25,18 @@ namespace OPENVDB_VERSION_NAME {
 namespace tools {
 
 
-/// @brief Convenience class that contains a pointer to a const or a non-const tree
-/// and a subset of methods to retrieve data from the tree.
+/// @brief Convenience class that contains a pointer to a tree to be stolen or
+/// deep copied depending on the tag dispatch class used and a subset of
+/// methods to retrieve data from the tree.
 ///
-/// @details This class has methods to extract data from the tree that will either
-/// result in stealing the data or deep-copying it depending on whether the
-/// DeepCopy or Steal tag dispatch class was used in its construction.
+/// @details The primary purpose of this class is to be able to create an array
+/// of TreeToMerge objects that each store a tree to be stolen or a tree to be
+/// deep-copied in an arbitrary order. Certain operations such as floating-point
+/// addition are non-associative so the order in which they are merged is
+/// important for the operation to remain deterministic regardless of how the
+/// data is being extracted from the tree.
 ///
-/// @details Stealing data requires a non-const tree pointer. There is a constructor
+/// @note Stealing data requires a non-const tree pointer. There is a constructor
 /// to pass in a tree shared pointer for cases where it is desirable for this class
 /// to maintain shared ownership.
 template <typename TreeT>
@@ -43,24 +47,24 @@ struct TreeToMerge
     using ValueType = typename TreeType::ValueType;
     using MaskTreeType = typename TreeT::template ValueConverter<ValueMask>::Type;
 
-    TreeToMerge() = default;
+    TreeToMerge() = delete;
 
     /// @brief Non-const pointer tree constructor for stealing data.
-    TreeToMerge(TreeType* tree, Steal)
-        : mTree(tree) { }
+    TreeToMerge(TreeType& tree, Steal)
+        : mTree(&tree), mSteal(true) { }
     /// @brief Non-const shared pointer tree constructor for stealing data.
     TreeToMerge(typename TreeType::Ptr treePtr, Steal)
-        : mTreePtr(treePtr), mTree(mTreePtr.get()) { }
+        : mTreePtr(treePtr), mTree(mTreePtr.get()), mSteal(true) { }
 
     /// @brief Const tree pointer constructor for deep-copying data. As the
     /// tree is not mutable and thus cannot be pruned, a lightweight mask tree
     /// with the same topology is created that can be pruned to use as a
     /// reference. Initialization of this mask tree can optionally be disabled
     /// for delayed construction.
-    TreeToMerge(const TreeType* constTree, DeepCopy, bool initialize = true)
-        : mConstTree(constTree)
+    TreeToMerge(const TreeType& tree, DeepCopy, bool initialize = true)
+        : mTree(&tree), mSteal(false)
     {
-        if (mConstTree && initialize)     this->initializeMask();
+        if (mTree && initialize)     this->initializeMask();
     }
 
     /// @brief Non-const tree pointer constructor for deep-copying data. The
@@ -68,23 +72,18 @@ struct TreeToMerge
     /// lightweight mask tree with the same topology is created that can be
     /// pruned to use as a reference. Initialization of this mask tree can
     /// optionally be disabled for delayed construction.
-    TreeToMerge(TreeType* tree, DeepCopy tag, bool initialize = true)
-        : TreeToMerge(static_cast<const TreeType*>(tree), tag, initialize) { }
+    TreeToMerge(TreeType& tree, DeepCopy tag, bool initialize = true)
+        : TreeToMerge(static_cast<const TreeType&>(tree), tag, initialize) { }
 
     /// @brief Reset the non-const tree shared pointer. This is primarily
     /// used to preserve the order of trees to merge in a container but have
     /// the data in the tree be lazily loaded or resampled.
-    void reset(typename TreeType::Ptr treePtr)
-    {
-        mTreePtr = treePtr;
-        mTree = mTreePtr.get();
-        mConstTree = nullptr;
-    }
+    void reset(typename TreeType::Ptr treePtr, Steal);
 
-    /// @brief Return a pointer to the non-const tree.
-    TreeType* tree() { return mTree; }
-    /// @brief Return a pointer to the const tree.
-    const TreeType* constTree() { return mConstTree; }
+    /// @brief Return a pointer to the tree to be stolen.
+    TreeType* treeToSteal() { return mSteal ? const_cast<TreeType*>(mTree) : nullptr; }
+    /// @brief Return a pointer to the tree to be deep-copied.
+    const TreeType* treeToDeepCopy() { return mSteal ? nullptr : mTree; }
 
     /// @brief Retrieve a const pointer to the root node.
     const RootNodeType* rootPtr() const;
@@ -113,15 +112,39 @@ struct TreeToMerge
     // returns true if mask has been initialized
     bool hasMask() const;
 
+    // returns MaskTree pointer or nullptr
+    MaskTreeType* mask() { return mMaskTree.ptr.get(); }
+    const MaskTreeType* mask() const { return mMaskTree.ptr.get(); }
+
 private:
+    struct MaskPtr;
     struct MaskUnionOp;
 
     typename TreeType::Ptr mTreePtr;
-    TreeType* mTree = nullptr;
-    const TreeType* mConstTree = nullptr;
-    typename MaskTreeType::Ptr mMaskTree;
+    const TreeType* mTree;
+    MaskPtr mMaskTree;
+    bool mSteal;
 }; // struct TreeToMerge
 
+
+/// @brief Wrapper around unique_ptr that deep-copies mask on copy construction
+template <typename TreeT>
+struct TreeToMerge<TreeT>::MaskPtr
+{
+    std::unique_ptr<MaskTreeType> ptr;
+
+    MaskPtr() = default;
+    ~MaskPtr() = default;
+    MaskPtr(MaskPtr&& other) = default;
+    MaskPtr& operator=(MaskPtr&& other) = default;
+    MaskPtr(const MaskPtr& other)
+        : ptr(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr) { }
+    MaskPtr& operator=(const MaskPtr& other)
+    {
+        ptr.reset(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr);
+        return *this;
+    }
+};
 
 /// @brief DynamicNodeManager operator used to generate a mask of the input
 /// tree, but with dense leaf nodes replaced with active tiles for compactness
@@ -162,12 +185,12 @@ struct CsgUnionOrIntersectionOp
     /// non-const tree with another. This constructor takes a Steal or DeepCopy
     /// tag dispatch class.
     template <typename TagT>
-    CsgUnionOrIntersectionOp(TreeT* tree, TagT tag) { mTreesToMerge.emplace_back(tree, tag); }
+    CsgUnionOrIntersectionOp(TreeT& tree, TagT tag) { mTreesToMerge.emplace_back(tree, tag); }
 
     /// @brief Convenience constructor to CSG union or intersect a single
     /// const tree with another. This constructor requires a DeepCopy tag
     /// dispatch class.
-    CsgUnionOrIntersectionOp(const TreeT* tree, DeepCopy tag) { mTreesToMerge.emplace_back(tree, tag); }
+    CsgUnionOrIntersectionOp(const TreeT& tree, DeepCopy tag) { mTreesToMerge.emplace_back(tree, tag); }
 
     /// @brief Constructor to CSG union or intersect a container of multiple
     /// const or non-const tree pointers. A Steal tag requires a container of
@@ -176,8 +199,10 @@ struct CsgUnionOrIntersectionOp
     template <typename TreesT, typename TagT>
     CsgUnionOrIntersectionOp(TreesT& trees, TagT tag)
     {
-        for (auto& tree : trees) {
-            mTreesToMerge.emplace_back(tree, tag);
+        for (auto* tree : trees) {
+            if (tree) {
+                mTreesToMerge.emplace_back(*tree, tag);
+            }
         }
     }
 
@@ -240,11 +265,11 @@ struct CsgDifferenceOp
     /// tree from another. This constructor takes a Steal or DeepCopy tag
     /// dispatch class.
     template <typename TagT>
-    CsgDifferenceOp(TreeT& tree, TagT tag) : mTree(&tree, tag) { }
+    CsgDifferenceOp(TreeT& tree, TagT tag) : mTree(tree, tag) { }
     /// @brief Convenience constructor to CSG difference a single const
     /// tree from another. This constructor requires an explicit DeepCopy tag
     /// dispatch class.
-    CsgDifferenceOp(const TreeT& tree, DeepCopy tag) : mTree(&tree, tag) { }
+    CsgDifferenceOp(const TreeT& tree, DeepCopy tag) : mTree(tree, tag) { }
 
     /// @brief Constructor to CSG difference the tree in a TreeToMerge object
     /// from another.
@@ -283,26 +308,35 @@ private:
 template<typename TreeT>
 void TreeToMerge<TreeT>::initializeMask()
 {
-    if (!mConstTree)    return;
-    mMaskTree.reset(new MaskTreeType);
-    MaskUnionOp op(*mConstTree);
-    tree::DynamicNodeManager<MaskTreeType, MaskTreeType::RootNodeType::LEVEL-1> manager(*mMaskTree);
+    if (mSteal)    return;
+    mMaskTree.ptr.reset(new MaskTreeType);
+    MaskUnionOp op(*mTree);
+    tree::DynamicNodeManager<MaskTreeType, MaskTreeType::RootNodeType::LEVEL-1> manager(*this->mask());
     manager.foreachTopDown(op);
 }
 
 template<typename TreeT>
 bool TreeToMerge<TreeT>::hasMask() const
 {
-    return bool(mMaskTree);
+    return bool(mMaskTree.ptr);
+}
+
+template<typename TreeT>
+void TreeToMerge<TreeT>::reset(typename TreeType::Ptr treePtr, Steal)
+{
+    if (!treePtr) {
+        OPENVDB_THROW(RuntimeError, "Cannot reset with empty Tree shared pointer.");
+    }
+    mSteal = true;
+    mTreePtr = treePtr;
+    mTree = mTreePtr.get();
 }
 
 template<typename TreeT>
 const typename TreeToMerge<TreeT>::RootNodeType*
 TreeToMerge<TreeT>::rootPtr() const
 {
-    if (mTree)               return &mTree->root();
-    else if (mConstTree)     return &mConstTree->root();
-    return nullptr;
+    return &mTree->root();
 }
 
 template<typename TreeT>
@@ -310,14 +344,9 @@ template<typename NodeT>
 const NodeT*
 TreeToMerge<TreeT>::probeConstNode(const Coord& ijk) const
 {
-    if (mTree)               return mTree->template probeConstNode<NodeT>(ijk);
-    else if (mConstTree) {
-        assert(mMaskTree);
-        // test mutable mask first, node may have already been pruned
-        if (!mMaskTree->isValueOn(ijk))    return nullptr;
-        return mConstTree->template probeConstNode<NodeT>(ijk);
-    }
-    return nullptr;
+    // test mutable mask first, node may have already been pruned
+    if (!mSteal && !this->mask()->isValueOn(ijk))    return nullptr;
+    return mTree->template probeConstNode<NodeT>(ijk);
 }
 
 template<typename TreeT>
@@ -325,17 +354,18 @@ template<typename NodeT>
 std::unique_ptr<NodeT>
 TreeToMerge<TreeT>::stealOrDeepCopyNode(const Coord& ijk)
 {
-    if (mTree) {
+    if (mSteal) {
+        TreeType* tree = const_cast<TreeType*>(mTree);
         return std::unique_ptr<NodeT>(
-            mTree->root().template stealNode<NodeT>(ijk, mTree->root().background(), false)
+            tree->root().template stealNode<NodeT>(ijk, mTree->root().background(), false)
         );
-    } else if (mConstTree) {
+    } else {
         auto* child = this->probeConstNode<NodeT>(ijk);
         if (child) {
-            assert(mMaskTree);
+            assert(this->hasMask());
             auto result = std::make_unique<NodeT>(*child);
             // prune mask tree
-            mMaskTree->addTile(NodeT::LEVEL, ijk, false, false);
+            this->mask()->addTile(NodeT::LEVEL, ijk, false, false);
             return result;
         }
     }
@@ -350,18 +380,19 @@ TreeToMerge<TreeT>::addTile(const Coord& ijk, const ValueType& value, bool activ
     // ignore leaf node tiles (values)
     if (NodeT::LEVEL == 0)  return;
 
-    if (mTree) {
-        auto* node = mTree->template probeNode<NodeT>(ijk);
+    if (mSteal) {
+        TreeType* tree = const_cast<TreeType*>(mTree);
+        auto* node = tree->template probeNode<NodeT>(ijk);
         if (node) {
             const Index pos = NodeT::coordToOffset(ijk);
             node->addTile(pos, value, active);
         }
-    } else if (mConstTree) {
-        auto* node = mConstTree->template probeConstNode<NodeT>(ijk);
+    } else {
+        auto* node = mTree->template probeConstNode<NodeT>(ijk);
         // prune mask tree
         if (node) {
-            assert(mMaskTree);
-            mMaskTree->addTile(NodeT::LEVEL, ijk, false, false);
+            assert(this->hasMask());
+            this->mask()->addTile(NodeT::LEVEL, ijk, false, false);
         }
     }
 }
@@ -488,7 +519,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
     const ValueT insideBackground = Union ? -this->background() : this->background();
     const ValueT outsideBackground = -insideBackground;
 
-    auto getTileFlag = [&](auto valueIter) -> uint8_t
+    auto getTileFlag = [&](auto& valueIter) -> uint8_t
     {
         uint8_t flag(0);
         const ValueT& value = valueIter.getValue();
@@ -718,10 +749,8 @@ template <typename TreeT, bool Union>
 const typename CsgUnionOrIntersectionOp<TreeT, Union>::ValueT&
 CsgUnionOrIntersectionOp<TreeT, Union>::background() const
 {
-    if (!mBackground) {
-        OPENVDB_THROW(RuntimeError, "Background value not set. "
-            "This operator is only intended to be used with foreachTopDown().");
-    }
+    // this operator is only intended to be used with foreachTopDown()
+    assert(mBackground);
     return *mBackground;
 }
 
@@ -743,7 +772,7 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
     constexpr uint8_t INSIDE_TILE = 0x2;
     constexpr uint8_t CHILD = 0x4;
 
-    auto getTileFlag = [&](auto valueIter) -> uint8_t
+    auto getTileFlag = [&](auto& valueIter) -> uint8_t
     {
         uint8_t flag(0);
         const ValueT& value = valueIter.getValue();
@@ -905,10 +934,8 @@ template <typename TreeT>
 const typename CsgDifferenceOp<TreeT>::ValueT&
 CsgDifferenceOp<TreeT>::background() const
 {
-    if (!mBackground) {
-        OPENVDB_THROW(RuntimeError, "Background value not set. "
-            "This operator is only intended to be used with foreachTopDown().");
-    }
+    // this operator is only intended to be used with foreachTopDown()
+    assert(mBackground);
     return *mBackground;
 }
 
@@ -916,10 +943,8 @@ template <typename TreeT>
 const typename CsgDifferenceOp<TreeT>::ValueT&
 CsgDifferenceOp<TreeT>::otherBackground() const
 {
-    if (!mOtherBackground) {
-        OPENVDB_THROW(RuntimeError, "Other background value not set. "
-            "This operator is only intended to be used with foreachTopDown().");
-    }
+    // this operator is only intended to be used with foreachTopDown()
+    assert(mOtherBackground);
     return *mOtherBackground;
 }
 
