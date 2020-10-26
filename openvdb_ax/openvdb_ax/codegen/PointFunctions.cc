@@ -21,7 +21,6 @@
 #include "../compiler/CompilerOptions.h"
 #include "../compiler/LeafLocalData.h"
 #include "../Exceptions.h"
-#include "../version.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
@@ -56,7 +55,7 @@ inline HandleT*
 groupHandle(const std::string& name, void** groupHandles, const void* const data)
 {
     const openvdb::points::AttributeSet* const attributeSet =
-        static_cast<const openvdb::points::AttributeSet* const>(data);
+        static_cast<const openvdb::points::AttributeSet*>(data);
 
     const size_t groupIdx = attributeSet->groupOffset(name);
     if (groupIdx == openvdb::points::AttributeSet::INVALID_POS) return nullptr;
@@ -89,7 +88,7 @@ inline FunctionGroup::Ptr ax_ingroup(const FunctionOptions& op)
         // If the handle doesn't exist, check to see if any new groups have
         // been added
         const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData* const>(leafDataPtr);
+            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
         handle = leafData->get(nameStr);
         return handle ? handle->get(static_cast<openvdb::Index>(index)) : false;
     };
@@ -180,7 +179,7 @@ inline FunctionGroup::Ptr axeditgroup(const FunctionOptions& op)
 
         if (!handle) {
             openvdb::ax::compiler::LeafLocalData* const leafData =
-                static_cast<openvdb::ax::compiler::LeafLocalData* const>(leafDataPtr);
+                static_cast<openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
 
             // If we are setting membership and the handle doesnt exist, create in in
             // the set of new data thats being added
@@ -357,7 +356,7 @@ inline FunctionGroup::Ptr axsetattribute(const FunctionOptions& op)
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
         openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<openvdb::ax::compiler::LeafLocalData* const>(leafDataPtr);
+            static_cast<openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
 
         // Check to see if the string exists in the metadata cache. If so, set the string and
         // remove any new data associated with it, otherwise set the new data
@@ -474,7 +473,7 @@ inline FunctionGroup::Ptr axgetattribute(const FunctionOptions& op)
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
         const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData* const>(leafDataPtr);
+            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
 
         std::string data;
         if (!leafData->getNewStringData(&(handle->array()), index, data)) {
@@ -555,7 +554,7 @@ inline FunctionGroup::Ptr axstrattribsize(const FunctionOptions& op)
         const AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
         const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData* const>(leafDataPtr);
+            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
 
         std::string data;
         if (!leafData->getNewStringData(&(handle->array()), index, data)) {

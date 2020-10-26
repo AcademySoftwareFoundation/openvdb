@@ -13,8 +13,11 @@
 #ifndef OPENVDB_AX_CODEGEN_GENERIC_FUNCTIONS_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_GENERIC_FUNCTIONS_HAS_BEEN_INCLUDED
 
+#include "FunctionRegistry.h"
+
 #include "../compiler/CompilerOptions.h"
-#include "../codegen/FunctionRegistry.h"
+
+#include <openvdb/version.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -65,10 +68,10 @@ inline FunctionRegistry::UniquePtr createDefaultRegistry(const FunctionOptions* 
     return registry;
 }
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_CODEGEN_GENERIC_FUNCTIONS_HAS_BEEN_INCLUDED
 

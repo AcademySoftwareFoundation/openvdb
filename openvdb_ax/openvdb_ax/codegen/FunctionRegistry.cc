@@ -22,7 +22,7 @@ void FunctionRegistry::insert(const std::string& identifier,
     if (!mMap.emplace(std::piecewise_construct,
               std::forward_as_tuple(identifier),
               std::forward_as_tuple(creator, internal)).second) {
-        OPENVDB_THROW(LLVMFunctionError, "A function already exists"
+        OPENVDB_THROW(AXCompilerError, "A function already exists"
             " with the provided identifier: \"" + identifier + "\"");
     }
 }
@@ -36,7 +36,7 @@ void FunctionRegistry::insertAndCreate(const std::string& identifier,
               std::forward_as_tuple(identifier),
               std::forward_as_tuple(creator, internal));
     if (!inserted.second) {
-        OPENVDB_THROW(LLVMFunctionError, "A function already exists"
+        OPENVDB_THROW(AXCompilerError, "A function already exists"
             " with the provided token: \"" + identifier + "\"");
     }
     inserted.first->second.create(op);
@@ -113,8 +113,8 @@ void FunctionRegistry::createAll(const FunctionOptions& op, const bool verify)
     }
 }
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 

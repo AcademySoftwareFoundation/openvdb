@@ -1,63 +1,91 @@
 
-name: ax
+name: AX
 
 on:
   push:
     branches:
       - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb/doc/**'
+      - 'openvdb_maya/**'
+      - '**/*.md'
   pull_request:
     branches:
       - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb/doc/**'
+      - 'openvdb_maya/**'
+      - '**/*.md'
   schedule:
     # run this workflow every midnight Tuesday
     - cron:  '0 0 * * 2'
 
 jobs:
-  linux-core:
+  linux-ax-vfx:
     runs-on: ubuntu-16.04
-    name: linux-vfx:${{ matrix.image }}-compiler:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    name: linux-ax-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-${{ matrix.build }}
     container:
-      image: aswf/ci-vfxall:${{ matrix.image }}
+      image: aswf/ci-openvdb:${{ matrix.image }}
     env:
       CXX: ${{ matrix.compiler }}
-      LLVM_DIR: /github/home/llvm-${{ matrix.llvm }}-${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2019', '2020']
-        compiler: ['g++', 'clang++']
+        image: ['2019-clang8', '2020-clang7', '2021-clang10']
+        compiler: ['clang++', 'g++']
         build: ['Release']
-        llvm: ['6.0.0','7.0.0','8.0.0','9.0.0','10.0.0']
-        # Debug builds
+        # Extra builds
         include:
-          - image: '2020'
-            compiler: 'g++'
-            build: 'Debug'
-            llvm: '8.0.0'
-          - image: '2020'
+          - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
-            llvm: '8.0.0'
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
-      # Setup
-      - name: llvm_cache
-        id: llvm_cache
-        uses: actions/cache@v2
-        with:
-          key: ${{ env.LLVM_DIR }}
-          path: ${{ env.LLVM_DIR }}
-      - name: install_llvm
-        if: steps.llvm_cache.outputs.cache-hit != 'true'
-        run: ./ci/install_llvm.sh ${{ matrix.llvm }} ${{ env.LLVM_DIR }}
-      - name: install_libedit
-        run: yum -y install libedit-devel
       # Build
       - name: build
         run: |
-          ./ci/build_ax.sh \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
-            -DLLVM_DIR=${{ env.LLVM_DIR }}
+          ./ci/build.sh ${{ matrix.build }} None ON None "core,axcore,axbin,axtest" \
+            -DOPENVDB_CXX_STRICT=ON
+      # Tests
+      - name: test
+        run: cd build && ctest -V
+      - name: test_doxygen_examples
+        run: ./ci/extract_test_examples.sh
+
+  linux-ax-standalone-vfx:
+    runs-on: ubuntu-16.04
+    name: linux-ax-standalone-vfx:${{ matrix.image }}-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    container:
+      image: aswf/ci-openvdb:${{ matrix.image }}
+    env:
+      CXX: ${{ matrix.compiler }}
+    strategy:
+      matrix:
+        image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
+        compiler: ['clang++']
+        build: ['Release']
+        # Extra builds
+        include:
+          - image: '2020-clang7'
+            compiler: 'g++'
+            build: 'Release'
+          - image: '2020-clang7'
+            compiler: 'clang++'
+            build: 'Debug'
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      # Build
+      - name: vdb
+        run: |
+          ./ci/build.sh ${{ matrix.build }} None ON None "core" -DOPENVDB_CXX_STRICT=ON
+          rm -rf build
+      - name: build
+        run: |
+          ./ci/build.sh ${{ matrix.build }} None ON None "axcore,axbin,axtest" \
+            -DOPENVDB_CXX_STRICT=ON
       # Tests
       - name: test
         run: cd build && ctest -V
@@ -66,18 +94,18 @@ jobs:
 
   macos-core:
     runs-on: macos-10.15
-    name: macos-compiler:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    name: macos-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
     env:
       CXX: ${{ matrix.compiler }}
     strategy:
       matrix:
-        compiler: ['g++', 'clang++']
+        compiler: ['clang++']
         build: ['Release']
-        llvm: ['6','7','8','9','10']
-        # Debug builds
+        llvm: ['7','8','9','10']
+        # Extra builds
         include:
           - compiler: 'g++'
-            build: 'Debug'
+            build: 'Release'
             llvm: '8'
           - compiler: 'clang++'
             build: 'Debug'
@@ -88,13 +116,10 @@ jobs:
       # Setup
       - name: install_deps
         run: ./ci/install_macos_ax.sh ${{ matrix.llvm }}
-      - name: install_openvdb
-        run: ./ci/install_openvdb.sh 7.0.0 $HOME/openvdb-7.0.0-${{ matrix.compiler }}
       # Build
       - name: build
         run: |
-          ./ci/build_ax.sh \
-            -DCMAKE_BUILD_TYPE=${{ matrix.build }} \
+          ./ci/build.sh ${{ matrix.build }} None ON None "core,axcore,axbin,axtest" \
             -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm \
             -DOPENVDB_ROOT=$HOME/openvdb-7.0.0-${{ matrix.compiler }}
       # Tests

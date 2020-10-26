@@ -4,13 +4,13 @@
 #include "TestHarness.h"
 #include "util.h"
 
-#include "../ax.h"
-#include "../codegen/Types.h"
-#include "../codegen/Functions.h"
-#include "../codegen/FunctionRegistry.h"
-#include "../codegen/FunctionTypes.h"
-#include "../compiler/PointExecutable.h"
-#include "../compiler/VolumeExecutable.h"
+#include <openvdb_ax/ax.h>
+#include <openvdb_ax/codegen/Types.h>
+#include <openvdb_ax/codegen/Functions.h>
+#include <openvdb_ax/codegen/FunctionRegistry.h>
+#include <openvdb_ax/codegen/FunctionTypes.h>
+#include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/compiler/VolumeExecutable.h>
 
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/PointConversion.h>
@@ -255,7 +255,7 @@ TestVDBFunctions::ingroupOrder()
     mHarness.addInputGroups({"b", "a"}, {false, true});
     mHarness.addExpectedGroups({"b", "a"}, {false, true});
 
-    mHarness.executeCode("test/snippets/vdb_functions/ingroup", nullptr, nullptr, true);
+    mHarness.executeCode("test/snippets/vdb_functions/ingroup", nullptr, true);
     AXTESTS_STANDARD_ASSERT();
 }
 
@@ -270,10 +270,9 @@ TestVDBFunctions::ingroup()
     // compile and execute
 
     openvdb::ax::Compiler compiler;
-    openvdb::ax::CustomData::Ptr customData = openvdb::ax::CustomData::create();
     std::string code = unittest_util::loadText("test/snippets/vdb_functions/ingroup");
     openvdb::ax::PointExecutable::Ptr executable =
-        compiler.compile<openvdb::ax::PointExecutable>(code, customData);
+        compiler.compile<openvdb::ax::PointExecutable>(code);
 
     CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
 
@@ -299,7 +298,7 @@ TestVDBFunctions::ingroup()
     openvdb::points::appendGroup(pointTree, "testGroup");
     setGroup(pointTree, "testGroup", false);
 
-    executable = compiler.compile<openvdb::ax::PointExecutable>(code, customData);
+    executable = compiler.compile<openvdb::ax::PointExecutable>(code);
     CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid1));
 
     for (auto leafIter = pointTree.cbeginLeaf(); leafIter; ++leafIter) {
@@ -343,8 +342,7 @@ TestVDBFunctions::ingroup()
     std::vector<short> membershipTestGroup2{0, 0, 1, 0};
     openvdb::points::setGroup(*pointDataTree2, pointIndexGrid->tree(), membershipTestGroup2, "testGroup2");
 
-    customData->reset();
-    executable = compiler.compile<openvdb::ax::PointExecutable>(code, customData);
+    executable = compiler.compile<openvdb::ax::PointExecutable>(code);
     CPPUNIT_ASSERT_NO_THROW(executable->execute(*pointDataGrid2));
 
     auto leafIter2 = pointDataTree2->cbeginLeaf();

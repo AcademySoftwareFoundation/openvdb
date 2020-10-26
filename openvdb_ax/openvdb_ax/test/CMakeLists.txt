@@ -35,6 +35,7 @@ set(TEST_SOURCE_FILES
   backend/TestFunctionGroup.cc
   backend/TestFunctionRegistry.cc
   backend/TestFunctionTypes.cc
+  backend/TestLogger.cc
   backend/TestSymbolTable.cc
   backend/TestTypes.cc
   compiler/TestPointExecutable.cc
@@ -95,9 +96,6 @@ target_include_directories(vdb_ax_test
 
 if(OPENVDB_AX_TEST_PROFILE)
   target_compile_definitions(vdb_ax_test PRIVATE "-DPROFILE")
-endif()
-if(NOT MATRIX_SUPPORT)
-  target_compile_definitions(vdb_ax_test PRIVATE -DOPENVDB_AX_NO_MATRIX)
 endif()
 
 add_test(NAME vdb_ax_unit_test COMMAND vdb_ax_test -v WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../)

@@ -3,7 +3,7 @@
 
 #include "util.h"
 
-#include "../codegen/FunctionTypes.h"
+#include <openvdb_ax/codegen/FunctionTypes.h>
 
 #include <cppunit/extensions/HelperMacros.h>
 
@@ -1863,7 +1863,7 @@ TestFunctionTypes::testIRFunctions()
     CPPUNIT_ASSERT(!M.getFunction("ax.ir.retnull.test"));
     // will throw as the function expects a float ret, not void or null
     // NOTE: The function will still be created, but be in an invaid state
-    CPPUNIT_ASSERT_THROW(test->create(M), openvdb::LLVMFunctionError);
+    CPPUNIT_ASSERT_THROW(test->create(M), openvdb::AXCodeGenError);
     function = M.getFunction("ax.ir.retnull.test");
     CPPUNIT_ASSERT(function);
 

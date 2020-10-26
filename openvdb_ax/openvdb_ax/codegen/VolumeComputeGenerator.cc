@@ -4,7 +4,6 @@
 /// @file codegen/VolumeComputeGenerator.cc
 
 #include "VolumeComputeGenerator.h"
-
 #include "FunctionRegistry.h"
 #include "FunctionTypes.h"
 #include "Types.h"
@@ -46,8 +45,8 @@ std::string VolumeKernel::getDefaultName() { return "ax.compute.voxel"; }
 VolumeComputeGenerator::VolumeComputeGenerator(llvm::Module& module,
                                                const FunctionOptions& options,
                                                FunctionRegistry& functionRegistry,
-                                               std::vector<std::string>* const warnings)
-    : ComputeGenerator(module, options, functionRegistry, warnings) {}
+                                               Logger& logger)
+    : ComputeGenerator(module, options, functionRegistry, logger) {}
 
 AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
 {
@@ -101,8 +100,9 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
     }
 
     // full code generation
+    // errors can stop traversal, but dont always, so check the log
 
-    this->traverse(&tree);
+    if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
 
     // insert set code
 
@@ -264,8 +264,8 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
 ///////////////////////////////////////////////////////////////////////////
 
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
