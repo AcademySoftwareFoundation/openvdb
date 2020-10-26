@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/points/PointDataGrid.h>
-#include "../compiler/Compiler.h"
+#include <openvdb_ax/compiler/Compiler.h>
 
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/logging.h>
+
 #include <cppunit/CompilerOutputter.h>
 #include <cppunit/TestFailure.h>
 #include <cppunit/TestListener.h>
@@ -15,6 +16,7 @@
 #include <cppunit/TextTestProgressListener.h>
 #include <cppunit/extensions/TestFactoryRegistry.h>
 #include <cppunit/ui/text/TestRunner.h>
+
 #include <algorithm> // for std::shuffle()
 #include <cmath> // for std::round()
 #include <cstdlib> // for EXIT_SUCCESS

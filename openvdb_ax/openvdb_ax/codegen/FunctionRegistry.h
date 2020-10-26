@@ -15,8 +15,9 @@
 #include "FunctionTypes.h"
 #include "Types.h"
 
-#include "../version.h"
 #include "../compiler/CompilerOptions.h"
+
+#include <openvdb/version.h>
 
 #include <unordered_map>
 
@@ -143,10 +144,10 @@ private:
     RegistryMap mMap;
 };
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_CODEGEN_FUNCTION_REGISTRY_HAS_BEEN_INCLUDED
 

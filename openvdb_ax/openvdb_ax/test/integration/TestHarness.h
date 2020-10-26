@@ -12,9 +12,9 @@
 
 #include "CompareGrids.h"
 
-#include "../ast/Tokens.h"
-#include "../compiler/Compiler.h"
-#include "../compiler/CustomData.h"
+#include <openvdb_ax/ast/Tokens.h>
+#include <openvdb_ax/compiler/Compiler.h>
+#include <openvdb_ax/compiler/CustomData.h>
 
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointScatter.h>
@@ -30,24 +30,20 @@ namespace unittest_util
 
 std::string loadText(const std::string& codeFileName);
 
-void wrapExecution(openvdb::points::PointDataGrid& grid,
+bool wrapExecution(openvdb::points::PointDataGrid& grid,
                    const std::string& codeFileName,
-                   const std::string * const group = nullptr,
-                   std::vector<std::string>* warnings = nullptr,
-                   const openvdb::ax::CustomData::Ptr& data =
-                       openvdb::ax::CustomData::create(),
-                   const openvdb::ax::CompilerOptions& opts =
-                       openvdb::ax::CompilerOptions(),
-                   const bool createMissing = true);
+                   const std::string * const group,
+                   openvdb::ax::Logger& logger,
+                   const openvdb::ax::CustomData::Ptr& data,
+                   const openvdb::ax::CompilerOptions& opts,
+                   const bool createMissing);
 
-void wrapExecution(openvdb::GridPtrVec& grids,
+bool wrapExecution(openvdb::GridPtrVec& grids,
                    const std::string& codeFileName,
-                   std::vector<std::string>* warnings = nullptr,
-                   const openvdb::ax::CustomData::Ptr& data =
-                       openvdb::ax::CustomData::create(),
-                   const openvdb::ax::CompilerOptions& opts =
-                       openvdb::ax::CompilerOptions(),
-                   const bool createMissing = false);
+                   openvdb::ax::Logger& logger,
+                   const openvdb::ax::CustomData::Ptr& data,
+                   const openvdb::ax::CompilerOptions& opts,
+                   const bool createMissing);
 
 /// @brief Structure for wrapping up most of the existing integration
 ///        tests with a simple interface
@@ -63,6 +59,7 @@ struct AXTestHarness
       , mVolumeBounds({0,0,0},{0,0,0})
       , mOpts(openvdb::ax::CompilerOptions())
       , mCustomData(openvdb::ax::CustomData::create())
+      , mLogger([](const std::string&) {})
     {
         reset();
     }
@@ -137,9 +134,8 @@ struct AXTestHarness
     }
 
     /// @brief excecutes a snippet of code contained in a file to the input data sets
-    void executeCode(const std::string& codeFile,
-                     const std::string * const group = nullptr,
-                     std::vector<std::string>* warnings = nullptr,
+    bool executeCode(const std::string& codeFile,
+                     const std::string* const group = nullptr,
                      const bool createMissing = false);
 
     /// @brief rebuilds the input and output data sets to their default harness states. This
@@ -189,7 +185,7 @@ struct AXTestHarness
 
     openvdb::ax::CompilerOptions mOpts;
     openvdb::ax::CustomData::Ptr mCustomData;
-
+    openvdb::ax::Logger mLogger;
 };
 
 class AXTestCase : public CppUnit::TestCase
@@ -244,7 +240,9 @@ public:
         mTestFiles[filename] = true; // has been used
 
           // execute
-        mHarness.executeCode(this->dir() + "/" + filename, args...);
+        const bool success = mHarness.executeCode(this->dir() + "/" + filename, args...);
+        CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + filename, success);
+        //@todo: print error message here
 
         // check
         std::stringstream out;

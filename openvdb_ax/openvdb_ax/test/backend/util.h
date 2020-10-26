@@ -4,7 +4,7 @@
 #ifndef OPENVDB_AX_UNITTEST_BACKEND_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_UNITTEST_BACKEND_UTIL_HAS_BEEN_INCLUDED
 
-#include "../codegen/Types.h"
+#include <openvdb_ax/codegen/Types.h>
 
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>

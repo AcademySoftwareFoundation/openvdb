@@ -54,7 +54,7 @@ TestString::testAssignFromAttributes()
     mHarness.addInputVolumes<std::string>(unittest_util::nameSequence("string_test", 6),
         {"test", "test", "new value", "new value", "", ""});
 
-    mHarness.executeCode("test/snippets/string/assignFromAttributes", nullptr, nullptr, true);
+    mHarness.executeCode("test/snippets/string/assignFromAttributes", nullptr, true);
     AXTESTS_STANDARD_ASSERT();
 }
 
@@ -76,7 +76,7 @@ TestString::testAssignNewOverwrite()
     mHarness.addInputVolumes<std::string>({"string_test1", "string_test2"},
         {"next_value", "new_value"});
 
-    mHarness.executeCode("test/snippets/string/assignNewOverwrite", nullptr, nullptr, true);
+    mHarness.executeCode("test/snippets/string/assignNewOverwrite", nullptr, true);
     AXTESTS_STANDARD_ASSERT();
 }
 
@@ -89,7 +89,7 @@ TestString::testBinaryConcat()
     mHarness.addInputVolumes<std::string>(unittest_util::nameSequence("string_test", 6),
         {"test new value", "test new value", "test new value", "test new value", "", "test new value"});
 
-    mHarness.executeCode("test/snippets/string/binaryConcat", nullptr, nullptr, true);
+    mHarness.executeCode("test/snippets/string/binaryConcat", nullptr, true);
     AXTESTS_STANDARD_ASSERT();
 }
 

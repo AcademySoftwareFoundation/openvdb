@@ -7,8 +7,7 @@
 ///
 /// @brief  Provides the definition for every abstract and concrete derived
 ///   class which represent a particular abstract syntax tree (AST) node
-///   type. Also provides access to the parser for generating a fully
-///   constructed AST from a given string.
+///   type.
 ///
 ///   AST nodes represents a particular branch of a complete AST. Concrete
 ///   nodes can be thought of as leaf node types which hold semantic
@@ -28,9 +27,10 @@
 #ifndef OPENVDB_AX_AST_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AST_HAS_BEEN_INCLUDED
 
-#include "Tokens.h"
 #include "Literals.h"
-#include "../version.h"
+#include "Tokens.h"
+
+#include <openvdb/version.h>
 
 #include <memory>
 #include <utility>
@@ -49,16 +49,6 @@ namespace ast {
 ///         node type (in terms of hierarchy) which represent a full AX file.
 ///         They are always returned from the parser.
 struct Tree;
-
-/// @brief  Construct an abstract syntax tree from a code snippet. If the code
-///         is not well formed, as defined b the AX grammar, a runtime exception
-///         will be thrown with the first lexer or parsing error.
-///
-/// @return A shared pointer to a valid AST.
-///
-/// @param code  The code to parse
-std::shared_ptr<Tree> parse(const char* code);
-
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -2401,14 +2391,14 @@ private:
     const Type mValue;
 };
 
+// fwd declaration for backwards compatibility, see Parse.h/.cc for definition
+openvdb::ax::ast::Tree::Ptr parse(const char* code);
+
 } // namespace ast
 } // namespace ax
 
-}
+} // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
-
-extern FILE* yyin;
-extern int yyparse(openvdb::ax::ast::Tree** tree);
 
 #endif // OPENVDB_AX_AST_HAS_BEEN_INCLUDED
 

@@ -6,7 +6,6 @@
 #include "VolumeExecutable.h"
 
 #include "../Exceptions.h"
-
 // @TODO refactor so we don't have to include VolumeComputeGenerator.h,
 // but still have the functions defined in one place
 #include "../codegen/VolumeComputeGenerator.h"
@@ -31,7 +30,7 @@ namespace OPENVDB_VERSION_NAME {
 /// If no matrix support exists in the core library, enable these
 /// inline operators for this translation unit to allow AX to build
 /// the volume executable with matrix support
-#ifdef OPENVDB_AX_NO_MATRIX
+#ifndef OPENVDB_HAS_MATRIX_SUPPORT
 namespace math {
 #define MATRIX_OPS(TYPE) \
 inline TYPE operator+(const TYPE&, const float&) { throw std::runtime_error("Invalid Matrix op+ called."); } \
@@ -45,7 +44,7 @@ MATRIX_OPS(Mat4<double>)
 MATRIX_OPS(Mat4<float>)
 #undef MATRIX_OPS
 }
-#endif // OPENVDB_AX_NO_MATRIX
+#endif // OPENVDB_HAS_MATRIX_SUPPORT
 
 
 namespace ax {
@@ -389,11 +388,11 @@ void registerVolumes(GridPtrVec& grids,
             }
         }
         if (!matchedName && !matchedGrid) {
-            OPENVDB_THROW(LookupError, "Missing grid \"" +
+            OPENVDB_THROW(AXExecutionError, "Missing grid \"" +
                 ast::tokens::typeStringFromToken(iter.type()) + "@" + iter.name() + "\".");
         }
         if (matchedName && !matchedGrid) {
-            OPENVDB_THROW(TypeError, "Mismatching grid access type. \"@" + iter.name() +
+            OPENVDB_THROW(AXExecutionError, "Mismatching grid access type. \"@" + iter.name() +
                 "\" exists but has been accessed with type \"" +
                 ast::tokens::typeStringFromToken(iter.type()) + "\".");
         }
@@ -401,7 +400,7 @@ void registerVolumes(GridPtrVec& grids,
         assert(matchedGrid);
 
         if (!supported(type)) {
-            OPENVDB_THROW(TypeError, "Could not register volume '"
+            OPENVDB_THROW(AXExecutionError, "Could not register volume '"
                 + matchedGrid->getName() + "' as it has an unknown or unsupported value type '"
                 + matchedGrid->valueType() + "'");
         }
@@ -488,7 +487,7 @@ inline void run(const openvdb::GridPtrVec& writeableGrids,
             run<IterT, GridType>(*grid, readptrs.data(), kernel, registry, custom, S);
         });
         if (!success) {
-            OPENVDB_THROW(TypeError, "Could not retrieve volume '" + grid->getName()
+            OPENVDB_THROW(AXExecutionError, "Could not retrieve volume '" + grid->getName()
                 + "' as it has an unknown or unsupported value type '" + grid->valueType()
                 + "'");
         }
@@ -536,7 +535,7 @@ void VolumeExecutable::execute(openvdb::GridPtrVec& grids) const
     }
     if (kernel == nullptr) {
         OPENVDB_THROW(AXCompilerError,
-            "No code has been successfully compiled for execution.");
+            "No AX kernel found for execution.");
     }
 
     if (mSettings->mValueIterator == IterType::ON)
@@ -655,7 +654,7 @@ size_t VolumeExecutable::getGrainSize() const
 }
 
 
-}
-}
-}
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 

@@ -7,7 +7,7 @@
 
 #include <openvdb/points/PointDataGrid.h>
 
-#ifdef OPENVDB_AX_NO_MATRIX
+#ifndef OPENVDB_HAS_MATRIX_SUPPORT
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -34,12 +34,54 @@ template <> bool isApproxEqual<Mat4d>(const Mat4d& a, const Mat4d& b, const Mat4
 }
 }
 }
-#endif // OPENVDB_AX_NO_MATRIX
+#endif // OPENVDB_HAS_MATRIX_SUPPORT
 
 namespace unittest_util
 {
 
+#if (OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER == 7 && \
+     OPENVDB_LIBRARY_MINOR_VERSION_NUMBER == 1)
+// Issue with TypeList where Unqiue defines recursively in 7.1
+template <typename... Ts> struct TListFix;
+
+template<typename ListT, typename... Ts> struct TSAppendImpl;
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TListFix<Ts...>, OtherTs...> { using type = TListFix<Ts..., OtherTs...>; };
+template<typename... Ts, typename... OtherTs>
+struct TSAppendImpl<TListFix<Ts...>, TListFix<OtherTs...>> { using type = TListFix<Ts..., OtherTs...>; };
+
+template<typename ListT, typename T> struct TSEraseImpl;
+template<typename T> struct TSEraseImpl<TListFix<>, T> { using type = TListFix<>; };
+template<typename... Ts, typename T>
+struct TSEraseImpl<TListFix<T, Ts...>, T> { using type = typename TSEraseImpl<TListFix<Ts...>, T>::type; };
+template<typename T2, typename... Ts, typename T>
+struct TSEraseImpl<TListFix<T2, Ts...>, T> {
+    using type = typename TSAppendImpl<TListFix<T2>,
+        typename TSEraseImpl<TListFix<Ts...>, T>::type>::type;
+};
+
+template<typename ListT, typename... Ts> struct TSRemoveImpl;
+template<typename ListT> struct TSRemoveImpl<ListT> { using type = ListT; };
+template<typename ListT, typename T, typename... Ts>
+struct TSRemoveImpl<ListT, T, Ts...> { using type = typename TSRemoveImpl<typename TSEraseImpl<ListT, T>::type, Ts...>::type; };
+template<typename ListT, typename... Ts>
+struct TSRemoveImpl<ListT, TListFix<Ts...>> { using type = typename TSRemoveImpl<ListT, Ts...>::type; };
+
+template <typename... Ts>
+struct TListFix
+{
+    using Self = TListFix;
+    template<typename... TypesToRemove>
+    using Remove = typename TSRemoveImpl<Self, TypesToRemove...>::type;
+    template<typename... TypesToAppend>
+    using Append = typename TSAppendImpl<Self, TypesToAppend...>::type;
+    template<typename OpT>
+    static void foreach(OpT op) { openvdb::internal::TSForEachImpl<OpT, Ts...>(op); }
+};
+using TypeList = TListFix<
+#else
 using TypeList = openvdb::TypeList<
+#endif
     double,
     float,
     int64_t,

@@ -15,6 +15,8 @@
 #include "AST.h"
 #include "Visitor.h"
 
+#include <openvdb/version.h>
+
 #include <string>
 
 namespace openvdb {
@@ -193,10 +195,10 @@ inline void visitNodeType(const ast::Node& node, const OpT& op)
     visitOp.traverse(&node);
 }
 
-}
-}
-}
-}
+} // namespace ast
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_COMPILER_AST_SCANNERS_HAS_BEEN_INCLUDED
 

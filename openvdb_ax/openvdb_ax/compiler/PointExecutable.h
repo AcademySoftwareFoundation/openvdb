@@ -12,10 +12,11 @@
 #ifndef OPENVDB_AX_COMPILER_POINT_EXECUTABLE_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_POINT_EXECUTABLE_HAS_BEEN_INCLUDED
 
-#include "../compiler/CustomData.h"
-#include "../compiler/AttributeRegistry.h"
+#include "CustomData.h"
+#include "AttributeRegistry.h"
 
 #include <openvdb/openvdb.h>
+#include <openvdb/version.h>
 #include <openvdb/points/PointDataGrid.h>
 
 #include <unordered_map>
@@ -140,9 +141,9 @@ private:
     std::unique_ptr<Settings> mSettings;
 };
 
-}
-}
-}
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_COMPILER_POINT_EXECUTABLE_HAS_BEEN_INCLUDED
 

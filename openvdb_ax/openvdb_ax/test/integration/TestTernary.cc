@@ -86,3 +86,4 @@ TestTernary::testTernaryVoid()
 
     AXTESTS_STANDARD_ASSERT();
 }
+

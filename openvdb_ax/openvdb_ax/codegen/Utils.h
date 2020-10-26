@@ -17,6 +17,8 @@
 #include "../ast/Tokens.h"
 #include "../Exceptions.h"
 
+#include <openvdb/version.h>
+
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/LLVMContext.h>
 
@@ -197,7 +199,7 @@ typePrecedence(llvm::Type* const typeA,
     typeB->print(llvm::errs());
     std::cerr << std::endl;
 
-    OPENVDB_THROW(LLVMTypeError, "Invalid type precedence");
+    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type precedence");
 }
 
 /// @brief  Returns a CastFunction which represents the corresponding instruction
@@ -287,7 +289,7 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
     targetType->print(llvm::errs());
     std::cerr << std::endl;
 
-    OPENVDB_THROW(LLVMTypeError, "Invalid type conversion");
+    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type conversion");
 }
 
 /// @brief  Returns a BinaryFunction representing the corresponding instruction to
@@ -320,7 +322,7 @@ llvmBinaryConversion(const llvm::Type* const type,
     if (type->isFloatingPointTy()) {
         const ast::tokens::OperatorType opType = ast::tokens::operatorType(token);
         if (opType == ast::tokens::LOGICAL || opType == ast::tokens::BITWISE) {
-            OPENVDB_THROW(LLVMBinaryOperationError, "Unable to perform operation \""
+            OPENVDB_THROW(AXCodeGenError, "Unable to perform operation \""
                 + ast::tokens::operatorNameFromToken(token) + "\" on floating points values");
         }
 
@@ -335,7 +337,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::LESSTHAN)        return BIND_BINARY_OP(CreateFCmpOLT);
         else if (token == ast::tokens::MORETHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOGE);
         else if (token == ast::tokens::LESSTHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOLE);
-        OPENVDB_THROW(LLVMTokenError, "Unrecognised binary operator \"" +
+        OPENVDB_THROW(AXCodeGenError, "Unrecognised binary operator \"" +
             ast::tokens::operatorNameFromToken(token) + "\"");
     }
     else if (type->isIntegerTy()) {
@@ -357,7 +359,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::BITAND)           return BIND_BINARY_OP(CreateAnd);
         else if (token == ast::tokens::BITOR)            return BIND_BINARY_OP(CreateOr);
         else if (token == ast::tokens::BITXOR)           return BIND_BINARY_OP(CreateXor);
-        OPENVDB_THROW(LLVMTokenError, "Unrecognised binary operator \"" +
+        OPENVDB_THROW(AXCodeGenError, "Unrecognised binary operator \"" +
             ast::tokens::operatorNameFromToken(token) + "\"");
     }
 
@@ -369,7 +371,7 @@ llvmBinaryConversion(const llvm::Type* const type,
 
     type->print(llvm::errs());
 
-    OPENVDB_THROW(LLVMTypeError, "Invalid type for binary operation");
+    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type for binary operation");
 }
 
 /// @brief  Returns true if the llvm Type 'from' can be safely cast to the llvm
@@ -558,7 +560,7 @@ boolComparison(llvm::Value* value,
     type->print(llvm::errs());
     std::cerr << std::endl;
 
-    OPENVDB_THROW(LLVMTypeError, "Invalid type for bool conversion");
+    OPENVDB_THROW(AXCodeGenError, "Invalid type for bool conversion");
 }
 
 /// @ brief  Performs a binary operation on two loaded llvm scalar values. The type of
@@ -584,7 +586,7 @@ binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
         llvm::raw_string_ostream os(error);
         os << "LHS Type: "; lhsType->print(os); os << ", ";
         os << "RHS Type: "; rhs->getType()->print(os); os << " ";
-        OPENVDB_THROW(LLVMTypeError, "Mismatching argument types for binary operation \"" +
+        OPENVDB_THROW(AXCodeGenError, "Mismatching argument types for binary operation \"" +
             ast::tokens::operatorNameFromToken(token) + "\". " + os.str());
     }
 
@@ -817,10 +819,10 @@ scalarToMatrix(llvm::Value* scalar,
     return array;
 }
 
-}
-}
-}
-}
+} // namespace codegen
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_CODEGEN_UTILS_HAS_BEEN_INCLUDED
 

@@ -12,6 +12,7 @@
 #define OPENVDB_AX_COMPILER_COMPILER_OPTIONS_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
+#include <openvdb/version.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -66,9 +67,9 @@ struct CompilerOptions
     FunctionOptions mFunctionOptions = FunctionOptions();
 };
 
-}
-}
-}
+} // namespace ax
+} // namespace OPENVDB_VERSION_NAME
+} // namespace openvdb
 
 #endif // OPENVDB_AX_COMPILER_FUNCTION_REGISTRY_OPTIONS_HAS_BEEN_INCLUDED
 

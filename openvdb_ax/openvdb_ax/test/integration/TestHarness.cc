@@ -4,9 +4,10 @@
 #include "TestHarness.h"
 #include "util.h"
 
+#include <openvdb_ax/compiler/PointExecutable.h>
+#include <openvdb_ax/compiler/VolumeExecutable.h>
+
 #include <openvdb/points/PointConversion.h>
-#include "../compiler/PointExecutable.h"
-#include "../compiler/VolumeExecutable.h"
 
 namespace unittest_util
 {
@@ -24,10 +25,10 @@ std::string loadText(const std::string& codeFileName)
     return sstream.str();
 }
 
-void wrapExecution(openvdb::points::PointDataGrid& grid,
+bool wrapExecution(openvdb::points::PointDataGrid& grid,
                    const std::string& codeFileName,
                    const std::string * const group,
-                   std::vector<std::string>* warnings,
+                   openvdb::ax::Logger& logger,
                    const openvdb::ax::CustomData::Ptr& data,
                    const openvdb::ax::CompilerOptions& opts,
                    const bool createMissing)
@@ -36,16 +37,18 @@ void wrapExecution(openvdb::points::PointDataGrid& grid,
 
     Compiler compiler(opts);
     const std::string code = loadText(codeFileName);
-    ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
-    PointExecutable::Ptr executable = compiler.compile<PointExecutable>(*syntaxTree, data, warnings);
+    ast::Tree::ConstPtr syntaxTree = ast::parse(code.c_str(), logger);
+    PointExecutable::Ptr executable = compiler.compile<PointExecutable>(*syntaxTree, logger, data);
+    if (!executable) return false;
     executable->setCreateMissing(createMissing);
     if (group) executable->setGroupExecution(*group);
     executable->execute(grid);
+    return true;
 }
 
-void wrapExecution(openvdb::GridPtrVec& grids,
+bool wrapExecution(openvdb::GridPtrVec& grids,
                    const std::string& codeFileName,
-                   std::vector<std::string>* warnings,
+                   openvdb::ax::Logger& logger,
                    const openvdb::ax::CustomData::Ptr& data,
                    const openvdb::ax::CompilerOptions& opts,
                    const bool createMissing)
@@ -54,11 +57,14 @@ void wrapExecution(openvdb::GridPtrVec& grids,
 
     Compiler compiler(opts);
     const std::string code = loadText(codeFileName);
-    ast::Tree::Ptr syntaxTree = ast::parse(code.c_str());
-    VolumeExecutable::Ptr executable = compiler.compile<VolumeExecutable>(*syntaxTree, data, warnings);
+
+    ast::Tree::ConstPtr syntaxTree = ast::parse(code.c_str(), logger);
+    VolumeExecutable::Ptr executable = compiler.compile<VolumeExecutable>(*syntaxTree, logger, data);
+    if (!executable) return false;
     executable->setCreateMissing(createMissing);
     executable->setValueIterator(VolumeExecutable::IterType::ON);
     executable->execute(grids);
+    return true;
 }
 
 void AXTestHarness::addInputGroups(const std::vector<std::string> &names,
@@ -83,20 +89,24 @@ void AXTestHarness::addExpectedGroups(const std::vector<std::string> &names,
     }
 }
 
-void AXTestHarness::executeCode(const std::string& codeFile,
-                                const std::string * const group,
-                                std::vector<std::string>* warnings,
+bool AXTestHarness::executeCode(const std::string& codeFile,
+                                const std::string* const group,
                                 const bool createMissing)
 {
+    bool success = false;
     if (mUsePoints) {
         for (auto& grid : mInputPointGrids) {
-            wrapExecution(*grid, codeFile, group, warnings, mCustomData, mOpts, createMissing);
+            mLogger.clear();
+            success = wrapExecution(*grid, codeFile, group, mLogger, mCustomData, mOpts, createMissing);
+            if (!success) break;
         }
     }
 
     if (mUseVolumes) {
-        wrapExecution(mInputVolumeGrids, codeFile, warnings, mCustomData, mOpts, createMissing);
+        mLogger.clear();
+        success = wrapExecution(mInputVolumeGrids, codeFile, mLogger, mCustomData, mOpts, createMissing);
     }
+    return success;
 }
 
 template <typename T>
@@ -218,6 +228,8 @@ void AXTestHarness::reset(const openvdb::Index64 ppv, const openvdb::CoordBBox& 
     mOutputPointGrids.back()->setName("custom_expected");
 
     mVolumeBounds = bounds;
+
+    mLogger.clear();
 }
 
 void AXTestHarness::reset()
@@ -261,6 +273,8 @@ void AXTestHarness::reset()
     mOutputPointGrids.back()->setName("4_points_expected");
 
     mVolumeBounds = openvdb::CoordBBox({0,0,0}, {0,0,0});
+
+    mLogger.clear();
 }
 
 template <typename ValueT>
