@@ -870,7 +870,6 @@ public:
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
 
-    //@{
     /// @brief   Threaded method that applies a user-supplied functor
     ///          to all the nodes in the tree.
     ///
