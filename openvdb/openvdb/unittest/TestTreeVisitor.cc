@@ -172,6 +172,8 @@ template<typename TreeT>
 void
 TestTreeVisitor::visitTree()
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
     TreeT tree = createTestTree<TreeT>();
     {
         // Traverse the tree, accumulating node counts.
@@ -202,6 +204,8 @@ TestTreeVisitor::visitTree()
         CPPUNIT_ASSERT_EQUAL(0U, visitor.leafCount()); // leaf nodes were skipped
         CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.nonLeafCount());
     }
+
+    OPENVDB_NO_DEPRECATION_WARNING_END
 }
 
 
@@ -280,6 +284,8 @@ private:
 void
 TestTreeVisitor::testVisit2Trees()
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
     using TreeT = openvdb::FloatTree;
     using Tree2T = openvdb::VectorTree;
     using ValueT = TreeT::ValueType;
@@ -341,4 +347,6 @@ TestTreeVisitor::testVisit2Trees()
     CPPUNIT_ASSERT_EQUAL(0U, visitor.bLeafCount());
     CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.aNonLeafCount());
     CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.bNonLeafCount());
+
+    OPENVDB_NO_DEPRECATION_WARNING_END
 }
