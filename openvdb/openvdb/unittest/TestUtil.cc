@@ -16,7 +16,7 @@
 #include <chrono>
 #include <iostream>
 
-#define BENCHMARK_PAGED_ARRAY
+//#define BENCHMARK_PAGED_ARRAY
 
 // For benchmark comparisons
 #ifdef BENCHMARK_PAGED_ARRAY

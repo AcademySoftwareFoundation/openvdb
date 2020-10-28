@@ -45,6 +45,10 @@ Houdini:
 Bug Fixes:
 - Fixed a bug which could cause recursive compile time instantiations of
   TypeList objects, manifesting in longer compile times.
+- Deprecated @vdblink::util::PagedArray::push_back util::PagedArray::push_back@endlink
+  due to a race condition. Instead use
+  @vdblink::util::PagedArray::ValueBuffer::push_back util::PagedArray::ValueBuffer::push_back@endlink
+  which is faster and thread-safe.
 
 @par
 API changes:
