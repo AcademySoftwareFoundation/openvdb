@@ -156,7 +156,7 @@ template<typename ValueT, size_t Log2PageSize = 10UL>
 class PagedArray
 {
 private:
-    static_assert(Log2PageSize >= 10UL, "Expected Log2PageSize >= 10");
+    //static_assert(Log2PageSize >= 10UL, "Expected Log2PageSize >= 10");
     class Page;
 
     // must allow mutiple threads to call operator[] as long as only one thread calls push_back
@@ -189,25 +189,20 @@ public:
     ///          make sure to create an instance per thread!
     class ValueBuffer;
 
+    /// @return a new instance of a ValueBuffer which supports thread-safe push_back!
+    ValueBuffer getBuffer() { return ValueBuffer(*this); }
+
     /// Const std-compliant iterator
     class ConstIterator;
 
      /// Non-const std-compliant iterator
     class Iterator;
 
-    /// @brief   Thread safe insertion, adds a new element at
-    ///          the end and increases the container size by one and
-    ///          returns the linear offset for the inserted element.
-    ///
-    /// @param value value to be added to this PagedArray
-    ///
-    /// @details Constant time complexity. May allocate a new page.
-    size_t push_back(const ValueType& value)
+
+    /// @brief This method is deprecated and will be removed shortly!
+    OPENVDB_DEPRECATED size_t push_back(const ValueType& value)
     {
-        const size_t index = mSize.fetch_and_increment();
-        if (index >= mCapacity) this->grow(index);
-        (*mPageTable[index >> Log2PageSize])[index] = value;
-        return index;
+        return this->push_back_unsafe(value);
     }
 
     /// @brief Slightly faster than the thread-safe push_back above.
@@ -600,6 +595,7 @@ public:
     PagedArrayType& parent() const { return *mParent; }
     /// @brief Return the current number of elements cached in this buffer.
     size_t size() const { return mSize; }
+    static size_t pageSize() { return 1UL << Log2PageSize; }
 private:
     PagedArray* mParent;
     Page*       mPage;
