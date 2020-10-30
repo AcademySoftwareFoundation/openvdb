@@ -17,19 +17,19 @@
     \note It is important to note that NanoVDB (by design) is a read-only
           sparse GPU (and CPU) friendly data structure intended for applications
           like rendering and collision detection. As such it obviously lacks
-          a lot of the functionalities and features of OpenVDB grids. NanoVDB
+          a lot of the functionality and features of OpenVDB grids. NanoVDB
           is essentially a compact linearized (or serialized) representation of
           an openvdb tree with getValue methods only. For best performance use
           the ReadAccessor::getValue method as opposed to the Tree::getValue
           method. Note that since a ReadAccessor caches previous access patterns
-          it is by design not thread-safe, so use one instantiate per thread
-          (it is very lightweight). Also, it is not safe to copy accessors between
+          it is by design not thread-safe, so use one instantiation per thread
+          (it is very light-weight). Also, it is not safe to copy accessors between
           the GPU and CPU! In fact, client code should only interface
           with the API of the Grid class (all other nodes of the NanoVDB data
           structure can safely be ignored by most client codes)!
 
 
-    \warning NanoVDB grids can only be constructed from with tools like openToNanoVDB
+    \warning NanoVDB grids can only be constructed via tools like openToNanoVDB
              or the GridBuilder. This explains why none of the grid nodes defined below
              have public constructors or destructors.
 
@@ -48,7 +48,7 @@
           BBox - a bounding box
           Mask - a bitmask essential to the non-root tree nodes
           Map  - an affine coordinate transformation
-          Grid - contains a Tree and a ma for world<->index transformations. Use
+          Grid - contains a Tree and a map for world<->index transformations. Use
                  this class as the main API with client code!
           Tree - contains a RootNode and getValue methods that should only be used for debugging
           RootNode - the top-level node of the VDB data structure
@@ -501,7 +501,7 @@ __hostdev__ inline int MaxIndex(const Vec3T& v)
 #endif
 }
 
-// round up byteSize to the nearest wordSize. E.g. to align to machine word: AlignUp<sizeof(size_t)(n)
+// round up byteSize to the nearest wordSize, e.g. to align to machine word: AlignUp<sizeof(size_t)(n)
 template<uint64_t wordSize>
 __hostdev__ inline uint64_t AlignUp(uint64_t byteCount)
 {
@@ -511,7 +511,7 @@ __hostdev__ inline uint64_t AlignUp(uint64_t byteCount)
 
 // ------------------------------> Coord <--------------------------------------
 
-/// @brief Signed (i, j, k) 32-bit integer coordinate class, simular to openvdb::math::Coord
+/// @brief Signed (i, j, k) 32-bit integer coordinate class, similar to openvdb::math::Coord
 class Coord
 {
     int32_t mVec[3]; // private member data - three signed index coordinates
@@ -573,7 +573,7 @@ public:
     // @brief Return a new instance with coordinates right-shifted by the given unsigned integer.
     __hostdev__ Coord operator>>(IndexType n) const { return Coord(mVec[0] >> n, mVec[1] >> n, mVec[2] >> n); }
 
-    /// @brief Return true is this Coord is Lexicographiclly less than the given Coord.
+    /// @brief Return true is this Coord is lexicographically less than the given Coord.
     __hostdev__ bool operator<(const Coord& rhs) const
     {
         return mVec[0] < rhs[0] ? true : mVec[0] > rhs[0] ? false : mVec[1] < rhs[1] ? true : mVec[1] > rhs[1] ? false : mVec[2] < rhs[2] ? true : false;
@@ -670,7 +670,7 @@ public:
 
 // ----------------------------> Vec3 <--------------------------------------
 
-/// @brief A simple vector class with three double components, simular to openvdb::math::Vec3
+/// @brief A simple vector class with three double components, similar to openvdb::math::Vec3
 template<typename T>
 class Vec3
 {
@@ -775,12 +775,12 @@ public:
         if (other[2] > mVec[2])
             mVec[2] = other[2];
     }
-    /// @brief Retun the smallest vector component
+    /// @brief Return the smallest vector component
     __hostdev__ ValueType min() const
     {
         return mVec[0] < mVec[1] ? (mVec[0] < mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] < mVec[2] ? mVec[1] : mVec[2]);
     }
-    /// @brief Retun the largest vector component
+    /// @brief Return the largest vector component
     __hostdev__ ValueType max() const
     {
         return mVec[0] > mVec[1] ? (mVec[0] > mVec[2] ? mVec[0] : mVec[2]) : (mVec[1] > mVec[2] ? mVec[1] : mVec[2]);
@@ -807,7 +807,7 @@ using Vec3f = Vec3<float>;
 
 // ----------------------------> Vec4 <--------------------------------------
 
-/// @brief A simple vector class with three double components, simular to openvdb::math::Vec4
+/// @brief A simple vector class with three double components, similar to openvdb::math::Vec4
 template<typename T>
 class Vec4
 {
@@ -974,7 +974,7 @@ struct FloatTraits<T, 8>
 template<typename ValueT>
 __hostdev__ GridType mapToGridType()
 {
-    if (is_same<ValueT, float>::value) { // resolved at compiletime
+    if (is_same<ValueT, float>::value) { // resolved at compile-time
         return GridType::Float;
     } else if (is_same<ValueT, double>::value) {
         return GridType::Double;
@@ -1113,7 +1113,7 @@ struct BBox;
 /// @brief Partial template specialization for floating point coordinate types.
 ///
 /// @note Min is inclusive and max is exclusive. If min = max the dimension of
-///       bounding box is is zero and therefore it is also empty.
+///       the bounding box is zero and therefore it is also empty.
 template<typename Vec3T>
 struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
 {
@@ -1351,7 +1351,7 @@ __hostdev__ static inline uint32_t FindHighestOn(uint64_t v)
 
 // ----------------------------> Mask <--------------------------------------
 
-/// @brief Bit-mask to encode active states and facilitate sequnetial iterators
+/// @brief Bit-mask to encode active states and facilitate sequential iterators
 /// and a fast codec for I/O compression.
 template<uint32_t LOG2DIM>
 class Mask
@@ -1364,10 +1364,10 @@ public:
     /// @brief Return the memory footprint in bytes of this Mask
     __hostdev__ static size_t memUsage() { return sizeof(Mask); }
 
-    /// @brief Return the number of bit available in this Mask
+    /// @brief Return the number of bits available in this Mask
     __hostdev__ static uint32_t bitCount() { return SIZE; }
 
-    /// @brief Return the number of machine words use by this Mask
+    /// @brief Return the number of machine words used by this Mask
     __hostdev__ static uint32_t wordCount() { return WORD_COUNT; }
 
     __hostdev__ uint32_t countOn() const
@@ -1443,7 +1443,7 @@ public:
 
     __hostdev__ Iterator beginOn() const { return Iterator(this->findFirstOn(), this); }
 
-    /// @brief Return true of the given bit is set.
+    /// @brief Return true if the given bit is set.
     __hostdev__ bool isOn(uint32_t n) const { return 0 != (mWords[n >> 6] & (uint64_t(1) << (n & 63))); }
 
     __hostdev__ bool isOn() const
@@ -1515,17 +1515,17 @@ private:
         uint32_t m = start & 63;
         uint64_t b = mWords[n];
         if (b & (uint64_t(1) << m))
-            return start; //simple case: start is on
+            return start; // simple case: start is on
         b &= ~uint64_t(0) << m; // mask out lower bits
         while (!b && ++n < WORD_COUNT)
-            b = mWords[n]; // find next none-zero word
+            b = mWords[n]; // find next non-zero word
         return (!b ? SIZE : (n << 6) + FindLowestOn(b)); // catch last word=0
     }
 }; // Mask class
 
 // ----------------------------> Map <--------------------------------------
 
-/// @brief Defined an affine transform and its inverse represented as a 3x3 matrix and a vec3 translation
+/// @brief Defines an affine transform and its inverse represented as a 3x3 matrix and a vec3 translation
 struct Map
 {
     float  mMatF[9]; // 9*4B <- 3x3 matrix
@@ -1637,8 +1637,8 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridBlindMetaData
 
 /// @brief Struct with all the member data of the Grid (useful during serialization of an openvdb grid)
 ///
-/// @note The transform is assumed to be affine (s0 linear!) and have uniform scale! So frustrum transforms
-///       and non-uniform scaling is not supported (primarily because they complicate ray-tracing in index space)
+/// @note The transform is assumed to be affine (so linear) and have uniform scale! So frustrum transforms
+///       and non-uniform scaling are not supported (primarily because they complicate ray-tracing in index space)
 ///
 /// @note No client code should (or can) interface with this struct so it can safely be ignored!
 struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
@@ -1747,7 +1747,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
 
 }; // GridData
 
-// Forward decleration of accelerated random access class
+// Forward declaration of accelerated random access class
 template <typename ValueT, int LEVEL0 = -1, int LEVEL1 = -1, int LEVEL2 = -1>
 class ReadAccessor;
 
@@ -2126,7 +2126,7 @@ uint32_t Tree<RootT>::getLinearOffset(const NodeT& node) const
 
 // --------------------------> RootNode <------------------------------------
 
-/// @brief Stuct with all the member data of the RootNode (useful during serialization of an openvdb RootNode)
+/// @brief Struct with all the member data of the RootNode (useful during serialization of an openvdb RootNode)
 ///
 /// @note No client code should (or can) interface with this struct so it can safely be ignored!
 template<typename ChildT>
@@ -2448,7 +2448,7 @@ private:
 
 // --------------------------> InternalNode <------------------------------------
 
-/// @brief Stuct with all the member data of the InternalNode (useful during serialization of an openvdb InternalNode)
+/// @brief Struct with all the member data of the InternalNode (useful during serialization of an openvdb InternalNode)
 ///
 /// @note No client code should (or can) interface with this struct so it can safely be ignored!
 template<typename ChildT, uint32_t LOG2DIM>
@@ -2906,7 +2906,7 @@ public:
     __hostdev__ bool isActive(const CoordT& ijk) const { return DataType::mValueMask.isOn(CoordToOffset(ijk)); }
     __hostdev__ bool isActive(uint32_t n) const { return DataType::mValueMask.isOn(n); }
 
-    /// @brief Retun @c true if the voxel value at the given coordinate is active and updates @c v with the value.
+    /// @brief Return @c true if the voxel value at the given coordinate is active and updates @c v with the value.
     __hostdev__ bool probeValue(const CoordT& ijk, ValueType& v) const
     {
         const uint32_t n = CoordToOffset(ijk);
@@ -2943,7 +2943,7 @@ private:
     template<typename, uint32_t>
     friend class InternalNode;
 
-    /// @brief Private method to retun a voxel value and update a (dummy) ReadAccessor
+    /// @brief Private method to return a voxel value and update a (dummy) ReadAccessor
     template<typename AccT>
     __hostdev__ const ValueType& getValueAndCache(const CoordT& ijk, const AccT&) const { return this->getValue(ijk); }
 
@@ -3041,19 +3041,19 @@ using MaskGrid   = Grid<MaskTree>;
 
 // --------------------------> ReadAccessor <------------------------------------
 
-/// @brief A read-only value acessor with three levels of node caching. This allows for
+/// @brief A read-only value accessor with three levels of node caching. This allows for
 ///        inverse tree traversal during lookup, which is on average significantly faster
-///        then the calling the equivalent method on the tree (i.e. top-down traversal).
+///        than calling the equivalent method on the tree (i.e. top-down traversal).
 ///
-/// @note  By virture of the fact that a value accessor accelerates random access operations
+/// @note  By virtue of the fact that a value accessor accelerates random access operations
 ///        by re-using cached access patterns, this access should be reused for multiple access
-///        operations. In other words, never create an instace of this calls for a single
-///        acccess only. In generate avoid single access operations with this accessor, and
-///        if that's not possible call the corresponding method on the tree instead.
+///        operations. In other words, never create an instance of this accessor for a single
+///        acccess only. In general avoid single access operations with this accessor, and
+///        if that is not possible call the corresponding method on the tree instead.
 ///
-/// @warning Since this ReadAccessor internally cached raw pointers to the nodes of the tree
-///          structure, it is not save to copy between host and device, or even share among
-///          multiple threads on the same host or device. However, it's light-weight so simple
+/// @warning Since this ReadAccessor internally caches raw pointers to the nodes of the tree
+///          structure, it is not safe to copy between host and device, or even to share among
+///          multiple threads on the same host or device. However, it is light-weight so simple
 ///          instantiate one per thread (on the host and/or device).
 ///
 /// @details Used to accelerated random access into a VDB tree. Provides on average
@@ -3725,15 +3725,15 @@ ReadAccessor<ValueT, LEVEL0, LEVEL1, LEVEL2> createAccessor(const NanoRoot<Value
 //////////////////////////////////////////////////
 
 /// @brief This is a convenient class that allows for access to grid meta-data
-///        that are independent of the value type of a grid. That is, this calls
+///        that are independent of the value type of a grid. That is, this class
 ///        can be used to get information about a grid without actually knowing
 ///        its ValueType.
 class GridMetaData
 {
     // We cast to a grid templated on a dummy ValueType which is safe becase we are very
     // careful only to call certain methods which are known to be invariant to the ValueType!
-    // In other words, don't use this technique unless you are intimitly familiar with the
-    // memory-layout of the data structure and the reasons for why certain methods are safe
+    // In other words, don't use this technique unless you are intimately familiar with the
+    // memory-layout of the data structure and the reasons why certain methods are safe
     // to call and others are not!
     using GridT = NanoGrid<int>;
     __hostdev__ const GridT& grid() const { return *reinterpret_cast<const GridT*>(this); }
@@ -3761,7 +3761,7 @@ public:
     __hostdev__ bool                     isEmpty() const { return this->grid().isEmpty(); }
 }; // GridMetaData
 
-/// @brief Class to access points at a specefic voxel location
+/// @brief Class to access points at a specific voxel location
 template<typename AttT>
 class PointAccessor : public DefaultReadAccessor<uint32_t>
 {
@@ -3782,7 +3782,7 @@ public:
                (grid.gridClass() == GridClass::PointData && is_same<Vec3f, AttT>::value));
         assert(grid.blindDataCount() >= 1);
     }
-    /// @brief Return the total number of point in the grid
+    /// @brief Return the total number of points in the grid
     __hostdev__ uint64_t gridPoints(const AttT*& begin, const AttT*& end) const
     {
         const uint64_t count = mGrid->blindMetaData(0).mElementCount;
@@ -3804,7 +3804,7 @@ public:
         return leaf->valueMax();
     }
 
-    /// @brief get iterators over offsets to points at a specefic voxel location
+    /// @brief get iterators over offsets to points at a specific voxel location
     __hostdev__ uint64_t voxelPoints(const Coord& ijk, const AttT*& begin, const AttT*& end) const
     {
         auto* leaf = this->probeLeaf(ijk);
