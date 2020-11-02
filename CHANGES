@@ -1,10 +1,24 @@
 OpenVDB Version History
 =======================
 
-Version 7.1.1 - In Development
+Version 7.2.0 - In Development
+
+    New features:
+    - Added tree::DynamicNodeManager that lazily caches the nodes at each
+      level of the tree to allow for efficient threading of topology-changing
+      top-down workflows.
+    - Added tools::CsgUnionOp, tools::CsgIntersectionOp and
+      tools::CsgDifferenceOp that use a parallel breadth-first algorithm to
+      accelerate CSG union, intersection and difference operations.
+    - Added tools::TreeToMerge which provides methods to steal or deep-copy
+      from a tree based on the tag dispatch class used in its construction.
 
     Improvements:
     - util::CpuTimer now uses C++11 chrono instead of TBB.
+    - Threaded the construction of LeafManager and NodeManager linear arrays.
+    - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
+      the new parallel breadth-first algorithms for much faster performance.
+    - Extended tree::NodeManager to allow for use with a const tree.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
@@ -18,6 +32,17 @@ Version 7.1.1 - In Development
     Bug fixes:
     - Fixed a bug which could cause recursive compile time instantiations of
       TypeList objects, manifesting in longer compile times.
+    - Deprecated util::PagedArray::push_back due to a race condition. Instead
+      use util::PagedArray::ValueBuffer::push_back which is faster and thread-safe.
+
+    API changes:
+    - Deprecated tree::LeafManager::getNodes. This method is no longer used when
+      constructing a NodeManager from a LeafManager.
+    - Deprecated Tree::visitActiveBBox, Tree::visit and Tree::visit2 methods in
+      favor of using a tree::DynamicNodeManager.
+    - Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
+      tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
+      tools now use the parallel breath-first algorithms.
 
     Build:
     - Removed the Makefiles.

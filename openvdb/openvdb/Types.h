@@ -1045,6 +1045,10 @@ class ShallowCopy {};
 /// @brief Tag dispatch class that distinguishes topology copy constructors
 /// from deep copy constructors
 class TopologyCopy {};
+/// @brief Tag dispatch class that distinguishes constructors that deep copy
+class DeepCopy {};
+/// @brief Tag dispatch class that distinguishes constructors that steal
+class Steal {};
 /// @brief Tag dispatch class that distinguishes constructors during file input
 class PartialCreate {};
 
