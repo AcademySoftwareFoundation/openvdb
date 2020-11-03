@@ -1,6 +1,5 @@
 double@test1 = double(bool@testbool);
-double@test2 = double(short@testshort);
-double@test3 = double(int@testint);
-double@test4 = double(long@testlong);
-double@test5 = double(float@testfloat);
+double@test2 = double(int32@testint32);
+double@test3 = double(int64@testint64);
+double@test4 = double(float@testfloat);
 

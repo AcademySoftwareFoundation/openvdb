@@ -228,7 +228,7 @@ static const unittest_util::CodeTests tests =
     },
     { "int(a) + float(b);",     Node::Ptr(
                                     new BinaryOperator(
-                                        new Cast(new Local("a"), CoreType::INT),
+                                        new Cast(new Local("a"), CoreType::INT32),
                                         new Cast(new Local("b"), CoreType::FLOAT),
                                         OperatorToken::PLUS
                                     )
@@ -258,10 +258,10 @@ static const unittest_util::CodeTests tests =
                                     )
                                 )
     },
-    { "0 + 1s;",                Node::Ptr(
+    { "0 + 1;",                 Node::Ptr(
                                     new BinaryOperator(
                                         new Value<int32_t>(0),
-                                        new Value<int16_t>(1),
+                                        new Value<int32_t>(1),
                                         OperatorToken::PLUS
                                     )
                                 )

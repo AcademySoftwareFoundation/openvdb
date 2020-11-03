@@ -38,6 +38,7 @@ set(TEST_SOURCE_FILES
   backend/TestLogger.cc
   backend/TestSymbolTable.cc
   backend/TestTypes.cc
+  compiler/TestAXRun.cc
   compiler/TestPointExecutable.cc
   compiler/TestVolumeExecutable.cc
   frontend/TestArrayPack.cc

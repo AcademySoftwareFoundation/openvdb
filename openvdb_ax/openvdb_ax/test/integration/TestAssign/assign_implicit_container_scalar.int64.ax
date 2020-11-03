@@ -1,4 +1,4 @@
-short local = 2s;
+int64 local = 2l;
 vec2d@testvec2d = local;
 vec2i@testvec2i = local;
 vec2f@testvec2f = local;

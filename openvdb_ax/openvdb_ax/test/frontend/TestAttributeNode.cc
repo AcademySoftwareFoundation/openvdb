@@ -19,10 +19,11 @@ namespace {
 static const unittest_util::CodeTests tests =
 {
     { "bool@_a;",   Node::Ptr(new Attribute("_a", CoreType::BOOL)) },
-    { "short@a_;",  Node::Ptr(new Attribute("a_", CoreType::SHORT)) },
-    { "i@a1;",      Node::Ptr(new Attribute("a1", CoreType::INT)) },
-    { "int@abc;",   Node::Ptr(new Attribute("abc", CoreType::INT)) },
-    { "long@a;",    Node::Ptr(new Attribute("a", CoreType::LONG)) },
+    { "int16@a_;",  Node::Ptr(new Attribute("a_", CoreType::INT16)) },
+    { "i@a1;",      Node::Ptr(new Attribute("a1", CoreType::INT32)) },
+    { "int@abc;",   Node::Ptr(new Attribute("abc", CoreType::INT32)) },
+    { "int32@abc;", Node::Ptr(new Attribute("abc", CoreType::INT32)) },
+    { "int64@a;",   Node::Ptr(new Attribute("a", CoreType::INT64)) },
     { "@a;",        Node::Ptr(new Attribute("a", CoreType::FLOAT, true)) },
     { "f@a;",       Node::Ptr(new Attribute("a", CoreType::FLOAT)) },
     { "float@a;",   Node::Ptr(new Attribute("a", CoreType::FLOAT)) },

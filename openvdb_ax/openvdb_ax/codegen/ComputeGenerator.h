@@ -64,6 +64,7 @@ struct ComputeKernel
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+namespace codegen_internal {
 
 struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
 {
@@ -104,6 +105,16 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
     {
         if (!cond) return true;
         if (!this->visit(cond)) return false;
+        return true;
+    }
+
+    /// @brief  Custom traversal of binary operators
+    /// @note   This overrides the default traversal to handle
+    ///         short-circuiting in logical AND and OR
+    bool traverse(const ast::BinaryOperator* bin)
+    {
+        if (!bin) return true;
+        if (!this->visit(bin)) return false;
         return true;
     }
 
@@ -176,7 +187,7 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
 
 protected:
 
-    FunctionGroup::Ptr getFunction(const std::string& identifier,
+    const FunctionGroup* getFunction(const std::string& identifier,
             const bool allowInternal = false);
 
     bool binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
@@ -209,6 +220,8 @@ protected:
 private:
     FunctionRegistry& mFunctionRegistry;
 };
+
+} // codegen_internal
 
 } // namespace codegen
 } // namespace ax

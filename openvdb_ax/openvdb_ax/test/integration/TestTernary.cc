@@ -13,10 +13,12 @@ public:
     CPPUNIT_TEST_SUITE(TestTernary);
     CPPUNIT_TEST(testTernary);
     CPPUNIT_TEST(testTernaryVoid);
+    CPPUNIT_TEST(testTernaryErrors);
     CPPUNIT_TEST_SUITE_END();
 
     void testTernary();
     void testTernaryVoid();
+    void testTernaryErrors();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTernary);
@@ -85,5 +87,12 @@ TestTernary::testTernaryVoid()
     mHarness.executeCode("test/snippets/ternary/ternaryVoid");
 
     AXTESTS_STANDARD_ASSERT();
+}
+
+void
+TestTernary::testTernaryErrors()
+{
+    const bool success = mHarness.executeCode("test/snippets/ternary/ternaryErrors");
+    CPPUNIT_ASSERT(!success);
 }
 

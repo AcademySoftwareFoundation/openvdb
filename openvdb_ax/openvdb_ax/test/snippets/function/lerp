@@ -1,4 +1,13 @@
-double@test1 = lerp(1.0, 11.0, 0.5);
-double@test2 = lerp(1.0, 11.0, 2.0);
-double@test3 = lerp(1.0, 11.0,-2.0);
-float@test4 = lerp(1.0f, 11.0f, 0.5f);
+double@test1 = lerp(-1.1, 1.0000001, 0.0);
+// test formulation returns b when t = 1.0
+double@test2 = lerp(-1.1, 1.0000001, 1.0);
+double@test3 = lerp(1.1, 1.0000001, 1.0);
+double@test4 = lerp(-1.1, -1.0000001, 1.0);
+// test formulation returns exact input when a==b
+double@test5 = lerp(1.1, 1.1, 100.0);
+double@test6 = lerp(-1.1, -1.1, 100.0);
+//
+double@test7 = lerp(1.0, 11.0, 0.5);
+double@test8 = lerp(1.0, 11.0, 2.0);
+double@test9 = lerp(1.0, 11.0,-2.0);
+float@test10 = lerp(1.0f, 11.0f, 0.5f);

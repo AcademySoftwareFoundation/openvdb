@@ -1,7 +1,0 @@
-short local = 2s;
-long@testlong = local;
-int@testint = local;
-bool@testbool = local;
-double@testdouble = local;
-float@testfloat = local;
-

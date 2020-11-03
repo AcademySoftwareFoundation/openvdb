@@ -1,0 +1,20 @@
+
+int32@test1 += 2;
+int32@test2 -= 2;
+int32@test3 *= 2;
+int32@test4 /= 2;
+int32@test5 %= 2;
+int32@test6 <<= 2;
+int32@test7 >>= 2;
+int32@test8 &= 2;
+int32@test9 ^= 2;
+int32@test10 |= 2;
+
+int32 local1 = 2,
+      local2 = 3;
+
+local1 += local2;
+int32@test11 = local1;
+int32@test12 += int32@test13;
+int32@test14 += local2;
+

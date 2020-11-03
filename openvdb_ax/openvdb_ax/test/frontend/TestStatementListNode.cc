@@ -18,47 +18,47 @@ namespace {
 
 static const unittest_util::CodeTests tests =
 {
-    { "int a = (1,2,3), b=1, c=(b=1);", Node::Ptr(new StatementList({
-                                            new DeclareLocal(CoreType::INT, new Local("a"),
+    { "int32 a = (1,2,3), b=1, c=(b=1);", Node::Ptr(new StatementList({
+                                            new DeclareLocal(CoreType::INT32, new Local("a"),
                                             new CommaOperator({
                                                 new Value<int32_t>(1),
                                                 new Value<int32_t>(2),
                                                 new Value<int32_t>(3),
                                             })),
-                                            new DeclareLocal(CoreType::INT, new Local("b"), new Value<int32_t>(1)),
-                                            new DeclareLocal(CoreType::INT, new Local("c"),
+                                            new DeclareLocal(CoreType::INT32, new Local("b"), new Value<int32_t>(1)),
+                                            new DeclareLocal(CoreType::INT32, new Local("c"),
                                                 new AssignExpression(
                                                     new Local("b"),
                                                     new Value<int32_t>(1))),
                                         }))
     },
-    { "int a, b;",                  Node::Ptr(new StatementList({
-                                        new DeclareLocal(CoreType::INT, new Local("a")),
-                                        new DeclareLocal(CoreType::INT, new Local("b"))
+    { "int32 a, b;",                Node::Ptr(new StatementList({
+                                        new DeclareLocal(CoreType::INT32, new Local("a")),
+                                        new DeclareLocal(CoreType::INT32, new Local("b"))
                                     }))
     },
-    { "int a, b = 1;",              Node::Ptr(new StatementList({
-                                        new DeclareLocal(CoreType::INT, new Local("a")),
-                                        new DeclareLocal(CoreType::INT, new Local("b"), new Value<int32_t>(1))
+    { "int32 a, b = 1;",            Node::Ptr(new StatementList({
+                                        new DeclareLocal(CoreType::INT32, new Local("a")),
+                                        new DeclareLocal(CoreType::INT32, new Local("b"), new Value<int32_t>(1))
                                     }))
     },
-    { "int a, b = 1, c = 1;",       Node::Ptr(new StatementList({
-                                        new DeclareLocal(CoreType::INT, new Local("a")),
-                                        new DeclareLocal(CoreType::INT, new Local("b"), new Value<int32_t>(1)),
-                                        new DeclareLocal(CoreType::INT, new Local("c"), new Value<int32_t>(1))
+    { "int32 a, b = 1, c = 1;",     Node::Ptr(new StatementList({
+                                        new DeclareLocal(CoreType::INT32, new Local("a")),
+                                        new DeclareLocal(CoreType::INT32, new Local("b"), new Value<int32_t>(1)),
+                                        new DeclareLocal(CoreType::INT32, new Local("c"), new Value<int32_t>(1))
                                     }))
     },
-    { "int a, b = 1, c;",       Node::Ptr(new StatementList({
-                                        new DeclareLocal(CoreType::INT, new Local("a")),
-                                        new DeclareLocal(CoreType::INT, new Local("b"), new Value<int32_t>(1)),
-                                        new DeclareLocal(CoreType::INT, new Local("c"))
+    { "int32 a, b = 1, c;",         Node::Ptr(new StatementList({
+                                        new DeclareLocal(CoreType::INT32, new Local("a")),
+                                        new DeclareLocal(CoreType::INT32, new Local("b"), new Value<int32_t>(1)),
+                                        new DeclareLocal(CoreType::INT32, new Local("c"))
                                     }))
     },
-    { "int a, b = 1, c, d = 1;",    Node::Ptr(new StatementList({
-                                        new DeclareLocal(CoreType::INT, new Local("a")),
-                                        new DeclareLocal(CoreType::INT, new Local("b"), new Value<int32_t>(1)),
-                                        new DeclareLocal(CoreType::INT, new Local("c")),
-                                        new DeclareLocal(CoreType::INT, new Local("d"), new Value<int32_t>(1))
+    { "int32 a, b = 1, c, d = 1;",  Node::Ptr(new StatementList({
+                                        new DeclareLocal(CoreType::INT32, new Local("a")),
+                                        new DeclareLocal(CoreType::INT32, new Local("b"), new Value<int32_t>(1)),
+                                        new DeclareLocal(CoreType::INT32, new Local("c")),
+                                        new DeclareLocal(CoreType::INT32, new Local("d"), new Value<int32_t>(1))
                                     }))
     }
 };

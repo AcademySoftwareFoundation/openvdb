@@ -1,9 +1,9 @@
 float a_float;
-int a_int;
+int32 a_int;
 
-short a_short = 1s;
-int b_int = 5;
-long a_long = 3l;
+int16 a_short = 1s;
+int32 b_int = 5;
+int64 a_long = 3l;
 
 float b_float = 0.2f;
 double a_double = 0.3;

@@ -46,7 +46,7 @@ inline void verifyContext(const llvm::Function* const F, const std::string& name
 }
 
 
-inline FunctionGroup::Ptr axgetvoxelpws(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axgetvoxelpws(const FunctionOptions& op)
 {
     static auto generate = [](const std::vector<llvm::Value*>&,
          llvm::IRBuilder<>& B) -> llvm::Value*
@@ -69,7 +69,7 @@ inline FunctionGroup::Ptr axgetvoxelpws(const FunctionOptions& op)
 }
 
 template <size_t Index>
-inline FunctionGroup::Ptr axgetcoord(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axgetcoord(const FunctionOptions& op)
 {
     static_assert(Index <= 2, "Invalid index for axgetcoord");
 
@@ -96,7 +96,7 @@ inline FunctionGroup::Ptr axgetcoord(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axsetvoxel(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axsetvoxel(const FunctionOptions& op)
 {
     static auto setvoxelptr =
         [](void* accessor,
@@ -229,7 +229,7 @@ inline FunctionGroup::Ptr axsetvoxel(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axgetvoxel(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axgetvoxel(const FunctionOptions& op)
 {
     static auto getvoxel =
         [](void* accessor,

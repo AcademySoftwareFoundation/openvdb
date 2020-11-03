@@ -1,7 +1,0 @@
-
-long@test1 = ++long@test2;
-long@test3 = long@test4++;
-long@test5 = (long@test6++, long@test7++, ++long@test6);
-long@test8 = (++long@test6, ++long@test7, long@test6++);
-++long@test9 = long@test9;
-

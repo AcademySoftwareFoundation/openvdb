@@ -28,46 +28,38 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace codegen {
 
-/// @brief  The global function registry which is used for function code generation.
-///         Each time a function is visited within the AST, its identifier is used
-///         as a key into this registry for the corresponding function retrieval
-///         and execution.
-///
-///         Functions can be inserted into the registry using insert() with a given
-///         identifier and pointer to a function base.
-///
+/// @brief  The function registry which is used for function code generation.
+///   Each time a function is visited within the AST, its identifier is used as
+///   a key into this registry for the corresponding function retrieval and
+///   execution. Functions can be inserted into the registry using insert() with
+///   a given identifier and pointer.
 class FunctionRegistry
 {
 public:
-
-    using ConstructorT = FunctionGroup::Ptr(*)(const FunctionOptions&);
+    using ConstructorT = FunctionGroup::UniquePtr(*)(const FunctionOptions&);
     using Ptr = std::shared_ptr<FunctionRegistry>;
     using UniquePtr = std::unique_ptr<FunctionRegistry>;
 
-    /// @brief An object to represent a registered function, storing its constructor,
-    ///        a pointer to the function definition and whether it should only be available
-    //         internally (i.e. to a developer, not a user)
+    /// @brief An object to represent a registered function, storing its
+    ///   constructor, a pointer to the function definition and whether it
+    ///   should only be available internally (i.e. to a developer, not a user)
     ///
     struct RegisteredFunction
     {
         /// @brief Constructor
         /// @param creator The function definition used to create this function
         /// @param internal Whether the function should be only internally accessible
-        ///
         RegisteredFunction(const ConstructorT& creator, const bool internal = false)
             : mConstructor(creator), mFunction(), mInternal(internal) {}
 
         /// @brief Create a function object using this creator of this function
         /// @param op The current function options
-        ///
         inline void create(const FunctionOptions& op) { mFunction = mConstructor(op); }
 
         /// @brief Return a pointer to this function definition
-        ///
-        inline FunctionGroup::Ptr function() const { return mFunction; }
+        inline const FunctionGroup* function() const { return mFunction.get(); }
 
         /// @brief Check whether this function should be only internally accesible
-        ///
         inline bool isInternal() const { return mInternal; }
 
     private:
@@ -78,66 +70,61 @@ public:
 
     using RegistryMap = std::unordered_map<std::string, RegisteredFunction>;
 
-    /// @brief  Insert and register a function base object to a function identifier.
-    /// @note   Throws if the identifier is already registered
+    /// @brief Insert and register a function object to a function identifier.
+    /// @note  Throws if the identifier is already registered
     ///
-    /// @param  identifier  The function identifier to register
-    /// @param  creator     The function base to link to the provided identifier
-    /// @param  internal    Whether to mark the function as only internally accessible
-    ///
-    void insert(const std::string& identifier, const ConstructorT creator, const bool internal = false);
+    /// @param identifier The function identifier to register
+    /// @param creator    The function to link to the provided identifier
+    /// @param internal   Whether to mark the function as only internally accessible
+    void insert(const std::string& identifier,
+        const ConstructorT creator,
+        const bool internal = false);
 
-    /// @brief  Insert and register a function base object to a function identifier.
-    /// @note   Throws if the identifier is already registered
+    /// @brief Insert and register a function object to a function identifier.
+    /// @note  Throws if the identifier is already registered
     ///
-    /// @param  identifier  The function identifier to register
-    /// @param  creator     The function base to link to the provided identifier
-    /// @param  op          FunctionOptions to pass the function constructor
-    /// @param  internal    Whether to mark the function as only internally accessible
-    ///
+    /// @param identifier The function identifier to register
+    /// @param creator    The function to link to the provided identifier
+    /// @param op         FunctionOptions to pass the function constructor
+    /// @param internal   Whether to mark the function as only internally accessible
     void insertAndCreate(const std::string& identifier,
                     const ConstructorT creator,
                     const FunctionOptions& op,
                     const bool internal = false);
 
-    /// @brief  Return the corresponding function object from a provided function identifier
-    /// @note   Returns a nullptr if no such function identifier has been registered or if the
-    ///         function is marked as internal
+    /// @brief Return the corresponding function from a provided function identifier
+    /// @note  Returns a nullptr if no such function identifier has been
+    ///   registered or if the function is marked as internal
     ///
     /// @param  identifier  The function identifier
     /// @param  op          FunctionOptions to pass the function constructor
-    /// @param  allowInternalAccess    Whether to look in the 'internal' functions
-    ///
-    FunctionGroup::Ptr getOrInsert(const std::string& identifier,
+    /// @param  allowInternalAccess  Whether to look in the 'internal' functions
+    const FunctionGroup* getOrInsert(const std::string& identifier,
                       const FunctionOptions& op,
                       const bool allowInternalAccess);
 
-    /// @brief  Return the corresponding function object from a provided function identifier
-    /// @note   Returns a nullptr if no such function identifier has been registered or if the
-    ///         function is marked as internal
+    /// @brief Return the corresponding function from a provided function identifier
+    /// @note  Returns a nullptr if no such function identifier has been
+    ///   registered or if the function is marked as internal
     ///
-    /// @param  identifier  The function identifier
-    /// @param  allowInternalAccess    Whether to look in the 'internal' functions
-    ///
-    FunctionGroup::Ptr get(const std::string& identifier,
+    /// @param identifier  The function identifier
+    /// @param allowInternalAccess  Whether to look in the 'internal' functions
+    const FunctionGroup* get(const std::string& identifier,
                           const bool allowInternalAccess) const;
 
-    /// @brief  Force the (re)creations of all function objects for all registered functions
-    /// @param  op  The current function options
-    /// @param  verify  Checks functions are created and have valid identifiers/symbols
-    ///
+    /// @brief Force the (re)creations of all function objects for all
+    ///   registered functions
+    /// @param op  The current function options
+    /// @param verify  Checks functions are created and have valid identifiers/symbols
     void createAll(const FunctionOptions& op, const bool verify = false);
 
     /// @brief  Return a const reference to the current registry map
-    ///
     inline const RegistryMap& map() const { return mMap; }
 
     /// @brief  Return whether or not the registry is empty
-    ///
     inline bool empty() const { return mMap.empty(); }
 
     /// @brief  Clear the underlying function registry
-    ///
     inline void clear() { mMap.clear(); }
 
 private:

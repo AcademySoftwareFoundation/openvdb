@@ -18,9 +18,9 @@ namespace {
 
 static const unittest_util::CodeTests tests =
 {
-    { "(1s, 2, (1,2,3));",              Node::Ptr(
+    { "(1, 2, (1,2,3));",               Node::Ptr(
                                             new CommaOperator({
-                                                new Value<int16_t>(1),
+                                                new Value<int32_t>(1),
                                                 new Value<int32_t>(2),
                                                 new CommaOperator({
                                                     new Value<int32_t>(1),

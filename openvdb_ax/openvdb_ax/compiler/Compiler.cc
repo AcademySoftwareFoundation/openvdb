@@ -362,7 +362,7 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
     /// @note  Depending on how functions are inserted into LLVM (Linkage Type) in
     ///        the future, InstallLazyFunctionCreator may be required
     for (const auto& iter : registry.map()) {
-        const codegen::FunctionGroup::Ptr function = iter.second.function();
+        const codegen::FunctionGroup* const function = iter.second.function();
         if (!function) continue;
 
         const codegen::FunctionGroup::FunctionList& list = function->list();
@@ -522,9 +522,8 @@ registerExternalGlobals(const codegen::SymbolTable& globals, CustomData::Ptr& da
         [&](const ast::tokens::CoreType type, const std::string& name, CustomData& data) -> llvm::Constant* {
         switch (type) {
             case ast::tokens::BOOL    : return initializeMetadataPtr<bool>(data, name, C);
-            case ast::tokens::SHORT   : return initializeMetadataPtr<int16_t>(data, name, C);
-            case ast::tokens::INT     : return initializeMetadataPtr<int32_t>(data, name, C);
-            case ast::tokens::LONG    : return initializeMetadataPtr<int64_t>(data, name, C);
+            case ast::tokens::INT32   : return initializeMetadataPtr<int32_t>(data, name, C);
+            case ast::tokens::INT64   : return initializeMetadataPtr<int64_t>(data, name, C);
             case ast::tokens::FLOAT   : return initializeMetadataPtr<float>(data, name, C);
             case ast::tokens::DOUBLE  : return initializeMetadataPtr<double>(data, name, C);
             case ast::tokens::VEC2I   : return initializeMetadataPtr<math::Vec2<int32_t>>(data, name, C);
@@ -651,7 +650,7 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
         module->setTargetTriple(TM->getTargetTriple().normalize());
     }
 
-    codegen::PointComputeGenerator
+    codegen::codegen_internal::PointComputeGenerator
         codeGenerator(*module, mCompilerOptions.mFunctionOptions,
             *mFunctionRegistry, logger);
     AttributeRegistry::Ptr attributes = codeGenerator.generate(*tree);
@@ -747,7 +746,7 @@ Compiler::compile<VolumeExecutable>(const ast::Tree& syntaxTree,
         module->setTargetTriple(TM->getTargetTriple().normalize());
     }
 
-    codegen::VolumeComputeGenerator
+    codegen::codegen_internal::VolumeComputeGenerator
         codeGenerator(*module, mCompilerOptions.mFunctionOptions,
             *mFunctionRegistry, logger);
     AttributeRegistry::Ptr attributes = codeGenerator.generate(syntaxTree);
