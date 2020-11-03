@@ -15,12 +15,14 @@ public:
     CPPUNIT_TEST(testConditionalScopingStatement);
     CPPUNIT_TEST(testConditionalSimpleStatement);
     CPPUNIT_TEST(testConditionalSimpleElseIf);
+    CPPUNIT_TEST(testConditionalErrors);
     CPPUNIT_TEST_SUITE_END();
 
     void testConditionalIfWithinElse();
     void testConditionalSimpleStatement();
     void testConditionalScopingStatement();
     void testConditionalSimpleElseIf();
+    void testConditionalErrors();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestConditional);
@@ -48,7 +50,7 @@ TestConditional::testConditionalSimpleStatement()
 void
 TestConditional::testConditionalScopingStatement()
 {
-    mHarness.addAttribute<int>("int_test", 1);
+    mHarness.addAttribute<int32_t>("int_test", 1);
     mHarness.executeCode("test/snippets/conditional/conditionalScopingStatement");
 
     AXTESTS_STANDARD_ASSERT();
@@ -64,4 +66,12 @@ TestConditional::testConditionalSimpleElseIf()
 
     AXTESTS_STANDARD_ASSERT();
 }
+
+void
+TestConditional::testConditionalErrors()
+{
+    const bool success = mHarness.executeCode("test/snippets/conditional/conditionalErrors");
+    CPPUNIT_ASSERT(!success);
+}
+
 

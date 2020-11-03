@@ -52,12 +52,12 @@ _T1_@test8 = (++_T1_@test6, ++_T1_@test7, _T1_@test6++);
     };
 
     generate(std::vector<std::string>{
-        "short", "int", "long", "float", "double",
+        "int16", "int32", "int64", "float", "double",
     });
 
     const auto names = unittest_util::nameSequence("test", 9);
     const std::map<std::string, std::function<void(bool)>> expected = {
-        { "short",
+        { "int16",
             [&](bool inc){
                 if (inc)
                     mHarness.addAttributes<int16_t>(names,
@@ -69,7 +69,7 @@ _T1_@test8 = (++_T1_@test6, ++_T1_@test7, _T1_@test6++);
                         { 0, 0,  2, 1,  2, 0, -5, 1, -5 });
             },
         },
-        { "int",
+        { "int32",
             [&](bool inc){
                 if (inc)
                     mHarness.addAttributes<int32_t>(names,
@@ -81,7 +81,7 @@ _T1_@test8 = (++_T1_@test6, ++_T1_@test7, _T1_@test6++);
                         { 0, 0,  2, 1,  2, 0, -5, 1, -5 });
             },
         },
-        { "long",
+        { "int64",
             [&](bool inc){
                 if (inc)
                     mHarness.addAttributes<int64_t>(names,

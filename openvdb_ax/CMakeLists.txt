@@ -98,20 +98,6 @@ message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE
 
 #########################################################################
 
-# Configure other dependencies
-
-if(OPENVDB_AX_SHARED AND NOT Boost_USE_STATIC_LIBS)
-  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
-  #        boost shared libraries (more specifically libraries built with -fPIC).
-  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
-  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
-  set(BUILD_SHARED_LIBS ON)
-  set(Boost_USE_STATIC_LIBS OFF)
-endif()
-find_package(Boost REQUIRED COMPONENTS random)
-
-#########################################################################
-
 set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   openvdb_ax/ast/Parse.cc
   openvdb_ax/ast/PrintTree.cc
@@ -123,12 +109,13 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   openvdb_ax/codegen/PointComputeGenerator.cc
   openvdb_ax/codegen/PointFunctions.cc
   openvdb_ax/codegen/StandardFunctions.cc
+  openvdb_ax/codegen/Types.cc
   openvdb_ax/codegen/VolumeComputeGenerator.cc
   openvdb_ax/codegen/VolumeFunctions.cc
   openvdb_ax/compiler/Compiler.cc
+  openvdb_ax/compiler/Logger.cc
   openvdb_ax/compiler/PointExecutable.cc
   openvdb_ax/compiler/VolumeExecutable.cc
-  openvdb_ax/compiler/Logger.cc
   openvdb_ax/math/OpenSimplexNoise.cc
 )
 
@@ -145,7 +132,6 @@ endif()
 set(OPENVDB_AX_AST_INCLUDE_FILES
   openvdb_ax/ast/AST.h
   openvdb_ax/ast/Parse.h
-  openvdb_ax/ast/Literals.h
   openvdb_ax/ast/PrintTree.h
   openvdb_ax/ast/Scanners.h
   openvdb_ax/ast/Tokens.h
@@ -159,6 +145,7 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
   openvdb_ax/codegen/Functions.h
   openvdb_ax/codegen/FunctionTypes.h
   openvdb_ax/codegen/PointComputeGenerator.h
+  openvdb_ax/codegen/PointLeafLocalData.h
   openvdb_ax/codegen/SymbolTable.h
   openvdb_ax/codegen/Types.h
   openvdb_ax/codegen/Utils.h
@@ -167,14 +154,13 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
 )
 
 set(OPENVDB_AX_COMPILER_INCLUDE_FILES
+  openvdb_ax/compiler/AttributeRegistry.h
   openvdb_ax/compiler/Compiler.h
   openvdb_ax/compiler/CompilerOptions.h
   openvdb_ax/compiler/CustomData.h
-  openvdb_ax/compiler/LeafLocalData.h
-  openvdb_ax/compiler/PointExecutable.h
-  openvdb_ax/compiler/AttributeRegistry.h
-  openvdb_ax/compiler/VolumeExecutable.h
   openvdb_ax/compiler/Logger.h
+  openvdb_ax/compiler/PointExecutable.h
+  openvdb_ax/compiler/VolumeExecutable.h
 )
 
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
@@ -208,7 +194,6 @@ endif()
 set(OPENVDB_AX_CORE_DEPENDENT_LIBS
   ${OPENVDB_LIB}
   ${LLVM_LIBS}
-  Boost::random
 )
 
 ##########################################################################

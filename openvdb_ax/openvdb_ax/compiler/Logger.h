@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file codegen/Logger.h
+/// @file compiler/Logger.h
 ///
 /// @authors Richard Jones
 ///

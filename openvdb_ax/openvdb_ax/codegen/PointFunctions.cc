@@ -16,10 +16,10 @@
 #include "FunctionTypes.h"
 #include "Types.h"
 #include "Utils.h"
+#include "PointLeafLocalData.h"
 
 #include "../ast/Tokens.h"
 #include "../compiler/CompilerOptions.h"
-#include "../compiler/LeafLocalData.h"
 #include "../Exceptions.h"
 
 #include <openvdb/openvdb.h>
@@ -65,7 +65,7 @@ groupHandle(const std::string& name, void** groupHandles, const void* const data
 
 }
 
-inline FunctionGroup::Ptr ax_ingroup(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
 {
     static auto ingroup =
         [](const AXString* const name,
@@ -87,8 +87,8 @@ inline FunctionGroup::Ptr ax_ingroup(const FunctionOptions& op)
 
         // If the handle doesn't exist, check to see if any new groups have
         // been added
-        const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
+        const codegen_internal::PointLeafLocalData* const leafData =
+            static_cast<const codegen_internal::PointLeafLocalData*>(leafDataPtr);
         handle = leafData->get(nameStr);
         return handle ? handle->get(static_cast<openvdb::Index>(index)) : false;
     };
@@ -117,7 +117,7 @@ inline FunctionGroup::Ptr ax_ingroup(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axingroup(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
 {
     static auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -155,7 +155,7 @@ inline FunctionGroup::Ptr axingroup(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axeditgroup(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
 {
     static auto editgroup =
         [](const AXString* const name,
@@ -178,8 +178,8 @@ inline FunctionGroup::Ptr axeditgroup(const FunctionOptions& op)
         }
 
         if (!handle) {
-            openvdb::ax::compiler::LeafLocalData* const leafData =
-                static_cast<openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
+            codegen_internal::PointLeafLocalData* const leafData =
+                static_cast<codegen_internal::PointLeafLocalData*>(leafDataPtr);
 
             // If we are setting membership and the handle doesnt exist, create in in
             // the set of new data thats being added
@@ -211,7 +211,7 @@ inline FunctionGroup::Ptr axeditgroup(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axaddtogroup(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
 {
     static auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -251,7 +251,7 @@ inline FunctionGroup::Ptr axaddtogroup(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axremovefromgroup(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
 {
     static auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -290,7 +290,7 @@ inline FunctionGroup::Ptr axremovefromgroup(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axdeletepoint(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axdeletepoint(const FunctionOptions& op)
 {
     static auto generate =
         [op](const std::vector<llvm::Value*>&,
@@ -321,7 +321,7 @@ inline FunctionGroup::Ptr axdeletepoint(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axsetattribute(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
 {
     static auto setattribptr =
         [](void* attributeHandle, uint64_t index, const auto value)
@@ -355,8 +355,8 @@ inline FunctionGroup::Ptr axsetattribute(const FunctionOptions& op)
         const std::string s(value->ptr, value->size);
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
-        openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
+        codegen_internal::PointLeafLocalData* const leafData =
+            static_cast<codegen_internal::PointLeafLocalData*>(leafDataPtr);
 
         // Check to see if the string exists in the metadata cache. If so, set the string and
         // remove any new data associated with it, otherwise set the new data
@@ -436,7 +436,7 @@ inline FunctionGroup::Ptr axsetattribute(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axgetattribute(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
 {
     static auto getattrib =
         [](void* attributeHandle, uint64_t index, auto value)
@@ -472,8 +472,8 @@ inline FunctionGroup::Ptr axgetattribute(const FunctionOptions& op)
 
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
-        const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
+        const codegen_internal::PointLeafLocalData* const leafData =
+            static_cast<const codegen_internal::PointLeafLocalData*>(leafDataPtr);
 
         std::string data;
         if (!leafData->getNewStringData(&(handle->array()), index, data)) {
@@ -538,7 +538,7 @@ inline FunctionGroup::Ptr axgetattribute(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axstrattribsize(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axstrattribsize(const FunctionOptions& op)
 {
     static auto strattribsize =
         [](void* attributeHandle,
@@ -553,8 +553,8 @@ inline FunctionGroup::Ptr axstrattribsize(const FunctionOptions& op)
 
         const AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
-        const openvdb::ax::compiler::LeafLocalData* const leafData =
-            static_cast<const openvdb::ax::compiler::LeafLocalData*>(leafDataPtr);
+        const codegen_internal::PointLeafLocalData* const leafData =
+            static_cast<const codegen_internal::PointLeafLocalData*>(leafDataPtr);
 
         std::string data;
         if (!leafData->getNewStringData(&(handle->array()), index, data)) {

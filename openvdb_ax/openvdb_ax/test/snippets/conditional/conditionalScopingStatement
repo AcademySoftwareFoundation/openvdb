@@ -1,4 +1,4 @@
-int@int_test = 0;
+int32@int_test = 0;
 
 if(true) {
     if (true) {

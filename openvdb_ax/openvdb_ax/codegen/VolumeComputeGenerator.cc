@@ -41,6 +41,7 @@ std::string VolumeKernel::getDefaultName() { return "ax.compute.voxel"; }
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+namespace codegen_internal {
 
 VolumeComputeGenerator::VolumeComputeGenerator(llvm::Module& module,
                                                const FunctionOptions& options,
@@ -180,7 +181,7 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
                 value = mBuilder.CreateLoad(value);
             }
 
-            const FunctionGroup::Ptr function = this->getFunction("setvoxel", true);
+            const FunctionGroup* const function = this->getFunction("setvoxel", true);
             function->execute({accessor, coordis, value}, mBuilder);
 
             mBuilder.CreateBr(continueBlock);
@@ -234,7 +235,7 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
     llvm::Value* accessor = mBuilder.CreateLoad(accessorPtr);
     llvm::Value* transform = mBuilder.CreateLoad(transformPtr);
 
-    const FunctionGroup::Ptr function = this->getFunction("getvoxel", true);
+    const FunctionGroup* const function = this->getFunction("getvoxel", true);
     function->execute({accessor, transform, coordws, location}, mBuilder);
 }
 
@@ -263,6 +264,7 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+} // namespace codegen_internal
 
 } // namespace codegen
 } // namespace ax

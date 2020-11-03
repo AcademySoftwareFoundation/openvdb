@@ -778,6 +778,7 @@ struct IRFunctionSRet : public SRetFunction<SignatureT, IRFunction<SignatureT>>
 struct FunctionGroup
 {
     using Ptr = std::shared_ptr<FunctionGroup>;
+    using UniquePtr = std::unique_ptr<FunctionGroup>;
     using FunctionList = std::vector<Function::Ptr>;
 
     FunctionGroup(const char* name,
@@ -1031,7 +1032,7 @@ struct FunctionBuilder
     inline FunctionBuilder& setDocumentation(const char* doc) { mDoc = doc; return *this; }
     inline FunctionBuilder& setPreferredImpl(DeclPreferrence pref) { mDeclPref = pref; return *this; }
 
-    inline FunctionGroup::Ptr get() const
+    inline FunctionGroup::UniquePtr get() const
     {
         for (auto& decl : mCFunctions) {
             const auto& s = mSettings.at(decl.get());
@@ -1076,7 +1077,7 @@ struct FunctionBuilder
             functions.insert(functions.end(), mCFunctions.begin(), mCFunctions.end());
         }
 
-        FunctionGroup::Ptr group(new FunctionGroup(mName, mDoc, functions));
+        FunctionGroup::UniquePtr group(new FunctionGroup(mName, mDoc, functions));
         return group;
     }
 

@@ -125,8 +125,8 @@ void TestPrinters::testReprint()
 
     // Test declarations
     os.str("");
-    in = "bool a; short b,c; int d=0, e; long f; float g; double h, i=0;";
-    expected = "bool a;\nshort b, c;\nint d = 0, e;\nlong f;\nfloat g;\ndouble h, i = 0;\n";
+    in = "bool a; int b,c; int32 d=0, e; int64 f; float g; double h, i=0;";
+    expected = "bool a;\nint32 b, c;\nint32 d = 0, e;\nint64 f;\nfloat g;\ndouble h, i = 0;\n";
     tree = parse(in.c_str());
     CPPUNIT_ASSERT(tree.get());
     reprint(*tree, os, "");
@@ -153,7 +153,7 @@ void TestPrinters::testReprint()
     // Test attributes/externals
     os.str("");
     in = "@a; $a; v@b; v$b; f@a; f$a; i@c; i$c; s@d; s$d;";
-    expected = "float@a;\nfloat$a;\nvec3f@b;\nvec3f$b;\nfloat@a;\nfloat$a;\nint@c;\nint$c;\nstring@d;\nstring$d;\n";
+    expected = "float@a;\nfloat$a;\nvec3f@b;\nvec3f$b;\nfloat@a;\nfloat$a;\nint32@c;\nint32$c;\nstring@d;\nstring$d;\n";
     tree = parse(in.c_str());
     CPPUNIT_ASSERT(tree.get());
     reprint(*tree, os, "");
@@ -170,8 +170,8 @@ void TestPrinters::testReprint()
 
     // Test loops
     os.str("");
-    in = "while (a) for (int b, c;;) do { d; } while (e)";
-    expected = "while (a)\n{\nfor (int b, c; true; )\n{\ndo\n{\nd;\n}\nwhile (e)\n}\n}\n";
+    in = "while (a) for (int32 b, c;;) do { d; } while (e)";
+    expected = "while (a)\n{\nfor (int32 b, c; true; )\n{\ndo\n{\nd;\n}\nwhile (e)\n}\n}\n";
     tree = parse(in.c_str());
     CPPUNIT_ASSERT(tree.get());
     reprint(*tree, os, "");
@@ -179,8 +179,8 @@ void TestPrinters::testReprint()
 
     // Test loops with indents
     os.str("");
-    in = "while (a) for (int b, c;;) do { d; } while (e)";
-    expected = "  while (a)\n  {\n    for (int b, c; true; )\n    {\n      do\n      {\n        d;\n      }\n      while (e)\n    }\n  }\n";
+    in = "while (a) for (int32 b, c;;) do { d; } while (e)";
+    expected = "  while (a)\n  {\n    for (int32 b, c; true; )\n    {\n      do\n      {\n        d;\n      }\n      while (e)\n    }\n  }\n";
     tree = parse(in.c_str());
     CPPUNIT_ASSERT(tree.get());
     reprint(*tree, os, "  ");

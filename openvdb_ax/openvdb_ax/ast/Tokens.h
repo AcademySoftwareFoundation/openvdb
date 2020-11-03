@@ -32,9 +32,9 @@ enum CoreType
 {
     BOOL = 0,
     CHAR,
-    SHORT,
-    INT,
-    LONG,
+    INT16,
+    INT32,
+    INT64,
     FLOAT,
     DOUBLE,
     //
@@ -86,11 +86,14 @@ inline CoreType tokenFromTypeString(const std::string& type)
         if (type == "quatf") return QUATF;
         if (type == "quatd") return QUATD;
     }
+    else if (type[0] == 'i') {
+        if (type == "int16") return INT16;
+        if (type == "int")   return INT32;
+        if (type == "int32") return INT32;
+        if (type == "int64") return INT64;
+    }
     else if (type == "bool")   return BOOL;
     else if (type == "char")   return CHAR;
-    else if (type == "short")  return SHORT;
-    else if (type == "int")    return INT;
-    else if (type == "long")   return LONG;
     else if (type == "float")  return FLOAT;
     else if (type == "double") return DOUBLE;
     else if (type == "string") return STRING;
@@ -108,11 +111,6 @@ inline CoreType tokenFromTypeString(const std::string& type)
         if (type == "mat4s") return MAT4F;
     }
     else if (type == "quats") return QUATF;
-    else if (type[0] == 'i') {
-        if (type == "int16") return SHORT;
-        if (type == "int32") return INT;
-        if (type == "int64") return LONG;
-    }
 
     return UNKNOWN;
 }
@@ -122,9 +120,9 @@ inline std::string typeStringFromToken(const CoreType type)
     switch (type) {
         case BOOL    : return "bool";
         case CHAR    : return "char";
-        case SHORT   : return "short";
-        case INT     : return "int";
-        case LONG    : return "long";
+        case INT16   : return "int16";
+        case INT32   : return "int32";
+        case INT64   : return "int64";
         case FLOAT   : return "float";
         case DOUBLE  : return "double";
         case VEC2I   : return "vec2i";
@@ -148,29 +146,6 @@ inline std::string typeStringFromToken(const CoreType type)
             return "unknown";
     }
 }
-
-template<typename T> CoreType tokenFromType()                    { return UNKNOWN; }
-template<> inline CoreType tokenFromType<bool>()                 { return BOOL; }
-template<> inline CoreType tokenFromType<char>()                 { return CHAR; }
-template<> inline CoreType tokenFromType<int16_t>()              { return SHORT; }
-template<> inline CoreType tokenFromType<int32_t>()              { return INT; }
-template<> inline CoreType tokenFromType<int64_t>()              { return LONG; }
-template<> inline CoreType tokenFromType<float>()                { return FLOAT; }
-template<> inline CoreType tokenFromType<double>()               { return DOUBLE; }
-template<> inline CoreType tokenFromType<math::Vec2<int32_t>>()  { return VEC2I; }
-template<> inline CoreType tokenFromType<math::Vec2<float>>()    { return VEC2F; }
-template<> inline CoreType tokenFromType<math::Vec2<double>>()   { return VEC2D; }
-template<> inline CoreType tokenFromType<math::Vec3<int32_t>>()  { return VEC3I; }
-template<> inline CoreType tokenFromType<math::Vec3<float>>()    { return VEC3F; }
-template<> inline CoreType tokenFromType<math::Vec3<double>>()   { return VEC3D; }
-template<> inline CoreType tokenFromType<math::Vec4<int32_t>>()  { return VEC4I; }
-template<> inline CoreType tokenFromType<math::Vec4<float>>()    { return VEC4F; }
-template<> inline CoreType tokenFromType<math::Vec4<double>>()   { return VEC4D; }
-template<> inline CoreType tokenFromType<math::Mat3<float>>()    { return MAT3F; }
-template<> inline CoreType tokenFromType<math::Mat3<double>>()   { return MAT3D; }
-template<> inline CoreType tokenFromType<math::Mat4<float>>()    { return MAT4F; }
-template<> inline CoreType tokenFromType<math::Mat4<double>>()   { return MAT4D; }
-template<> inline CoreType tokenFromType<std::string>()          { return STRING; }
 
 enum OperatorToken
 {

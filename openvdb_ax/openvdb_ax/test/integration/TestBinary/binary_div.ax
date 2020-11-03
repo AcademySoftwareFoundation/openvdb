@@ -1,7 +1,7 @@
 
-long@testlong = 3l / 2l;
-int@testint = 3 / 2;
-short@testshort = 3s / 2s;
+int64@testint64 = 3l / 2l;
+int32@testint32 = 3 / 2;
+int16@testint16 = 3 / 2;
 bool@testbool = false / true;
 double@testdouble = 2.3 / 1.1;
 float@testfloat = 2.3f / 1.1f;

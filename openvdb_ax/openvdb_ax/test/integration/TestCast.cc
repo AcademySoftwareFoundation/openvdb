@@ -46,62 +46,48 @@ TestCast::explicitScalar()
         }
     };
 
-    generate(std::vector<std::string>{ "bool", "short", "int", "long", "float", "double" });
+    generate(std::vector<std::string>{ "bool", "int32", "int64", "float", "double" });
 
-    const auto names = unittest_util::nameSequence("test", 5);
+    const auto names = unittest_util::nameSequence("test", 4);
     const std::map<std::string, std::function<void()>> expected = {
         { "bool", [&](){
-             mHarness.addAttribute<int16_t>("testshort", 1, 1);
-             mHarness.addAttribute<int32_t>("testint", 1, 1);
-             mHarness.addAttribute<int64_t>("testlong", 0, 0);
+             mHarness.addAttribute<int32_t>("testint32", 1, 1);
+             mHarness.addAttribute<int64_t>("testint64", 0, 0);
              mHarness.addAttribute<float>("testfloat", 2.3f, 2.3f);
              mHarness.addAttribute<double>("testdouble", 0.1, 0.1);
-             mHarness.addAttributes<bool>(names, {true, true, false, true, true});
+             mHarness.addAttributes<bool>(names, {true, false, true, true});
             }
         },
-        { "short", [&](){
+        { "int32", [&](){
              mHarness.addAttribute<bool>("testbool", true, true);
-             mHarness.addAttribute<int32_t>("testint", 2, 2);
-             mHarness.addAttribute<int64_t>("testlong", 2, 2);
+             mHarness.addAttribute<int64_t>("testint64", 2, 2);
              mHarness.addAttribute<float>("testfloat", 2.3f, 2.3f);
              mHarness.addAttribute<double>("testdouble", 2.1, 2.1);
-             mHarness.addAttributes<int16_t>(names, {1, 2, 2, 2, 2});
+             mHarness.addAttributes<int32_t>(names, {1, 2, 2, 2});
             }
         },
-        { "int", [&](){
+        { "int64", [&]() {
              mHarness.addAttribute<bool>("testbool", true, true);
-             mHarness.addAttribute<int16_t>("testshort", 2, 2);
-             mHarness.addAttribute<int64_t>("testlong", 2, 2);
+             mHarness.addAttribute<int32_t>("testint32", 2, 2);
              mHarness.addAttribute<float>("testfloat", 2.3f, 2.3f);
              mHarness.addAttribute<double>("testdouble", 2.1, 2.1);
-             mHarness.addAttributes<int32_t>(names, {1, 2, 2, 2, 2});
-            }
-        },
-        { "long", [&]() {
-             mHarness.addAttribute<bool>("testbool", true, true);
-             mHarness.addAttribute<int16_t>("testshort", 2, 2);
-             mHarness.addAttribute<int32_t>("testint", 2, 2);
-             mHarness.addAttribute<float>("testfloat", 2.3f, 2.3f);
-             mHarness.addAttribute<double>("testdouble", 2.1, 2.1);
-             mHarness.addAttributes<int64_t>(names, {1, 2, 2, 2, 2});
+             mHarness.addAttributes<int64_t>(names, {1, 2, 2, 2});
             }
         },
         { "float", [&]() {
              mHarness.addAttribute<bool>("testbool", true, true);
-             mHarness.addAttribute<int16_t>("testshort", 1, 1);
-             mHarness.addAttribute<int32_t>("testint", 1, 1);
-             mHarness.addAttribute<int64_t>("testlong", 1, 1);
+             mHarness.addAttribute<int32_t>("testint32", 1, 1);
+             mHarness.addAttribute<int64_t>("testint64", 1, 1);
              mHarness.addAttribute<double>("testdouble", 1.1, 1.1);
-             mHarness.addAttributes<float>(names, {1.0f, 1.0f, 1.0f, 1.0f, float(1.1)});
+             mHarness.addAttributes<float>(names, {1.0f, 1.0f, 1.0f, float(1.1)});
             }
         },
         { "double", [&]() {
              mHarness.addAttribute<bool>("testbool", true, true);
-             mHarness.addAttribute<int16_t>("testshort", 1, 1);
-             mHarness.addAttribute<int32_t>("testint", 1, 1);
-             mHarness.addAttribute<int64_t>("testlong", 1, 1);
+             mHarness.addAttribute<int32_t>("testint32", 1, 1);
+             mHarness.addAttribute<int64_t>("testint64", 1, 1);
              mHarness.addAttribute<float>("testfloat", 1.1f, 1.1f);
-             mHarness.addAttributes<double>(names, {1.0, 1.0, 1.0, 1.0, double(1.1f)});
+             mHarness.addAttributes<double>(names, {1.0, 1.0, 1.0, double(1.1f)});
             }
         }
     };

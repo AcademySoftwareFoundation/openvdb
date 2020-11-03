@@ -15,7 +15,6 @@
 #define OPENVDB_AX_AST_VISITOR_HAS_BEEN_INCLUDED
 
 #include "AST.h"
-#include "Literals.h"
 #include "Tokens.h"
 
 #include <openvdb/version.h>
@@ -123,9 +122,9 @@ struct Visitor
     inline bool postOrderNodes() const { return true; }
 
     /// @brief  Default behavior option. Reverses the traversal order of child
-    ///         nodes. If true, child nodes are accessed from first to last
-    ///         index .i.e. 0 -> Node::children(). If false, child nodes are
-    ///         accessed from last to first .i.e. Node::children() -> 0
+    ///         nodes. If true, child nodes are accessed from last to first
+    ///         index .i.e. Node::children() -> 0. If false, child nodes are
+    ///         accessed from first to last .i.e. 0 -> Node::children()
     inline bool reverseChildVisits() const { return false; }
 
     /// @brief  Default behavior option. Controls whether nodes visit themselves
