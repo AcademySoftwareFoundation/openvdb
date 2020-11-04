@@ -64,6 +64,8 @@ struct VolumeKernel
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+namespace codegen_internal {
+
 /// @brief Visitor object which will generate llvm IR for a syntax tree which has been generated
 ///        from AX that targets volumes.  The IR will represent a single function. It is mainly
 ///        used by the Compiler class.
@@ -92,6 +94,8 @@ private:
     llvm::Value* accessorHandleFromToken(const std::string&);
     void getAccessorValue(const std::string&, llvm::Value*);
 };
+
+} // namespace codegen_internal
 
 } // namespace codegen
 } // namespace ax

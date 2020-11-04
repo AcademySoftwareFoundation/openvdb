@@ -221,7 +221,7 @@ TestVolumeExecutable::testCompilerCases()
     logger.clear();
     {
         openvdb::ax::VolumeExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::VolumeExecutable>("int i = 1e200000000;", logger); // warning
+            compiler->compile<openvdb::ax::VolumeExecutable>("int i = 18446744073709551615;", logger); // warning
         CPPUNIT_ASSERT(executable);
         CPPUNIT_ASSERT(logger.hasWarning());
     }
@@ -255,7 +255,7 @@ TestVolumeExecutable::testCompilerCases()
     }
     logger.clear();
     {
-        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 1e200000000;", logger);
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
         CPPUNIT_ASSERT(tree);
         openvdb::ax::VolumeExecutable::Ptr executable =
             compiler->compile<openvdb::ax::VolumeExecutable>(*tree, logger); // warning
@@ -286,7 +286,7 @@ TestVolumeExecutable::testCompilerCases()
     }
     logger.clear();
     {
-        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 1e200000000;", logger);
+        openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
         openvdb::ax::VolumeExecutable::Ptr executable =
             compiler->compile<openvdb::ax::VolumeExecutable>(*(tree->copy()), logger); // warning
         CPPUNIT_ASSERT(executable);

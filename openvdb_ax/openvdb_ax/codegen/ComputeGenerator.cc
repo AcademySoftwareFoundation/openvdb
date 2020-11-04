@@ -94,6 +94,7 @@ std::string ComputeKernel::getDefaultName() { return "ax.compute"; }
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////////////////////////////////
 
+namespace codegen_internal {
 
 ComputeGenerator::ComputeGenerator(llvm::Module& module,
                                    const FunctionOptions& options,
@@ -177,12 +178,20 @@ bool ComputeGenerator::visit(const ast::ConditionalStatement* cond)
 
     // generate conditional
     if (!this->traverse(cond->condition())) return false;
-    llvm::Value* condition = mValues.top(); mValues.pop();
+    llvm::Value* condition = mValues.top();
+
     if (condition->getType()->isPointerTy()) {
         condition = mBuilder.CreateLoad(condition);
     }
-    condition = boolComparison(condition, mBuilder);
+    llvm::Type* conditionType = condition->getType();
+    // check the type of the condition branch is bool-convertable
+    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+        condition = boolComparison(condition, mBuilder);
+    } else {
+        if (!mLog.error("cannot convert non-scalar type to bool in condition", cond)) return false;
+    }
 
+    mValues.pop();
     const bool hasElse = cond->hasFalse();
     llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(mContext, "then", mFunction);
     llvm::BasicBlock* elseBlock = hasElse ? llvm::BasicBlock::Create(mContext, "else", mFunction) : postIfBlock;
@@ -218,8 +227,16 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     llvm::Type* trueType = trueValue->getType();
     bool truePtr = trueType->isPointerTy();
 
-    llvm::Value* boolCondition = truePtr ?
+    llvm::Type* conditionType = truePtr ? trueType->getPointerElementType() : trueType;
+    llvm::Value* boolCondition = nullptr;
+    // check the type of the condition branch is bool-convertable
+    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+        boolCondition = truePtr ?
             boolComparison(mBuilder.CreateLoad(trueValue), mBuilder) : boolComparison(trueValue, mBuilder);
+    }
+    else {
+        if (!mLog.error("cannot convert non-scalar type to bool in condition", tern)) return false;
+    }
 
     llvm::BasicBlock* trueBlock = llvm::BasicBlock::Create(mContext, "ternary_true", mFunction);
     llvm::BasicBlock* falseBlock = llvm::BasicBlock::Create(mContext, "ternary_false", mFunction);
@@ -246,7 +263,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     if (!this->traverse(tern->falseBranch())) return false;
     llvm::BranchInst* falseBranch = mBuilder.CreateBr(returnBlock);
 
-    llvm::Value* falseValue = mValues.top(); mValues.pop();
+    llvm::Value* falseValue = mValues.top();
     llvm::Type* falseType = falseValue->getType();
 
     // if both variables of same type do no casting or loading
@@ -352,20 +369,25 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         // void type ternary acts like if-else statement
         // push void value to stop use of return from this expression
         mBuilder.SetInsertPoint(returnBlock);
+        mValues.pop();
         mValues.push(falseValue);
         return true;
     }
 
     // reset to continue block
     mBuilder.SetInsertPoint(returnBlock);
-    llvm::PHINode* ternary = mBuilder.CreatePHI(trueValue->getType(), 2, "ternary");
+    // if any errors have occurred these may not be the same type
+    if (falseValue->getType() == trueValue->getType()) {
+        llvm::PHINode* ternary = mBuilder.CreatePHI(trueValue->getType(), 2, "ternary");
 
-    // if nesting branches the blocks for true and false branches may have been updated
-    // so get these again rather than reusing trueBlock/falseBlock
-    ternary->addIncoming(trueValue, trueBranch->getParent());
-    ternary->addIncoming(falseValue, falseBranch->getParent());
+        // if nesting branches the blocks for true and false branches may have been updated
+        // so get these again rather than reusing trueBlock/falseBlock
+        ternary->addIncoming(trueValue, trueBranch->getParent());
+        ternary->addIncoming(falseValue, falseBranch->getParent());
 
-    mValues.push(ternary);
+        mValues.pop();
+        mValues.push(ternary);
+    }
     return true;
 }
 
@@ -428,7 +450,14 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     if (condition->getType()->isPointerTy()) {
         condition = mBuilder.CreateLoad(condition);
     }
-    condition = boolComparison(condition, mBuilder);
+    llvm::Type* conditionType = condition->getType();
+    // check the type of the condition branch is bool-convertable
+    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+        condition = boolComparison(condition, mBuilder);
+    }
+    else {
+        if (!mLog.error("cannot convert non-scalar type to bool in condition", loop)) return false;
+    }
     mBuilder.CreateCondBr(condition, bodyBlock, postLoopBlock);
 
     // reset to post loop block
@@ -495,12 +524,75 @@ bool ComputeGenerator::visit(const ast::Keyword* node)
 
 bool ComputeGenerator::visit(const ast::BinaryOperator* node)
 {
-    llvm::Value* rhs = mValues.top(); mValues.pop();
-    llvm::Value* lhs = mValues.top(); mValues.pop();
-    llvm::Value* result = nullptr;
-    if (!this->binaryExpression(result, lhs, rhs, node->operation(), node)) return false;
+    if (!this->traverse(node->lhs())) return false;
 
-    if (result) mValues.push(result);
+    openvdb::ax::ast::tokens::OperatorToken opToken = node->operation();
+    // if AND or OR, need to handle short-circuiting
+    if (opToken == openvdb::ax::ast::tokens::OperatorToken::AND
+        || opToken == openvdb::ax::ast::tokens::OperatorToken::OR) {
+
+        llvm::Value* lhs = mValues.top(); mValues.pop();
+        llvm::Type* lhsType = lhs->getType();
+        if (lhsType->isPointerTy()) {
+            lhs = mBuilder.CreateLoad(lhs);
+            lhsType = lhsType->getPointerElementType();
+        }
+
+        if (lhsType->isFloatingPointTy() || lhsType->isIntegerTy()) {
+            lhs = boolComparison(lhs, mBuilder);
+        }
+        else {
+            if (!mLog.error("cannot convert non-scalar lhs type to bool", node)) return false;
+        }
+
+        llvm::BasicBlock* rhsBlock = llvm::BasicBlock::Create(mContext, "binary_rhs", mFunction);
+        llvm::BasicBlock* returnBlock = llvm::BasicBlock::Create(mContext, "binary_return", mFunction);
+        llvm::BranchInst* lhsBranch = nullptr;
+
+        if (opToken == openvdb::ax::ast::tokens::OperatorToken::AND) {
+            lhsBranch = mBuilder.CreateCondBr(lhs, rhsBlock, returnBlock);
+        }
+        else {
+            lhsBranch = mBuilder.CreateCondBr(lhs, returnBlock, rhsBlock);
+        }
+
+        mBuilder.SetInsertPoint(rhsBlock);
+        if (!this->traverse(node->rhs())) return false;
+
+        llvm::Value* rhs = mValues.top(); mValues.pop();
+        llvm::Type* rhsType = rhs->getType();
+        if (rhsType->isPointerTy()) {
+            rhs = mBuilder.CreateLoad(rhs);
+            rhsType = rhsType->getPointerElementType();
+        }
+
+        if (rhsType->isFloatingPointTy() || rhsType->isIntegerTy()) {
+            rhs = boolComparison(rhs, mBuilder);
+        }
+        else {
+            if (!mLog.error("cannot convert non-scalar rhs type to bool", node)) return false;
+        }
+
+        llvm::BranchInst* rhsBranch = mBuilder.CreateBr(returnBlock);
+
+        mBuilder.SetInsertPoint(returnBlock);
+        llvm::PHINode* result = mBuilder.CreatePHI(LLVMType<bool>::get(mContext), 2, "binary_op");
+        result->addIncoming(lhs, lhsBranch->getParent());
+        result->addIncoming(rhs, rhsBranch->getParent());
+        mValues.push(result);
+    }
+    else {
+        if (!this->traverse(node->rhs())) return false;
+        llvm::Value* rhs = mValues.top(); mValues.pop();
+        llvm::Value* lhs = mValues.top();
+        llvm::Value* result = nullptr;
+        if (!this->binaryExpression(result, lhs, rhs, node->operation(), node)) return false;
+
+        if (result) {
+            mValues.pop();
+            mValues.push(result);
+        }
+    }
     return true;
 }
 
@@ -520,7 +612,7 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         return true;
     }
 
-    llvm::Value* value = mValues.top(); mValues.pop();
+    llvm::Value* value = mValues.top();
     llvm::Type* type = value->getType();
     if (type->isPointerTy()) {
         type = type->getPointerElementType();
@@ -599,7 +691,10 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         if (!mLog.error("value is not a scalar or vector", node)) return false;
     }
 
-    if (result) mValues.push(result);
+    if (result)  {
+        mValues.pop();
+        mValues.push(result);
+    }
     return true;
 }
 
@@ -638,7 +733,6 @@ bool ComputeGenerator::visit(const ast::Crement* node)
         if (!mLog.error("unable to assign to an rvalue", node)) return false;
         return true;
     }
-    mValues.pop();
     llvm::Value* rvalue = mBuilder.CreateLoad(value);
     llvm::Type* type = rvalue->getType();
 
@@ -661,6 +755,7 @@ bool ComputeGenerator::visit(const ast::Crement* node)
 
         // decide what to put on the expression stack
     }
+    mValues.pop();
 
     if (node->post()) mValues.push(rvalue);
     else              mValues.push(value);
@@ -669,8 +764,7 @@ bool ComputeGenerator::visit(const ast::Crement* node)
 
 bool ComputeGenerator::visit(const ast::FunctionCall* node)
 {
-
-    const FunctionGroup::Ptr function = this->getFunction(node->name());
+    const FunctionGroup* const function = this->getFunction(node->name());
     if (!function) {
         if (!mLog.error("unable to locate function \"" + node->name() + "\".", node)) return false;
     }
@@ -1040,11 +1134,10 @@ bool ComputeGenerator::visit(const ast::Value<std::string>* node)
     return true;
 }
 
-FunctionGroup::Ptr ComputeGenerator::getFunction(const std::string &identifier,
+const FunctionGroup* ComputeGenerator::getFunction(const std::string &identifier,
                                                 const bool allowInternal)
 {
-    FunctionGroup::Ptr function = mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
-    return function;
+    return mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
 }
 
 template <typename ValueType>
@@ -1053,19 +1146,14 @@ ComputeGenerator::visit(const ast::Value<ValueType>* node)
 {
     using ContainerT = typename ast::Value<ValueType>::ContainerType;
 
-    const ValueType literal = static_cast<ValueType>(node->value());
-
-    static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
-    if (node->text()) {
-        if (!mLog.warning("integer constant is too large to be represented: " + *(node->text())
-                + " will be converted to \"" + std::to_string(literal) + "\"", node)) return false;
-    }
-    else if (node->asContainerType() > max) {
-        if (!mLog.warning("signed integer overflow " + std::to_string(node->asContainerType())
-                + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>() + "'", node)) return false;
+    static const ContainerT max =
+        static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
+    if (node->asContainerType() > max) {
+        if (!mLog.warning("signed integer overflow in integer literal "
+            + std::to_string(node->asContainerType()), node)) return false;
     }
 
-    llvm::Constant* value = LLVMType<ValueType>::get(mContext, literal);
+    llvm::Constant* value = LLVMType<ValueType>::get(mContext, node->value());
     mValues.push(value);
     return true;
 }
@@ -1074,23 +1162,8 @@ template <typename ValueType>
 typename std::enable_if<std::is_floating_point<ValueType>::value, bool>::type
 ComputeGenerator::visit(const ast::Value<ValueType>* node)
 {
-    using ContainerT = typename ast::Value<ValueType>::ContainerType;
-
-    assert(std::isinf(node->value()) || node->value() >= static_cast<ContainerT>(0.0));
-    const ValueType literal = static_cast<ValueType>(node->value());
-
-    static const ContainerT max = static_cast<ContainerT>(std::numeric_limits<ValueType>::max());
-    if (node->text()) {
-        if (!mLog.warning("floating constant exceeds range of double: " + *(node->text())
-                + " will be converted to inf.", node)) return false;
-    }
-    else if (node->asContainerType() > max) {
-        if (!mLog.warning("floating point overflow " + std::to_string(node->asContainerType())
-            + " cannot be represented in type '" + openvdb::typeNameAsString<ValueType>()
-            + "' and will be converted to \"" + std::to_string(literal) + "\"", node)) return false;
-    }
-
-    llvm::Constant* value = LLVMType<ValueType>::get(mContext, literal);
+    assert(std::isinf(node->value()) || node->value() >= 0.0);
+    llvm::Constant* value = LLVMType<ValueType>::get(mContext, node->value());
     mValues.push(value);
     return true;
 }
@@ -1194,6 +1267,17 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
     if (componentwise) {
         assert(rsize == lsize || (rsize == 1 || lsize == 1));
         const size_t resultsize = std::max(lsize, rsize);
+
+        if (ltype != rtype) {
+            llvm::Type* letype = ltype->isArrayTy() ? ltype->getArrayElementType() : ltype;
+            llvm::Type* retype = rtype->isArrayTy() ? rtype->getArrayElementType() : rtype;
+            if (letype != retype) {
+                llvm::Type* highest = typePrecedence(letype, retype);
+                if (highest != letype) {
+                    if (!mLog.warning("implicit conversion in assignment (possible truncation)", node)) return false;
+                }
+            }
+        }
 
         // compute the componentwise precision
 
@@ -1399,12 +1483,26 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
         assert(rtype->isArrayTy() || rtype->isFloatingPointTy() || rtype->isIntegerTy());
         assert(rsize == lsize || (rsize == 1 || lsize == 1));
 
+        if (op == ast::tokens::DIVIDE || op == ast::tokens::MODULO) {
+            if (llvm::Constant* c = llvm::dyn_cast<llvm::Constant>(rhs)) {
+                if (c->isZeroValue()) {
+                    if (op == ast::tokens::DIVIDE) {
+                        if (!mLog.warning("division by zero is undefined", node)) return false;
+                    }
+                    else {
+                        if (!mLog.warning("modulo by zero is undefined", node)) return false;
+                    }
+                }
+            }
+        }
+
         // compute the componentwise precision
 
         llvm::Type* opprec = ltype->isArrayTy() ? ltype->getArrayElementType() : ltype;
         opprec = rtype->isArrayTy() ?
             typePrecedence(opprec, rtype->getArrayElementType()) :
             typePrecedence(opprec, rtype);
+
         // if bool, the lowest precision and subsequent result should be int32
         // for arithmetic, bitwise and certain other ops
         // @note - no bool containers, so if the type is a container, it can't
@@ -1559,6 +1657,8 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
     return true;
 }
 
+
+} // namespace codegen_internal
 
 } // namespace codegen
 } // namespace ax

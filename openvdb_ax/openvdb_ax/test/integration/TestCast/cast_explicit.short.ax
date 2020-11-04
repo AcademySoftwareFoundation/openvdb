@@ -1,6 +1,0 @@
-short@test1 = short(bool@testbool);
-short@test2 = short(int@testint);
-short@test3 = short(long@testlong);
-short@test4 = short(float@testfloat);
-short@test5 = short(double@testdouble);
-

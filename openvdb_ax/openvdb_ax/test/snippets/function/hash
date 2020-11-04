@@ -1,5 +1,5 @@
 
-long@test1 = hash("");
-long@test2 = hash("0");
-long@test3 = hash("abc");
-long@test4 = hash("123");
+int64@test1 = hash("");
+int64@test2 = hash("0");
+int64@test3 = hash("abc");
+int64@test4 = hash("123");

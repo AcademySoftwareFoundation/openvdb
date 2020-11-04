@@ -171,9 +171,9 @@ inline bool supported(const ast::tokens::CoreType type)
 {
     switch (type) {
         case ast::tokens::BOOL    : return true;
-        case ast::tokens::SHORT   : return true;
-        case ast::tokens::INT     : return true;
-        case ast::tokens::LONG    : return true;
+        case ast::tokens::INT16   : return true;
+        case ast::tokens::INT32   : return true;
+        case ast::tokens::INT64   : return true;
         case ast::tokens::FLOAT   : return true;
         case ast::tokens::DOUBLE  : return true;
         case ast::tokens::VEC2I   : return true;
@@ -204,9 +204,9 @@ retrieveAccessor(VolumeFunctionArguments& args,
     assert(supported(type) && "Could not retrieve accessor from unsupported type");
     switch (type) {
         case ast::tokens::BOOL    : { args.addAccessor(static_cast<ConverterT<bool>*>(grid)->tree()); return; }
-        case ast::tokens::SHORT   : { args.addAccessor(static_cast<ConverterT<int16_t>*>(grid)->tree()); return; }
-        case ast::tokens::INT     : { args.addAccessor(static_cast<ConverterT<int32_t>*>(grid)->tree()); return; }
-        case ast::tokens::LONG    : { args.addAccessor(static_cast<ConverterT<int64_t>*>(grid)->tree()); return; }
+        case ast::tokens::INT16   : { args.addAccessor(static_cast<ConverterT<int16_t>*>(grid)->tree()); return; }
+        case ast::tokens::INT32   : { args.addAccessor(static_cast<ConverterT<int32_t>*>(grid)->tree()); return; }
+        case ast::tokens::INT64   : { args.addAccessor(static_cast<ConverterT<int64_t>*>(grid)->tree()); return; }
         case ast::tokens::FLOAT   : { args.addAccessor(static_cast<ConverterT<float>*>(grid)->tree()); return; }
         case ast::tokens::DOUBLE  : { args.addAccessor(static_cast<ConverterT<double>*>(grid)->tree()); return; }
         case ast::tokens::VEC2D   : { args.addAccessor(static_cast<ConverterT<openvdb::math::Vec2<double>>*>(grid)->tree()); return; }
@@ -235,9 +235,9 @@ createGrid(const ast::tokens::CoreType& type)
     assert(supported(type) && "Could not retrieve accessor from unsupported type");
     switch (type) {
         case ast::tokens::BOOL    : return ConverterT<bool>::create();
-        case ast::tokens::SHORT   : return ConverterT<int16_t>::create();
-        case ast::tokens::INT     : return ConverterT<int32_t>::create();
-        case ast::tokens::LONG    : return ConverterT<int64_t>::create();
+        case ast::tokens::INT16   : return ConverterT<int16_t>::create();
+        case ast::tokens::INT32   : return ConverterT<int32_t>::create();
+        case ast::tokens::INT64   : return ConverterT<int64_t>::create();
         case ast::tokens::FLOAT   : return ConverterT<float>::create();
         case ast::tokens::DOUBLE  : return ConverterT<double>::create();
         case ast::tokens::VEC2D   : return ConverterT<openvdb::math::Vec2<double>>::create();

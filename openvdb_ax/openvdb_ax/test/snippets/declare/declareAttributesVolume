@@ -2,10 +2,10 @@
 // are not supported at the moment.  Can be deprecated if this ever changes
 
 @float_test1;
-int@int_test1;
+int32@int_test1;
 
-int@int_test2 = 5;
-long@long_test = 3l;
+int32@int_test2 = 5;
+int64@long_test = 3l;
 
 float@float_test2 = 0.2f;
 double@double_test = 0.3;

@@ -32,7 +32,6 @@ static const unittest_util::CodeTests tests =
     { "@a.r;",            Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int32_t>(0))) },
     { "@a.g;",            Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int32_t>(1))) },
     { "@a.b;",            Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int32_t>(2))) },
-    { "@a[0s];",          Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int16_t>(0))) },
     { "@a[0l];",          Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int64_t>(0))) },
     { "@a[0];",           Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int32_t>(0))) },
     { "@a[1];",           Node::Ptr(new ArrayUnpack(new Attribute("a", CoreType::FLOAT, true), new Value<int32_t>(1))) },

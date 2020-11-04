@@ -19,9 +19,8 @@ using ConfigMap = std::unordered_map<std::string, std::unordered_map<std::string
 
 static const ConfigMap integral = {
     { "bool",   { { "_l1_", "true" }, { "_l2_", "false" } }  },
-    { "short",  { { "_l1_", "2s" },   { "_l2_", "3s" } }     },
-    { "int",    { { "_l1_", "2" },    { "_l2_", "3" } }      },
-    { "long",   { { "_l1_", "2l" },   { "_l2_", "3l" } }     }
+    { "int32",  { { "_l1_", "2" },    { "_l2_", "3" } }      },
+    { "int64",  { { "_l1_", "2l" },   { "_l2_", "3l" } }     }
 };
 
 static const ConfigMap floating = {
@@ -154,17 +153,12 @@ _T1_@test8 = _l1_;
                     { true, true, true, true, false, false, true, true });
             },
         },
-        { "short",
-            [&](){ mHarness.addAttributes<int16_t>(names,
-                    { 2, 2, 2, 2, 3, 3, 2, 2 });
-            },
-        },
-        { "int",
+        { "int32",
             [&](){ mHarness.addAttributes<int32_t>(names,
                     { 2, 2, 2, 2, 3, 3, 2, 2 });
             },
         },
-        { "long",
+        { "int64",
             [&](){ mHarness.addAttributes<int64_t>(names,
                     { 2, 2, 2, 2, 3, 3, 2, 2 });
             },
@@ -413,17 +407,7 @@ _T1_@test14 += local2;
                 },
             }
         },
-        { "short", {
-                [&](){ mHarness.addAttributes<int16_t>(names,
-                        { 2, -2, 0, 0, 0, 0, 0, 0, 2, 2,  5, 0, 0, 3 });
-                },
-                [&](){ mHarness.addAttributes<int16_t>(names,
-                        { 1, 2, 3, 4, 5,  6, 7, 8,  9, 10,  0, 12, 13, 14 },  // in
-                        { 3, 0, 6, 2, 1, 24, 1, 0, 11, 10,  5, 25, 13, 17 }); // expected
-                },
-            }
-        },
-        { "int", {
+        { "int32", {
                 [&](){ mHarness.addAttributes<int32_t>(names,
                         { 2, -2, 0, 0, 0, 0, 0, 0, 2, 2,  5, 0, 0, 3 });
                 },
@@ -433,7 +417,7 @@ _T1_@test14 += local2;
                 },
             }
         },
-        { "long", {
+        { "int64", {
                 [&](){ mHarness.addAttributes<int64_t>(names,
                         { 2, -2, 0, 0, 0, 0, 0, 0, 2, 2,  5, 0, 0, 3 });
                 },
@@ -1159,50 +1143,37 @@ TestAssign::implicitScalarAssignment()
     // source -> dest
     const std::map<std::string, std::function<void()>> expected = {
         { "bool", [&](){
-             mHarness.addAttribute<int16_t>("testshort", 1);
-             mHarness.addAttribute<int32_t>("testint", 1);
-             mHarness.addAttribute<int64_t>("testlong", 1);
+             mHarness.addAttribute<int32_t>("testint32", 1);
+             mHarness.addAttribute<int64_t>("testint64", 1);
              mHarness.addAttribute<float>("testfloat", 1.0f);
              mHarness.addAttribute<double>("testdouble", 1.0);
             }
         },
-        { "short", [&](){
+        { "int32", [&](){
              mHarness.addAttribute<bool>("testbool", true);
-             mHarness.addAttribute<int32_t>("testint", 2);
-             mHarness.addAttribute<int64_t>("testlong", 2);
+             mHarness.addAttribute<int64_t>("testint64", 2);
              mHarness.addAttribute<float>("testfloat", 2.0f);
              mHarness.addAttribute<double>("testdouble", 2.0);
             }
         },
-        { "int", [&](){
+        { "int64", [&](){
              mHarness.addAttribute<bool>("testbool", true);
-             mHarness.addAttribute<int16_t>("testshort", 2);
-             mHarness.addAttribute<int64_t>("testlong", 2);
-             mHarness.addAttribute<float>("testfloat", 2.0f);
-             mHarness.addAttribute<double>("testdouble", 2.0);
-            }
-        },
-        { "long", [&](){
-             mHarness.addAttribute<bool>("testbool", true);
-             mHarness.addAttribute<int16_t>("testshort", 2);
-             mHarness.addAttribute<int32_t>("testint", 2);
+             mHarness.addAttribute<int32_t>("testint32", 2);
              mHarness.addAttribute<float>("testfloat", 2.0f);
              mHarness.addAttribute<double>("testdouble", 2.0);
             }
         },
         { "float", [&](){
              mHarness.addAttribute<bool>("testbool", true);
-             mHarness.addAttribute<int16_t>("testshort", 1);
-             mHarness.addAttribute<int32_t>("testint", 1);
-             mHarness.addAttribute<int64_t>("testlong", 1);
+             mHarness.addAttribute<int32_t>("testint32", 1);
+             mHarness.addAttribute<int64_t>("testint64", 1);
              mHarness.addAttribute<double>("testdouble", double(1.1f));
             }
         },
         { "double", [&](){
              mHarness.addAttribute<bool>("testbool", true);
-             mHarness.addAttribute<int16_t>("testshort", 1);
-             mHarness.addAttribute<int32_t>("testint", 1);
-             mHarness.addAttribute<int64_t>("testlong", 1);
+             mHarness.addAttribute<int32_t>("testint32", 1);
+             mHarness.addAttribute<int64_t>("testint64", 1);
              mHarness.addAttribute<float>("testfloat", float(1.1));
             }
         }
@@ -1397,7 +1368,7 @@ TestAssign::implicitContainerScalarAssignment()
                 mHarness.addAttribute<openvdb::math::Mat4<double>>("testmat4d", symmetric4(1.0));
             }
         },
-        { "short", [&]() {
+        { "int32", [&](){
                 mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(2,2));
                 mHarness.addAttribute<openvdb::math::Vec2<double>>("testvec2d", openvdb::math::Vec2<double>(2.0,2.0));
                 mHarness.addAttribute<openvdb::math::Vec2<float>>("testvec2f", openvdb::math::Vec2<float>(2.0f,2.0f));
@@ -1413,23 +1384,7 @@ TestAssign::implicitContainerScalarAssignment()
                 mHarness.addAttribute<openvdb::math::Mat4<double>>("testmat4d", symmetric4(2.0));
             }
         },
-        { "int", [&](){
-                mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(2,2));
-                mHarness.addAttribute<openvdb::math::Vec2<double>>("testvec2d", openvdb::math::Vec2<double>(2.0,2.0));
-                mHarness.addAttribute<openvdb::math::Vec2<float>>("testvec2f", openvdb::math::Vec2<float>(2.0f,2.0f));
-                mHarness.addAttribute<openvdb::math::Vec3<int32_t>>("testvec3i", openvdb::math::Vec3<int32_t>(2,2,2));
-                mHarness.addAttribute<openvdb::math::Vec3<double>>("testvec3d", openvdb::math::Vec3<double>(2.0,2.0,2.0));
-                mHarness.addAttribute<openvdb::math::Vec3<float>>("testvec3f", openvdb::math::Vec3<float>(2.0f,2.0f,2.0f));
-                mHarness.addAttribute<openvdb::math::Vec4<int32_t>>("testvec4i", openvdb::math::Vec4<int32_t>(2,2,2,2));
-                mHarness.addAttribute<openvdb::math::Vec4<double>>("testvec4d", openvdb::math::Vec4<double>(2.0,2.0,2.0,2.0));
-                mHarness.addAttribute<openvdb::math::Vec4<float>>("testvec4f", openvdb::math::Vec4<float>(2.0f,2.0f,2.0f,2.0f));
-                mHarness.addAttribute<openvdb::math::Mat3<float>>("testmat3f", symmetric3(2.0f));
-                mHarness.addAttribute<openvdb::math::Mat3<double>>("testmat3d", symmetric3(2.0));
-                mHarness.addAttribute<openvdb::math::Mat4<float>>("testmat4f", symmetric4(2.0f));
-                mHarness.addAttribute<openvdb::math::Mat4<double>>("testmat4d", symmetric4(2.0));
-            }
-        },
-        { "long", [&](){
+        { "int64", [&](){
                 mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(2,2));
                 mHarness.addAttribute<openvdb::math::Vec2<double>>("testvec2d", openvdb::math::Vec2<double>(2.0,2.0));
                 mHarness.addAttribute<openvdb::math::Vec2<float>>("testvec2f", openvdb::math::Vec2<float>(2.0f,2.0f));

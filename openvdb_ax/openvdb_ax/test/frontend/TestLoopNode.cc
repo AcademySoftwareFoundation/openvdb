@@ -18,22 +18,22 @@ namespace {
 
 static const unittest_util::CodeTests tests =
 {
-    { "for (int i = 0; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                             new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                             new Block(),
-                                            new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                            new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                             new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for(int i = 0; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for(int32 i = 0; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                             new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                             new Block(),
-                                            new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                            new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                             new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for (int i = 0;i < 10;++i) ;", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0;i < 10;++i) ;", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                         new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                         new Block(),
-                                        new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                        new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                         new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
     { "for (i; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
@@ -135,10 +135,10 @@ static const unittest_util::CodeTests tests =
                                     nullptr,
                                     new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for (int i = 0; i < 10; ++i, ++j) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0; i < 10; ++i, ++j) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                                 new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                                 new Block(),
-                                                new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                                new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                                 new CommaOperator({
                                                     new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false),
                                                     new Crement(new Local("j"), Crement::Operation::Increment, /*post*/false)
@@ -153,22 +153,22 @@ static const unittest_util::CodeTests tests =
                                                 new Crement(new Local("j"), Crement::Operation::Increment, /*post*/false)
                                             })))
     },
-    { "for (int i = 0; i; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0; i; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                         new Local("i"),
                                         new Block(),
-                                        new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                        new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                         new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for (int i = 0; func(i); ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0; func(i); ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                             new FunctionCall("func", new Local("i")),
                                             new Block(),
-                                            new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                            new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                             new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for (int i = 0; int j = func(i); ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
-                                            new DeclareLocal(CoreType::INT, new Local("j"),new FunctionCall("func", new Local("i"))),
+    { "for (int32 i = 0; int32 j = func(i); ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+                                            new DeclareLocal(CoreType::INT32, new Local("j"),new FunctionCall("func", new Local("i"))),
                                             new Block(),
-                                            new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                            new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                             new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
     { "for (; i < 10;) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
@@ -195,12 +195,12 @@ static const unittest_util::CodeTests tests =
                                     new Value<int32_t>(3)
                                 }))))
     },
-    { "for (int i = 0, j = 0, k; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0, j = 0, k; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                                     new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                                     new Block(),
-                                                    new StatementList({new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
-                                                                       new DeclareLocal(CoreType::INT, new Local("j"), new Value<int32_t>(0)),
-                                                                       new DeclareLocal( CoreType::INT, new Local("k"))}),
+                                                    new StatementList({new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
+                                                                       new DeclareLocal(CoreType::INT32, new Local("j"), new Value<int32_t>(0)),
+                                                                       new DeclareLocal( CoreType::INT32, new Local("k"))}),
                                                     new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
     { "for (i = 0, j = 0; i < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
@@ -212,17 +212,17 @@ static const unittest_util::CodeTests tests =
                                                 }),
                                                 new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "for (int i = 0; i < 10, j < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
+    { "for (int32 i = 0; i < 10, j < 10; ++i) {}", Node::Ptr(new Loop(tokens::LoopToken::FOR,
                                                     new CommaOperator({
                                                         new BinaryOperator(new Local("i"), new Value<int32_t>(10), OperatorToken::LESSTHAN),
                                                         new BinaryOperator(new Local("j"), new Value<int32_t>(10), OperatorToken::LESSTHAN)
                                                     }),
                                                     new Block(),
-                                                    new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+                                                    new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                                     new Crement(new Local("i"), Crement::Operation::Increment, /*post*/false)))
     },
-    { "while (int i = 0) {}", Node::Ptr(new Loop(tokens::LoopToken::WHILE,
-                                new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+    { "while (int32 i = 0) {}", Node::Ptr(new Loop(tokens::LoopToken::WHILE,
+                                new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                 new Block()))
     },
     { "while (i = 0) {}", Node::Ptr(new Loop(tokens::LoopToken::WHILE,
@@ -267,8 +267,8 @@ static const unittest_util::CodeTests tests =
                                         }),
                                         new Block()))
     },
-    { "do ; while (int i = 0)", Node::Ptr(new Loop(tokens::LoopToken::DO,
-                                    new DeclareLocal(CoreType::INT, new Local("i"), new Value<int32_t>(0)),
+    { "do ; while (int32 i = 0)", Node::Ptr(new Loop(tokens::LoopToken::DO,
+                                    new DeclareLocal(CoreType::INT32, new Local("i"), new Value<int32_t>(0)),
                                     new Block()))
     },
     { "do ; while ((a,b,c))", Node::Ptr(new Loop(tokens::LoopToken::DO,

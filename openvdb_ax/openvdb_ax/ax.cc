@@ -63,12 +63,13 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
 {
     if (grids.empty()) return;
     // Check the type of all grids. If they are all points, run for point data.
-    // Otherwise, run for numerical volumes.
-    bool points = true;
+    // Otherwise, run for numerical volumes. Throw if the container has both.
+    const bool points = grids.front()->isType<points::PointDataGrid>();
     for (auto& grid : grids) {
-        if (!grid->isType<points::PointDataGrid>()) {
-            points = false;
-            break;
+        if (points ^ grid->isType<points::PointDataGrid>()) {
+            OPENVDB_THROW(AXCompilerError,
+                "Unable to process both OpenVDB Points and OpenVDB Volumes in "
+                "a single invocation of ax::run()");
         }
     }
     // Construct a logger that will output errors to cerr and suppress warnings
@@ -201,3 +202,4 @@ void uninitialize()
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
+

@@ -10,6 +10,7 @@
 #include <cppunit/extensions/HelperMacros.h>
 
 #include <string>
+#include <cstdlib>
 
 using namespace openvdb::ax::ast;
 using namespace openvdb::ax::ast::tokens;
@@ -17,6 +18,19 @@ using namespace openvdb::ax::ast::tokens;
 namespace {
 
 using CodeTestMap = std::map<Node::NodeType, unittest_util::CodeTests>;
+
+auto converti(const char* c) -> uint64_t { return std::strtoull(c, /*end*/nullptr, /*base*/10); }
+auto convertf(const char* c) -> float { return std::strtof(c, /*end*/nullptr); }
+auto convertd(const char* c) -> double { return std::strtod(c, /*end*/nullptr); }
+
+template <typename T>
+std::string fullDecimalValue(const T t) {
+    // 767 is max number of digits necessary to accurately represent base 2 doubles
+    std::ostringstream os;
+    os << std::setprecision(767) << t;
+    return os.str();
+}
+
 
 static const CodeTestMap value_tests =
 {
@@ -31,45 +45,24 @@ static const CodeTestMap value_tests =
     },
 
     {
-        Node::NodeType::ValueInt16Node,
-        {
-            { "1234567890s;",  Node::Ptr(new Value<int16_t>("1234567890")) }, // signed int wrap
-            { "00s;",          Node::Ptr(new Value<int16_t>("0")) },
-            { "0s;",           Node::Ptr(new Value<int16_t>("0")) },
-            // signed int wrap
-            { std::to_string(std::numeric_limits<int16_t>::max()) + "0s;",
-                Node::Ptr(new Value<int16_t>(std::to_string(std::numeric_limits<int16_t>::max()) + "0"))
-            },
-            // signed int wrap
-            { std::to_string(std::numeric_limits<uint64_t>::max()) + "s;",
-                Node::Ptr(new Value<int16_t>(std::to_string(std::numeric_limits<uint64_t>::max())))
-            }
-        }
-    },
-
-    {
         Node::NodeType::ValueInt32Node,
         {
-            { "00;",                Node::Ptr(new Value<int32_t>("0")) },
-            { "1000000000000000;",  Node::Ptr(new Value<int32_t>("1000000000000000")) }, // signed int wrap
-            { "0;",                 Node::Ptr(new Value<int32_t>("0")) },
-            { "1234567890;",        Node::Ptr(new Value<int32_t>("1234567890")) },
-            { "1;",                 Node::Ptr(new Value<int32_t>("1")) },
+            { "00;",                Node::Ptr(new Value<int32_t>(converti("0"))) },
+            { "1000000000000000;",  Node::Ptr(new Value<int32_t>(converti("1000000000000000"))) }, // signed int wrap
+            { "0;",                 Node::Ptr(new Value<int32_t>(converti("0"))) },
+            { "1234567890;",        Node::Ptr(new Value<int32_t>(converti("1234567890"))) },
+            { "1;",                 Node::Ptr(new Value<int32_t>(converti("1"))) },
             // signed int wrap
             { std::to_string(std::numeric_limits<int64_t>::max()) + ";",
-                Node::Ptr(new Value<int32_t>(std::to_string(std::numeric_limits<int64_t>::max())))
+                Node::Ptr(new Value<int32_t>(std::numeric_limits<int64_t>::max()))
             },
             // signed int wrap
             { std::to_string(std::numeric_limits<uint64_t>::max()) + ";",
-                Node::Ptr(new Value<int32_t>(std::to_string(std::numeric_limits<uint64_t>::max())))
+                Node::Ptr(new Value<int32_t>(std::numeric_limits<uint64_t>::max()))
             },
             // signed int wrap
             { std::to_string(std::numeric_limits<int32_t>::max()) + "0;",
-                Node::Ptr(new Value<int32_t>(std::to_string(std::numeric_limits<int32_t>::max()) + "0"))
-            },
-            // overflow
-            { std::to_string(std::numeric_limits<uint64_t>::max()) + "0;",
-                Node::Ptr(new Value<int32_t>(std::to_string(std::numeric_limits<uint64_t>::max()) + "0"))
+                Node::Ptr(new Value<int32_t>(uint64_t(std::numeric_limits<int32_t>::max()) * 10ul))
             }
         }
     },
@@ -77,16 +70,12 @@ static const CodeTestMap value_tests =
     {
         Node::NodeType::ValueInt64Node,
         {
-            { "01l;",                       Node::Ptr(new Value<int64_t>("1")) },
-            { "0l;",                        Node::Ptr(new Value<int64_t>("0")) },
-            { "1234567890l;",               Node::Ptr(new Value<int64_t>("1234567890l")) },
-            // overflow
-            { std::to_string(std::numeric_limits<int64_t>::max()) + "0l;",
-                Node::Ptr(new Value<int64_t>(std::to_string(std::numeric_limits<uint64_t>::max()) + "0"))
-            },
+            { "01l;",                       Node::Ptr(new Value<int64_t>(converti("1"))) },
+            { "0l;",                        Node::Ptr(new Value<int64_t>(converti("0"))) },
+            { "1234567890l;",               Node::Ptr(new Value<int64_t>(converti("1234567890l"))) },
             // signed int wrap
             { std::to_string(uint64_t(std::numeric_limits<int64_t>::max()) + 1) + "l;",
-                Node::Ptr(new Value<int64_t>(std::to_string(uint64_t(std::numeric_limits<int64_t>::max()) + 1ul)))
+                Node::Ptr(new Value<int64_t>(uint64_t(std::numeric_limits<int64_t>::max()) + 1ul))
             }
         }
     },
@@ -94,45 +83,46 @@ static const CodeTestMap value_tests =
     {
         Node::NodeType::ValueFloatNode,
         {
-            { ".123456789f;",               Node::Ptr(new Value<float>(".123456789f")) },
-            { "0.0f;",                      Node::Ptr(new Value<float>("0.0f")) },
-            { "00.f;",                      Node::Ptr(new Value<float>("0.0f")) },
-            { "0e+0f;",                     Node::Ptr(new Value<float>("0.0f")) },
-            { "0e-0f;",                     Node::Ptr(new Value<float>("0.0f")) },
-            { "0e0f;",                      Node::Ptr(new Value<float>("0.0f")) },
-            { "1234567890.0987654321f;",    Node::Ptr(new Value<float>("1234567890.0987654321f")) },
-            { "1e+6f;",                     Node::Ptr(new Value<float>("1e+6f")) },
-            { "1E+6f;",                     Node::Ptr(new Value<float>("1E+6f")) },
-            { "1e-6f;",                     Node::Ptr(new Value<float>("1e-6f")) },
-            { "1E-6f;",                     Node::Ptr(new Value<float>("1E-6f")) },
-            { "1e123456789f;",              Node::Ptr(new Value<float>("1e123456789f")) }, // overflow
-            { "1e6f;",                      Node::Ptr(new Value<float>("1e6f")) },
-            { "1E6f;",                      Node::Ptr(new Value<float>("1E6f")) }
+            { ".123456789f;",               Node::Ptr(new Value<float>(convertf(".123456789f"))) },
+            { "0.0f;",                      Node::Ptr(new Value<float>(convertf("0.0f"))) },
+            { "00.f;",                      Node::Ptr(new Value<float>(convertf("0.0f"))) },
+            { "0e+0f;",                     Node::Ptr(new Value<float>(convertf("0.0f"))) },
+            { "0e-0f;",                     Node::Ptr(new Value<float>(convertf("0.0f"))) },
+            { "0e0f;",                      Node::Ptr(new Value<float>(convertf("0.0f"))) },
+            { "1234567890.0987654321f;",    Node::Ptr(new Value<float>(convertf("1234567890.0987654321f"))) },
+            { "1e+6f;",                     Node::Ptr(new Value<float>(convertf("1e+6f"))) },
+            { "1E+6f;",                     Node::Ptr(new Value<float>(convertf("1E+6f"))) },
+            { "1e-6f;",                     Node::Ptr(new Value<float>(convertf("1e-6f"))) },
+            { "1E-6f;",                     Node::Ptr(new Value<float>(convertf("1E-6f"))) },
+            { "1e6f;",                      Node::Ptr(new Value<float>(convertf("1e6f"))) },
+            { "1E6f;",                      Node::Ptr(new Value<float>(convertf("1E6f"))) }
         }
     },
 
     {
         Node::NodeType::ValueDoubleNode,
         {
-            { ".123456789;",                Node::Ptr(new Value<double>(".123456789")) },
-            { "0.0;",                       Node::Ptr(new Value<double>("0.0")) },
-            { "0e0;",                       Node::Ptr(new Value<double>("0.0f")) },
-            { "1.0;",                       Node::Ptr(new Value<double>("1.0")) },
-            { "1234567890.00000000;",       Node::Ptr(new Value<double>("1234567890.0")) },
-            { "1234567890.0987654321;",     Node::Ptr(new Value<double>("1234567890.0987654321")) },
-            { "1234567890.10000000;",       Node::Ptr(new Value<double>("1234567890.1")) },
-            { "1234567890e-0;",             Node::Ptr(new Value<double>("1234567890e-0")) },
-            { "1e+6;",                      Node::Ptr(new Value<double>("1e+6")) },
-            { "1e-6;",                      Node::Ptr(new Value<double>("1e-6")) },
-            { "1e01;",                      Node::Ptr(new Value<double>("1e01")) },
-            { "1e123456789;",               Node::Ptr(new Value<double>("1e123456789")) }, // overflow
-            { "1e6;",                       Node::Ptr(new Value<double>("1e6")) },
-            { "1E6;",                       Node::Ptr(new Value<double>("1E6")) },
+            { ".123456789;",                Node::Ptr(new Value<double>(convertd(".123456789"))) },
+            { "0.0;",                       Node::Ptr(new Value<double>(convertd("0.0"))) },
+            { "0e0;",                       Node::Ptr(new Value<double>(convertd("0.0f"))) },
+            { "1.0;",                       Node::Ptr(new Value<double>(convertd("1.0"))) },
+            { "1234567890.00000000;",       Node::Ptr(new Value<double>(convertd("1234567890.0"))) },
+            { "1234567890.0987654321;",     Node::Ptr(new Value<double>(convertd("1234567890.0987654321"))) },
+            { "1234567890.10000000;",       Node::Ptr(new Value<double>(convertd("1234567890.1"))) },
+            { "1234567890e-0;",             Node::Ptr(new Value<double>(convertd("1234567890e-0"))) },
+            { "1e+6;",                      Node::Ptr(new Value<double>(convertd("1e+6"))) },
+            { "1e-6;",                      Node::Ptr(new Value<double>(convertd("1e-6"))) },
+            { "1e01;",                      Node::Ptr(new Value<double>(convertd("1e01"))) },
+            { "1e6;",                       Node::Ptr(new Value<double>(convertd("1e6"))) },
+            { "1E6;",                       Node::Ptr(new Value<double>(convertd("1E6"))) },
             { std::to_string(std::numeric_limits<double>::max()) + ";",
-                Node::Ptr(new Value<double>(std::to_string(std::numeric_limits<double>::max())))
+                Node::Ptr(new Value<double>(std::numeric_limits<double>::max()))
             },
-            { std::to_string(std::numeric_limits<double>::min()) + ";",
-                Node::Ptr(new Value<double>(std::to_string(std::numeric_limits<double>::min())))
+            { fullDecimalValue(std::numeric_limits<double>::max()) + ".0;",
+                Node::Ptr(new Value<double>(std::numeric_limits<double>::max()))
+            },
+            { fullDecimalValue(std::numeric_limits<double>::min()) + ";",
+                Node::Ptr(new Value<double>(std::numeric_limits<double>::min()))
             }
         }
     },

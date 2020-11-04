@@ -63,9 +63,9 @@ struct TestIRFunction : public openvdb::ax::codegen::IRFunctionBase
 struct CBindings
 {
     static void voidfunc() {}
-    static int16_t scalarfunc(bool,int16_t,int32_t,int64_t,float,double) { return short(); }
-    static int32_t scalatptsfunc(bool*,int16_t*,int32_t*,int64_t*,float*,double*) { return int(); }
-    static int64_t arrayfunc(bool(*)[1],int16_t(*)[2],int32_t(*)[3],int64_t(*)[4],float(*)[5],double(*)[6]) { return long(); }
+    static int16_t scalarfunc(bool,int16_t,int32_t,int64_t,float,double) { return int16_t(); }
+    static int32_t scalatptsfunc(bool*,int16_t*,int32_t*,int64_t*,float*,double*) { return int32_t(); }
+    static int64_t arrayfunc(bool(*)[1],int16_t(*)[2],int32_t(*)[3],int64_t(*)[4],float(*)[5],double(*)[6]) { return int64_t(); }
     static void multiptrfunc(void*, void**, void***, float*, float**, float***) { }
     template <typename Type> static inline Type tmplfunc() { return Type(); }
 };
@@ -249,15 +249,15 @@ TestFunctionTypes::testPrintSignature()
     os.str("");
 
     printSignature(os, types, vt, "", {"one"}, true);
-    CPPUNIT_ASSERT_EQUAL(std::string("void(int one; long)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("void(int32 one; int64)"), os.str());
     os.str("");
 
     printSignature(os, types, vt, "", {"one", "two"}, true);
-    CPPUNIT_ASSERT_EQUAL(std::string("void(int one; long two)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("void(int32 one; int64 two)"), os.str());
     os.str("");
 
     printSignature(os, types, vt, "1", {"one", "two", "three"}, true);
-    CPPUNIT_ASSERT_EQUAL(std::string("void 1(int one; long two)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("void 1(int32 one; int64 two)"), os.str());
     os.str("");
 
     printSignature(os, types, vt, "1", {"", "two"}, false);
@@ -272,7 +272,7 @@ TestFunctionTypes::testPrintSignature()
     types.emplace_back(llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 3));
 
     printSignature(os, types, llvm::Type::getInt64Ty(C), "test", {"", "two"}, true);
-    CPPUNIT_ASSERT_EQUAL(std::string("long test(int; long two; i8*; vec3i)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("int64 test(int32; int64 two; i8*; vec3i)"), os.str());
     os.str("");
 
     types.clear();
@@ -347,7 +347,7 @@ TestFunctionTypes::testFunctionCreate()
     // test print
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
-    CPPUNIT_ASSERT_EQUAL(std::string("void name(int)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("void name(int32)"), os.str());
 
     //
     // Test empty signature
@@ -389,7 +389,7 @@ TestFunctionTypes::testFunctionCreate()
     // test print
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
-    CPPUNIT_ASSERT_EQUAL(std::string("int name()"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("int32 name()"), os.str());
 
     //
     // Test scalar types
@@ -448,7 +448,7 @@ TestFunctionTypes::testFunctionCreate()
     // test print
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
-    CPPUNIT_ASSERT_EQUAL(std::string("short name(bool; short; int; long; float; double)"), os.str());
+    CPPUNIT_ASSERT_EQUAL(std::string("int16 name(bool; int16; int32; int64; float; double)"), os.str());
 
     //
     // Test scalar ptrs types
@@ -584,7 +584,7 @@ TestFunctionTypes::testFunctionCreate()
     // test print - note mat/i types are not ax types
     os.str("");
     test->print(C, os, "name", /*axtypes=*/true);
-    CPPUNIT_ASSERT_EQUAL(std::string("long name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
+    CPPUNIT_ASSERT_EQUAL(std::string("int64 name(vec2i; vec2f; vec2d; vec3i; vec3f; vec3d;"
         " vec4i; vec4f; vec4d; [9 x i32]*; mat3f; mat3d; [16 x i32]*; mat4f; mat4d)"),
         os.str());
 
@@ -765,7 +765,7 @@ TestFunctionTypes::testFunctionCall()
             llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 2)->getPointerTo(),  // vec2d
             llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 9)->getPointerTo(),  // mat3d
             llvm::Type::getInt32Ty(C), // int
-            llvm::Type::getInt64Ty(C), // long
+            llvm::Type::getInt64Ty(C), // int64
             llvm::Type::getFloatTy(C)  // float
         },
         llvm::Type::getVoidTy(C),
@@ -779,7 +779,7 @@ TestFunctionTypes::testFunctionCall()
     llvm::Value* f32c0 = LLVMType<float>::get(C, 0.0f); // float
     llvm::Value* d64c0 = LLVMType<double>::get(C, 0.0); // double
     llvm::Value* i32c1 = B.getInt32(1); // int
-    llvm::Value* i64c1 = B.getInt64(1); // long
+    llvm::Value* i64c1 = B.getInt64(1); // int64
     llvm::Value* vec3i = openvdb::ax::codegen::arrayPack({i32c1,i32c1,i32c1}, B); // vec3i
     llvm::Value* vec2d = openvdb::ax::codegen::arrayPack({d64c0,d64c0},B); // vec2d
     llvm::Value* mat3d = openvdb::ax::codegen::arrayPack({ d64c0,d64c0,d64c0,
@@ -909,9 +909,9 @@ TestFunctionTypes::testFunctionCall()
     argsToCast.emplace_back(vec3i); // vec3i - no cast required
     argsToCast.emplace_back(vec2d); // vec2d - no cast required
     argsToCast.emplace_back(mat3d); // mat3d - no cast required
-    argsToCast.emplace_back(i64c1); // long
-    argsToCast.emplace_back(i64c1); // long - no cast required
-    argsToCast.emplace_back(i64c1); // long
+    argsToCast.emplace_back(i64c1); // int64
+    argsToCast.emplace_back(i64c1); // int64 - no cast required
+    argsToCast.emplace_back(i64c1); // int64
 
     result = test->call(argsToCast, B, /*cast*/true);
     CPPUNIT_ASSERT(result);
@@ -1201,9 +1201,9 @@ TestFunctionTypes::testFunctionMatch()
 
     const std::vector<llvm::Type*> scalars {
         llvm::Type::getInt1Ty(C),   // bool
-        llvm::Type::getInt16Ty(C),  // short
+        llvm::Type::getInt16Ty(C),  // int16
         llvm::Type::getInt32Ty(C),  // int
-        llvm::Type::getInt64Ty(C),  // long
+        llvm::Type::getInt64Ty(C),  // int64
         llvm::Type::getFloatTy(C),  // float
         llvm::Type::getDoubleTy(C)  // double
     };
@@ -1265,9 +1265,9 @@ TestFunctionTypes::testFunctionMatch()
 
     test.reset(new TestFunction({
             llvm::Type::getInt1Ty(C),   // bool
-            llvm::Type::getInt16Ty(C),  // short
-            llvm::Type::getInt32Ty(C),  // int
-            llvm::Type::getInt64Ty(C),  // long
+            llvm::Type::getInt16Ty(C),  // int16
+            llvm::Type::getInt32Ty(C),  // int32
+            llvm::Type::getInt64Ty(C),  // int64
             llvm::Type::getFloatTy(C),  // float
             llvm::Type::getDoubleTy(C), // double
             llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 2)->getPointerTo(),    // vec2i

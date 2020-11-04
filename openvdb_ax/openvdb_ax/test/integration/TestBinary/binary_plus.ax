@@ -1,7 +1,7 @@
 
-long@testlong = 2l + 3l;
-int@testint = 2 + 3;
-short@testshort = 2s + 3s;
+int64@testint64 = 2l + 3l;
+int32@testint32 = 2 + 3;
+int16@testint16 = 2 + 3;
 bool@testbool = true + false;
 double@testdouble = 1.1 + 2.3;
 float@testfloat = 1.1f + 2.3f;
