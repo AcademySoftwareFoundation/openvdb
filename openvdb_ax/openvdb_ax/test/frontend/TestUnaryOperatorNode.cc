@@ -53,7 +53,7 @@ static const unittest_util::CodeTests tests =
     { "-@a;",           Node::Ptr(new UnaryOperator(new Attribute("a", CoreType::FLOAT, true), OperatorToken::MINUS)) },
     { "!v@a;",          Node::Ptr(new UnaryOperator(new Attribute("a", CoreType::VEC3F), OperatorToken::NOT)) },
     { "~v@a;",          Node::Ptr(new UnaryOperator(new Attribute("a", CoreType::VEC3F), OperatorToken::BITNOT)) },
-    { "+int(a);",       Node::Ptr(new UnaryOperator(new Cast(new Local("a"), CoreType::INT), OperatorToken::PLUS)) },
+    { "+int(a);",       Node::Ptr(new UnaryOperator(new Cast(new Local("a"), CoreType::INT32), OperatorToken::PLUS)) },
     { "-(float(a));",   Node::Ptr(new UnaryOperator(new Cast(new Local("a"), CoreType::FLOAT), OperatorToken::MINUS)) },
     { "!a.x;",          Node::Ptr(new UnaryOperator(new ArrayUnpack(new Local("a"), new Value<int32_t>(0)), OperatorToken::NOT)) },
     { "-a[0];",         Node::Ptr(new UnaryOperator(new ArrayUnpack(new Local("a"), new Value<int32_t>(0)), OperatorToken::MINUS)) },

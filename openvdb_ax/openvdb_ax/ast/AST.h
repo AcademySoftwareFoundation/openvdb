@@ -27,7 +27,6 @@
 #ifndef OPENVDB_AX_AST_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_AST_HAS_BEEN_INCLUDED
 
-#include "Literals.h"
 #include "Tokens.h"
 
 #include <openvdb/version.h>
@@ -2255,11 +2254,11 @@ struct Value : public ValueBase
     using UniquePtr = std::unique_ptr<Value<T>>;
 
     using Type = T;
-    using LiteralLimitsT = LiteralLimits<Type>;
     /// @brief  Integers and Floats store their value as ContainerType, which is
     ///         guaranteed to be at least large enough to represent the maximum
     ///         possible supported type for the requested precision.
-    using ContainerType = typename LiteralLimitsT::ContainerT;
+    using ContainerType = typename std::conditional<
+        std::is_integral<T>::value, uint64_t, T>::type;
 
     /// @brief  The list of supported numerical constants.
     /// @note   Strings are specialized and handled separately
@@ -2272,36 +2271,17 @@ struct Value : public ValueBase
         std::is_same<T, double>::value;
     static_assert(IsSupported, "Incompatible ast::Value node instantiated.");
 
-    /// @brief  Construct a numerical Value from a given string. The string
-    ///         should be a positive integer or floating point number.
-    ///         Exponent-signs are supported for floating point numbers.
-    /// @note   If the maximum container type cannot be used to store the value
-    ///         or if the string is invalid, the resulting value is the maximum
-    ///         possible container type for scalars or infinity for floats and
-    ///         mText is initialized to the original string
-    /// @note   This constructor should not be used to construct booleans
-    Value(const std::string number)
-        : mValue(LiteralLimitsT::onLimitOverflow())
-        , mText(nullptr) {
-            try {
-                mValue = LiteralLimitsT::convert(number);
-            }
-            catch (std::out_of_range&) {
-                mText.reset(new std::string(number));
-            }
-        }
     /// @brief  Directly construct a Value from a source integer, float or
     ///         boolean, guaranteeing valid construction. Note that the provided
     ///         argument should not be negative
     Value(const ContainerType value)
-        : mValue(value), mText(nullptr) {}
+        : mValue(value) {}
     /// @brief  Deep copy constructor for a Value
     /// @note   No parent information needs updating as a Value is a "leaf
     ///         level" node (contains no children)
     /// @param  other  A const reference to another Value to deep copy
     Value(const Value<T>& other)
-        : mValue(other.mValue)
-        , mText(other.mText ? new std::string(*other.mText) : nullptr) {}
+        : mValue(other.mValue)  {}
     ~Value() override = default;
 
     /// @copybrief Node::copy()
@@ -2318,47 +2298,35 @@ struct Value : public ValueBase
     /// @copybrief Node::nodename()
     const char* nodename() const override {
         if (std::is_same<T, bool>::value)    return "boolean literal";
-        if (std::is_same<T, int16_t>::value) return "short (16bit) literal";
-        if (std::is_same<T, int32_t>::value) return "integer (32bit) literal";
-        if (std::is_same<T, int64_t>::value) return "long (64bit) literal";
+        if (std::is_same<T, int16_t>::value) return "int16 literal";
+        if (std::is_same<T, int32_t>::value) return "int32 literal";
+        if (std::is_same<T, int64_t>::value) return "int64 literal";
         if (std::is_same<T, float>::value)   return "float (32bit) literal";
         if (std::is_same<T, double>::value)  return "double (64bit) literal";
     }
     /// @copybrief Node::subname()
     const char* subname() const override {
         if (std::is_same<T, bool>::value)    return "bool";
-        if (std::is_same<T, int16_t>::value) return "shrt";
-        if (std::is_same<T, int32_t>::value) return "int";
-        if (std::is_same<T, int64_t>::value) return "long";
+        if (std::is_same<T, int16_t>::value) return "i16";
+        if (std::is_same<T, int32_t>::value) return "i32";
+        if (std::is_same<T, int64_t>::value) return "i64";
         if (std::is_same<T, float>::value)   return "flt";
-        if (std::is_same<T, double>::value)  return "dble";
+        if (std::is_same<T, double>::value)  return "dbl";
     }
     /// @copybrief Node::basetype()
     const ValueBase* basetype() const override { return this; }
 
-    /// @brief  Query whether or not this Value ended up with a ContainerType
-    ///         overflow by checking to see if mText was initialized. This
-    ///         overflow is specific to the highest precision ContainerType, not
-    ///         necessarily the value type T.
-    /// @return True if mText was set
-    inline bool overflow() const { return static_cast<bool>(this->text()); }
-    /// @brief  Access any text stored on the Value. This set if construction
-    ///         of the value failed from the provided string argument
-    /// @return A const pointer to the text. Can be a nullptr
-    inline const std::string* text() const { return mText.get(); }
     /// @brief  Access the value as its stored type
     /// @return The value as its stored ContainerType
     inline ContainerType asContainerType() const { return mValue; }
     /// @brief  Access the value as its requested (templated) type
     /// @return The value as its templed type T
     inline T value() const { return static_cast<T>(mValue); }
+
 private:
     // A container of a max size defined by LiteralValueContainer to hold values
     // which may be out of scope. This is only used for warnings
-    ContainerType mValue;
-    // The original string representation of the variable used for warnings if
-    // it's unable to be represented (usually due to overflow)
-    std::unique_ptr<std::string> mText;
+    const ContainerType mValue;
 };
 
 /// @brief  Specialization of Values for strings

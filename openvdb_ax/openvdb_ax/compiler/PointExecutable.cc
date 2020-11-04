@@ -4,12 +4,12 @@
 /// @file compiler/PointExecutable.cc
 
 #include "PointExecutable.h"
-#include "LeafLocalData.h"
 
 #include "../Exceptions.h"
 // @TODO refactor so we don't have to include PointComputeGenerator.h,
 // but still have the functions defined in one place
 #include "../codegen/PointComputeGenerator.h"
+#include "../codegen/PointLeafLocalData.h"
 
 #include <openvdb/Types.h>
 
@@ -41,6 +41,7 @@ namespace {
 using KernelFunctionPtr = std::add_pointer<codegen::PointKernel::Signature>::type;
 using FunctionTraitsT = codegen::PointKernel::FunctionTraitsT;
 using ReturnT = FunctionTraitsT::ReturnType;
+using PointLeafLocalData = codegen::codegen_internal::PointLeafLocalData;
 
 /// @brief  The arguments of the generated function
 ///
@@ -90,7 +91,7 @@ struct PointFunctionArguments
     PointFunctionArguments(const KernelFunctionPtr function,
                            const CustomData* const customData,
                            const points::AttributeSet& attributeSet,
-                           compiler::LeafLocalData* const leafLocalData)
+                           PointLeafLocalData* const leafLocalData)
         : mFunction(function)
         , mCustomData(customData)
         , mAttributeSet(&attributeSet)
@@ -162,7 +163,7 @@ private:
 #else
     std::vector<std::unique_ptr<points::GroupHandle>> mGroupHandles;
 #endif
-    compiler::LeafLocalData* const mLeafLocalData;
+    PointLeafLocalData* const mLeafLocalData;
 };
 
 
@@ -227,9 +228,9 @@ inline bool supported(const ast::tokens::CoreType type)
     switch (type) {
         case ast::tokens::BOOL    : return true;
         case ast::tokens::CHAR    : return true;
-        case ast::tokens::SHORT   : return true;
-        case ast::tokens::INT     : return true;
-        case ast::tokens::LONG    : return true;
+        case ast::tokens::INT16   : return true;
+        case ast::tokens::INT32   : return true;
+        case ast::tokens::INT64   : return true;
         case ast::tokens::FLOAT   : return true;
         case ast::tokens::DOUBLE  : return true;
         case ast::tokens::VEC2I   : return true;
@@ -264,9 +265,9 @@ addAttributeHandle(PointFunctionArguments& args,
     switch (type) {
         case ast::tokens::BOOL    : return addAttributeHandleTyped<bool>(args, leaf, name, write);
         case ast::tokens::CHAR    : return addAttributeHandleTyped<char>(args, leaf, name, write);
-        case ast::tokens::SHORT   : return addAttributeHandleTyped<int16_t>(args, leaf, name, write);
-        case ast::tokens::INT     : return addAttributeHandleTyped<int32_t>(args, leaf, name, write);
-        case ast::tokens::LONG    : return addAttributeHandleTyped<int64_t>(args, leaf, name, write);
+        case ast::tokens::INT16   : return addAttributeHandleTyped<int16_t>(args, leaf, name, write);
+        case ast::tokens::INT32   : return addAttributeHandleTyped<int32_t>(args, leaf, name, write);
+        case ast::tokens::INT64   : return addAttributeHandleTyped<int64_t>(args, leaf, name, write);
         case ast::tokens::FLOAT   : return addAttributeHandleTyped<float>(args, leaf, name, write);
         case ast::tokens::DOUBLE  : return addAttributeHandleTyped<double>(args, leaf, name, write);
         case ast::tokens::VEC2I   : return addAttributeHandleTyped<math::Vec2<int32_t>>(args, leaf, name, write);
@@ -303,7 +304,7 @@ struct PointExecuterOp
                const KernelFunctionPtr computeFunction,
                const math::Transform& transform,
                const GroupIndex& groupIndex,
-               std::vector<compiler::LeafLocalData::UniquePtr>& leafLocalData,
+               std::vector<PointLeafLocalData::UniquePtr>& leafLocalData,
                const std::string& positionAttribute,
                const std::pair<bool,bool>& positionAccess)
         : mAttributeRegistry(attributeRegistry)
@@ -338,7 +339,7 @@ struct PointExecuterOp
         const size_t count = leaf.getLastValue();
         const points::AttributeSet& set = leaf.attributeSet();
         auto& leafLocalData = mLeafLocalData[idx];
-        leafLocalData.reset(new compiler::LeafLocalData(count));
+        leafLocalData.reset(new PointLeafLocalData(count));
 
         PointFunctionArguments args(mComputeFunction, mCustomData, set, leafLocalData.get());
 
@@ -429,7 +430,7 @@ private:
     const KernelFunctionPtr   mComputeFunction;
     const math::Transform&    mTransform;
     const GroupIndex&         mGroupIndex;
-    std::vector<compiler::LeafLocalData::UniquePtr>& mLeafLocalData;
+    std::vector<PointLeafLocalData::UniquePtr>& mLeafLocalData;
     const std::string&          mPositionAttribute;
     const std::pair<bool,bool>& mPositionAccess;
 };
@@ -442,9 +443,9 @@ void appendMissingAttributes(points::PointDataGrid& grid,
         switch (type) {
             case ast::tokens::BOOL    : return points::TypedAttributeArray<bool>::attributeType();
             case ast::tokens::CHAR    : return points::TypedAttributeArray<char>::attributeType();
-            case ast::tokens::SHORT   : return points::TypedAttributeArray<int16_t>::attributeType();
-            case ast::tokens::INT     : return points::TypedAttributeArray<int32_t>::attributeType();
-            case ast::tokens::LONG    : return points::TypedAttributeArray<int64_t>::attributeType();
+            case ast::tokens::INT16   : return points::TypedAttributeArray<int16_t>::attributeType();
+            case ast::tokens::INT32   : return points::TypedAttributeArray<int32_t>::attributeType();
+            case ast::tokens::INT64   : return points::TypedAttributeArray<int64_t>::attributeType();
             case ast::tokens::FLOAT   : return points::TypedAttributeArray<float>::attributeType();
             case ast::tokens::DOUBLE  : return points::TypedAttributeArray<double>::attributeType();
             case ast::tokens::VEC2I   : return points::TypedAttributeArray<math::Vec2<int32_t>>::attributeType();
@@ -592,7 +593,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
 
     const math::Transform& transform = grid.transform();
     LeafManagerT leafManager(grid.tree());
-    std::vector<compiler::LeafLocalData::UniquePtr> leafLocalData(leafManager.leafCount());
+    std::vector<PointLeafLocalData::UniquePtr> leafLocalData(leafManager.leafCount());
     const bool threaded = mSettings->mGrainSize > 0;
 
     PointExecuterOp executerOp(*mAttributeRegistry,
@@ -627,7 +628,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     leafManager.foreach(
         [&groups, &leafLocalData, newStrings] (auto& leaf, size_t idx) {
 
-            compiler::LeafLocalData::UniquePtr& data = leafLocalData[idx];
+            PointLeafLocalData::UniquePtr& data = leafLocalData[idx];
 
             for (const auto& name : groups) {
 
@@ -653,7 +654,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
 
             if (newStrings) {
                 const MetaMap& metadata = leaf.attributeSet().descriptor().getMetadata();
-                const compiler::LeafLocalData::StringArrayMap& stringArrayMap = data->getStringArrayMap();
+                const PointLeafLocalData::StringArrayMap& stringArrayMap = data->getStringArrayMap();
 
                 for (const auto& arrayIter : stringArrayMap) {
                     points::StringAttributeWriteHandle::Ptr handle =

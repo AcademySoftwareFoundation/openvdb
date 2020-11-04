@@ -9,16 +9,12 @@
 ///
 
 %code top {
-    #include <stdio.h>
-    #include <vector>
-
-    #include <openvdb/Platform.h> // for OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-
     #include "openvdb_ax/ast/AST.h"
     #include "openvdb_ax/ast/Parse.h"
     #include "openvdb_ax/ast/Tokens.h"
-
     #include "openvdb_ax/compiler/Logger.h"
+    #include <openvdb/Platform.h> // for OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    #include <vector>
 
     /// @note  Bypasses bison conversion warnings in yyparse
     OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
@@ -63,6 +59,7 @@
 
     const char* string;
     uint64_t index;
+    double flt;
 
     openvdb::ax::ast::Tree* tree;
     openvdb::ax::ast::ValueBase* value;
@@ -82,10 +79,10 @@
 }
 
 
-%code {
-
+%code
+{
     template<typename T, typename... Args>
-    T* newNode(YYLTYPE* loc, const Args&... args) {
+    T* newNode(AXLTYPE* loc, const Args&... args) {
         T* ptr = new T(args...);
         assert(axlog);
         axlog->addNodeLocation(ptr, {loc->first_line, loc->first_column});
@@ -103,19 +100,16 @@
 %token RETURN BREAK CONTINUE
 %token LCURLY RCURLY
 %token LSQUARE RSQUARE
-%token STRING DOUBLE FLOAT LONG INT SHORT BOOL VOID
+%token STRING DOUBLE FLOAT INT32 INT64 BOOL
 %token VEC2I VEC2F VEC2D VEC3I VEC3F VEC3D VEC4I VEC4F VEC4D
-%token F_AT I_AT V_AT S_AT
+%token F_AT I_AT V_AT S_AT I16_AT
 %token MAT3F MAT3D MAT4F MAT4D M3F_AT M4F_AT
 %token F_DOLLAR I_DOLLAR V_DOLLAR S_DOLLAR
 %token DOT_X DOT_Y DOT_Z
-%token <string> L_SHORT
-%token <string> L_INT
-%token <string> L_LONG
-%token <string> L_FLOAT
-%token <string> L_DOUBLE
-%token <string> L_STRING
-%token <string> IDENTIFIER
+%token <index> L_INT32 L_INT64
+%token <flt> L_FLOAT
+%token <flt> L_DOUBLE
+%token <string> L_STRING IDENTIFIER
 
 /* AX nonterminal symbols and their union types
  */
@@ -165,6 +159,7 @@
  * deallocating it.
  */
 %destructor { } <index> // nothing to do
+%destructor { } <flt> // nothing to do
 %destructor { } <tree>
 %destructor { free(const_cast<char*>($$)); } <string>
 %destructor { for (auto& ptr : *$$) delete ptr; delete $$; } <explist>
@@ -187,6 +182,13 @@
 %left SHIFTLEFT SHIFTRIGHT
 %left PLUS MINUS
 %left MULTIPLY DIVIDE MODULO
+/*  UMINUS exists for contextual precedence with negation. Note that
+ *  this is somewhat unecessary as * / % ops evaluate to the same
+ *  values regardless i.e. (-a)*b == -(a*b), (-a)/b == -(a/b) and
+ *  (-a)%b == -(a%b). In general it makes sense to adhere to this
+ *  anyway (i.e. reprint -a * b rather than -(a*b))
+ */
+%left UMINUS // for contextual precedence with negation
 %left NOT BITNOT PLUSPLUS MINUSMINUS
 %left LCURLY RCURLY
 %left LPARENS RPARENS
@@ -412,10 +414,10 @@ ternary_expression:
 
 /// @brief  A unary expression which takes an expression and returns an expression
 unary_expression:
-      PLUS expression        { $$ = newNode<UnaryOperator>(&@1, $2, tokens::PLUS); }
-    | MINUS expression       { $$ = newNode<UnaryOperator>(&@1, $2, tokens::MINUS); }
-    | BITNOT expression      { $$ = newNode<UnaryOperator>(&@1, $2, tokens::BITNOT); }
-    | NOT expression         { $$ = newNode<UnaryOperator>(&@1, $2, tokens::NOT); }
+      PLUS expression                { $$ = newNode<UnaryOperator>(&@1, $2, tokens::PLUS); }
+    | MINUS expression %prec UMINUS  { $$ = newNode<UnaryOperator>(&@1, $2, tokens::MINUS); }
+    | BITNOT expression              { $$ = newNode<UnaryOperator>(&@1, $2, tokens::BITNOT); }
+    | NOT expression                 { $$ = newNode<UnaryOperator>(&@1, $2, tokens::NOT); }
 ;
 
 pre_crement:
@@ -461,7 +463,8 @@ variable:
 /// @brief  Syntax for supported attribute access
 attribute:
       type AT IDENTIFIER     { $$ = newNode<Attribute>(&@$, $3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
-    | I_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::INT); free(const_cast<char*>($2)); }
+    | I16_AT IDENTIFIER      { $$ = newNode<Attribute>(&@$, $2, tokens::INT16); free(const_cast<char*>($2)); }
+    | I_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::INT32); free(const_cast<char*>($2)); }
     | F_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::FLOAT); free(const_cast<char*>($2)); }
     | V_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::VEC3F); free(const_cast<char*>($2)); }
     | S_AT IDENTIFIER        { $$ = newNode<Attribute>(&@$, $2, tokens::STRING); free(const_cast<char*>($2)); }
@@ -473,7 +476,7 @@ attribute:
 /// @brief  Syntax for supported external variable access
 external:
       type DOLLAR IDENTIFIER  { $$ = newNode<ExternalVariable>(&@$, $3, static_cast<tokens::CoreType>($1)); free(const_cast<char*>($3)); }
-    | I_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::INT); free(const_cast<char*>($2)); }
+    | I_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::INT32); free(const_cast<char*>($2)); }
     | F_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::FLOAT); free(const_cast<char*>($2)); }
     | V_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::VEC3F); free(const_cast<char*>($2)); }
     | S_DOLLAR IDENTIFIER     { $$ = newNode<ExternalVariable>(&@$, $2, tokens::STRING); free(const_cast<char*>($2)); }
@@ -491,14 +494,13 @@ local:
 /// @note   Anything which uses one of the below tokens must free the returned char
 ///         array (aside from TRUE and FALSE tokens)
 literal:
-      L_SHORT         { $$ = newNode<Value<int16_t>>(&@1, $1); free(const_cast<char*>($1)); }
-    | L_INT           { $$ = newNode<Value<int32_t>>(&@1, $1); free(const_cast<char*>($1)); }
-    | L_LONG          { $$ = newNode<Value<int64_t>>(&@1, $1); free(const_cast<char*>($1)); }
-    | L_FLOAT         { $$ = newNode<Value<float>>(&@1, $1); free(const_cast<char*>($1)); }
-    | L_DOUBLE        { $$ = newNode<Value<double>>(&@1, $1); free(const_cast<char*>($1)); }
-    | L_STRING        { $$ = newNode<Value<std::string>>(&@1, $1); free(const_cast<char*>($1)); }
-    | TRUE            { $$ = newNode<Value<bool>>(&@1, true); }
-    | FALSE           { $$ = newNode<Value<bool>>(&@1, false); }
+      L_INT32   { $$ = newNode<Value<int32_t>>(&@1, $1); }
+    | L_INT64   { $$ = newNode<Value<int64_t>>(&@1, $1); }
+    | L_FLOAT   { $$ = newNode<Value<float>>(&@1, static_cast<float>($1)); }
+    | L_DOUBLE  { $$ = newNode<Value<double>>(&@1, $1); }
+    | L_STRING  { $$ = newNode<Value<std::string>>(&@1, $1); free(const_cast<char*>($1)); }
+    | TRUE      { $$ = newNode<Value<bool>>(&@1, true); }
+    | FALSE     { $$ = newNode<Value<bool>>(&@1, false); }
 ;
 
 type:
@@ -519,9 +521,8 @@ matrix_type:
 /// @brief  Scalar types
 scalar_type:
       BOOL    { $$ = tokens::BOOL; }
-    | SHORT   { $$ = tokens::SHORT; }
-    | INT     { $$ = tokens::INT; }
-    | LONG    { $$ = tokens::LONG; }
+    | INT32   { $$ = tokens::INT32; }
+    | INT64   { $$ = tokens::INT64; }
     | FLOAT   { $$ = tokens::FLOAT; }
     | DOUBLE  { $$ = tokens::DOUBLE; }
 ;

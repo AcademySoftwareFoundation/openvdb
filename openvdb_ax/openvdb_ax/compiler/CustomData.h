@@ -12,8 +12,6 @@
 #ifndef OPENVDB_AX_COMPILER_CUSTOM_DATA_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_COMPILER_CUSTOM_DATA_HAS_BEEN_INCLUDED
 
-#include "../ast/Literals.h"
-
 #include <openvdb/version.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/Types.h>
@@ -26,6 +24,16 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
+
+/// @brief  The backend representation of strings in AX. This is also how
+///         strings are passed from the AX code generation to functions.
+struct AXString
+{
+    // usually size_t. Used to match the implementation of std:string
+    using SizeType = std::allocator<char>::size_type;
+    const char* ptr = nullptr;
+    SizeType size = 0;
+};
 
 ///  @brief The custom data class is a simple container for named openvdb metadata.  Its primary use
 ///         case is passing arbitrary "external" data to an AX executable object when calling

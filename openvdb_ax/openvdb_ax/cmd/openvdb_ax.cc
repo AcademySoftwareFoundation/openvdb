@@ -211,7 +211,7 @@ void printFunctions(const bool namesOnly,
     // only include non internal functions and apply any search
     // criteria
 
-    std::map<std::string, openvdb::ax::codegen::FunctionGroup::Ptr> functionMap;
+    std::map<std::string, const openvdb::ax::codegen::FunctionGroup*> functionMap;
     for (const auto& iter : registry->map()) {
         if (iter.second.isInternal()) continue;
         if (!search.empty() && iter.first.find(search) == std::string::npos) {
@@ -247,7 +247,7 @@ void printFunctions(const bool namesOnly,
         llvm::LLVMContext C;
 
         for (const auto& iter : functionMap) {
-            const openvdb::ax::codegen::FunctionGroup::Ptr function = iter.second;
+            const openvdb::ax::codegen::FunctionGroup* const function = iter.second;
             const char* cdocs = function->doc();
             if (!cdocs || cdocs[0] == '\0') {
                 cdocs = "<No documentation exists for this function>";

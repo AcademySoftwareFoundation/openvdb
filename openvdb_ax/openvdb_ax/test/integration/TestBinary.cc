@@ -15,9 +15,9 @@ using ConfigMap = std::unordered_map<std::string, std::unordered_map<std::string
 
 static const ConfigMap integral = {
     { "bool",   { { "_L1_", "true" }, { "_L2_", "false" } }  },
-    { "short",  { { "_L1_", "2s" },   { "_L2_", "3s" } }     },
-    { "int",    { { "_L1_", "2" },    { "_L2_", "3" } }      },
-    { "long",   { { "_L1_", "2l" },   { "_L2_", "3l" } }     }
+    { "int16",  { { "_L1_", "2" },    { "_L2_", "3" } }      },
+    { "int32",  { { "_L1_", "2" },    { "_L2_", "3" } }      },
+    { "int64",  { { "_L1_", "2l" },   { "_L2_", "3l" } }     }
 };
 
 static const ConfigMap floating = {
@@ -147,9 +147,9 @@ _T1_@_A1_ = _L1_ + _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", true); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 5); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 5); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 5); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 5); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 5); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 5); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 1.1f + 2.3f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 1.1 + 2.3); } },
         { "vec2i",  [&](){ mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(4,6)); } },
@@ -217,9 +217,9 @@ _T1_@_A1_ = _L1_ - _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", true); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", -1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", -1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", -1); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", -1); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", -1); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", -1); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 1.1f - 2.3f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 1.1 - 2.3); } },
         { "vec2i",  [&](){ mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(-2,-2)); } },
@@ -285,9 +285,9 @@ _T1_@_A1_ = _L1_ * _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", false); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 6); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 6); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 6); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 6); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 6); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 6); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 1.1f * 2.3f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 1.1 * 2.3); } },
         { "vec2i",  [&](){ mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(3,8)); } },
@@ -353,9 +353,9 @@ _T1_@_A1_ = _L2_ / _L1_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", false); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 1); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 1); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 1); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 1); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 2.3f/1.1f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 2.3/1.1); } },
         { "vec2i",  [&](){ mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(3,2)); } },
@@ -405,9 +405,9 @@ _T1_@_A1_ = _L2_ % _L1_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", false); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 1); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 1); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 1); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 1); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", std::fmod(2.3f,1.1f)); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", std::fmod(2.3,1.1)); } },
         { "vec2i",  [&](){ mHarness.addAttribute<openvdb::math::Vec2<int32_t>>("testvec2i", openvdb::math::Vec2<int32_t>(0,0)); } },
@@ -452,9 +452,9 @@ _T1_@_A1_ = _L1_ & _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", false); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 2); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 2); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 2); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 2); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 2); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 2); } },
     };
 
     for (const auto& expc : expected) {
@@ -487,10 +487,10 @@ _T1_@_A1_ = _L1_ | _L2_;)";
     this->registerTest(repl, "binary_bitor.ax");
 
     const std::map<std::string, std::function<void()>> expected = {
-        { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", true); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 3); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 3); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 3); } },
+        { "bool",  [&](){ mHarness.addAttribute<bool>("testbool", true); } },
+        { "int16", [&](){ mHarness.addAttribute<int16_t>("testint16", 3); } },
+        { "int32", [&](){ mHarness.addAttribute<int32_t>("testint32", 3); } },
+        { "int64", [&](){ mHarness.addAttribute<int64_t>("testint64", 3); } },
     };
 
     for (const auto& expc : expected) {
@@ -523,10 +523,10 @@ _T1_@_A1_ = _L1_ ^ _L2_;)";
     this->registerTest(repl, "binary_bitxor.ax");
 
     const std::map<std::string, std::function<void()>> expected = {
-        { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", true); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 1); } },
+        { "bool",  [&](){ mHarness.addAttribute<bool>("testbool", true); } },
+        { "int16", [&](){ mHarness.addAttribute<int16_t>("testint16", 1); } },
+        { "int32", [&](){ mHarness.addAttribute<int32_t>("testint32", 1); } },
+        { "int64", [&](){ mHarness.addAttribute<int64_t>("testint64", 1); } },
     };
 
     for (const auto& expc : expected) {
@@ -561,9 +561,9 @@ _T1_@_A1_ = _L1_ && _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", false); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 1); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 1); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 1); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 1); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 1.0f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 1.0); } },
     };
@@ -572,6 +572,24 @@ _T1_@_A1_ = _L1_ && _L2_;)";
         expc.second.operator()();
     }
     this->execute("binary_logicaland.ax");
+
+    // Also test short circuiting logical op for &&
+
+    mHarness.reset();
+    this->registerTest(R"(
+int@scircuit1 = 0;
+int@scircuit2 = 1;
+int@scircuit3 = 2;
+int@scircuit1++ && ++int@scircuit2;
+++int@scircuit1 && ++int@scircuit3;
+int@scircuit4 = 1;
+int@scircuit5 = 1;
+true && int@scircuit4 = 2;
+false && int@scircuit5 = 2;)",
+    "binary_logicaland_scircuit.ax");
+
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("scircuit", 5), { 2, 1, 3, 2, 1 });
+    this->execute("binary_logicaland_scircuit.ax");
 }
 
 
@@ -600,9 +618,9 @@ _T1_@_A1_ = _L1_ || _L2_;)";
 
     const std::map<std::string, std::function<void()>> expected = {
         { "bool",   [&](){ mHarness.addAttribute<bool>("testbool", true); } },
-        { "short",  [&](){ mHarness.addAttribute<int16_t>("testshort", 1); } },
-        { "int",    [&](){ mHarness.addAttribute<int32_t>("testint", 1); } },
-        { "long",   [&](){ mHarness.addAttribute<int64_t>("testlong", 1); } },
+        { "int16",  [&](){ mHarness.addAttribute<int16_t>("testint16", 1); } },
+        { "int32",  [&](){ mHarness.addAttribute<int32_t>("testint32", 1); } },
+        { "int64",  [&](){ mHarness.addAttribute<int64_t>("testint64", 1); } },
         { "float",  [&](){ mHarness.addAttribute<float>("testfloat", 1.0f); } },
         { "double", [&](){ mHarness.addAttribute<double>("testdouble", 1.0); } },
     };
@@ -611,6 +629,24 @@ _T1_@_A1_ = _L1_ || _L2_;)";
         expc.second.operator()();
     }
     this->execute("binary_logicalor.ax");
+
+    // Also test short circuiting logical op for ||
+
+    mHarness.reset();
+    this->registerTest(R"(
+int@scircuit1 = 0;
+int@scircuit2 = 1;
+int@scircuit3 = 2;
+int@scircuit1++ || ++int@scircuit2;
+++int@scircuit1 || ++int@scircuit3;
+int@scircuit4 = 1;
+int@scircuit5 = 1;
+true || int@scircuit4 = 2;
+false || int@scircuit5 = 2;)",
+    "binary_logicalor_scircuit.ax");
+
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("scircuit", 5), { 2, 2, 2, 1, 2 });
+    this->execute("binary_logicalor_scircuit.ax");
 }
 
 
@@ -963,19 +999,19 @@ _T1_@_A2_ = _L2_ << _L1_;)";
                 mHarness.addAttribute<bool>("testbool2", false);
             }
         },
-        { "short",  [&](){
-                mHarness.addAttribute<int16_t>("testshort1", 16);
-                mHarness.addAttribute<int16_t>("testshort2", 12);
+        { "int16",  [&](){
+                mHarness.addAttribute<int16_t>("testint161", 16);
+                mHarness.addAttribute<int16_t>("testint162", 12);
             }
         },
-        { "int",    [&](){
-                mHarness.addAttribute<int32_t>("testint1", 16);
-                mHarness.addAttribute<int32_t>("testint2", 12);
+        { "int32",    [&](){
+                mHarness.addAttribute<int32_t>("testint321", 16);
+                mHarness.addAttribute<int32_t>("testint322", 12);
             }
         },
-        { "long",   [&](){
-                mHarness.addAttribute<int64_t>("testlong1", 16);
-                mHarness.addAttribute<int64_t>("testlong2", 12);
+        { "int64",   [&](){
+                mHarness.addAttribute<int64_t>("testint641", 16);
+                mHarness.addAttribute<int64_t>("testint642", 12);
             }
         },
     };
@@ -1017,19 +1053,19 @@ _T1_@_A2_ = _L2_ >> _L1_;)";
                 mHarness.addAttribute<bool>("testbool2", false);
             }
         },
-        { "short",  [&](){
-                mHarness.addAttribute<int16_t>("testshort1", 0);
-                mHarness.addAttribute<int16_t>("testshort2", 0);
+        { "int16",  [&](){
+                mHarness.addAttribute<int16_t>("testint161", 0);
+                mHarness.addAttribute<int16_t>("testint162", 0);
             }
         },
         { "int",    [&](){
-                mHarness.addAttribute<int32_t>("testint1", 0);
-                mHarness.addAttribute<int32_t>("testint2", 0);
+                mHarness.addAttribute<int32_t>("testint321", 0);
+                mHarness.addAttribute<int32_t>("testint322", 0);
             }
         },
-        { "long",   [&](){
-                mHarness.addAttribute<int64_t>("testlong1", 0);
-                mHarness.addAttribute<int64_t>("testlong2", 0);
+        { "int64",   [&](){
+                mHarness.addAttribute<int64_t>("testint641", 0);
+                mHarness.addAttribute<int64_t>("testint642", 0);
             }
         },
     };

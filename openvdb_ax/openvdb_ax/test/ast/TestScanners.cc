@@ -123,8 +123,8 @@ void TestScanners::testVisitNodeType()
         ++count; return true;
     };
 
-    // "long@a;"
-    Node::Ptr node(new Attribute("a", CoreType::LONG));
+    // "int64@a;"
+    Node::Ptr node(new Attribute("a", CoreType::INT64));
 
     visitNodeType<Node>(*node, counter);
     CPPUNIT_ASSERT_EQUAL(size_t(1), count);

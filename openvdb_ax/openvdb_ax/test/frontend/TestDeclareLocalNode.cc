@@ -19,9 +19,8 @@ namespace {
 static const unittest_util::CodeTests tests =
 {
     { "bool a_;",    Node::Ptr(new DeclareLocal(CoreType::BOOL, new Local("a_"))) },
-    { "short _a;",   Node::Ptr(new DeclareLocal(CoreType::SHORT, new Local("_a"))) },
-    { "int _;",      Node::Ptr(new DeclareLocal(CoreType::INT, new Local("_"))) },
-    { "long aa;",    Node::Ptr(new DeclareLocal(CoreType::LONG, new Local("aa"))) },
+    { "int32 _;",    Node::Ptr(new DeclareLocal(CoreType::INT32, new Local("_"))) },
+    { "int64 aa;",   Node::Ptr(new DeclareLocal(CoreType::INT64, new Local("aa"))) },
     { "float A;",    Node::Ptr(new DeclareLocal(CoreType::FLOAT, new Local("A"))) },
     { "double _A;",  Node::Ptr(new DeclareLocal(CoreType::DOUBLE, new Local("_A"))) },
     { "vec2i a1;",   Node::Ptr(new DeclareLocal(CoreType::VEC2I, new Local("a1"))) },

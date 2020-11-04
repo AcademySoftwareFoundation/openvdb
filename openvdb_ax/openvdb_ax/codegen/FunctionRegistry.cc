@@ -42,18 +42,18 @@ void FunctionRegistry::insertAndCreate(const std::string& identifier,
     inserted.first->second.create(op);
 }
 
-FunctionGroup::Ptr FunctionRegistry::getOrInsert(const std::string& identifier,
+const FunctionGroup* FunctionRegistry::getOrInsert(const std::string& identifier,
                                                 const FunctionOptions& op,
                                                 const bool allowInternalAccess)
 {
     auto iter = mMap.find(identifier);
-    if (iter == mMap.end()) return FunctionGroup::Ptr();
+    if (iter == mMap.end()) return nullptr;
     FunctionRegistry::RegisteredFunction& reg = iter->second;
-    if (!allowInternalAccess && reg.isInternal()) return FunctionGroup::Ptr();
+    if (!allowInternalAccess && reg.isInternal()) return nullptr;
 
     if (!reg.function()) reg.create(op);
 
-    FunctionGroup::Ptr function = reg.function();
+    const FunctionGroup* const function = reg.function();
 
     // initialize function dependencies if necessary
 
@@ -64,7 +64,7 @@ FunctionGroup::Ptr FunctionRegistry::getOrInsert(const std::string& identifier,
                 // if the function ptr doesn't exist, create it with getOrInsert.
                 // This provides internal access and ensures handling of cyclical
                 // dependencies do not cause a problem
-                FunctionGroup::Ptr internal = this->get(dep, true);
+                const FunctionGroup* const internal = this->get(dep, true);
                 if (!internal) this->getOrInsert(dep, op, true);
             }
         }
@@ -73,11 +73,11 @@ FunctionGroup::Ptr FunctionRegistry::getOrInsert(const std::string& identifier,
     return function;
 }
 
-FunctionGroup::Ptr FunctionRegistry::get(const std::string& identifier, const bool allowInternalAccess) const
+const FunctionGroup* FunctionRegistry::get(const std::string& identifier, const bool allowInternalAccess) const
 {
     auto iter = mMap.find(identifier);
-    if (iter == mMap.end()) return FunctionGroup::Ptr();
-    if (!allowInternalAccess && iter->second.isInternal()) return FunctionGroup::Ptr();
+    if (iter == mMap.end()) return nullptr;
+    if (!allowInternalAccess && iter->second.isInternal()) return nullptr;
     return iter->second.function();
 }
 

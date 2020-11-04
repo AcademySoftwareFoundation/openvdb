@@ -15,13 +15,11 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
-#include <boost/functional/hash.hpp>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_01.hpp>
-
 #include <iostream>
 #include <cstdlib>
 #include <cmath>
+#include <functional>
+#include <random>
 
 using namespace openvdb::points;
 using namespace openvdb::ax;
@@ -71,6 +69,7 @@ public:
     CPPUNIT_TEST(pretransform);
     CPPUNIT_TEST(print);
     CPPUNIT_TEST(rand);
+    CPPUNIT_TEST(rand32);
     CPPUNIT_TEST(sign);
     CPPUNIT_TEST(signbit);
     CPPUNIT_TEST(simplexnoise);
@@ -116,6 +115,7 @@ public:
     void pretransform();
     void print();
     void rand();
+    void rand32();
     void sign();
     void signbit();
     void simplexnoise();
@@ -580,8 +580,9 @@ TestStandardFunctions::lengthsq()
 void
 TestStandardFunctions::lerp()
 {
-    mHarness.addAttributes<double>(unittest_util::nameSequence("test", 3), {6.0, 21.0, -19.0});
-    mHarness.addAttribute<float>("test4", 6.0f);
+    mHarness.addAttributes<double>(unittest_util::nameSequence("test", 9),
+        {-1.1, 1.0000001, 1.0000001, -1.0000001, 1.1, -1.1, 6.0, 21.0, -19.0});
+    mHarness.addAttribute<float>("test10", 6.0f);
     testFunctionOptions(mHarness, "lerp");
 }
 
@@ -814,28 +815,55 @@ TestStandardFunctions::print()
 void
 TestStandardFunctions::rand()
 {
-    auto hashToSeed = [](size_t hash) -> uint32_t {
-        unsigned int seed = 0;
-        do {
-            seed ^= (uint32_t) hash;
-        } while (hash >>= sizeof(uint32_t) * 8);
-        return seed;
-    };
+    std::mt19937_64 engine;
+    std::uniform_real_distribution<double> uniform(0.0,1.0);
 
-    boost::uniform_01<double> uniform_01;
-    size_t hash = boost::hash<double>()(2.0);
-    boost::mt19937 engine(static_cast<boost::mt19937::result_type>(hashToSeed(hash)));
+    size_t hash = std::hash<double>()(2.0);
+    engine.seed(hash);
 
-    const double expected1 = uniform_01(engine);
+    const double expected1 = uniform(engine);
 
-    hash = boost::hash<double>()(3.0);
-    engine.seed(static_cast<boost::mt19937::result_type>(hashToSeed(hash)));
-    const double expected2 = uniform_01(engine);
-    const double expected3 = uniform_01(engine);
+    hash = std::hash<double>()(3.0);
+    engine.seed(hash);
+
+    const double expected2 = uniform(engine);
+    const double expected3 = uniform(engine);
 
     mHarness.addAttributes<double>({"test0", "test1", "test2", "test3"},
         {expected1, expected1, expected2, expected3});
     testFunctionOptions(mHarness, "rand");
+}
+
+void
+TestStandardFunctions::rand32()
+{
+    auto hashToSeed = [](size_t hash) ->
+        std::mt19937::result_type
+    {
+        unsigned int seed = 0;
+        do {
+            seed ^= (uint32_t) hash;
+        } while (hash >>= sizeof(uint32_t) * 8);
+        return std::mt19937::result_type(seed);
+    };
+
+    std::mt19937 engine;
+    std::uniform_real_distribution<double> uniform(0.0,1.0);
+
+    size_t hash = std::hash<double>()(2.0);
+    engine.seed(hashToSeed(hash));
+
+    const double expected1 = uniform(engine);
+
+    hash = std::hash<double>()(3.0);
+    engine.seed(hashToSeed(hash));
+
+    const double expected2 = uniform(engine);
+    const double expected3 = uniform(engine);
+
+    mHarness.addAttributes<double>({"test0", "test1", "test2", "test3"},
+        {expected1, expected1, expected2, expected3});
+    testFunctionOptions(mHarness, "rand32");
 }
 
 void

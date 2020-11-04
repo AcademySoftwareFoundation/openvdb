@@ -193,13 +193,8 @@ typePrecedence(llvm::Type* const typeA,
     if (typeA->isIntegerTy(1)) return typeA;
     if (typeB->isIntegerTy(1)) return typeB;
 
-    std::cerr << "Attempted to compare ";
-    typeA->print(llvm::errs());
-    std::cerr << " to ";
-    typeB->print(llvm::errs());
-    std::cerr << std::endl;
-
-    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type precedence");
+    assert(false && "invalid LLVM type precedence");
+    return nullptr;
 }
 
 /// @brief  Returns a CastFunction which represents the corresponding instruction
@@ -282,14 +277,8 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
     }
 
 #undef BIND_ARITHMETIC_CAST_OP
-
-    std::cerr << "Attempted to convert ";
-    sourceType->print(llvm::errs());
-    std::cerr << " to ";
-    targetType->print(llvm::errs());
-    std::cerr << std::endl;
-
-    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type conversion");
+    assert(false && "invalid LLVM type conversion");
+    return CastFunction();
 }
 
 /// @brief  Returns a BinaryFunction representing the corresponding instruction to
@@ -320,11 +309,9 @@ llvmBinaryConversion(const llvm::Type* const type,
     // See http://stackoverflow.com/questions/5346160/llvm-irbuildercreateudiv-createsdiv-createexactudiv
 
     if (type->isFloatingPointTy()) {
-        const ast::tokens::OperatorType opType = ast::tokens::operatorType(token);
-        if (opType == ast::tokens::LOGICAL || opType == ast::tokens::BITWISE) {
-            OPENVDB_THROW(AXCodeGenError, "Unable to perform operation \""
-                + ast::tokens::operatorNameFromToken(token) + "\" on floating points values");
-        }
+        assert(!(ast::tokens::operatorType(token) == ast::tokens::LOGICAL ||
+            ast::tokens::operatorType(token) == ast::tokens::BITWISE)
+                && "unable to perform logical or bitwise operation on floating point values");
 
         if (token == ast::tokens::PLUS)                 return BIND_BINARY_OP(CreateFAdd);
         else if (token == ast::tokens::MINUS)           return BIND_BINARY_OP(CreateFSub);
@@ -337,8 +324,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::LESSTHAN)        return BIND_BINARY_OP(CreateFCmpOLT);
         else if (token == ast::tokens::MORETHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOGE);
         else if (token == ast::tokens::LESSTHANOREQUAL) return BIND_BINARY_OP(CreateFCmpOLE);
-        OPENVDB_THROW(AXCodeGenError, "Unrecognised binary operator \"" +
-            ast::tokens::operatorNameFromToken(token) + "\"");
+        assert(false && "unrecognised binary operator");
     }
     else if (type->isIntegerTy()) {
         if (token == ast::tokens::PLUS)                  return BIND_BINARY_OP(CreateAdd); // No Unsigned/Signed Wrap
@@ -359,19 +345,12 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::BITAND)           return BIND_BINARY_OP(CreateAnd);
         else if (token == ast::tokens::BITOR)            return BIND_BINARY_OP(CreateOr);
         else if (token == ast::tokens::BITXOR)           return BIND_BINARY_OP(CreateXor);
-        OPENVDB_THROW(AXCodeGenError, "Unrecognised binary operator \"" +
-            ast::tokens::operatorNameFromToken(token) + "\"");
+        assert(false && "unrecognised binary operator");
     }
 
 #undef BIND_BINARY_OP
-
-    std::cerr << "Attempted to generate a binary operator \""
-              << ast::tokens::operatorNameFromToken(token) << "\""
-              << "with type ";
-
-    type->print(llvm::errs());
-
-    OPENVDB_THROW(AXCodeGenError, "Invalid LLVM type for binary operation");
+    assert(false && "invalid LLVM type for binary operation");
+    return BinaryFunction();
 }
 
 /// @brief  Returns true if the llvm Type 'from' can be safely cast to the llvm
@@ -555,16 +534,12 @@ boolComparison(llvm::Value* value,
     if (type->isFloatingPointTy())  return builder.CreateFCmpONE(value, llvm::ConstantFP::get(type, 0.0));
     else if (type->isIntegerTy(1))  return builder.CreateICmpNE(value, llvm::ConstantInt::get(type, 0));
     else if (type->isIntegerTy())   return builder.CreateICmpNE(value, llvm::ConstantInt::getSigned(type, 0));
-
-    std::cerr << "Attempted to convert ";
-    type->print(llvm::errs());
-    std::cerr << std::endl;
-
-    OPENVDB_THROW(AXCodeGenError, "Invalid type for bool conversion");
+    assert(false && "Invalid type for bool conversion");
+    return nullptr;
 }
 
-/// @ brief  Performs a binary operation on two loaded llvm scalar values. The type of
-///          operation performed is defined by the token (see the list of supported
+/// @ brief  Performs a binary operation on two loaded llvm scalar values of the same type.
+///          The type of operation performed is defined by the token (see the list of supported
 ///          tokens in ast/Tokens.h. Returns a loaded llvm scalar result
 ///
 /// @param lhs       The left hand side value of the binary operation
@@ -577,31 +552,17 @@ boolComparison(llvm::Value* value,
 inline llvm::Value*
 binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
                const ast::tokens::OperatorToken& token,
-               llvm::IRBuilder<>& builder,
-               std::string* warnings = nullptr)
+               llvm::IRBuilder<>& builder)
 {
     llvm::Type* lhsType = lhs->getType();
-    if (lhsType != rhs->getType()) {
-        std::string error;
-        llvm::raw_string_ostream os(error);
-        os << "LHS Type: "; lhsType->print(os); os << ", ";
-        os << "RHS Type: "; rhs->getType()->print(os); os << " ";
-        OPENVDB_THROW(AXCodeGenError, "Mismatching argument types for binary operation \"" +
-            ast::tokens::operatorNameFromToken(token) + "\". " + os.str());
-    }
+    assert(lhsType == rhs->getType());
 
     const ast::tokens::OperatorType opType = ast::tokens::operatorType(token);
 
     if (opType == ast::tokens::LOGICAL) {
         lhs = boolComparison(lhs, builder);
         rhs = boolComparison(rhs, builder);
-        lhsType = lhs->getType();
-    }
-    else if (opType == ast::tokens::BITWISE && lhsType->isFloatingPointTy()) {
-        rhs = arithmeticConversion(rhs, LLVMType<int64_t>::get(builder.getContext()), builder);
-        lhs = arithmeticConversion(lhs, LLVMType<int64_t>::get(builder.getContext()), builder);
-        lhsType = lhs->getType();
-        if (warnings) *warnings = std::string("Implicit cast from float to int.");
+        lhsType = lhs->getType(); // now bool type
     }
 
     const BinaryFunction llvmBinaryFunction = llvmBinaryConversion(lhsType, token);

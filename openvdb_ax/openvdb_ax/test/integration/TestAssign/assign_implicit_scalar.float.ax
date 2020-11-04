@@ -1,7 +1,6 @@
 float local = 1.1f;
-long@testlong = local;
-int@testint = local;
-short@testshort = local;
+int64@testint64 = local;
 bool@testbool = local;
+int32@testint32 = local;
 double@testdouble = local;
 

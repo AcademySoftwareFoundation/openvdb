@@ -20,15 +20,13 @@
 #include "../compiler/CompilerOptions.h"
 #include "../compiler/CustomData.h"
 
-#include <boost/functional/hash.hpp>
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_01.hpp>
-
 #include <tbb/enumerable_thread_specific.h>
 
 #include <llvm/IR/Intrinsics.h>
 
 #include <unordered_map>
+#include <functional>
+#include <random>
 #include <cmath>
 #include <stddef.h>
 #include <stdint.h>
@@ -48,7 +46,7 @@ namespace
 // that fit into an unsigned int, and then shift those bytes out of the
 // hash. We repeat until we have no bits left in the hash.
 template <typename SeedType>
-inline SeedType hashToSeed(std::size_t hash) {
+inline SeedType hashToSeed(size_t hash) {
     SeedType seed = 0;
     do {
         seed ^= (SeedType) hash;
@@ -77,7 +75,7 @@ struct SimplexNoise
 ///////////////////////////////////////////////////////////////////////////
 
 #define DEFINE_LLVM_FP_INTRINSIC(Identifier, Doc)                                           \
-    inline FunctionGroup::Ptr llvm_##Identifier(const FunctionOptions& op)                  \
+    inline FunctionGroup::UniquePtr llvm_##Identifier(const FunctionOptions& op)            \
     {                                                                                       \
         static auto generate =                                                              \
             [](const std::vector<llvm::Value*>& args,                                       \
@@ -105,7 +103,7 @@ struct SimplexNoise
     }                                                                                       \
 
 #define DEFINE_AX_C_FP_BINDING(Identifier, Doc)                                             \
-    inline FunctionGroup::Ptr ax##Identifier(const FunctionOptions& op)                     \
+    inline FunctionGroup::UniquePtr ax##Identifier(const FunctionOptions& op)                     \
     {                                                                                       \
         return FunctionBuilder(#Identifier)                                                 \
             .addSignature<double(double)>((double(*)(double))(std::Identifier))             \
@@ -143,7 +141,7 @@ DEFINE_LLVM_FP_INTRINSIC(round, "Computes the nearest integer value to arg (in f
 // pow created explicitly as it takes two arguments and performs slighlty different
 // calls for integer exponents
 
-inline FunctionGroup::Ptr llvm_pow(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr llvm_pow(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -180,7 +178,7 @@ inline FunctionGroup::Ptr llvm_pow(const FunctionOptions& op)
 
 DEFINE_AX_C_FP_BINDING(cbrt, "Computes the cubic root of the input.")
 
-inline FunctionGroup::Ptr axabs(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axabs(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -222,7 +220,7 @@ inline FunctionGroup::Ptr axabs(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axdot(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axdot(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -266,7 +264,7 @@ inline FunctionGroup::Ptr axdot(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axcross(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axcross(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -326,7 +324,7 @@ inline FunctionGroup::Ptr axcross(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axlengthsq(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axlengthsq(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -376,7 +374,7 @@ inline FunctionGroup::Ptr axlengthsq(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axlength(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axlength(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -421,7 +419,7 @@ inline FunctionGroup::Ptr axlength(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axnormalize(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -482,27 +480,99 @@ inline FunctionGroup::Ptr axnormalize(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axlerp(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axlerp(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
            llvm::IRBuilder<>& B) -> llvm::Value*
     {
         assert(args.size() == 3);
-        llvm::Value* a = args[0];
-        llvm::Value* b = args[1];
-        llvm::Value* x = args[2];
+        llvm::Value* a = args[0], *b = args[1], *t = args[2];
+        llvm::Value* zero = llvm::ConstantFP::get(a->getType(), 0.0);
         llvm::Value* one = llvm::ConstantFP::get(a->getType(), 1.0);
-        llvm::Value* result = binaryOperator(one, x, ast::tokens::MINUS, B);
-        result = binaryOperator(result, a, ast::tokens::MULTIPLY, B);
-        llvm::Value* right = binaryOperator(x, b, ast::tokens::MULTIPLY, B);
-        result = binaryOperator(result, right, ast::tokens::PLUS, B);
-        return result;
+        llvm::Function* base = B.GetInsertBlock()->getParent();
+
+        // @todo short-circuit?
+        llvm::Value* a1 = binaryOperator(a, zero, ast::tokens::LESSTHANOREQUAL, B);
+        llvm::Value* b1 = binaryOperator(b, zero, ast::tokens::MORETHANOREQUAL, B);
+        llvm::Value* a2 = binaryOperator(a, zero, ast::tokens::MORETHANOREQUAL, B);
+        llvm::Value* b2 = binaryOperator(b, zero, ast::tokens::LESSTHANOREQUAL, B);
+        a1 = binaryOperator(a1, b1, ast::tokens::AND, B);
+        a2 = binaryOperator(a2, b2, ast::tokens::AND, B);
+        a1 = binaryOperator(a1, a2, ast::tokens::OR, B);
+
+        llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
+        llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
+        B.CreateCondBr(a1, then, post);
+
+        B.SetInsertPoint(then);
+        llvm::Value* r = binaryOperator(one, t, ast::tokens::MINUS, B);
+        r = binaryOperator(r, a, ast::tokens::MULTIPLY, B);
+        llvm::Value* right = binaryOperator(t, b, ast::tokens::MULTIPLY, B);
+        r = binaryOperator(r, right, ast::tokens::PLUS, B);
+        B.CreateRet(r);
+
+        B.SetInsertPoint(post);
+
+        llvm::Value* tisone = binaryOperator(t, one, ast::tokens::EQUALSEQUALS, B);
+
+        then = llvm::BasicBlock::Create(B.getContext(), "then", base);
+        post = llvm::BasicBlock::Create(B.getContext(), "post", base);
+        B.CreateCondBr(tisone, then, post);
+
+        B.SetInsertPoint(then);
+        B.CreateRet(b);
+
+        B.SetInsertPoint(post);
+
+        // if nlerp
+        llvm::Value* x = binaryOperator(b, a, ast::tokens::MINUS, B);
+        x = binaryOperator(t, x, ast::tokens::MULTIPLY, B);
+        x = binaryOperator(a, x, ast::tokens::PLUS, B);
+
+        then = llvm::BasicBlock::Create(B.getContext(), "then", base);
+        post = llvm::BasicBlock::Create(B.getContext(), "post", base);
+
+        a1 = binaryOperator(t, one, ast::tokens::MORETHAN, B);
+        a2 = binaryOperator(b, a, ast::tokens::MORETHAN, B);
+        a1 = binaryOperator(a1, a2, ast::tokens::EQUALSEQUALS, B);
+        B.CreateCondBr(a1, then, post);
+
+        B.SetInsertPoint(then);
+        b1 = binaryOperator(b, x, ast::tokens::LESSTHAN, B);
+        B.CreateRet(B.CreateSelect(b1, x, b));
+
+        B.SetInsertPoint(post);
+        b1 = binaryOperator(x, b, ast::tokens::LESSTHAN, B);
+        return B.CreateRet(B.CreateSelect(b1, x, b));
     };
 
-    static auto lerp = [](auto a, auto b, auto x) -> auto {
+    // This lerp implementation is taken from clang and matches the C++20 standard
+    static auto lerp = [](auto a, auto b, auto t) -> auto
+    {
         using ValueT = decltype(a);
-        return (ValueT(1.0) - x) * a + x * b;
+        // If there is a zero crossing with a,b do the more precise
+        // linear interpolation. This is only monotonic if there is
+        // a zero crossing
+        // Exact, monotonic, bounded, determinate, and (for a=b=0)
+        // consistent
+        if ((a <= 0 && b >= 0) || (a >= 0 && b <= 0)) {
+            return t * b + (ValueT(1.0) - t) * a;
+        }
+        // If t is exactly 1, return b (as the second impl doesn't
+        // guarantee this due to fp arithmetic)
+        if (t == ValueT(1.0)) return b;
+        // less precise interpolation when there is no crossing
+        // Exact at t=0, monotonic except near t=1, bounded,
+        // determinate, and consistent
+        const auto x = a + t * (b - a);
+        // Ensure b is preferred to another equal value (i.e. -0. vs. +0.),
+        // which avoids returning -0 for t==1 but +0 for other nearby
+        // values of t. This branching also stops nans being returns from
+        // inf inputs
+        // monotonic near t=1
+        if ((t > ValueT(1.0)) == (b > a)) return b < x ? x : b;
+        else                              return x < b ? x : b;
     };
 
     return FunctionBuilder("lerp")
@@ -515,14 +585,14 @@ inline FunctionGroup::Ptr axlerp(const FunctionOptions& op)
         .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Performs bilinear interpolation between the values. If the amount is "
-            "outside the range 0 to 1, the values will be extrapolated linearly. If "
-            "amount is 0, the first value is returned. If it is 1, the second value "
-            "is returned.")
+        .setDocumentation("Performs bilinear interpolation between the values. If the "
+            "amount is outside the range 0 to 1, the values will be extrapolated linearly. "
+            "If amount is 0, the first value is returned. If it is 1, the second value "
+            "is returned. This implementation is guaranteed to be monotonic.")
         .get();
 }
 
-inline FunctionGroup::Ptr axmin(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axmin(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -553,7 +623,7 @@ inline FunctionGroup::Ptr axmin(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axmax(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axmax(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -584,7 +654,7 @@ inline FunctionGroup::Ptr axmax(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axclamp(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axclamp(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -619,7 +689,7 @@ inline FunctionGroup::Ptr axclamp(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axfit(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axfit(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -708,26 +778,20 @@ inline FunctionGroup::Ptr axfit(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axrand(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axrand(const FunctionOptions& op)
 {
     struct Rand
     {
-        static double rand(const uint32_t* seed)
+        static double rand(const std::mt19937_64::result_type* seed)
         {
             using ThreadLocalEngineContainer =
-                tbb::enumerable_thread_specific<boost::mt19937>;
-
-            // Obtain thread-local engine (or create if it doesn't exist already).
+                tbb::enumerable_thread_specific<std::mt19937_64>;
             static ThreadLocalEngineContainer ThreadLocalEngines;
-            static boost::uniform_01<double> Generator;
-
-            boost::mt19937& engine = ThreadLocalEngines.local();
+            static std::uniform_real_distribution<double> Generator(0.0,1.0);
+            std::mt19937_64& engine = ThreadLocalEngines.local();
             if (seed) {
-                engine.seed(static_cast<boost::mt19937::result_type>(*seed));
+                engine.seed(static_cast<std::mt19937_64::result_type>(*seed));
             }
-
-            // Once we have seeded the random number generator, we then evaluate it,
-            // which returns a floating point number in the range [0,1)
             return Generator(engine);
         }
 
@@ -735,44 +799,23 @@ inline FunctionGroup::Ptr axrand(const FunctionOptions& op)
 
         static double rand(double seed)
         {
-            // We initially hash the double-precision seed with `boost::hash`. The
-            // important thing about the hash is that it produces a "reliable" hash value,
-            // taking into account a number of special cases for floating point numbers
-            // (e.g. -0 and +0 must return the same hash value, etc). Other than these
-            // special cases, this function will usually just copy the binary
-            // representation of a float into the resultant `size_t`
-            const size_t hash = boost::hash<double>()(seed);
-
-            // Now that we have a reliable hash (with special floating-point cases taken
-            // care of), we proceed to use this hash to seed a random number generator.
-            // The generator takes an unsigned int, which is not guaranteed to be the
-            // same size as size_t.
-            //
-            // So, we must convert it. I should note that the OpenVDB math libraries will
-            // do this for us, but its implementation static_casts `size_t` to `unsigned int`,
-            // and because `boost::hash` returns a binary copy of the original
-            // double-precision number in almost all cases, this ends up producing noticable
-            // patterns in the result (e.g. by truncating the upper 4 bytes, values of 1.0,
-            // 2.0, 3.0, and 4.0 all return the same hash value because their lower 4 bytes
-            // are all zero).
-            //
-            // We use the `hashToSeed` function to reduce our `size_t` to an `unsigned int`,
-            // whilst taking all bits in the `size_t` into account.
-            const uint32_t uintseed = hashToSeed<uint32_t>(hash);
-            return Rand::rand(&uintseed);
+            const std::mt19937_64::result_type hash =
+                static_cast<std::mt19937_64::result_type>(std::hash<double>()(seed));
+            return Rand::rand(&hash);
         }
 
-        static double rand(int32_t seed)
+        static double rand(int64_t seed)
         {
-            const uint32_t uintseed = static_cast<uint32_t>(seed);
-            return Rand::rand(&uintseed);
+            const std::mt19937_64::result_type hash =
+                static_cast<std::mt19937_64::result_type>(seed);
+            return Rand::rand(&hash);
         }
     };
 
     return FunctionBuilder("rand")
         .addSignature<double()>((double(*)())(Rand::rand))
         .addSignature<double(double)>((double(*)(double))(Rand::rand))
-        .addSignature<double(int32_t)>((double(*)(int32_t))(Rand::rand))
+        .addSignature<double(int64_t)>((double(*)(int64_t))(Rand::rand))
         .setArgumentNames({"seed"})
         // We can't constant fold rand even if it's been called with a constant as
         // it will leave the generator in a different state in comparison to other
@@ -793,7 +836,97 @@ inline FunctionGroup::Ptr axrand(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axsign(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axrand32(const FunctionOptions& op)
+{
+    struct Rand
+    {
+        static double rand(const std::mt19937::result_type* seed)
+        {
+            using ThreadLocalEngineContainer =
+                tbb::enumerable_thread_specific<std::mt19937>;
+            // Obtain thread-local engine (or create if it doesn't exist already).
+            static ThreadLocalEngineContainer ThreadLocalEngines;
+            static std::uniform_real_distribution<double> Generator(0.0,1.0);
+            std::mt19937& engine = ThreadLocalEngines.local();
+            if (seed) {
+                engine.seed(static_cast<std::mt19937::result_type>(*seed));
+            }
+            // Once we have seeded the random number generator, we then evaluate it,
+            // which returns a floating point number in the range [0,1)
+            return Generator(engine);
+        }
+
+        static double rand() { return Rand::rand(nullptr); }
+
+        static double rand(double seed)
+        {
+            // We initially hash the double-precision seed with `std::hash`. The
+            // important thing about the hash is that it produces a "reliable" hash value,
+            // taking into account a number of special cases for floating point numbers
+            // (e.g. -0 and +0 must return the same hash value, etc). Other than these
+            // special cases, this function will usually just copy the binary
+            // representation of a float into the resultant `size_t`
+            const size_t hash = std::hash<double>()(seed);
+
+            // Now that we have a reliable hash (with special floating-point cases taken
+            // care of), we proceed to use this hash to seed a random number generator.
+            // The generator takes an unsigned int, which is not guaranteed to be the
+            // same size as size_t.
+            //
+            // So, we must convert it. I should note that the OpenVDB math libraries will
+            // do this for us, but its implementation static_casts `size_t` to `unsigned int`,
+            // and because `std::hash` returns a binary copy of the original
+            // double-precision number in almost all cases, this ends up producing noticable
+            // patterns in the result (e.g. by truncating the upper 4 bytes, values of 1.0,
+            // 2.0, 3.0, and 4.0 all return the same hash value because their lower 4 bytes
+            // are all zero).
+            //
+            // We use the `hashToSeed` function to reduce our `size_t` to an `unsigned int`,
+            // whilst taking all bits in the `size_t` into account.
+            // On some architectures std::uint_fast32_t may be size_t, but we always hash to
+            // be consistent.
+            const std::mt19937::result_type uintseed =
+                static_cast<std::mt19937::result_type>(hashToSeed<uint32_t>(hash));
+            return Rand::rand(&uintseed);
+        }
+
+        static double rand(int32_t seed)
+        {
+            const std::mt19937::result_type uintseed =
+                static_cast<std::mt19937::result_type>(seed);
+            return Rand::rand(&uintseed);
+        }
+    };
+
+    return FunctionBuilder("rand32")
+        .addSignature<double()>((double(*)())(Rand::rand))
+        .addSignature<double(double)>((double(*)(double))(Rand::rand))
+        .addSignature<double(int32_t)>((double(*)(int32_t))(Rand::rand))
+        .setArgumentNames({"seed"})
+        // We can't constant fold rand even if it's been called with a constant as
+        // it will leave the generator in a different state in comparison to other
+        // threads and, as it relies on an internal state, doesn't respect branching
+        // etc. We also can't use a different generate for constant calls as subsequent
+        // calls to rand() without an argument won't know to advance the generator.
+        .setConstantFold(false)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Creates a random number based on the provided 32 bit "
+            "seed. The number will be in the range of 0 to 1. The same number is "
+            "produced for the same seed. "
+            "NOTE: This function does not share the same random number generator as "
+            "rand(). rand32() may provide a higher throughput on some architectures, "
+            "but will produce different results to rand(). "
+            "NOTE: If rand32 is called without a seed the previous state of the random "
+            "number generator is advanced for the currently processing element. This "
+            "state is determined by the last call to rand32() with a given seed. If "
+            "rand32 is not called with a seed, the generator advances continuously "
+            "across different elements which can produce non-deterministic results. "
+            "It is important that rand32 is always called with a seed at least once "
+            "for deterministic results.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axsign(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -839,7 +972,7 @@ inline FunctionGroup::Ptr axsign(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axsignbit(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axsignbit(const FunctionOptions& op)
 {
     return FunctionBuilder("signbit")
         .addSignature<bool(double)>((bool(*)(double))(std::signbit))
@@ -862,7 +995,7 @@ inline FunctionGroup::Ptr axsignbit(const FunctionOptions& op)
 
 // Matrix math
 
-inline FunctionGroup::Ptr axdeterminant(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axdeterminant(const FunctionOptions& op)
 {
     // 3 by 3 determinant
     static auto generate3 =
@@ -954,7 +1087,7 @@ inline FunctionGroup::Ptr axdeterminant(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axdiag(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axdiag(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1068,7 +1201,7 @@ inline FunctionGroup::Ptr axdiag(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axidentity3(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axidentity3(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1096,7 +1229,7 @@ inline FunctionGroup::Ptr axidentity3(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axidentity4(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axidentity4(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1124,7 +1257,7 @@ inline FunctionGroup::Ptr axidentity4(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axmmmult(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axmmmult(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1185,7 +1318,7 @@ inline FunctionGroup::Ptr axmmmult(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axpolardecompose(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axpolardecompose(const FunctionOptions& op)
 {
     static auto polardecompose = [](auto in, auto orth, auto symm) -> bool {
         bool success = false;
@@ -1221,7 +1354,7 @@ inline FunctionGroup::Ptr axpolardecompose(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axpostscale(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1268,7 +1401,7 @@ inline FunctionGroup::Ptr axpostscale(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axpretransform(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axpretransform(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1337,7 +1470,7 @@ inline FunctionGroup::Ptr axpretransform(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axprescale(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1383,7 +1516,7 @@ inline FunctionGroup::Ptr axprescale(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axtrace(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axtrace(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1434,7 +1567,7 @@ inline FunctionGroup::Ptr axtrace(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axtransform(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axtransform(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1503,7 +1636,7 @@ inline FunctionGroup::Ptr axtransform(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axtranspose(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
 {
     static auto generate =
         [](const std::vector<llvm::Value*>& args,
@@ -1558,7 +1691,7 @@ inline FunctionGroup::Ptr axtranspose(const FunctionOptions& op)
 
 // Noise
 
-inline FunctionGroup::Ptr axsimplexnoise(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axsimplexnoise(const FunctionOptions& op)
 {
     static auto simplexnoisex = [](double x) -> double {
         return SimplexNoise::noise(x, 0.0, 0.0);
@@ -1593,7 +1726,7 @@ inline FunctionGroup::Ptr axsimplexnoise(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axcurlsimplexnoise(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axcurlsimplexnoise(const FunctionOptions& op)
 {
     using CurlSimplexNoiseV3D = void(double(*)[3], const double(*)[3]);
     using CurlSimplexNoiseD = void(double(*)[3], double, double, double);
@@ -1648,7 +1781,7 @@ DEFINE_AX_C_FP_BINDING(cosh, "Computes the hyperbolic cosine of the input.")
 DEFINE_AX_C_FP_BINDING(sinh, "Computes the hyperbolic sine of the input.")
 DEFINE_AX_C_FP_BINDING(tanh, "Computes the hyperbolic tangent of the input.")
 
-inline FunctionGroup::Ptr axtan(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axtan(const FunctionOptions& op)
 {
     // @todo  consider using this IR implementation over std::tan, however
     //        we then lose constant folding (as results don't match). Ideally
@@ -1686,7 +1819,7 @@ inline FunctionGroup::Ptr axtan(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axatan2(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axatan2(const FunctionOptions& op)
 {
     return FunctionBuilder("atan2")
         .addSignature<double(double,double)>((double(*)(double,double))(std::atan2))
@@ -1708,7 +1841,7 @@ inline FunctionGroup::Ptr axatan2(const FunctionOptions& op)
 
 // String
 
-inline FunctionGroup::Ptr axatoi(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axatoi(const FunctionOptions& op)
 {
     // WARNING: decltype removes the throw identifer from atoi. We should
     // use this are automatically update the function attributes as appropriate
@@ -1727,7 +1860,7 @@ inline FunctionGroup::Ptr axatoi(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axatof(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axatof(const FunctionOptions& op)
 {
     // WARNING: decltype removes the throw identifer from atof. We should
     // use this are automatically update the function attributes as appropriate
@@ -1746,7 +1879,7 @@ inline FunctionGroup::Ptr axatof(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axhash(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axhash(const FunctionOptions& op)
 {
     static auto hash = [](const AXString* axstr) -> int64_t {
         const std::string str(axstr->ptr, axstr->size);
@@ -1772,7 +1905,7 @@ inline FunctionGroup::Ptr axhash(const FunctionOptions& op)
 
 // Utility
 
-inline FunctionGroup::Ptr axprint(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
 {
     static auto print = [](auto v) { std::cout << v << std::endl; };
     static auto printv = [](auto* v) { std::cout << *v << std::endl; };
@@ -1822,7 +1955,7 @@ inline FunctionGroup::Ptr axprint(const FunctionOptions& op)
 
 // Custom
 
-inline FunctionGroup::Ptr ax_external(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr ax_external(const FunctionOptions& op)
 {
     static auto find = [](auto out, const void* const data,  const AXString* const name)
     {
@@ -1853,7 +1986,7 @@ inline FunctionGroup::Ptr ax_external(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axexternal(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -1892,7 +2025,7 @@ inline FunctionGroup::Ptr axexternal(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::Ptr axexternalv(const FunctionOptions& op)
+inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
 {
     auto generate =
         [op](const std::vector<llvm::Value*>& args,
@@ -1976,6 +2109,7 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("min", axmin);
     add("normalize", axnormalize);
     add("rand", axrand);
+    add("rand32", axrand32);
     add("sign", axsign);
     add("signbit", axsignbit);
 

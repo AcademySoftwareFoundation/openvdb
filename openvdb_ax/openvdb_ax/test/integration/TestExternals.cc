@@ -43,7 +43,7 @@ _T1_@test1 = _T1_$ext1;)";
     };
 
     generate(std::vector<std::string>{
-        "bool", "short", "int", "long", "float", "double",
+        "bool", "int32", "int64", "float", "double",
         "vec2i", "vec2f", "vec2d",
         "vec3i", "vec3f", "vec3d",
         "vec4i", "vec4f", "vec4d",
@@ -60,21 +60,14 @@ _T1_@test1 = _T1_$ext1;)";
                 mHarness.mCustomData->insertData("ext1", openvdb::TypedMetadata<bool>(true).copy());
              },
         },
-        { "short",
-            [&](){
-                mHarness.addAttribute<int16_t>("test1", -1);
-                mHarness.mCustomData.reset(new openvdb::ax::CustomData());
-                mHarness.mCustomData->insertData("ext1", openvdb::TypedMetadata<int16_t>(-1).copy());
-             },
-        },
-        { "int",
+        { "int32",
             [&](){
                 mHarness.addAttribute<int32_t>("test1", -2);
                 mHarness.mCustomData.reset(new openvdb::ax::CustomData());
                 mHarness.mCustomData->insertData("ext1", openvdb::TypedMetadata<int32_t>(-2).copy());
             },
         },
-        { "long",
+        { "int64",
             [&](){
                 mHarness.addAttribute<int64_t>("test1", 3);
                 mHarness.mCustomData.reset(new openvdb::ax::CustomData());

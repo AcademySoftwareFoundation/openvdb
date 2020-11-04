@@ -12,8 +12,8 @@
 #define OPENVDB_AX_CODEGEN_TYPES_HAS_BEEN_INCLUDED
 
 #include "../ast/Tokens.h"
-#include "../ast/Literals.h"
 #include "../Exceptions.h"
+#include "../compiler/CustomData.h" // for AXString
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
@@ -33,6 +33,12 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 namespace codegen {
+
+template <size_t Bits> struct int_t;
+template <> struct int_t<8>  { using type = int8_t;  };
+template <> struct int_t<16> { using type = int16_t; };
+template <> struct int_t<32> { using type = int32_t; };
+template <> struct int_t<64> { using type = int64_t; };
 
 /// @brief LLVM type mapping from pod types
 /// @note  LLVM Types do not store information about the value sign, only meta
@@ -211,8 +217,8 @@ struct LLVMType<void>
     }
 };
 
-/// @note void* implemented as signed int8_t* to match clang IR generation
-template <> struct LLVMType<void*> : public LLVMType<int8_t*> {};
+/// @note void* implemented as signed int_t* to match clang IR generation
+template <> struct LLVMType<void*> : public LLVMType<int_t<sizeof(void*)>::type*> {};
 
 template <typename T> struct LLVMType<const T> : public LLVMType<T> {};
 template <typename T> struct LLVMType<const T*> : public LLVMType<T*> {};
@@ -305,119 +311,29 @@ struct FunctionTraits<ReturnT(Args...)>
 /// @param size  The number of bits of the integer type
 /// @param C     The LLVMContext to request the Type from.
 ///
-inline llvm::IntegerType*
-llvmIntType(const uint32_t size, llvm::LLVMContext& C)
-{
-    switch (size) {
-        case 1 :  return llvm::cast<llvm::IntegerType>(LLVMType<bool>::get(C));
-        case 8 :  return llvm::cast<llvm::IntegerType>(LLVMType<int8_t>::get(C));
-        case 16 : return llvm::cast<llvm::IntegerType>(LLVMType<int16_t>::get(C));
-        case 32 : return llvm::cast<llvm::IntegerType>(LLVMType<int32_t>::get(C));
-        case 64 : return llvm::cast<llvm::IntegerType>(LLVMType<int64_t>::get(C));
-        default : return llvm::Type::getIntNTy(C, size);
-    }
-}
-
+llvm::IntegerType* llvmIntType(const uint32_t size, llvm::LLVMContext& C);
 
 /// @brief Returns an llvm floating point Type given a requested size and context
 /// @param size  The size of the float to request, i.e. float - 32, double - 64 etc.
 /// @param C     The LLVMContext to request the Type from.
 ///
-inline llvm::Type*
-llvmFloatType(const uint32_t size, llvm::LLVMContext& C)
-{
-    switch (size) {
-        case 32 : return LLVMType<float>::get(C);
-        case 64 : return LLVMType<double>::get(C);
-        default : OPENVDB_THROW(AXCodeGenError,
-            "Invalid float size requested from LLVM Context");
-    }
-}
+llvm::Type* llvmFloatType(const uint32_t size, llvm::LLVMContext& C);
 
 /// @brief  Returns an llvm type representing a type defined by a string.
 /// @note   For string types, this function returns the element type, not the
 ///         object type! The llvm type representing a char block of memory
 ///         is LLVMType<char*>::get(C);
-/// @param type  The name of the type to request.
+/// @param type  The AX token type
 /// @param C     The LLVMContext to request the Type from.
 ///
-inline llvm::Type*
-llvmTypeFromToken(const ast::tokens::CoreType& type,
-                  llvm::LLVMContext& C)
-{
-    switch (type) {
-        case ast::tokens::BOOL    : return LLVMType<bool>::get(C);
-        case ast::tokens::SHORT   : return LLVMType<int16_t>::get(C);
-        case ast::tokens::INT     : return LLVMType<int32_t>::get(C);
-        case ast::tokens::LONG    : return LLVMType<int64_t>::get(C);
-        case ast::tokens::FLOAT   : return LLVMType<float>::get(C);
-        case ast::tokens::DOUBLE  : return LLVMType<double>::get(C);
-        case ast::tokens::VEC2I   : return LLVMType<int32_t[2]>::get(C);
-        case ast::tokens::VEC2F   : return LLVMType<float[2]>::get(C);
-        case ast::tokens::VEC2D   : return LLVMType<double[2]>::get(C);
-        case ast::tokens::VEC3I   : return LLVMType<int32_t[3]>::get(C);
-        case ast::tokens::VEC3F   : return LLVMType<float[3]>::get(C);
-        case ast::tokens::VEC3D   : return LLVMType<double[3]>::get(C);
-        case ast::tokens::VEC4I   : return LLVMType<int32_t[4]>::get(C);
-        case ast::tokens::VEC4F   : return LLVMType<float[4]>::get(C);
-        case ast::tokens::VEC4D   : return LLVMType<double[4]>::get(C);
-        case ast::tokens::MAT3F   : return LLVMType<float[9]>::get(C);
-        case ast::tokens::MAT3D   : return LLVMType<double[9]>::get(C);
-        case ast::tokens::MAT4F   : return LLVMType<float[16]>::get(C);
-        case ast::tokens::MAT4D   : return LLVMType<double[16]>::get(C);
-        case ast::tokens::STRING  : return LLVMType<AXString>::get(C);
-        case ast::tokens::UNKNOWN :
-        default      :
-            OPENVDB_THROW(AXCodeGenError,
-                "Token type not recognised in request for LLVM type");
-    }
-}
+llvm::Type* llvmTypeFromToken(const ast::tokens::CoreType& type, llvm::LLVMContext& C);
 
-inline ast::tokens::CoreType
-tokenFromLLVMType(const llvm::Type* type)
-{
-    if (type->isPointerTy()) {
-        type = type->getPointerElementType();
-    }
-    if (type->isIntegerTy(1))   return ast::tokens::BOOL;
-    if (type->isIntegerTy(16))  return ast::tokens::SHORT;
-    if (type->isIntegerTy(32))  return ast::tokens::INT;
-    if (type->isIntegerTy(64))  return ast::tokens::LONG;
-    if (type->isFloatTy())      return ast::tokens::FLOAT;
-    if (type->isDoubleTy())     return ast::tokens::DOUBLE;
-    if (type->isArrayTy()) {
-        const ast::tokens::CoreType elementType =
-            tokenFromLLVMType(type->getArrayElementType());
-        const size_t size = type->getArrayNumElements();
-        if (size == 2) {
-            if (elementType == ast::tokens::INT)     return ast::tokens::VEC2I;
-            if (elementType == ast::tokens::FLOAT)   return ast::tokens::VEC2F;
-            if (elementType == ast::tokens::DOUBLE)  return ast::tokens::VEC2D;
-        }
-        else if (size == 3) {
-            if (elementType == ast::tokens::INT)     return ast::tokens::VEC3I;
-            if (elementType == ast::tokens::FLOAT)   return ast::tokens::VEC3F;
-            if (elementType == ast::tokens::DOUBLE)  return ast::tokens::VEC3D;
-        }
-        else if (size == 4) {
-            if (elementType == ast::tokens::INT)     return ast::tokens::VEC4I;
-            if (elementType == ast::tokens::FLOAT)   return ast::tokens::VEC4F;
-            if (elementType == ast::tokens::DOUBLE)  return ast::tokens::VEC4D;
-        }
-        else if (size == 9) {
-            if (elementType == ast::tokens::FLOAT)   return ast::tokens::MAT3F;
-            if (elementType == ast::tokens::DOUBLE)  return ast::tokens::MAT3D;
-        }
-        else if (size == 16) {
-            if (elementType == ast::tokens::FLOAT)   return ast::tokens::MAT4F;
-            if (elementType == ast::tokens::DOUBLE)  return ast::tokens::MAT4D;
-        }
-    }
-    if (type == LLVMType<AXString>::get(type->getContext())) {
-        return ast::tokens::STRING;
-    }
-    return ast::tokens::UNKNOWN;
-}
+/// @brief  Return a corresponding AX token which represents the given LLVM Type.
+/// @note   If the type does not exist in AX, ast::tokens::UNKNOWN is returned.
+///         Must not be a nullptr.
+/// @param type  a valid LLVM Type
+///
+ast::tokens::CoreType tokenFromLLVMType(const llvm::Type* type);
 
 } // namespace codegen
 } // namespace ax

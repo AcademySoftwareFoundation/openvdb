@@ -32,12 +32,12 @@ unittest_util::CodeTests tests =
     { "@a = test();",       Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT, true), new FunctionCall("test"))) },
     { "@a = 1 + i@b;",      Node::Ptr(new AssignExpression(
                                 new Attribute("a", CoreType::FLOAT, true),
-                                new BinaryOperator(new Value<int32_t>(1), new Attribute("b", CoreType::INT), OperatorToken::PLUS)
+                                new BinaryOperator(new Value<int32_t>(1), new Attribute("b", CoreType::INT32), OperatorToken::PLUS)
                             ))
     },
     { "@a = -int@b;",       Node::Ptr(new AssignExpression(
                                 new Attribute("a", CoreType::FLOAT, true),
-                                new UnaryOperator(new Attribute("b", CoreType::INT), OperatorToken::MINUS)
+                                new UnaryOperator(new Attribute("b", CoreType::INT32), OperatorToken::MINUS)
                             ))
     },
     { "@a = ++float@b;",    Node::Ptr(new AssignExpression(
@@ -64,16 +64,16 @@ unittest_util::CodeTests tests =
                                 new ArrayUnpack(new Attribute("b", CoreType::VEC3F), new Value<int32_t>(0))
                             ))
     },
-    { "@a = 1s;",           Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT, true), new Value<int16_t>(1))) },
     { "@a = \"b\";",        Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT, true), new Value<std::string>("b"))) },
     { "@a = b;",            Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT, true), new Local("b"))) },
 
     // test all attribute
     { "bool@a = true;",     Node::Ptr(new AssignExpression(new Attribute("a", CoreType::BOOL), new Value<bool>(true))) },
-    { "short@a = true;",    Node::Ptr(new AssignExpression(new Attribute("a", CoreType::SHORT), new Value<bool>(true))) },
-    { "i@a = true;",        Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT), new Value<bool>(true))) },
-    { "int@a = true;",      Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT), new Value<bool>(true))) },
-    { "long@a = true;",     Node::Ptr(new AssignExpression(new Attribute("a", CoreType::LONG), new Value<bool>(true))) },
+    { "int16@a = true;",    Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT16), new Value<bool>(true))) },
+    { "i@a = true;",        Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT32), new Value<bool>(true))) },
+    { "int@a = true;",      Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT32), new Value<bool>(true))) },
+    { "int32@a = true;",    Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT32), new Value<bool>(true))) },
+    { "int64@a = true;",    Node::Ptr(new AssignExpression(new Attribute("a", CoreType::INT64), new Value<bool>(true))) },
     { "f@a = true;",        Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT), new Value<bool>(true))) },
     { "float@a = true;",    Node::Ptr(new AssignExpression(new Attribute("a", CoreType::FLOAT), new Value<bool>(true))) },
     { "double@a = true;",   Node::Ptr(new AssignExpression(new Attribute("a", CoreType::DOUBLE), new Value<bool>(true))) },

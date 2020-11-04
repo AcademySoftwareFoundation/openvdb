@@ -1,7 +1,6 @@
-int local = 2;
-long@testlong = local;
-short@testshort = local;
+int64 local = 2l;
 bool@testbool = local;
+int32@testint32 = local;
 double@testdouble = local;
 float@testfloat = local;
 
