@@ -32,8 +32,12 @@ public:
     using value_type = T;
     using ValueType = T;
     using MyBase = Mat<3, T>;
+
     /// Trivial constructor, the matrix is NOT initialized
-    Mat3() {}
+    Mat3() = default;
+    ~Mat3() = default;
+    Mat3(const Mat3&) = default;
+    Mat3& operator=(const Mat3&) = default;
 
     /// Constructor given the quaternion rotation, e.g.    Mat3f m(q);
     /// The quaternion is normalized and used to construct the matrix
@@ -92,16 +96,6 @@ public:
         MyBase::mm[7] = static_cast<T>(a[7]);
         MyBase::mm[8] = static_cast<T>(a[8]);
     } // constructor1Test
-
-    /// Copy constructor
-    Mat3(const Mat<3, T> &m)
-    {
-        for (int i=0; i<3; ++i) {
-            for (int j=0; j<3; ++j) {
-                MyBase::mm[i*3 + j] = m[i][j];
-            }
-        }
-    }
 
     /// Conversion constructor
     template<typename Source>
@@ -815,6 +809,9 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
 using Mat3s = Mat3<float>;
 using Mat3d = Mat3<double>;
 using Mat3f = Mat3d;
+
+OPENVDB_IS_POD(Mat3s)
+OPENVDB_IS_POD(Mat3d)
 
 } // namespace math
 
