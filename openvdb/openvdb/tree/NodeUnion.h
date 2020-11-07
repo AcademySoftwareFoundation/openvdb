@@ -20,9 +20,12 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-// Default implementation that stores the child pointer and the value separately
-// (i.e., not in a union)
-// This implementation is not used for POD, math::Vec or math::Coord value types.
+/// @brief Default implementation of a NodeUnion that stores the child pointer
+///   and the value separately (i.e., not in a union). Types which select this
+///   specialization usually do not conform to the requirements of a union
+///   member, that is that the type ValueT is not trivially copyable. This
+///   implementation is thus NOT used for POD, math::Vec, math::Mat, math::Quat
+///   or math::Coord types, but is used (for example) with std::string
 template<typename ValueT, typename ChildT, typename Enable = void>
 class NodeUnion
 {
@@ -50,9 +53,11 @@ public:
         "Unexpected instantiation of NodeUnion");
 };
 
-// Template specialization for values of POD types (int, float, pointer, etc.)
+/// @brief Template specialization of a NodeUnion that stores the child pointer
+///   and the value together (int, float, pointer, etc.)
 template<typename ValueT, typename ChildT>
-class NodeUnion<ValueT, ChildT, typename std::enable_if<std::is_trivially_copyable<ValueT>::value>::type>
+class NodeUnion<ValueT, ChildT,
+    typename std::enable_if<std::is_trivially_copyable<ValueT>::value>::type>
 {
 private:
     union { ChildT* mChild; ValueT mValue; };
