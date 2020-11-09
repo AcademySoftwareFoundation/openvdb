@@ -19,6 +19,9 @@ Version 7.2.0 - In Development
     - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
       the new parallel breadth-first algorithms for much faster performance.
     - Extended tree::NodeManager to allow for use with a const tree.
+    - Added math::Abs, math::cwiseAdd, math::cwiseLessThan and
+      math::cwiseGreaterThan methods for Matrix types. Matrix grids can now be
+      instantiated.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel

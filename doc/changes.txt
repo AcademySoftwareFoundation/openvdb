@@ -30,6 +30,10 @@ Improvements:
   parallel breadth-first algorithms for much faster performance.
 - Extended @vdblink::tree::NodeManager NodeManager@endlink to allow for use with
   a const tree.
+- Added @vdblink::math::Abs Abs@endlink, @vdblink::math::cwiseAdd cwiseAdd@endlink,
+  @vdblink::math::cwiseLessThan cwiseLessThan@endlink and
+  @vdblink::math::cwiseGreaterThan cwiseGreaterThan@endlink methods for Matrix types.
+  Matrix grids can now be instantiated.
 
 @par
 Houdini:
