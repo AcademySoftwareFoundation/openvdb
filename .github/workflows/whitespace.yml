@@ -1,0 +1,33 @@
+
+name: Whitespace
+
+on:
+  push:
+    paths-ignore:
+      - 'tsc/meetings/**'
+  pull_request:
+    paths-ignore:
+      - 'tsc/meetings/**'
+
+jobs:
+  # Search the git repository for any trailing spaces excluding meeting notes
+  trailingspaces:
+    runs-on: ubuntu-16.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: test
+      run: |
+          set +e
+          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*'
+          test $? -eq 1
+
+  # Search for any tabs excluding meeting notes, image files and a few others
+  spacesnottabs:
+    runs-on: ubuntu-16.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: test
+      run: |
+          set +e
+          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png'
+          test $? -eq 1

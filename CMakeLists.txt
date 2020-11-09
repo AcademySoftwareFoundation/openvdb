@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -86,6 +86,9 @@ option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
 know it to be required.]=] ON)
+option(USE_ZLIB [=[
+Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -110,7 +113,7 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_USE_DEPRECATED_ABI_5 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
@@ -121,10 +124,13 @@ A global list of library paths to additionally use into when searching for depen
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
   set(CONCURRENT_MALLOC Auto CACHE STRING
-    "Choose a concurrent malloc library, options are: None Auto Jemalloc Tbbmalloc.
-    Although not required, it is strongly recommended to use a concurrent memory allocator.
-    Auto is the default and implies Jemalloc, unless USE_MAYA is ON or Jemalloc is unavailable,
-    in which case Tbbmalloc is used." FORCE
+    "Explicitly link the OpenVDB executables against a particular concurrent malloc library.
+    Options are: None Auto Jemalloc Tbbmalloc. Although not required, it is strongly recommended
+    to use a concurrent memory allocator. Has no effect if OPENVDB_BUILD_BINARIES and
+    OPENVDB_BUILD_UNITTESTS are false. Auto is the default and implies Jemalloc, unless USE_MAYA
+    is ON or Jemalloc is unavailable, in which case Tbbmalloc is used. Note that this is not
+    linked into library builds and defers this choice to downstream applications via explicit
+    CMake targets." FORCE
   )
 elseif(NOT ${CONCURRENT_MALLOC} IN_LIST _CONCURRENT_MALLOC_OPTIONS)
   message(WARNING "Unrecognized value for CONCURRENT_MALLOC, using Auto instead.")
@@ -144,62 +150,35 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
+if(USE_BLOSC AND NOT USE_ZLIB)
+  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
+endif()
+
 # Top-level location for all openvdb headers
 set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
-option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
-option(OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF)
-
-# Alias deprecated vars
-
 if(OPENVDB_BUILD_HOUDINI_SOPS)
-  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
-  message(DEPRECATION "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
-    "Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
-  set(OPENVDB_BUILD_HOUDINI_PLUGIN ON)
+  message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
-
-if(OPENVDB_ENABLE_3_ABI_COMPATIBLE)
-  message(DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated and will be removed. Use "
-    "-D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version.")
-  if(OPENVDB_ABI_VERSION_NUMBER)
-    if(NOT (${OPENVDB_ABI_VERSION_NUMBER} EQUAL 3))
-      message(WARNING "OPENVDB_ABI_VERSION_NUMBER holds a different ABI value to "
-        "OPENVDB_ENABLE_3_ABI_COMPATIBLE, which will be ignored.")
-    endif()
-  else()
-    # Don't bother setting the docstring as we'll update it later
-    set(OPENVDB_ABI_VERSION_NUMBER "3" CACHE STRING "" FORCE)
-  endif()
-endif()
-
 if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
-  message(DEPRECATION "The USE_SYSTEM_LIBRARY_PATHS option is deprecated and will be removed. "
-    "Use DISABLE_CMAKE_SEARCH_PATHS.")
-  if(USE_SYSTEM_LIBRARY_PATHS)
-    set(DISABLE_CMAKE_SEARCH_PATHS OFF)
-  else()
-    set(DISABLE_CMAKE_SEARCH_PATHS ON)
-  endif()
+  message(FATAL_ERROR "The USE_SYSTEM_LIBRARY_PATHS option has been removed. Use DISABLE_CMAKE_SEARCH_PATHS.")
 endif()
 
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
   OPENVDB_CXX_STRICT
-  OPENVDB_ENABLE_3_ABI_COMPATIBLE
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
   USE_CCACHE
-  OPENVDB_BUILD_HOUDINI_SOPS
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
-  OPENVDB_USE_DEPRECATED_ABI
+  OPENVDB_USE_DEPRECATED_ABI_5
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
   OPENVDB_CODE_COVERAGE
@@ -212,13 +191,14 @@ mark_as_advanced(
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
 # @note  Blosc version is currently treated as exception which must be adhered
-# to. The minimum version must be at least 1.5. Previous versions are incompatible.
-set(MINIMUM_BLOSC_VERSION 1.5)
+# to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
+# Later versions (including 1.5.4), can be buggy on certain platforms.
+set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
-# OPENVDB_USE_DEPRECATED_ABI should be used to circumvent this
-set(MINIMUM_OPENVDB_ABI_VERSION 4)
+# OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
+set(MINIMUM_OPENVDB_ABI_VERSION 5)
 set(MINIMUM_CXX_STANDARD 14)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 5)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 6)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2018 of the VFX platform where avaiable
@@ -248,7 +228,9 @@ endif()
 
 # VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+# Note: CMake 3.15 chosen as possible next version due to Windows support
+# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
 #set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
@@ -337,7 +319,6 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
-#  FindOpenGL.cmake is needed if CMake < 3.8
 #  FindNumPy.cmake is needed if CMake < 3.14
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
@@ -587,11 +568,18 @@ unset(HAS_AVAILABLE_WARNINGS)
 # * On Windows, we follow SideFX's example in using Tbbmalloc due to the challenges
 #   of injecting into the Windows runtime to replace the system allocator.
 
-if(CONCURRENT_MALLOC STREQUAL "Auto")
+if((OPENVDB_BUILD_BINARIES OR OPENVDB_BUILD_UNITTESTS) AND CONCURRENT_MALLOC STREQUAL "Auto")
   if(WIN32 OR APPLE OR USE_MAYA)
     set(CONCURRENT_MALLOC "Tbbmalloc")
   else()
-    set(CONCURRENT_MALLOC "Jemalloc")
+    find_package(Jemalloc QUIET)
+    if(NOT TARGET Jemalloc::jemalloc)
+      message(WARNING "Unable to find Jemalloc, attempting to fall back to TBB malloc.
+        It is recommended to use Jemalloc for optimum performance.")
+      set(CONCURRENT_MALLOC "Tbbmalloc")
+    else()
+      set(CONCURRENT_MALLOC "Jemalloc")
+    endif()
   endif()
 endif()
 
@@ -639,7 +627,12 @@ if(NOT OPENVDB_BUILD_CORE)
   endif()
 else()
   include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
-  OPENVDB_VERSION_FROM_HEADER("${CMAKE_CURRENT_SOURCE_DIR}/openvdb/version.h"
+  set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
+  if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
+    message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
+  endif()
+
+  OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
     VERSION OpenVDB_VERSION
     MAJOR   OpenVDB_MAJOR_VERSION
     MINOR   OpenVDB_MINOR_VERSION
@@ -676,23 +669,19 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
 endif()
 
 if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if(OPENVDB_USE_DEPRECATED_ABI)
+  if(OPENVDB_USE_DEPRECATED_ABI_5)
     message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
       "are deprecated and will soon be removed.")
   else()
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set OPENVDB_USE_DEPRECATED_ABI to ON to suppress this error.")
+      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 to ON to suppress this error.")
   endif()
   # global target definition
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI)
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_5)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it
 # via add_definitions()
-
-if(OpenVDB_ABI EQUAL 3)
-  add_definitions(-DOPENVDB_3_ABI_COMPATIBLE)
-endif()
 
 add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 message(STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
@@ -706,31 +695,31 @@ determine the ABI number. You may set this to force a given ABI number.]=] FORCE
 ##########################################################################
 
 if(OPENVDB_BUILD_CORE)
-  add_subdirectory(openvdb)
+  add_subdirectory(openvdb/openvdb)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)
-  add_subdirectory(openvdb/python)
+  add_subdirectory(openvdb/openvdb/python)
 endif()
 
 if(OPENVDB_BUILD_BINARIES)
-  add_subdirectory(openvdb/cmd)
+  add_subdirectory(openvdb/openvdb/cmd)
 endif()
 
 if(OPENVDB_BUILD_UNITTESTS)
-  add_subdirectory(openvdb/unittest)
+  add_subdirectory(openvdb/openvdb/unittest)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
-  add_subdirectory(openvdb_houdini)
+  add_subdirectory(openvdb_houdini/openvdb_houdini)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_ABITESTS)
-  add_subdirectory(openvdb_houdini/abitest)
+  add_subdirectory(openvdb_houdini/openvdb_houdini/abitest)
 endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
-  add_subdirectory(openvdb_maya)
+  add_subdirectory(openvdb_maya/openvdb_maya)
 endif()
 
 ##########################################################################

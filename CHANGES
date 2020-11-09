@@ -1,7 +1,99 @@
 OpenVDB Version History
 =======================
 
-Version 7.1.0 - In Development
+Version 7.2.0 - In Development
+
+    New features:
+    - Added tree::DynamicNodeManager that lazily caches the nodes at each
+      level of the tree to allow for efficient threading of topology-changing
+      top-down workflows.
+    - Added tools::CsgUnionOp, tools::CsgIntersectionOp and
+      tools::CsgDifferenceOp that use a parallel breadth-first algorithm to
+      accelerate CSG union, intersection and difference operations.
+    - Added tools::TreeToMerge which provides methods to steal or deep-copy
+      from a tree based on the tag dispatch class used in its construction.
+
+    Improvements:
+    - util::CpuTimer now uses C++11 chrono instead of TBB.
+    - Threaded the construction of LeafManager and NodeManager linear arrays.
+    - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
+      the new parallel breadth-first algorithms for much faster performance.
+    - Extended tree::NodeManager to allow for use with a const tree.
+
+    Houdini:
+    - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
+      transform was ignoring the contents of packed geometry.
+    - Fixed a bug in the OpenVDB Points Convert SOP where points representing
+      packed geometry were also being converted.
+    - Fixed a bug where a Houdini SOP's verb would not be correctly associated
+      with the corresponding node if the node's internal name was changed.
+    - Fixed bug where OpenVDB Convert SOP could revert the name attribute.
+
+    Bug fixes:
+    - Fixed a bug which could cause recursive compile time instantiations of
+      TypeList objects, manifesting in longer compile times.
+    - Deprecated util::PagedArray::push_back due to a race condition. Instead
+      use util::PagedArray::ValueBuffer::push_back which is faster and thread-safe.
+
+    API changes:
+    - Deprecated tree::LeafManager::getNodes. This method is no longer used when
+      constructing a NodeManager from a LeafManager.
+    - Deprecated Tree::visitActiveBBox, Tree::visit and Tree::visit2 methods in
+      favor of using a tree::DynamicNodeManager.
+    - Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
+      tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
+      tools now use the parallel breath-first algorithms.
+
+    Build:
+    - Removed the Makefiles.
+    - Re-organised the repository layout such that each independent library
+      is able to be configured against an existing installation of OpenVDB
+      without ambiguous include paths.
+    - Upgraded CMake minimum version support to 3.12.
+    - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
+    - Fixed various compiler warnings for GCC 9.1.
+    - Moved to CMake doxygen commands and removed the doxygen-config files for
+      doxygen documentation.
+    - Added USE_ZLIB compiler flag that enables zlib compression and defaults
+      to on.
+    - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
+      Windows which use the multithread/DLL-specific version of the CRT.
+      [Reported by Tobias Rittig]
+
+Version 7.1.0 - August 13, 2020
+
+      As of this release, support for grid ABI=4 has been removed.
+
+    New features:
+    - Added a novel parallel sparse FastSweeping class that outperforms our
+      existing techniques for computing signed distance fields in addition to
+      supporting velocity extension.
+    - Added tools::fogToSdf which converts a scalar (fog) volume into a signed
+      distance field.
+    - Added tools::sdfToSdf which re-normalizes a signed distance field;
+    - Added tools::fogToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a scalar (fog) volume.
+    - Added tools::sdfToExt which extends an arbitrary field (e.g. velocity)
+      off the iso-surface of a signed distance field.
+    - Added tools::fogToSdfAndExt which computes a signed distance and extends
+      an arbitrary field (e.g. velocity) off the iso-surface of a signed
+      distance field.
+    - Added tools::fogToSdfAndExt which re-normalizes a signed distance and
+      extends an arbitrary field (e.g. velocity) off the iso-surface of a
+      signed distance field.
+    - Added tools::dilateSdf which dilates a signed distance field.
+    - Added tools::maskSdf which extends an existing signed distance into a
+      user-defined mask.
+    - Added Grid::isTreeUnique() to tell if the tree is shared with another
+      grid.
+    - Added PointDataLeafNode::stealAttributeSet() and
+      AttributeSet::removeAttribute() for releasing ownership of attribute
+      data.
+    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
+      group index collisions when attempting to merge two Descriptors.
+    - Added RootNode::childCount(), InternalNode::childCount() and
+      LeafNode::childCount() to count the number of immediate child nodes that
+      exist below the current node.
 
     Improvements:
     - Added GroupWriteHandle::setUnsafe() for faster performance when the group
@@ -22,15 +114,17 @@ Version 7.1.0 - In Development
     - vdb_view now uses OPENVDB_LOG_FATAL when catching exceptions.
     - vdb_view, vdb_print and vdb_render now use std::terminate() when catching
       an unknown exception.
-
-    New features:
-    - Added Grid::isTreeUnique() to tell if the tree is shared with another
-      grid.
-    - Added PointDataLeafNode::stealAttributeSet() and
-      AttributeSet::removeAttribute() for releasing ownership of attribute
-      data.
-    - Added AttributeSet::Descriptor::groupIndexCollision() for detecting
-      group index collisions when attempting to merge two Descriptors.
+    - Removed Boost::thread as a dependency of vdb_view in favour of
+      std::thread.
+    - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
+      the latter in favour of new openvdb math constants for pi
+    - Removed usage of boost/mpl/*.hpp methods in favour of new template
+      meta-programming methods on the openvdb::TypeList struct. This now
+      supports get, front, back, contains, index, unique, popback, popfront
+      and range removal of types.
+    - Changed the tree::NodeChain implementation to use an openvdb::TypeList
+      rather than a boost::mpl::vector and updated all usage of tree::NodeChain
+      accordingly.
 
     Bug fixes:
     - Fixed a bug where grids with no active values might return true when the
@@ -73,10 +167,16 @@ Version 7.1.0 - In Development
       point of the VDB when computing bounding box. SOPs affected include Clip,
       Fill, Points Group, Rasterize Points, Read, Remove Divergence.
       [Contributed by Kuba Roth]
+    - OpenVDB from Polygons SOP now always displays the vector UI, as otherwise
+      it might be stuck hidden if the input hasn't cooked.
+    - OpenVDB from Polygons and OpenVDB from Particles SOPs no longer require
+      input geometry to have been cooked to offer a choice of attributes,
+      the user may now also type in a value.
 
     Build:
     - Improved the CMake build for the OpenVDB Houdini library on Windows.
       [Reported by Ian Woodward]
+    - Remove some logic for compilers older than Visual Studio 2019.
     - Fixed a bug in the CMake FindIlmBase/OpenEXR modules which could cause
       compilers on UNIX systems to fail to find stdlib.h if IlmBase/OpenEXR
       headers were installed to /usr/include.
@@ -120,7 +220,18 @@ Version 7.1.0 - In Development
       OpenEXR/IlmBase on Windows.
     - Improved the behaviour of boost implicit linking with the
       Boost::disable_autolinking target.
-
+    - Added support for importing pyopenvdb and openvdb_houdini through the
+      FindOpenVDB CMake module
+    - Removed the OPENVDB_2_ABI_COMPATIBLE and OPENVDB_3_ABI_COMPATIBLE macros.
+    - Fixed a few GCC compiler warnings by adding override keywords.
+      [Contributed by Edward Lam]
+    - jemalloc/tbbmalloc are no longer linked into library artifacts of the
+      OpenVDB CMake build. The CONCURRENT_MALLOC CMake option now only applies
+      to the executables.
+    - Introduced a new OpenVDB::openvdb_je interface target through the
+      FindOpenVDB CMake module which adds Jemalloc as a link time dependency.
+    - CMake build fix for the vdb_render binary on Windows when building
+      statically and using OpenEXR 2.5
 
 Version 7.0.0 - December 6, 2019
 

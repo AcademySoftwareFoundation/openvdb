@@ -1,0 +1,28 @@
+
+name: Docs
+
+on:
+  push:
+    branches:
+      - '*'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb_maya/**'
+      - '**/*.md'
+  pull_request:
+    branches:
+      - '*'
+    paths-ignore:
+      - 'CHANGES'
+      - 'openvdb_maya/**'
+      - '**/*.md'
+
+jobs:
+  doxygen:
+    runs-on: ubuntu-16.04
+    steps:
+    - uses: actions/checkout@v2
+    - name: install
+      run: ./ci/install_doxygen.sh
+    - name: build
+      run: ./ci/build_docs.sh
