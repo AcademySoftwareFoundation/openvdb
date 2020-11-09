@@ -1318,13 +1318,32 @@ inline bool hasTranslation(const Mat4<T>& m) {
     return (m.row(3) != Vec4<T>(0, 0, 0, 1));
 }
 
-/// @brief  explicit component-wise adder for matrices
+template<typename T>
+inline Mat4<T>
+Abs(const Mat4<T>& m)
+{
+    return Abs<4, T>(m);
+}
+
 template<typename Type1, typename Type2>
 inline Mat4<Type1>
-cwiseAdd(const Mat4<Type1>& v, const Type2 s)
+cwiseAdd(const Mat4<Type1>& m, const Type2 s)
 {
-    const Mat<4u, Type1>& base = v;
-    return cwiseAdd(base, s);
+    return cwiseAdd<4, Type1, Type2>(m, s);
+}
+
+template<typename T>
+inline bool
+cwiseLessThan(const Mat4<T>& m0, const Mat4<T>& m1)
+{
+    return cwiseLessThan<4, T>(m0, m1);
+}
+
+template<typename T>
+inline bool
+cwiseGreaterThan(const Mat4<T>& m0, const Mat4<T>& m1)
+{
+    return cwiseGreaterThan<4, T>(m0, m1);
 }
 
 using Mat4s = Mat4<float>;

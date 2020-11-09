@@ -1024,9 +1024,22 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
 ////////////////////////////////////////
 
+/// @return the absolute value of the given Mat.
+template<unsigned SIZE, typename T>
+Mat<SIZE, T>
+Abs(const Mat<SIZE, T>& in)
+{
+    Mat<SIZE, T> out;
+    const T* ip = in.asPointer();
+    T* op = out.asPointer();
+    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) *op = math::Abs(*ip);
+    return out;
+}
+
 /// @return true if m0 < m1, comparing components in order of significance.
 template<unsigned SIZE, typename T>
-bool operator<(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+inline bool
+cwiseLessThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
 {
     const T* m0p = m0.asPointer();
     const T* m1p = m1.asPointer();
@@ -1039,7 +1052,8 @@ bool operator<(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
 
 /// @return true if m0 > m1, comparing components in order of significance.
 template<unsigned SIZE, typename T>
-bool operator>(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+inline bool
+cwiseGreaterThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
 {
     const T* m0p = m0.asPointer();
     const T* m1p = m1.asPointer();
@@ -1048,18 +1062,6 @@ bool operator>(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
         if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p > *m1p;
     }
     return *m0p > *m1p;
-}
-
-/// @return the absolute value of the given Mat.
-template<unsigned SIZE, typename T>
-Mat<SIZE, T>
-Abs(const Mat<SIZE, T>& in)
-{
-    Mat<SIZE, T> out;
-    const T* ip = in.asPointer();
-    T* op = out.asPointer();
-    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) *op = math::Abs(*ip);
-    return out;
 }
 
 /// @brief  explicit component-wise adder for matrices

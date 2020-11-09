@@ -797,13 +797,32 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     return false;
 }
 
-/// @brief  explicit component-wise adder for matrices
+template<typename T>
+inline Mat3<T>
+Abs(const Mat3<T>& m)
+{
+    return Abs<3, T>(m);
+}
+
 template<typename Type1, typename Type2>
 inline Mat3<Type1>
-cwiseAdd(const Mat3<Type1>& v, const Type2 s)
+cwiseAdd(const Mat3<Type1>& m, const Type2 s)
 {
-    const Mat<3, Type1>& base = v;
-    return cwiseAdd(base, s);
+    return cwiseAdd<3, Type1, Type2>(m, s);
+}
+
+template<typename T>
+inline bool
+cwiseLessThan(const Mat3<T>& m0, const Mat3<T>& m1)
+{
+    return cwiseLessThan<3, T>(m0, m1);
+}
+
+template<typename T>
+inline bool
+cwiseGreaterThan(const Mat3<T>& m0, const Mat3<T>& m1)
+{
+    return cwiseGreaterThan<3, T>(m0, m1);
 }
 
 using Mat3s = Mat3<float>;
