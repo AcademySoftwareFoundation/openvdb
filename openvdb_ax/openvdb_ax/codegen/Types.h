@@ -307,6 +307,27 @@ struct FunctionTraits<ReturnT(Args...)>
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
+/// @brief Returns an llvm Constant holding a scalar value
+/// @param t  The scalar constant
+/// @param type  The LLVM type. Can differ from the type of t, in which
+///   case the value will be cast to the llvm type
+///
+template <typename T>
+inline llvm::Constant*
+llvmConstant(const T t, llvm::Type* type)
+{
+    static_assert(std::is_floating_point<T>::value || std::is_integral<T>::value,
+        "T type for llvmConstant must be a floating point or integral type.");
+
+    if (type->isIntegerTy()) {
+        return llvm::ConstantInt::get(type, static_cast<uint64_t>(t), /*signed*/true);
+    }
+    else {
+        assert(type->isFloatingPointTy());
+        return llvm::ConstantFP::get(type, static_cast<double>(t));
+    }
+}
+
 /// @brief Returns an llvm IntegerType given a requested size and context
 /// @param size  The number of bits of the integer type
 /// @param C     The LLVMContext to request the Type from.

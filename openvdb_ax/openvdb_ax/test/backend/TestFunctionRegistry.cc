@@ -41,7 +41,7 @@ TestFunctionRegistry::testCreateAllVerify()
         std::cerr.rdbuf(buffer.rdbuf());
         reg->createAll(opts, true);
         const std::string& result = buffer.str();
-        CPPUNIT_ASSERT(result.empty());
+        CPPUNIT_ASSERT_MESSAGE(result, result.empty());
     }
     catch (...) {
         std::cerr.rdbuf(sbuf);

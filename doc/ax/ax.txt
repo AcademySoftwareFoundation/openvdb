@@ -219,14 +219,15 @@ missing types from OpenVDB.
 <th>Category</th><th>Type</th><th>Definition</th><th>Attribute Syntax</th><th>Points</th><th>Voxels</th>
 </tr>
 <tr>
-<td rowspan="6"> @ref axscalars </td>
+<td rowspan="7"> @ref axscalars </td>
 <td>`bool`</td>
 <td>Boolean value, true or false</td><td>`bool@`</td>
 <td>@b Yes</td><td>@b Yes</td>
 </tr>
-<tr><td>`short`</td><td>16-bit signed integer value</td><td>`short@`</td><td>@b Yes</td><td>No</td></tr>
-<tr><td>`int`</td><td>32-bit signed integer value</td><td>`int@,   i@`</td><td>@b Yes</td><td>@b Yes</td></tr>
-<tr><td>`long`</td><td>64-bit signed integer value</td><td>`long@`</td><td>@b Yes</td><td>@b Yes</td></tr>
+<tr><td>`int16`*</td><td>16-bit signed integer value</td><td>`int16@`</td><td>@b Yes</td><td>No</td></tr>
+<tr><td>`int32`</td><td>32-bit signed integer value</td><td>`int32@,   int@,   i@`</td><td>@b Yes</td><td>@b Yes</td></tr>
+<tr><td>`int`</td><td colspan="4">Alias for integer type (typically int32)</td></tr>
+<tr><td>`int64`</td><td>64-bit signed integer value</td><td>`int64@`</td><td>@b Yes</td><td>@b Yes</td></tr>
 <tr><td>`float`</td><td>32-bit floating point value</td><td>`float@   f@   @`</td><td>@b Yes</td><td>@b Yes</td></tr>
 <tr><td>`double`</td><td>64-bit floating point value</td><td>`double@`</td><td>@b Yes</td><td>@b Yes</td></tr>
 <tr>
@@ -264,16 +265,16 @@ missing types from OpenVDB.
 <td style="border-top-width: thick">@b Yes</td>
 </tr>
 </table>
+ - @b Note* - There is no support for int16 local variables or integer literals.
 
 
 @subsection axscalars Scalars
 @par
-AX Supports boolean, integer and floating point scalar types. All scalar
-typenames are pulled from C, where @b `short` represents a 16-bit value, @b `int`
-represents a 32-bit integer value and @b `long` represents a 64-bit value. @b
-`float` and @b `double` represent 32-bit and 64-bit floating point values
-respectively. All scalars, excluding bools, are signed; there are no other
-unsigned scalar types in AX.
+AX Supports boolean, integer and floating point scalar types. @b `int` and
+@b `int32` represent 32-bit integer values and @b `int64` represents a 64-bit
+value. @b `float` and @b `double` represent 32-bit and 64-bit floating point
+values respectively. All scalars, excluding bools, are signed; there are no
+other unsigned scalar types in AX.
 @par Integer Overflow and Floating Point Truncation
 Scalars may be cast from one type to another, either explicitly using the
 @ref axopother "cast" operator or implicitly during @ref axopassignment
@@ -292,7 +293,7 @@ b = a; // implicit conversion from float "a". "b" is set to 1
 @par
 This example demonstrates integer overflow in AX.
 @code
-long a = 2147483648l; // one more than can be held in an int (note the last letter "l")
+int64 a = 2147483648l; // one more than can be held in an int (note the last letter "l")
 int b = a; // implicit conversion. "b" is set to -2147483648
 @endcode
 @par Infinite and NaN values
@@ -324,7 +325,7 @@ There is currently support for vectors of sizes 2, 3 and 4 elements. The suffix
 letter on the vector types denotes the contained elements precision, with the
 number corresponding to the vector size. For example, @b `vec2i` denotes a vector
 of two 32-bit integer elements. There are no native types for vectors with
-@b `bool`, @b `short` or @b `long` elements, so these are not supported.
+@b `bool`, @b `int16` or @b `int64` elements, so these are not supported.
 @par Matrices
 Matrices are stored in row major layout (lexographical access order) which
 matches the representation of a matrix in OpenVDB. Matrix support consists of
@@ -386,9 +387,8 @@ the resulting highest rank is chosen as the target type for all values. These
 rankings are defined as follows:
  - If any element types are of type `double`, all other element types are converted to `double`
  - else, if any element types are of type `float`, all other element types are converted to `float`
- - else, if any element types are of type `long`, all other element types are converted to `long`
- - else, if any element types are of type `int`, all other element types are converted to `int`
- - else, if any element types are of type `short`, all other element types are converted to `short`
+ - else, if any element types are of type `int64`, all other element types are converted to `int64`
+ - else, if any element types are of type `int32`, all other element types are converted to `int32`
  - else, all element types are `bool`
 @par
 For example:
@@ -729,7 +729,7 @@ container types). Binary arithmetic operations have the following forms:
 <tr><td>Subtraction</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`-`</b> @a `rhs` </td><td>The first operand minus the second operand</td></tr>
 <tr><td>Multiplication</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`*`</b> @a `rhs` </td><td>The product of both operands</td></tr>
 <tr><td>Division</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`/`</b> @a `rhs` </td><td>The first operand divided by the second operand</td></tr>
-<tr><td>Modulo</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`%`</b> @a `rhs` </td><td>The remainder of the first operand divided by the second operand</td></tr>
+<tr><td>Modulo</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`%`</b> @a `rhs` </td><td>The @b floored modulo operator. See @ref axbinmultop "Multiplicative operands"</td></tr>
 <tr><td>Bitwise AND</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&amp;`</b> @a `rhs` </td>
 <td>The @b integral bitwise AND result of each bit in the first operand applied to the bit at the same location in the second operand</td></tr>
 <tr><td>Bitwise OR</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`|`</b> @a `rhs` </td>
@@ -845,7 +845,7 @@ to `a + (b + c)`.
 Examples of validity of additive operations:
 @par
 @code{.c}
-short a = 0;
+int a = 0;
 vec2f b = 1.0f;
 vec2i c = 2;
 mat4d d = 0.0;
@@ -870,8 +870,17 @@ operation:
     - @b OR performs matrix multiplication for vector and matrix types.
  - with the arithmetic @b `/` (@ref axtokens "forward slash token") is the first
  operand divided by the second operand.
- - with the arithmetic @b `%` (@ref axtokens "percentage token") is the remainder
- of the division of the first operand by the second.
+ - with the arithmetic @b `%` (@ref axtokens "percentage token") is the
+ @b floored modulo operations .i.e. the expression `d % D` returns the result
+ `D - d * floor(D/d)`. This is in contrast to truncated modulo operations
+ `D - d * (D/d)` where the division is truncated.
+@warning
+Floored modulo has been chosen to provide better expected behaviour with signed
+dividends. In such cases the result will always be positive; in other words,
+the sign of the result is @b always taken from the divisor. This does however
+mean that the relationship properties between `%` and `/` differ when either
+@b `d` or @b `D` is negative. i.e.:
+`(d/D)*D + (d%D) != d`
 @note
 The multiplicative operation @b `*` has important behaviour for vectors and
 matrix types.
@@ -1108,7 +1117,7 @@ These operations only run on @b integral operands. After @ref axtypeprecedence
 <td>@ref axscalars "intergral"</td>
 <td style="text-align:left">
 Returns the result of the bitwise operation as described above. If either operand
-is not an integral type (`bool` `short` `int` or `long`), the program is ill formed.
+is not an integral type (`bool` `int32` or `int64`), the program is ill formed.
 </td>
 </table>
 
@@ -1230,9 +1239,10 @@ Binary logical operations compute and return the result of a boolean operation
 on two operands. Both operands are implicitly converted to @b `bool` types if
 they are not already.
 @warning
-These operators are <b>currently not</b> short-circuiting; all operands are
-evaluated once. Importantly, do not rely on this behaviour as it may be subject
-to change.
+These operators are short-circuiting; for logical AND, the second operand is
+only evaluated if the first is @b true. For logical OR, the second operand is
+only evaluated if the first is @b false. In both cases, the first operand is
+always evaluated.
 @par
 They have the following forms:
 @par
@@ -1240,10 +1250,10 @@ They have the following forms:
 <tr><th>Operator&nbsp;Name</th><th>Operator&nbsp;Syntax</th><th>Returns</th></tr>
 <tr><td>AND</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`&&`</b> @a `rhs` </td>
 <td>Returns true if both operands are true. Otherwise, the result is false. This
-operator is @b NOT short-circuiting: all operands are evaluated once.</td></tr>
+operator is short-circuiting.</td></tr>
 <tr><td>Inclusive OR</td><td bgcolor="#ffc4c4"> @a `lhs` <b>`||`</b> @a `rhs` </td>
-<td>Returns true if either the first or the second operand (or both) is true.
-This operator is @b NOT short-circuiting: all operands are evaluated once.</td></tr>
+<td>Returns true if either the first or the second operand is true. This operator
+is short-circuiting.</td></tr>
 </table>
 @par
 The following combination of AX type categories are supported for comparison
@@ -1404,7 +1414,7 @@ not listed, it is not supported):
 <td style="text-align:left">Returns the result (reference or copy) of the scalar
 increment or decrement operation.\n
 @b Note: boolean incrementation and decrementation is not supported. Only
-`short`, `int`, `long`, `float` and `double` types are valid.  </td>
+`int32`, `int64`, `float` and `double` types are valid.  </td>
 </tr>
 </table>
 
@@ -1976,9 +1986,8 @@ can be used to assign any scalar a value.
 <table>
 <tr><th>Type</th><th>Literal Tokens</th></tr>
 <tr><td>`bool`</td><td>Tokens @b `true` and @b `false`</td></tr>
-<tr><td>`short`</td><td>The letter @b `s` e.g. @code short a = 10s; @endcode</td></tr>
-<tr><td>`int`</td><td>No suffix, automatically infered from integral literals..</td></tr>
-<tr><td>`long`</td><td>The letter @b `l` e.g. @code long a = 10l; @endcode</td></tr>
+<tr><td>`int32`</td><td>No suffix, automatically infered from integral literals</td></tr>
+<tr><td>`int64`</td><td>The letter @b `l` e.g. @code int64 a = 10l; @endcode</td></tr>
 <tr><td>`float`</td><td>The letter @b `f` e.g. @code float a = 0.0f; @endcode</td></tr>
 <tr><td>`double`</td><td>No suffix, automatically infered from floating point literals.</td></tr>
 <tr><td>`string`</td><td>Character strings wrapped in double quotes @b \" @b \"</td></tr>

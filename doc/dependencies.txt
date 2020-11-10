@@ -43,7 +43,7 @@ OpenVDB LOD             | Core Library dependencies                             
 OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
-OpenVDB AX              | Core Library dependencies, LLVM, Boost::random                                       | Bison, Flex
+OpenVDB AX              | Core Library dependencies, LLVM,                                                     | Bison, Flex
 OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
 OpenVDB Documentation   | Doxygen                                                                              | -
 
@@ -66,7 +66,7 @@ IlmBase        | 2.2     | 2.2         | Used half precision floating points and
 OpenEXR        | 2.2     | 2.2         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 2017 U6 | 2017 U6     | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
-Boost          | 1.61    | 1.61        | Components: system, iostreams, python, numpy, random              | Y       | Y        | https://www.boost.org
+Boost          | 1.61    | 1.61        | Components: system, iostreams, python, numpy                      | Y       | Y        | https://www.boost.org
 LLVM           | 6.0.0   | 8.0.0       | Target-independent code generation                                | Y       | Y        | https://llvm.org/
 Bison          | 3.0.0   | 3.0.5       | General-purpose parser generator                                  | Y       | Y        | https://www.gnu.org/software/gcc
 Flex           | 2.6     | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
@@ -119,7 +119,6 @@ apt-get install libboost-system-dev     # Boost::system
 apt-get install libboost-iostreams-dev  # Boost::iostream
 # AX
 apt-get install llvm-8-dev              # LLVM
-apt-get install libboost-random-dev     # Boost::random
 # Python
 apt-get install libboost-python-dev     # Boost::python
 apt-get install libboost-numpy-dev      # Boost::numpy

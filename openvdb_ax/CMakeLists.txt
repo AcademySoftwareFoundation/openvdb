@@ -252,14 +252,12 @@ if(OPENVDB_AX_SHARED)
     )
   endif()
 
-  # @TODO - Use a similar system to vdb to extract the version number from version.h
-
   set_target_properties(
     openvdb_ax_shared
     PROPERTIES
       OUTPUT_NAME openvdb_ax
-      SOVERSION 0.3
-      VERSION 0.3.0
+      SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
+      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
     )
 
   if(OPENVDB_ENABLE_RPATH)
