@@ -307,6 +307,7 @@ llvmBinaryConversion(const llvm::Type* const type,
 
     // NOTE: Binary % and / ops always take sign into account (CreateSDiv vs CreateUDiv, CreateSRem vs CreateURem).
     // See http://stackoverflow.com/questions/5346160/llvm-irbuildercreateudiv-createsdiv-createexactudiv
+    // a%b in AX is implemented as a floored modulo op and is handled explicitly in binaryExpression
 
     if (type->isFloatingPointTy()) {
         assert(!(ast::tokens::operatorType(token) == ast::tokens::LOGICAL ||
@@ -317,7 +318,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::MINUS)           return BIND_BINARY_OP(CreateFSub);
         else if (token == ast::tokens::MULTIPLY)        return BIND_BINARY_OP(CreateFMul);
         else if (token == ast::tokens::DIVIDE)          return BIND_BINARY_OP(CreateFDiv);
-        else if (token == ast::tokens::MODULO)          return BIND_BINARY_OP(CreateFRem);
+        else if (token == ast::tokens::MODULO)          return BIND_BINARY_OP(CreateFRem); // Note this is NOT a%b in AX.
         else if (token == ast::tokens::EQUALSEQUALS)    return BIND_BINARY_OP(CreateFCmpOEQ);
         else if (token == ast::tokens::NOTEQUALS)       return BIND_BINARY_OP(CreateFCmpONE);
         else if (token == ast::tokens::MORETHAN)        return BIND_BINARY_OP(CreateFCmpOGT);
@@ -331,7 +332,7 @@ llvmBinaryConversion(const llvm::Type* const type,
         else if (token == ast::tokens::MINUS)            return BIND_BINARY_OP(CreateSub); // No Unsigned/Signed Wrap
         else if (token == ast::tokens::MULTIPLY)         return BIND_BINARY_OP(CreateMul); // No Unsigned/Signed Wrap
         else if (token == ast::tokens::DIVIDE)           return BIND_BINARY_OP(CreateSDiv); // IsExact = false - when true, poison value if the reuslt is rounded
-        else if (token == ast::tokens::MODULO)           return BIND_BINARY_OP(CreateSRem);
+        else if (token == ast::tokens::MODULO)           return BIND_BINARY_OP(CreateSRem); // Note this is NOT a%b in AX.
         else if (token == ast::tokens::EQUALSEQUALS)     return BIND_BINARY_OP(CreateICmpEQ);
         else if (token == ast::tokens::NOTEQUALS)        return BIND_BINARY_OP(CreateICmpNE);
         else if (token == ast::tokens::MORETHAN)         return BIND_BINARY_OP(CreateICmpSGT);
@@ -546,9 +547,6 @@ boolComparison(llvm::Value* value,
 /// @param rhs       The right hand side value of the binary operation
 /// @param token     The token representing the binary operation to perform
 /// @param builder   The current llvm IRBuilder
-/// @param warnings  An optional string which will be set to any warnings this function
-///                  generates
-///
 inline llvm::Value*
 binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
                const ast::tokens::OperatorToken& token,

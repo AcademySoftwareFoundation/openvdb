@@ -990,6 +990,158 @@ inline FunctionGroup::UniquePtr axsignbit(const FunctionOptions& op)
         .get();
 }
 
+inline FunctionGroup::UniquePtr axtruncatemod(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+        return binaryOperator(args[0], args[1], ast::tokens::MODULO, B);
+    };
+
+    return FunctionBuilder("truncatemod")
+        .addSignature<double(double,double)>(generate)
+        .addSignature<float(float,float)>(generate)
+        .addSignature<int64_t(int64_t,int64_t)>(generate)
+        .addSignature<int32_t(int32_t,int32_t)>(generate)
+        .addSignature<int16_t(int16_t,int16_t)>(generate)
+        .setArgumentNames({"dividend", "divisor"})
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Truncated modulo, where the result of the division operator "
+            "on (dividend / divisor) is truncated. The remainder is thus calculated with "
+            "D - d * trunc(D/d). This is equal to the C/C++ % implementation. This is NOT "
+            "equal to a%b in AX. See floormod(), euclideanmod().")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axfloormod(const FunctionOptions& op)
+{
+    static auto ifmod = [](auto D, auto d) -> auto
+    {
+        using ValueType = decltype(D);
+        auto r = D % d; // tmod
+        if ((r > 0 && d < 0) || (r < 0 && d > 0)) r = r+d;
+        return ValueType(r);
+    };
+
+    static auto ffmod = [](auto D, auto d) -> auto
+    {
+        auto r = std::fmod(D, d);
+        if ((r > 0 && d < 0) || (r < 0 && d > 0)) r = r+d;
+        return r;
+    };
+
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+        llvm::Value* D = args[0];
+        llvm::Value* d = args[1];
+        // tmod
+        llvm::Value* r = binaryOperator(D, d, ast::tokens::MODULO, B);
+
+        llvm::Value* zero = llvmConstant(0, D->getType());
+        llvm::Value* a1 = binaryOperator(r, zero, ast::tokens::MORETHAN, B);
+        llvm::Value* a2 = binaryOperator(d, zero, ast::tokens::LESSTHAN, B);
+        a1 = binaryOperator(a1, a2, ast::tokens::AND, B);
+        llvm::Value* b1 = binaryOperator(r, zero, ast::tokens::LESSTHAN, B);
+        llvm::Value* b2 = binaryOperator(d, zero, ast::tokens::MORETHAN, B);
+        b1 = binaryOperator(b1, b2, ast::tokens::AND, B);
+        a1 = binaryOperator(a1, b1, ast::tokens::OR, B);
+
+        llvm::Value* rplus = binaryOperator(r, d, ast::tokens::PLUS, B);
+        return B.CreateSelect(a1, rplus, r);
+    };
+
+    return FunctionBuilder("floormod")
+        .addSignature<double(double,double)>(generate, (double(*)(double,double))(ffmod))
+        .addSignature<float(float,float)>(generate, (float(*)(float,float))(ffmod))
+        .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(ifmod))
+        .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(ifmod))
+        .addSignature<int16_t(int16_t,int16_t)>(generate, (int16_t(*)(int16_t,int16_t))(ifmod))
+        .setArgumentNames({"dividend", "divisor"})
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Floored modulo, where the result of the division operator "
+            "on (dividend / divisor) is floored. The remainder is thus calculated with "
+            "D - d * floor(D/d). This is the implemented modulo % operator of AX. This is "
+            "equal to the python % implementation. See trucnatemod(), euclideanmod().")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
+{
+    static auto iemod = [](auto D, auto d) -> auto
+    {
+        using ValueType = decltype(D);
+        auto r = D%d;
+        if (r < 0) {
+            if (d > 0) r = r + d;
+            else       r = r - d;
+        }
+        return ValueType(r);
+    };
+
+    static auto femod = [](auto D, auto d) -> auto
+    {
+        auto r = std::fmod(D, d);
+        if (r < 0) {
+            if (d > 0) r = r + d;
+            else       r = r - d;
+        }
+        return r;
+    };
+
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+        llvm::Value* D = args[0], *d = args[1];
+        llvm::Value* r = binaryOperator(D, d, ast::tokens::MODULO, B); // tmod
+
+        llvm::Value* zero = llvmConstant(0, D->getType());
+        llvm::Value* a1 = binaryOperator(d, zero, ast::tokens::MORETHAN, B);
+        llvm::Value* rplus = binaryOperator(r, d, ast::tokens::PLUS, B);
+        llvm::Value* rminus = binaryOperator(r, d, ast::tokens::MINUS, B);
+        llvm::Value* rd = B.CreateSelect(a1, rplus, rminus);
+
+        a1 = binaryOperator(r, zero, ast::tokens::LESSTHAN, B);
+        return B.CreateSelect(a1, rd, r);
+    };
+
+    return FunctionBuilder("euclideanmod")
+        .addSignature<double(double,double)>(generate, (double(*)(double,double))(femod))
+        .addSignature<float(float,float)>(generate, (float(*)(float,float))(femod))
+        .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(iemod))
+        .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(iemod))
+        .addSignature<int16_t(int16_t,int16_t)>(generate, (int16_t(*)(int16_t,int16_t))(iemod))
+        .setArgumentNames({"dividend", "divisor"})
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Euclidean modulo, where by the result of the division operator "
+            "on (dividend / divisor) is floored or ceiled depending on its sign, guaranteeing "
+            "that the return value is always positive. The remainder is thus calculated with "
+            "D - d * (d < 0 ? ceil(D/d) : floor(D/d)). This is NOT equal to a%b in AX. See "
+            "truncatemod(), floormod().")
+        .get();
+}
+
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
@@ -2101,7 +2253,9 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("clamp", axclamp);
     add("cross", axcross);
     add("dot", axdot);
+    add("euclideanmod", axeuclideanmod);
     add("fit", axfit);
+    add("floormod", axfloormod);
     add("length", axlength);
     add("lengthsq", axlengthsq);
     add("lerp", axlerp);
@@ -2112,6 +2266,7 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("rand32", axrand32);
     add("sign", axsign);
     add("signbit", axsignbit);
+    add("truncatemod", axtruncatemod);
 
     // matrix math
 

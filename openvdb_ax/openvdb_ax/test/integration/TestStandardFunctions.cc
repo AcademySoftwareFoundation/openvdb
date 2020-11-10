@@ -50,8 +50,10 @@ public:
     CPPUNIT_TEST(determinant);
     CPPUNIT_TEST(diag);
     CPPUNIT_TEST(dot);
+    CPPUNIT_TEST(euclideanmod);
     CPPUNIT_TEST(external);
     CPPUNIT_TEST(fit);
+    CPPUNIT_TEST(floormod);
     CPPUNIT_TEST(hash);
     CPPUNIT_TEST(identity3);
     CPPUNIT_TEST(identity4);
@@ -76,6 +78,7 @@ public:
     CPPUNIT_TEST(sinh);
     CPPUNIT_TEST(tan);
     CPPUNIT_TEST(tanh);
+    CPPUNIT_TEST(truncatemod);
     CPPUNIT_TEST(trace);
     CPPUNIT_TEST(transform);
     CPPUNIT_TEST(transpose);
@@ -96,8 +99,10 @@ public:
     void determinant();
     void diag();
     void dot();
+    void euclideanmod();
     void external();
     void fit();
+    void floormod();
     void hash();
     void identity3();
     void identity4();
@@ -122,6 +127,7 @@ public:
     void sinh();
     void tan();
     void tanh();
+    void truncatemod();
     void trace();
     void transform();
     void transpose();
@@ -424,6 +430,24 @@ TestStandardFunctions::dot()
 }
 
 void
+TestStandardFunctions::euclideanmod()
+{
+    static auto emod = [](auto D, auto d) -> auto {
+        using ValueType = decltype(D);
+        return ValueType(D - d * (d < 0 ? std::ceil(D/double(d)) : std::floor(D/double(d))));
+    };
+
+    // @note these also test that these match % op
+    const std::vector<int32_t> ivalues{ emod(7, 5), emod(-7, 5), emod(7,-5), emod(-7,-5) };
+    const std::vector<float> fvalues{ emod(7.2f, 5.7f), emod(-7.2f, 5.7f), emod(7.2f, -5.7f), emod(-7.2f, -5.7f) };
+    const std::vector<double> dvalues{ emod(7.2, 5.7), emod(-7.2, 5.7), emod(7.2, -5.7), emod(-7.2, -5.7) };
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("itest", 4), ivalues);
+    mHarness.addAttributes<float>(unittest_util::nameSequence("ftest", 4), fvalues);
+    mHarness.addAttributes<double>(unittest_util::nameSequence("dtest", 4), dvalues);
+    testFunctionOptions(mHarness, "euclideanmod");
+}
+
+void
 TestStandardFunctions::external()
 {
     mHarness.addAttribute<float>("foo", 2.0f);
@@ -478,6 +502,33 @@ TestStandardFunctions::fit()
         -5.0, 0.0, -1.0, 4.5, 4.5, 4.5, 4.5, 4.5};
     mHarness.addAttributes<double>(unittest_util::nameSequence("double_test", 17), values);
     testFunctionOptions(mHarness, "fit");
+}
+
+void
+TestStandardFunctions::floormod()
+{
+    auto axmod = [](auto D, auto d) -> auto {
+        auto r = std::fmod(D, d);
+        if ((r > 0 && d < 0) || (r < 0 && d > 0)) r = r+d;
+        return r;
+    };
+
+    // @note these also test that these match % op
+    const std::vector<int32_t> ivalues{ 2,2, 3,3, -3,-3, -2,-2 };
+    const std::vector<float> fvalues{ axmod(7.2f,5.7f),axmod(7.2f,5.7f),
+        axmod(-7.2f,5.7f),axmod(-7.2f,5.7f),
+        axmod(7.2f,-5.7f),axmod(7.2f,-5.7f),
+        axmod(-7.2f,-5.7f),axmod(-7.2f,-5.7f)
+    };
+    const std::vector<double> dvalues{ axmod(7.2,5.7),axmod(7.2,5.7),
+        axmod(-7.2,5.7),axmod(-7.2,5.7),
+        axmod(7.2,-5.7),axmod(7.2,-5.7),
+        axmod(-7.2,-5.7),axmod(-7.2,-5.7)
+    };
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("itest", 8), ivalues);
+    mHarness.addAttributes<float>(unittest_util::nameSequence("ftest", 8), fvalues);
+    mHarness.addAttributes<double>(unittest_util::nameSequence("dtest", 8), dvalues);
+    testFunctionOptions(mHarness, "floormod");
 }
 
 void
@@ -929,6 +980,19 @@ TestStandardFunctions::trace()
     mHarness.addAttribute<double>("test1", 6.0);
     mHarness.addAttribute<float>("test2", 6.0f);
     testFunctionOptions(mHarness, "trace");
+}
+
+void
+TestStandardFunctions::truncatemod()
+{
+    // @note these also test that these match % op
+    const std::vector<int32_t> ivalues{ 2,-2,2,-2, };
+    const std::vector<float> fvalues{ std::fmod(7.2f, 5.7f), std::fmod(-7.2f, 5.7f), std::fmod(7.2f, -5.7f), std::fmod(-7.2f, -5.7f) };
+    const std::vector<double> dvalues{ std::fmod(7.2, 5.7), std::fmod(-7.2, 5.7), std::fmod(7.2, -5.7), std::fmod(-7.2, -5.7) };
+    mHarness.addAttributes<int32_t>(unittest_util::nameSequence("itest", 4), ivalues);
+    mHarness.addAttributes<float>(unittest_util::nameSequence("ftest", 4), fvalues);
+    mHarness.addAttributes<double>(unittest_util::nameSequence("dtest", 4), dvalues);
+    testFunctionOptions(mHarness, "truncatemod");
 }
 
 void
