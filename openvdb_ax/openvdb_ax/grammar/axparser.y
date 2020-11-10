@@ -183,10 +183,11 @@
 %left PLUS MINUS
 %left MULTIPLY DIVIDE MODULO
 /*  UMINUS exists for contextual precedence with negation. Note that
- *  this is somewhat unecessary as * / % ops evaluate to the same
- *  values regardless i.e. (-a)*b == -(a*b), (-a)/b == -(a/b) and
- *  (-a)%b == -(a%b). In general it makes sense to adhere to this
- *  anyway (i.e. reprint -a * b rather than -(a*b))
+ *  whilst the evaluation of (-a)*b == -(a*b) and (-a)/b == -(a/b)
+ *  (due to truncated division), AX implements a floored modulus.
+ *  This means thats (-a)%b != -(a%b) and, as such, this precedence
+ *  must be respected. Note that in general it makes sense to adhere
+ *  to this anyway (i.e. reprint -a * b rather than -(a*b))
  */
 %left UMINUS // for contextual precedence with negation
 %left NOT BITNOT PLUSPLUS MINUSMINUS

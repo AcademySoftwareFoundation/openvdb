@@ -1535,14 +1535,27 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
         std::vector<llvm::Value*> elements;
         elements.reserve(resultsize);
 
-        // perform op
+        // handle floored modulo
+        Function::Ptr target;
+        auto runop = [&target, op, this](llvm::Value* a, llvm::Value* b) {
+            if (target) return target->call({a,b}, this->mBuilder, /*cast=*/false);
+            else        return binaryOperator(a, b, op, this->mBuilder);
+        };
 
+        if (op == ast::tokens::MODULO) {
+            const FunctionGroup* mod = this->getFunction("floormod");
+            assert(mod);
+            target = mod->match({opprec,opprec}, mContext);
+            assert(target);
+        }
+
+        // perform op
         for (size_t i = 0; i < resultsize; ++i) {
             llvm::Value* lelement = lsize == 1 ? lhs : mBuilder.CreateLoad(mBuilder.CreateConstGEP2_64(lhs, 0, i));
             llvm::Value* relement = rsize == 1 ? rhs : mBuilder.CreateLoad(mBuilder.CreateConstGEP2_64(rhs, 0, i));
             lelement = arithmeticConversion(lelement, opprec, mBuilder);
             relement = arithmeticConversion(relement, opprec, mBuilder);
-            elements.emplace_back(binaryOperator(lelement, relement, op, mBuilder));
+            elements.emplace_back(runop(lelement, relement));
         }
 
         // handle vec/mat results
