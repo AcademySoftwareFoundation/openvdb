@@ -153,6 +153,7 @@ public:
     template<typename T>
     inline void setEnum(const std::string& k, const char** enums, int enumCount, const T v) const
     {
+        (void)enumCount;
         assert(v >= 0 && v < enumCount);
         this->insert(std::make_pair(k, enums[v]));
     }

@@ -72,9 +72,21 @@ public:
     {
     }
 
-    __hostdev__ void setEye(const Vec3Type& eye) { mEye = eye; }
+    __hostdev__ Ray& offsetEye(RealT offset)
+    {
+        mEye[0] += offset;
+        mEye[1] += offset;
+        mEye[2] += offset;
+        return *this;
+    }
 
-    __hostdev__ void setDir(const Vec3Type& dir)
+    __hostdev__ Ray& setEye(const Vec3Type& eye)
+    {
+        mEye = eye;
+        return *this;
+    }
+
+    __hostdev__ Ray& setDir(const Vec3Type& dir)
     {
         mDir = dir;
         mInvDir[0] = 1.0 / mDir[0];
@@ -83,23 +95,37 @@ public:
         mSign[0] = mInvDir[0] < 0;
         mSign[1] = mInvDir[1] < 0;
         mSign[2] = mInvDir[2] < 0;
+        return *this;
     }
 
-    __hostdev__ void setMinTime(RealT t0) { mTimeSpan.t0 = t0; }
+    __hostdev__ Ray& setMinTime(RealT t0)
+    {
+        mTimeSpan.t0 = t0;
+        return *this;
+    }
 
-    __hostdev__ void setMaxTime(RealT t1) { mTimeSpan.t1 = t1; }
+    __hostdev__ Ray& setMaxTime(RealT t1)
+    {
+        mTimeSpan.t1 = t1;
+        return *this;
+    }
 
-    __hostdev__ void setTimes(
+    __hostdev__ Ray& setTimes(
         RealT t0 = Delta<RealT>::value(),
         RealT t1 = Maximum<RealT>::value())
     {
         assert(t0 > 0 && t1 > 0);
         mTimeSpan.set(t0, t1);
+        return *this;
     }
 
-    __hostdev__ void scaleTimes(RealT scale) { mTimeSpan.scale(scale); }
+    __hostdev__ Ray& scaleTimes(RealT scale)
+    {
+        mTimeSpan.scale(scale);
+        return *this;
+    }
 
-    __hostdev__ void reset(
+    __hostdev__ Ray& reset(
         const Vec3Type& eye,
         const Vec3Type& direction,
         RealT           t0 = Delta<RealT>::value(),
@@ -108,6 +134,7 @@ public:
         this->setEye(eye);
         this->setDir(direction);
         this->setTimes(t0, t1);
+        return *this;
     }
 
     __hostdev__ const Vec3T& eye() const { return mEye; }

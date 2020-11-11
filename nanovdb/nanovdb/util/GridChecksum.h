@@ -44,14 +44,14 @@ uint64_t checksum(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode
 /// @brief Return true if the checksum of the @a grid matches the expected
 ///        value already encoded into the grid's meta data.
 ///
-/// @param grid Grid whoes checksum is validated.
+/// @param grid Grid whose checksum is validated.
 /// @param mode Defines the mode of computation for the checksum.
 template <typename ValueT>
 bool validateChecksum(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default);
 
 /// @brief Updates the checksum of a grid
 ///
-/// @param grid Grid whoes checksum will be updated.
+/// @param grid Grid whose checksum will be updated.
 /// @param mode Defines the mode of computation for the checksum.
 template <typename ValueT>
 void updateChecksum(NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default);

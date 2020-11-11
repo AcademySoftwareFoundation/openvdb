@@ -76,10 +76,11 @@ public:
     EventMessage                                                       getEventMessage(int eventIndex) const;
     int                                                                getEventMessages(std::vector<EventMessage>& messages, int startIndex) const;
 
-    bool   addGridsFromInternal(const std::string& url, const std::string& params);
-    bool   addGridsFromLocalFile(const std::string& url, const std::string& gridName, const std::string& localFilename);
-    bool   addGridsMetaFromLocalFile(const std::string& url, const std::string& gridName, const std::string& localFilename);
-    size_t addEventMessage(const EventMessage& s);
+    bool                     addGridsFromInternal(const std::string& url, const std::string& params);
+    bool                     addGridsFromLocalFile(const std::string& url, const std::string& gridName, const std::string& localFilename);
+    bool                     addGridsMetaFromLocalFile(const std::string& url, const std::string& gridName, const std::string& localFilename);
+    size_t                   addEventMessage(const EventMessage& s);
+    std::vector<std::string> getGridsNamesFromLocalFile(const std::string& url, const std::string& localFilename);
 
 private:
     Asset::Ptr     ensureAsset(const std::string& url);

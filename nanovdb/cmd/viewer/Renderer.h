@@ -83,6 +83,8 @@ struct RendererParams
     int                   mFrameEnd = 99;
     bool                  mFrameLoop = true;
     int                   mMaxProgressiveSamples = 1;
+    float                 mMaterialBlackbodyTemperature = 1.0f;
+    float                 mMaterialVolumeDensity = 1.0f;
     SceneRenderParameters mSceneParameters;
 };
 
@@ -108,13 +110,16 @@ public:
     void           renderSequence();
     bool           updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSyncing, bool isPrinting, bool* isSelectedNodePending = nullptr);
 
-    std::string    addSceneNode(const std::string& nodeName = "");
+    int            addGridAssetsAndNodes(const std::string& nodePrefix, std::vector<GridAssetUrl> urls);
+    std::string    addSceneNode(const std::string& nodeName = "", bool makeUnique = true);
     void           setSceneNodeGridAttachment(const std::string& nodeName, int attachmentIndex, const GridAssetUrl& url);
     void           addGridAsset(const GridAssetUrl& url);
     std::string    updateFilePathWithFrame(const std::string& filePath, int frame) const;
     SceneNode::Ptr findNode(const std::string& name);
+    SceneNode::Ptr findNodeByIndex(const int i);
 
-    GridManager::AssetGridStatus updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNode::Ptr node, SceneNodeGridAttachment::Ptr attachment);
+    std::vector<std::string>     getGridNamesFromFile(const GridAssetUrl& url);
+    GridManager::AssetGridStatus updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNodeGridAttachment::Ptr attachment);
 
     std::string nextUniqueNodeId(const std::string& prefix = "");
 
@@ -124,16 +129,17 @@ public:
 
     void  resetAccumulationBuffer();
     bool  setRenderPlatformByName(std::string name);
-    bool  saveFrameBuffer(int frame = 0);
+    bool  saveFrameBuffer(int frame = 0, const std::string& filenameOverride = "", const std::string& formatOverride = "");
     float computePSNR(FrameBufferBase& other);
 
-    void resetCamera();
+    void resetCamera(bool isFramingSceneNodeBounds = true);
+    void setCamera(const nanovdb::Vec3f& rot);
     bool selectSceneNodeByIndex(int nodeIndex);
 
 protected:
     void setRenderPlatform(int platform);
-    
-    void removeSceneNodes(std::vector<int> indices);    
+
+    void removeSceneNodes(std::vector<int> indices);
     void updateEventLog(bool isPrinting = false);
 
     GridManager                            mGridManager;
@@ -149,6 +155,7 @@ protected:
     int                                    mLastSceneFrame = 0;
     RenderStatistics                       mRenderStats;
     uint32_t                               mNextUniqueId = 0;
+    uint32_t                               mScreenShotIteration = 0;
 
     class CameraState
     {
@@ -169,8 +176,8 @@ protected:
         bool update();
 
     private:
-        nanovdb::Vec3f mCameraPosition = nanovdb::Vec3f{0,0,0};
-        nanovdb::Vec3f mCameraAxis[3] = {{1,0,0},{0,1,0},{0,0,1}};
+        nanovdb::Vec3f mCameraPosition = nanovdb::Vec3f{0, 0, 0};
+        nanovdb::Vec3f mCameraAxis[3] = {{1, 0, 0}, {0, 1, 0}, {0, 0, 1}};
     };
 
     SceneNode::Ptr ensureSceneNode(const std::string& nodeName);
@@ -178,6 +185,8 @@ protected:
 
     std::vector<SceneNode::Ptr> mSceneNodes;
 
-    CameraState  mDefaultCameraState;
+    CameraState mDefaultCameraState;
+
+public:
     CameraState* mCurrentCameraState = &mDefaultCameraState;
 };

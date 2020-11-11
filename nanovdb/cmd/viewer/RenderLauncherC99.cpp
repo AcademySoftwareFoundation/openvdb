@@ -26,7 +26,7 @@ extern "C" {
 
 extern "C" void launchRender(int method, int width, int height, vec4* imgPtr, const nanovdb_Node0_float* node0Level, const nanovdb_Node1_float* node1Level, const nanovdb_Node2_float* node2Level, const nanovdb_RootData_float* rootData, const nanovdb_RootData_Tile_float* rootDataTiles, const nanovdb_GridData* gridData, const ArgUniforms* uniforms);
 
-bool RenderLauncherC99::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherC99::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     if (grids[0].gridHandle == nullptr)
         return false;

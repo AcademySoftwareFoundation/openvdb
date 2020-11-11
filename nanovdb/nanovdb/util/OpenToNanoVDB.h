@@ -22,8 +22,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_invoke.h>
 #include <tbb/parallel_sort.h>
-#include <tbb/atomic.h>
 
+#include <atomic>
 #include <type_traits>
 
 #ifndef NANOVDB_OPENTONANOVDB_H_HAS_BEEN_INCLUDED
@@ -90,7 +90,6 @@ namespace { // unnamed namespace
 
 /// @brief This class will openToNanoVDB an OpenVDB grid into a NanoVDB grid managed by a GridHandle.
 template<typename SrcTreeT, typename BufferT = HostBuffer>
-//typename StatsT = Extrema<typename SrcTreeT::ValueType, openvdb::VecTraits<typename SrcTreeT::ValueType>::IsVec ? 1 : 0> >
 class OpenToNanoVDB
 {
     struct BlindMetaData; // forward decleration
@@ -98,7 +97,7 @@ class OpenToNanoVDB
     ValueT                  mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
     uint8_t*                mData;
     uint64_t                mBytes[8]; // Byte offsets to from mData to: tree, blindmetadata, root, node2, node1, leafs, blinddata, (total size)
-    std::set<BlindMetaData> mBlindMetaData; // sorted accoring to index
+    std::set<BlindMetaData> mBlindMetaData; // sorted according to index
 
 public:
     /// @brief Construction from an existing const OpenVDB Grid.
@@ -107,7 +106,7 @@ public:
     {
     }
 
-    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpneVDB grid
+    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpenVDB grid
     GridHandle<BufferT> operator()(const openvdb::Grid<SrcTreeT>& grid,
                                    StatsMode                      sMode = StatsMode::Default,
                                    ChecksumMode                   mode = ChecksumMode::Default,
@@ -177,6 +176,11 @@ private:
     template<typename LeafT>
     typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
     postProcessPoints(std::vector<const LeafT*>& array);
+    
+    //template<typename AttT>
+    //void copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx, const openvdb::Name &codec);
+    template<typename AttT, typename CodecT = openvdb::points::UnknownCodec>
+    void copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx);
 
     /// @brief Private methods to access points to data
     template<typename DstNodeT>
@@ -190,21 +194,13 @@ private:
     nanovdb::GridBlindMetaData*  blindMetaData() const { return reinterpret_cast<nanovdb::GridBlindMetaData*>(mData + mBytes[1]); }
     uint8_t*                     blindData() const { return reinterpret_cast<uint8_t*>(mData + mBytes[6]); }
 
-    /// @brief Private method used to cache the x compoment of a Coord into x and
+    /// @brief Private method used to cache the x component of a Coord into x and
     //         encode uint32_t id into the x component despite it being of type const int32_t.
     static void cache(int32_t& x, const CoordT& ijk, uint32_t id)
     {
         x = ijk[0];
         reinterpret_cast<uint32_t&>(const_cast<CoordT&>(ijk)[0]) = id;
     }
-
-    template<typename T, typename FlagT>
-    typename std::enable_if<!std::is_floating_point<T>::value>::type
-    setFlag(const T&, const T&, FlagT& flag) const { flag &= ~FlagT(1); } // unset first bit
-
-    template<typename T, typename FlagT>
-    typename std::enable_if<std::is_floating_point<T>::value>::type
-    setFlag(const T& min, const T& max, FlagT& flag) const;
 
     /// @brief Private method to sorts the nodes in the specified array using the provided key function
     template<typename NodeT, typename KeyT>
@@ -216,7 +212,7 @@ template<typename SrcTreeT, typename BufferT>
 template<typename LeafT>
 uint64_t OpenToNanoVDB<SrcTreeT, BufferT>::pointCount(std::vector<const LeafT*>& array)
 {
-    tbb::atomic<uint64_t> pointCount = 0;
+    std::atomic<uint64_t> pointCount{0};
     tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
                       [&](const tbb::blocked_range<uint64_t>& r) {
                           uint64_t sum = 0;
@@ -251,9 +247,9 @@ OpenToNanoVDB<SrcTreeT, BufferT>::preProcessPoints(std::vector<const LeafT*>& ar
 {
     const uint64_t count = this->pointCount(array);
     mBlindMetaData.clear();
-    if (count == 0)
-        return;
-    mBlindMetaData.emplace("index", "uint32", 0, count, sizeof(uint32_t));
+    if (count != 0) {
+        mBlindMetaData.emplace("index", "uint32", 0, count, sizeof(uint32_t));
+    }
 }
 
 template<typename SrcTreeT, typename BufferT>
@@ -323,13 +319,54 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
                       });
 }
 
+
+template<typename SrcTreeT, typename BufferT>
+template<typename AttT, typename CodecT>
+inline void
+OpenToNanoVDB<SrcTreeT, BufferT>::copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx)
+{
+    static_assert(std::is_same<typename SrcNode0::ValueType, openvdb::PointDataIndex32>::value, "Expected value to openvdb::PointData");
+    using RangeT  = tbb::blocked_range<uint64_t>;
+    using HandleT = openvdb::points::AttributeHandle<AttT, CodecT>;
+    AttT* attPtr  = reinterpret_cast<AttT*>(mData + this->gridData()->blindMetaData(static_cast<uint32_t>(attIdx)).mByteOffset);
+    auto* dstLeaf = this->template nodeData<DstNode0>(); 
+    tbb::parallel_for(RangeT(0, array.size(), 16), [&](const RangeT& r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            auto* srcLeaf = array[i];
+            HandleT handle(srcLeaf->constAttributeArray(attIdx));
+            AttT* p = attPtr + dstLeaf[i].mMinimum;
+            for (auto iter = srcLeaf->beginIndexOn(); iter; ++iter) {
+                *p++ = handle.get(*iter);
+            }
+        }
+    });
+}
+
+/*
+template<typename SrcTreeT, typename BufferT>
+template<typename AttT>
+inline void
+OpenToNanoVDB<SrcTreeT, BufferT>::copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx, const openvdb::Name &codec)
+{
+    if (codec == openvdb::points::FixedPointCodec<false>::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::FixedPointCodec<false>>(array, attIdx);
+    } else if (codec == openvdb::points::FixedPointCodec<true>::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::FixedPointCodec<true>>(array, attIdx);
+    } else if (codec == openvdb::points::NullCodec::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::NullCodec>(array, attIdx);
+    } else {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::UnknownCodec>(array, attIdx);
+    }
+}
+*/
 template<typename SrcTreeT, typename BufferT>
 template<typename LeafT>
 inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
 OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& array)
 {
-    if (mBlindMetaData.empty())
+    if (mBlindMetaData.empty()) {
         return;
+    }
     const uint32_t leafCount = array.size();
     auto*          data = this->template nodeData<DstNode0>();
 
@@ -355,119 +392,49 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
             ss << "Point attribute name \"" << b.name << "\" is more then " << nanovdb::GridBlindMetaData::MaxNameSize << " characters";
             OPENVDB_THROW(openvdb::ValueError, ss.str());
         }
+        
+        //const openvdb::Name codec = array.empty() ? "" : array[0]->constAttributeArray(b.index).codecType();
         memcpy(meta.mName, b.name.c_str(), b.name.size() + 1);
         if (b.typeName == "vec3s") {
             meta.mDataType = GridType::Vec3f;
-            using T = openvdb::Vec3f;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
+            this->template copyPointAttribute<openvdb::Vec3f>(array, b.index);
             if (b.name == "P") {
-                meta.mSemantic = GridBlindDataSemantic::PointPosition;
-                tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                                  [&](const tbb::blocked_range<uint64_t>& r) {
-                                      for (auto i = r.begin(); i != r.end(); ++i) {
-                                          auto*                               leaf = array[i];
-                                          openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                          T*                                  p = ptr + data[i].mMinimum;
-                                          for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                                              const auto ijk = iter.getCoord();
-                                              assert(leaf->isValueOn(ijk));
-                                              *p++ = ijk.asVec3s() + posHandle.get(*iter);
-                                          }
-                                      }
-                                  });
+                meta.mSemantic = GridBlindDataSemantic::PointPosition;  
+            } else if (b.name == "V") {
+                meta.mSemantic = GridBlindDataSemantic::PointVelocity;
+            } else if (b.name == "Cd") {
+                meta.mSemantic = GridBlindDataSemantic::PointColor;
+            } else if (b.name == "N") {
+                meta.mSemantic = GridBlindDataSemantic::PointNormal;
             } else {
-                if (b.name == "V") {
-                    meta.mSemantic = GridBlindDataSemantic::PointVelocity;
-                } else if (b.name == "Cd") {
-                    meta.mSemantic = GridBlindDataSemantic::PointColor;
-                } else if (b.name == "N") {
-                    meta.mSemantic = GridBlindDataSemantic::PointNormal;
-                } else {
-                    meta.mSemantic = GridBlindDataSemantic::Unknown;
-                }
-                tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                                  [&](const tbb::blocked_range<uint64_t>& r) {
-                                      for (auto i = r.begin(); i != r.end(); ++i) {
-                                          auto*                               leaf = array[i];
-                                          openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                          T*                                  p = ptr + data[i].mMinimum;
-                                          for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                              *p++ = posHandle.get(*iter);
-                                      }
-                                  });
+                meta.mSemantic = GridBlindDataSemantic::Unknown;
             }
         } else if (b.typeName == "int32") {
             meta.mDataType = GridType::Int32;
+            this->template copyPointAttribute<int32_t>(array, b.index);
             if (b.name == "id") {
                 meta.mSemantic = GridBlindDataSemantic::PointId;
             } else {
                 meta.mSemantic = GridBlindDataSemantic::Unknown;
             }
-            using T = int32_t;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
         } else if (b.typeName == "int64") {
             meta.mDataType = GridType::Int64;
+            this->template copyPointAttribute<int64_t>(array, b.index);
             if (b.name == "id") {
                 meta.mSemantic = GridBlindDataSemantic::PointId;
             } else {
                 meta.mSemantic = GridBlindDataSemantic::Unknown;
             }
-            using T = int64_t;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
         } else if (b.typeName == "float") {
             meta.mDataType = GridType::Float;
             meta.mSemantic = GridBlindDataSemantic::Unknown;
-
-            using T = float;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
+            this->template copyPointAttribute<float>(array, b.index);
         } else {
             std::stringstream ss;
             ss << "Unsupported point attribute type: \"" << b.typeName << "\"";
             OPENVDB_THROW(openvdb::ValueError, ss.str());
         }
     } // loop over bind data
-}
-
-template<typename SrcTreeT, typename BufferT>
-template<typename T, typename FlagT>
-inline typename std::enable_if<std::is_floating_point<T>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::setFlag(const T& min, const T& max, FlagT& flag) const
-{
-    if (mDelta > 0 && (min > mDelta || max < -mDelta)) {
-        flag |= FlagT(1); // set first bit
-    } else {
-        flag &= ~FlagT(1); // unset first bit
-    }
 }
 
 template<typename SrcTreeT, typename BufferT>
@@ -620,7 +587,7 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     stopTimer();
 
     mData = nullptr;
-    return handle; // envokes move constructor
+    return handle; // invokes move constructor
 } // operator()
 
 template<typename SrcTreeT, typename BufferT>
@@ -636,6 +603,7 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
             auto*           data = dstLeaf->data();
             data->mValueMask = srcLeaf->valueMask(); // copy value mask
             data->mBBoxMin = srcLeaf->origin(); // copy origin of node
+            data->mFlags = 0u;
             const ValueT* src = srcLeaf->buffer().data();
             for (ValueT *dst = data->mValues, *end = dst + SrcNode0::size(); dst != end; dst += 4, src += 4) {
                 dst[0] = src[0]; // copy *all* voxel values in sets of four, i.e. loop-unrolling
@@ -666,8 +634,8 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
             data->mOffset = size - i;
             data->mValueMask = srcNode->getValueMask();
             data->mChildMask = srcNode->getChildMask();
-            for (auto iter = srcNode->cbeginValueAll(); iter; ++iter) {
-                data->mTable[iter.pos()].value = *iter;
+            for (auto tileIter = srcNode->cbeginValueAll(); tileIter; ++tileIter) {
+                data->mTable[tileIter.pos()].value = *tileIter;
             }
             for (auto childIter = srcNode->cbeginChildOn(); childIter; ++childIter) {
                 const auto childID = static_cast<uint32_t>(childIter->origin()[0]);
@@ -746,7 +714,7 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
     data.mWorldBBox = BBox<Vec3R>();
     data.mBlindMetadataOffset = mBlindMetaData.size() ? mBytes[1] : 0;
     data.mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
-    { /// @todo allow long loger grid names by encoding it as blind meta data!
+    { /// @todo allow long grid names by encoding it as blind meta data!
         const std::string name = srcGrid.getName();
         if (name.length() + 1 > nanovdb::GridData::MaxNameSize) {
             std::stringstream ss;

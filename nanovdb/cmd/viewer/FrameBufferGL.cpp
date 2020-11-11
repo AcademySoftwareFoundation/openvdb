@@ -92,6 +92,9 @@ FrameBufferGL::FrameBufferGL(void* context, void* display)
     , mTextureBufferId(0)
     , mTempBuffer(nullptr)
 {
+    (void)mTempBuffer;
+    (void)mTempBufferAccess;
+
     for (int i = 0; i < BUFFER_COUNT; ++i) {
         mPixelPackBuffers[i] = 0;
         mBufferResourcesCUDA[i] = nullptr;

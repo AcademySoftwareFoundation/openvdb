@@ -932,7 +932,7 @@ void* RenderLauncherOptix::mapCUDA(int access, const std::shared_ptr<Resource>& 
     return imgBuffer->cudaMap(FrameBufferBase::AccessType(access));
 }
 
-bool RenderLauncherOptix::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherOptix::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     if (grids[0].gridHandle == nullptr)
         return false;

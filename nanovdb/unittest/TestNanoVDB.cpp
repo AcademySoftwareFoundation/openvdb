@@ -26,17 +26,16 @@
 #include "../examples/ex_util/CpuTimer.h"
 
 inline std::ostream&
-operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
+operator<<(std::ostream& os, const nanovdb::Coord& ijk)
 {
-    os << "(" << b[0][0] << "," << b[0][1] << "," << b[0][2] << ") -> "
-       << "(" << b[1][0] << "," << b[1][1] << "," << b[1][2] << ")";
+    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
     return os;
 }
 
 inline std::ostream&
-operator<<(std::ostream& os, const nanovdb::Coord& ijk)
+operator<<(std::ostream& os, const nanovdb::CoordBBox& b)
 {
-    os << "(" << ijk[0] << "," << ijk[1] << "," << ijk[2] << ")";
+    os << b[0] << " -> " << b[1];
     return os;
 }
 
@@ -136,8 +135,8 @@ TEST_F(TestNanoVDB, Assumptions)
 TEST_F(TestNanoVDB, Magic)
 {
     EXPECT_EQ(28, NANOVDB_MAJOR_VERSION_NUMBER);
-    EXPECT_EQ(0, NANOVDB_MINOR_VERSION_NUMBER);
-    EXPECT_EQ(0, NANOVDB_PATCH_VERSION_NUMBER);
+    EXPECT_EQ( 1, NANOVDB_MINOR_VERSION_NUMBER);
+    EXPECT_EQ( 2, NANOVDB_PATCH_VERSION_NUMBER);
     EXPECT_EQ(0x304244566f6e614eUL, NANOVDB_MAGIC_NUMBER); // Magic number: "NanoVDB0" in hex)
     EXPECT_EQ(0x4e616e6f56444230UL, nanovdb::io::reverseEndianness(NANOVDB_MAGIC_NUMBER));
 
@@ -955,7 +954,10 @@ TEST_F(TestNanoVDB, LeafNode)
         }
         data.mMinimum = 0.0f;
         data.mMaximum = 1.234f;
+        data.mFlags = uint8_t(2);// set bit # 1 on since leaf contains active values
     }
+
+    EXPECT_TRUE( leaf->isActive() );
 
     { // compute BBox
         auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
@@ -984,6 +986,8 @@ TEST_F(TestNanoVDB, LeafNode)
         EXPECT_EQ(bbox[0], nanovdb::Coord(4, 0, 0));
         EXPECT_EQ(bbox[1], nanovdb::Coord(7, 7, 7));
     }
+
+    EXPECT_TRUE( leaf->isActive() );
 
     // check values
     auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer.get())->values();
@@ -1575,6 +1579,11 @@ TEST_F(TestNanoVDB, GridBuilderBasic0)
         EXPECT_EQ(0.0f, srcAcc.getValue(nanovdb::Coord(1, 2, 3)));
         EXPECT_FALSE(srcAcc.isActive(nanovdb::Coord(1, 2, 3)));
         EXPECT_EQ(0.0f, dstAcc.getValue(nanovdb::Coord(1, 2, 3)));
+        EXPECT_EQ(dstGrid->tree().root().valueMin(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().valueMax(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().average(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().variance(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().stdDeviation(), 0.0f);
     }
 } // GridBuilderBasic0
 
@@ -1601,6 +1610,11 @@ TEST_F(TestNanoVDB, GridBuilderBasic1)
         EXPECT_TRUE(srcAcc.isActive(nanovdb::Coord(1, 2, 3)));
         EXPECT_EQ(nanovdb::Coord(1, 2, 3), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord(1, 2, 3), dstGrid->indexBBox()[1]);
+        EXPECT_EQ(dstGrid->tree().root().valueMin(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().valueMax(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().average(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().variance(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().stdDeviation(), 0.0f);
     }
 } // GridBuilderBasic1
 
@@ -1637,6 +1651,12 @@ TEST_F(TestNanoVDB, GridBuilderBasic2)
 
         EXPECT_EQ(nanovdb::Coord(1, -2, 3), dstGrid->indexBBox()[0]);
         EXPECT_EQ(nanovdb::Coord(2, 2, 9), dstGrid->indexBBox()[1]);
+
+        EXPECT_EQ(dstGrid->tree().root().valueMin(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().valueMax(), 2.0f);
+        EXPECT_EQ(dstGrid->tree().root().average(),  1.5f);
+        EXPECT_EQ(dstGrid->tree().root().variance(), 0.25f);// Sim (x_i - Avg)^2/N = ((1-1.5)^2 (2-1.5)^2)/2 = (0.25+0.25)/2 = 0.5 * 0.5
+        EXPECT_EQ(dstGrid->tree().root().stdDeviation(), 0.5f);// stdDev = Sqrt(var)
     }
 } // GridBuilderBasic2
 
@@ -1676,6 +1696,12 @@ TEST_F(TestNanoVDB, GridBuilderBasicDense)
         }
         EXPECT_EQ(bbox[0], dstGrid->indexBBox()[0]);
         EXPECT_EQ(bbox[1], dstGrid->indexBBox()[1]);
+
+        EXPECT_EQ(dstGrid->tree().root().valueMin(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().valueMax(), 1.0f);
+        EXPECT_EQ(dstGrid->tree().root().average(),  1.0f);
+        EXPECT_EQ(dstGrid->tree().root().variance(), 0.0f);
+        EXPECT_EQ(dstGrid->tree().root().stdDeviation(), 0.0f);
     }
 } // GridBuilderDense
 
@@ -1728,6 +1754,11 @@ struct Sphere
         const ValueT dst = this->sdf(ijk);
         return dst >= mBackground ? mBackground : dst <= -mBackground ? -mBackground : dst;
     }
+    ValueT operator()(const nanovdb::Vec3<ValueT>& p) const
+    {
+        const ValueT dst = this->sdf(p);
+        return dst >= mBackground ? mBackground : dst <= -mBackground ? -mBackground : dst;
+    }
     bool isInside(const nanovdb::Coord& ijk) const
     {
         return this->sdf(ijk) < 0;
@@ -1743,13 +1774,13 @@ struct Sphere
     }
 
 private:
-    ValueT sdf(const nanovdb::Coord& ijk) const
+    ValueT sdf(nanovdb::Vec3<ValueT> xyz) const
     {
-        nanovdb::Vec3<ValueT> xyz(ijk[0], ijk[1], ijk[2]);
         xyz *= mVoxelSize;
         xyz -= mCenter;
         return xyz.length() - mRadius;
     }
+    ValueT sdf(const nanovdb::Coord& ijk) const { return this->sdf(nanovdb::Vec3<ValueT>(ijk[0], ijk[1], ijk[2])); }
     static_assert(nanovdb::is_floating_point<float>::value, "Sphere: expect floating point");
     const nanovdb::Vec3<ValueT> mCenter;
     const ValueT                mRadius, mVoxelSize, mBackground;
@@ -2007,10 +2038,8 @@ TEST_F(TestNanoVDB, createPointSphere)
                     EXPECT_TRUE(acc.isActive(ijk));
                     EXPECT_TRUE(acc.getValue(ijk) != std::numeric_limits<uint32_t>::max());
                     EXPECT_EQ(1u, acc.voxelPoints(ijk, begin, end)); // exactly one point per voxel
-                    const auto  p = begin->round();
-                    const float diff = nanovdb::Vec3f(ijk - p).lengthSqr();
-                    EXPECT_TRUE(diff <= 1.0f); // allow for floating point rounding error by one voxel
-                    //if (diff > 1.0f) std::cerr << "p = ("<<p[0]<<", "<<p[1]<<", "<<p[2]<<")"<<"ijk = ("<<ijk[0]<<", "<<ijk[1]<<", "<<ijk[2]<<")"<<std::endl;
+                    const nanovdb::Vec3f p = *begin + ijk.asVec3s();// local voxel coordinate + global index coordinates
+                    EXPECT_TRUE(nanovdb::Abs(sphere(p)) <= 1.0f);
                 } else {
                     EXPECT_FALSE(acc.isActive(ijk));
                     EXPECT_TRUE(acc.getValue(ijk) < 512 || acc.getValue(ijk) == std::numeric_limits<uint32_t>::max());

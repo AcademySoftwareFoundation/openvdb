@@ -86,8 +86,9 @@ public:
         , mW((eye - lookat).normalize())
         , mU(up.cross(mW))
         , mV(up)
-        , mFovY(vfov)
         , mAspect(aspect)
+        , mIpd(1.0f)
+        , mFovY(vfov)
     {
     }
 

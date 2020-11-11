@@ -325,6 +325,7 @@ cnanovdb_node##LEVEL##SUFFIX##_getValue(const CNANOVDB_GLOBAL cnanovdb_node##LEV
 VALUETYPE \
 cnanovdb_node##LEVEL##SUFFIX##_getValueAndCache(const CNANOVDB_GLOBAL cnanovdb_node##LEVEL##SUFFIX *RESTRICT node, const cnanovdb_coord *RESTRICT ijk, cnanovdb_readaccessor *RESTRICT /* DO NOT REMOVE: Required for C99 compliance */ acc) \
 { \
+    (void)(acc); \
     uint32_t n = cnanovdb_node##LEVEL##SUFFIX##_CoordToOffset(ijk); \
     return node->mVoxels[n]; \
 } \

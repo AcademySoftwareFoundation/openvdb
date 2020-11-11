@@ -1,6 +1,6 @@
 option(NANOVDB_USE_EGL "Build with EGL support" OFF)
 option(NANOVDB_USE_NATIVEFILEDIALOG "Build with nativefiledialog support" OFF)
-option(NANOVDB_BUILD_INTERACTIVE_RENDERER "Build interactive renderer" ON)
+option(NANOVDB_USE_GLFW "Build interactive renderer" ON)
 
 # -----------------------------------------------------------------------
 # workaround for win32 bug when nvcc "--keep" is used.
@@ -14,7 +14,7 @@ endif()
 
 set(IMGUI_SOURCE_FILES "")
 
-if(NANOVDB_BUILD_INTERACTIVE_RENDERER)
+if(NANOVDB_USE_GLFW)
 
   if(NOT USE_EMSCRIPTEN_TOOLCHAIN)
     # -----------------------------
@@ -156,7 +156,7 @@ if(NANOVDB_BUILD_INTERACTIVE_RENDERER)
       endif()
     endif(NOT imgui_POPULATED)
   endif()
-endif(NANOVDB_BUILD_INTERACTIVE_RENDERER)
+endif(NANOVDB_USE_GLFW)
 
 # -----------------------------------------------------------------------
 if(TRUE)
@@ -279,6 +279,11 @@ if(TRUE)
             "-D${NANOVDB_VIEWER_USE_GLES_FLAG}"
             "-D${NANOVDB_USE_NFD_FLAG}")
 
+  if(WIN32)
+    target_compile_definitions(nanovdb_viewer
+                               PRIVATE "-D_CRT_SECURE_NO_WARNINGS")
+  endif()
+
   target_link_libraries(
     nanovdb_viewer
     PRIVATE libnanovdb
@@ -366,9 +371,9 @@ if(TRUE)
   target_include_directories(nanovdb_validate PRIVATE ${NANOVDB_INCLUDE_DIR})
 
   target_compile_definitions(
-    nanovdb_validate PRIVATE "-D${NANOVDB_USE_BLOSC_FLAG}"
-                             "-D${NANOVDB_USE_ZLIB_FLAG}"
-                             "-D${NANOVDB_USE_TBB_FLAG}")
+    nanovdb_validate
+    PRIVATE "-D${NANOVDB_USE_BLOSC_FLAG}" "-D${NANOVDB_USE_ZLIB_FLAG}"
+            "-D${NANOVDB_USE_TBB_FLAG}")
 
   target_link_libraries(nanovdb_validate PRIVATE libnanovdb ${NANOVDB_BLOSC}
                                                  ${NANOVDB_ZLIB} ${NANOVDB_TBB})
