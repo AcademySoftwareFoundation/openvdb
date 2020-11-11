@@ -34,6 +34,8 @@ Version 7.2.0 - In Development
       TypeList objects, manifesting in longer compile times.
     - Deprecated util::PagedArray::push_back due to a race condition. Instead
       use util::PagedArray::ValueBuffer::push_back which is faster and thread-safe.
+    - Fixed various cases of undefined behavior in some LevelSetUtil methods
+      [Reported by fkemmler]
 
     API changes:
     - Deprecated tree::LeafManager::getNodes. This method is no longer used when
