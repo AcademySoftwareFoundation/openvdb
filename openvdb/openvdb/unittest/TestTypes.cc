@@ -493,7 +493,7 @@ TestTypes::testTypeList()
     static_assert(std::is_same<IntTypes::Get<0>, Int16>::value, "");
     static_assert(std::is_same<IntTypes::Get<1>, Int32>::value, "");
     static_assert(std::is_same<IntTypes::Get<2>, Int64>::value, "");
-    static_assert(std::is_same<IntTypes::Get<3>,  internal::NullType>::value, "");
+    static_assert(std::is_same<IntTypes::Get<3>,  typelist_internal::NullType>::value, "");
     static_assert(!std::is_same<IntTypes::Get<3>, void>::value, "");
 
     // Unique
@@ -526,9 +526,9 @@ TestTypes::testTypeList()
     // Test methods on an empty list
     static_assert(!EmptyList::Contains<Int16>, "");
     static_assert(EmptyList::Index<Int16> == -1, "");
-    static_assert(std::is_same<EmptyList::Get<0>, internal::NullType>::value, "");
-    static_assert(std::is_same<EmptyList::Front, internal::NullType>::value, "");
-    static_assert(std::is_same<EmptyList::Back, internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::Get<0>, typelist_internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::Front, typelist_internal::NullType>::value, "");
+    static_assert(std::is_same<EmptyList::Back, typelist_internal::NullType>::value, "");
     static_assert(std::is_same<EmptyList::PopFront, EmptyList>::value, "");
     static_assert(std::is_same<EmptyList::PopBack, EmptyList>::value, "");
     static_assert(std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value, "");
@@ -560,5 +560,5 @@ TestTypes::testTypeList()
     static_assert(std::is_same<NodeChainT::Get<1>, IternalT1>::value, "");
     static_assert(std::is_same<NodeChainT::Get<2>, IternalT2>::value, "");
     static_assert(std::is_same<NodeChainT::Get<3>, RootT>::value, "");
-    static_assert(std::is_same<NodeChainT::Get<4>, internal::NullType>::value, "");
+    static_assert(std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value, "");
 }

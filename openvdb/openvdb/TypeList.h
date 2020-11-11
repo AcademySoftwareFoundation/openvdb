@@ -25,7 +25,7 @@ namespace OPENVDB_VERSION_NAME {
 
 template<typename... Ts> struct TypeList; // forward declaration
 
-namespace internal {
+namespace typelist_internal {
 
 // Implementation details of @c TypeList
 
@@ -371,9 +371,9 @@ struct TypeList
     static constexpr size_t Size = sizeof...(Ts);
 
     /// @brief Access a particular element of this type list. If the index
-    ///        is out of range, internal::NullType is returned.
+    ///        is out of range, typelist_internal::NullType is returned.
     template<size_t N>
-    using Get = typename internal::TSGetElementImpl<Self, N>::type;
+    using Get = typename typelist_internal::TSGetElementImpl<Self, N>::type;
     using Front = Get<0>;
     using Back = Get<Size-1>;
 
@@ -390,7 +390,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename T>
-    static constexpr bool Contains = internal::TSHasTypeImpl<Self, T>::Value;
+    static constexpr bool Contains = typelist_internal::TSHasTypeImpl<Self, T>::Value;
 
     /// @brief Returns the index of the first found element of the given type, -1 if
     /// no matching element exists.
@@ -406,7 +406,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename T>
-    static constexpr int64_t Index = internal::TSHasTypeImpl<Self, T>::Index;
+    static constexpr int64_t Index = typelist_internal::TSHasTypeImpl<Self, T>::Index;
 
     /// @brief Remove any duplicate types from this TypeList by rotating the
     /// next valid type left (maintains the order of other types). Optionally
@@ -421,7 +421,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename ListT = TypeList<>>
-    using Unique = typename internal::TSMakeUniqueImpl<ListT, Ts...>::type;
+    using Unique = typename typelist_internal::TSMakeUniqueImpl<ListT, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
     /// @details Example:
@@ -437,7 +437,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename... TypesToAppend>
-    using Append = typename internal::TSAppendImpl<Self, TypesToAppend...>::type;
+    using Append = typename typelist_internal::TSAppendImpl<Self, TypesToAppend...>::type;
 
     /// @brief Remove all occurrences of one or more types, or the members of
     /// another TypeList, from this list.
@@ -450,7 +450,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename... TypesToRemove>
-    using Remove = typename internal::TSRemoveImpl<Self, TypesToRemove...>::type;
+    using Remove = typename typelist_internal::TSRemoveImpl<Self, TypesToRemove...>::type;
 
     /// @brief Remove the first element of this type list. Has no effect if the
     ///        type list is already empty.
@@ -465,7 +465,7 @@ struct TypeList
     ///     EmptyTypes::PopFront; // openvdb::TypeList<>;
     /// }
     /// @endcode
-    using PopFront = typename internal::TSRemoveFirstImpl<Self>::type;
+    using PopFront = typename typelist_internal::TSRemoveFirstImpl<Self>::type;
 
     /// @brief Remove the last element of this type list. Has no effect if the
     ///        type list is already empty.
@@ -480,7 +480,7 @@ struct TypeList
     ///     EmptyTypes::PopBack; // openvdb::TypeList<>;
     /// }
     /// @endcode
-    using PopBack = typename internal::TSRemoveLastImpl<Self>::type;
+    using PopBack = typename typelist_internal::TSRemoveLastImpl<Self>::type;
 
     /// @brief Return a new list with types removed by their location within the list.
     ///        If First is equal to Last, a single element is removed (if it exists).
@@ -497,7 +497,7 @@ struct TypeList
     /// }
     /// @endcode
     template <size_t First, size_t Last>
-    using RemoveByIndex = typename internal::TSRemoveIndicesImpl<Self, First, Last>::type;
+    using RemoveByIndex = typename typelist_internal::TSRemoveIndicesImpl<Self, First, Last>::type;
 
     /// @brief Invoke a templated, unary functor on a value of each type in this list.
     /// @details Example:
@@ -520,7 +520,7 @@ struct TypeList
     /// @note The functor object is passed by value.  Wrap it with @c std::ref
     /// to use the same object for each type.
     template<typename OpT>
-    static void foreach(OpT op) { internal::TSForEachImpl<OpT, Ts...>(op); }
+    static void foreach(OpT op) { typelist_internal::TSForEachImpl<OpT, Ts...>(op); }
 };
 
 
