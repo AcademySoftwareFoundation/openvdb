@@ -43,7 +43,7 @@ OpenVDB LOD             | Core Library dependencies                             
 OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
-OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest                                                | -
 OpenVDB Documentation   | Doxygen                                                                              | -
 
  - @b * Boost::numpy is required for NumPy support with Boost from version 1.65
@@ -66,7 +66,7 @@ ZLIB           | 1.2.7   | Latest      | Compression library for disk serializat
 Boost          | 1.61    | 1.61        | Components: system, iostreams, python, numpy                      | Y       | Y        | https://www.boost.org
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
 NumPy          | 1.12.1  | 1.12.1      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
-CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
+GoogleTest     | 1.8     | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 Blosc          | 1.5     | 1.5         | Recommended dependency for improved disk compression              | N       | N*       | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
@@ -97,7 +97,7 @@ required OpenVDB dependencies.
 
 @subsection depUsingAptGet Using UNIX apt-get
 
-@b Note: Blosc and CppUnit are unavailable using apt-get. See the other
+@b Note: Blosc is unavailable using apt-get. See the other
 package manager methods or the [manual installation](@ref depManInstall)
 options.
 
@@ -115,6 +115,7 @@ apt-get install libboost-numpy-dev      # Boost::numpy
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 apt-get install liblog4cplus-dev        # Log4cplus
+apt-get instsall googletest             # GoogleTest
 apt-get install libglfw3-dev            # GLFW
 apt-get install doxygen                 # doxygen
 @endcode
@@ -140,7 +141,7 @@ brew install boost                     # Boost
 brew install boost-python              # Boost-python
 brew install python                    # Python
 brew install numpy                     # NumPy
-brew install cppunit                   # CppUnit
+brew install gtest                     # GoogleTest
 brew install glfw                      # GLFW
 brew install doxygen                   # Doxygen
 @endcode
@@ -163,20 +164,6 @@ cd c-blosc-1.5.0
 mkdir -p $HOME/blosc
 # Requires CMake
 cmake -DCMAKE_INSTALL_PREFIX=$HOME/blosc
-make
-make install
-@endcode
-
-@b CppUnit
-
-@code{.sh}
-#!/bin/bash
-wget http://dev-www.libreoffice.org/src/cppunit-1.13.2.tar.gz
-tar -xvzf cppunit-1.13.2.tar.gz
-cd cppunit-1.13.2
-# Install to users home directory - you may customise this location
-mkdir -p $HOME/cppunit
-./configure --prefix=$HOME/cppunit
 make
 make install
 @endcode

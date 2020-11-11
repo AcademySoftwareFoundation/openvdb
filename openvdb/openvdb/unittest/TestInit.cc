@@ -1,91 +1,82 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 
 
-class TestInit: public CppUnit::TestCase
+class TestInit: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestInit);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST_SUITE_END();
-
-    void test();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestInit);
 
-
-void
-TestInit::test()
+TEST_F(TestInit, test)
 {
     using namespace openvdb;
 
     initialize();
 
     // data types
-    CPPUNIT_ASSERT(DoubleMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(FloatMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Int32Metadata::isRegisteredType());
-    CPPUNIT_ASSERT(Int64Metadata::isRegisteredType());
-    CPPUNIT_ASSERT(StringMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec2IMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec2SMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec2DMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec3IMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec3SMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(Vec3DMetadata::isRegisteredType());
+    EXPECT_TRUE(DoubleMetadata::isRegisteredType());
+    EXPECT_TRUE(FloatMetadata::isRegisteredType());
+    EXPECT_TRUE(Int32Metadata::isRegisteredType());
+    EXPECT_TRUE(Int64Metadata::isRegisteredType());
+    EXPECT_TRUE(StringMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec2IMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec2SMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec2DMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec3IMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec3SMetadata::isRegisteredType());
+    EXPECT_TRUE(Vec3DMetadata::isRegisteredType());
 
     // map types
-    CPPUNIT_ASSERT(math::AffineMap::isRegistered());
-    CPPUNIT_ASSERT(math::UnitaryMap::isRegistered());
-    CPPUNIT_ASSERT(math::ScaleMap::isRegistered());
-    CPPUNIT_ASSERT(math::TranslationMap::isRegistered());
-    CPPUNIT_ASSERT(math::ScaleTranslateMap::isRegistered());
-    CPPUNIT_ASSERT(math::NonlinearFrustumMap::isRegistered());
+    EXPECT_TRUE(math::AffineMap::isRegistered());
+    EXPECT_TRUE(math::UnitaryMap::isRegistered());
+    EXPECT_TRUE(math::ScaleMap::isRegistered());
+    EXPECT_TRUE(math::TranslationMap::isRegistered());
+    EXPECT_TRUE(math::ScaleTranslateMap::isRegistered());
+    EXPECT_TRUE(math::NonlinearFrustumMap::isRegistered());
 
     // grid types
-    CPPUNIT_ASSERT(BoolGrid::isRegistered());
-    CPPUNIT_ASSERT(FloatGrid::isRegistered());
-    CPPUNIT_ASSERT(DoubleGrid::isRegistered());
-    CPPUNIT_ASSERT(Int32Grid::isRegistered());
-    CPPUNIT_ASSERT(Int64Grid::isRegistered());
-    CPPUNIT_ASSERT(StringGrid::isRegistered());
-    CPPUNIT_ASSERT(Vec3IGrid::isRegistered());
-    CPPUNIT_ASSERT(Vec3SGrid::isRegistered());
-    CPPUNIT_ASSERT(Vec3DGrid::isRegistered());
+    EXPECT_TRUE(BoolGrid::isRegistered());
+    EXPECT_TRUE(FloatGrid::isRegistered());
+    EXPECT_TRUE(DoubleGrid::isRegistered());
+    EXPECT_TRUE(Int32Grid::isRegistered());
+    EXPECT_TRUE(Int64Grid::isRegistered());
+    EXPECT_TRUE(StringGrid::isRegistered());
+    EXPECT_TRUE(Vec3IGrid::isRegistered());
+    EXPECT_TRUE(Vec3SGrid::isRegistered());
+    EXPECT_TRUE(Vec3DGrid::isRegistered());
 
     uninitialize();
 
-    CPPUNIT_ASSERT(!DoubleMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!FloatMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Int32Metadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Int64Metadata::isRegisteredType());
-    CPPUNIT_ASSERT(!StringMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec2IMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec2SMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec2DMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec3IMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec3SMetadata::isRegisteredType());
-    CPPUNIT_ASSERT(!Vec3DMetadata::isRegisteredType());
+    EXPECT_TRUE(!DoubleMetadata::isRegisteredType());
+    EXPECT_TRUE(!FloatMetadata::isRegisteredType());
+    EXPECT_TRUE(!Int32Metadata::isRegisteredType());
+    EXPECT_TRUE(!Int64Metadata::isRegisteredType());
+    EXPECT_TRUE(!StringMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec2IMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec2SMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec2DMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec3IMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec3SMetadata::isRegisteredType());
+    EXPECT_TRUE(!Vec3DMetadata::isRegisteredType());
 
-    CPPUNIT_ASSERT(!math::AffineMap::isRegistered());
-    CPPUNIT_ASSERT(!math::UnitaryMap::isRegistered());
-    CPPUNIT_ASSERT(!math::ScaleMap::isRegistered());
-    CPPUNIT_ASSERT(!math::TranslationMap::isRegistered());
-    CPPUNIT_ASSERT(!math::ScaleTranslateMap::isRegistered());
-    CPPUNIT_ASSERT(!math::NonlinearFrustumMap::isRegistered());
+    EXPECT_TRUE(!math::AffineMap::isRegistered());
+    EXPECT_TRUE(!math::UnitaryMap::isRegistered());
+    EXPECT_TRUE(!math::ScaleMap::isRegistered());
+    EXPECT_TRUE(!math::TranslationMap::isRegistered());
+    EXPECT_TRUE(!math::ScaleTranslateMap::isRegistered());
+    EXPECT_TRUE(!math::NonlinearFrustumMap::isRegistered());
 
-    CPPUNIT_ASSERT(!BoolGrid::isRegistered());
-    CPPUNIT_ASSERT(!FloatGrid::isRegistered());
-    CPPUNIT_ASSERT(!DoubleGrid::isRegistered());
-    CPPUNIT_ASSERT(!Int32Grid::isRegistered());
-    CPPUNIT_ASSERT(!Int64Grid::isRegistered());
-    CPPUNIT_ASSERT(!StringGrid::isRegistered());
-    CPPUNIT_ASSERT(!Vec3IGrid::isRegistered());
-    CPPUNIT_ASSERT(!Vec3SGrid::isRegistered());
-    CPPUNIT_ASSERT(!Vec3DGrid::isRegistered());
+    EXPECT_TRUE(!BoolGrid::isRegistered());
+    EXPECT_TRUE(!FloatGrid::isRegistered());
+    EXPECT_TRUE(!DoubleGrid::isRegistered());
+    EXPECT_TRUE(!Int32Grid::isRegistered());
+    EXPECT_TRUE(!Int64Grid::isRegistered());
+    EXPECT_TRUE(!StringGrid::isRegistered());
+    EXPECT_TRUE(!Vec3IGrid::isRegistered());
+    EXPECT_TRUE(!Vec3SGrid::isRegistered());
+    EXPECT_TRUE(!Vec3DGrid::isRegistered());
 }

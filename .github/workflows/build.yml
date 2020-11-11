@@ -29,6 +29,8 @@ jobs:
       image: aswf/ci-openvdb:2021
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -42,6 +44,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -55,6 +59,8 @@ jobs:
       image: aswf/ci-openvdb:2019
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.8.0
     - name: build
       run: ./ci/build.sh clang++ Release 6 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -68,6 +74,8 @@ jobs:
       image: aswf/ci-openvdb:2018
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.8.0
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.12.0
     - name: build
@@ -105,6 +113,8 @@ jobs:
       image: aswf/ci-base:2019
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -127,6 +137,8 @@ jobs:
       image: aswf/ci-base:2018
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.8.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -151,6 +163,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
@@ -162,6 +176,8 @@ jobs:
       image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -184,6 +200,8 @@ jobs:
       image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -206,6 +224,8 @@ jobs:
       image: aswf/ci-openvdb:2021
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -219,6 +239,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
 
@@ -228,6 +250,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh clang++ DebugNoInfo 7 ON None -DOPENVDB_CXX_STRICT=ON
 
@@ -237,6 +261,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh clang++ Release 7 ON SSE42 -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -305,6 +331,9 @@ jobs:
     - name: install
       shell: bash
       run: ./ci/install_blosc.sh 1.5.0
+    - name: install
+      shell: bash
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to

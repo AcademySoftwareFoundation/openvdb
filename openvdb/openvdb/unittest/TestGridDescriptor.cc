@@ -1,31 +1,18 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/io/GridDescriptor.h>
 #include <openvdb/openvdb.h>
 
 
-class TestGridDescriptor: public CppUnit::TestCase
+class TestGridDescriptor: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestGridDescriptor);
-    CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testCopy);
-    CPPUNIT_TEST(testName);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testIO();
-    void testCopy();
-    void testName();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestGridDescriptor);
 
-
-void
-TestGridDescriptor::testIO()
+TEST_F(TestGridDescriptor, testIO)
 {
     using namespace openvdb::io;
     using namespace openvdb;
@@ -54,7 +41,7 @@ TestGridDescriptor::testIO()
 
     GridDescriptor gd2;
 
-    CPPUNIT_ASSERT_THROW(gd2.read(istr), openvdb::LookupError);
+    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
 
     // Register the grid.
     GridBase::clearRegistry();
@@ -63,25 +50,24 @@ TestGridDescriptor::testIO()
     // seek back and read again.
     istr.seekg(0, std::ios_base::beg);
     GridBase::Ptr grid;
-    CPPUNIT_ASSERT_NO_THROW(grid = gd2.read(istr));
+    EXPECT_NO_THROW(grid = gd2.read(istr));
 
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), gd2.gridName());
-    CPPUNIT_ASSERT_EQUAL(gd.uniqueName(), gd2.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(gd.gridType(), gd2.gridType());
-    CPPUNIT_ASSERT_EQUAL(gd.instanceParentName(), gd2.instanceParentName());
-    CPPUNIT_ASSERT(grid.get() != NULL);
-    CPPUNIT_ASSERT_EQUAL(GridType::gridType(), grid->type());
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), gd2.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), gd2.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), gd2.getEndPos());
+    EXPECT_EQ(gd.gridName(), gd2.gridName());
+    EXPECT_EQ(gd.uniqueName(), gd2.uniqueName());
+    EXPECT_EQ(gd.gridType(), gd2.gridType());
+    EXPECT_EQ(gd.instanceParentName(), gd2.instanceParentName());
+    EXPECT_TRUE(grid.get() != NULL);
+    EXPECT_EQ(GridType::gridType(), grid->type());
+    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
 
     // Clear the registry when we are done.
     GridBase::clearRegistry();
 }
 
 
-void
-TestGridDescriptor::testCopy()
+TEST_F(TestGridDescriptor, testCopy)
 {
     using namespace openvdb::io;
     using namespace openvdb;
@@ -100,18 +86,17 @@ TestGridDescriptor::testCopy()
     // do the copy
     gd2 = gd;
 
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), gd2.gridName());
-    CPPUNIT_ASSERT_EQUAL(gd.uniqueName(), gd2.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(gd.gridType(), gd2.gridType());
-    CPPUNIT_ASSERT_EQUAL(gd.instanceParentName(), gd2.instanceParentName());
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), gd2.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), gd2.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), gd2.getEndPos());
+    EXPECT_EQ(gd.gridName(), gd2.gridName());
+    EXPECT_EQ(gd.uniqueName(), gd2.uniqueName());
+    EXPECT_EQ(gd.gridType(), gd2.gridType());
+    EXPECT_EQ(gd.instanceParentName(), gd2.instanceParentName());
+    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
 }
 
 
-void
-TestGridDescriptor::testName()
+TEST_F(TestGridDescriptor, testName)
 {
     using openvdb::Name;
     using openvdb::io::GridDescriptor;
@@ -123,10 +108,10 @@ TestGridDescriptor::testName()
 
     // Verify that the grid name and the unique name are equivalent
     // when the unique name has no suffix.
-    CPPUNIT_ASSERT_EQUAL(name, gd.gridName());
-    CPPUNIT_ASSERT_EQUAL(name, gd.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(name, GridDescriptor::nameAsString(name));
-    CPPUNIT_ASSERT_EQUAL(name, GridDescriptor::stripSuffix(name));
+    EXPECT_EQ(name, gd.gridName());
+    EXPECT_EQ(name, gd.uniqueName());
+    EXPECT_EQ(name, GridDescriptor::nameAsString(name));
+    EXPECT_EQ(name, GridDescriptor::stripSuffix(name));
 
     // Add a suffix.
     name = GridDescriptor::addSuffix("test", 2);
@@ -134,26 +119,26 @@ TestGridDescriptor::testName()
 
     // Verify that the grid name and the unique name differ
     // when the unique name has a suffix.
-    CPPUNIT_ASSERT_EQUAL(name, gd.uniqueName());
-    CPPUNIT_ASSERT(gd.gridName() != gd.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(GridDescriptor::stripSuffix(name), gd.gridName());
-    CPPUNIT_ASSERT_EQUAL(Name("test[2]"), GridDescriptor::nameAsString(name));
+    EXPECT_EQ(name, gd.uniqueName());
+    EXPECT_TRUE(gd.gridName() != gd.uniqueName());
+    EXPECT_EQ(GridDescriptor::stripSuffix(name), gd.gridName());
+    EXPECT_EQ(Name("test[2]"), GridDescriptor::nameAsString(name));
 
     // As above, but with a longer suffix
     name = GridDescriptor::addSuffix("test", 13);
     gd = GridDescriptor(name, typ);
 
-    CPPUNIT_ASSERT_EQUAL(name, gd.uniqueName());
-    CPPUNIT_ASSERT(gd.gridName() != gd.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(GridDescriptor::stripSuffix(name), gd.gridName());
-    CPPUNIT_ASSERT_EQUAL(Name("test[13]"), GridDescriptor::nameAsString(name));
+    EXPECT_EQ(name, gd.uniqueName());
+    EXPECT_TRUE(gd.gridName() != gd.uniqueName());
+    EXPECT_EQ(GridDescriptor::stripSuffix(name), gd.gridName());
+    EXPECT_EQ(Name("test[13]"), GridDescriptor::nameAsString(name));
 
     // Multiple suffixes aren't supported, but verify that
     // they behave reasonably, at least.
     name = GridDescriptor::addSuffix(name, 4);
     gd = GridDescriptor(name, typ);
 
-    CPPUNIT_ASSERT_EQUAL(name, gd.uniqueName());
-    CPPUNIT_ASSERT(gd.gridName() != gd.uniqueName());
-    CPPUNIT_ASSERT_EQUAL(GridDescriptor::stripSuffix(name), gd.gridName());
+    EXPECT_EQ(name, gd.uniqueName());
+    EXPECT_TRUE(gd.gridName() != gd.uniqueName());
+    EXPECT_EQ(GridDescriptor::stripSuffix(name), gd.gridName());
 }
