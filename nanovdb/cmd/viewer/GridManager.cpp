@@ -32,7 +32,7 @@
 
 // create a nanovdb grid from a typeName.
 // Returns a valid GridHandle on success.
-static nanovdb::GridHandle<> createInternalGrid(std::string typeName, std::string url)
+static nanovdb::GridHandle<> createInternalGrid(std::string typeName, std::string /*url*/)
 {
     if (typeName == "empty") {
         nanovdb::GridBuilder<float> builder(0);
@@ -179,7 +179,7 @@ int GridManager::getEventMessages(std::vector<EventMessage>& messages, int start
 {
     messages.clear();
     std::lock_guard<std::recursive_mutex> scopedLock(mEventListMutex);
-    for (int i = startIndex; i < mEventMessages.size(); ++i)
+    for (size_t i = startIndex; i < mEventMessages.size(); ++i)
         messages.push_back(mEventMessages[i]);
     return messages.size();
 }
@@ -296,10 +296,40 @@ bool GridManager::addGridsFromInternal(const std::string& url, const std::string
     }
 }
 
+std::vector<std::string> GridManager::getGridsNamesFromLocalFile(const std::string& url, const std::string& localFilename)
+{
+    std::vector<std::string> result;
+    std::string              extension = urlGetPathExtension(localFilename);
+    try {
+        if (extension == "vdb") {
+#if defined(NANOVDB_USE_OPENVDB)
+            openvdb::io::File file(localFilename);
+            file.open(true);
+            auto gridMetas = file.readAllGridMetadata();
+            for (auto& gridMeta : *gridMetas) {
+                result.push_back(gridMeta->getName());
+                addEventMessage({GridManager::EventMessage::Type::kInfo, "Found grid \"" + gridMeta->getName() + "\" from \"" + url + "\""});
+            }
+#else
+            throw std::runtime_error("OpenVDB is not supported in this build. Please recompile with OpenVDB support.");
+#endif
+        } else {
+            // load all the grids in the file...
+            auto gridMetas = nanovdb::io::readGridMetaData(localFilename);
+            for (auto& gridMeta : gridMetas) {
+                result.push_back(gridMeta.gridName);
+                addEventMessage({GridManager::EventMessage::Type::kInfo, "Found grid \"" + gridMeta.gridName + "\" from \"" + url + "\""});
+            }
+        }
+    }
+    catch (const std::exception& e) {
+        addEventMessage({GridManager::EventMessage::Type::kError, "Can't load grid meta from \"" + url + "\" - " + e.what()});
+    }
+    return result;
+}
+
 bool GridManager::addGridsMetaFromLocalFile(const std::string& url, const std::string& gridName, const std::string& localFilename)
 {
-    const int verbosity = 0;
-
     std::string extension = urlGetPathExtension(localFilename);
 
     Asset::Ptr     asset = ensureAsset(url);
@@ -353,7 +383,7 @@ bool GridManager::addGridsMetaFromLocalFile(const std::string& url, const std::s
             if (gridName.length() > 0) {
                 auto                             gridMetas = nanovdb::io::readGridMetaData(localFilename);
                 const nanovdb::io::GridMetaData* gridMeta = nullptr;
-                for (int i = 0; i < gridMetas.size(); ++i) {
+                for (size_t i = 0; i < gridMetas.size(); ++i) {
                     if (gridMetas[i].gridName == gridName) {
                         gridMeta = &gridMetas[i];
                         break;

@@ -74,6 +74,8 @@ private:
     bool drawMaterialGridAttachment(SceneNode::Ptr node, int attachmentIndex);
     void drawPendingGlyph();
 
+    std::string getScreenShotFilename(int iteration) const;
+
     void*  mWindow = nullptr;
     int    mWindowWidth = 0;
     int    mWindowHeight = 0;

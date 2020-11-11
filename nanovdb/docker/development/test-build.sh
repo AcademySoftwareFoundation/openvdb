@@ -11,7 +11,7 @@ CUDA_VER=$1; shift
 
 if [[ -z "${COMPILER_NAME}" ]]; then
     COMPILER_NAME="clang++"
-else if [[ -z "${CUDA_VER}" ]]; then
+elif [[ -z "${CUDA_VER}" ]]; then
     CUDA_VER="10.2"
 else
     GIT_BRANCH=$1; shift

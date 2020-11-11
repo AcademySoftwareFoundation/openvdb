@@ -26,12 +26,12 @@ namespace nanovdb {
 template<typename T>
 struct ConvertTrait;
 
-/// @brief Forward declaration of free-standing function that deserializes a typed NanoVDB grid into an OpenVDB Grid
+/// @brief Forward declaration of free-standing function that de-serializes a typed NanoVDB grid into an OpenVDB Grid
 template<typename ValueT>
 typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<ValueT>::Type>::Type>::Ptr
 nanoToOpenVDB(const NanoGrid<ValueT>& grid, int verbose = 0);
 
-/// @brief Forward declaration of free-standing function that deserializes a NanoVDB GridHandle into an OpenVDB GridBase
+/// @brief Forward declaration of free-standing function that de-serializes a NanoVDB GridHandle into an OpenVDB GridBase
 template<typename BufferT>
 openvdb::GridBase::Ptr
 nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose = 0);
@@ -63,7 +63,7 @@ public:
     /// @brief Construction from an existing const OpenVDB Grid.
     NanoToOpenVDB(){};
 
-    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpneVDB grid
+    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpenVDB grid
     typename DstGridT::Ptr operator()(const NanoGrid<ValueType>& grid, int verbose = 0);
 
 private:

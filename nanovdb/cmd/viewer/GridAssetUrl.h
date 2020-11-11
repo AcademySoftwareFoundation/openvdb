@@ -42,17 +42,18 @@ public:
         return !mPath.empty() || !mGridName.empty();
     }
 
-    inline GridAssetUrl asSequence(int frame) const;
-    inline std::string  url() const { return mScheme + "://" + mPath; }
-    inline std::string  path() const { return mPath; }
-    inline std::string  scheme() const { return mScheme; }
-    inline std::string  gridName() const { return mGridName; }
-    inline int          frameStart() const { return mFrameStart; }
-    inline int          frameEnd() const { return mFrameEnd; }
-    inline bool         isSequence() const { return mIsSequence; }
-    inline int          frameStep() const { return mFrameStep; }
+    inline std::string        url() const { return mScheme + "://" + mPath; }
+    inline std::string        path() const { return mPath; }
+    inline std::string        scheme() const { return mScheme; }
+    inline const std::string& gridName() const { return mGridName; }
+    inline std::string&       gridName() { return mGridName; }
+    inline int                frameStart() const { return mFrameStart; }
+    inline int                frameEnd() const { return mFrameEnd; }
+    inline bool               isSequence() const { return mIsSequence; }
+    inline int                frameStep() const { return mFrameStep; }
 
-    std::string fullname() const;
+    GridAssetUrl asSequence(int frame) const;
+    std::string  fullname() const;
 
     std::string updateUrlWithFrame(int frame) const;
 

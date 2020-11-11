@@ -27,7 +27,7 @@ USE_INTRINSICS := yes
 
 BUILD_BENCHMARK := yes
 BUILD_UNITTESTS := yes
-BUILD_INTERACTIVE_RENDERER := no
+USE_GLFW := yes
 
 ifeq (yes,$(USE_OPENVDB))
 	USE_TBB = yes
@@ -36,6 +36,7 @@ ifeq (yes,$(USE_OPENVDB))
 endif
 
 ifeq ("$(shell uname -s)","Darwin")
+    USE_CUDA = no
     SHELL = /bin/tcsh
 endif
 
@@ -53,7 +54,7 @@ else
 endif
 BUILD_DEBUG   = $(CC) $(CXXFLAGS) -O1 -g
 BUILD_RELEASE = $(CC) $(CXXFLAGS) -DNDEBUG -O3
-INCLUDES = -I$(HOME)/local/include -I./
+INCLUDES = -I$(HOME)/local/include -I./ -Iexternal
 LIBRARY = -L/usr/lib
 LIBS = -lpthread
 BRANCH = $(shell git rev-parse --abbrev-ref HEAD)
@@ -76,7 +77,7 @@ endif
 	USE_CUDA = no
 endif
 
-ifeq (yes,$(BUILD_INTERACTIVE_RENDERER))
+ifeq (yes,$(USE_GLFW))
 	USE_OPENGL = yes
 	VIEWER_SRC_FILES += release/Viewer.o
 	VIEWER_LIBS += -lglfw
@@ -127,7 +128,7 @@ ifeq (yes,$(USE_OPENGL))
 ifeq ("$(shell uname -s)","Darwin")
 	LIBS += -framework OpenGL
 else
-	LIBS += -lGL
+	LIBS += -lGL -ldl
 endif
 	CXXFLAGS += -DNANOVDB_USE_GLAD
 	INCLUDES += -Iexternal/glad/include
@@ -186,18 +187,15 @@ ifeq (yes,$(BUILD_BENCHMARK))
 endif
 
 # build interactive-renderer...
-ifeq (yes,$(BUILD_INTERACTIVE_RENDERER))
-
-ifneq ("$(shell uname -s)","Darwin")
+ifeq (yes,$(USE_GLFW))
 	CXXFLAGS += -DNANOVDB_USE_GLFW
-endif
-
 endif
 
 # Avoid associating these build target with files of the same name
 .PHONY: all run clean test archive
 
 .DEFAULT_GOAL := release
+
 
 # build targets
 
@@ -453,6 +451,26 @@ release/glad.o: external/glad/src/glad.c
 	@mkdir -p release
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
+release/AssetLoader.o: cmd/viewer/AssetLoader.cpp cmd/viewer/AssetLoader.h $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+release/CallbackPool.o: cmd/viewer/CallbackPool.cpp cmd/viewer/CallbackPool.h $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+release/GridAssetUrl.o: cmd/viewer/GridAssetUrl.cpp cmd/viewer/GridAssetUrl.h $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+release/GridManager.o: cmd/viewer/GridManager.cpp cmd/viewer/GridManager.h $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+release/StringUtils.o: cmd/viewer/StringUtils.cpp cmd/viewer/StringUtils.h $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
 # build executables
 
 release/testNanoVDB: release/TestNanoVDB.o
@@ -546,6 +564,11 @@ release/nanovdb_viewer: release/nanovdb_viewer.o \
 						release/RenderLauncherCpuMT.o \
 						release/Renderer.o \
 						release/BatchRenderer.o \
+						release/AssetLoader.o \
+						release/CallbackPool.o \
+						release/GridAssetUrl.o \
+						release/GridManager.o \
+						release/StringUtils.o \
 						$(VIEWER_SRC_FILES)
 	$(BUILD_CUDA) $(LIBRARY) -o $@ $^ $(VIEWER_LIBS) $(LIBS)
 

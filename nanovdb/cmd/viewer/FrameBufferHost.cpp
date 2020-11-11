@@ -79,12 +79,12 @@ bool FrameBufferHost::setup(int w, int h, InternalFormat format)
     return true;
 }
 
-bool FrameBufferHost::render(int x, int y, int w, int h)
+bool FrameBufferHost::render(int /*x*/, int /*y*/, int /*w*/, int /*h*/)
 {
     return false;
 }
 
-void* FrameBufferHost::map(AccessType access)
+void* FrameBufferHost::map(AccessType /*access*/)
 {
     return mBuffer;
 }
@@ -93,9 +93,9 @@ void FrameBufferHost::unmap()
 {
 }
 
-void* FrameBufferHost::cudaMap(AccessType access, void* stream)
+void* FrameBufferHost::cudaMap(AccessType /*access*/, void* /*stream*/)
 {
-    int writeIndex = (mIndex + 1) % BUFFER_COUNT;
+    //int writeIndex = (mIndex + 1) % BUFFER_COUNT;
 
     if (!mSize)
         return nullptr;
@@ -106,9 +106,11 @@ void* FrameBufferHost::cudaMap(AccessType access, void* stream)
 
 void FrameBufferHost::cudaUnmap(void* stream)
 {
-    int writeIndex = (mIndex + 1) % BUFFER_COUNT;
+    //int writeIndex = (mIndex + 1) % BUFFER_COUNT;
 #if defined(NANOVDB_USE_CUDA)
     NANOVDB_CUDA_SAFE_CALL(cudaStreamSynchronize(cudaStream_t(stream)));
+#else
+    (void)stream;
 #endif
     invalidate();
 }
@@ -130,6 +132,8 @@ void* FrameBufferHost::clMap(AccessType access, void* stream)
 
     return (void*)memCL;
 #else
+    (void)access;
+    (void)stream;
     return nullptr;
 #endif
 }
@@ -141,5 +145,7 @@ void FrameBufferHost::clUnmap(void* stream)
     cl_mem bufferCL = cl_mem(mBufferResourcesCL[writeIndex]);
     cl_int err = clEnqueueReleaseGLObjects(cl_command_queue(stream), 1, &bufferCL, 0, 0, NULL);
     invalidate();
+#else
+    (void)stream;
 #endif
 }

@@ -52,11 +52,11 @@ __global__ void launchRenderKernel(int width, int height, FnT fn, Args... args)
     fn(ix, iy, width, height, args...);
 }
 
-struct CudaLauncher
+struct PlatformLauncherCUDA
 {
     RenderLauncherCUDA* mOwner;
 
-    CudaLauncher(RenderLauncherCUDA* owner)
+    PlatformLauncherCUDA(RenderLauncherCUDA* owner)
         : mOwner(owner)
     {
     }
@@ -241,7 +241,7 @@ void* RenderLauncherCUDA::mapCUDA(int access, const std::shared_ptr<ImageResourc
     return imgBuffer->cudaMap(FrameBufferBase::AccessType(access));
 }
 
-bool RenderLauncherCUDA::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherCUDA::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
@@ -259,7 +259,7 @@ bool RenderLauncherCUDA::render(MaterialClass method, int width, int height, Fra
         return false;
     }
 
-    CudaLauncher methodLauncher(this);    
+    PlatformLauncherCUDA methodLauncher(this);    
     launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
     
     unmapCUDA(imageResource, imgBuffer);

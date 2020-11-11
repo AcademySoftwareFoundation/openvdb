@@ -118,9 +118,9 @@ static void windowDropCB(GLFWwindow* w, int count, const char** paths)
     reinterpret_cast<Viewer*>(glfwGetWindowUserPointer(w))->onDrop(count, paths);
 }
 
+#if defined(NANOVDB_USE_NFD)
 static bool openFileDialog(std::string& outPathStr)
 {
-#if defined(NANOVDB_USE_NFD)
     nfdchar_t*  outPath = NULL;
     nfdresult_t result = NFD_OpenDialog("vdb,nvdb", NULL, &outPath);
     if (result == NFD_OKAY) {
@@ -132,14 +132,10 @@ static bool openFileDialog(std::string& outPathStr)
         throw std::runtime_error(std::string(NFD_GetError()));
     }
     return true;
-#else
-    return false;
-#endif
 }
 
 static bool openFolderDialog(std::string& outPathStr, const std::string& pathStr)
 {
-#if defined(NANOVDB_USE_NFD)
     nfdchar_t*  outPath = NULL;
     nfdresult_t result = NFD_PickFolder(pathStr.c_str(), &outPath);
     if (result == NFD_OKAY) {
@@ -151,10 +147,8 @@ static bool openFolderDialog(std::string& outPathStr, const std::string& pathStr
         throw std::runtime_error(std::string(NFD_GetError()));
     }
     return true;
-#else
-    return false;
-#endif
 }
+#endif
 
 Viewer::Viewer(const RendererParams& params)
     : RendererBase(params)
@@ -199,6 +193,11 @@ void Viewer::updateWindowTitle()
 
     std::ostringstream ss;
     ss << "NanoVDB Viewer: " << mRenderLauncher.name() << " @ " << mFps << " fps";
+    if (mSelectedSceneNodeIndex >= 0) {
+        ss << " - ";
+        ss << mSceneNodes[mSelectedSceneNodeIndex]->mName;
+        ss << '[' << mSceneNodes[mSelectedSceneNodeIndex]->mAttachments[0]->mAssetUrl.fullname() << ']';
+    }
     glfwSetWindowTitle((GLFWwindow*)mWindow, ss.str().c_str());
 }
 
@@ -299,16 +298,8 @@ void Viewer::open()
     ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
-#if defined(NANOVDB_USE_IMGUI_DOCKING)
-    //io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
-    //io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
-    //io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
-#else
     io.ConfigWindowsMoveFromTitleBarOnly = true;
-#endif
-
     ImGui::StyleColorsDark();
-
     ImGui_ImplGlfw_InitForOpenGL((GLFWwindow*)mWindow, true);
     ImGui_ImplOpenGL3_Init("#version 100");
 #endif
@@ -326,84 +317,6 @@ void Viewer::mainLoop(void* userData)
         emscripten_cancel_main_loop();
 #endif
     }
-}
-
-static ImGuiID dock_id_prop;
-static ImGuiID dock_id_bottom;
-static ImGuiID dock_id_center;
-
-static void showDockSpace(bool* p_open)
-{
-#if defined(NANOVDB_USE_IMGUI_DOCKING) && 0
-
-    static bool               opt_fullscreen_persistant = true;
-    bool                      opt_fullscreen = opt_fullscreen_persistant;
-    static ImGuiDockNodeFlags dockspace_flags = ImGuiDockNodeFlags_None | ImGuiDockNodeFlags_PassthruCentralNode | ImGuiDockNodeFlags_NoDockingInCentralNode;
-
-    // We are using the ImGuiWindowFlags_NoDocking flag to make the parent window not dockable into,
-    // because it would be confusing to have two docking targets within each others.
-    ImGuiWindowFlags window_flags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoDocking;
-    if (opt_fullscreen) {
-        ImGuiViewport* viewport = ImGui::GetMainViewport();
-        ImGui::SetNextWindowPos(viewport->Pos);
-        ImGui::SetNextWindowSize(viewport->Size);
-        ImGui::SetNextWindowViewport(viewport->ID);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
-        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-        window_flags |= ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove;
-        window_flags |= ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoNavFocus;
-    }
-
-    // When using ImGuiDockNodeFlags_PassthruCentralNode, DockSpace() will render our background
-    // and handle the pass-thru hole, so we ask Begin() to not render a background.
-    if (dockspace_flags & ImGuiDockNodeFlags_PassthruCentralNode)
-        window_flags |= ImGuiWindowFlags_NoBackground;
-
-    // Important: note that we proceed even if Begin() returns false (aka window is collapsed).
-    // This is because we want to keep our DockSpace() active. If a DockSpace() is inactive,
-    // all active windows docked into it will lose their parent and become undocked.
-    // We cannot preserve the docking relationship between an active window and an inactive docking, otherwise
-    // any change of dockspace/settings would lead to windows being stuck in limbo and never being visible.
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-    ImGui::Begin("###DockSpace", p_open, window_flags);
-    ImGui::PopStyleVar();
-
-    if (opt_fullscreen)
-        ImGui::PopStyleVar(2);
-
-    // DockSpace
-    ImGuiIO& io = ImGui::GetIO();
-    if (io.ConfigFlags & ImGuiConfigFlags_DockingEnable) {
-        ImGuiID dockspace_id = ImGui::GetID("MyDockSpace");
-        //ImGui::DockSpace(dockspace_id, ImVec2(0.0f, 0.0f), dockspace_flags);
-
-        ImVec2 dockspace_size(800, 800);
-
-        if (ImGui::DockBuilderGetNode(dockspace_id) == nullptr) {
-            // setup initial config...
-            ImGui::DockBuilderRemoveNode(dockspace_id); // Clear out existing layout
-            ImGui::DockBuilderAddNode(dockspace_id, dockspace_flags); // Add empty node
-            ImGui::DockBuilderSetNodeSize(dockspace_id, dockspace_size);
-
-            ImGuiID dock_main_id = dockspace_id; // This variable will track the document node, however we are not using it here as we aren't docking anything into it.
-            dock_id_prop = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Left, 0.20f, NULL, &dock_main_id);
-            dock_id_bottom = ImGui::DockBuilderSplitNode(dock_main_id, ImGuiDir_Down, 0.20f, NULL, &dock_main_id);
-            ImGuiDockNode* centerNode = ImGui::DockBuilderGetCentralNode(dockspace_id);
-            dock_id_center = -1;
-
-            ImGui::DockBuilderDockWindow("Event Log", dock_id_bottom);
-            ImGui::DockBuilderDockWindow("Grid-Sets", dock_id_prop);
-            ImGui::DockBuilderDockWindow("Grid Stats", dock_id_prop);
-            ImGui::DockBuilderDockWindow("Extra", dock_id_prop);
-            ImGui::DockBuilderFinish(dockspace_id);
-        }
-
-    } else {
-        //ShowDockingDisabledMessage();
-    }
-
-    ImGui::End();
-#endif
 }
 
 bool Viewer::runLoop()
@@ -431,9 +344,6 @@ bool Viewer::runLoop()
     ImGui_ImplGlfw_NewFrame();
     ImGui::NewFrame();
     ImGuiIO& io = ImGui::GetIO();
-
-    bool show = true;
-    showDockSpace(&show);
 
     drawMenuBar();
     drawSceneGraph();
@@ -537,7 +447,7 @@ void Viewer::printHelp(std::ostream& s) const
     assert(platforms.size() > 0);
     std::stringstream platformList;
     platformList << "[" << platforms[0];
-    for (int i = 1; i < platforms.size(); ++i)
+    for (size_t i = 1; i < platforms.size(); ++i)
         platformList << "," << platforms[i];
     platformList << "]";
 
@@ -553,6 +463,7 @@ void Viewer::printHelp(std::ostream& s) const
     s << "\n";
     s << "View options ------------------------\n";
     s << "- Frame Selected               [F]\n";
+    s << "- Screenshot                   [CTRL + P (or PRINTSCREEN)]\n";
     s << "\n";
     s << "Animation options ------------------------\n";
     s << "- Toggle Play/Stop             [ENTER]\n";
@@ -575,12 +486,12 @@ void Viewer::printHelp(std::ostream& s) const
 void Viewer::updateAnimationControl()
 {
     if (mPlaybackState == PlaybackState::PLAY) {
-        float t = getTime();
+        float t = (float)getTime();
         if ((t - mPlaybackLastTime) * mPlaybackRate > 1.0f) {
             mPlaybackTime += (t - mPlaybackLastTime) * mPlaybackRate;
             mPlaybackLastTime = t;
         }
-        RendererBase::setSceneFrame(mPlaybackTime);
+        RendererBase::setSceneFrame((int)mPlaybackTime);
     }
 }
 
@@ -588,8 +499,8 @@ void Viewer::setSceneFrame(int frame)
 {
     RendererBase::setSceneFrame(frame);
 
-    mPlaybackLastTime = getTime();
-    mPlaybackTime = frame - mParams.mFrameStart;
+    mPlaybackLastTime = (float)getTime();
+    mPlaybackTime = (float)(frame - mParams.mFrameStart);
     mPlaybackState = PlaybackState::STOP;
 }
 
@@ -598,9 +509,9 @@ bool Viewer::updateCamera()
     int  sceneFrame = getSceneFrame();
     bool isChanged = false;
 
-    if (mCurrentCameraState->mFrame != sceneFrame) {
+    if (mCurrentCameraState->mFrame != (float)sceneFrame) {
         isChanged = true;
-        mCurrentCameraState->mFrame = sceneFrame;
+        mCurrentCameraState->mFrame = (float)sceneFrame;
     }
 
     if (mPlaybackState == PlaybackState::PLAY && mParams.mUseTurntable) {
@@ -641,12 +552,13 @@ bool Viewer::updateCamera()
 
 void Viewer::onDrop(int numPaths, const char** paths)
 {
+    std::vector<GridAssetUrl> urls;
     for (int i = 0; i < numPaths; i++) {
-        auto nodeId = addSceneNode("");
-        addGridAsset(paths[i]);
-        setSceneNodeGridAttachment(nodeId, 0, paths[i]);
-        selectSceneNodeByIndex(findNode(nodeId)->mIndex);
+        urls.push_back(paths[i]);
     }
+
+    int sceneNodeIndex = addGridAssetsAndNodes("default", urls);
+    selectSceneNodeByIndex(sceneNodeIndex);
 }
 
 void Viewer::onKey(int key, int action)
@@ -660,10 +572,16 @@ void Viewer::onKey(int key, int action)
     if (action == GLFW_PRESS) {
         if (key == GLFW_KEY_ESCAPE || key == 'Q') {
             glfwSetWindowShouldClose((GLFWwindow*)mWindow, true);
+        } else if (key == GLFW_KEY_PRINT_SCREEN || (glfwGetKey((GLFWwindow*)mWindow, GLFW_KEY_LEFT_CONTROL) && key == 'P')) {
+            saveFrameBuffer(getSceneFrame(), getScreenShotFilename(mScreenShotIteration), "png");
         } else if (key == 'H') {
             mIsDrawingHelpDialog = !mIsDrawingHelpDialog;
+#if !defined(NANOVDB_USE_IMGUI)            
+            printHelp(std::cout);
+#endif
         } else if (key == 'F') {
-            resetCamera();
+            bool isFramingSceneNode = (glfwGetKey((GLFWwindow*)mWindow, GLFW_KEY_LEFT_CONTROL) > 0);
+            resetCamera(isFramingSceneNode);
             resetAccumulationBuffer();
         } else if (key == '`') {
             mIsDrawingSceneGraph = !mIsDrawingSceneGraph;
@@ -702,7 +620,7 @@ void Viewer::onKey(int key, int action)
                 if (mPlaybackState == PlaybackState::PLAY) {
                     mPlaybackState = PlaybackState::STOP;
                 } else {
-                    mPlaybackLastTime = getTime();
+                    mPlaybackLastTime = (float)getTime();
                     mPlaybackState = PlaybackState::PLAY;
                 }
             }
@@ -717,8 +635,6 @@ void Viewer::onKey(int key, int action)
             selectSceneNodeByIndex(mSelectedSceneNodeIndex + 1);
             updateWindowTitle();
             mFps = 0;
-        } else if (key == GLFW_KEY_PRINT_SCREEN) {
-            saveFrameBuffer(getSceneFrame());
         } else if (key >= GLFW_KEY_1 && key <= GLFW_KEY_9) {
             setRenderPlatform((key - GLFW_KEY_1));
             updateWindowTitle();
@@ -760,8 +676,8 @@ void Viewer::onMouseButton(int button, int action)
             double xpos, ypos;
             glfwGetCursorPos((GLFWwindow*)mWindow, &xpos, &ypos);
             int x = int(xpos);
-            int y = int(ypos);
-            mPendingSceneFrame = mParams.mFrameStart + ((float(x) / mWindowWidth) * (mParams.mFrameEnd - mParams.mFrameStart + 1));
+            //int y = int(ypos);
+            mPendingSceneFrame = mParams.mFrameStart + (int)((float(x) / mWindowWidth) * (mParams.mFrameEnd - mParams.mFrameStart + 1));
             if (mPendingSceneFrame > mParams.mFrameEnd)
                 mPendingSceneFrame = mParams.mFrameEnd;
             else if (mPendingSceneFrame < mParams.mFrameStart)
@@ -782,7 +698,7 @@ void Viewer::onMouseMove(int x, int y)
 
     if (mMouseDown) {
         if (glfwGetKey((GLFWwindow*)mWindow, GLFW_KEY_TAB) == GLFW_PRESS) {
-            mPendingSceneFrame = mParams.mFrameStart + ((float(x) / mWindowWidth) * (mParams.mFrameEnd - mParams.mFrameStart + 1));
+            mPendingSceneFrame = mParams.mFrameStart + (int)((float(x) / mWindowWidth) * (mParams.mFrameEnd - mParams.mFrameStart + 1));
             if (mPendingSceneFrame > mParams.mFrameEnd)
                 mPendingSceneFrame = mParams.mFrameEnd;
             else if (mPendingSceneFrame < mParams.mFrameStart)
@@ -915,7 +831,7 @@ void Viewer::drawRenderOptionsDialog()
     if (!mIsDrawingRenderOptions)
         return;
 
-    ImGui::Begin("Render Options", &mIsDrawingRenderOptions, ImGuiWindowFlags_AlwaysAutoResize);
+    ImGui::Begin("Render Options", &mIsDrawingRenderOptions, ImGuiWindowFlags_None);
 
     ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
     if (ImGui::BeginTabBar("Render-options", tab_bar_flags)) {
@@ -942,7 +858,7 @@ void Viewer::drawRenderOptionsDialog()
                             return true;
                         },
                         static_cast<void*>(&sFileFormats),
-                        sFileFormats.size())) {
+                        (int)sFileFormats.size())) {
                     mParams.mOutputExtension = sFileFormats[fileFormat];
                     if (mParams.mOutputExtension == "auto")
                         mParams.mOutputExtension = "";
@@ -1081,6 +997,8 @@ void Viewer::drawRenderOptionsDialog()
         resetAccumulationBuffer();
 
     ImGui::End();
+#else
+    (void)mIsDrawingRenderOptions;
 #endif
 }
 
@@ -1147,6 +1065,8 @@ void Viewer::drawAboutDialog()
     }
 
     ImGui::End();
+#else
+    (void)mIsDrawingAboutDialog;
 #endif
 }
 
@@ -1166,11 +1086,14 @@ void Viewer::drawRenderPlatformWidget(const char* label)
 
     if (ImGui::Combo(label, &mParams.mRenderLauncherType, comboStr))
         setRenderPlatform(mParams.mRenderLauncherType);
+#else
+    (void)label;
 #endif
 }
 
 bool Viewer::drawMaterialGridAttachment(SceneNode::Ptr node, int attachmentIndex)
 {
+#if defined(NANOVDB_USE_IMGUI)
     bool isChanged = false;
     char buf[1024];
     auto attachment = node->mAttachments[attachmentIndex];
@@ -1206,12 +1129,17 @@ bool Viewer::drawMaterialGridAttachment(SceneNode::Ptr node, int attachmentIndex
     }
 
     return isChanged;
+#else
+    (void)node;
+    (void)attachmentIndex;
+    return false;
+#endif
 }
 
 bool Viewer::drawPointRenderOptionsWidget(SceneNode::Ptr node, int attachmentIndex)
 {
-    bool isChanged = false;
 #if defined(NANOVDB_USE_IMGUI)
+    bool isChanged = false;
 
     static std::vector<std::string> semanticNames;
     if (semanticNames.empty()) {
@@ -1252,8 +1180,8 @@ bool Viewer::drawPointRenderOptionsWidget(SceneNode::Ptr node, int attachmentInd
         };
 
         int w = ImGui::GetColumnWidth(1);
-        ImGui::BeginChild("left pane", ImVec2(w, 100), false, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
-        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2, 2));
+        ImGui::BeginChild("left pane", ImVec2((float)w, 100.f), false, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoDecoration);
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(2.f, 2.f));
         ImGui::Columns(2);
 
         ImGui::AlignTextToFramePadding();
@@ -1273,9 +1201,9 @@ bool Viewer::drawPointRenderOptionsWidget(SceneNode::Ptr node, int attachmentInd
         // Right
         {
             attributeIndex = attachment->attributeSemanticMap[semanticIndex + 1].attribute + 1; // add one as item[0] is "None"
-            isChanged |= ImGui::Combo("Attribute", &attributeIndex, vector_getter, static_cast<void*>(&attributeNames), attributeNames.size());
-            isChanged |= ImGui::DragFloat("Offset", &attachment->attributeSemanticMap[semanticIndex + 1].offset, 0.01, 0.0, 1.0);
-            isChanged |= ImGui::DragFloat("Gain", &attachment->attributeSemanticMap[semanticIndex + 1].gain, 0.01, 0.0, 1.0);
+            isChanged |= ImGui::Combo("Attribute", &attributeIndex, vector_getter, static_cast<void*>(&attributeNames), (int)attributeNames.size());
+            isChanged |= ImGui::DragFloat("Offset", &attachment->attributeSemanticMap[semanticIndex + 1].offset, 0.01f, 0.0f, 1.0f);
+            isChanged |= ImGui::DragFloat("Gain", &attachment->attributeSemanticMap[semanticIndex + 1].gain, 0.01f, 0.0f, 1.0f);
         }
 
         ImGui::NextColumn();
@@ -1289,12 +1217,17 @@ bool Viewer::drawPointRenderOptionsWidget(SceneNode::Ptr node, int attachmentInd
             attachment->attributeSemanticMap[semanticIndex + 1].attribute = attributeIndex - 1; // minus one as item[0] is "None"
         }
     }
-#endif
     return isChanged;
+#else
+    (void)node;
+    (void)attachmentIndex;
+    return false;
+#endif
 }
 
 bool Viewer::drawMaterialParameters(SceneNode::Ptr node, MaterialClass mat)
 {
+#if defined(NANOVDB_USE_IMGUI)
     bool isChanged = false;
 
     ImGui::AlignTextToFramePadding();
@@ -1359,6 +1292,12 @@ bool Viewer::drawMaterialParameters(SceneNode::Ptr node, MaterialClass mat)
         ImGui::NextColumn();
         ImGui::SetNextItemWidth(-1);
         isChanged |= ImGui::DragFloat("##density-value", &params.volumeDensityScale, 0.01f);
+        ImGui::NextColumn();
+
+        ImGui::BulletText("Radius");
+        ImGui::NextColumn();
+        ImGui::SetNextItemWidth(-1);
+        isChanged |= ImGui::DragFloat("##radius", &node->mAttachments[0]->attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius].offset, 0.01f);
         ImGui::NextColumn();
 
         ImGui::BulletText("Attributes");
@@ -1464,6 +1403,11 @@ bool Viewer::drawMaterialParameters(SceneNode::Ptr node, MaterialClass mat)
     }
 
     return isChanged;
+#else
+    (void)node;
+    (void)mat;
+    return false;
+#endif
 }
 
 void Viewer::drawSceneGraphNodes()
@@ -1571,6 +1515,8 @@ void Viewer::drawSceneGraphNodes()
             ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
+#else
+    return;
 #endif
 }
 
@@ -1592,6 +1538,7 @@ void Viewer::drawSceneGraph()
 
 void Viewer::drawGridInfo(const std::string& url, const std::string& gridName)
 {
+#if defined(NANOVDB_USE_IMGUI)
     nanovdb::GridHandle<>* gridHdl = std::get<1>(mGridManager.getGrid(url, gridName)).get();
     if (gridHdl) {
         auto meta = gridHdl->gridMetaData();
@@ -1625,6 +1572,11 @@ void Viewer::drawGridInfo(const std::string& url, const std::string& gridName)
     } else {
         ImGui::TextUnformatted("Loading...");
     }
+#else
+    (void)url;
+    (void)gridName;
+    return;
+#endif
 }
 
 void Viewer::drawAssets()
@@ -1698,6 +1650,8 @@ void Viewer::drawAssets()
         }
         ImGui::End();
     }
+#else
+    return;
 #endif
 }
 
@@ -1744,7 +1698,9 @@ void Viewer::drawEventLog()
     }
     ImGui::EndChild();
     ImGui::End();
-
+#else
+    (void)mLogAutoScroll;
+    return;
 #endif
 }
 
@@ -1771,14 +1727,21 @@ void Viewer::drawRenderStatsOverlay()
     window_flags |= ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoFocusOnAppearing | ImGuiWindowFlags_NoNav | ImGuiWindowFlags_NoMove;
 #endif
 
+    ImGui::SetNextWindowSize(ImVec2(200, 0), ImGuiCond_Always);
     if (ImGui::Begin("Render Stats:", &mIsDrawingRenderStats, window_flags)) {
         ImGui::Text("Frame (%d - %d): %d", mParams.mFrameStart, mParams.mFrameEnd, mLastSceneFrame);
-        ImGui::Text("FPS: %d", mFps);
-        ImGui::Separator();
-        drawRenderPlatformWidget("");
+        ImGui::Text("FPS: %d (%s)", mFps, mRenderLauncher.name().c_str());
     }
     ImGui::End();
+#else
+    return;
 #endif
+}
+
+std::string Viewer::getScreenShotFilename(int iteration) const
+{
+    std::string screenShotFilename = "screenshot-" + std::to_string((int)time(NULL)) + "-" + std::to_string(iteration) + ".png";
+    return screenShotFilename;
 }
 
 void Viewer::drawMenuBar()
@@ -1794,11 +1757,8 @@ void Viewer::drawMenuBar()
                 std::string filePath;
                 if (openFileDialog(filePath)) {
                     try {
-                        auto nodeId = addSceneNode();
-                        setSceneNodeGridAttachment(nodeId, 0, filePath);
-                        selectSceneNodeByIndex(findNode(nodeId)->mIndex);
-
-                        addGridAsset(filePath);
+                        int sceneNodeIndex = addGridAssetsAndNodes("default", {filePath});
+                        selectSceneNodeByIndex(sceneNodeIndex);
                     }
                     catch (const std::exception& e) {
                         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
@@ -1859,7 +1819,6 @@ void Viewer::drawMenuBar()
                         auto nodeId = addSceneNode(it.first);
                         setSceneNodeGridAttachment(nodeId, 0, it.second);
                         selectSceneNodeByIndex(findNode(nodeId)->mIndex);
-
                         addGridAsset(it.second);
                     }
                 }
@@ -1877,7 +1836,7 @@ void Viewer::drawMenuBar()
             if (ImGui::MenuItem("Play from start", "Ctrl(Enter)", false)) {
                 mPendingSceneFrame = mParams.mFrameStart;
                 mPlaybackState = PlaybackState::PLAY;
-                mPlaybackLastTime = getTime();
+                mPlaybackLastTime = (float)getTime();
                 mPlaybackTime = 0;
             }
             ImGui::EndMenu();
@@ -1885,22 +1844,15 @@ void Viewer::drawMenuBar()
 
         if (ImGui::BeginMenu("Render")) {
             {
-                std::string screenshotLabel = "no output specified";
-                auto        sceneFrame = getSceneFrame();
-                if (!mParams.mOutputFilePath.empty()) {
-                    screenshotLabel = updateFilePathWithFrame(mParams.mOutputFilePath, sceneFrame);
-                }
-
                 bool areAttachmentsReady = true;
                 if (mSelectedSceneNodeIndex >= 0) {
                     areAttachmentsReady = updateNodeAttachmentRequests(mSceneNodes[mSelectedSceneNodeIndex], true, mIsDumpingLog);
                 }
 
-                if (ImGui::MenuItem("Save Screenshot", screenshotLabel.c_str(), false, areAttachmentsReady && !mParams.mOutputFilePath.empty())) {
-                    for (int i = (mParams.mUseAccumulation) ? mParams.mMaxProgressiveSamples : 1; i > 0; --i) {
-                        render(sceneFrame);
-                    }
-                    saveFrameBuffer(sceneFrame);
+                auto screenShotFilename = getScreenShotFilename(mScreenShotIteration);
+
+                if (ImGui::MenuItem("Save Screenshot", screenShotFilename.c_str(), false, areAttachmentsReady)) {
+                    saveFrameBuffer(getSceneFrame(), screenShotFilename, "png");
                 }
             }
 
@@ -1973,5 +1925,7 @@ void Viewer::drawMenuBar()
             ImGui::CloseCurrentPopup();
         ImGui::EndPopup();
     }
+#else
+    return;
 #endif
 }

@@ -59,7 +59,7 @@ createLevelSetSphere(ValueT             radius = 100,
 //================================================================================================
 
 /// @brief Returns a handle to a sparse fog volume of a sphere such
-///        that the eterior is 0 and inactive, the interior is active
+///        that the exterior is 0 and inactive, the interior is active
 ///        with values varying smoothly from 0 at the surface of the
 ///        sphere to 1 at the halfWidth and interior of the sphere.
 ///
@@ -119,8 +119,8 @@ createPointSphere(int                pointsPerVoxel = 1,
 /// @param halfWidth   Half-width of narrow band in voxel units
 /// @param origin      Origin of grid in world units
 /// @param name        Name of the grid
-/// @param sMode     Mode of computation for the statistics.
-/// @param cMode     Mode of computation for the checksum.
+/// @param sMode       Mode of computation for the statistics.
+/// @param cMode       Mode of computation for the checksum.
 /// @param buffer      Buffer used for memory allocation by the handle
 template<typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -149,8 +149,8 @@ createLevelSetTorus(ValueT             majorRadius = 100,
 /// @param halfWidth   Half-width of narrow band in voxel units
 /// @param origin      Origin of grid in world units
 /// @param name        Name of the grid
-/// @param sMode     Mode of computation for the statistics.
-/// @param cMode     Mode of computation for the checksum.
+/// @param sMode       Mode of computation for the statistics.
+/// @param cMode       Mode of computation for the checksum.
 /// @param buffer      Buffer used for memory allocation by the handle
 template<typename ValueT = float, typename BufferT = HostBuffer>
 GridHandle<BufferT>
@@ -407,27 +407,27 @@ public:
     void sdfToFog();
 
     template<typename BufferT = HostBuffer>
-    GridHandle<BufferT> getHandle(double voxelSize = 1.0,
-                                  const Vec3d& gridOrigin = Vec3d(0),
+    GridHandle<BufferT> getHandle(double             voxelSize = 1.0,
+                                  const Vec3d&       gridOrigin = Vec3d(0),
                                   const std::string& name = "",
-                                  GridClass gridClass = GridClass::Unknown,
-                                  StatsMode sMode = StatsMode::Default,
-                                  ChecksumMode mode = ChecksumMode::Default,
-                                  const BufferT& buffer = BufferT());
+                                  GridClass          gridClass = GridClass::Unknown,
+                                  StatsMode          sMode = StatsMode::Default,
+                                  ChecksumMode       mode = ChecksumMode::Default,
+                                  const BufferT&     buffer = BufferT());
 
     template<typename BufferT = HostBuffer>
-    GridHandle<BufferT> getHandle(const Map& map,
+    GridHandle<BufferT> getHandle(const Map&         map,
                                   const std::string& name = "",
-                                  GridClass gridClass = GridClass::Unknown,
-                                  StatsMode sMode = StatsMode::Default,
-                                  ChecksumMode cMode = ChecksumMode::Default,
-                                  const BufferT& buffer = BufferT());
+                                  GridClass          gridClass = GridClass::Unknown,
+                                  StatsMode          sMode = StatsMode::Default,
+                                  ChecksumMode       cMode = ChecksumMode::Default,
+                                  const BufferT&     buffer = BufferT());
 
     /// @brief Sets grids values in domain of the @a bbox to those returned by the specified @a func with the
     ///        expected signature [](const Coord&)->ValueT.
     ///
     /// @note If @a func returns a value equal to the brackground value (specified in the constructor) at a
-    ///       specefic voxel coordinate, then the active state of that coordinate is left off! Else the value
+    ///       specific voxel coordinate, then the active state of that coordinate is left off! Else the value
     ///       value is set and the active state is on. This is done to allow for sparse grids to be generated.
     ///
     /// @param func  Functor used to evaluate the grid values in the @a bbox
@@ -532,8 +532,8 @@ GridHandle<BufferT> GridBuilder<ValueT, StatsT>::
               const Vec3d&       p0, // origin
               const std::string& name,
               GridClass          gridClass,
-              StatsMode          sMode, // mode of comutation for the statistics
-              ChecksumMode       cMode, // mode of comutation for the checksum
+              StatsMode          sMode, // mode of computation for the statistics
+              ChecksumMode       cMode, // mode of computation for the checksum
               const BufferT&     buffer)
 {
     if (dx <= 0) {
@@ -591,7 +591,7 @@ GridHandle<BufferT> GridBuilder<ValueT, StatsT>::
 
     GridHandle<BufferT> handle(BufferT::create(this->gridSize(), &buffer));
     mData = handle.data();
-    auto *grid = reinterpret_cast<NanoGrid<ValueT>*>(mData);
+    auto* grid = reinterpret_cast<NanoGrid<ValueT>*>(mData);
 
     this->processLeafs();
 
@@ -717,6 +717,7 @@ void GridBuilder<ValueT, StatsT>::
             assert(size_t(srcLeaf.mID) == i);
             data->mValueMask = srcLeaf.mValueMask; // copy value mask
             data->mBBoxMin = srcLeaf.mOrigin; // copy origin of node
+            data->mFlags = 0u;
             const ValueT* src = srcLeaf.mValues;
             for (ValueT *dst = data->mValues, *end = dst + SrcNode0::SIZE; dst != end; dst += 4, src += 4) {
                 dst[0] = src[0]; // copy *all* voxel values in sets of four, i.e. loop-unrolling
@@ -1752,7 +1753,7 @@ template<typename ValueT>
 std::shared_ptr<GridBuilder<ValueT>>
 initBBox(ValueT       width, // width of the box in world units
          ValueT       height, // height of the box in world units
-         ValueT       depth, // depth of th ebox in world units
+         ValueT       depth, // depth of the box in world units
          ValueT       thickness, // thickness of the wire in world units
          const Vec3d& center, //center of sphere in world units
          ValueT       voxelSize, // size of a voxel in world units
@@ -1788,7 +1789,7 @@ initBBox(ValueT       width, // width of the box in world units
                   ValueT(center[1] - origin[1]) / voxelSize,
                   ValueT(center[2] - origin[2]) / voxelSize);
 
-    // Define utinity functions
+    // Define utility functions
     auto Pos = [](ValueT x) { return x > 0 ? x : 0; };
     auto Neg = [](ValueT x) { return x < 0 ? x : 0; };
 
@@ -1847,8 +1848,8 @@ createLevelSetSphere(ValueT             radius, // radius of sphere in world uni
                      ValueT             halfWidth, // half-width of narrow band in voxel units
                      const Vec3d&       origin, // origin of grid in world units
                      const std::string& name, // name of grid
-                     StatsMode          sMode, // mode of comutation for the statistics
-                     ChecksumMode       cMode, // mode of comutation for the checksum
+                     StatsMode          sMode, // mode of computation for the statistics
+                     ChecksumMode       cMode, // mode of computation for the checksum
                      const BufferT&     buffer)
 {
     auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
@@ -1868,8 +1869,8 @@ createFogVolumeSphere(ValueT             radius, // radius of sphere in world un
                       ValueT             halfWidth, // half-width of narrow band in voxel units
                       const Vec3d&       origin, // origin of grid in world units
                       const std::string& name, // name of grid
-                      StatsMode          sMode, // mode of comutation for the statistics
-                      ChecksumMode       cMode, // mode of comutation for the checksum
+                      StatsMode          sMode, // mode of computation for the statistics
+                      ChecksumMode       cMode, // mode of computation for the checksum
                       const BufferT&     buffer)
 {
     auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
@@ -1889,7 +1890,7 @@ createPointSphere(int                pointsPerVoxel, // half-width of narrow ban
                   ValueT             voxelSize, // size of a voxel in world units
                   const Vec3d&       origin, // origin of grid in world units
                   const std::string& name, // name of grid
-                  ChecksumMode       cMode, // mode of comutation for the checksum
+                  ChecksumMode       cMode, // mode of computation for the checksum
                   const BufferT&     buffer)
 {
     auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
@@ -1912,8 +1913,8 @@ createLevelSetTorus(ValueT             majorRadius, // major radius of torus in 
                     ValueT             halfWidth, // half-width of narrow band in voxel units
                     const Vec3d&       origin, // origin of grid in world units
                     const std::string& name, // name of grid
-                    StatsMode          sMode, // mode of comutation for the statistics
-                    ChecksumMode       cMode, // mode of comutation for the checksum
+                    StatsMode          sMode, // mode of computation for the statistics
+                    ChecksumMode       cMode, // mode of computation for the checksum
                     const BufferT&     buffer)
 {
     auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
@@ -1934,8 +1935,8 @@ createFogVolumeTorus(ValueT             majorRadius, // major radius of torus in
                      ValueT             halfWidth, // half-width of narrow band in voxel units
                      const Vec3d&       origin, // origin of grid in world units
                      const std::string& name, // name of grid
-                     StatsMode          sMode, // mode of comutation for the statistics
-                     ChecksumMode       cMode, // mode of comutation for the checksum
+                     StatsMode          sMode, // mode of computation for the statistics
+                     ChecksumMode       cMode, // mode of computation for the checksum
                      const BufferT&     buffer)
 {
     auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
@@ -1956,7 +1957,7 @@ createPointTorus(int                pointsPerVoxel, // half-width of narrow band
                  ValueT             voxelSize, // size of a voxel in world units
                  const Vec3d&       origin, // origin of grid in world units
                  const std::string& name, // name of grid
-                 ChecksumMode       cMode, // mode of comutation for the checksum
+                 ChecksumMode       cMode, // mode of computation for the checksum
                  const BufferT&     buffer)
 {
     auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
@@ -1980,8 +1981,8 @@ createLevelSetBox(ValueT             width, // width of box in world units
                   ValueT             halfWidth, // half-width of narrow band in voxel units
                   const Vec3d&       origin, // origin of grid in world units
                   const std::string& name, // name of grid
-                  StatsMode          sMode, // mode of comutation for the statistics
-                  ChecksumMode       cMode, // mode of comutation for the checksum
+                  StatsMode          sMode, // mode of computation for the statistics
+                  ChecksumMode       cMode, // mode of computation for the checksum
                   const BufferT&     buffer)
 {
     auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
@@ -2004,8 +2005,8 @@ createLevelSetBBox(ValueT             width, // width of box in world units
                    ValueT             halfWidth, // half-width of narrow band in voxel units
                    const Vec3d&       origin, // origin of grid in world units
                    const std::string& name, // name of grid
-                   StatsMode          sMode, // mode of comutation for the statistics
-                   ChecksumMode       cMode, // mode of comutation for the checksum
+                   StatsMode          sMode, // mode of computation for the statistics
+                   ChecksumMode       cMode, // mode of computation for the checksum
                    const BufferT&     buffer)
 {
     auto builder = initBBox(width, height, depth, thickness, center, voxelSize, halfWidth, origin);
@@ -2027,8 +2028,8 @@ createFogVolumeBox(ValueT             width, // width of box in world units
                    ValueT             halfWidth, // half-width of narrow band in voxel units
                    const Vec3d&       origin, // origin of grid in world units
                    const std::string& name, // name of grid
-                   StatsMode          sMode, // mode of comutation for the statistics
-                   ChecksumMode       cMode, // mode of comutation for the checksum
+                   StatsMode          sMode, // mode of computation for the statistics
+                   ChecksumMode       cMode, // mode of computation for the checksum
                    const BufferT&     buffer)
 {
     auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
@@ -2050,7 +2051,7 @@ createPointBox(int                pointsPerVoxel, // half-width of narrow band i
                ValueT             voxelSize, // size of a voxel in world units
                const Vec3d&       origin, // origin of grid in world units
                const std::string& name, // name of grid
-               ChecksumMode       cMode, // mode of comutation for the checksum
+               ChecksumMode       cMode, // mode of computation for the checksum
                const BufferT&     buffer)
 {
     auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
@@ -2070,7 +2071,7 @@ inline GridHandle<BufferT>
 createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world units
                    int                     pointsPerVoxel, // half-width of narrow band in voxel units
                    const std::string&      name, // name of grid
-                   ChecksumMode            cMode, // mode of comutation for the checksum
+                   ChecksumMode            cMode, // mode of computation for the checksum
                    const BufferT&          buffer)
 {
     static_assert(is_floating_point<ValueT>::value, "createPointScatter: expect floating point");
@@ -2094,11 +2095,10 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
     GridBuilder<uint32_t> builder(std::numeric_limits<uint32_t>::max(), pointSize);
     auto                  dstAcc = builder.getAccessor();
     std::srand(1234);
-    const ValueT s = 1 / (1 + ValueT(RAND_MAX));
-    auto         op = [&](const Coord& p) {
-        //return Vec3T(p[0] + s*rand(), p[1] + s*rand(), p[2] + s*rand());
-        return Vec3T(p[0] + s * rand() - 0.5, p[1] + s * rand() - 0.5, p[2] + s * rand() - 0.5);
-        //return srcGrid.indexToWorld(Vec3T(p[0] + s*rand(), p[1] + s*rand(), p[2] + s*rand()));
+    const ValueT s = 1 / (1 + ValueT(RAND_MAX)); // scale so s*rand() is in ] 0, 1 [
+    // return a point with random local voxel coordinates (-0.5 to +0.5)
+    auto randomPoint = [&s]() {
+        return Vec3T(s * rand() - 0.5, s * rand() - 0.5, s * rand() - 0.5);
     };
     const auto& srcTree = srcGrid.tree();
     for (uint32_t i = 0, end = srcTree.nodeCount(0); i < end; ++i) {
@@ -2107,9 +2107,9 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
         dstLeaf->mValueMask = srcLeaf->valueMask();
         for (uint32_t j = 0, m = 0; j < 512; ++j) {
             if (dstLeaf->mValueMask.isOn(j)) {
-                const auto ijk = srcLeaf->offsetToGlobalCoord(j);
-                for (int n = 0; n < pointsPerVoxel; ++n, ++m)
-                    xyz.push_back(op(ijk));
+                for (int n = 0; n < pointsPerVoxel; ++n, ++m) {
+                    xyz.push_back(randomPoint());
+                }
             }
             dstLeaf->mValues[j] = m;
         }

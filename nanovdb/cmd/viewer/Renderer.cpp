@@ -99,8 +99,10 @@ SceneNode::Ptr RendererBase::ensureSceneNode(const std::string& nodeName)
         sceneNode = std::make_shared<SceneNode>();
         sceneNode->mMaterialClass = mParams.mMaterialOverride;
         sceneNode->mName = nodeName;
-        sceneNode->mIndex = mSceneNodes.size();
+        sceneNode->mIndex = (int)mSceneNodes.size();
         sceneNode->mMaterialParameters = makeMaterialParameters();
+        sceneNode->mMaterialParameters.volumeTemperatureScale = mParams.mMaterialBlackbodyTemperature;
+        sceneNode->mMaterialParameters.volumeDensityScale = mParams.mMaterialVolumeDensity;
         mSceneNodes.push_back(sceneNode);
 
         // we currently only support 2 grid attachments.
@@ -118,14 +120,21 @@ SceneNode::Ptr RendererBase::ensureSceneNode(const std::string& nodeName)
     // if no nodes are selected, then select this.
     // this will make the viewer to show the first created node by default.
     if (mSelectedSceneNodeIndex < 0)
-        mSelectedSceneNodeIndex = mSceneNodes.size() - 1;
+        mSelectedSceneNodeIndex = (int)mSceneNodes.size() - 1;
 
     return sceneNode;
 }
 
+SceneNode::Ptr RendererBase::findNodeByIndex(const int i)
+{
+    if (i < 0 || i >= mSceneNodes.size())
+        return nullptr;
+    return mSceneNodes[i];
+}
+
 SceneNode::Ptr RendererBase::findNode(const std::string& name)
 {
-    for (int i = 0; i < mSceneNodes.size(); ++i) {
+    for (size_t i = 0; i < mSceneNodes.size(); ++i) {
         if (mSceneNodes[i]->mName == name) {
             return mSceneNodes[i];
         }
@@ -139,7 +148,7 @@ std::string RendererBase::nextUniqueNodeId(const std::string& name)
     int  index = 0;
     auto prefix = name;
     if (prefix.empty())
-        prefix = "node";
+        prefix = "default";
     std::ostringstream ss(prefix);
     while (findNode(ss.str())) {
         // add index to name...
@@ -150,10 +159,8 @@ std::string RendererBase::nextUniqueNodeId(const std::string& name)
     return ss.str();
 }
 
-GridManager::AssetGridStatus RendererBase::updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNode::Ptr sceneNode, SceneNodeGridAttachment::Ptr attachment)
+GridManager::AssetGridStatus RendererBase::updateAttachmentState(const std::string& url, const GridManager::AssetStatusInfoType& residentAssetMap, SceneNodeGridAttachment::Ptr attachment)
 {
-    bool isBlocking = false;
-
     auto assetUrl = attachment->mAssetUrl;
     if (!assetUrl)
         return GridManager::AssetGridStatus::kUnknown;
@@ -205,7 +212,7 @@ bool RendererBase::updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSync
             continue;
 
         auto url = attachment->mAssetUrl.updateUrlWithFrame(mPendingSceneFrame);
-        auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, node, attachment);
+        auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, attachment);
         updateAttachment(node, attachment.get(), url, assetUrl.gridName(), gridAssetStatus);
 
         // we ignore any assets that have errored or loaded, so we don't keep trying every frame.
@@ -226,6 +233,7 @@ bool RendererBase::updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSync
     }
 
     if (isSyncing) {
+        //logInfo("Waiting for assets...");
         do {
             updateEventLog(isPrinting);
 
@@ -239,7 +247,7 @@ bool RendererBase::updateNodeAttachmentRequests(SceneNode::Ptr node, bool isSync
                     continue;
 
                 auto url = assetUrl.updateUrlWithFrame(mPendingSceneFrame);
-                auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, node, attachment);
+                auto gridAssetStatus = updateAttachmentState(url, residentAssetMap, attachment);
                 hasErrors |= (gridAssetStatus == GridManager::AssetGridStatus::kError);
 
                 updateAttachment(node, attachment.get(), url, assetUrl.gridName(), gridAssetStatus);
@@ -285,19 +293,15 @@ void RendererBase::updateAttachment(SceneNode::Ptr sceneNode, SceneNodeGridAttac
             auto grid = gridHdl.grid<uint32_t>();
             assert(grid);
 
-            char** names;
-            int    n = grid->blindDataCount();
-            names = new char*[n];
-
             // set defaults...
             for (int i = 0; i < (int)nanovdb::GridBlindDataSemantic::End; ++i) {
                 attachment->attributeSemanticMap[i].attribute = -1;
                 attachment->attributeSemanticMap[i].gain = 1.0f;
                 attachment->attributeSemanticMap[i].offset = 0.0f;
             }
-            attachment->attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius].offset = 0.5f;
+            attachment->attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::PointRadius].offset = 0.1f;
 
-            for (int i = 0; i < n; ++i) {
+            for (int i = 0; i < grid->blindDataCount(); ++i) {
                 auto meta = grid->blindMetaData(i);
                 attachment->attributeSemanticMap[(int)meta.mSemantic].attribute = i;
                 attachment->attributeSemanticMap[(int)meta.mSemantic].gain = 1.0f;
@@ -328,7 +332,7 @@ void RendererBase::updateEventLog(bool isPrinting)
 {
     std::vector<GridManager::EventMessage> eventMessages;
     mLastEventIndex += mGridManager.getEventMessages(eventMessages, mLastEventIndex);
-    for (int i = 0; i < eventMessages.size(); ++i) {
+    for (size_t i = 0; i < eventMessages.size(); ++i) {
         if (isPrinting) {
             const auto& e = eventMessages[i];
             if (e.mType == GridManager::EventMessage::Type::kError)
@@ -383,9 +387,11 @@ void RendererBase::logInfo(const std::string& msg)
     updateEventLog(true);
 }
 
-std::string RendererBase::addSceneNode(const std::string& nodeName)
+std::string RendererBase::addSceneNode(const std::string& nodeName, bool makeUnique)
 {
-    auto newName = nextUniqueNodeId(nodeName);
+    auto newName = nodeName;
+    if (makeUnique)
+        newName = nextUniqueNodeId(nodeName);
     ensureSceneNode(newName);
     return newName;
 }
@@ -394,16 +400,51 @@ void RendererBase::setSceneNodeGridAttachment(const std::string& nodeName, int a
 {
     auto node = ensureSceneNode(nodeName);
     if (node) {
-        logInfo(nodeName + " attaching grid: " + url.fullname());
-        if (node->mAttachments[attachmentIndex]->mAssetUrl != url) {
-            node->mAttachments[attachmentIndex]->mAssetUrl = url;
-            node->mAttachments[attachmentIndex]->mStatus = GridManager::AssetGridStatus::kUnknown;
-            node->mAttachments[attachmentIndex]->mFrameUrl = "";
-            node->mAttachments[attachmentIndex]->mGridClassOverride = nanovdb::GridClass::Unknown;
-            // clear the bounds
-            node->mBounds = nanovdb::BBoxR();
+        if (attachmentIndex >= node->mAttachments.size()) {
+            logError("sceneNode[" + nodeName + "] ignoring grid attachment: " + url.fullname());
+        } else {
+            logInfo("sceneNode[" + nodeName + "] assigning grid attachment: " + url.fullname());
+            if (node->mAttachments[attachmentIndex]->mAssetUrl != url) {
+                node->mAttachments[attachmentIndex]->mAssetUrl = url;
+                node->mAttachments[attachmentIndex]->mStatus = GridManager::AssetGridStatus::kUnknown;
+                node->mAttachments[attachmentIndex]->mFrameUrl = "";
+                node->mAttachments[attachmentIndex]->mGridClassOverride = nanovdb::GridClass::Unknown;
+                // clear the bounds
+                node->mBounds = nanovdb::BBoxR();
+            }
         }
     }
+}
+
+int RendererBase::addGridAssetsAndNodes(const std::string& nodePrefix, std::vector<GridAssetUrl> urls)
+{
+    std::string nodeId;
+    for (size_t i = 0; i < urls.size(); ++i) {
+        auto& assetUrl = urls[i];
+        if (assetUrl.scheme() == "file" && assetUrl.gridName().empty()) {
+            auto gridNames = getGridNamesFromFile(assetUrl);
+            for (auto& gridName : gridNames) {
+                assetUrl.gridName() = gridName;
+                addGridAsset(assetUrl);
+                nodeId = addSceneNode(nodePrefix, true);
+                setSceneNodeGridAttachment(nodeId, 0, assetUrl);
+            }
+        } else {
+            addGridAsset(assetUrl);
+            nodeId = addSceneNode(nodePrefix, true);
+            setSceneNodeGridAttachment(nodeId, 0, assetUrl);
+        }
+    }
+    updateEventLog(true);
+
+    if (nodeId.length())
+        return findNode(nodeId)->mIndex;
+    return -1;
+}
+
+std::vector<std::string> RendererBase::getGridNamesFromFile(const GridAssetUrl& url)
+{
+    return mGridManager.getGridsNamesFromLocalFile(url.fullname(), url.asSequence(getSceneFrame()).path());
 }
 
 void RendererBase::addGridAsset(const GridAssetUrl& url)
@@ -491,8 +532,8 @@ bool RendererBase::render(int frame)
     }
     auto wBboxSize = wBbox.max() - wBbox.min();
     auto sceneParameters = mParams.mSceneParameters;
-    sceneParameters.groundHeight = wBbox.min()[1];
-    sceneParameters.groundFalloff = 1000.f * float(wBboxSize.length());
+    sceneParameters.groundHeight =(float)wBbox.min()[1];
+    sceneParameters.groundFalloff = (50.f * float(wBboxSize.length())) / tanf((3.142f / 180.f) * mCurrentCameraState->mFovY * 0.5f);
     sceneParameters.camera = Camera(mParams.mSceneParameters.camera.lensType(), mCurrentCameraState->eye(), mCurrentCameraState->target(), mCurrentCameraState->V(), mCurrentCameraState->mFovY, float(w) / h);
     sceneParameters.camera.ipd() = mParams.mSceneParameters.camera.ipd();
 
@@ -515,7 +556,7 @@ bool RendererBase::render(int frame)
 
     // collect the grid pointers...
     std::vector<GridRenderParameters> gridsAttachmentPtrs;
-    for (int i = 0; i < sceneNode->mAttachments.size(); ++i) {
+    for (size_t i = 0; i < sceneNode->mAttachments.size(); ++i) {
         auto attachment = sceneNode->mAttachments[i];
         auto url = attachment->mAssetUrl.updateUrlWithFrame(frame);
         auto gridName = attachment->mAssetUrl.gridName();
@@ -523,7 +564,7 @@ bool RendererBase::render(int frame)
         gridsAttachmentPtrs.push_back(GridRenderParameters{std::get<0>(gridAssetData), std::get<1>(gridAssetData).get()});
     }
 
-    renderRc = mRenderLauncher.render(materialClass, w, h, mFrameBuffer.get(), numAccumulations, gridsAttachmentPtrs.size(), gridsAttachmentPtrs.data(), sceneParameters, materialParameters, &mRenderStats);
+    renderRc = mRenderLauncher.render(materialClass, w, h, mFrameBuffer.get(), numAccumulations, (int)gridsAttachmentPtrs.size(), gridsAttachmentPtrs.data(), sceneParameters, materialParameters, &mRenderStats);
     return renderRc;
 }
 
@@ -565,7 +606,7 @@ void RendererBase::removeSceneNodes(std::vector<int> indices)
     std::sort(indices.begin(), indices.end());
     std::reverse(indices.begin(), indices.end());
 
-    for (int i = 0; i < indices.size(); ++i) {
+    for (size_t i = 0; i < indices.size(); ++i) {
         mSceneNodes.erase(mSceneNodes.begin() + indices[i]);
     }
 
@@ -586,13 +627,32 @@ void RendererBase::printHelp(std::ostream& s) const
     s << "\n";
 }
 
-void RendererBase::resetCamera()
+void RendererBase::setCamera(const nanovdb::Vec3f& rot)
+{
+    mCurrentCameraState->mCameraRotation = rot;
+    mCurrentCameraState->mIsViewChanged = true;
+    mCurrentCameraState->update();
+}
+
+void RendererBase::resetCamera(bool isFramingSceneNodeBounds)
 {
     nanovdb::BBox<nanovdb::Vec3R> bbox(nanovdb::Vec3R(-100), nanovdb::Vec3R(100));
 
     if (mSelectedSceneNodeIndex >= 0) {
-        if (!mSceneNodes[mSelectedSceneNodeIndex]->mBounds.empty()) {
-            bbox = mSceneNodes[mSelectedSceneNodeIndex]->mBounds;
+        auto sceneNode = mSceneNodes[mSelectedSceneNodeIndex];
+        if (isFramingSceneNodeBounds) {
+            if (!sceneNode->mBounds.empty()) {
+                bbox = sceneNode->mBounds;
+            }
+        } else {
+            auto attachment = sceneNode->mAttachments[0];
+            auto url = attachment->mAssetUrl.updateUrlWithFrame(getSceneFrame());
+            auto gridName = attachment->mAssetUrl.gridName();
+            auto gridAssetData = mGridManager.getGrid(url, gridName);
+            auto gridBounds = std::get<0>(gridAssetData);
+            if (!gridBounds.empty()) {
+                bbox = gridBounds;
+            }
         }
     }
 
@@ -609,7 +669,7 @@ void RendererBase::resetCamera()
     } else {
         mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
         mCurrentCameraState->mCameraDistance = halfWidth / tanf(mCurrentCameraState->mFovY * 0.5f * (3.142f / 180.f));
-        mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(M_PI / 8, (M_PI) / 4, 0);
+        mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(float(M_PI) / 8.f, float(M_PI) / 4.f, 0.f);
     }
 
     mCurrentCameraState->mIsViewChanged = true;
@@ -717,9 +777,9 @@ bool RendererBase::updateCamera()
     int  sceneFrame = getSceneFrame();
     bool isChanged = false;
 
-    if (mCurrentCameraState->mFrame != sceneFrame) {
+    if (mCurrentCameraState->mFrame != (float)sceneFrame) {
         isChanged = true;
-        mCurrentCameraState->mFrame = sceneFrame;
+        mCurrentCameraState->mFrame = (float)sceneFrame;
     }
 
     if (mParams.mUseTurntable && isChanged) {
@@ -732,32 +792,42 @@ bool RendererBase::updateCamera()
     return isChanged;
 }
 
-bool RendererBase::saveFrameBuffer(int frame)
+bool RendererBase::saveFrameBuffer(int frame, const std::string& filenameOverride, const std::string& formatOverride)
 {
     assert(mFrameBuffer);
 
-    if (mParams.mOutputFilePath.empty()) {
+    std::string filename = filenameOverride;
+    if (filename.empty())
+        filename = mParams.mOutputFilePath;
+
+    if (filename.empty()) {
         logError("Output filename must be specified for framebuffer export.");
         return false;
     }
 
-    auto ext = mParams.mOutputExtension;
+    std::string ext = formatOverride;
     if (ext.empty()) {
-        ext = urlGetPathExtension(mParams.mOutputFilePath);
+        ext = mParams.mOutputExtension;
+        if (ext.empty()) {
+            ext = urlGetPathExtension(filename);
+        }
     }
 
     if (ext.empty()) {
-        logError("File format can not be determined from output filename, \"" + mParams.mOutputFilePath + "\"");
+        logError("File format can not be determined from output filename, \"" + filename + "\"");
         return false;
     }
 
-    auto filename = updateFilePathWithFrame(mParams.mOutputFilePath, frame);
-    logDebug("Exporting framebuffer to " + filename);
+    auto resolvedFilename = updateFilePathWithFrame(filename, frame);
+    logDebug("Exporting framebuffer to " + resolvedFilename);
 
-    if (mFrameBuffer->save(filename.c_str(), ext.c_str(), 80) == false) {
-        logError("Unable to export framebuffer to filename \"" + filename + "\" as \"" + ext + "\"");
+    if (mFrameBuffer->save(resolvedFilename.c_str(), ext.c_str(), 80) == false) {
+        logError("Unable to export framebuffer to filename \"" + resolvedFilename + "\" as \"" + ext + "\"");
         return false;
     }
+
+    // we maintain a counter so that screenshot names are always unique.
+    mScreenShotIteration++;
     return true;
 }
 

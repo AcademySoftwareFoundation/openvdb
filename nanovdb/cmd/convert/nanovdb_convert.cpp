@@ -33,7 +33,17 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "-h,--help\tPrints this message\n"
               << "-s,--stats mode\t where mode={none, bbox, extrema, all}\n"
               << "-v,--verbose\tPrint verbose information to the terminal\n"
+              << "--version\tPrint version information to the terminal\n"
               << "-z,--zip\tUse ZIP compression on the output file\n";
+    exit(exitStatus);
+}
+
+void version [[noreturn]] (const std::string& progName, int exitStatus = EXIT_SUCCESS)
+{
+    std::cout << "\n " << progName << " was build against NanoVDB version " 
+              << NANOVDB_MAJOR_VERSION_NUMBER << "."
+              << NANOVDB_MINOR_VERSION_NUMBER << "."
+              << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
     exit(exitStatus);
 }
 
@@ -47,11 +57,16 @@ int main(int argc, char* argv[])
     bool                     verbose = false, overwrite = false;
     std::string              gridName;
     std::vector<std::string> fileNames;
+    auto toLowerCase = [](std::string &str) { 
+        std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){return std::tolower(c);});
+    };
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
             if (arg == "-v" || arg == "--verbose") {
                 verbose = true;
+            } else if (arg == "--version") {
+                version(argv[0]);
             } else if (arg == "-f" || arg == "--force") {
                 overwrite = true;
             } else if (arg == "-h" || arg == "--help") {
@@ -66,7 +81,7 @@ int main(int argc, char* argv[])
                     usage(argv[0]);
                 } else {
                     std::string str(argv[++i]);
-                    std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){ return std::tolower(c); });
+                    toLowerCase(str);
                     if (str == "none") {
                        cMode = nanovdb::ChecksumMode::Disable;
                     } else if (str == "partial") {
@@ -84,7 +99,7 @@ int main(int argc, char* argv[])
                     usage(argv[0]);
                 } else {
                     std::string str(argv[++i]);
-                    std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){ return std::tolower(c); });
+                    toLowerCase(str);
                     if (str == "none") {
                        sMode = nanovdb::StatsMode::Disable;
                     } else if (str == "bbox") {
@@ -106,15 +121,16 @@ int main(int argc, char* argv[])
                     gridName.assign(argv[++i]);
                 }
             } else {
-                std::cerr << "Unrecognized option: \"" << arg << "\"\n" << std::endl;
+                std::cerr << "\nIllegal option: \"" << arg << "\"\n";
                 usage(argv[0]);
             }
         } else if (!arg.empty()) {
             fileNames.push_back(arg);
         }
     }
+
     if (fileNames.size() < 2) {
-        std::cerr << "Expected at least an input file followed by exactly one output file\n" << std::endl;
+        std::cerr << "Expected at least one input file followed by exactly one output file\n" << std::endl;
         usage(argv[0]);
     }
     const std::string outputFile = fileNames.back();
@@ -135,7 +151,8 @@ int main(int argc, char* argv[])
             std::cout << "Overwrite the existing output file named \"" << outputFile << "\"? [Y]/N: ";
             std::string answer;
             getline(std::cin, answer);
-            if (!answer.empty() && answer != "Y" && answer != "y" && answer != "yes" && answer != "YES") {
+            toLowerCase(answer);
+            if (!answer.empty() && answer != "y" && answer != "yes") {
                 std::cout << "Please specify a different output file" << std::endl;
                 exit(EXIT_SUCCESS);
             }
@@ -207,11 +224,6 @@ int main(int argc, char* argv[])
                 }
             } // loop over input files
             file.write(*grids);
-        }
-        if (verbose) {
-            std::cout << "\nThis binary was build against NanoVDB version " << NANOVDB_MAJOR_VERSION_NUMBER << "."
-                                                                            << NANOVDB_MINOR_VERSION_NUMBER << "."
-                                                                            << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
         }
     }
     catch (const std::exception& e) {

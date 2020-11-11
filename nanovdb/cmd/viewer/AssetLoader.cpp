@@ -207,7 +207,7 @@ void AssetLoaderImpl::processRequest(AssetRequest::Ptr request)
 
     try {
         AssetResponse::Ptr response;
-        
+
         std::string scheme = urlGetScheme(url);
         if (scheme == "file" || scheme.empty()) {
             isSuccessful = handleLoadContentFile(request);
@@ -239,8 +239,8 @@ void AssetLoaderImpl::processRequest(AssetRequest::Ptr request)
 static const char* kAssetStatusErrorTypeStr[size_t(AssetLoadStatus::Type::kNumTypes)] = {"Success", "Unknown scheme", "Unknown error", "Not found", "Invalid file"};
 
 AssetLoadStatus::AssetLoadStatus(Type code, const std::string& msg)
-    : mCode(code)
-    , mMessage((msg.length() > 0) ? msg : kAssetStatusErrorTypeStr[int(code)])
+    : mMessage((msg.length() > 0) ? msg : kAssetStatusErrorTypeStr[int(code)])
+    , mCode(code)
 {
 }
 

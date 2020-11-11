@@ -24,7 +24,17 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
               << "-h,--help\tPrints this message\n"
               << "-l,--long\tPrints out extra grid information\n"
               << "-s,--short\tOnly prints out a minimum amount of grid information\n"
-              << "-v,--verbose\tPrint information about the meaning of the labels\n";
+              << "-v,--verbose\tPrint information about the meaning of the labels\n"
+              << "--version\tPrint version information to the terminal\n";
+    exit(exitStatus);
+}
+
+void version [[noreturn]] (const std::string& progName, int exitStatus = EXIT_SUCCESS)
+{
+    std::cout << "\n " << progName << " was build against NanoVDB version " 
+              << NANOVDB_MAJOR_VERSION_NUMBER << "."
+              << NANOVDB_MINOR_VERSION_NUMBER << "."
+              << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
     exit(exitStatus);
 }
 
@@ -43,6 +53,8 @@ int main(int argc, char* argv[])
         if (arg[0] == '-') {
             if (arg == "-h" || arg == "--help") {
                 usage(argv[0], EXIT_SUCCESS);
+            } else if (arg == "--version") {
+                version(argv[0]);
             } else if (arg == "-s" || arg == "--short") {
                 mode = Short;
             } else if (arg == "-l" || arg == "--long") {
@@ -57,7 +69,7 @@ int main(int argc, char* argv[])
                     gridName.assign(argv[++i]);
                 }
             } else {
-                std::cerr << "\nUnrecognized option: \"" << arg << "\"\n";
+                std::cerr << "\nIllegal option: \"" << arg << "\"\n";
                 usage(argv[0]);
             }
         } else if (!arg.empty()) {
@@ -289,9 +301,6 @@ int main(int argc, char* argv[])
                 throw std::runtime_error("Internal error in switch!");
                 break;
             }
-            std::cout << "\nThis binary was build against NanoVDB version " << NANOVDB_MAJOR_VERSION_NUMBER << "."
-                                                                            << NANOVDB_MINOR_VERSION_NUMBER << "."
-                                                                            << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
         }
     }
     catch (const std::exception& e) {

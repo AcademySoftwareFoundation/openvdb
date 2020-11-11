@@ -159,11 +159,11 @@ void CallbackPool::sendCallback(CallbackType callback)
     this->mImpl->mCallbackCV.notify_one();
 }
 
-void CallbackPool::onSetup(int threadNum)
+void CallbackPool::onSetup(int /*threadNum*/)
 {
 }
 
-void CallbackPool::onCleanup(int threadNum)
+void CallbackPool::onCleanup(int /*threadNum*/)
 {
 }
 

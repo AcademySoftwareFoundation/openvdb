@@ -35,6 +35,8 @@ BatchRenderer::BatchRenderer(const RendererParams& params)
 
 bool initializeEGL(const RendererParams& params, void** glContext, void** glDisplay)
 {
+    (void)params;
+    
     *glContext = nullptr;
     *glDisplay = nullptr;
 
@@ -220,7 +222,7 @@ void BatchRenderer::run()
 
         updateScene();
 
-        for (int i=(mParams.mUseAccumulation)?mParams.mMaxProgressiveSamples:1;i>0;--i) {
+        for (int i = (mParams.mUseAccumulation) ? mParams.mMaxProgressiveSamples : 1; i > 0; --i) {
             render(frame);
         }
 

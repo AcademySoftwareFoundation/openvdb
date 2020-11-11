@@ -28,14 +28,14 @@ enum class StatsMode : uint32_t {
     Disable = 0,// disable the computation of any type of statistics (obviously the FASTEST!)
     BBox = 1,// only compute the bbox of active values per node and total activeVoxelCount
     MinMax = 2,// additionally compute extrema values
-    All = 3,// compute all of the statics, i.e. bbox, min/max, averager and standard deviation
-    Default = 3,
+    All = 3,// compute all of the statics, i.e. bbox, min/max, average and standard deviation
+    Default = 3,// default computational mode for statistics
     End = 4,
 };
 
 /// @brief Re-computes the min/max and bbox information for an existing NaoVDB Grid
 ///
-/// @param grid  Grid whoes stats to update
+/// @param grid  Grid whose stats to update
 /// @param mode  Mode of computation for the statistics.
 template<typename ValueT>
 void gridStats(NanoGrid<ValueT>& grid, StatsMode mode = StatsMode::Default);
@@ -69,28 +69,32 @@ public:
     {
     }
     Extrema& operator=(const Extrema&) = default;
-    void min(const ValueT& v)
+    Extrema& min(const ValueT& v)
     {
         if (v < mMin) {
             mMin = v;
         }
+        return *this;
     }
-    void max(const ValueT& v)
+    Extrema& max(const ValueT& v)
     {
         if (v > mMax) {
             mMax = v;
         }
+        return *this;
     }
-    void add(const ValueT& v)
+    Extrema& add(const ValueT& v)
     {
         this->min(v);
         this->max(v);
+        return *this;
     }
-    void add(const ValueT& v, uint64_t) { this->add(v); }
-    void add(const Extrema& other)
+    Extrema& add(const ValueT& v, uint64_t) { return this->add(v); }
+    Extrema& add(const Extrema& other)
     {
         this->min(other.mMin);
         this->max(other.mMax);
+        return *this;
     }
     const ValueT& min() const { return mMin; }
     const ValueT& max() const { return mMax; }
@@ -110,11 +114,12 @@ protected:
     {
         Real scalar;
         VecT vector;
-        Pair(Real s)
+
+        Pair(Real s)// is only used by Extrema() default c-tor
             : scalar(s)
             , vector(s)
         {
-        } // is only used by Extrema() default c-tor
+        }
         Pair(const VecT& v)
             : scalar(v.lengthSqr())
             , vector(v)
@@ -122,17 +127,16 @@ protected:
         }
         Pair& operator=(const Pair&) = default;
         bool  operator<(const Pair& rhs) const { return scalar < rhs.scalar; }
-        bool  operator>(const Pair& rhs) const { return scalar > rhs.scalar; }
-        bool  operator<=(const Pair& rhs) const { return scalar <= rhs.scalar; }
     } mMin, mMax;
-    void add(const Pair& p)
+    Extrema& add(const Pair& p)
     {
         if (p < mMin) {
             mMin = p;
         }
-        if (p > mMax) {
+        if (mMax < p) {
             mMax = p;
         }
+        return *this;
     }
 
 public:
@@ -152,32 +156,37 @@ public:
     {
     }
     Extrema& operator=(const Extrema&) = default;
-    void     min(const VecT& v)
+    Extrema& min(const VecT& v)
     {
         Pair tmp(v);
         if (tmp < mMin) {
             mMin = tmp;
         }
+        return *this;
     }
-    void max(const VecT& v)
+    Extrema& max(const VecT& v)
     {
         Pair tmp(v);
-        if (tmp > mMax) {
+        if (mMax < tmp) {
             mMax = tmp;
         }
+        return *this;
     }
-    void add(const VecT& v) { this->add(Pair(v)); }
-    void add(const VecT& v, uint64_t) { this->add(Pair(v)); }
-    void add(const Extrema& other)
+    Extrema& add(const VecT& v) { return this->add(Pair(v)); }
+    Extrema& add(const VecT& v, uint64_t) { return this->add(Pair(v)); }
+    Extrema& add(const Extrema& other)
     {
-        if (other.mMin < mMin)
+        if (other.mMin < mMin) {
             mMin = other.mMin;
-        if (other.mMax > mMax)
+        }
+        if (mMax < other.mMax) {
             mMax = other.mMax;
+        }
+        return *this;
     }
     const VecT& min() const { return mMin.vector; }
     const VecT& max() const { return mMax.vector; }
-    operator bool() const { return mMin <= mMax; }
+    operator bool() const { return !(mMax < mMin); }
     static constexpr bool hasMinMax() { return true; }
     static constexpr bool hasAverage() { return false; }
     static constexpr bool hasStdDeviation() { return false; }
@@ -221,16 +230,17 @@ public:
     {
     }
     /// @brief Add a single sample
-    void add(const ValueT& val)
+    Stats& add(const ValueT& val)
     {
         BaseT::add(val);
         mSize += 1;
         const double delta = double(val) - mAvg;
         mAvg += delta / double(mSize);
         mAux += delta * (double(val) - mAvg);
+        return *this;
     }
     /// @brief Add @a n samples with constant value @a val.
-    void add(const ValueT& val, uint64_t n)
+    Stats& add(const ValueT& val, uint64_t n)
     {
         const double denom = 1.0 / double(mSize + n);
         const double delta = double(val) - mAvg;
@@ -238,10 +248,11 @@ public:
         mAux += denom * delta * delta * double(mSize) * double(n);
         BaseT::add(val);
         mSize += n;
+        return *this;
     }
 
     /// Add the samples from the other Stats instance.
-    void add(const Stats& other)
+    Stats& add(const Stats& other)
     {
         if (other.mSize > 0) {
             const double denom = 1.0 / double(mSize + other.mSize);
@@ -251,6 +262,7 @@ public:
             BaseT::add(other);
             mSize += other.mSize;
         }
+        return *this;
     }
 
     static constexpr bool hasMinMax() { return true; }
@@ -307,7 +319,7 @@ public:
     {
     }
     /// @brief Add a single sample
-    void add(const ValueT& val)
+    Stats& add(const ValueT& val)
     {
         typename BaseT::Pair tmp(val);
         BaseT::add(tmp);
@@ -315,9 +327,10 @@ public:
         const double delta = tmp.scalar - mAvg;
         mAvg += delta / double(mSize);
         mAux += delta * (tmp.scalar - mAvg);
+        return *this;
     }
     /// @brief Add @a n samples with constant value @a val.
-    void add(const ValueT& val, uint64_t n)
+    Stats& add(const ValueT& val, uint64_t n)
     {
         typename BaseT::Pair tmp(val);
         const double         denom = 1.0 / double(mSize + n);
@@ -326,10 +339,11 @@ public:
         mAux += denom * delta * delta * double(mSize) * double(n);
         BaseT::add(tmp);
         mSize += n;
+        return *this;
     }
 
     /// Add the samples from the other Stats instance.
-    void add(const Stats& other)
+    Stats& add(const Stats& other)
     {
         if (other.mSize > 0) {
             const double denom = 1.0 / double(mSize + other.mSize);
@@ -339,6 +353,7 @@ public:
             BaseT::add(other);
             mSize += other.mSize;
         }
+        return *this;
     }
 
     static constexpr bool hasMinMax() { return true; }
@@ -376,12 +391,12 @@ struct NoopStats
     NoopStats() {}
     NoopStats(const ValueT&) {}
     /// @brief Add a single sample
-    void add(const ValueT&) {}
+    NoopStats& add(const ValueT&) { return *this; }
     /// @brief Add @a n samples with constant value @a val.
-    void add(const ValueT&, uint64_t) {}
+    NoopStats& add(const ValueT&, uint64_t) { return *this; }
 
     /// Add the samples from the other Stats instance.
-    void add(const NoopStats&) {}
+    NoopStats& add(const NoopStats&) { return *this; }
 
     static constexpr bool hasMinMax() { return false; }
     static constexpr bool hasAverage() { return false; }
@@ -522,9 +537,9 @@ GridStats<ValueT, StatsT>::
     setFlag(const T& min, const T& max, FlagT& flag) const
 {
     if (mDelta > 0 && (min > mDelta || max < -mDelta)) {
-        flag |= FlagT(1); // set first bit
+        flag |= FlagT(1); //  set 1st bit on to enable rendering
     } else {
-        flag &= ~FlagT(1); // unset first bit
+        flag &= ~FlagT(1); // set 1st bit off to disable rendering
     }
 }
 
@@ -539,24 +554,26 @@ void GridStats<ValueT, StatsT>::
         uint64_t sum = 0;
         for (auto i = r.begin(); i != r.end(); ++i) {
             Node0* leaf = tree.template getNode<Node0>(i);
-            auto*  data = leaf->data();
+            auto* data = leaf->data();
             if (auto n = data->mValueMask.countOn()) {
+                data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
                 sum += n;
                 leaf->updateBBox(); // optionally update active bounding box
                 if (DO_STATS) { // resolved at compiletime
                     const ValueT* v = data->mValues;
                     StatsT&       s = stats[i];
-                    for (auto it = data->mValueMask.beginOn(); it; ++it)
+                    for (auto it = data->mValueMask.beginOn(); it; ++it) {
                         s.add(v[*it]);
+                    }
                     this->setStats(data, s);
                     this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
                 }
             } else {
-                throw std::runtime_error("Expected at least one active voxel per leaf node.");
+                data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf does not contain active voxel
             }
         }
         mActiveVoxelCount += sum;
-    };
+    };// kernel
     forEach(0, tree.nodeCount(0), 8, kernel);
 } // GridStats::processLeafs
 
@@ -573,9 +590,9 @@ void GridStats<ValueT, StatsT>::
         for (auto i = r.begin(); i != r.end(); ++i) {
             NodeT* node = tree.template getNode<NodeT>(i);
             auto*  data = node->data();
-            sum += ChildT::NUM_VALUES * data->mValueMask.countOn(); // active tiles
             CoordBBox bbox; // empty
             for (auto iter = data->mValueMask.beginOn(); iter; ++iter) {
+                sum += ChildT::NUM_VALUES; // active tiles
                 if (DO_STATS) { // resolved at compiletime
                     stats[i].add(data->mTable[*iter].value, ChildT::NUM_VALUES);
                 }
@@ -584,23 +601,28 @@ void GridStats<ValueT, StatsT>::
                 bbox[1].maxComponent(ijk + Coord(int32_t(ChildT::DIM) - 1));
             }
             for (auto iter = data->mChildMask.beginOn(); iter; ++iter) {
+                const auto& childBBox = data->child(*iter)->bbox();
+                if (childBBox.empty()) continue;
+                bbox[0].minComponent(childBBox[0]);
+                bbox[1].maxComponent(childBBox[1]);
                 if (DO_STATS) { // resolved at compiletime
                     stats[i].add(childStats[data->mTable[*iter].childID]);
                 }
-                const auto& childBBox = data->child(*iter)->bbox();
-                bbox[0].minComponent(childBBox[0]);
-                bbox[1].maxComponent(childBBox[1]);
             }
-            if (bbox.empty())
-                throw std::runtime_error("Internal node with no children or active values! Hint: try pruneInactive.");
             data->mBBox = bbox;
-            if (DO_STATS) { // resolved at compiletime
-                this->setStats(data, stats[i]);
-                this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
+            if (bbox.empty()) {
+                data->mFlags &= ~uint32_t(1); // set 1st bit off since node to disable rendering of node
+                data->mFlags &= ~uint32_t(2); // set 2nd bit off since node does not contain active values
+            } else {
+                data->mFlags |=  uint32_t(2); // set 2nd bit on since node contains active values
+                if (DO_STATS) { // resolved at compiletime
+                    this->setStats(data, stats[i]);
+                    this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
+                }
             }
         }
         mActiveVoxelCount += sum;
-    };
+    };// kernel
     forEach(0, tree.template nodeCount<NodeT>(), 4, kernel);
 } // GridStats::processNodes
 
@@ -623,6 +645,7 @@ void GridStats<ValueT, StatsT>::
             auto& tile = data.tile(i);
             if (tile.isChild()) { // process child node
                 auto& childBBox = data.child(tile).bbox();
+                if (childBBox.empty()) continue;
                 bbox[0].minComponent(childBBox[0]);
                 bbox[1].maxComponent(childBBox[1]);
                 if (DO_STATS)

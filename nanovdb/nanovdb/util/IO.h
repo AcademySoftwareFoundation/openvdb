@@ -12,7 +12,7 @@
            file compression, support for multiple grids per file as well as
            multiple grid types.
 
-    \note  This file does NOT depend on OpenVDB, but optioanlly on ZIP and BLOSC
+    \note  This file does NOT depend on OpenVDB, but optionally on ZIP and BLOSC
 */
 
 #ifndef NANOVDB_IO_H_HAS_BEEN_INCLUDED
@@ -96,7 +96,7 @@ inline uint64_t reverseEndianness(uint64_t val)
 
 /// @brief Data encoded at the head of each segment of a file or stream.
 ///
-/// @note A file or stream is devided into one or more segments thateach contain
+/// @note A file or stream is composed of one or more segments that each contain
 //        one or more grids.
 // Magic number of NanoVDB files   (uint64_t) |
 // Major number of the file format (uint16_t) |
@@ -156,7 +156,7 @@ struct GridMetaData : public MetaData
 
 struct Segment
 {
-    // Check assumtions made during read and write of Header and MetaData
+    // Check assumptions made during read and write of Header and MetaData
     static_assert(sizeof(Header) == 16u, "Unexpected sizeof(Header)");
     static_assert(sizeof(MetaData) == 160u, "Unexpected sizeof(MetaData)");
     Header                    header;
@@ -211,7 +211,7 @@ GridHandle<BufferT> readGrid(std::istream& is, uint64_t n = 0, const BufferT& bu
 template<typename BufferT = HostBuffer>
 GridHandle<BufferT> readGrid(const std::string& fileName, const std::string& gridName, int verbose = 0, const BufferT& buffer = BufferT());
 
-/// @brief Read the first grid with a specefic name
+/// @brief Read the first grid with a specific name
 template<typename BufferT = HostBuffer>
 GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, const BufferT& buffer = BufferT());
 
@@ -461,7 +461,7 @@ inline bool Segment::read(std::istream& is)
             ss << "This tool was compiled against an older version of NanoVDB: " << NANOVDB_MAJOR_VERSION_NUMBER << ".X!\n\t"
                << "Recommendation: Re-compile this tool against version " << header.major << ".X of NanoVDB";
         }
-        throw std::runtime_error("An unrecoverable error in nanaovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
+        throw std::runtime_error("An unrecoverable error in nanovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
     }
     meta.resize(header.gridCount);
     for (auto& m : meta) {
@@ -570,7 +570,7 @@ GridHandle<BufferT> readGrid(std::istream& is, uint64_t n, const BufferT& buffer
     throw std::runtime_error("Grid index exceeds grid count in file");
 }
 
-/// @brief Read the first grid with a specefic name
+/// @brief Read the first grid with a specific name
 template<typename BufferT>
 GridHandle<BufferT> readGrid(const std::string& fileName, const std::string& gridName, int verbose, const BufferT& buffer)
 {
@@ -682,7 +682,7 @@ inline bool hasGrid(std::istream& is, const std::string& gridName)
         std::streamoff seek = 0;
         for (auto& m : s.meta) {
             if (m.nameKey == key && m.gridName == gridName) {
-                return true; // check for hask key collision
+                return true; // check for hash key collision
             }
             seek += m.fileSize;
         }

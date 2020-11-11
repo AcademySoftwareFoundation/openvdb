@@ -49,7 +49,7 @@ __hostdev__ SampleFromVoxels<TreeOrAccT, Order, UseCache> createSampler(const Tr
 }
 
 /// @brief Utility function that returns the Coord of the round-down of @a xyz
-///        and redefined @xyz as the frational part, ie xyz-in = return-value + xyz-out
+///        and redefined @xyz as the fractional part, ie xyz-in = return-value + xyz-out
 template<typename CoordT, typename RealT, template<typename> class Vec3T>
 __hostdev__ inline CoordT Floor(Vec3T<RealT>& xyz);
 
@@ -283,7 +283,7 @@ bool TrilinearSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[2][2][2])
            (less ^ (v[1][1][0] < ValueT(0)));
 }
 
-/// @brief Template specializaton that does not use caching of stencil points
+/// @brief Template specialization that does not use caching of stencil points
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 1, false> : public TrilinearSampler<TreeOrAccT>
 {
@@ -559,7 +559,7 @@ bool TriquadraticSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[3][3][3])
     return false;
 }
 
-/// @brief Template specializaton that does not use caching of stencil points
+/// @brief Template specialization that does not use caching of stencil points
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 2, false> : public TriquadraticSampler<TreeOrAccT>
 {

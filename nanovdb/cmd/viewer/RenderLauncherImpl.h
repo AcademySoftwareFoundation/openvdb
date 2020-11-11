@@ -32,6 +32,14 @@ class FrameBufferBase;
 template<MaterialClass>
 struct LauncherForType;
 
+inline bool gridIsClass(const void* gridPtr, const nanovdb::GridClass gridclass)
+{
+    if (!gridPtr)
+        return false;
+    auto gridHdl = reinterpret_cast<const nanovdb::GridHandle<>*>(gridPtr);
+    return gridHdl->gridMetaData()->gridClass() == gridclass;
+}
+
 inline bool gridIsType(const void* gridPtr, const nanovdb::GridType gridType)
 {
     if (!gridPtr)
@@ -230,7 +238,7 @@ struct LauncherForType<MaterialClass::kPointsFast>
             return;
         }
 
-        if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) {
+        if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) { // && gridIsClass(gridParams.gridHandle, nanovdb::GridClass::PointIndex)) {
             auto pointGrid = launcher.template grid<uint32_t>(gridParams.gridHandle);
             launcher.render(width, height, render::points::RenderPointsRgba32fFn(), imgPtr, numAccumulations, pointGrid, sceneParams, materialParams);
         } else {
