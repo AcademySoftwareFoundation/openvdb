@@ -83,10 +83,9 @@ public:
     static const int size = 4;
 
     /// Trivial constructor, the quaternion is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Quat() = default;
-    ~Quat() = default;
-    Quat(const Quat&) = default;
-    Quat& operator=(const Quat&) = default;
 
     /// Constructor with four arguments, e.g.   Quatf q(1,2,3,4);
     Quat(T x, T y, T z, T w)

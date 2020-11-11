@@ -36,10 +36,9 @@ public:
     using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Mat4() = default;
-    ~Mat4() = default;
-    Mat4(const Mat4&) = default;
-    Mat4& operator=(const Mat4&) = default;
 
     /// Constructor given array of elements, the ordering is in row major form:
     /** @verbatim

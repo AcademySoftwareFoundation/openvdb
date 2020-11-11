@@ -34,10 +34,10 @@ public:
 
     static const int size = SIZE;
 
+    /// Trivial constructor, the Tuple is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Tuple() = default;
-    ~Tuple() = default;
-    Tuple(const Tuple&) = default;
-    Tuple& operator=(const Tuple& src) = default;
 
     /// @brief Conversion constructor.
     /// @details Tuples with different value types and different sizes can be

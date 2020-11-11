@@ -28,10 +28,9 @@ public:
     using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Vec4() = default;
-    ~Vec4() = default;
-    Vec4(const Vec4&) = default;
-    Vec4& operator=(const Vec4&) = default;
 
     /// @brief Construct a vector all of whose components have the given value.
     explicit Vec4(T val) { this->mm[0] = this->mm[1] = this->mm[2] = this->mm[3] = val; }

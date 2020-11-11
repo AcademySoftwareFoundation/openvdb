@@ -34,10 +34,9 @@ public:
     using MyBase = Mat<3, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Mat3() = default;
-    ~Mat3() = default;
-    Mat3(const Mat3&) = default;
-    Mat3& operator=(const Mat3&) = default;
 
     /// Constructor given the quaternion rotation, e.g.    Mat3f m(q);
     /// The quaternion is normalized and used to construct the matrix

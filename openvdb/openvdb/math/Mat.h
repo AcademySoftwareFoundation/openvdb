@@ -31,10 +31,9 @@ public:
     enum SIZE_ { size = SIZE };
 
     /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
     Mat() = default;
-    ~Mat() = default;
-    Mat(const Mat&) = default;
-    Mat& operator=(const Mat&) = default;
 
     // Number of cols, rows, elements
     static unsigned numRows() { return SIZE; }
