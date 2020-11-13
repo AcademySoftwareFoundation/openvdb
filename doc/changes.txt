@@ -49,6 +49,8 @@ Bug Fixes:
   due to a race condition. Instead use
   @vdblink::util::PagedArray::ValueBuffer::push_back util::PagedArray::ValueBuffer::push_back@endlink
   which is faster and thread-safe.
+- Fixed various cases of undefined behavior in some LevelSetUtil methods
+  [Reported&nbsp;by&nbsp;fkemmler]
 
 @par
 API changes:
