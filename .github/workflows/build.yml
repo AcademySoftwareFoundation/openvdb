@@ -91,6 +91,8 @@ jobs:
       image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
