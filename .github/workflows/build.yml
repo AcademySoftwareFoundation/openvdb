@@ -27,7 +27,7 @@ on:
 jobs:
   linux-vfx:
     runs-on: ubuntu-16.04
-    name: linux-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-type:${{ matrix.config.build }}-abi:${{ matrix.config.abi }}
+    name: linux-vfx:${{ matrix.config.image }}-abi:${{ matrix.config.abi }}-cxx:${{ matrix.config.cxx }}-type:${{ matrix.config.build }}
     container:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
