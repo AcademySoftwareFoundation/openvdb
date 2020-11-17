@@ -15,6 +15,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
+#include "Merge.h"
 #include "ValueTransformer.h" // for transformValues()
 #include "Prune.h"// for prune
 #include "SignedFloodFill.h" // for signedFloodFill()
@@ -722,6 +723,27 @@ struct CopyOp
 };
 /// @endcond
 
+template <typename TreeT>
+inline void validateLevelSet(const TreeT& tree, const std::string& gridName = std::string(""))
+{
+    using ValueT = typename TreeT::ValueType;
+    const ValueT zero = zeroVal<ValueT>();
+    if (!(tree.background() > zero)) {
+        std::stringstream ss;
+        ss << "expected grid ";
+        if (!gridName.empty()) ss << gridName << " ";
+        ss << "outside value > 0, got " << tree.background();
+        OPENVDB_THROW(ValueError, ss.str());
+    }
+    if (!(-tree.background() < zero)) {
+        std::stringstream ss;
+        ss << "expected grid ";
+        if (!gridName.empty()) ss << gridName << " ";
+        ss << "inside value < 0, got " << -tree.background();
+        OPENVDB_THROW(ValueError, ss.str());
+    }
+}
+
 } // namespace composite
 
 
@@ -858,270 +880,6 @@ compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
 ////////////////////////////////////////
 
 
-/// Base visitor class for CSG operations
-/// (not intended to be used polymorphically, so no virtual functions)
-template<typename TreeType>
-class CsgVisitorBase
-{
-public:
-    using TreeT = TreeType;
-    using ValueT = typename TreeT::ValueType;
-    using ChildIterT = typename TreeT::LeafNodeType::ChildAllIter;
-
-    enum { STOP = 3 };
-
-    CsgVisitorBase(const TreeT& aTree, const TreeT& bTree):
-        mAOutside(aTree.background()),
-        mAInside(math::negative(mAOutside)),
-        mBOutside(bTree.background()),
-        mBInside(math::negative(mBOutside))
-    {
-        const ValueT zero = zeroVal<ValueT>();
-        if (!(mAOutside > zero)) {
-            OPENVDB_THROW(ValueError,
-                "expected grid A outside value > 0, got " << mAOutside);
-        }
-        if (!(mAInside < zero)) {
-            OPENVDB_THROW(ValueError,
-                "expected grid A inside value < 0, got " << mAInside);
-        }
-        if (!(mBOutside > zero)) {
-            OPENVDB_THROW(ValueError,
-                "expected grid B outside value > 0, got " << mBOutside);
-        }
-        if (!(mBInside < zero)) {
-            OPENVDB_THROW(ValueError,
-                "expected grid B outside value < 0, got " << mBOutside);
-        }
-    }
-
-protected:
-    ValueT mAOutside, mAInside, mBOutside, mBInside;
-};
-
-
-////////////////////////////////////////
-
-
-template<typename TreeType>
-struct CsgUnionVisitor: public CsgVisitorBase<TreeType>
-{
-    using TreeT = TreeType;
-    using ValueT = typename TreeT::ValueType;
-    using ChildIterT = typename TreeT::LeafNodeType::ChildAllIter;
-
-    enum { STOP = CsgVisitorBase<TreeT>::STOP };
-
-    CsgUnionVisitor(const TreeT& a, const TreeT& b): CsgVisitorBase<TreeT>(a, b) {}
-
-    /// Don't process nodes that are at different tree levels.
-    template<typename AIterT, typename BIterT>
-    inline int operator()(AIterT&, BIterT&) { return 0; }
-
-    /// Process root and internal nodes.
-    template<typename IterT>
-    inline int operator()(IterT& aIter, IterT& bIter)
-    {
-        ValueT aValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* aChild = aIter.probeChild(aValue);
-        if (!aChild && aValue < zeroVal<ValueT>()) {
-            // A is an inside tile.  Leave it alone and stop traversing this branch.
-            return STOP;
-        }
-
-        ValueT bValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* bChild = bIter.probeChild(bValue);
-        if (!bChild && bValue < zeroVal<ValueT>()) {
-            // B is an inside tile.  Make A an inside tile and stop traversing this branch.
-            aIter.setValue(this->mAInside);
-            aIter.setValueOn(bIter.isValueOn());
-            delete aChild;
-            return STOP;
-        }
-
-        if (!aChild && aValue > zeroVal<ValueT>()) {
-            // A is an outside tile.  If B has a child, transfer it to A,
-            // otherwise leave A alone.
-            if (bChild) {
-                bIter.setValue(this->mBOutside);
-                bIter.setValueOff();
-                bChild->resetBackground(this->mBOutside, this->mAOutside);
-                aIter.setChild(bChild); // transfer child
-                delete aChild;
-            }
-            return STOP;
-        }
-
-        // If A has a child and B is an outside tile, stop traversing this branch.
-        // Continue traversal only if A and B both have children.
-        return (aChild && bChild) ? 0 : STOP;
-    }
-
-    /// Process leaf node values.
-    inline int operator()(ChildIterT& aIter, ChildIterT& bIter)
-    {
-        ValueT aValue, bValue;
-        aIter.probeValue(aValue);
-        bIter.probeValue(bValue);
-        if (aValue > bValue) { // a = min(a, b)
-            aIter.setValue(bValue);
-            aIter.setValueOn(bIter.isValueOn());
-        }
-        return 0;
-    }
-};
-
-
-
-////////////////////////////////////////
-
-
-template<typename TreeType>
-struct CsgIntersectVisitor: public CsgVisitorBase<TreeType>
-{
-    using TreeT = TreeType;
-    using ValueT = typename TreeT::ValueType;
-    using ChildIterT = typename TreeT::LeafNodeType::ChildAllIter;
-
-    enum { STOP = CsgVisitorBase<TreeT>::STOP };
-
-    CsgIntersectVisitor(const TreeT& a, const TreeT& b): CsgVisitorBase<TreeT>(a, b) {}
-
-    /// Don't process nodes that are at different tree levels.
-    template<typename AIterT, typename BIterT>
-    inline int operator()(AIterT&, BIterT&) { return 0; }
-
-    /// Process root and internal nodes.
-    template<typename IterT>
-    inline int operator()(IterT& aIter, IterT& bIter)
-    {
-        ValueT aValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* aChild = aIter.probeChild(aValue);
-        if (!aChild && !(aValue < zeroVal<ValueT>())) {
-            // A is an outside tile.  Leave it alone and stop traversing this branch.
-            return STOP;
-        }
-
-        ValueT bValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* bChild = bIter.probeChild(bValue);
-        if (!bChild && !(bValue < zeroVal<ValueT>())) {
-            // B is an outside tile.  Make A an outside tile and stop traversing this branch.
-            aIter.setValue(this->mAOutside);
-            aIter.setValueOn(bIter.isValueOn());
-            delete aChild;
-            return STOP;
-        }
-
-        if (!aChild && aValue < zeroVal<ValueT>()) {
-            // A is an inside tile.  If B has a child, transfer it to A,
-            // otherwise leave A alone.
-            if (bChild) {
-                bIter.setValue(this->mBOutside);
-                bIter.setValueOff();
-                bChild->resetBackground(this->mBOutside, this->mAOutside);
-                aIter.setChild(bChild); // transfer child
-                delete aChild;
-            }
-            return STOP;
-        }
-
-        // If A has a child and B is an outside tile, stop traversing this branch.
-        // Continue traversal only if A and B both have children.
-        return (aChild && bChild) ? 0 : STOP;
-    }
-
-    /// Process leaf node values.
-    inline int operator()(ChildIterT& aIter, ChildIterT& bIter)
-    {
-        ValueT aValue, bValue;
-        aIter.probeValue(aValue);
-        bIter.probeValue(bValue);
-        if (aValue < bValue) { // a = max(a, b)
-            aIter.setValue(bValue);
-            aIter.setValueOn(bIter.isValueOn());
-        }
-        return 0;
-    }
-};
-
-
-////////////////////////////////////////
-
-
-template<typename TreeType>
-struct CsgDiffVisitor: public CsgVisitorBase<TreeType>
-{
-    using TreeT = TreeType;
-    using ValueT = typename TreeT::ValueType;
-    using ChildIterT = typename TreeT::LeafNodeType::ChildAllIter;
-
-    enum { STOP = CsgVisitorBase<TreeT>::STOP };
-
-    CsgDiffVisitor(const TreeT& a, const TreeT& b): CsgVisitorBase<TreeT>(a, b) {}
-
-    /// Don't process nodes that are at different tree levels.
-    template<typename AIterT, typename BIterT>
-    inline int operator()(AIterT&, BIterT&) { return 0; }
-
-    /// Process root and internal nodes.
-    template<typename IterT>
-    inline int operator()(IterT& aIter, IterT& bIter)
-    {
-        ValueT aValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* aChild = aIter.probeChild(aValue);
-        if (!aChild && !(aValue < zeroVal<ValueT>())) {
-            // A is an outside tile.  Leave it alone and stop traversing this branch.
-            return STOP;
-        }
-
-        ValueT bValue = zeroVal<ValueT>();
-        typename IterT::ChildNodeType* bChild = bIter.probeChild(bValue);
-        if (!bChild && bValue < zeroVal<ValueT>()) {
-            // B is an inside tile.  Make A an inside tile and stop traversing this branch.
-            aIter.setValue(this->mAOutside);
-            aIter.setValueOn(bIter.isValueOn());
-            delete aChild;
-            return STOP;
-        }
-
-        if (!aChild && aValue < zeroVal<ValueT>()) {
-            // A is an inside tile.  If B has a child, transfer it to A,
-            // otherwise leave A alone.
-            if (bChild) {
-                bIter.setValue(this->mBOutside);
-                bIter.setValueOff();
-                bChild->resetBackground(this->mBOutside, this->mAOutside);
-                aIter.setChild(bChild); // transfer child
-                bChild->negate();
-                delete aChild;
-            }
-            return STOP;
-        }
-
-        // If A has a child and B is an outside tile, stop traversing this branch.
-        // Continue traversal only if A and B both have children.
-        return (aChild && bChild) ? 0 : STOP;
-    }
-
-    /// Process leaf node values.
-    inline int operator()(ChildIterT& aIter, ChildIterT& bIter)
-    {
-        ValueT aValue, bValue;
-        aIter.probeValue(aValue);
-        bIter.probeValue(bValue);
-        bValue = math::negative(bValue);
-        if (aValue < bValue) { // a = max(a, -b)
-            aIter.setValue(bValue);
-            aIter.setValueOn(bIter.isValueOn());
-        }
-        return 0;
-    }
-};
-
-
-////////////////////////////////////////
-
-
 template<typename GridOrTreeT>
 inline void
 csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
@@ -1129,8 +887,11 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
-    CsgUnionVisitor<TreeT> visitor(aTree, bTree);
-    aTree.visit2(bTree, visitor);
+    composite::validateLevelSet(aTree, "A");
+    composite::validateLevelSet(bTree, "B");
+    CsgUnionOp<TreeT> op(bTree, Steal());
+    tree::DynamicNodeManager<TreeT> nodeManager(aTree);
+    nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
 }
 
@@ -1141,8 +902,11 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
-    CsgIntersectVisitor<TreeT> visitor(aTree, bTree);
-    aTree.visit2(bTree, visitor);
+    composite::validateLevelSet(aTree, "A");
+    composite::validateLevelSet(bTree, "B");
+    CsgIntersectionOp<TreeT> op(bTree, Steal());
+    tree::DynamicNodeManager<TreeT> nodeManager(aTree);
+    nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
 }
 
@@ -1153,8 +917,11 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
     using Adapter = TreeAdapter<GridOrTreeT>;
     using TreeT = typename Adapter::TreeType;
     TreeT &aTree = Adapter::tree(a), &bTree = Adapter::tree(b);
-    CsgDiffVisitor<TreeT> visitor(aTree, bTree);
-    aTree.visit2(bTree, visitor);
+    composite::validateLevelSet(aTree, "A");
+    composite::validateLevelSet(bTree, "B");
+    CsgDifferenceOp<TreeT> op(bTree, Steal());
+    tree::DynamicNodeManager<TreeT> nodeManager(aTree);
+    nodeManager.foreachTopDown(op);
     if (prune) tools::pruneLevelSet(aTree);
 }
 

@@ -77,6 +77,28 @@ jobs:
     - name: test_install
       run: ./ci/test_install.sh
 
+  testhou185:
+    runs-on: ubuntu-16.04
+    container:
+      image: aswf/ci-base:2020
+    steps:
+    - uses: actions/checkout@v1
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_5-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
+    - name: houdini
+      run: ./ci/install_houdini.sh
+    - name: build
+      run: ./ci/build_houdini.sh clang++ Release ON
+    - name: test
+      run: ./ci/test.sh
+
   testhou180:
     runs-on: ubuntu-16.04
     container:
@@ -134,18 +156,18 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testhou180gcc:
+  testhou185gcc:
     runs-on: ubuntu-16.04
     container:
-      image: aswf/ci-base:2019
+      image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v1
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_0-
+        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_5-
     - name: validate_houdini
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
@@ -156,18 +178,18 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testhou180debug:
+  testhou185debug:
     runs-on: ubuntu-16.04
     container:
-      image: aswf/ci-base:2019
+      image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v1
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_0-
+        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini18_5-
     - name: validate_houdini
       if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
@@ -275,19 +297,19 @@ jobs:
     - uses: actions/checkout@v2
     - name: install
       shell: bash
+      # brew boost-python3 installs a "Keg-only" version of python which is
+      # not installed to PATH. We must manually provide the location of the
+      # required python installation to CMake through a hint variable which
+      # is exported in install_macos.sh
       run: ./ci/install_macos.sh
     - name: install
       shell: bash
       run: ./ci/install_blosc.sh 1.5.0
     - name: build
       shell: bash
-      # brew boost-python installs a "Keg-only" version of python which is
-      # not insatlled to PATH. Until this becomes the default, we must
-      # manually provide the location of the require python installation
-      # See https://formulae.brew.sh/formula/python@3.8
       # Also need to disable compiler warnings for ABI 6 and above due to
       # the version of clang installed
-      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DPython_ROOT_DIR=/usr/local/opt/python@3.8 -DOPENVDB_CXX_STRICT=OFF
+      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DOPENVDB_CXX_STRICT=OFF
     - name: test
       shell: bash
       run: ./ci/test.sh

@@ -2661,6 +2661,8 @@ struct BBoxOp
 void
 TestTree::testProcessBBox()
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
     using openvdb::Coord;
     using openvdb::CoordBBox;
     //check two leaf nodes and two tiles at each level 1, 2 and 3
@@ -2688,6 +2690,8 @@ TestTree::testProcessBBox()
             CPPUNIT_ASSERT(op.bbox[i] == bbox[i]);
         }
     }
+
+    OPENVDB_NO_DEPRECATION_WARNING_END
 }
 
 void
