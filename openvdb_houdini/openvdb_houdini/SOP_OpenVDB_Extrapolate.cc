@@ -91,7 +91,7 @@ struct FastSweepingParms {
         mExtGroup(nullptr),
         mMode(""),
         mNeedExt(false),
-        mExtGridNum(0),
+        mNumExtVdb(0),
         mNSweeps(1),
         mIgnoreTiles(false),
         mPattern(""),
@@ -105,7 +105,7 @@ struct FastSweepingParms {
     const GA_PrimitiveGroup* mExtGroup;
     UT_String mMode;
     bool mNeedExt;
-    int mExtGridNum;
+    int mNumExtVdb;
     int mNSweeps;
     bool mIgnoreTiles;
     UT_String mPattern;
@@ -338,7 +338,7 @@ newSopOperator(OP_OperatorTable* table)
                 items.push_back(dataTypeToString(DataType(i))); // token
                 items.push_back(dataTypeToMenuItems(DataType(i))); // label
             }
-            gridParms.add(hutil::ParmFactory(PRM_STRING, "elementType#", "Type")
+            gridParms.add(hutil::ParmFactory(PRM_STRING, "elementtype#", "Type")
                 .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
                 .setTooltip("The type of value stored at each voxel")
                 .setDocumentation(
@@ -348,32 +348,32 @@ newSopOperator(OP_OperatorTable* table)
         }
 
         // Optional grid name string
-        gridParms.add(hutil::ParmFactory(PRM_STRING, "gridName#", "Name")
+        gridParms.add(hutil::ParmFactory(PRM_STRING, "matchgroup#", "Match Group")
             .setTooltip("A name for this VDB")
             .setDocumentation("A value for the `name` attribute of this VDB primitive"));
 
         // Default background values
         // {
         const char* bgHelpStr = "The \"default\" value for any voxel not explicitly set";
-        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgFloat#", "Background Value")
+        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgfloat#", "Background Value")
             .setTooltip(bgHelpStr)
             .setDocumentation(bgHelpStr));
-        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgInt#", "Background Value")
+        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgint#", "Background Value")
             .setDefault(PRMoneDefaults)
             .setTooltip(bgHelpStr)
             .setDocumentation(nullptr));
-        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgVec3f#", "Background Value")
+        gridParms.add(hutil::ParmFactory(PRM_FLT_J, "bgvec3f#", "Background Value")
             .setVectorSize(3)
             .setTooltip(bgHelpStr)
             .setDocumentation(nullptr));
-        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgVec3i#", "Background Value")
+        gridParms.add(hutil::ParmFactory(PRM_INT_J, "bgvec3i#", "Background Value")
             .setVectorSize(3)
             .setTooltip(bgHelpStr)
             .setDocumentation(nullptr));
         // }
     }
 
-    parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "extGridNum", "VDBs")
+    parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "numextvdb", "VDBs")
         .setMultiparms(gridParms)
         .setDefault(PRMoneDefaults));
 
@@ -418,32 +418,32 @@ SOP_OpenVDB_Extrapolate::updateParmsFlags()
     changed |= enableParm("ignoretiles", mode == "mask");
 
     bool needExt = mode == "fogext" || mode == "sdfext" || mode == "fogsdfext" || mode == "sdfsdfext";
-    for (int i = 1, N = static_cast<int>(evalInt("extGridNum", 0, 0)); i <= N; ++i) {
-        evalStringInst("elementType#", &i, tmpStr, 0, 0);
+    for (int i = 1, N = static_cast<int>(evalInt("numextvdb", 0, 0)); i <= N; ++i) {
+        evalStringInst("elementtype#", &i, tmpStr, 0, 0);
         DataType eType = stringToDataType(tmpStr.toStdString());
 
         // Disable unused bg value options
-        changed |= enableParmInst("bgFloat#", &i, (eType == TYPE_FLOAT || eType == TYPE_DOUBLE) && needExt);
-        changed |= enableParmInst("bgInt#",   &i, (eType == TYPE_INT) && needExt);
-        changed |= enableParmInst("bgVec3f#", &i, (eType == TYPE_VEC3S || eType == TYPE_VEC3D) && needExt);
-        changed |= enableParmInst("bgVec3i#", &i, eType == TYPE_VEC3I && needExt);
+        changed |= enableParmInst("bgfloat#", &i, (eType == TYPE_FLOAT || eType == TYPE_DOUBLE) && needExt);
+        changed |= enableParmInst("bgint#",   &i, (eType == TYPE_INT) && needExt);
+        changed |= enableParmInst("bgvec3f#", &i, (eType == TYPE_VEC3S || eType == TYPE_VEC3D) && needExt);
+        changed |= enableParmInst("bgvec3i#", &i, eType == TYPE_VEC3I && needExt);
         changed |= enableParmInst("vecType#", &i, eType >= TYPE_VEC3S && needExt);
 
         // Hide unused bg value options.
-        changed |= setVisibleStateInst("bgFloat#", &i, eType == TYPE_FLOAT || eType == TYPE_DOUBLE);
-        changed |= setVisibleStateInst("bgInt#",   &i, eType == TYPE_INT);
-        changed |= setVisibleStateInst("bgVec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
-        changed |= setVisibleStateInst("bgVec3i#", &i, eType == TYPE_VEC3I);
+        changed |= setVisibleStateInst("bgfloat#", &i, eType == TYPE_FLOAT || eType == TYPE_DOUBLE);
+        changed |= setVisibleStateInst("bgint#",   &i, eType == TYPE_INT);
+        changed |= setVisibleStateInst("bgvec3f#", &i, eType == TYPE_VEC3S || eType == TYPE_VEC3D);
+        changed |= setVisibleStateInst("bgvec3i#", &i, eType == TYPE_VEC3I);
         changed |= setVisibleStateInst("vecType#", &i, eType >= TYPE_VEC3S);
 
         // Disable all these parameters if we don't need extension
         // changed |= enableParmInst("gridClass#", &i, needExt);
-        changed |= enableParmInst("elementType#", &i, needExt);
-        changed |= enableParmInst("gridName#", &i, needExt);
+        changed |= enableParmInst("elementtype#", &i, needExt);
+        changed |= enableParmInst("matchgroup#", &i, needExt);
 
         //// Enable different data types
-        //changed |= enableParmInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
-        //changed |= setVisibleStateInst("elementType#", &i, gridClass == openvdb::GRID_UNKNOWN);
+        //changed |= enableParmInst("elementtype#", &i, gridClass == openvdb::GRID_UNKNOWN);
+        //changed |= setVisibleStateInst("elementtype#", &i, gridClass == openvdb::GRID_UNKNOWN);
     }
     return changed;
 }
@@ -483,9 +483,9 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
     if (parms.mNeedExt) {
         UT_String tmpStr;
 
-        for (int i = 1; i <= parms.mExtGridNum; ++i) {
+        for (int i = 1; i <= parms.mNumExtVdb; ++i) {
             // Get the extension primitive
-            evalStringInst("gridName#", &i, tmpStr, 0, parms.mTime);
+            evalStringInst("matchgroup#", &i, tmpStr, 0, parms.mTime);
             parms.mExtGroup = matchGroup(*gdp, tmpStr);
             hvdb::VdbPrimIterator extPrim(gdp, parms.mExtGroup);
             if (!extPrim) {
@@ -494,52 +494,52 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
             }
             parms.mExtPrimName = extPrim.getPrimitiveNameOrIndex().toStdString();
 
-            evalStringInst("elementType#", &i, tmpStr, 0, parms.mTime);
+            evalStringInst("elementtype#", &i, tmpStr, 0, parms.mTime);
             DataType eType = stringToDataType(tmpStr.toStdString());
 
             switch(eType) {
                 case TYPE_FLOAT:
                 {
-                    float extBg = static_cast<float>(evalFloatInst("bgFloat#", &i, 0, parms.mTime));
+                    float extBg = static_cast<float>(evalFloatInst("bgfloat#", &i, 0, parms.mTime));
                     process<FSGridT, openvdb::FloatGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_FLOAT
                 case TYPE_DOUBLE:
                 {
-                    double extBg = static_cast<double>(evalFloatInst("bgFloat#", &i, 0, parms.mTime));
+                    double extBg = static_cast<double>(evalFloatInst("bgfloat#", &i, 0, parms.mTime));
                     process<FSGridT, openvdb::FloatGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_DOUBLE
                 case TYPE_INT:
                 {
-                    int extBg = static_cast<int>(evalIntInst("bgInt#", &i, 0, parms.mTime));
+                    int extBg = static_cast<int>(evalIntInst("bgint#", &i, 0, parms.mTime));
                     process<FSGridT, openvdb::FloatGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_INT
                 case TYPE_VEC3S:
                 {
                     openvdb::Vec3f extBg(
-                        static_cast<float>(evalFloatInst("bgVec3f#", &i, 0, parms.mTime)),
-                        static_cast<float>(evalFloatInst("bgVec3f#", &i, 1, parms.mTime)),
-                        static_cast<float>(evalFloatInst("bgVec3f#", &i, 2, parms.mTime)));
+                        static_cast<float>(evalFloatInst("bgvec3f#", &i, 0, parms.mTime)),
+                        static_cast<float>(evalFloatInst("bgvec3f#", &i, 1, parms.mTime)),
+                        static_cast<float>(evalFloatInst("bgvec3f#", &i, 2, parms.mTime)));
                     process<FSGridT, openvdb::Vec3SGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_VEC3S
                 case TYPE_VEC3D:
                 {
                     openvdb::Vec3d extBg(
-                        static_cast<double>(evalFloatInst("bgVec3f#", &i, 0, parms.mTime)),
-                        static_cast<double>(evalFloatInst("bgVec3f#", &i, 1, parms.mTime)),
-                        static_cast<double>(evalFloatInst("bgVec3f#", &i, 2, parms.mTime)));
+                        static_cast<double>(evalFloatInst("bgvec3f#", &i, 0, parms.mTime)),
+                        static_cast<double>(evalFloatInst("bgvec3f#", &i, 1, parms.mTime)),
+                        static_cast<double>(evalFloatInst("bgvec3f#", &i, 2, parms.mTime)));
                     process<FSGridT, openvdb::Vec3DGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_VEC3D
                 case TYPE_VEC3I:
                 {
                     openvdb::Vec3i extBg(
-                        static_cast<openvdb::Int32>(evalIntInst("bgVec3i#", &i, 0, parms.mTime)),
-                        static_cast<openvdb::Int32>(evalIntInst("bgVec3i#", &i, 1, parms.mTime)),
-                        static_cast<openvdb::Int32>(evalIntInst("bgVec3i#", &i, 2, parms.mTime)));
+                        static_cast<openvdb::Int32>(evalIntInst("bgvec3i#", &i, 0, parms.mTime)),
+                        static_cast<openvdb::Int32>(evalIntInst("bgvec3i#", &i, 1, parms.mTime)),
+                        static_cast<openvdb::Int32>(evalIntInst("bgvec3i#", &i, 2, parms.mTime)));
                     process<FSGridT, openvdb::Vec3IGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_VEC3I
@@ -593,11 +593,9 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 outGrid = sdfToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
             }
 
-            // Create GEO_PrimVDB*
-            std::string primName = parms.mExtPrimName + "Ext";
+            // Replace the primitive
             outGrid->setTransform(fsGrid->transform().copy());
-            outGrid->setName(primName);
-            hvdb::createVdbPrimitive(*gdp, outGrid, primName.c_str());
+            hvdb::replaceVdbPrimitive(*gdp, outGrid, *exPrim, true);
         } else if (parms.mMode == "fogsdfext" || parms.mMode == "sdfsdfext") {
             std::pair<hvdb::Grid::Ptr, hvdb::Grid::Ptr> outPair;
             if (parms.mMode == "fogsdfext") {
@@ -607,15 +605,12 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 outPair = sdfToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
             }
 
-            // Create GEO_PrimVDB*
-            std::string sdfPrimName = parms.mFSPrimName + "Sdf";
-            std::string extPrimName = parms.mExtPrimName + "Ext";
-            outPair.first->setName(sdfPrimName);
+            // Replace the primitives
             outPair.first->setTransform(fsGrid->transform().copy());
+            outPair.first->setGridClass(openvdb::GRID_LEVEL_SET);
             outPair.second->setTransform(fsGrid->transform().copy());
-            outPair.second->setName(extPrimName);
-            hvdb::createVdbPrimitive(*gdp, outPair.first, sdfPrimName.c_str());
-            hvdb::createVdbPrimitive(*gdp, outPair.second, extPrimName.c_str());
+            hvdb::replaceVdbPrimitive(*gdp, outPair.first, *lsPrim, true);
+            hvdb::replaceVdbPrimitive(*gdp, outPair.second, *exPrim, true);
         }
     } else {
         hvdb::Grid::Ptr outGrid;
@@ -639,7 +634,6 @@ SOP_OpenVDB_Extrapolate::Cache::process(
         }
         // Replace the original VDB primitive with a new primitive that contains
         // the output grid and has the same attributes and group membership.
-        // TODO: Should we add a toggle to replace/append the vdb primitive?
         outGrid->setGridClass(openvdb::GRID_LEVEL_SET);
         hvdb::replaceVdbPrimitive(*gdp, outGrid, *lsPrim, true);
     } // !parms.mNeedExt
@@ -674,7 +668,7 @@ SOP_OpenVDB_Extrapolate::Cache::evalFastSweepingParms(OP_Context& context, FastS
     evalString(parms.mMode, "mode", 0, time);
 
     parms.mNeedExt = (parms.mMode == "fogext") || (parms.mMode == "sdfext") || (parms.mMode == "fogsdfext") || (parms.mMode == "sdfsdfext");
-    parms.mExtGridNum = static_cast<int>(evalInt("extGridNum", 0, 0));
+    parms.mNumExtVdb = static_cast<int>(evalInt("numextvdb", 0, 0));
     parms.mNSweeps = static_cast<int>(evalInt("sweeps", 0, time));
     parms.mIgnoreTiles = static_cast<bool>(evalInt("ignoretiles", 0, time));
 
@@ -727,6 +721,7 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
         }
 
         // Go through the VDB primitives and process them
+        // We only use grids of types UT_VDB_FLOAT and UT_VDB_DOUBLE in Fast Sweeping.
         for (hvdb::VdbPrimIterator it(gdp, parms.mFSGroup); it;) {
             hvdb::Grid& inGrid = it->getGrid();
             UT_VDBType inType = UTvdbGetGridType(inGrid);
