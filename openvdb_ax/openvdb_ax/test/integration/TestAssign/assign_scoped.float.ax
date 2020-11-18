@@ -1,0 +1,38 @@
+
+float var = 30.0f;
+
+{
+    float var = 3.0f;
+}
+{
+    float var = 1.0f;
+    float@test2 = var;
+    {
+        float var = -10.0f;
+        float@test3 = var;
+    }
+    {
+        float@test7 = var;
+    }
+}
+{
+    float var = -100.0f;
+}
+{
+    float var = 50.0f;
+    {
+        float var = -15.0f;
+        float@test4 = var;
+    }
+    {
+        float var = -10.0f;
+    }
+    {
+        float@test5 = var;
+    }
+
+    float@test6 = var;
+}
+
+float@test1 = var;
+

@@ -993,12 +993,12 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
     std::unique_ptr<CharLeafNodeType*[]> maskNodes(new CharLeafNodeType*[numLeafNodes]);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numLeafNodes),
-        LabelBoundaryVoxels<LeafNodeType>(isovalue, &nodes[0], maskNodes.get()));
+        LabelBoundaryVoxels<LeafNodeType>(isovalue, nodes.data(), maskNodes.get()));
 
     // create mask grid
     typename CharTreeType::Ptr maskTree(new CharTreeType(1));
 
-    PopulateTree<CharTreeType> populate(*maskTree, maskNodes.get(), &leafnodeCount[0], 1);
+    PopulateTree<CharTreeType> populate(*maskTree, maskNodes.get(), leafnodeCount.data(), 1);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, numInternalNodes), populate);
 
     // optionally evaluate the fill mask
@@ -1014,7 +1014,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
             new BoolLeafNodeType*[fillMaskNodes.size()]);
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, fillMaskNodes.size()),
-            FillMaskBoundary<TreeType>(tree, isovalue, *fillMask, &fillMaskNodes[0],
+            FillMaskBoundary<TreeType>(tree, isovalue, *fillMask, fillMaskNodes.data(),
                 boundaryMaskNodes.get()));
 
         tree::ValueAccessor<CharTreeType> maskAcc(*maskTree);
@@ -1053,7 +1053,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
 
     if (!extraMaskNodes.empty()) {
         tbb::parallel_for(tbb::blocked_range<size_t>(0, extraMaskNodes.size()),
-            FlipRegionSign<CharLeafNodeType>(&extraMaskNodes[0]));
+            FlipRegionSign<CharLeafNodeType>(extraMaskNodes.data()));
     }
 
     // propagate sign information into tile region
@@ -1120,13 +1120,13 @@ computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
     std::unique_ptr<BoolLeafNodeType*[]> maskNodes(new BoolLeafNodeType*[numLeafNodes]);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, numLeafNodes),
-        MaskInteriorVoxels<LeafNodeType>(iso, &nodes[0], maskNodes.get()));
+        MaskInteriorVoxels<LeafNodeType>(iso, nodes.data(), maskNodes.get()));
 
 
     // create mask grid
     typename BoolTreeType::Ptr maskTree(new BoolTreeType(false));
 
-    PopulateTree<BoolTreeType> populate(*maskTree, maskNodes.get(), &leafnodeCount[0], false);
+    PopulateTree<BoolTreeType> populate(*maskTree, maskNodes.get(), leafnodeCount.data(), false);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, numInternalNodes), populate);
 
 
@@ -1135,7 +1135,7 @@ computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
     maskTree->getNodes(internalMaskNodes);
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, internalMaskNodes.size()),
-        MaskInteriorTiles<TreeType, BoolInternalNodeType>(iso, tree, &internalMaskNodes[0]));
+        MaskInteriorTiles<TreeType, BoolInternalNodeType>(iso, tree, internalMaskNodes.data()));
 
     tree::ValueAccessor<const TreeType> acc(tree);
 
@@ -1929,7 +1929,7 @@ struct FloodFillSign
             tree.getNodes(nodes);
 
             if (!nodes.empty()) {
-                FindMinTileValue<InternalNodeType> minOp(&nodes[0]);
+                FindMinTileValue<InternalNodeType> minOp(nodes.data());
                 tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), minOp);
                 minSDFValue = std::min(minSDFValue, minOp.minValue);
             }
@@ -1939,7 +1939,7 @@ struct FloodFillSign
             std::vector<const LeafNodeType*> nodes;
             tree.getNodes(nodes);
             if (!nodes.empty()) {
-                FindMinVoxelValue<LeafNodeType> minOp(&nodes[0]);
+                FindMinVoxelValue<LeafNodeType> minOp(nodes.data());
                 tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), minOp);
                 minSDFValue = std::min(minSDFValue, minOp.minValue);
             }
@@ -2194,13 +2194,13 @@ sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
         ValueType minSDFValue = std::numeric_limits<ValueType>::max();
 
         {
-            level_set_util_internal::FindMinTileValue<InternalNodeType> minOp(&internalNodes[0]);
+            level_set_util_internal::FindMinTileValue<InternalNodeType> minOp(internalNodes.data());
             tbb::parallel_reduce(tbb::blocked_range<size_t>(0, internalNodes.size()), minOp);
             minSDFValue = std::min(minSDFValue, minOp.minValue);
         }
 
         if (minSDFValue > ValueType(0.0)) {
-            level_set_util_internal::FindMinVoxelValue<LeafNodeType> minOp(&nodes[0]);
+            level_set_util_internal::FindMinVoxelValue<LeafNodeType> minOp(nodes.data());
             tbb::parallel_reduce(tbb::blocked_range<size_t>(0, nodes.size()), minOp);
             minSDFValue = std::min(minSDFValue, minOp.minValue);
         }
@@ -2213,13 +2213,13 @@ sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
     // (Positive values are set to zero with inactive state and negative values are remapped
     // from zero to one with active state.)
     tbb::parallel_for(tbb::blocked_range<size_t>(0, nodes.size()),
-        level_set_util_internal::SDFVoxelsToFogVolume<LeafNodeType>(&nodes[0], cutoffDistance));
+        level_set_util_internal::SDFVoxelsToFogVolume<LeafNodeType>(nodes.data(), cutoffDistance));
 
     // Populate a new tree with the remaining leafnodes
     typename TreeType::Ptr newTree(new TreeType(ValueType(0.0)));
 
     level_set_util_internal::PopulateTree<TreeType> populate(
-        *newTree, &nodes[0], &leafnodeCount[0], 0);
+        *newTree, nodes.data(), leafnodeCount.data(), 0);
     tbb::parallel_reduce(tbb::blocked_range<size_t>(0, numInternalNodes), populate);
 
     // Transform tile values (Negative valued tiles are set to 1.0 with active state.)
@@ -2228,7 +2228,7 @@ sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
 
     tbb::parallel_for(tbb::blocked_range<size_t>(0, internalNodes.size()),
         level_set_util_internal::SDFTilesToFogVolume<TreeType, InternalNodeType>(
-            tree, &internalNodes[0]));
+            tree, internalNodes.data()));
 
     {
         tree::ValueAccessor<const TreeType> acc(tree);

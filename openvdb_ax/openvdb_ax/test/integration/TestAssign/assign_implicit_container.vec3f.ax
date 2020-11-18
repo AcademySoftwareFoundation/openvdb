@@ -1,0 +1,4 @@
+vec3f local = {1.1f, 2.3f, 4.3f};
+vec3d@testvec3d = local;
+vec3i@testvec3i = local;
+

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-/// @file Utils.h
+/// @file openvdb_houdini/Utils.h
 /// @author FX R&D Simulation team
 /// @brief Utility classes and functions for OpenVDB plugins
 

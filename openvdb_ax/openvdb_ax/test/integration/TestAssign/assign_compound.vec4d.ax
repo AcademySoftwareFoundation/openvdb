@@ -1,0 +1,15 @@
+
+vec4d@test1 += {1.1,  2.3, 4.3, 5.4};
+vec4d@test2 -= {1.1,  2.3, 4.3, 5.4};
+vec4d@test3 *= {1.1,  2.3, 4.3, 5.4};
+vec4d@test4 /= {1.1,  2.3, 4.3, 5.4};
+vec4d@test5 %= {1.1,  2.3, 4.3, 5.4};
+
+vec4d local1 = {1.1,  2.3, 4.3, 5.4},
+    local2 = {5.1, 6.3, 7.3, 8.4};
+
+local1 += local2;
+vec4d@test6 = local1;
+vec4d@test7 += vec4d@test8;
+vec4d@test9 += local2;
+

@@ -667,7 +667,7 @@ public:
                 }
             }
 
-            det += sign * MyBase::mm[i] * submat.det();
+            det += T(sign) * MyBase::mm[i] * submat.det();
             sign = -sign;
         }
 

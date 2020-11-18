@@ -2,9 +2,13 @@
 
 set -ex
 
-COMPILER="$1"
 RELEASE="$2"
 EXTRAS="$3"
+
+# print versions
+bash --version
+$CXX -v
+cmake --version
 
 # DebugNoInfo is a custom CMAKE_BUILD_TYPE - no optimizations, no symbols, asserts enabled
 
@@ -17,7 +21,6 @@ if [ -d "hou" ]; then
     cd build
     cmake \
         -DCMAKE_CXX_FLAGS_DebugNoInfo="" \
-        -DCMAKE_CXX_COMPILER=${COMPILER} \
         -DCMAKE_BUILD_TYPE=${RELEASE} \
         -DOPENVDB_CXX_STRICT=ON \
         -DOPENVDB_USE_DEPRECATED_ABI_5=ON \
@@ -30,7 +33,7 @@ if [ -d "hou" ]; then
          ..
 
     # Can only build using one thread with GCC due to memory constraints
-    if [ "$COMPILER" = "clang++" ]; then
+    if [ "$CXX" = "clang++" ]; then
         make -j2
     else
         make

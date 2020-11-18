@@ -1,0 +1,17 @@
+
+string@test1 = "foo";
+string local1 = "foo";
+string@test2 = local1;
+string@test3 =
+    string@test4 =
+        string@test2;
+string local3,
+      local2 = "bar";
+string@test5 =
+    local3 =
+        local2;
+string@test6 = "bar",
+     string@test7 = "foo";
+string@test8 = "bar";
+string@test8 = "foo";
+

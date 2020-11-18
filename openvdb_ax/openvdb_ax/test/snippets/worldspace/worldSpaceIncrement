@@ -1,0 +1,2 @@
+
+v@P += {5.0f, 6.0f, 7.0f}; // increment @P in world-space

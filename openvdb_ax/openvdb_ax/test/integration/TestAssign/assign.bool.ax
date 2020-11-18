@@ -1,0 +1,17 @@
+
+bool@test1 = true;
+bool local1 = true;
+bool@test2 = local1;
+bool@test3 =
+    bool@test4 =
+        bool@test2;
+bool local3,
+      local2 = false;
+bool@test5 =
+    local3 =
+        local2;
+bool@test6 = false,
+     bool@test7 = true;
+bool@test8 = false;
+bool@test8 = true;
+

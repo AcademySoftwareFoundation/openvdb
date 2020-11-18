@@ -1,0 +1,4 @@
+vec4i local = {1, 2, 3, 4};
+vec4d@testvec4d = local;
+vec4f@testvec4f = local;
+
