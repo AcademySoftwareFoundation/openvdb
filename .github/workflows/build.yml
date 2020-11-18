@@ -272,7 +272,7 @@ jobs:
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static\lib" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: install
       shell: bash
