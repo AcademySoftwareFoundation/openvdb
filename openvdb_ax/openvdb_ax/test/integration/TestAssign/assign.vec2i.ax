@@ -1,0 +1,17 @@
+
+vec2i@test1 = {1, 2};
+vec2i local1 = {1, 2};
+vec2i@test2 = local1;
+vec2i@test3 =
+    vec2i@test4 =
+        vec2i@test2;
+vec2i local3,
+      local2 = {3, 4};
+vec2i@test5 =
+    local3 =
+        local2;
+vec2i@test6 = {3, 4},
+     vec2i@test7 = {1, 2};
+vec2i@test8 = {3, 4};
+vec2i@test8 = {1, 2};
+

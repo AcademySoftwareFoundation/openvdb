@@ -1,0 +1,16 @@
+for (int i; {1,1,1}; ++i) {
+    true;
+}
+
+for (int i; {1,1,1} < 1; ++i) {
+    true;
+}
+
+do {
+    true;
+} while ("foo")
+
+mat3f mat = identity3();
+while (mat) {
+    true;
+}

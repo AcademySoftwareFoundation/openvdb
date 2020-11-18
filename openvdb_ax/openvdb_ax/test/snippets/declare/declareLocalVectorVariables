@@ -1,0 +1,7 @@
+vec3f a_float;
+vec3i a_int;
+
+vec3i b_int = {5, 6, 7};
+
+vec3f b_float = {0.2f, 0.3f, 0.4f};
+vec3d a_double = {0.3, 0.4, 0.5};

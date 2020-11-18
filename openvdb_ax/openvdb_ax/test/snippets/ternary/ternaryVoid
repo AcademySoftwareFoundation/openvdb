@@ -1,0 +1,3 @@
+
+bool b = false;
+b ? deletepoint() : addtogroup("notdead");

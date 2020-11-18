@@ -1,0 +1,17 @@
+
+double@test1 = 1.1;
+double local1 = 1.1;
+double@test2 = local1;
+double@test3 =
+    double@test4 =
+        double@test2;
+double local3,
+      local2 = 2.3;
+double@test5 =
+    local3 =
+        local2;
+double@test6 = 2.3,
+     double@test7 = 1.1;
+double@test8 = 2.3;
+double@test8 = 1.1;
+

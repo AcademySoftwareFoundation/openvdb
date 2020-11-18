@@ -1,0 +1,8 @@
+
+vec3f testf = {1.f, 2.f, 3.f};
+vec3d testd = {1., 2., 3.};
+vec3i testi = {1, 2, 3};
+
+vec3f@test1 = normalize(testf);
+vec3d@test2 = normalize(testd);
+vec3d@test3 = normalize(testi);

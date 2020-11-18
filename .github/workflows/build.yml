@@ -4,241 +4,118 @@ name: Build
 on:
   push:
     branches:
-      - '*'
+      - '**'
     paths-ignore:
       - 'CHANGES'
       - 'openvdb/doc/**'
       - 'openvdb_maya/**'
+      - 'openvdb_ax/**'
       - '**/*.md'
   pull_request:
     branches:
-      - '*'
+      - '**'
     paths-ignore:
       - 'CHANGES'
       - 'openvdb/doc/**'
       - 'openvdb_maya/**'
+      - 'openvdb_ax/**'
       - '**/*.md'
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
 
 jobs:
-  testvfx2021:
+  linux-vfx:
     runs-on: ubuntu-16.04
+    name: linux-vfx:${{ matrix.config.image }}-abi:${{ matrix.config.abi }}-cxx:${{ matrix.config.cxx }}-type:${{ matrix.config.build }}
     container:
-      image: aswf/ci-openvdb:2021
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-    - name: test_install
-      run: ./ci/test_install.sh
-
-  testabi7:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2020
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-    - name: test_install
-      run: ./ci/test_install.sh
-
-  testabi6:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2019
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ Release 6 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-    - name: test_install
-      run: ./ci/test_install.sh
-
-  testabi5:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2018
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          - { cxx: clang++, image: '2018', abi: '5', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2019', abi: '6', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '7', build: 'Release',     test: 'ON'  } # @todo, bump to abi 8
+          - { cxx: clang++, image: '2020', abi: '7', build: 'DebugNoInfo', test: 'OFF' } # tests take too long..
+          - { cxx: g++,     image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
+          - { cxx: g++,     image: '2021', abi: '7', build: 'Release',     test: 'ON'  } # @todo, bump to abi 8
+      fail-fast: false
     steps:
     - uses: actions/checkout@v1
     - name: install_cmake
+      if: matrix.config.image == '2018'
       run: ./ci/install_cmake.sh 3.12.0
     - name: build
-      run: ./ci/build.sh clang++ Release 5 ON None -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh ${{ matrix.config.build }} ${{ matrix.config.abi }} ON None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
-      run: ./ci/test.sh
-    - name: test_install
-      run: ./ci/test_install.sh
+      if: matrix.config.test == 'ON'
+      run: |
+        ./ci/test.sh
+        ./ci/test_install.sh
 
-  testhou185:
+  linux-vfx-houdini:
     runs-on: ubuntu-16.04
+    name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
-      image: aswf/ci-base:2020
+      image: aswf/ci-base:${{ matrix.config.image }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          - { cxx: clang++, image: '2018', hou: '17_5', build: 'Release', extras: 'ON'  }
+          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON'  }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON'  }
+          - { cxx: clang++, image: '2019', hou: '18_5', build: 'Debug',   extras: 'OFF' }
+          - { cxx: g++,     image: '2019', hou: '18_5', build: 'Release', extras: 'OFF' }
+      fail-fast: false
     steps:
     - uses: actions/checkout@v1
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_5-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Release ON
-    - name: test
-      run: ./ci/test.sh
-
-  testhou180:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2019
-    steps:
-    - uses: actions/checkout@v1
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_0-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Release ON
-    - name: test
-      run: ./ci/test.sh
-
-  testhou175:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2018
-    steps:
-    - uses: actions/checkout@v1
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini17_5-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini17_5-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
     - name: install_cmake
+      if: matrix.config.image == '2018'
       run: ./ci/install_cmake.sh 3.12.0
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
+    - name: houdini
+      run: ./ci/install_houdini.sh
     - name: build
-      run: ./ci/build_houdini.sh clang++ Release ON
+      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }}
     - name: test
       run: ./ci/test.sh
 
   testabi7lite:
     runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
     container:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 OFF None -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
+      run: ./ci/build.sh Release 7 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
       run: ./ci/test.sh
-
-  testhou185gcc:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2020
-    steps:
-    - uses: actions/checkout@v1
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_5-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
-    - name: build
-      run: ./ci/build_houdini.sh g++ Release OFF
-    - name: test
-      run: ./ci/test.sh
-
-  testhou185debug:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-base:2020
-    steps:
-    - uses: actions/checkout@v1
-    - name: fetch_houdini
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini18_5-
-    - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
-      run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
-    - name: build
-      run: ./ci/build_houdini.sh clang++ Debug OFF
-    - name: test
-      run: ./ci/test.sh
-
-  testvfx2021gcc:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2021
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
-    - name: test
-      run: ./ci/test.sh
-    - name: test_install
-      run: ./ci/test_install.sh
-
-  testabi7gcc:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2020
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh g++ Release 7 ON None -DOPENVDB_CXX_STRICT=ON
-
-  testabi7debug:
-    runs-on: ubuntu-16.04
-    container:
-      image: aswf/ci-openvdb:2020
-    steps:
-    - uses: actions/checkout@v1
-    - name: build
-      run: ./ci/build.sh clang++ DebugNoInfo 7 ON None -DOPENVDB_CXX_STRICT=ON
 
   testabi7sse:
     runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
     container:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
     - name: build
-      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh Release 7 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -293,6 +170,8 @@ jobs:
 
   testmacos1015:
     runs-on: macos-10.15
+    env:
+      CXX: clang++
     steps:
     - uses: actions/checkout@v2
     - name: install
@@ -309,7 +188,7 @@ jobs:
       shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to
       # the version of clang installed
-      run: ./ci/build.sh clang++ Release 7 ON SSE42 -DOPENVDB_CXX_STRICT=OFF
+      run: ./ci/build.sh Release 7 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=OFF
     - name: test
       shell: bash
       run: ./ci/test.sh

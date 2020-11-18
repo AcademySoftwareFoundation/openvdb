@@ -1,0 +1,17 @@
+
+int64@test1 = 2l;
+int64 local1 = 2l;
+int64@test2 = local1;
+int64@test3 =
+    int64@test4 =
+        int64@test2;
+int64 local3,
+      local2 = 3l;
+int64@test5 =
+    local3 =
+        local2;
+int64@test6 = 3l,
+     int64@test7 = 2l;
+int64@test8 = 3l;
+int64@test8 = 2l;
+
