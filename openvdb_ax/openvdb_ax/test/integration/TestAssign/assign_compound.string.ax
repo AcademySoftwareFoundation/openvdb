@@ -1,0 +1,17 @@
+
+string@test1 += "foo";
+
+string local1 = "foo",
+      local2 = "bar";
+
+// test default init and empty string
+string empty = "";
+string defaultstr;
+local1 += local2;
+defaultstr += local1;
+defaultstr += empty;
+
+string@test2 = defaultstr;
+string@test3 += string@test4;
+string@test5 += local2;
+

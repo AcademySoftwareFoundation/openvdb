@@ -1,0 +1,15 @@
+float local = 1.1f;
+vec2d@testvec2d = local;
+vec2i@testvec2i = local;
+vec2f@testvec2f = local;
+vec3d@testvec3d = local;
+vec3i@testvec3i = local;
+vec3f@testvec3f = local;
+vec4d@testvec4d = local;
+vec4i@testvec4i = local;
+vec4f@testvec4f = local;
+mat3d@testmat3d = local;
+mat3f@testmat3f = local;
+mat4d@testmat4d = local;
+mat4f@testmat4f = local;
+

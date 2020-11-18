@@ -1,0 +1,1 @@
+v@test = v@P; // the point of this test is that we are using a world-space accessor but not writing to P

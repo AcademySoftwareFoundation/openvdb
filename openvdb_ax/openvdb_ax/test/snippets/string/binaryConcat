@@ -1,0 +1,15 @@
+
+string test = "test";
+string space = " ";
+string test2 = "new value";
+string result = test + space + test2;
+
+string@string_test1 = result; // "test new value"
+string@string_test2 = test + space + test2; // "test new value"
+
+result = test + " " + test2;
+
+string@string_test3 = result; // "test new value"
+string@string_test4 = test + " " + test2; // "test new value"
+string@string_test5 = "" + ""; // ""
+string@string_test6 = "" + result; // "test new value"

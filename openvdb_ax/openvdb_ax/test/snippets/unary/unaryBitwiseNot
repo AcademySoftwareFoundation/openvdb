@@ -1,0 +1,6 @@
+
+int int_value = 8;
+int int_value2 = 7;
+
+int@int_test = ~int_value;
+int@int_test2 = ~int_value2;

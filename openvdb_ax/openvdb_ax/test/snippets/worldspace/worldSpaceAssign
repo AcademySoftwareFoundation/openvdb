@@ -1,0 +1,4 @@
+
+v@P_original = @P;       // access @P - should return original world-space position
+@P = {2.22f, 3.33f, 4.44f}; // store @P - value given in world-space should be turned into voxel-space
+v@P_new = @P;            // access @P - should return @P in world-space and store in P_new

@@ -1,0 +1,36 @@
+// Ensure curl noise can be passed a vec3d and assigned to a vec3d
+vec3d in_double = {1.0, -2.0, 3.0};
+vec3d out_double = curlnoise(in_double);
+
+// Ensure curl noise can be passed a vec3f
+vec3f in_float = {1.0, -2.0, 3.0};
+vec3f out_float = curlnoise(in_float);
+
+// Ensure result of curl noise can be assigned to vec3d attribute
+vec3d@out_double = curlnoise(in_double);
+
+// Ensure result of curl noise can be assigned to vec3f attribute
+vec3f@out_float = curlnoise(in_float);
+
+// Ensure curl noise can accept three double-precision scalars
+double x_double = 1.0;
+double y_double = -2.0;
+double z_double = 3.0;
+vec3d@out_double_from_scalars = curlnoise(x_double, y_double, z_double);
+
+// Ensure curl noise can accept three single-precision scalars
+float x_float = 1.0f;
+float y_float = -2.0f;
+float z_float = 3.0f;
+vec3f@out_float_from_scalars = curlnoise(x_float, y_float, z_float);
+
+// Ensure curl noise can be assigned to local (both vec3f and scalar)
+float float_assign_test = curlnoise(1.0, -2.0, 3.0);
+@float_assign_test = float_assign_test;
+
+vec3f vector_assign_test = curlnoise(1.0, -2.0, 3.0);
+v@vector_assign_test = vector_assign_test;
+
+// Ensure the curl noise arguments can be implicitly casted (should be equal)
+v@cast_test_1 = curlnoise(1, 2.0, 3.0f);
+v@cast_test_2 = curlnoise(1.0, 2.0f, 3);

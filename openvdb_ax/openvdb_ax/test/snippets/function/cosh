@@ -1,0 +1,2 @@
+double@test1 = cosh(1.0);
+float@test2 = cosh(1.0f);

@@ -1,0 +1,27 @@
+// both adds and removes from groups
+// we use 9 groups as a stress test since 8 groups can be stored
+// using a single attribute
+
+addtogroup("newTestGroup1");
+int@newTestAttribute1 = ingroup("newTestGroup1");
+addtogroup("newTestGroup2");
+addtogroup("newTestGroup3");
+addtogroup("newTestGroup4");
+addtogroup("newTestGroup5");
+addtogroup("newTestGroup6");
+addtogroup("newTestGroup7");
+addtogroup("newTestGroup8");
+addtogroup("newTestGroup9");
+
+// should already exist
+
+if(ingroup("existingTestGroup"))
+{
+    removefromgroup("newTestGroup9");
+    addtogroup("existingTestGroup2");
+    int@newTestAttribute2 = 1;
+}
+
+// remove from a group that neither exists nor will be added
+// nothing should be done in this case
+removefromgroup("nonExistentGroup");

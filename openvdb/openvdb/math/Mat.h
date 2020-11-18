@@ -941,7 +941,7 @@ lInfinityNorm(const MatType& matrix)
         typename MatType::ValueType column_sum = 0;
 
         for (int i = 0; i<n; ++i) {
-            column_sum += fabs(matrix(i,j));
+            column_sum += std::fabs(matrix(i,j));
         }
         norm = std::max(norm, column_sum);
     }
@@ -962,7 +962,7 @@ lOneNorm(const MatType& matrix)
         typename MatType::ValueType row_sum = 0;
 
         for (int j = 0; j<n; ++j) {
-            row_sum += fabs(matrix(i,j));
+            row_sum += std::fabs(matrix(i,j));
         }
         norm = std::max(norm, row_sum);
     }

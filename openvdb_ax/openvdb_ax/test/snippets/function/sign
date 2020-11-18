@@ -1,0 +1,13 @@
+i@test1 = sign(-0.0);
+i@test2 = sign(+0.0);
+i@test3 = sign(-0.0f);
+i@test4 = sign(+0.0f);
+i@test5 = sign(0.0);
+i@test6 = sign(0.0f);
+i@test7 = sign(0);
+i@test8 = sign(-0.1);
+i@test9 = sign(-0.1f);
+i@test10 = sign(-1);
+i@test11 = sign(0.1);
+i@test12 = sign(0.1f);
+i@test13 = sign(1);

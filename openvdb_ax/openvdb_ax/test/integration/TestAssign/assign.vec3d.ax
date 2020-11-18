@@ -1,0 +1,17 @@
+
+vec3d@test1 = {1.1,  2.3 , 4.3};
+vec3d local1 = {1.1,  2.3 , 4.3};
+vec3d@test2 = local1;
+vec3d@test3 =
+    vec3d@test4 =
+        vec3d@test2;
+vec3d local3,
+      local2 = {4.1,  5.3, 6.3};
+vec3d@test5 =
+    local3 =
+        local2;
+vec3d@test6 = {4.1,  5.3, 6.3},
+     vec3d@test7 = {1.1,  2.3 , 4.3};
+vec3d@test8 = {4.1,  5.3, 6.3};
+vec3d@test8 = {1.1,  2.3 , 4.3};
+
