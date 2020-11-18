@@ -58,8 +58,8 @@ contact us for more information.
 
 @section axintro Introduction
 @par
-AX is a fast and portable JIT compiled expression language, originally designed
-for writing volume and point kernels specifically for OpenVDB. It was originally
+AX is a fast and portable JIT compiled expression language, designed for
+writing volume and point kernels represented as OpenVDB grids. It was originally
 developed by the RNDFX team at <A HREF="https://www.dneg.com">DNEG</A> to
 provide a more consistent way for artists to be able to interface with OpenVDB
 data across a variety of in house and external digital content creation software,
@@ -72,7 +72,7 @@ from deviating from their syntax too significantly. Specifically, it does not
 aim to change what are already well established and heavily used language
 syntaxes within the Visual Effects industry; on the contrary, AX aims to provide
 an interface to which a user with previous or little programming experience can
-easily transition to. However it does introduce new concepts where the the
+easily transition to. However, it does introduce new concepts where the
 creators deemed necessary to provide the best and most representative syntax
 relating to the design for OpenVDB volume and point modification.
 
@@ -96,6 +96,17 @@ OpenVDB Points or OpenVDB Volumes. For any given AX program, the execution conte
 (what it's processing) may change what functionality is available and, more
 importantly, the behaviour of reading/writing from attributes. See the @ref axexecutionxcontext
 for details.
+@par
+Whilst powerful, AX is not a catch all replacement for all types of VDB
+operations. Some of this is related to its infancy i.e. missing native support
+for some useful functions, the foundations of which may be supported by AX but
+have not yet been exposed. However there may be certain paradigms which AX is
+better tailored to support than others. Grid reductions, for example, typically
+require the passing of a state between programs; a design pattern which AX is
+less equipped to handle. AX kernels can be abstractly thought of as a "foreach()"
+function (see @ref axprogramexample) and whilst there are ways to achieve
+reductions, it is an example which would be better suited to a custom C++
+implementation.
 @par
 For details of extending AX for custom geometry, see the @subpage openvdbaxapi
 developer documentation. Note that custom geometry support requires C++ extension.
@@ -162,10 +173,10 @@ example given above.
 
 @subsection axexecutionxcontext OpenVDB Execution Context
 @par
-AX programs are designed to run over different types of geometry, specifically
-OpenVDB points and OpenVDB volumes, the latter of which is the set of all
-numerical OpenVDB grids. Programs must be compiled separately for points and
-volumes, or twice to support both (see the @ref vdbaxbinary "vdb_ax binary").
+AX programs are designed to run over different types of grids, specifically
+OpenVDB points and OpenVDB volumes, the latter of which is the set of all default
+supported mathematic volume types in OpenVDB. Programs must be compiled separately
+for points and volumes, or twice to support both (see the @ref vdbaxbinary "vdb_ax binary").
 This is known as compiling for a target <b>Execution Context</b>. There are two
 main considerations to make when switching between execution contexts:
     - Certain @ref axfunctions "functions" may not be available under a given
@@ -180,17 +191,18 @@ AX kernels compiled for OpenVDB Points run @b individually on <b>each point</b>
 in every <b>active voxel</b> in a points VDB. Attributes that have been
 accessed in the program are provided such that the program has access to all
 data available on the currently processing point. Multiple OpenVDB Point grids
-can be processed by the same AX program, but only a single OpenVDB Points VDB
+can be processed by the same AX program, but only a single OpenVDB Points grid
 can be processed at a time. The default behaviour for AX point programs is to
 process every point which exists in active OpenVDB voxels.
 @par Execution over Volumes
 AX kernels for OpenVDB volumes run individually on every <b>active voxel</b> of
 VDBs which are @b written to (whilst retaining access to all available VDBs).
 Volumes can be thought of as only holding a single "attribute". Whilst points
-hold relevant attributes on the same element in the geometry (assuming no
-neighbour accesses), multiple volume accesses require accessing multiple volume
-primitives. The location of this access is the <b>world space position</b> of
-each voxel. Assignment operations determine which volumes will be executed over.
+hold all attributes within a single VDB points grid (and values for all attributes
+are are defined for all points in that grid), multiple volume attributes require
+multiple VDB volumes to be accessed. The location of this access is the
+<b>world space position</b> of each voxel. Assignment operations determine which
+volumes will be executed over.
 @par
 See the syntax section on @ref axattribaccess "accessing attribute" for more
 information.
@@ -202,8 +214,8 @@ information.
 @section axdatatypes Data Types
 @par
 AX supports a rich variety of native types to be able to maximise the efficiency
-of arithmetic operations and facilitate accessing underlying geometry. As AX was
-originaly designed for OpenVDB, native AX types aim to provide direct access to
+of arithmetic operations and facilitate accessing underlying geometry. As AX is
+designed for OpenVDB, native AX types aim to provide direct access to
 all supported OpenVDB data types. You may find, however, that some AX types do
 not exist as OpenVDB volume/point types or refuse to be serialized in some
 installations of OpenVDB. The table below lists all available types in AX, the
