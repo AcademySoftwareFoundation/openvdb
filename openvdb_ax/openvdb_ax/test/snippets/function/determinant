@@ -1,0 +1,23 @@
+
+mat3f m3f = { 1.0f, 0.0f,   0.0f,
+              0.0f, 200.0f, 0.0f,
+              0.0f, 0.0f,   3.0f };
+
+mat3d m3d = { 100.0, 0.0,  0.0,
+              0.0,   2.0,  0.0,
+              0.0,   0.0,  3.0 };
+
+mat4f m4f = { 1.0f, 0.0f, 0.0f, 0.0f,
+              0.0f, 2.0f, 0.0f, 0.0f,
+              0.0f, 0.0f, 3.0f, 0.0f,
+              0.0f, 0.0f, 0.0f, 4.0f };
+
+mat4d m4d = { 1.0, 0.0, 0.0, 0.0,
+              0.0, 2.0, 0.0, 0.0,
+              0.0, 0.0, 3.0, 0.0,
+              0.0, 0.0, 0.0, 400.0 };
+
+float@det3_float = determinant(m3f);
+double@det3_double = determinant(m3d);
+float@det4_float = determinant(m4f);
+double@det4_double = determinant(m4d);

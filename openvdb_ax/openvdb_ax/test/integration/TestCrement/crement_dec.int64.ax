@@ -1,0 +1,7 @@
+
+int64@test1 = --int64@test2;
+int64@test3 = int64@test4--;
+int64@test5 = (int64@test6--, int64@test7--, --int64@test6);
+int64@test8 = (--int64@test6, --int64@test7, int64@test6--);
+--int64@test9 = int64@test9;
+

@@ -1,0 +1,20 @@
+vec2d test1 = {2.2, 3.3};
+double@test1 = lengthsq(test1);
+vec2f test2 = {2.2f, 3.3f};
+float@test2 = lengthsq(test2);
+vec2i test3 = {2, 3};
+int@test3 = lengthsq(test3);
+
+vec3d test4 = {2.2, 3.3, 6.6};
+double@test4 = lengthsq(test4);
+vec3f test5 = {2.2f, 3.3f, 6.6f};
+float@test5 = lengthsq(test5);
+vec3i test6 = {2, 3, 6};
+int@test6 = lengthsq(test6);
+
+vec4d test7 = {2.2, 3.3, 6.6, 7.7};
+double@test7 = lengthsq(test7);
+vec4f test8 = {2.2f, 3.3f, 6.6f, 7.7f};
+float@test8 = lengthsq(test8);
+vec4i test9 = {2, 3, 6, 7};
+int@test9 = lengthsq(test9);

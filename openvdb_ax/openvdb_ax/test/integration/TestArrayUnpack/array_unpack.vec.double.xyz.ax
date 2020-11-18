@@ -1,0 +1,13 @@
+
+vec2d@test1.x = vec2d@test2.y;
+vec2d@test2.y = vec2d@test1.x;
+
+vec3d@test3.y = vec3d@test3.z;
+vec3d@test4.z = vec3d@test4.x;
+vec3d@test3.x = vec3d@test4.y;
+
+vec4d@test5.x = vec4d@test6.z;
+vec4d@test5[3] = vec4d@test5.y;
+vec4d@test5.z = vec4d@test6[3];
+vec4d@test6.y = vec4d@test6.x;
+

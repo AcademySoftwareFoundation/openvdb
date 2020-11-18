@@ -1,0 +1,18 @@
+
+int int_value = 3;
+
+int_value = - int_value;
+int_value = - int_value;
+int_value = - int_value;
+int_value = + int_value;
+
+int@int_test = int_value;
+
+float float_value = 5.5f;
+
+float_value = - float_value;
+float_value = - float_value;
+float_value = - float_value;
+float_value = + float_value;
+
+float@float_test = float_value;

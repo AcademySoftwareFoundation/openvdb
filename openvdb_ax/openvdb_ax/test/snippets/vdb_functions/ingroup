@@ -1,0 +1,10 @@
+
+// create an attribute from groups so that we can check their values in
+// the C++ test code.  We add "1" since data is often initialized to 0 and
+// this can cause misleading test results.
+
+if (ingroup("a")) i@test = 1;
+
+int@groupTest = ingroup("testGroup") + 1;
+int@groupTest2 = ingroup("testGroup2") + 1;
+

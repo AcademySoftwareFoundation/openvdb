@@ -65,6 +65,11 @@ option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
+
+option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
+option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
+option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
+
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
@@ -74,7 +79,6 @@ option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BU
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
-
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
@@ -212,6 +216,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_OPENEXR_VERSION 2.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2017.0)
+  set(MINIMUM_LLVM_VERSION 6.0.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
   set(MINIMUM_NUMPY_VERSION 1.12.1)
@@ -348,7 +353,8 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR
+   OPENVDB_BUILD_HOUDINI_ABITESTS)
   set(USE_HOUDINI ON)
 endif()
 
@@ -376,6 +382,9 @@ endif()
 if(NOT (
     OPENVDB_BUILD_CORE OR
     OPENVDB_BUILD_BINARIES OR
+    OPENVDB_BUILD_AX OR
+    OPENVDB_BUILD_AX_BINARIES OR
+    OPENVDB_BUILD_AX_UNITTESTS OR
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
@@ -641,6 +650,22 @@ else()
   message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 endif()
 
+# Locate openvdb_ax if necessary
+
+if(WIN32)
+  if(OPENVDB_BUILD_AX OR
+     OPENVDB_BUILD_AX_BINARIES OR
+     OPENVDB_BUILD_AX_UNITTESTS)
+    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
+  endif()
+endif()
+
+if(NOT OPENVDB_BUILD_AX AND
+   (OPENVDB_BUILD_AX_BINARIES OR
+    OPENVDB_BUILD_AX_UNITTESTS))
+  find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
+endif()
+
 # Validate the OpenVDB ABI Version. If OpenVDB_ABI is not set, we're either building
 # the core library OR the ABI hasn't been deduced from a VDB installation. Use the
 # value from OPENVDB_ABI_VERSION_NUMBER, falling back to the lib major version number
@@ -696,6 +721,18 @@ determine the ABI number. You may set this to force a given ABI number.]=] FORCE
 
 if(OPENVDB_BUILD_CORE)
   add_subdirectory(openvdb/openvdb)
+endif()
+
+if(OPENVDB_BUILD_AX)
+  add_subdirectory(openvdb_ax)
+endif()
+
+if(OPENVDB_BUILD_AX_BINARIES)
+  add_subdirectory(openvdb_ax/openvdb_ax/cmd)
+endif()
+
+if(OPENVDB_BUILD_AX_UNITTESTS)
+  add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)

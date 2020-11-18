@@ -1,0 +1,7 @@
+
+double@test1 = ++double@test2;
+double@test3 = double@test4++;
+double@test5 = (double@test6++, double@test7++, ++double@test6);
+double@test8 = (++double@test6, ++double@test7, double@test6++);
+++double@test9 = double@test9;
+

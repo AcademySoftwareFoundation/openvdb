@@ -1,0 +1,14 @@
+if (false)
+{
+    int@return_test3 = 1;
+    return;
+    int@return_test3 = 2;
+}
+else
+{
+    int@return_test3 = 3;
+    return;
+    int@return_test3 = 4;
+}
+
+int@return_test3 = 5;
