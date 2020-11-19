@@ -436,7 +436,7 @@ public:
         typename MaskTreeType::Ptr interiorMask(
             new MaskTreeType(domainMaskGrid.tree(), /*background=*/false, openvdb::TopologyCopy()));
         mBorderMask.reset(new MaskTreeType(*interiorMask));
-        openvdb::tools::erodeVoxels(*interiorMask, /*iterations=*/1, openvdb::tools::NN_FACE);
+        openvdb::tools::erodeActiveLeafValues(*interiorMask, /*iterations=*/1, openvdb::tools::NN_FACE);
         mBorderMask->topologyDifference(*interiorMask);
     }
 

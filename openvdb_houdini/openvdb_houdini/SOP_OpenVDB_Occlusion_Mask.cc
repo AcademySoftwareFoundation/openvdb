@@ -322,14 +322,14 @@ struct ConstructShadow
                 topologyMask.tree().merge(tmpGrid->tree());
 
                 if (mErode > 3) {
-                    openvdb::tools::erodeVoxels(topologyMask.tree(), (mErode - 3));
+                    openvdb::tools::erodeActiveLeafValues(topologyMask.tree(), (mErode - 3));
                 }
 
             } else {
                 topologyMask.tree().topologyUnion(tree);
 
                 if (mErode > 0) {
-                    openvdb::tools::erodeVoxels(topologyMask.tree(), mErode);
+                    openvdb::tools::erodeActiveLeafValues(topologyMask.tree(), mErode);
                 }
             }
 
