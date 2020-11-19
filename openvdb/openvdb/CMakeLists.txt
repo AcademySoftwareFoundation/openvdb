@@ -232,6 +232,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
   Platform.h
   PlatformConfig.h
   Types.h
+  TypeList.h
   version.h
 )
 

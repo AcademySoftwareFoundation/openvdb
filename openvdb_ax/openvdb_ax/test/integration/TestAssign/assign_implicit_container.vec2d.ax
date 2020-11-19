@@ -1,0 +1,4 @@
+vec2d local = {1.1, 2.3};
+vec2i@testvec2i = local;
+vec2f@testvec2f = local;
+

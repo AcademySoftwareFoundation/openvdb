@@ -1,0 +1,104 @@
+// for loop with break
+{
+    vec3f v = 0.0f;
+
+    for (int i = 0; i < 3 ;++i) {
+        if (i == 1) break;
+        v[i] = i + 1;
+    }
+    vec3f@loop_test4 = v;
+}
+
+// for loop with continue
+{
+    vec3f v = 0.0f;
+
+    for (int i = 0; i < 3 ;++i) {
+        if (i == 1) continue;
+        v[i] = i + 1;
+    }
+    vec3f@loop_test5 = v;
+}
+
+// for loop without condition
+{
+    vec3f v = 0.0f;
+    for(int i = 0; ;++i) {
+        if (i == 3) break;
+        v[i] = i + 1;
+    }
+    vec3f@loop_test6 = v;
+}
+
+// for loop without condition or init
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    for (;;++i) {
+        if (i == 3) break;
+        v[i] = i + 1;
+    }
+    vec3f@loop_test7 = v;
+}
+
+// infinite for loop
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    for(;;) {
+        if (i == 3) break;
+        v[i] = i + 1;
+        ++i;
+    }
+    vec3f@loop_test8 = v;
+}
+
+// nested for loop with break
+{
+    mat3f mat = 0.0f;
+    for(int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            if (i == 1) break;
+            mat[i,j] = i * 3 + j + 1;
+        }
+    }
+    mat3f@loop_test19 = mat;
+}
+
+// nested for loop with two breaks
+{
+    mat3f mat = 0.0f;
+    for(int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            if (i == 1) break;
+            if (j == 1) break;
+            mat[i,j] = i * 3 + j + 1;
+        }
+    }
+    mat3f@loop_test20 = mat;
+}
+
+// nested for loop with break and continue
+{
+    mat3f mat = 0.0f;
+    for(int i = 0; i < 3; ++i) {
+        for (int j = 0; j < 3; ++j) {
+            if (i == 1) break;
+            if (j == 1) continue;
+            mat[i,j] = i * 3 + j + 1;
+        }
+    }
+    mat3f@loop_test21 = mat;
+}
+
+// for loop with return
+{
+    vec3f v = 0.0f;
+    vec3f@return_test4 = 10;
+
+    for (int i = 0; i < 3 ;++i) {
+        if (i == 1) return;
+        v[i] = i + 1;
+    }
+    vec3f@return_test4 = v;
+}

@@ -1,0 +1,34 @@
+
+vec3i v3i = {0, 1, -1};
+vec3f v3f = {0.0f, 1.1f, -1.1f};
+vec3d v3d = {0.0, 1.1, -1.1};
+
+vec4i v4i = {0, 1, -1, 2};
+vec4f v4f = {0.0f, 1.1f, -1.1f, 2.1f};
+vec4d v4d = {0.0, 1.1, -1.1, 2.1};
+
+// vec3
+
+vec3i@v3i1 = +v3i;
+vec3i@v3i2 = -v3i;
+vec3i@v3i3 = ~v3i;
+vec3i@v3i4 = !v3i;
+
+vec3f@v3f1 = +v3f;
+vec3f@v3f2 = -v3f;
+
+vec3d@v3d1 = +v3d;
+vec3d@v3d2 = -v3d;
+
+// vec4
+
+vec4i@v4i1 = +v4i;
+vec4i@v4i2 = -v4i;
+vec4i@v4i3 = ~v4i;
+vec4i@v4i4 = !v4i;
+
+vec4f@v4f1 = +v4f;
+vec4f@v4f2 = -v4f;
+
+vec4d@v4d1 = +v4d;
+vec4d@v4d2 = -v4d;

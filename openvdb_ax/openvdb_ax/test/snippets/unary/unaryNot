@@ -1,0 +1,6 @@
+
+bool t = true;
+bool f = false;
+
+bool@bool_test = !t;
+bool@bool_test2 = !f;

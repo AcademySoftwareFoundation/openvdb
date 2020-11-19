@@ -1287,7 +1287,7 @@ public:
         std::vector<GLuint> indices(pointCount);
 
         openvdb::Coord ijk;
-        openvdb::Vec3d pos, color, normal;
+        openvdb::Vec3d pos, color;
         openvdb::tree::LeafManager<BoolTreeT> leafs(*mask);
 
         openvdb::tree::ValueAccessor<const TreeType> acc(tree);
