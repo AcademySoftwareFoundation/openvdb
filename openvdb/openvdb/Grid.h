@@ -1516,9 +1516,7 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-    const auto value = zeroVal<ValueType>() + tolerance;
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    const auto value = math::cwiseAdd(zeroVal<ValueType>(), tolerance);
     this->tree().prune(static_cast<ValueType>(value));
 }
 

@@ -7,35 +7,6 @@
 
 #include <openvdb/points/PointDataGrid.h>
 
-#ifndef OPENVDB_HAS_MATRIX_SUPPORT
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-
-template <typename MatT>
-bool matapprox(const MatT& a, const MatT& b, const MatT& t)
-{
-    const auto *t0 = a.asPointer();
-    const auto *t1 = b.asPointer();
-    const auto *t2 = t.asPointer();
-    for (size_t i=0; i<MatT::numElements(); ++i) {
-        if (!isApproxEqual(t0[i], t1[i], t2[i])) return false;
-    }
-    return true;
-}
-
-/// Specialise isApproxEqual for matrices
-template <> bool isApproxEqual<Mat3s>(const Mat3s& a, const Mat3s& b, const Mat3s& t) { return matapprox(a, b, t); }
-template <> bool isApproxEqual<Mat3d>(const Mat3d& a, const Mat3d& b, const Mat3d& t) { return matapprox(a, b, t); }
-template <> bool isApproxEqual<Mat4s>(const Mat4s& a, const Mat4s& b, const Mat4s& t) { return matapprox(a, b, t); }
-template <> bool isApproxEqual<Mat4d>(const Mat4d& a, const Mat4d& b, const Mat4d& t) { return matapprox(a, b, t); }
-
-}
-}
-}
-#endif // OPENVDB_HAS_MATRIX_SUPPORT
-
 namespace unittest_util
 {
 

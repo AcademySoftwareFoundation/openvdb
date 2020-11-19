@@ -97,6 +97,16 @@ public:
         return ostr;
     }
 
+    /// Direct access to the internal data
+    T* asPointer() { return mm; }
+    const T* asPointer() const { return mm; }
+
+    //@{
+    /// Array style reference to ith row
+    T* operator[](int i) { return &(mm[i*SIZE]); }
+    const T* operator[](int i) const { return &(mm[i*SIZE]); }
+    //@}
+
     void write(std::ostream& os) const {
         os.write(reinterpret_cast<const char*>(&mm), sizeof(T)*SIZE*SIZE);
     }
@@ -995,6 +1005,36 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
     positive_hermitian = unitary.transpose() * input;
     return true;
+}
+
+////////////////////////////////////////
+
+/// @return true if m0 < m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+inline bool
+cwiseLessThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p < *m1p;
+    }
+    return *m0p < *m1p;
+}
+
+/// @return true if m0 > m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+inline bool
+cwiseGreaterThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p > *m1p;
+    }
+    return *m0p > *m1p;
 }
 
 } // namespace math

@@ -202,10 +202,6 @@ set(OPENVDB_AX_CORE_DEPENDENT_LIBS
 
 if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PUBLIC ${LLVM_DEFINITIONS})
-  if(OPENVDB_HAS_MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
-  endif()
-
   target_include_directories(openvdb_ax_static PUBLIC . )
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
@@ -234,10 +230,6 @@ endif()
 
 if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PUBLIC ${LLVM_DEFINITIONS})
-  if(OPENVDB_HAS_MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
-  endif()
-
   target_include_directories(openvdb_ax_shared PUBLIC . )
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}

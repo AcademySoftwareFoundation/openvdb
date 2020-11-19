@@ -22,6 +22,9 @@ Version 7.2.0 - In Development
     - Vector, Matrix and Quaternion types now satisfy the Trivial Type requirement.
       Their empty constructors and copy constructors have been removed (and are left
       to the compiler to define).
+    - Added math::Abs, math::cwiseAdd, math::cwiseLessThan and
+      math::cwiseGreaterThan methods for Matrix types. Matrix grids can now be
+      instantiated.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel

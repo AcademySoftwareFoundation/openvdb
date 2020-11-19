@@ -171,20 +171,6 @@ public:
         return Vec3<T>((*this)(0,j), (*this)(1,j), (*this)(2,j));
     } // rowColumnTest
 
-    // NB: The following two methods were changed to
-    // work around a gccWS5 compiler issue related to strict
-    // aliasing (see FX-475).
-
-    //@{
-    /// Array style reference to ith row
-    /// e.g.    m[1][2] = 4;
-    T* operator[](int i) { return &(MyBase::mm[i*3]); }
-    const T* operator[](int i) const { return &(MyBase::mm[i*3]); }
-    //@}
-
-    T* asPointer() {return MyBase::mm;}
-    const T* asPointer() const {return MyBase::mm;}
-
     /// Alternative indexed reference to the elements
     /// Note that the indices are row first and column second.
     /// e.g.    m(0,0) = 1;
@@ -804,6 +790,45 @@ diagonalizeSymmetricMatrix(const Mat3<T>& input, Mat3<T>& Q, Vec3<T>& D,
     return false;
 }
 
+template<typename T>
+inline Mat3<T>
+Abs(const Mat3<T>& m)
+{
+    Mat3<T> out;
+    const T* ip = m.asPointer();
+    T* op = out.asPointer();
+    for (unsigned i = 0; i < 9; ++i, ++op, ++ip) *op = math::Abs(*ip);
+    return out;
+}
+
+template<typename Type1, typename Type2>
+inline Mat3<Type1>
+cwiseAdd(const Mat3<Type1>& m, const Type2 s)
+{
+    Mat3<Type1> out;
+    const Type1* ip = m.asPointer();
+    Type1* op = out.asPointer();
+    for (unsigned i = 0; i < 9; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
+}
+
+template<typename T>
+inline bool
+cwiseLessThan(const Mat3<T>& m0, const Mat3<T>& m1)
+{
+    return cwiseLessThan<3, T>(m0, m1);
+}
+
+template<typename T>
+inline bool
+cwiseGreaterThan(const Mat3<T>& m0, const Mat3<T>& m1)
+{
+    return cwiseGreaterThan<3, T>(m0, m1);
+}
 
 using Mat3s = Mat3<float>;
 using Mat3d = Mat3<double>;

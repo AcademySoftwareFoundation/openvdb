@@ -33,6 +33,10 @@ Improvements:
 - Vector, Matrix and Quaternion types now satisfy the Trivial Type requirement.
   Their empty constructors and copy constructors have been removed (and are left
   to the compiler to define).
+- Added @vdblink::math::Abs Abs@endlink, @vdblink::math::cwiseAdd cwiseAdd@endlink,
+  @vdblink::math::cwiseLessThan cwiseLessThan@endlink and
+  @vdblink::math::cwiseGreaterThan cwiseGreaterThan@endlink methods for Matrix types.
+  Matrix grids can now be instantiated.
 
 @par
 Houdini:

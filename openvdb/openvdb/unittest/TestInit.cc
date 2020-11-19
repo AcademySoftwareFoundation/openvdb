@@ -11,9 +11,11 @@ class TestInit: public CppUnit::TestCase
 public:
     CPPUNIT_TEST_SUITE(TestInit);
     CPPUNIT_TEST(test);
+    CPPUNIT_TEST(testMatGrids);
     CPPUNIT_TEST_SUITE_END();
 
     void test();
+    void testMatGrids();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestInit);
@@ -88,4 +90,19 @@ TestInit::test()
     CPPUNIT_ASSERT(!Vec3IGrid::isRegistered());
     CPPUNIT_ASSERT(!Vec3SGrid::isRegistered());
     CPPUNIT_ASSERT(!Vec3DGrid::isRegistered());
+}
+
+
+void
+TestInit::testMatGrids()
+{
+    // small test to ensure matrix grid types compile
+    using Mat3sGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat3s>::Type;
+    using Mat3dGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat3d>::Type;
+    using Mat4sGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat4s>::Type;
+    using Mat4dGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat4d>::Type;
+    Mat3sGrid a; (void)(a);
+    Mat3dGrid b; (void)(b);
+    Mat4sGrid c; (void)(c);
+    Mat4dGrid d; (void)(d);
 }
