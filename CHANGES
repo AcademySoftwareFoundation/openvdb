@@ -45,6 +45,7 @@ Version 7.2.0 - In Development
     - Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
       tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
       tools now use the parallel breath-first algorithms.
+    - Moved openvdb::TypeList from Types.h into its own header TypeList.h
 
     Build:
     - Removed the Makefiles.
