@@ -3,6 +3,8 @@
 //
 /// @file   Morphology.h
 ///
+/// @authors Ken Museth, Nick Avramoussis
+///
 /// @brief  Implementation of morphological dilation and erosion.
 ///
 /// @note   By design the morphological operations only change the
@@ -10,9 +12,6 @@
 ///         change the values of voxels that change state an efficient
 ///         technique is to construct a boolean mask by performing a
 ///         topology difference between the original and final grids.
-///
-/// @author Ken Museth
-///
 
 #ifndef OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
@@ -25,12 +24,10 @@
 #include "../tree/ValueAccessor.h"
 #include "../tree/LeafManager.h"
 
-#include <tbb/tbb_thread.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
-#include <functional>
 #include <type_traits>
 #include <vector>
 
@@ -242,7 +239,7 @@ public:
     ///    chooses to steal the mask nodes rather than copy them. Although faster,
     ///    this means that leaf nodes may be re-allocated. Set this to true if you
     ///    need the original topology pointers to be preserved.
-    inline void dilateVoxels(const size_t iter,
+    void dilateVoxels(const size_t iter,
         const NearestNeighbors nn,
         const bool prune = false,
         const bool preserveMaskLeafNodes = false);
@@ -332,7 +329,9 @@ public:
                 case NN_FACE_EDGE        : { this->dilate18(mask); return; }
                 case NN_FACE_EDGE_VERTEX : { this->dilate26(mask); return; }
                 case NN_FACE             : { this->dilate6(mask);  return; }
-                default                  : { this->dilate6(mask);  return; }
+                default                  : {
+                    assert(false && "Unknown op during dilation."); return;
+                }
             }
         }
 
@@ -376,7 +375,9 @@ public:
                 case NN_FACE_EDGE        : { this->erode18(mask); return; }
                 case NN_FACE_EDGE_VERTEX : { this->erode26(mask); return; }
                 case NN_FACE             : { this->erode6(mask);  return; }
-                default                  : { this->erode6(mask);  return; }
+                default                  : {
+                    assert(false && "Unknown op during erosion."); return;
+                }
             }
         }
 
@@ -558,7 +559,7 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         });
     }
     else {
-        // NN_FACE dilation scheme
+        // NN_FACE erosion scheme
 
         // Save the value masks of all leaf nodes.
         std::vector<MaskType> nodeMasks;
@@ -1205,9 +1206,13 @@ inline void erodeActiveLeafValues(TreeOrLeafManagerT& treeOrLeafM,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
+OPENVDB_DEPRECATED
 inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
-                         NearestNeighbors nn = NN_FACE);
+                         NearestNeighbors nn = NN_FACE)
+{
+    dilateActiveLeafValues(tree, iterations, nn, /*threaded*/false);
+}
 
 /// @brief Topologically dilate all leaf-level active voxels in a tree
 /// using one of three nearest neighbor connectivity patterns.
@@ -1224,9 +1229,16 @@ inline void dilateVoxels(TreeType& tree,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
+OPENVDB_DEPRECATED
 inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
                          int iterations = 1,
-                         NearestNeighbors nn = NN_FACE);
+                         NearestNeighbors nn = NN_FACE)
+{
+    if (iterations <= 0) return;
+    morphology::Morphology<TreeType> morph(manager);
+    morph.setThreaded(false);
+    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
+}
 
 //@{
 /// @brief Topologically erode all leaf-level active voxels in the given tree.
@@ -1235,37 +1247,20 @@ inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
 /// of any voxels, only their active states.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType>
+OPENVDB_DEPRECATED
 inline void erodeVoxels(TreeType& tree,
                         int iterations=1,
-                        NearestNeighbors nn = NN_FACE);
+                        NearestNeighbors nn = NN_FACE)
+{
+    erodeActiveLeafValues(tree, iterations, nn, /*threaded*/true);
+    tools::pruneLevelSet(tree); // matches old behaviour
+}
 
 template<typename TreeType>
+OPENVDB_DEPRECATED
 inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
                         int iterations = 1,
-                        NearestNeighbors nn = NN_FACE);
-//@}
-
-template<typename TreeType>
-inline void
-dilateVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
-{
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(manager);
-    morph.setThreaded(false);
-    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-}
-
-template<typename TreeType>
-inline void
-dilateVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
-{
-    dilateActiveLeafValues(tree, iterations, nn, /*threaded*/false);
-
-}
-
-template<typename TreeType>
-inline void
-erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbors nn)
+                        NearestNeighbors nn = NN_FACE)
 {
     if (iterations <= 0) return;
     morphology::Morphology<TreeType> morph(manager);
@@ -1273,14 +1268,7 @@ erodeVoxels(tree::LeafManager<TreeType>& manager, int iterations, NearestNeighbo
     morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
     tools::pruneLevelSet(manager.tree()); // matches old behaviour
 }
-
-template<typename TreeType>
-inline void
-erodeVoxels(TreeType& tree, int iterations, NearestNeighbors nn)
-{
-    erodeActiveLeafValues(tree, iterations, nn, /*threaded*/true);
-    tools::pruneLevelSet(tree); // matches old behaviour
-}
+//@}
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
