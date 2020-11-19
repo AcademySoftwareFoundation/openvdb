@@ -794,14 +794,26 @@ template<typename T>
 inline Mat3<T>
 Abs(const Mat3<T>& m)
 {
-    return Abs<3, T>(m);
+    Mat3<T> out;
+    const T* ip = m.asPointer();
+    T* op = out.asPointer();
+    for (unsigned i = 0; i < 9; ++i, ++op, ++ip) *op = math::Abs(*ip);
+    return out;
 }
 
 template<typename Type1, typename Type2>
 inline Mat3<Type1>
 cwiseAdd(const Mat3<Type1>& m, const Type2 s)
 {
-    return cwiseAdd<3, Type1, Type2>(m, s);
+    Mat3<Type1> out;
+    const Type1* ip = m.asPointer();
+    Type1* op = out.asPointer();
+    for (unsigned i = 0; i < 9; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
 }
 
 template<typename T>

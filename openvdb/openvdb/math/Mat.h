@@ -1009,18 +1009,6 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
 ////////////////////////////////////////
 
-/// @return the absolute value of the given Mat.
-template<unsigned SIZE, typename T>
-Mat<SIZE, T>
-Abs(const Mat<SIZE, T>& in)
-{
-    Mat<SIZE, T> out;
-    const T* ip = in.asPointer();
-    T* op = out.asPointer();
-    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) *op = math::Abs(*ip);
-    return out;
-}
-
 /// @return true if m0 < m1, comparing components in order of significance.
 template<unsigned SIZE, typename T>
 inline bool
@@ -1047,22 +1035,6 @@ cwiseGreaterThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
         if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p > *m1p;
     }
     return *m0p > *m1p;
-}
-
-/// @brief  explicit component-wise adder for matrices
-template<unsigned SIZE, typename Type1, typename Type2>
-inline Mat<SIZE, Type1>
-cwiseAdd(const Mat<SIZE, Type1>& v, const Type2 s)
-{
-    Mat<SIZE, Type1> out;
-    const Type1* ip = v.asPointer();
-    Type1* op = out.asPointer();
-    for (unsigned i = 0; i < SIZE*SIZE; ++i, ++op, ++ip) {
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        *op = *ip + s;
-        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-    }
-    return out;
 }
 
 } // namespace math
