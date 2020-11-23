@@ -1,0 +1,25 @@
+double@dtest1 = sqrt(9.0);
+double@dtest2 = cos(0.0);
+double@dtest3 = sin(0.0);
+double@dtest4 = log(1.0);
+double@dtest5 = log10(1.0);
+double@dtest6 = log2(2.0);
+double@dtest7 = exp(0.0);
+double@dtest8 = exp2(4.0);
+double@dtest9 = fabs(-10.321);
+double@dtest10 = floor(2194.213);
+double@dtest11 = ceil(2194.213);
+double@dtest12 = round(0.5);
+
+float@ftest1  = sqrt(9.0f);
+float@ftest2  = cos(0.0f);
+float@ftest3  = sin(0.0f);
+float@ftest4  = log(1.0f);
+float@ftest5  = log10(1.0f);
+float@ftest6  = log2(2.0f);
+float@ftest7  = exp(0.0f);
+float@ftest8  = exp2(4.0f);
+float@ftest9  = fabs(-10.321f);
+float@ftest10 = floor(2194.213f);
+float@ftest11 = ceil(2194.213f);
+float@ftest12 = round(0.5f);

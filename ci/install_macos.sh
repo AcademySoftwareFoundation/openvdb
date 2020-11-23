@@ -3,6 +3,7 @@
 set -x
 
 brew update
+brew install bash
 brew install cmake
 brew install ilmbase
 brew install openexr

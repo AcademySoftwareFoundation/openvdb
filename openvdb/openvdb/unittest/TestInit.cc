@@ -80,3 +80,17 @@ TEST_F(TestInit, test)
     EXPECT_TRUE(!Vec3SGrid::isRegistered());
     EXPECT_TRUE(!Vec3DGrid::isRegistered());
 }
+
+
+TEST_F(TestInit, testMatGrids)
+{
+    // small test to ensure matrix grid types compile
+    using Mat3sGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat3s>::Type;
+    using Mat3dGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat3d>::Type;
+    using Mat4sGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat4s>::Type;
+    using Mat4dGrid = openvdb::BoolGrid::ValueConverter<openvdb::Mat4d>::Type;
+    Mat3sGrid a; (void)(a);
+    Mat3dGrid b; (void)(b);
+    Mat4sGrid c; (void)(c);
+    Mat4dGrid d; (void)(d);
+}

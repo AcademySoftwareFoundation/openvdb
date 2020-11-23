@@ -1,0 +1,44 @@
+
+// source range negative
+
+double@double_test1 = fit(-1.7, -2.5, -1.5, 15.0, 25.0);
+
+// target range negative
+
+double@double_test2 = fit(1.7, 1.5, 2.5, -25.0, -15.0);
+
+// outside of range
+
+double@double_test3 = fit(-3.0, -2.5, -1.5, -25.0, -15.0);
+double@double_test4 = fit(3.0, -2.5, -1.5, -25.0, -15.0);
+
+// flip
+
+double@double_test5 = fit(0.3, 0.5, 1.5, -15.0, -25.0);
+
+// target range is reversed
+
+double@double_test6 = fit(0.8, 0.5, 1.5, -15.0, -25.0);
+double@double_test7 = fit(1.4, 0.5, 1.5, -15.0, -25.0);
+
+// input is range min/max
+
+double@double_test8 = fit(0, -3, 0, 10, 0);
+double@double_test9 = fit(-3, -3, 0, 10, 0);
+
+// source range and target range reverse and input out of scope
+
+double@double_test10 = fit(-3, 10, 0, -1, -5);
+
+// test 0 input and output ranges
+
+double@double_test11 = fit(2,5,0,0,0);
+double@double_test12 = fit(10,0,0,0,-2);
+
+// test different argument type combinations
+
+double@double_test13 = fit(2.5, 2.0, 3.0f, 4.0f, 5.0f);
+double@double_test14 = fit(2.5f, 2.0f, 3.0f, 4.0f, 5.0f);
+double@double_test15 = fit(2.5, 2, 3.0f, 4.0f, 5.0);
+double@double_test16 = fit(2.5f, 2, 3.0f, 4.0f, 5.0f);
+double@double_test17 = fit(2.5, 2, 3.0, 4.0, 5.0);

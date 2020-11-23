@@ -1,0 +1,20 @@
+
+bool@test1 += true;
+bool@test2 -= true;
+bool@test3 *= true;
+bool@test4 /= true;
+bool@test5 %= true;
+bool@test6 <<= true;
+bool@test7 >>= true;
+bool@test8 &= true;
+bool@test9 ^= true;
+bool@test10 |= true;
+
+bool local1 = true,
+      local2 = false;
+
+local1 += local2;
+bool@test11 = local1;
+bool@test12 += bool@test13;
+bool@test14 += local2;
+

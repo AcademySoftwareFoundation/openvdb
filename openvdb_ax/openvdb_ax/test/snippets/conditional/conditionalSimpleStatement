@@ -1,0 +1,6 @@
+@float_test = 5.f;
+bool@bool_test = false;
+
+if (!bool@bool_test) @float_test = 1.f;
+
+if(!bool@bool_test) if(true) bool@bool_test = true;

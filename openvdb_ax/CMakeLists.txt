@@ -1,0 +1,299 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
+
+  CMake Configuration for OpenVDB AX
+
+#]=======================================================================]
+
+cmake_minimum_required(VERSION 3.12)
+project(OpenVDBAXCore LANGUAGES CXX)
+
+option(OPENVDB_AX_SHARED "Build dynamically linked version of the ax library." ON)
+option(OPENVDB_AX_STATIC "Build statically linked version of the ax library." ON)
+option(USE_NEW_PASS_MANAGER [=[
+Enable the new Optimization Pass Manager. This is a developer option.]=] OFF)
+
+if(NOT OPENVDB_AX_SHARED AND NOT OPENVDB_AX_STATIC)
+  message(FATAL_ERROR "Both static and shared ax OpenVDB libraries have been disabled. "
+    "At least one must be enabled when building the ax library."
+  )
+endif()
+
+mark_as_advanced(USE_NEW_PASS_MANAGER)
+
+#########################################################################
+
+message(STATUS "----------------------------------------------------")
+message(STATUS "-------------- Configuring OpenVDBAX ---------------")
+message(STATUS "----------------------------------------------------")
+
+##########################################################################
+
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
+else()
+  set(OPENVDB_LIB openvdb)
+endif()
+
+# Configure grammar target
+
+set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
+file(MAKE_DIRECTORY ${OPENVDB_AX_GRAMMAR_DIR})
+
+if(OPENVDB_BUILD_AX_GRAMMAR)
+  find_package(FLEX REQUIRED)
+  find_package(BISON 3.0 REQUIRED)
+
+  set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Werror")
+
+  if(OPENVDB_AX_GRAMMAR_NO_LINES)
+    # Suppress #line directives
+    set(FLEX_COMPILE_FLAGS "${FLEX_COMPILE_FLAGS} -L")
+    set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
+  endif()
+
+  FLEX_TARGET(openvdb_ax_lexer openvdb_ax/grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+    COMPILE_FLAGS ${FLEX_COMPILE_FLAGS}
+  )
+  BISON_TARGET(openvdb_ax_parser openvdb_ax/grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
+    DEFINES_FILE ${OPENVDB_AX_GRAMMAR_DIR}/axparser.h
+    COMPILE_FLAGS ${BISON_COMPILE_FLAGS}
+  )
+  ADD_FLEX_BISON_DEPENDENCY(openvdb_ax_lexer openvdb_ax_parser)
+
+  # Add a custom target so the language is only ever generated once
+  add_custom_target(openvdb_ax_grammar
+    COMMENT "Re-generate the AX language files."
+    DEPENDS
+      ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+      ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
+endif()
+
+#########################################################################
+
+# Configure LLVM
+
+find_package(LLVM REQUIRED)
+find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
+
+if(found_LLVM)
+  set(LLVM_LIBS "LLVM")
+else()
+  llvm_map_components_to_libnames(_llvm_libs
+    native core executionengine support mcjit passes objcarcopts)
+  set(LLVM_LIBS "${_llvm_libs}")
+endif()
+
+if(MINIMUM_LLVM_VERSION)
+  if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
+    message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
+      "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
+  endif()
+endif()
+
+message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE_VERSION}\", "
+  "minimum required is \"${MINIMUM_LLVM_VERSION}\")")
+
+#########################################################################
+
+set(OPENVDB_AX_LIBRARY_SOURCE_FILES
+  openvdb_ax/ast/Parse.cc
+  openvdb_ax/ast/PrintTree.cc
+  openvdb_ax/ast/Scanners.cc
+  openvdb_ax/ax.cc
+  openvdb_ax/codegen/ComputeGenerator.cc
+  openvdb_ax/codegen/FunctionRegistry.cc
+  openvdb_ax/codegen/FunctionTypes.cc
+  openvdb_ax/codegen/PointComputeGenerator.cc
+  openvdb_ax/codegen/PointFunctions.cc
+  openvdb_ax/codegen/StandardFunctions.cc
+  openvdb_ax/codegen/Types.cc
+  openvdb_ax/codegen/VolumeComputeGenerator.cc
+  openvdb_ax/codegen/VolumeFunctions.cc
+  openvdb_ax/compiler/Compiler.cc
+  openvdb_ax/compiler/Logger.cc
+  openvdb_ax/compiler/PointExecutable.cc
+  openvdb_ax/compiler/VolumeExecutable.cc
+  openvdb_ax/math/OpenSimplexNoise.cc
+)
+
+if(OPENVDB_BUILD_AX_GRAMMAR)
+  list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
+    ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+    ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
+else()
+  list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
+    openvdb_ax/grammar/generated/axlexer.cc
+    openvdb_ax/grammar/generated/axparser.cc)
+endif()
+
+set(OPENVDB_AX_AST_INCLUDE_FILES
+  openvdb_ax/ast/AST.h
+  openvdb_ax/ast/Parse.h
+  openvdb_ax/ast/PrintTree.h
+  openvdb_ax/ast/Scanners.h
+  openvdb_ax/ast/Tokens.h
+  openvdb_ax/ast/Visitor.h
+)
+
+set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
+  openvdb_ax/codegen/ComputeGenerator.h
+  openvdb_ax/codegen/ConstantFolding.h
+  openvdb_ax/codegen/FunctionRegistry.h
+  openvdb_ax/codegen/Functions.h
+  openvdb_ax/codegen/FunctionTypes.h
+  openvdb_ax/codegen/PointComputeGenerator.h
+  openvdb_ax/codegen/PointLeafLocalData.h
+  openvdb_ax/codegen/SymbolTable.h
+  openvdb_ax/codegen/Types.h
+  openvdb_ax/codegen/Utils.h
+  openvdb_ax/codegen/VolumeComputeGenerator.h
+  openvdb_ax/math/OpenSimplexNoise.h
+)
+
+set(OPENVDB_AX_COMPILER_INCLUDE_FILES
+  openvdb_ax/compiler/AttributeRegistry.h
+  openvdb_ax/compiler/Compiler.h
+  openvdb_ax/compiler/CompilerOptions.h
+  openvdb_ax/compiler/CustomData.h
+  openvdb_ax/compiler/Logger.h
+  openvdb_ax/compiler/PointExecutable.h
+  openvdb_ax/compiler/VolumeExecutable.h
+)
+
+# @todo CMake >= 3.12, use an object library to consolidate shared/static
+# builds. There are limitations with earlier versions of CMake when used with
+# imported targets.
+
+if(OPENVDB_AX_SHARED)
+  add_library(openvdb_ax_shared SHARED ${OPENVDB_AX_LIBRARY_SOURCE_FILES})
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    add_dependencies(openvdb_ax_shared openvdb_ax_grammar)
+  endif()
+endif()
+
+if(OPENVDB_AX_STATIC)
+  add_library(openvdb_ax_static STATIC ${OPENVDB_AX_LIBRARY_SOURCE_FILES})
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    add_dependencies(openvdb_ax_static openvdb_ax_grammar)
+  endif()
+endif()
+
+# Alias either the shared or static library to the generic OpenVDB
+# target. Dependent components should use this target to build against
+# such that they are always able to find a valid build of OpenVDB
+
+if(OPENVDB_AX_SHARED)
+  add_library(openvdb_ax ALIAS openvdb_ax_shared)
+else()
+  add_library(openvdb_ax ALIAS openvdb_ax_static)
+endif()
+
+set(OPENVDB_AX_CORE_DEPENDENT_LIBS
+  ${OPENVDB_LIB}
+  ${LLVM_LIBS}
+)
+
+##########################################################################
+
+# Configure static build
+
+if(OPENVDB_AX_STATIC)
+  target_compile_definitions(openvdb_ax_static PUBLIC ${LLVM_DEFINITIONS})
+  target_include_directories(openvdb_ax_static PUBLIC . )
+  target_include_directories(openvdb_ax_static
+    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
+  )
+
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    target_include_directories(openvdb_ax_static
+      PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    )
+    target_compile_definitions(openvdb_ax_static
+      PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
+    )
+  endif()
+
+  set_target_properties(openvdb_ax_static
+    PROPERTIES OUTPUT_NAME openvdb_ax
+  )
+
+  target_link_libraries(openvdb_ax_static
+    PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS}
+    )
+  if(USE_NEW_PASS_MANAGER)
+    target_compile_definitions(openvdb_ax_static PRIVATE -DUSE_NEW_PASS_MANAGER)
+  endif()
+endif()
+
+if(OPENVDB_AX_SHARED)
+  target_compile_definitions(openvdb_ax_shared PUBLIC ${LLVM_DEFINITIONS})
+  target_include_directories(openvdb_ax_shared PUBLIC . )
+  target_include_directories(openvdb_ax_shared
+    SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
+  )
+
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    target_include_directories(openvdb_ax_shared
+      PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
+    )
+    target_compile_definitions(openvdb_ax_shared
+      PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
+    )
+  endif()
+
+  set_target_properties(
+    openvdb_ax_shared
+    PROPERTIES
+      OUTPUT_NAME openvdb_ax
+      SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
+      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
+    )
+
+  if(OPENVDB_ENABLE_RPATH)
+    # @todo There is probably a better way to do this for imported targets
+    list(APPEND RPATHS
+      ${Boost_LIBRARY_DIRS}
+      ${IlmBase_LIBRARY_DIRS}
+      ${OpenEXR_LIBRARY_DIRS}
+      ${Log4cplus_LIBRARY_DIRS}
+      ${Blosc_LIBRARY_DIRS}
+      ${Tbb_LIBRARY_DIRS}
+      ${LLVM_LIBRARY_DIRS}
+    )
+    list(REMOVE_DUPLICATES RPATHS)
+    set_target_properties(openvdb_ax_shared
+      PROPERTIES INSTALL_RPATH "${RPATHS}"
+    )
+  endif()
+
+  target_link_libraries(openvdb_ax_shared
+    PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS}
+    )
+  if(USE_NEW_PASS_MANAGER)
+    target_compile_definitions(openvdb_ax_shared PRIVATE -DUSE_NEW_PASS_MANAGER)
+  endif()
+endif()
+
+install(FILES openvdb_ax/ax.h openvdb_ax/Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
+install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
+install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
+install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
+
+if(OPENVDB_AX_STATIC)
+  install(TARGETS openvdb_ax_static
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+endif()
+
+if(OPENVDB_AX_SHARED)
+  install(TARGETS openvdb_ax_shared
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+  )
+endif()

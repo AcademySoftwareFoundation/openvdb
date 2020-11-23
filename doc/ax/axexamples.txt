@@ -1,0 +1,133 @@
+/**
+<div style="width:800px;text-align:justify;">
+
+@page axexamples AX Code Examples
+
+@section sExpmaplesContents Contents
+- @ref secPointsExamples
+    - @ref subsecPointAttributesExample
+    - @ref subsecCullPointsExample
+    - @ref subsecDragExample
+- @ref secVolumeExamples
+    - @ref subsecVolumeAssignmentExample
+
+@section secPointsExamples Points Examples
+@par
+These examples demonstrate how to use AX on VDB points grids.
+
+
+@subsection subsecPointAttributesExample Point Attributes Example
+@par
+This example shows a couple of ways to use AX with points attributes. The @
+symbol is the identifier for a point attribute. The type of each attribute is
+specified before the @ symbol and the name is specified afterwards. For example:
+@b `int@count` would imply an @b integer attribute called @b count.
+@par
+In this example there are three point attributes: a @b float attribute @b speed,
+a @b vector3 float attribute @b velocity and a @b vector3 float attribute
+@b colour.
+@par
+This snippet uses the functions @ref axlength "length" and @ref axfit "fit" to
+give points a colour between black and white based on their speed.
+@par
+@code{.c}
+// This statement writes to a new float attribute called speed and reads from a
+// vector float attribute called velocity. The length function is used here to
+// return the length of the point's velocity vector.
+float@speed = length(vec3f@velocity);
+
+// Points that move faster than this threshold will all be mapped to the same
+// colour (white).
+float fast_threshold = 6.f;
+
+// Writing a single value to a vector will mean that all components of the
+// vector are assigned the same value.
+vec3f@colour = fit(float@speed, 0, fast_threshold, 0, 1);
+@endcode
+@par
+The @b velocity attribute in this example is assumed to exist and have a range
+of values to produce some visual variance in colour. The attributes @b speed and
+@b colour do not need to exist before this snippet is run as the attributes are
+only written to and will be created on the fly.
+@par
+@b Note. In Houdini (AX SOP) changing the name of the attribute from @b colour to
+@b Cd will result in the points being given a colour in the viewport as Cd is
+a special attribute.
+
+
+@subsection subsecCullPointsExample Delete Points
+@par
+This example demonstrates a simple way of removing points from a VDB points grid.
+It uses a combination of @ref axrand and @ref axdeletepoint to randomly delete
+roughly half of the points in the input VDB points grid.
+@par
+@code{.c}
+float threshold = 0.5;
+
+// The rand function takes a seed and produces a random value between 0 and 1.
+// The integer attribute id from the points is used to seed the rand function.
+// If the value from rand is greater than the threshold (0.5) then delete the point.
+if (rand(i@id) > threshold) {
+    deletepoint();
+}
+@endcode
+@par
+The @b id attribute in this example is assumed to be a unique @b integer for
+each point in the VDB points grid such that @ref axrand will receive a
+different seed value per point producing a good distribution of random values.
+
+
+@subsection subsecDragExample Drag Example
+@par
+This example shows something a bit more complex: modifying a point's velocity
+with a drag force and then moving the point with the modified velocity.
+@par
+@code{.c}
+float dt = 1.0f / (4.0f * 24.0f); // timestep
+vec3f gravity = {0.0f, -9.81f, 0.0f}; // gravity
+vec3f dV = {2.0f, 0.0f, 0.0f} - v@v; // drag
+
+float lengthV = length(dV);
+float Re = lengthV * @rad / 1.225f;
+
+float C = 0.0f;
+
+if (Re > 1000.0f) C = 24.0f / Re;
+else C = 0.424f;
+
+// calculate drag force
+vec3f drag = 0.5f * 1.2f * C * lengthV * dV * 4.0f * 3.14f * pow(@rad, 2.0f);
+
+// update velocity
+v@v += (gravity -  drag / ((4.0f / 3.0f) * 3.14f * pow(@rad, 3.0f))) * dt;
+
+// update position
+v@P += v@v * dt;
+@endcode
+
+<br/><hr>
+
+@section secVolumeExamples Volume Examples
+@par
+These examples demonstrate how to use AX on VDB volume grids.
+
+
+@subsection subsecVolumeAssignmentExample Volume Assignment Example
+@par
+This example shows a couple of ways to use AX with volumes. The @ symbol is the
+identifier for a volume. The type of each volume is specified before the
+@ symbol and the name is specified afterwards. For example: `float@density`
+would imply a @b float volume called @b density.
+@par
+Unlike when working on points AX will not create new volumes if they don't
+already exist when written to in a snippet. This snippet uses @ref axclamp to
+constrain the @b density attribute between zero and one.
+@par
+@code{.c}
+float@density = clamp(float@density, 0.f, 1.f);
+@endcode
+@par
+The @b density attribute in this example is assumed to exist already.
+
+</div>
+*/

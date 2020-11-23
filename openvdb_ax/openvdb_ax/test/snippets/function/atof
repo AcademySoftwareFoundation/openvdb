@@ -1,0 +1,13 @@
+double@test1 = atof("");
+double@test2 = atof("-0.0");
+double@test3 = atof("+0.0");
+double@test4 = atof("-1.1");
+double@test5 = atof("1.5");
+double@test6 = atof("1.s9");
+double@test7 = atof("1s.9");
+double@test8 = atof(" 1.6");
+double@test9 = atof("1.5s1");
+double@test10 = atof("1. 1.3");
+double@test11 = atof("11.11");
+double@test12 = atof("1.79769e+308");
+double@test13 = atof("2.22507e-308");

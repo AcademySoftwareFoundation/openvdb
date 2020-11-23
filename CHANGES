@@ -19,6 +19,12 @@ Version 7.2.0 - In Development
     - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
       the new parallel breadth-first algorithms for much faster performance.
     - Extended tree::NodeManager to allow for use with a const tree.
+    - Vector, Matrix and Quaternion types now satisfy the Trivial Type requirement.
+      Their empty constructors and copy constructors have been removed (and are left
+      to the compiler to define).
+    - Added math::Abs, math::cwiseAdd, math::cwiseLessThan and
+      math::cwiseGreaterThan methods for Matrix types. Matrix grids can now be
+      instantiated.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
@@ -45,6 +51,9 @@ Version 7.2.0 - In Development
     - Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
       tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
       tools now use the parallel breath-first algorithms.
+    - Moved openvdb::TypeList from Types.h into its own header TypeList.h
+    - Removed an unnecessary specialization of NodeUnion and CopyTraits from
+      NodeUnion.h. Replaced std::is_pod usage with std::is_trivially_copyable.
 
     Build:
     - Removed the Makefiles.
