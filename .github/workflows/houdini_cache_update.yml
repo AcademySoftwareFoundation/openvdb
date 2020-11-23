@@ -21,6 +21,8 @@ jobs:
       run: ./ci/download_houdini.sh 18.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
       run: ./ci/install_houdini.sh
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -41,6 +43,8 @@ jobs:
       run: ./ci/download_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
       run: ./ci/install_houdini.sh
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build_houdini.sh clang++ Release ON
     - name: test
@@ -61,6 +65,8 @@ jobs:
       run: ./ci/download_houdini.sh 17.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
       run: ./ci/install_houdini.sh
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.12.0
     - name: build
