@@ -2,8 +2,8 @@
 
 set -ex
 
-RELEASE="$2"
-EXTRAS="$3"
+RELEASE="$1"
+EXTRAS="$2"
 
 # print versions
 bash --version
