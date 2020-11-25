@@ -507,13 +507,13 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
                 case TYPE_DOUBLE:
                 {
                     double extBg = static_cast<double>(evalFloatInst("bgfloat#", &i, 0, parms.mTime));
-                    process<FSGridT, openvdb::FloatGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
+                    process<FSGridT, openvdb::DoubleGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_DOUBLE
                 case TYPE_INT:
                 {
                     int extBg = static_cast<int>(evalIntInst("bgint#", &i, 0, parms.mTime));
-                    process<FSGridT, openvdb::FloatGrid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
+                    process<FSGridT, openvdb::Int32Grid>(parms, lsPrim, fsIsoValue, nullptr /*=maskPrim*/, *extPrim, extBg);
                     break;
                 } // TYPE_INT
                 case TYPE_VEC3S:
@@ -556,7 +556,7 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
 
 
 //template<typename FSGridT, typename ExtValueT>
-template<typename FSGridT, typename ExtGridT = FSGridT>
+template<typename FSGridT, typename ExtGridT>
 bool
 SOP_OpenVDB_Extrapolate::Cache::process(
     const FastSweepingParms& parms,
