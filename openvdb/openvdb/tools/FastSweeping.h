@@ -1063,10 +1063,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                                     const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
                                                     static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
                                                     static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
-                                    sum2 += d2*ExtValueT(op(xform.indexToWorld(xyz)));
+                                    sum2 += ExtValueT(d2*ExtValueT(op(xform.indexToWorld(xyz))));
                                 }
                             }//look over six cases
-                            ext[voxelIter.pos()] = (SdfValueT(1) / sum1) * sum2;
+                            ext[voxelIter.pos()] = ExtValueT((SdfValueT(1) / sum1) * sum2);
                             sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1);
                         }// voxel is neighboring the iso-surface
                     }// intersecting voxels
@@ -1386,8 +1386,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                     d2.v -= update;
                                     // affine combination of two neighboring extension values
                                     const SdfValueT w = SdfValueT(1)/(d1.v+d2.v);
-                                    acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                           d2.v*acc2->getValue(d2(ijk))));
+                                    acc2->setValue(ijk, ExtValueT(w*(d1.v*acc2->getValue(d1(ijk)) +
+                                                                     d2.v*acc2->getValue(d2(ijk)))));
                                 }//update ext?
                             }//update sdf?
                             continue;
@@ -1411,9 +1411,9 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                 d3.v -= update;
                                 // affine combination of three neighboring extension values
                                 const SdfValueT w = SdfValueT(1)/(d1.v+d2.v+d3.v);
-                                acc2->setValue(ijk, w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                       d2.v*acc2->getValue(d2(ijk)) +
-                                                       d3.v*acc2->getValue(d3(ijk))));
+                                acc2->setValue(ijk, ExtValueT(w*(d1.v*acc2->getValue(d1(ijk)) +
+                                                                 d2.v*acc2->getValue(d2(ijk)) +
+                                                                 d3.v*acc2->getValue(d3(ijk)))));
                             }//update ext?
                         }//update sdf?
                     }//test for non-negative determinant
