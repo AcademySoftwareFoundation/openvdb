@@ -215,6 +215,16 @@ TestGrid::testIsTreeUnique()
     // copy with new tree
     GridBase::Ptr grid3 = grid->copyGridWithNewTree();
     CPPUNIT_ASSERT(grid->isTreeUnique());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    // shallow copy using GridBase
+    GridBase::Ptr grid4 = grid->copyGrid();
+    CPPUNIT_ASSERT(!grid4->isTreeUnique());
+
+    // copy with new tree using GridBase
+    GridBase::Ptr grid5 = grid->copyGridWithNewTree();
+    CPPUNIT_ASSERT(grid5->isTreeUnique());
+#endif
 }
 
 
