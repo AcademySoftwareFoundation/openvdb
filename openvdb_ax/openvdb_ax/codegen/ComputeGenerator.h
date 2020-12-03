@@ -66,6 +66,20 @@ struct ComputeKernel
 
 namespace codegen_internal {
 
+/// @brief Visitor object which will generate llvm IR for a syntax tree.
+/// This provides the majority of the code generation functionality but is incomplete
+/// and should be inherited from and extended with ast::Attribute handling (see
+/// PointComputeGenerator.h/VolumeComputeGenerator.h for examples).
+/// @note: The visit/traverse methods work slightly differently to the normal Visitor
+/// to allow proper handling of errors and visitation history. Nodes that inherit from
+/// ast::Expression can return false from visit() (and so traverse()), but this will not
+/// necessarily stop traversal altogether. Instead, any ast::Statements that are not also
+/// ast::Expressions i.e. Block, ConditionalStatement, Loop, DeclareLocal override their
+/// visit/traverse methods to handle custom traversal order, and the catching of failed child
+/// Expression visit/traverse calls. This allows errors in independent Statements to not halt
+/// traversal for future Statements and so allow capturing of multiple errors in an ast::Tree
+/// in a single call to generate().
+///
 struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
 {
     ComputeGenerator(llvm::Module& module,
@@ -97,6 +111,18 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
         if (!this->visit(block)) return false;
         return true;
     }
+
+    /// @brief  Custom traversal of comma expression
+    /// @note   This overrides the default traversal to handle errors
+    ///         without stopping generation of entire list
+    /// @todo   Replace with a binary operator that simply returns the second value
+    bool traverse(const ast::CommaOperator* comma)
+    {
+        if (!comma) return true;
+        if (!this->visit(comma)) return false;
+        return true;
+    }
+
 
     /// @brief  Custom traversal of conditional statements
     /// @note   This overrides the default traversal to handle

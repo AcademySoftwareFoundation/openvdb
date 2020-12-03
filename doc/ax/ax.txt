@@ -8,7 +8,7 @@
 Welcome to the AX Language documentation. These docs provide detailed
 information on the AX language including syntax, data types, available
 functionality (including OpenVDB specific methods) execution structure and
-control flow. See the @subpage openvdbaxapi documentation for the C++ developer
+control flow. See the @subpage axcplusplus documentation for the C++ developer
 documentation.
 @note
 These documents are currently in @b BETA and are subject to change. Please
@@ -108,7 +108,7 @@ function (see @ref axprogramexample) and whilst there are ways to achieve
 reductions, it is an example which would be better suited to a custom C++
 implementation.
 @par
-For details of extending AX for custom geometry, see the @subpage openvdbaxapi
+For details of extending AX for custom geometry, see the @subpage axcplusplus
 developer documentation. Note that custom geometry support requires C++ extension.
 
 
@@ -1771,21 +1771,24 @@ all other expressions.
 
 @anchor axopternary
 @par Ternary Conditional
-
-@note
-todo
-
-<!--
-The ternary conditional operator can be thought of as an in-line @ref axaxbranching
-"if statment", where each branch has a single statement. It has the form:
+The ternary conditional operator can be thought of as an in-line @ref axbranching
+"if-else statement" that returns a value, where each of the if/else branches has
+a single expression that will be returned. It has the form:
 @par
 <table><tr>
 <td bgcolor="#ffc4c4">@a `a`&nbsp;<b>`?`</b>&nbsp;@a `b`&nbsp;<b>`:`</b> @a `c`</td>
 </tr></table>
-Where @b `a` is the condition to evaluate and @b `b` and `c` are expressions
-with return values. @b `b` is evaluated and returned if the condition is @b true,
-@b `c` is evaluated and returned if the condition is @b false.
--->
+Where @b `a` is the condition, evaluated and converted to @b bool, and @b `b` and @b
+`c` are expressions of the same or implicit-castable types. @b `b` is evaluated and
+returned if the condition is @b true, @b `c` is evaluated and returned if the
+condition is @b false. Only the expression out of @b `b` and @b `c` that is
+returned will be evaluated. Expressions with no return value (a.k.a @b `void`)
+are supported as long as @b `b` and @b `c` are both of this type.
+@par
+Also supported is the 'Elvis' operator, @b `a` @b `?` @b `:` @b `c` (or `?:`).
+Here, @b `a` is evaluated once, and if when converted to @b bool is @b true, @b `a` is
+returned, otherwise @b `c` is evaluated and returned. In this case, @b `a` and @b
+`c` must be the same or implicit-castable types, and both implicit-castable to @b bool.
 
 @anchor axvecmatinit
 @par Vector/Matrix Initializer

@@ -1,0 +1,496 @@
+/**
+<div style="width:800px;text-align:justify;">
+
+@page axcplusplus OpenVDB AX
+
+@section axcdocs AX C++ Documentation
+@par
+The following documentation focuses on the C++ design and API of OpenVDB AX,
+@b not the front end AX language. For the latter, see the
+@ref ax "AX Language documentation". For more specific function API information,
+search for the relevant function doxygen.
+@note
+These documents are actively being worked on and are subject to change. See the
+API doxygen comments or contact us for more information.
+
+@section vdbaxcontents Contents
+- @ref vdbaxapiabi
+- @ref vdbaxrepo
+    - @ref vdbaxgrammar
+    - @ref vdbaxast
+        - @ref vdbaxastscanners
+    - @ref vdbaxcompilerpipe
+        - @ref vdbaxcompilerlogging
+        - @ref vdbaxcompilerexe
+        - @ref vdbaxcompilercustomdata
+        - @ref vdbaxcodegen
+        - @ref vdbaxcompiler
+    - @ref vdbaxbinary
+- @ref vdbaxtoaxtypes
+- @ref vdbaxextend
+
+<hr>
+
+@section vdbaxapiabi Versioning, API and ABI
+@par
+AX is a self contained library which currently has a one way dependency on
+OpenVDB; any downstream artifact that uses AX will need to build and link
+against both OpenVDB and OpenVDB AX. There are a few important factors to be
+aware of with this integration:
+@par
+ - OpenVDB AX is tied to the OpenVDB library version. There is no explicit
+ OpenVDB AX version. This includes the OpenVDB namespaced API, the shared
+ library version suffix on relevant platforms and the OpenVDB ABI. It *may* be
+ possible to build OpenVDB AX against a different version of OpenVDB however
+ this is not explicitly supported.
+ - There are no ABI compatibility guarantees for OpenVDB AX components i.e. AX
+ components do not support the transfer of themselves as binary representations
+ across dynamic library boundaries to applications where AX has been compiled at
+ a different location in the OpenVDB repository. Support for this may change in
+ the future.
+@par
+In general, anything in the public namespace (defined as anything not labelled
+"internal") comes with standard API guarantees; that is, classes and methods
+will not change visible behaviour or signatures and deprecations will occur with
+appropriate replacements (where necessary) prior to removal. However, due to the
+nature of the project and its infancy, it's encouraged to continue reading below
+into the relevant AX components. These provide a better description of their
+intended public consumption and completeness.
+
+<hr>
+
+@section vdbaxrepo OpenVDB AX Repository
+@par
+The AX repository has been laid out using a modular design. Each subdirectory
+encompasses a set of similar tools with a fairly consistent (one-way) dependency
+diagram to other tools in the repository. The following provides a short
+description of each directory, listed in this ad-hoc dependency order (from
+highest to lowest):
+@par
+ - @b grammar: Provides the flex/bison lexer/grammar rules for generating the
+ OpenVDB AX language, as well as the pre-generated `.c` files.
+ - @b ast: The definition of an AX Abstract Syntax Tree, its node types and
+ methods to work explicitly with them.
+ - @b compiler: The frontend C++ user interface for building and using AX.
+ - @b codegen: The backend LLVM IR code generation for AX.
+@par
+Additional tools include (in no particular order):
+@par
+ - @b cmd: Command line binary tools for AX.
+ - @b math: Various mathematical methods, typically used by the AX
+ code generators when building native functions.
+ - @b test: Unit testing framework for AX.
+
+@subsection vdbaxgrammar The Grammar
+@par
+The subdirectory @b grammar contains the rules used to generate an AX abstract
+syntax tree, as defined by the @ref ax "AX Language specification." These files
+do not provide an API per-se and are primarily used internally by the @b ast
+module. The grammar syntax rules are specified in files with <b>.y</b> suffix
+and the tokenziers are specified by the <b>.l</b> suffix. These files are designed
+to work with two UNIX tools, GNU <A HREF="https://www.gnu.org/software/bison/manual/">
+Bison</A> and <A HREF="https://westes.github.io/flex/manual/">Flex</A>. Together
+these tools provide a workflow for developers to create develop a wide range of
+language parsers. It's encouraged to visit the corresponding manuals for more
+information on their use.
+@par
+The AX grammar is defined with a <A HREF="https://en.wikipedia.org/wiki/LR_parser">
+LR parser</A>. In simplest terms, this means that the syntactical rules define a
+grammar which is parsed bottom-up, left-to-right, deterministically and context
+free (for the most part). These are fairly typical traits of parsers used to
+define computer languages. The parser is @b not designed to be interactive, nor
+reentrant (is not thread safe, each string is parsed sequentially) however such
+limitations are not imposed by AX and may be removed in the future. Note that
+the internal function symbols are correctly prefixed (with @b ax), so AX should
+be compatible with other software that also uses Bison/Flex.
+@par
+The <b>.y</b> and <b>.l</b> files are typically not part of the normal build
+process. Bison and Flex use them to generate compatible C/C++ code, however this
+code is always pre-generated and provided with the AX repository within the
+<b>grammar/generated</b> subdirectory. This C/C++ code is compiled into the AX
+library. Thus, the grammar is provided for two reasons; to demonstrate how the
+syntactical rules are implemented and to provide expert users the ability to
+regenerate the C/C++ bindings (see @ref openvdbaxbuild "the build instructions").
+Importantly, AX does not install any of the files in the grammar folder; the
+parser is accessed through the @b ast module.
+
+@subsection vdbaxast The AST
+@par
+The @b ast module provides:
+ - The complete implemenation of an @ref AST.h "AX abstract syntax tree"
+ - The openvdb::ax::ast::parse() method
+ - The @vdblink::ax::ast::Visitor AST Visitor@endlink
+ - AST scanners and tools
+@par
+All methods in this module are designed to work around an AX AST, which represents the
+syntactical constructs of the AX language as a hierarchy of C++ objects (nodes).
+The complete AST hierarchy is visualized by the @vdblink::ax::ast::Node doxygen
+class graph for an openvdb::ax::ast::Node@endlink, which represents the top most
+node in the AST. The AST API exists in a nested namespace (`openvdb::ax::ast`)
+and can be used by clients for more granular control and modifications to an AST.
+Importantly, the AST API contains the openvdb::ax::ast::parse() method, which
+invokes the C/C++ functions built by the grammar to iteratively construct an
+AST from a provided character string.
+@par
+A number of other tools are provided by the module to work with an AST such as
+tools to re-interpret the AST back to AX compatible code, printing of the AST's
+node hierarchy/layout and scanners which are able to query details from AST
+branches. All these methods use the @vdblink::ax::ast::Visitor AX visitor
+framework@endlink, a visitor pattern traversal class strongly influenced by
+<A HREF="https://clang.llvm.org/doxygen/classclang_1_1RecursiveASTVisitor.html">
+Clang's RecursiveVisitor</A>. Clients can use the AX visitor to implement their
+own AST analysis or modifications (see @ref vdbaxextend).
+
+@subsubsection vdbaxastscanners Scanners
+@par
+todo
+
+@subsection vdbaxcompilerpipe The Compiler Pipeline
+@par
+The @b compiler subdirectory contains the bulk of the C++ API intended to be
+used directly by clients of OpenVDB AX. It links together the grammar, AST and
+code generation to produce AX executable objects, forming a pipeline from an
+initial string of AX code to final execution across some geometry. The following
+sections detail the core components to the Compiler pipeline.
+
+@subsubsection vdbaxcompilerlogging Logging
+@par
+Anyone familiar with programming languages will undoubtedly be aware of the huge
+variety and quantity of feedback that's presented to clients during use. This
+information, when properly presented, can be invaluable and help to advise
+users during their usage of the language. AX provides @vdblink::ax::Logger a
+Logger class@endlink which can be used throughout the Compiler pipeline to
+store and report this information. By default, this class reports all errors to
+<A HREF="https://en.cppreference.com/w/cpp/io/cerr">std::cerr</A> and swallows
+warnings, but can be customised depending on your needs e.g:
+@par
+@code{.cpp}
+#include <openvdb_ax/compiler/Logger.h>
+
+// Create a logger which sends errors and warnings to std::cerr
+openvdb::ax::Logger
+    logs([](const std::string& msg) { std::cerr << msg << std::endl; },
+         [](const std::string& msg) { std::cerr << msg << std::endl; });
+
+logs.setMaxErrors(5); // stop reporting after 5 errors
+logs.setWarningsAsErrors(false); // don't count warnings as an error
+logs.setPrintLines(true); // print code lines
+logs.setNumberedOutput(true); // number each error/warning reported
+@endcode
+@par
+A  @vdblink::ax::Logger Logger@endlink should be passed to the relevant pipeline
+methods as detailed in the following sections.
+
+@subsubsection vdbaxcompilerexe Executables
+@par
+The "executable" terminology comes from the binary representation of the
+compiled function which is invoked. AX executables essentially wrap the
+generated function calls from the AX codegen with an efficient multi-threaded
+invoke for the type of geometry being processed. The executable classes are
+designed to be lightweight to store, modify and copy with a consolidated
+interface for running and customising execution.
+@par
+There are two main types of executables; the @vdblink::ax::VolumeExecutable
+VolumeExecutable@endlink, designed to work with all OpenVDB Volumes and the
+@vdblink::ax::PointExecutable PointExecutable@endlink which works with OpenVDB
+`PointDataGrids`. They are not expected to be created directly; instead these
+objects are returned by the @vdblink::ax::Compiler AX Compiler@endlink depending
+on the selected @vdblink::ax::Compiler::compile() Compiler::compile() @endlink
+function.
+@note
+There is no inherent limitation to the design of the `VolumeExecutable` which
+stops it working on `PointDataGrids` but it's not particular useful in it's
+current form and can be confusing so it is explicitly disallowed.
+@par
+The executables are distinctly detached from the @vdblink::ax::Compiler
+Compiler@endlink once they have been built and can be safely used no matter
+previous or subsequent compilations of AX code. There are a variety of settings
+on the executables to control runtime behaviour - below demonstrates an example
+of using this API:
+@par
+@code{.cpp}
+using namespace openvdb;
+
+ax::Compiler compiler;  // compiler
+
+FloatGrid a;
+a.setName("a");
+a.tree().setValueOn({0,0,0}, 1.0f); // set single coordinate to active 1.0f
+
+const ax::VolumeExecutable::Ptr exe1 =
+    compiler.compile<ax::VolumeExecutable>("f@a += 1.0f;");
+exe1->execute(a); // run over active leaf voxels in parallel
+
+ax::VolumeExecutable::Ptr exe2 =
+    compiler.compile<ax::VolumeExecutable>("f@a += 2.0f;");
+
+// set to process all voxels
+exe2->setValueIterator(ax::VolumeExecutable::IterType::ALL);
+exe2->execute(a); // run over active and inactive leaf voxels in parallel
+
+std::cout << a.tree().getValue({0,0,0}) << std::endl; // prints 4.0f
+std::cout << a.tree().getValue({1,0,0}) << std::endl; // prints 2.0f
+@endcode
+
+@par Executable Thread Safety
+The executables are responsible for launching the compiled AX kernels and may
+internally use multiple threads. Multiple executables of any type can co-exist
+and be executed concurrently with unique arguments. For example:
+@par
+@code{.cpp}
+
+FloatGrid a1, a2; // assume both are named "a"
+auto exe1 = compiler.compile<ax::VolumeExecutable>("f@a += 1.0f;");
+auto exe2 = compiler.compile<ax::VolumeExecutable>("f@a += 2.0f;");
+
+std::thread t1([&]() { exe1->execute(a1); } );
+std::thread t2([&]() {
+    exe1->execute(a2); // safe even if exe1::execute is being used by another thread
+    exe2->execute(a2); // safe, can be running alongside another executable
+});
+@endcode
+@par
+This is, however, only safe depending on the access pattern of the AX code, the
+iteration patterns of the executables and the grid data being fed to the
+`execute` methods. When we talk about the thread safety of these classes we are
+referring to the invocation of their execution method <b>with the same argument
+data</b> by multiple threads, @b not how many threads the executables themselves
+use (which can be configured by the `grainSize()` setting). Importantly, for a
+given VDB grid or VDB Points attribute <b>"foo"</b>:
+ - For The @vdblink::ax::VolumeExecutable VolumeExecutable@endlink it is safe to
+ call @vdblink::ax::VolumeExecutable VolumeExecutable::execute@endlink @b from
+ multiple threads only if:
+   - All relevant AX kernels <b>do not write</b> to grid @b foo.
+ - For The @vdblink::ax::PointExecutable PointExecutable@endlink it is safe to
+ call @vdblink::ax::PointExecutable PointExecutable::execute@endlink @b from
+ multiple threads only if:
+   - All relevant AX kernels <b>do not write</b> to attribute @b foo.
+   - All relevant AX kernels <b>do not create</b> any attributes or groups.
+   - All relevant AX kernels <b>do not modify</b> the @b position "P" attribute.
+@par
+For example:
+@par
+@code{.cpp}
+auto exe = compiler.compile<ax::VolumeExecutable>("@a = @b");
+
+// Grid a1 and a2 called "a", b called "b". Grid b is given to both threads.
+// This is safe as we guarantee b is only read from
+std::thread t1([&]() { GridPtrVec v{a1,b}; exe1->execute(v); } );
+std::thread t2([&]() { GridPtrVec v{a2,b}; exe1->execute(v); } );
+@endcode
+@par
+You can use the tools provided in @ref Scanners.h to query data accesses on
+AX ASTs to verify access patterns of your data.
+
+@subsubsection vdbaxcompilercustomdata Custom Data
+@par
+The AX language provides two main tokens to access memory which has not been
+allocated by AX itself. The first token, @b \@ (the "at" symbol), is designed to
+provide read/write access to geometry attributes. The second token is the dollar
+character @b $. This allows <b>read only</b> access to custom data that can be
+modified in C++ i.e. outside the scope of an AX program. In the same way as the
+@b \@attribute syntax, the value of this data can change without the need for AX
+to re-compile the program. It is, however, solely on the C++ clients of AX to
+make sure that this data is setup correctly when integrating AX into their
+applications.
+@par
+Consider this trivial example:
+@par
+@code{.c}
+f@density = f$my_value;
+// f$my_value = f@density; NOTE: writing to $ values is disallowed
+@endcode
+@par
+When compiled, this program will attempt to read a single float type value with
+the storage name "my_value". If the value cannot be found, a zero intialized
+block of memory (with size of the desired type) is returned. So, with no further
+setup, this will assign each value of @b density to 0.0f.
+@par
+The @vdblink::ax::CustomData CustomData@endlink class provides the intermediary
+storage for this data between the code generation and the compiler. Clients
+should use this API to create and modify custom data which will become available
+to AX programs. Although the data is stored as abstract openvdb::Metadata
+objects, the values are embedded into AX programs as pointers to their location
+in memory. In practice this means that accessing data stored in this way is
+almost as fast as accessing an AX local variable, though certain optimizations,
+such as constant folding, will not apply. As previously mentioned, this also
+means that the AX program does not need to be recompiled should this value need
+to be changed.
+@par
+The @vdblink::ax::CustomData CustomData@endlink starts off detached from an
+executable and thus must be provided when invoking
+@vdblink::ax::Compiler::compile Compiler::compile()@endlink. It is then tied to
+the AX executable for its duration. The compiler will validate the types of
+all accessed data of an AX program and, if it does not exist, the data will be
+created. Note that multiple executables can access the same
+@vdblink::ax::CustomData CustomData@endlink instance.
+@par
+@code{.cpp}
+using namespace openvdb;
+
+FloatGrid density;
+density.setName("density");
+
+ax::Compiler compiler;  // compiler
+ax::CustomData::Ptr data(new ax::CustomData);  // empty custom data
+
+// data provided to compile is now registered with this exe. "m_value" is created
+ax::VolumeExecutable::Ptr exe =
+    compiler.compile<ax::VolumeExecutable>("f@density = f$my_value;", data);
+exe->execute(density); // my_value doesn't exist, density set to 0.0f
+
+// Compiler::compile will have created this
+assert(data->hasValue<TypedMetadata<float>>("my_value"));
+
+// get the data in its typed storage wrapper
+TypedMetadata<float>* meta = data->getValue<TypedMetadata<float>>("my_value");
+meta->set(1.0f);  // set the value of "my_value" to 1.0f
+
+// don't need to re-compile
+exe->execute(density); // density set to 1.0f
+@endcode
+@warning
+Care should be taken to ensure that modifications to custom data values are
+peformed outside of any calls to `execute()`. Any attempt to modify the data
+whilst executables attempt to access it will result in undefined behaviour.
+
+@subsubsection vdbaxcodegen Codegen
+@par
+todo
+
+@subsubsection vdbaxcompiler The Compiler
+@par
+The @vdblink::ax::Compiler Compiler@endlink brings together the above
+components. It is responsible setting up LLVM contexts and modules for a given
+AX program, invoking the compute generators, binding custom data, performing any
+necessary AX and LLVM optimisations and finally JIT compiling the program to a
+callable function. The @vdblink::ax::Compiler::compile() Compiler::compile()
+@endlink member functions execute the aforementioned steps and, if successful,
+return a pointer to an executable.
+@par
+There are two main ways to invoke compilation; one with an @vdblink::ax::Logger
+AX Logger@endlink and one without. The prior will either return a valid pointer
+to a generated executable on success or a `nullptr` on failure. It is guaranteed
+to never throw a code generation runtime error and expects the caller to either
+query or setup the state of the logger to handle warnings and errors. The latter
+internally creates a default logger which swallows warnings and prints all
+possible errors to `std::cerr`. Note that the latter will throw a runtime error
+on failure and is thus guaranteed to never return a `nullptr`.
+@par
+@code{.cpp}
+using namespace openvdb;
+
+ax::Compiler compiler;
+std::vector<std::string> warn, err;
+// custom logger to collect warnings and errors
+ax::Logger logger(
+    [&warn]() { warn.emplace_back(msg); },
+    [&err]()  { err.emplace_back(msg);  }
+);
+
+// logger provided, exe could be null if input is invalid
+auto exe = compiler.compile<ax::VolumeExecutable>("f@a = 1.0f;", logger);
+// print warnings
+for (cosnt auto& msg : warn) std::cout << msg << std::endl;
+if (!exe) {
+    for (cosnt auto& msg : err) std::cout << msg << std::endl;
+}
+
+// without logger, divison by zero warning won't be reported
+exe = compiler.compile<ax::VolumeExecutable>("f@a = 1.0f / 0.0f;");
+
+// without logger, invalid AX will cause a runtime error but
+// also print errors to std::cerr
+try {
+    exe = compiler.compile<ax::VolumeExecutable>("foo");
+}
+catch (...) {
+    std::cerr << "See above error logs..." << std::endl;
+}
+@endcode
+@warning
+A single instance of the @vdblink::ax::Compiler AX Compiler@endlink uses a
+uniquely constructed <A HREF="https://llvm.org/doxygen/classllvm_1_1LLVMContext.html">
+LLVMContext</A>. This context is @b shared between copies of the Compiler,
+however new Compilers create new LLVMContexts. It is therefor unsafe to invoke
+concurrent calls to @vdblink::ax::Compiler::compile() Compiler::compile()
+@endlink on Compilers which share the same underlying LLVMContext.
+@par
+@code{.cpp}
+ax::Compiler C1, C2;
+
+// @warning Not safe!
+// std::thread t1([&]() { C1.compile<ax::VolumeExecutable>("@a;") } );
+// std::thread t2([&]() { C1.compile<ax::VolumeExecutable>("@b;") } );
+
+// the following is safe as C1 and C2 are unique instances
+std::thread t1([&]() { C1.compile<ax::VolumeExecutable>("@a;") } );
+std::thread t2([&]() { C2.compile<ax::VolumeExecutable>("@a;") } );
+@endcode
+
+
+@subsection vdbaxbinary The Command Line Binary
+@par
+todo
+
+<hr>
+
+@section vdbaxtoaxtypes OpenVDB / OpenVDB AX Types
+@par
+Whilst OpenVDB AX is primarily designed for OpenVDB, it has its own notion of
+types. This is so that the actual AX language is able to support arithmetic that
+OpenVDB geometry would perhaps otherwise not support. For example, AX supports
+3x3 and 4x4 matrix types. These types are akin to the `openvdb::math::Mat` types
+that exist in OpenVDB library - however, historically, these types are not
+"registered Grid types" by default by OpenVDB. This means that, although you
+could theoretically create an `openvdb::Mat3dGrid` OpenVDB may not support the
+reading or writing of these grid types out the box. Whilst this may change in
+the future, there may exist other examples of types in AX which suffer from the
+same limitation of existing geometry types in OpenVDB.
+@par
+Native OpenVDB types are types which are @b a) registered for serialization and
+@b b) compilable by the default C++ installation of OpenVDB. This is a bit
+convoluted, so what does this actually mean in practice? Generally, accessing an
+@b attribute in AX requires that data to exist on the underlying geometry. As
+such, reading or writing to a given attribute (for example `bool@myattr`)
+requires both the AX compiler @b and the underlying geometry to support the
+given type. As mentioned above, there may be times where this isn't the case.
+Consider the following:
+@par
+@code{.c}
+vec4i a = {1,2,3,4};
+vec4i@attr = a;
+@endcode
+@par
+Now lets assume that a notion of four `int32` values is not supported for
+serialization of OpenVDB points or volumes (we assume the type can at least be
+instantiated). Whilst this code may execute, serializing this data to disk may
+fail due to unregistered OpenVDB types. AX does @b not register any additional
+OpenVDB types. This choice is left to downstream software. In this example, to
+allow for serialization of `vec4` types, some variant of the following can be
+implemented in your application.
+@warning
+The choice to register Grid types in OpenVDB is left to the OpenVDB maintainers.
+There are important consequences to registering custom types - other default
+installations of OpenVDB <b>will not be able to read your files</b> unless
+compiled with similar instantiations.
+@par
+@code{.cpp}
+openvdb::initialize(); // standard init of vdb
+openvdb::ax::initialize(); // standard init of ax
+// Define a Vec4I grid type from the openvdb::math::Vec4<int32_t> class.
+// Use a ValueConverter to ensure the grid has the same configuration as
+// a standard OpenVDB grid type.
+using Vec4IGrid = openvdb::BoolGrid::ValueConverter<openvdb::Vec4I>::Type;
+// register this type
+Vec4IGrid::registerGrid();
+@endcode
+
+<hr>
+@section vdbaxextend Extending OpenVDB AX
+<!--@subsection vdbaxcustomtraversal Custom AST Traversal-->
+<!--@subsection vdbaxcustomtraversal Designing an Executable-->
+<!--@subsection vdbaxcustomtraversal Geometry Callbacks-->
+<!--@subsection vdbaxcustomtraversal Custom Code Generation-->
+</div>
+*/
