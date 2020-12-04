@@ -70,6 +70,7 @@ Version 7.2.0 - In Development
     - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
       Windows which use the multithread/DLL-specific version of the CRT.
       [Reported by Tobias Rittig]
+    - Core library unit tests use GoogleTest instead of CppUnit.
 
 Version 7.1.0 - August 13, 2020
 
