@@ -905,7 +905,7 @@ public:
     /// @brief Return true if tree is not shared with another grid.
     /// @note This is a virtual function with ABI=8
 #if OPENVDB_ABI_VERSION_NUMBER >= 8
-    bool isTreeUnique() const override;
+    bool isTreeUnique() const final;
 #else
     bool isTreeUnique() const;
 #endif
