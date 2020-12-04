@@ -88,6 +88,7 @@ Build:
 - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
   Windows which use the multithread/DLL-specific version of the CRT.
   <I>[Reported&nbsp;by&nbsp;Tobias&nbsp;Rittig]</I>
+- Core library unit tests use GoogleTest instead of CppUnit.
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly

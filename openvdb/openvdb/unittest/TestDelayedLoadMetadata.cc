@@ -1,59 +1,51 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/DelayedLoadMetadata.h>
 
-class TestDelayedLoadMetadata : public CppUnit::TestCase
+class TestDelayedLoadMetadata : public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestDelayedLoadMetadata);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST_SUITE_END();
-
-    void test();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestDelayedLoadMetadata);
 
-void
-TestDelayedLoadMetadata::test()
+TEST_F(TestDelayedLoadMetadata, test)
 {
     using namespace openvdb::io;
 
     // registration
 
-    CPPUNIT_ASSERT(!DelayedLoadMetadata::isRegisteredType());
+    EXPECT_TRUE(!DelayedLoadMetadata::isRegisteredType());
 
     DelayedLoadMetadata::registerType();
 
-    CPPUNIT_ASSERT(DelayedLoadMetadata::isRegisteredType());
+    EXPECT_TRUE(DelayedLoadMetadata::isRegisteredType());
 
     DelayedLoadMetadata::unregisterType();
 
-    CPPUNIT_ASSERT(!DelayedLoadMetadata::isRegisteredType());
+    EXPECT_TRUE(!DelayedLoadMetadata::isRegisteredType());
 
     openvdb::initialize();
 
-    CPPUNIT_ASSERT(DelayedLoadMetadata::isRegisteredType());
+    EXPECT_TRUE(DelayedLoadMetadata::isRegisteredType());
 
     // construction
 
     DelayedLoadMetadata metadata;
 
-    CPPUNIT_ASSERT(metadata.empty());
+    EXPECT_TRUE(metadata.empty());
 
     metadata.resizeMask(size_t(2));
 
-    CPPUNIT_ASSERT(!metadata.empty());
+    EXPECT_TRUE(!metadata.empty());
 
     metadata.setMask(0, DelayedLoadMetadata::MaskType(5));
     metadata.setMask(1, DelayedLoadMetadata::MaskType(-3));
 
-    CPPUNIT_ASSERT_EQUAL(metadata.getMask(0), DelayedLoadMetadata::MaskType(5));
-    CPPUNIT_ASSERT_EQUAL(metadata.getMask(1), DelayedLoadMetadata::MaskType(-3));
+    EXPECT_EQ(metadata.getMask(0), DelayedLoadMetadata::MaskType(5));
+    EXPECT_EQ(metadata.getMask(1), DelayedLoadMetadata::MaskType(-3));
 
     metadata.resizeCompressedSize(size_t(3));
 
@@ -61,30 +53,30 @@ TestDelayedLoadMetadata::test()
     metadata.setCompressedSize(1, DelayedLoadMetadata::CompressedSizeType(101));
     metadata.setCompressedSize(2, DelayedLoadMetadata::CompressedSizeType(-13522));
 
-    CPPUNIT_ASSERT_EQUAL(metadata.getCompressedSize(0), DelayedLoadMetadata::CompressedSizeType(6));
-    CPPUNIT_ASSERT_EQUAL(metadata.getCompressedSize(1), DelayedLoadMetadata::CompressedSizeType(101));
-    CPPUNIT_ASSERT_EQUAL(metadata.getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
+    EXPECT_EQ(metadata.getCompressedSize(0), DelayedLoadMetadata::CompressedSizeType(6));
+    EXPECT_EQ(metadata.getCompressedSize(1), DelayedLoadMetadata::CompressedSizeType(101));
+    EXPECT_EQ(metadata.getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
 
     // copy construction
 
     DelayedLoadMetadata metadataCopy1(metadata);
 
-    CPPUNIT_ASSERT(!metadataCopy1.empty());
+    EXPECT_TRUE(!metadataCopy1.empty());
 
-    CPPUNIT_ASSERT_EQUAL(metadataCopy1.getMask(0), DelayedLoadMetadata::MaskType(5));
-    CPPUNIT_ASSERT_EQUAL(metadataCopy1.getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
+    EXPECT_EQ(metadataCopy1.getMask(0), DelayedLoadMetadata::MaskType(5));
+    EXPECT_EQ(metadataCopy1.getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
 
     openvdb::Metadata::Ptr baseMetadataCopy2 = metadata.copy();
     DelayedLoadMetadata::Ptr metadataCopy2 =
         openvdb::StaticPtrCast<DelayedLoadMetadata>(baseMetadataCopy2);
 
-    CPPUNIT_ASSERT_EQUAL(metadataCopy2->getMask(0), DelayedLoadMetadata::MaskType(5));
-    CPPUNIT_ASSERT_EQUAL(metadataCopy2->getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
+    EXPECT_EQ(metadataCopy2->getMask(0), DelayedLoadMetadata::MaskType(5));
+    EXPECT_EQ(metadataCopy2->getCompressedSize(2), DelayedLoadMetadata::CompressedSizeType(-13522));
 
     // I/O
 
     metadata.clear();
-    CPPUNIT_ASSERT(metadata.empty());
+    EXPECT_TRUE(metadata.empty());
 
     const size_t headerInitialSize(sizeof(openvdb::Index32));
     const size_t headerCountSize(sizeof(openvdb::Index32));
@@ -95,11 +87,11 @@ TestDelayedLoadMetadata::test()
     { // empty buffer
         std::stringstream ss(std::ios_base::out | std::ios_base::in | std::ios_base::binary);
         metadata.write(ss);
-        CPPUNIT_ASSERT_EQUAL(ss.tellp(), std::streampos(headerInitialSize));
+        EXPECT_EQ(ss.tellp(), std::streampos(headerInitialSize));
 
         DelayedLoadMetadata newMetadata;
         newMetadata.read(ss);
-        CPPUNIT_ASSERT(newMetadata.empty());
+        EXPECT_TRUE(newMetadata.empty());
     }
 
     { // single value, no compressed sizes
@@ -110,13 +102,13 @@ TestDelayedLoadMetadata::test()
         std::stringstream ss(std::ios_base::out | std::ios_base::in | std::ios_base::binary);
         metadata.write(ss);
         std::streampos expectedPos(headerTotalSize + sizeof(int8_t));
-        CPPUNIT_ASSERT_EQUAL(ss.tellp(), expectedPos);
-        CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(expectedPos)-headerInitialSize, size_t(metadata.size()));
+        EXPECT_EQ(ss.tellp(), expectedPos);
+        EXPECT_EQ(static_cast<size_t>(expectedPos)-headerInitialSize, size_t(metadata.size()));
 
         DelayedLoadMetadata newMetadata;
         newMetadata.read(ss);
-        CPPUNIT_ASSERT(!newMetadata.empty());
-        CPPUNIT_ASSERT_EQUAL(newMetadata.getMask(0), DelayedLoadMetadata::MaskType(5));
+        EXPECT_TRUE(!newMetadata.empty());
+        EXPECT_EQ(newMetadata.getMask(0), DelayedLoadMetadata::MaskType(5));
     }
 
     { // single value, with compressed sizes
@@ -131,14 +123,14 @@ TestDelayedLoadMetadata::test()
         metadata.write(ss);
         std::streampos expectedPos(headerTotalSize + sizeof(int8_t) + sizeof(int64_t));
 
-        CPPUNIT_ASSERT_EQUAL(expectedPos, ss.tellp());
-        CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(ss.tellp())-headerInitialSize, size_t(metadata.size()));
+        EXPECT_EQ(expectedPos, ss.tellp());
+        EXPECT_EQ(static_cast<size_t>(ss.tellp())-headerInitialSize, size_t(metadata.size()));
 
         DelayedLoadMetadata newMetadata;
         newMetadata.read(ss);
-        CPPUNIT_ASSERT(!newMetadata.empty());
-        CPPUNIT_ASSERT_EQUAL(newMetadata.getMask(0), DelayedLoadMetadata::MaskType(5));
-        CPPUNIT_ASSERT_EQUAL(newMetadata.getCompressedSize(0), DelayedLoadMetadata::CompressedSizeType(-10322));
+        EXPECT_TRUE(!newMetadata.empty());
+        EXPECT_EQ(newMetadata.getMask(0), DelayedLoadMetadata::MaskType(5));
+        EXPECT_EQ(newMetadata.getCompressedSize(0), DelayedLoadMetadata::CompressedSizeType(-10322));
     }
 
     { // larger, but compressible buffer
@@ -160,21 +152,21 @@ TestDelayedLoadMetadata::test()
         std::stringstream ss(std::ios_base::out | std::ios_base::in | std::ios_base::binary);
         metadata.write(ss);
 
-        CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(ss.tellp())-headerInitialSize, size_t(metadata.size()));
+        EXPECT_EQ(static_cast<size_t>(ss.tellp())-headerInitialSize, size_t(metadata.size()));
 
         std::streampos uncompressedSize(uncompressedBufferSize + headerTotalSize);
 #ifdef OPENVDB_USE_BLOSC
         // expect a compression ratio of more than 10x
-        CPPUNIT_ASSERT(ss.tellp() * 10 < uncompressedSize);
+        EXPECT_TRUE(ss.tellp() * 10 < uncompressedSize);
 #else
-        CPPUNIT_ASSERT(ss.tellp() == uncompressedSize);
+        EXPECT_TRUE(ss.tellp() == uncompressedSize);
 #endif
 
         DelayedLoadMetadata newMetadata;
         newMetadata.read(ss);
-        CPPUNIT_ASSERT_EQUAL(metadata.size(), newMetadata.size());
+        EXPECT_EQ(metadata.size(), newMetadata.size());
         for (size_t i = 0; i < size; i++) {
-            CPPUNIT_ASSERT_EQUAL(metadata.getMask(i), newMetadata.getMask(i));
+            EXPECT_EQ(metadata.getMask(i), newMetadata.getMask(i));
         }
     }
 
@@ -190,7 +182,7 @@ TestDelayedLoadMetadata::test()
         openvdb::MetaMap metamap;
         metamap.insertMeta("delayload", metadata);
 
-        CPPUNIT_ASSERT_EQUAL(size_t(1), metamap.metaCount());
+        EXPECT_EQ(size_t(1), metamap.metaCount());
 
         metamap.writeMeta(ss);
 
@@ -198,7 +190,7 @@ TestDelayedLoadMetadata::test()
             openvdb::MetaMap newMetamap;
             newMetamap.readMeta(ss);
 
-            CPPUNIT_ASSERT_EQUAL(size_t(1), newMetamap.metaCount());
+            EXPECT_EQ(size_t(1), newMetamap.metaCount());
         }
 
         {
@@ -207,7 +199,7 @@ TestDelayedLoadMetadata::test()
             openvdb::MetaMap newMetamap;
             newMetamap.readMeta(ss);
 
-            CPPUNIT_ASSERT_EQUAL(size_t(0), newMetamap.metaCount());
+            EXPECT_EQ(size_t(0), newMetamap.metaCount());
         }
     }
 }
