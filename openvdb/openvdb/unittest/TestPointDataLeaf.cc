@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
@@ -18,47 +18,11 @@ using namespace openvdb;
 using namespace openvdb::points;
 
 
-class TestPointDataLeaf: public CppUnit::TestCase
+class TestPointDataLeaf: public ::testing::Test
 {
 public:
-
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestPointDataLeaf);
-    CPPUNIT_TEST(testEmptyLeaf);
-    CPPUNIT_TEST(testOffsets);
-    CPPUNIT_TEST(testSetValue);
-    CPPUNIT_TEST(testMonotonicity);
-    CPPUNIT_TEST(testAttributes);
-    CPPUNIT_TEST(testSteal);
-    CPPUNIT_TEST(testTopologyCopy);
-    CPPUNIT_TEST(testEquivalence);
-    CPPUNIT_TEST(testIterators);
-    CPPUNIT_TEST(testReadWriteCompression);
-    CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testSwap);
-    CPPUNIT_TEST(testCopyOnWrite);
-    CPPUNIT_TEST(testCopyDescriptor);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testEmptyLeaf();
-    void testOffsets();
-    void testSetValue();
-    void testMonotonicity();
-    void testAttributes();
-    void testSteal();
-    void testTopologyCopy();
-    void testEquivalence();
-    void testIterators();
-    void testReadWriteCompression();
-    void testIO();
-    void testSwap();
-    void testCopyOnWrite();
-    void testCopyDescriptor();
-
-private:
-
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 }; // class TestPointDataLeaf
 
 using LeafType = PointDataTree::LeafNodeType;
@@ -174,20 +138,19 @@ std::vector<openvdb::Vec3R> genPoints(const int numPoints)
 
 } // namespace
 
-void
-TestPointDataLeaf::testEmptyLeaf()
+TEST_F(TestPointDataLeaf, testEmptyLeaf)
 {
     // empty leaf construction
 
     {
         LeafType* leafNode = new LeafType();
 
-        CPPUNIT_ASSERT(leafNode);
-        CPPUNIT_ASSERT(leafNode->isEmpty());
-        CPPUNIT_ASSERT(!leafNode->buffer().empty());
-        CPPUNIT_ASSERT(zeroLeafValues(leafNode));
-        CPPUNIT_ASSERT(noAttributeData(leafNode));
-        CPPUNIT_ASSERT(leafNode->origin() == openvdb::Coord(0, 0, 0));
+        EXPECT_TRUE(leafNode);
+        EXPECT_TRUE(leafNode->isEmpty());
+        EXPECT_TRUE(!leafNode->buffer().empty());
+        EXPECT_TRUE(zeroLeafValues(leafNode));
+        EXPECT_TRUE(noAttributeData(leafNode));
+        EXPECT_TRUE(leafNode->origin() == openvdb::Coord(0, 0, 0));
 
         delete leafNode;
     }
@@ -199,21 +162,20 @@ TestPointDataLeaf::testEmptyLeaf()
 
         LeafType* leafNode = new LeafType(coord);
 
-        CPPUNIT_ASSERT(leafNode);
-        CPPUNIT_ASSERT(leafNode->isEmpty());
-        CPPUNIT_ASSERT(!leafNode->buffer().empty());
-        CPPUNIT_ASSERT(zeroLeafValues(leafNode));
-        CPPUNIT_ASSERT(noAttributeData(leafNode));
+        EXPECT_TRUE(leafNode);
+        EXPECT_TRUE(leafNode->isEmpty());
+        EXPECT_TRUE(!leafNode->buffer().empty());
+        EXPECT_TRUE(zeroLeafValues(leafNode));
+        EXPECT_TRUE(noAttributeData(leafNode));
 
-        CPPUNIT_ASSERT(leafNode->origin() == openvdb::Coord(16, 24, 40));
+        EXPECT_TRUE(leafNode->origin() == openvdb::Coord(16, 24, 40));
 
         delete leafNode;
     }
 }
 
 
-void
-TestPointDataLeaf::testOffsets()
+TEST_F(TestPointDataLeaf, testOffsets)
 {
     // offsets for one point per voxel (active = true)
 
@@ -224,8 +186,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->setOffsetOn(i, i);
         }
 
-        CPPUNIT_ASSERT(leafNode->getValue(10) == 10);
-        CPPUNIT_ASSERT(leafNode->isDense());
+        EXPECT_TRUE(leafNode->getValue(10) == 10);
+        EXPECT_TRUE(leafNode->isDense());
 
         delete leafNode;
     }
@@ -239,8 +201,8 @@ TestPointDataLeaf::testOffsets()
             leafNode->setOffsetOnly(i, i);
         }
 
-        CPPUNIT_ASSERT(leafNode->getValue(10) == 10);
-        CPPUNIT_ASSERT(leafNode->isEmpty());
+        EXPECT_TRUE(leafNode->getValue(10) == 10);
+        EXPECT_TRUE(leafNode->isEmpty());
 
         delete leafNode;
     }
@@ -260,7 +222,7 @@ TestPointDataLeaf::testOffsets()
 
         const LeafType::NodeMaskType& valueMask = leafNode->getValueMask();
         for (openvdb::Index i = 0; i < LeafType::SIZE; ++i ) {
-            CPPUNIT_ASSERT(valueMask.isOn(i));
+            EXPECT_TRUE(valueMask.isOn(i));
         }
 
         delete leafNode;
@@ -281,7 +243,7 @@ TestPointDataLeaf::testOffsets()
 
         const LeafType::NodeMaskType& valueMask = leafNode->getValueMask();
         for (openvdb::Index i = 0; i < LeafType::SIZE; ++i ) {
-            CPPUNIT_ASSERT(valueMask.isOff(i));
+            EXPECT_TRUE(valueMask.isOff(i));
         }
 
         delete leafNode;
@@ -293,7 +255,7 @@ TestPointDataLeaf::testOffsets()
         LeafType* leafNode = new LeafType();
 
         std::vector<LeafType::ValueType> newOffsets;
-        CPPUNIT_ASSERT_THROW(leafNode->setOffsets(newOffsets), openvdb::ValueError);
+        EXPECT_THROW(leafNode->setOffsets(newOffsets), openvdb::ValueError);
 
         delete leafNode;
     }
@@ -308,7 +270,7 @@ TestPointDataLeaf::testOffsets()
         // empty Descriptor should throw on leaf node initialize
         auto emptyDescriptor = std::make_shared<Descriptor>();
         LeafType* emptyLeafNode = new LeafType();
-        CPPUNIT_ASSERT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5),
+        EXPECT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5),
             openvdb::IndexError);
 
         // create a non-empty Descriptor
@@ -330,7 +292,7 @@ TestPointDataLeaf::testOffsets()
             offsets.back() = numAttributes;
             leafNode->setOffsets(offsets);
 
-            CPPUNIT_ASSERT_NO_THROW(leafNode->validateOffsets());
+            EXPECT_NO_THROW(leafNode->validateOffsets());
             delete leafNode;
         }
 
@@ -343,7 +305,7 @@ TestPointDataLeaf::testOffsets()
             *offsets.begin() = 1;
             leafNode->setOffsets(offsets);
 
-            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            EXPECT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
             delete leafNode;
         }
 
@@ -368,7 +330,7 @@ TestPointDataLeaf::testOffsets()
             offsets.back() = numAttributes;
             leafNode->setOffsets(offsets);
 
-            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            EXPECT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
             delete leafNode;
         }
 
@@ -390,7 +352,7 @@ TestPointDataLeaf::testOffsets()
             offsets.back() = numAttributes - 1;
             leafNode->setOffsets(offsets);
 
-            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            EXPECT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
             delete leafNode;
         }
 
@@ -411,15 +373,14 @@ TestPointDataLeaf::testOffsets()
             offsets.back() = numAttributes + 1;
             leafNode->setOffsets(offsets);
 
-            CPPUNIT_ASSERT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
+            EXPECT_THROW(leafNode->validateOffsets(), openvdb::ValueError);
             delete leafNode;
         }
     }
 }
 
 
-void
-TestPointDataLeaf::testSetValue()
+TEST_F(TestPointDataLeaf, testSetValue)
 {
     // the following tests are not run when in debug mode due to assertions firing
 #ifdef NDEBUG
@@ -443,13 +404,12 @@ TestPointDataLeaf::testSetValue()
     leaf.modifyValue(index, Local::op);
     leaf.modifyValueAndActiveState(xyz, Local::op);
 
-    CPPUNIT_ASSERT_EQUAL(0, int(leaf.getValue(xyz)));
+    EXPECT_EQ(0, int(leaf.getValue(xyz)));
 #endif
 }
 
 
-void
-TestPointDataLeaf::testMonotonicity()
+TEST_F(TestPointDataLeaf, testMonotonicity)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
 
@@ -467,18 +427,17 @@ TestPointDataLeaf::testMonotonicity()
         }
     }
 
-    CPPUNIT_ASSERT(monotonicOffsets(leaf));
+    EXPECT_TRUE(monotonicOffsets(leaf));
 
     // manually change a value and ensure offsets become non-monotonic
 
     leaf.setOffsetOn(500, 4);
 
-    CPPUNIT_ASSERT(!monotonicOffsets(leaf));
+    EXPECT_TRUE(!monotonicOffsets(leaf));
 }
 
 
-void
-TestPointDataLeaf::testAttributes()
+TEST_F(TestPointDataLeaf, testAttributes)
 {
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
     using AttributeI        = TypedAttributeArray<int32_t>;
@@ -493,7 +452,7 @@ TestPointDataLeaf::testAttributes()
 
     LeafType leaf(openvdb::Coord(0, 0, 0));
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(0));
 
     leaf.initializeAttributes(descrA, /*arrayLength=*/100);
 
@@ -506,123 +465,123 @@ TestPointDataLeaf::testAttributes()
 
     // note that the default value has not been added to the replacement descriptor,
     // however the default value of the attribute is as expected
-    CPPUNIT_ASSERT_EQUAL(0,
+    EXPECT_EQ(0,
         leaf.attributeSet().descriptor().getDefaultValue<int>("id"));
-    CPPUNIT_ASSERT_EQUAL(7,
+    EXPECT_EQ(7,
         AttributeI::cast(*leaf.attributeSet().getConst("id")).get(0));
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(2));
 
     {
         const AttributeArray* array = leaf.attributeSet().get(/*pos=*/0);
 
-        CPPUNIT_ASSERT_EQUAL(array->size(), Index(100));
+        EXPECT_EQ(array->size(), Index(100));
     }
 
     // manually set a voxel
 
     leaf.setOffsetOn(LeafType::SIZE - 1, 10);
 
-    CPPUNIT_ASSERT(!zeroLeafValues(&leaf));
+    EXPECT_TRUE(!zeroLeafValues(&leaf));
 
     // neither dense nor empty
 
-    CPPUNIT_ASSERT(!leaf.isDense());
-    CPPUNIT_ASSERT(!leaf.isEmpty());
+    EXPECT_TRUE(!leaf.isDense());
+    EXPECT_TRUE(!leaf.isEmpty());
 
     // clear the attributes and check voxel values are zero but value mask is not touched
 
     leaf.clearAttributes(/*updateValueMask=*/ false);
 
-    CPPUNIT_ASSERT(!leaf.isDense());
-    CPPUNIT_ASSERT(!leaf.isEmpty());
+    EXPECT_TRUE(!leaf.isDense());
+    EXPECT_TRUE(!leaf.isEmpty());
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(2));
-    CPPUNIT_ASSERT(zeroLeafValues(&leaf));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(2));
+    EXPECT_TRUE(zeroLeafValues(&leaf));
 
     // call clearAttributes again, updating the value mask and check it is now inactive
 
     leaf.clearAttributes();
 
-    CPPUNIT_ASSERT(leaf.isEmpty());
+    EXPECT_TRUE(leaf.isEmpty());
 
     // ensure arrays are uniform
 
     const AttributeArray* array0 = leaf.attributeSet().get(/*pos=*/0);
     const AttributeArray* array1 = leaf.attributeSet().get(/*pos=*/1);
 
-    CPPUNIT_ASSERT_EQUAL(array0->size(), Index(1));
-    CPPUNIT_ASSERT_EQUAL(array1->size(), Index(1));
+    EXPECT_EQ(array0->size(), Index(1));
+    EXPECT_EQ(array1->size(), Index(1));
 
     // test leaf returns expected result for hasAttribute()
 
-    CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/0));
-    CPPUNIT_ASSERT(leaf.hasAttribute("P"));
+    EXPECT_TRUE(leaf.hasAttribute(/*pos*/0));
+    EXPECT_TRUE(leaf.hasAttribute("P"));
 
-    CPPUNIT_ASSERT(leaf.hasAttribute(/*pos*/1));
-    CPPUNIT_ASSERT(leaf.hasAttribute("id"));
+    EXPECT_TRUE(leaf.hasAttribute(/*pos*/1));
+    EXPECT_TRUE(leaf.hasAttribute("id"));
 
-    CPPUNIT_ASSERT(!leaf.hasAttribute(/*pos*/2));
-    CPPUNIT_ASSERT(!leaf.hasAttribute("test"));
+    EXPECT_TRUE(!leaf.hasAttribute(/*pos*/2));
+    EXPECT_TRUE(!leaf.hasAttribute("test"));
 
     // test underlying attributeArray can be accessed by name and index,
     // and that their types are as expected.
 
     const LeafType* constLeaf = &leaf;
 
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray(/*pos*/0).type(),
         AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray("P").type(),
         AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos*/1).type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray(/*pos*/1).type(),
         AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray("id").type(),
         AttributeI::attributeType()));
 
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray(/*pos*/0).type(),
         AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray("P").type(),
         AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos*/1).type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray(/*pos*/1).type(),
         AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray("id").type(),
         AttributeI::attributeType()));
 
     // check invalid pos or name throws
 
-    CPPUNIT_ASSERT_THROW(leaf.attributeArray(/*pos=*/3), openvdb::LookupError);
-    CPPUNIT_ASSERT_THROW(leaf.attributeArray("not_there"), openvdb::LookupError);
+    EXPECT_THROW(leaf.attributeArray(/*pos=*/3), openvdb::LookupError);
+    EXPECT_THROW(leaf.attributeArray("not_there"), openvdb::LookupError);
 
-    CPPUNIT_ASSERT_THROW(constLeaf->attributeArray(/*pos=*/3), openvdb::LookupError);
-    CPPUNIT_ASSERT_THROW(constLeaf->attributeArray("not_there"), openvdb::LookupError);
+    EXPECT_THROW(constLeaf->attributeArray(/*pos=*/3), openvdb::LookupError);
+    EXPECT_THROW(constLeaf->attributeArray("not_there"), openvdb::LookupError);
 
     // test leaf can be successfully cast to TypedAttributeArray and check types
 
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos=*/0).type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray(/*pos=*/0).type(),
                          AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("P").type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray("P").type(),
                          AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray(/*pos=*/1).type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray(/*pos=*/1).type(),
                          AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(leaf.attributeArray("id").type(),
+    EXPECT_TRUE(matchingNamePairs(leaf.attributeArray("id").type(),
                          AttributeI::attributeType()));
 
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos=*/0).type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray(/*pos=*/0).type(),
                          AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("P").type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray("P").type(),
                          AttributeVec3s::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray(/*pos=*/1).type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray(/*pos=*/1).type(),
                          AttributeI::attributeType()));
-    CPPUNIT_ASSERT(matchingNamePairs(constLeaf->attributeArray("id").type(),
+    EXPECT_TRUE(matchingNamePairs(constLeaf->attributeArray("id").type(),
                          AttributeI::attributeType()));
 
     // check invalid pos or name throws
 
-    CPPUNIT_ASSERT_THROW(leaf.attributeArray(/*pos=*/2), openvdb::LookupError);
-    CPPUNIT_ASSERT_THROW(leaf.attributeArray("test"), openvdb::LookupError);
+    EXPECT_THROW(leaf.attributeArray(/*pos=*/2), openvdb::LookupError);
+    EXPECT_THROW(leaf.attributeArray("test"), openvdb::LookupError);
 
-    CPPUNIT_ASSERT_THROW(constLeaf->attributeArray(/*pos=*/2), openvdb::LookupError);
-    CPPUNIT_ASSERT_THROW(constLeaf->attributeArray("test"), openvdb::LookupError);
+    EXPECT_THROW(constLeaf->attributeArray(/*pos=*/2), openvdb::LookupError);
+    EXPECT_THROW(constLeaf->attributeArray("test"), openvdb::LookupError);
 
     // check memory usage = attribute set + base leaf
 
@@ -632,12 +591,11 @@ TestPointDataLeaf::testAttributes()
 
     const Index64 memUsage = baseLeaf.memUsage() + leaf.attributeSet().memUsage();
 
-    CPPUNIT_ASSERT_EQUAL(memUsage, leaf.memUsage());
+    EXPECT_EQ(memUsage, leaf.memUsage());
 }
 
 
-void
-TestPointDataLeaf::testSteal()
+TEST_F(TestPointDataLeaf, testSteal)
 {
     using AttributeVec3s = TypedAttributeArray<Vec3s>;
     using Descriptor = AttributeSet::Descriptor;
@@ -650,27 +608,26 @@ TestPointDataLeaf::testSteal()
 
     LeafType leaf(openvdb::Coord(0, 0, 0));
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(0));
 
     leaf.initializeAttributes(descrA, /*arrayLength=*/100);
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(1));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(1));
 
     // steal the attribute set
 
     AttributeSet::UniquePtr attributeSet = leaf.stealAttributeSet();
 
-    CPPUNIT_ASSERT(attributeSet);
-    CPPUNIT_ASSERT_EQUAL(attributeSet->size(), size_t(1));
+    EXPECT_TRUE(attributeSet);
+    EXPECT_EQ(attributeSet->size(), size_t(1));
 
     // ensure a new attribute set has been inserted in it's place
 
-    CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), size_t(0));
+    EXPECT_EQ(leaf.attributeSet().size(), size_t(0));
 }
 
 
-void
-TestPointDataLeaf::testTopologyCopy()
+TEST_F(TestPointDataLeaf, testTopologyCopy)
 {
     // test topology copy from a float Leaf
 
@@ -686,13 +643,13 @@ TestPointDataLeaf::testTopologyCopy()
         floatLeaf.setValueOn(7);
         floatLeaf.setValueOn(8);
 
-        CPPUNIT_ASSERT_EQUAL(floatLeaf.onVoxelCount(), Index64(4));
+        EXPECT_EQ(floatLeaf.onVoxelCount(), Index64(4));
 
         // validate construction of a PointDataLeaf using a TopologyCopy
 
         LeafType leaf(floatLeaf, 0, openvdb::TopologyCopy());
 
-        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), Index64(4));
+        EXPECT_EQ(leaf.onVoxelCount(), Index64(4));
 
         LeafType leaf2(openvdb::Coord(8, 8, 8));
 
@@ -700,17 +657,17 @@ TestPointDataLeaf::testTopologyCopy()
         leaf2.setValueOn(4);
         leaf2.setValueOn(7);
 
-        CPPUNIT_ASSERT(!leaf.hasSameTopology(&leaf2));
+        EXPECT_TRUE(!leaf.hasSameTopology(&leaf2));
 
         leaf2.setValueOn(8);
 
-        CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+        EXPECT_TRUE(leaf.hasSameTopology(&leaf2));
 
         // validate construction of a PointDataLeaf using an Off-On TopologyCopy
 
         LeafType leaf3(floatLeaf, 1, 2, openvdb::TopologyCopy());
 
-        CPPUNIT_ASSERT_EQUAL(leaf3.onVoxelCount(), Index64(4));
+        EXPECT_EQ(leaf3.onVoxelCount(), Index64(4));
     }
 
     // test topology copy from a PointIndexLeaf
@@ -736,21 +693,20 @@ TestPointDataLeaf::testTopologyCopy()
 
         auto iter = pointGridPtr->tree().cbeginLeaf();
 
-        CPPUNIT_ASSERT(iter);
+        EXPECT_TRUE(iter);
 
         // check that the active voxel counts match for all leaves
 
         for ( ; iter; ++iter) {
             LeafType leaf(*iter);
 
-            CPPUNIT_ASSERT_EQUAL(iter->onVoxelCount(), leaf.onVoxelCount());
+            EXPECT_EQ(iter->onVoxelCount(), leaf.onVoxelCount());
         }
     }
 }
 
 
-void
-TestPointDataLeaf::testEquivalence()
+TEST_F(TestPointDataLeaf, testEquivalence)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
@@ -793,11 +749,11 @@ TestPointDataLeaf::testEquivalence()
     {
         LeafType leaf2(leaf);
 
-        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        CPPUNIT_ASSERT(leaf.hasSameTopology(&leaf2));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf.hasSameTopology(&leaf2));
 
-        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().size(), leaf2.attributeSet().size());
-        CPPUNIT_ASSERT_EQUAL(leaf.attributeSet().get(0)->size(),
+        EXPECT_EQ(leaf.attributeSet().size(), leaf2.attributeSet().size());
+        EXPECT_EQ(leaf.attributeSet().get(0)->size(),
             leaf2.attributeSet().get(0)->size());
     }
 
@@ -806,27 +762,26 @@ TestPointDataLeaf::testEquivalence()
     {
         LeafType leaf2(leaf);
 
-        CPPUNIT_ASSERT(leaf == leaf2);
+        EXPECT_TRUE(leaf == leaf2);
 
         leaf2.setOrigin(openvdb::Coord(0, 8, 0));
 
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
     }
 
     {
         LeafType leaf2(leaf);
 
-        CPPUNIT_ASSERT(leaf == leaf2);
+        EXPECT_TRUE(leaf == leaf2);
 
         leaf2.setValueOn(10);
 
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
     }
 }
 
 
-void
-TestPointDataLeaf::testIterators()
+TEST_F(TestPointDataLeaf, testIterators)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
@@ -864,33 +819,32 @@ TestPointDataLeaf::testIterators()
 
     { // test index on
         LeafType::IndexOnIter iterOn(leaf.beginIndexOn());
-        CPPUNIT_ASSERT_EQUAL(iterCount(iterOn), Index64(size/2));
+        EXPECT_EQ(iterCount(iterOn), Index64(size/2));
         for (int i = 0; iterOn; ++iterOn, i += 2) {
-            CPPUNIT_ASSERT_EQUAL(*iterOn, Index32(i));
+            EXPECT_EQ(*iterOn, Index32(i));
         }
     }
 
     { // test index off
         LeafType::IndexOffIter iterOff(leaf.beginIndexOff());
-        CPPUNIT_ASSERT_EQUAL(iterCount(iterOff), Index64(size/2));
+        EXPECT_EQ(iterCount(iterOff), Index64(size/2));
         for (int i = 1; iterOff; ++iterOff, i += 2) {
-            CPPUNIT_ASSERT_EQUAL(*iterOff, Index32(i));
+            EXPECT_EQ(*iterOff, Index32(i));
         }
     }
 
     { // test index all
         LeafType::IndexAllIter iterAll(leaf.beginIndexAll());
-        CPPUNIT_ASSERT_EQUAL(iterCount(iterAll), Index64(size));
+        EXPECT_EQ(iterCount(iterAll), Index64(size));
         for (int i = 0; iterAll; ++iterAll, ++i) {
-            CPPUNIT_ASSERT_EQUAL(*iterAll, Index32(i));
+            EXPECT_EQ(*iterAll, Index32(i));
         }
     }
 
 }
 
 
-void
-TestPointDataLeaf::testReadWriteCompression()
+TEST_F(TestPointDataLeaf, testReadWriteCompression)
 {
     using namespace openvdb;
 
@@ -916,7 +870,7 @@ TestPointDataLeaf::testReadWriteCompression()
             io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
 
             for (Index i = 0; i < count; i++) {
-                CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+                EXPECT_EQ(srcBuf.get()[i], destBuf.get()[i]);
             }
         }
 
@@ -940,17 +894,17 @@ TestPointDataLeaf::testReadWriteCompression()
             ss.read(reinterpret_cast<char*>(&size), sizeof(uint16_t));
             if (size == std::numeric_limits<uint16_t>::max())   size = 0;
 
-            CPPUNIT_ASSERT_EQUAL(size_t(size), referenceBytes);
+            EXPECT_EQ(size_t(size), referenceBytes);
 
             io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
 
             int magic2;
             ss.read(reinterpret_cast<char*>(&magic2), sizeof(int));
 
-            CPPUNIT_ASSERT_EQUAL(magic, magic2);
+            EXPECT_EQ(magic, magic2);
 
             for (Index i = 0; i < count; i++) {
-                CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+                EXPECT_EQ(srcBuf.get()[i], destBuf.get()[i]);
             }
 
             io::setStreamMetadataPtr(ss, nullMetadata);
@@ -971,7 +925,7 @@ TestPointDataLeaf::testReadWriteCompression()
             uint16_t actualSize(size);
             if (size == std::numeric_limits<uint16_t>::max())   actualSize = 0;
 
-            CPPUNIT_ASSERT_EQUAL(size_t(actualSize), referenceBytes);
+            EXPECT_EQ(size_t(actualSize), referenceBytes);
 
             streamMetadata->setPass(size);
 
@@ -981,7 +935,7 @@ TestPointDataLeaf::testReadWriteCompression()
             int magic2;
             ss.read(reinterpret_cast<char*>(&magic2), sizeof(int));
 
-            CPPUNIT_ASSERT_EQUAL(magic, magic2);
+            EXPECT_EQ(magic, magic2);
 
             io::setStreamMetadataPtr(ss, nullMetadata);
         }
@@ -994,7 +948,7 @@ TestPointDataLeaf::testReadWriteCompression()
             ssInvalid.write(reinterpret_cast<const char*>(&bytes16), sizeof(uint16_t));
 
             std::unique_ptr<PointDataIndex32[]> destBuf(new PointDataIndex32[count]);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(),
+            EXPECT_THROW(io::readCompressedValues(ssInvalid, destBuf.get(),
                 count, valueMask, false), RuntimeError);
         }
 #endif
@@ -1005,12 +959,12 @@ TestPointDataLeaf::testReadWriteCompression()
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(),
+            EXPECT_THROW(io::readCompressedValues(ss, destBuf.get(),
                 count+1, valueMask, false), RuntimeError);
 
             ss.str("");
             io::writeCompressedValues(ss, srcBuf.get(), count, valueMask, childMask, false);
-            CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, destBuf.get(),
+            EXPECT_THROW(io::readCompressedValues(ss, destBuf.get(),
                 1, valueMask, false), RuntimeError);
         }
 #endif
@@ -1029,7 +983,7 @@ TestPointDataLeaf::testReadWriteCompression()
             int test2;
             ss.read(reinterpret_cast<char*>(&test2), sizeof(int));
 
-            CPPUNIT_ASSERT_EQUAL(test, test2);
+            EXPECT_EQ(test, test2);
         }
     }
 
@@ -1048,7 +1002,7 @@ TestPointDataLeaf::testReadWriteCompression()
         io::readCompressedValues(ss, destBuf.get(), count, valueMask, false);
 
         for (Index i = 0; i < count; i++) {
-            CPPUNIT_ASSERT_EQUAL(srcBuf.get()[i], destBuf.get()[i]);
+            EXPECT_EQ(srcBuf.get()[i], destBuf.get()[i]);
         }
     }
 
@@ -1057,15 +1011,14 @@ TestPointDataLeaf::testReadWriteCompression()
         PointDataIndex32* buf = nullptr;
         Index count = std::numeric_limits<uint16_t>::max();
 
-        CPPUNIT_ASSERT_THROW(io::writeCompressedValues(ss, buf, count, valueMask, childMask, false),
+        EXPECT_THROW(io::writeCompressedValues(ss, buf, count, valueMask, childMask, false),
             IoError);
-        CPPUNIT_ASSERT_THROW(io::readCompressedValues(ss, buf, count, valueMask, false), IoError);
+        EXPECT_THROW(io::readCompressedValues(ss, buf, count, valueMask, false), IoError);
     }
 }
 
 
-void
-TestPointDataLeaf::testIO()
+TEST_F(TestPointDataLeaf, testIO)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
@@ -1114,14 +1067,14 @@ TestPointDataLeaf::testIO()
 
         // check topology matches
 
-        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        CPPUNIT_ASSERT(leaf2.isValueOn(4));
-        CPPUNIT_ASSERT(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
 
         // check only topology (values and attributes still empty)
 
-        CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(0));
-        CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(0));
+        EXPECT_EQ(leaf2.getValue(4), ValueType(0));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(0));
     }
 
     // read and write buffers to disk
@@ -1146,7 +1099,7 @@ TestPointDataLeaf::testIO()
 
             io::StreamMetadata::Ptr meta;
             io::setStreamMetadataPtr(ostr, meta);
-            CPPUNIT_ASSERT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
+            EXPECT_THROW(leaf.writeBuffers(ostr), openvdb::IoError);
         }
 
         std::istringstream istr(ostr.str(), std::ios_base::binary);
@@ -1166,14 +1119,14 @@ TestPointDataLeaf::testIO()
 
         // check topology matches
 
-        CPPUNIT_ASSERT_EQUAL(leaf.onVoxelCount(), leaf2.onVoxelCount());
-        CPPUNIT_ASSERT(leaf2.isValueOn(4));
-        CPPUNIT_ASSERT(!leaf2.isValueOn(5));
+        EXPECT_EQ(leaf.onVoxelCount(), leaf2.onVoxelCount());
+        EXPECT_TRUE(leaf2.isValueOn(4));
+        EXPECT_TRUE(!leaf2.isValueOn(5));
 
         // check only topology (values and attributes still empty)
 
-        CPPUNIT_ASSERT_EQUAL(leaf2.getValue(4), ValueType(20));
-        CPPUNIT_ASSERT_EQUAL(leaf2.attributeSet().size(), size_t(2));
+        EXPECT_EQ(leaf2.getValue(4), ValueType(20));
+        EXPECT_EQ(leaf2.attributeSet().size(), size_t(2));
     }
 
     { // test multi-buffer IO
@@ -1207,9 +1160,9 @@ TestPointDataLeaf::testIO()
             }
 
             LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
 
-            CPPUNIT_ASSERT(leaf == *leafFromDisk);
+            EXPECT_TRUE(leaf == *leafFromDisk);
         }
 
         { // read grids from file and pre-fetch
@@ -1225,21 +1178,21 @@ TestPointDataLeaf::testIO()
             }
 
             LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
 
             const AttributeVec3s& position(
                 AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
             const AttributeF& density(
                 AttributeF::cast(leafFromDisk->constAttributeArray("density")));
 
-            CPPUNIT_ASSERT(leafFromDisk->buffer().isOutOfCore());
+            EXPECT_TRUE(leafFromDisk->buffer().isOutOfCore());
 #if OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(position.isOutOfCore());
-            CPPUNIT_ASSERT(density.isOutOfCore());
+            EXPECT_TRUE(position.isOutOfCore());
+            EXPECT_TRUE(density.isOutOfCore());
 #else
             // delayed-loading is only available on attribute arrays when using Blosc
-            CPPUNIT_ASSERT(!position.isOutOfCore());
-            CPPUNIT_ASSERT(!density.isOutOfCore());
+            EXPECT_TRUE(!position.isOutOfCore());
+            EXPECT_TRUE(!density.isOutOfCore());
 #endif
 
             // prefetch voxel data only
@@ -1247,13 +1200,13 @@ TestPointDataLeaf::testIO()
 
             // ensure out-of-core data is now in-core after pre-fetching
 
-            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
+            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
 #if OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(position.isOutOfCore());
-            CPPUNIT_ASSERT(density.isOutOfCore());
+            EXPECT_TRUE(position.isOutOfCore());
+            EXPECT_TRUE(density.isOutOfCore());
 #else
-            CPPUNIT_ASSERT(!position.isOutOfCore());
-            CPPUNIT_ASSERT(!density.isOutOfCore());
+            EXPECT_TRUE(!position.isOutOfCore());
+            EXPECT_TRUE(!density.isOutOfCore());
 #endif
 
             { // re-open
@@ -1266,7 +1219,7 @@ TestPointDataLeaf::testIO()
             }
 
             leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
 
             const AttributeVec3s& position2(
                 AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
@@ -1278,12 +1231,12 @@ TestPointDataLeaf::testIO()
 
             // ensure out-of-core voxel and position data is now in-core after pre-fetching
 
-            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
-            CPPUNIT_ASSERT(!position2.isOutOfCore());
+            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
+            EXPECT_TRUE(!position2.isOutOfCore());
 #if OPENVDB_USE_BLOSC
-            CPPUNIT_ASSERT(density2.isOutOfCore());
+            EXPECT_TRUE(density2.isOutOfCore());
 #else
-            CPPUNIT_ASSERT(!density2.isOutOfCore());
+            EXPECT_TRUE(!density2.isOutOfCore());
 #endif
 
             { // re-open
@@ -1296,7 +1249,7 @@ TestPointDataLeaf::testIO()
             }
 
             leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
 
             const AttributeVec3s& position3(
                 AttributeVec3s::cast(leafFromDisk->constAttributeArray("P")));
@@ -1308,9 +1261,9 @@ TestPointDataLeaf::testIO()
 
             // ensure out-of-core voxel and position data is now in-core after pre-fetching
 
-            CPPUNIT_ASSERT(!leafFromDisk->buffer().isOutOfCore());
-            CPPUNIT_ASSERT(!position3.isOutOfCore());
-            CPPUNIT_ASSERT(!density3.isOutOfCore());
+            EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
+            EXPECT_TRUE(!position3.isOutOfCore());
+            EXPECT_TRUE(!density3.isOutOfCore());
         }
 
         remove("leaf.vdb");
@@ -1362,8 +1315,8 @@ TestPointDataLeaf::testIO()
 
         attr2.compact();
 
-        CPPUNIT_ASSERT(attr0.isUniform());
-        CPPUNIT_ASSERT(attr2.isUniform());
+        EXPECT_TRUE(attr0.isUniform());
+        EXPECT_TRUE(attr2.isUniform());
 
         grid->tree().addLeaf(new LeafType(leaf0));
         grid->tree().addLeaf(new LeafType(leaf1));
@@ -1391,16 +1344,16 @@ TestPointDataLeaf::testIO()
             }
 
             LeafType* leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
-            CPPUNIT_ASSERT(leaf0 == *leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
+            EXPECT_TRUE(leaf0 == *leafFromDisk);
 
             leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 8, 0));
-            CPPUNIT_ASSERT(leafFromDisk);
-            CPPUNIT_ASSERT(leaf1 == *leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
+            EXPECT_TRUE(leaf1 == *leafFromDisk);
 
             leafFromDisk = gridFromDisk->tree().probeLeaf(openvdb::Coord(0, 0, 8));
-            CPPUNIT_ASSERT(leafFromDisk);
-            CPPUNIT_ASSERT(leaf2 == *leafFromDisk);
+            EXPECT_TRUE(leafFromDisk);
+            EXPECT_TRUE(leaf2 == *leafFromDisk);
         }
 
         remove("leaf.vdb");
@@ -1408,8 +1361,7 @@ TestPointDataLeaf::testIO()
 }
 
 
-void
-TestPointDataLeaf::testSwap()
+TEST_F(TestPointDataLeaf, testSwap)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
@@ -1436,8 +1388,8 @@ TestPointDataLeaf::testSwap()
     // swap out the underlying attribute set with a new attribute set with a matching
     // descriptor
 
-    CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("density")->size());
-    CPPUNIT_ASSERT_EQUAL(initialArrayLength, leaf.attributeSet().get("id")->size());
+    EXPECT_EQ(initialArrayLength, leaf.attributeSet().get("density")->size());
+    EXPECT_EQ(initialArrayLength, leaf.attributeSet().get("id")->size());
 
     descrA = Descriptor::create(AttributeVec3s::attributeType());
 
@@ -1450,12 +1402,12 @@ TestPointDataLeaf::testSwap()
 
     leaf.replaceAttributeSet(newAttributeSet);
 
-    CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("density")->size());
-    CPPUNIT_ASSERT_EQUAL(newArrayLength, leaf.attributeSet().get("id")->size());
+    EXPECT_EQ(newArrayLength, leaf.attributeSet().get("density")->size());
+    EXPECT_EQ(newArrayLength, leaf.attributeSet().get("id")->size());
 
     // ensure we refuse to swap when the attribute set is null
 
-    CPPUNIT_ASSERT_THROW(leaf.replaceAttributeSet(nullptr), openvdb::ValueError);
+    EXPECT_THROW(leaf.replaceAttributeSet(nullptr), openvdb::ValueError);
 
     // ensure we refuse to swap when the descriptors do not match,
     // unless we explicitly allow a mismatch.
@@ -1465,14 +1417,13 @@ TestPointDataLeaf::testSwap()
 
     attributeSet->appendAttribute("extra", AttributeF::attributeType());
 
-    CPPUNIT_ASSERT_THROW(leaf.replaceAttributeSet(attributeSet), openvdb::ValueError);
+    EXPECT_THROW(leaf.replaceAttributeSet(attributeSet), openvdb::ValueError);
 
     leaf.replaceAttributeSet(attributeSet, true);
-    CPPUNIT_ASSERT_EQUAL(const_cast<AttributeSet*>(&leaf.attributeSet()), attributeSet);
+    EXPECT_EQ(const_cast<AttributeSet*>(&leaf.attributeSet()), attributeSet);
 }
 
-void
-TestPointDataLeaf::testCopyOnWrite()
+TEST_F(TestPointDataLeaf, testCopyOnWrite)
 {
     using AttributeVec3s    = TypedAttributeArray<openvdb::Vec3s>;
     using AttributeF        = TypedAttributeArray<float>;
@@ -1494,7 +1445,7 @@ TestPointDataLeaf::testCopyOnWrite()
 
     const AttributeSet& attributeSet = leaf.attributeSet();
 
-    CPPUNIT_ASSERT_EQUAL(attributeSet.size(), size_t(2));
+    EXPECT_EQ(attributeSet.size(), size_t(2));
 
     // ensure attribute arrays are shared between leaf nodes until write
 
@@ -1502,45 +1453,44 @@ TestPointDataLeaf::testCopyOnWrite()
 
     const AttributeSet& attributeSetCopy = leafCopy.attributeSet();
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSetCopy.isShared(/*pos=*/1));
 
     // test that from a const leaf, accesses to the attribute arrays do not
     // make then unique
 
     const AttributeArray* constArray = attributeSetCopy.getConst(/*pos=*/1);
-    CPPUNIT_ASSERT(constArray);
+    EXPECT_TRUE(constArray);
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSetCopy.isShared(/*pos=*/1));
 
     constArray = attributeSetCopy.get(/*pos=*/1);
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSetCopy.isShared(/*pos=*/1));
 
     constArray = &(leafCopy.attributeArray(/*pos=*/1));
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSetCopy.isShared(/*pos=*/1));
 
     constArray = &(leafCopy.attributeArray("density"));
 
-    CPPUNIT_ASSERT(attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(attributeSetCopy.isShared(/*pos=*/1));
 
     // test makeUnique is called from non const getters
 
     AttributeArray* attributeArray = &(leaf.attributeArray(/*pos=*/1));
-    CPPUNIT_ASSERT(attributeArray);
+    EXPECT_TRUE(attributeArray);
 
-    CPPUNIT_ASSERT(!attributeSet.isShared(/*pos=*/1));
-    CPPUNIT_ASSERT(!attributeSetCopy.isShared(/*pos=*/1));
+    EXPECT_TRUE(!attributeSet.isShared(/*pos=*/1));
+    EXPECT_TRUE(!attributeSetCopy.isShared(/*pos=*/1));
 }
 
 
-void
-TestPointDataLeaf::testCopyDescriptor()
+TEST_F(TestPointDataLeaf, testCopyDescriptor)
 {
     using AttributeVec3s    = TypedAttributeArray<Vec3s>;
     using AttributeS        = TypedAttributeArray<float>;
@@ -1570,27 +1520,24 @@ TestPointDataLeaf::testCopyDescriptor()
 
     PointDataTree tree2(tree);
 
-    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), openvdb::Index32(2));
+    EXPECT_EQ(tree2.leafCount(), openvdb::Index32(2));
 
     descrA->setGroup("test", size_t(1));
 
     PointDataTree::LeafCIter iter2 = tree2.cbeginLeaf();
-    CPPUNIT_ASSERT(iter2->attributeSet().descriptor().hasGroup("test"));
+    EXPECT_TRUE(iter2->attributeSet().descriptor().hasGroup("test"));
     ++iter2;
-    CPPUNIT_ASSERT(iter2->attributeSet().descriptor().hasGroup("test"));
+    EXPECT_TRUE(iter2->attributeSet().descriptor().hasGroup("test"));
 
     // call makeDescriptorUnique and ensure that descriptors are no longer shared
 
     Descriptor::Ptr newDescriptor = makeDescriptorUnique(tree2);
-    CPPUNIT_ASSERT(newDescriptor);
+    EXPECT_TRUE(newDescriptor);
 
     descrA->setGroup("test2", size_t(2));
 
     iter2 = tree2.cbeginLeaf();
-    CPPUNIT_ASSERT(!iter2->attributeSet().descriptor().hasGroup("test2"));
+    EXPECT_TRUE(!iter2->attributeSet().descriptor().hasGroup("test2"));
     ++iter2;
-    CPPUNIT_ASSERT(!iter2->attributeSet().descriptor().hasGroup("test2"));
+    EXPECT_TRUE(!iter2->attributeSet().descriptor().hasGroup("test2"));
 }
-
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDataLeaf);

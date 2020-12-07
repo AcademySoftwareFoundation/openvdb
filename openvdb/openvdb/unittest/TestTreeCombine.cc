@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Composite.h>
@@ -28,45 +28,13 @@ using Float433Grid = openvdb::Grid<Float433Tree>;
 }
 
 
-class TestTreeCombine: public CppUnit::TestFixture
+class TestTreeCombine: public ::testing::Test
 {
 public:
-     void setUp() override { openvdb::initialize(); Float433Grid::registerGrid(); }
-     void tearDown() override { openvdb::uninitialize(); }
+    void SetUp() override { openvdb::initialize(); Float433Grid::registerGrid(); }
+    void TearDown() override { openvdb::uninitialize(); }
 
-    CPPUNIT_TEST_SUITE(TestTreeCombine);
-    CPPUNIT_TEST(testCombine);
-    CPPUNIT_TEST(testCombine2);
-    CPPUNIT_TEST(testCompMax);
-    CPPUNIT_TEST(testCompMin);
-    CPPUNIT_TEST(testCompSum);
-    CPPUNIT_TEST(testCompProd);
-    CPPUNIT_TEST(testCompDiv);
-    CPPUNIT_TEST(testCompDivByZero);
-    CPPUNIT_TEST(testCompReplace);
-    CPPUNIT_TEST(testBoolTree);
-#ifdef DWA_OPENVDB
-    CPPUNIT_TEST(testCsg);
-#endif
-    CPPUNIT_TEST(testCsgCopy);
-    CPPUNIT_TEST(testCompActiveLeafVoxels);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testCombine();
-    void testCombine2();
-    void testCompMax();
-    void testCompMin();
-    void testCompSum();
-    void testCompProd();
-    void testCompDiv();
-    void testCompDivByZero();
-    void testCompReplace();
-    void testBoolTree();
-    void testCsg();
-    void testCsgCopy();
-    void testCompActiveLeafVoxels();
-
-private:
+protected:
     template<class TreeT, typename TreeComp, typename ValueComp>
     void testComp(const TreeComp&, const ValueComp&);
 
@@ -77,9 +45,6 @@ private:
     typename TreeT::Ptr
     visitCsg(const TreeT& a, const TreeT& b, const TreeT& ref, const VisitorT&);
 };
-
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestTreeCombine);
 
 
 ////////////////////////////////////////
@@ -151,8 +116,7 @@ inline openvdb::Vec3f divv(const openvdb::Vec3f& a, const openvdb::Vec3f& b) { r
 } // unnamed namespace
 
 
-void
-TestTreeCombine::testCombine()
+TEST_F(TestTreeCombine, testCombine)
 {
     testComp<openvdb::FloatTree>(Local::combine<openvdb::FloatTree>, Local::orderf);
     testComp<openvdb::VectorTree>(Local::combine<openvdb::VectorTree>, Local::orderv);
@@ -162,48 +126,42 @@ TestTreeCombine::testCombine()
 }
 
 
-void
-TestTreeCombine::testCompMax()
+TEST_F(TestTreeCombine, testCompMax)
 {
     testComp<openvdb::FloatTree>(Local::compMax<openvdb::FloatTree>, Local::maxf);
     testComp<openvdb::VectorTree>(Local::compMax<openvdb::VectorTree>, Local::maxv);
 }
 
 
-void
-TestTreeCombine::testCompMin()
+TEST_F(TestTreeCombine, testCompMin)
 {
     testComp<openvdb::FloatTree>(Local::compMin<openvdb::FloatTree>, Local::minf);
     testComp<openvdb::VectorTree>(Local::compMin<openvdb::VectorTree>, Local::minv);
 }
 
 
-void
-TestTreeCombine::testCompSum()
+TEST_F(TestTreeCombine, testCompSum)
 {
     testComp<openvdb::FloatTree>(Local::compSum<openvdb::FloatTree>, Local::sumf);
     testComp<openvdb::VectorTree>(Local::compSum<openvdb::VectorTree>, Local::sumv);
 }
 
 
-void
-TestTreeCombine::testCompProd()
+TEST_F(TestTreeCombine, testCompProd)
 {
     testComp<openvdb::FloatTree>(Local::compMul<openvdb::FloatTree>, Local::mulf);
     testComp<openvdb::VectorTree>(Local::compMul<openvdb::VectorTree>, Local::mulv);
 }
 
 
-void
-TestTreeCombine::testCompDiv()
+TEST_F(TestTreeCombine, testCompDiv)
 {
     testComp<openvdb::FloatTree>(Local::compDiv<openvdb::FloatTree>, Local::divf);
     testComp<openvdb::VectorTree>(Local::compDiv<openvdb::VectorTree>, Local::divv);
 }
 
 
-void
-TestTreeCombine::testCompDivByZero()
+TEST_F(TestTreeCombine, testCompDivByZero)
 {
     const openvdb::Coord c0(0), c1(1), c2(2), c3(3), c4(4);
 
@@ -223,11 +181,11 @@ TestTreeCombine::testCompDivByZero()
 
         openvdb::tools::compDiv(a, b);
 
-        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c0)); //  1 / 0
-        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c1)); //  1 / 0
-        CPPUNIT_ASSERT_EQUAL(-inf, a.getValue(c2)); // -1 / 0
-        CPPUNIT_ASSERT_EQUAL(-inf, a.getValue(c3)); // -1 / 0
-        CPPUNIT_ASSERT_EQUAL(   0, a.getValue(c4)); //  0 / 0
+        EXPECT_EQ( inf, a.getValue(c0)); //  1 / 0
+        EXPECT_EQ( inf, a.getValue(c1)); //  1 / 0
+        EXPECT_EQ(-inf, a.getValue(c2)); // -1 / 0
+        EXPECT_EQ(-inf, a.getValue(c3)); // -1 / 0
+        EXPECT_EQ(   0, a.getValue(c4)); //  0 / 0
     }
     {
         const openvdb::Index32 zero(0), inf = std::numeric_limits<openvdb::Index32>::max();
@@ -241,9 +199,9 @@ TestTreeCombine::testCompDivByZero()
 
         openvdb::tools::compDiv(a, b);
 
-        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c0)); //  1 / 0
-        CPPUNIT_ASSERT_EQUAL( inf, a.getValue(c1)); //  1 / 0
-        CPPUNIT_ASSERT_EQUAL(zero, a.getValue(c2)); //  0 / 0
+        EXPECT_EQ( inf, a.getValue(c0)); //  1 / 0
+        EXPECT_EQ( inf, a.getValue(c1)); //  1 / 0
+        EXPECT_EQ(zero, a.getValue(c2)); //  0 / 0
     }
 
     // Verify that non-integer-valued grids don't use integer division semantics.
@@ -260,17 +218,16 @@ TestTreeCombine::testCompDivByZero()
 
         openvdb::tools::compDiv(a, b);
 
-        CPPUNIT_ASSERT(std::isinf(a.getValue(c0))); //  1 / 0
-        CPPUNIT_ASSERT(std::isinf(a.getValue(c1))); //  1 / 0
-        CPPUNIT_ASSERT(std::isinf(a.getValue(c2))); // -1 / 0
-        CPPUNIT_ASSERT(std::isinf(a.getValue(c3))); // -1 / 0
-        CPPUNIT_ASSERT(std::isnan(a.getValue(c4))); //  0 / 0
+        EXPECT_TRUE(std::isinf(a.getValue(c0))); //  1 / 0
+        EXPECT_TRUE(std::isinf(a.getValue(c1))); //  1 / 0
+        EXPECT_TRUE(std::isinf(a.getValue(c2))); // -1 / 0
+        EXPECT_TRUE(std::isinf(a.getValue(c3))); // -1 / 0
+        EXPECT_TRUE(std::isnan(a.getValue(c4))); //  0 / 0
     }
 }
 
 
-void
-TestTreeCombine::testCompReplace()
+TEST_F(TestTreeCombine, testCompReplace)
 {
     testCompRepl<openvdb::FloatTree>();
     testCompRepl<openvdb::VectorTree>();
@@ -312,39 +269,39 @@ TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
         comp(aTree, bTree);
 
         // a = 3 (On), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(op(three, minusOne), aTree.getValue(openvdb::Coord(0, 0, 0)));
+        EXPECT_EQ(op(three, minusOne), aTree.getValue(openvdb::Coord(0, 0, 0)));
 
         // a = 3 (On), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(three, five), aTree.getValue(openvdb::Coord(0, 0, 1)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 0, 1)));
+        EXPECT_EQ(op(three, five), aTree.getValue(openvdb::Coord(0, 0, 1)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 0, 1)));
 
         // a = 1 (On, = bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(one, five), aTree.getValue(openvdb::Coord(0, 0, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 0, 2)));
+        EXPECT_EQ(op(one, five), aTree.getValue(openvdb::Coord(0, 0, 2)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 0, 2)));
 
         // a = 1 (On, = bg), b = -2 (On)
-        CPPUNIT_ASSERT_EQUAL(op(one, minusTwo), aTree.getValue(openvdb::Coord(0, 1, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 1, 2)));
+        EXPECT_EQ(op(one, minusTwo), aTree.getValue(openvdb::Coord(0, 1, 2)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 1, 2)));
 
         // a = 1 (bg), b = 4 (On)
-        CPPUNIT_ASSERT_EQUAL(op(one, four), aTree.getValue(openvdb::Coord(0, 1, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 1, 0)));
+        EXPECT_EQ(op(one, four), aTree.getValue(openvdb::Coord(0, 1, 0)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 1, 0)));
 
         // a = 3 (Off), b = -1 (Off)
-        CPPUNIT_ASSERT_EQUAL(op(three, minusOne), aTree.getValue(openvdb::Coord(1, 0, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 0, 0)));
+        EXPECT_EQ(op(three, minusOne), aTree.getValue(openvdb::Coord(1, 0, 0)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 0, 0)));
 
         // a = 3 (Off), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(three, five), aTree.getValue(openvdb::Coord(1, 0, 1)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 0, 1)));
+        EXPECT_EQ(op(three, five), aTree.getValue(openvdb::Coord(1, 0, 1)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 0, 1)));
 
         // a = 1 (bg), b = 4 (Off)
-        CPPUNIT_ASSERT_EQUAL(op(one, four), aTree.getValue(openvdb::Coord(1, 1, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 1, 0)));
+        EXPECT_EQ(op(one, four), aTree.getValue(openvdb::Coord(1, 1, 0)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 1, 0)));
 
         // a = 1 (bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(one, five), aTree.getValue(openvdb::Coord(1000, 1, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1000, 1, 2)));
+        EXPECT_EQ(op(one, five), aTree.getValue(openvdb::Coord(1000, 1, 2)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1000, 1, 2)));
     }
 
     // As above, but combining the A grid into the B grid
@@ -368,39 +325,39 @@ TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
         comp(bTree, aTree);
 
         // a = 3 (On), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(op(minusOne, three), bTree.getValue(openvdb::Coord(0, 0, 0)));
+        EXPECT_EQ(op(minusOne, three), bTree.getValue(openvdb::Coord(0, 0, 0)));
 
         // a = 3 (On), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(five, three), bTree.getValue(openvdb::Coord(0, 0, 1)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 0, 1)));
+        EXPECT_EQ(op(five, three), bTree.getValue(openvdb::Coord(0, 0, 1)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 0, 1)));
 
         // a = 1 (On, = bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(five, one), bTree.getValue(openvdb::Coord(0, 0, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 0, 2)));
+        EXPECT_EQ(op(five, one), bTree.getValue(openvdb::Coord(0, 0, 2)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 0, 2)));
 
         // a = 1 (On, = bg), b = -2 (On)
-        CPPUNIT_ASSERT_EQUAL(op(minusTwo, one), bTree.getValue(openvdb::Coord(0, 1, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 1, 2)));
+        EXPECT_EQ(op(minusTwo, one), bTree.getValue(openvdb::Coord(0, 1, 2)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 1, 2)));
 
         // a = 1 (bg), b = 4 (On)
-        CPPUNIT_ASSERT_EQUAL(op(four, one), bTree.getValue(openvdb::Coord(0, 1, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 1, 0)));
+        EXPECT_EQ(op(four, one), bTree.getValue(openvdb::Coord(0, 1, 0)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 1, 0)));
 
         // a = 3 (Off), b = -1 (Off)
-        CPPUNIT_ASSERT_EQUAL(op(minusOne, three), bTree.getValue(openvdb::Coord(1, 0, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 0, 0)));
+        EXPECT_EQ(op(minusOne, three), bTree.getValue(openvdb::Coord(1, 0, 0)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 0, 0)));
 
         // a = 3 (Off), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(five, three), bTree.getValue(openvdb::Coord(1, 0, 1)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 0, 1)));
+        EXPECT_EQ(op(five, three), bTree.getValue(openvdb::Coord(1, 0, 1)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 0, 1)));
 
         // a = 1 (bg), b = 4 (Off)
-        CPPUNIT_ASSERT_EQUAL(op(four, one), bTree.getValue(openvdb::Coord(1, 1, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 1, 0)));
+        EXPECT_EQ(op(four, one), bTree.getValue(openvdb::Coord(1, 1, 0)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 1, 0)));
 
         // a = 1 (bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(op(five, one), bTree.getValue(openvdb::Coord(1000, 1, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1000, 1, 2)));
+        EXPECT_EQ(op(five, one), bTree.getValue(openvdb::Coord(1000, 1, 2)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1000, 1, 2)));
     }
 }
 
@@ -408,8 +365,7 @@ TestTreeCombine::testComp(const TreeComp& comp, const ValueComp& op)
 ////////////////////////////////////////
 
 
-void
-TestTreeCombine::testCombine2()
+TEST_F(TestTreeCombine, testCombine2)
 {
     using openvdb::Coord;
     using openvdb::Vec3d;
@@ -436,16 +392,16 @@ TestTreeCombine::testCombine2()
 
     const float tolerance = 0.0;
     // Average of set value 3 and set value -1
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, outFloatTree.getValue(c0), tolerance);
+    EXPECT_NEAR(1.0, outFloatTree.getValue(c0), tolerance);
     // Average of set value 3 and bg value 5
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, outFloatTree.getValue(c1), tolerance);
+    EXPECT_NEAR(4.0, outFloatTree.getValue(c1), tolerance);
     // Average of bg value 1 and set value 4
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.5, outFloatTree.getValue(c2), tolerance);
+    EXPECT_NEAR(2.5, outFloatTree.getValue(c2), tolerance);
     // Average of bg value 1 and bg value 5
-    CPPUNIT_ASSERT(outFloatTree.isValueOff(c3));
-    CPPUNIT_ASSERT(outFloatTree.isValueOff(c4));
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(c3), tolerance);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, outFloatTree.getValue(c4), tolerance);
+    EXPECT_TRUE(outFloatTree.isValueOff(c3));
+    EXPECT_TRUE(outFloatTree.isValueOff(c4));
+    EXPECT_NEAR(3.0, outFloatTree.getValue(c3), tolerance);
+    EXPECT_NEAR(3.0, outFloatTree.getValue(c4), tolerance);
 
     // As above, but combining vector grids:
     const Vec3d zero(0), one(1), two(2), three(3), four(4), five(5);
@@ -457,16 +413,16 @@ TestTreeCombine::testCombine2()
     outVecTree.combine2(aVecTree, bVecTree, Local::vec3dAverage);
 
     // Average of set value 3 and set value -1
-    CPPUNIT_ASSERT_EQUAL(one, outVecTree.getValue(c0));
+    EXPECT_EQ(one, outVecTree.getValue(c0));
     // Average of set value 3 and bg value 5
-    CPPUNIT_ASSERT_EQUAL(four, outVecTree.getValue(c1));
+    EXPECT_EQ(four, outVecTree.getValue(c1));
     // Average of bg value 1 and set value 4
-    CPPUNIT_ASSERT_EQUAL(2.5 * one, outVecTree.getValue(c2));
+    EXPECT_EQ(2.5 * one, outVecTree.getValue(c2));
     // Average of bg value 1 and bg value 5
-    CPPUNIT_ASSERT(outVecTree.isValueOff(c3));
-    CPPUNIT_ASSERT(outVecTree.isValueOff(c4));
-    CPPUNIT_ASSERT_EQUAL(three, outVecTree.getValue(c3));
-    CPPUNIT_ASSERT_EQUAL(three, outVecTree.getValue(c4));
+    EXPECT_TRUE(outVecTree.isValueOff(c3));
+    EXPECT_TRUE(outVecTree.isValueOff(c4));
+    EXPECT_EQ(three, outVecTree.getValue(c3));
+    EXPECT_EQ(three, outVecTree.getValue(c4));
 
     // Multiply the vector tree by the scalar tree.
     {
@@ -474,19 +430,19 @@ TestTreeCombine::testCombine2()
         vecTree.combine2(outVecTree, outFloatTree, Local::vec3dFloatMultiply);
 
         // Product of set value (1, 1, 1) and set value 1
-        CPPUNIT_ASSERT(vecTree.isValueOn(c0));
-        CPPUNIT_ASSERT_EQUAL(one, vecTree.getValue(c0));
+        EXPECT_TRUE(vecTree.isValueOn(c0));
+        EXPECT_EQ(one, vecTree.getValue(c0));
         // Product of set value (4, 4, 4) and set value 4
-        CPPUNIT_ASSERT(vecTree.isValueOn(c1));
-        CPPUNIT_ASSERT_EQUAL(4 * 4 * one, vecTree.getValue(c1));
+        EXPECT_TRUE(vecTree.isValueOn(c1));
+        EXPECT_EQ(4 * 4 * one, vecTree.getValue(c1));
         // Product of set value (2.5, 2.5, 2.5) and set value 2.5
-        CPPUNIT_ASSERT(vecTree.isValueOn(c2));
-        CPPUNIT_ASSERT_EQUAL(2.5 * 2.5 * one, vecTree.getValue(c2));
+        EXPECT_TRUE(vecTree.isValueOn(c2));
+        EXPECT_EQ(2.5 * 2.5 * one, vecTree.getValue(c2));
         // Product of bg value (3, 3, 3) and bg value 3
-        CPPUNIT_ASSERT(vecTree.isValueOff(c3));
-        CPPUNIT_ASSERT(vecTree.isValueOff(c4));
-        CPPUNIT_ASSERT_EQUAL(3 * 3 * one, vecTree.getValue(c3));
-        CPPUNIT_ASSERT_EQUAL(3 * 3 * one, vecTree.getValue(c4));
+        EXPECT_TRUE(vecTree.isValueOff(c3));
+        EXPECT_TRUE(vecTree.isValueOff(c4));
+        EXPECT_EQ(3 * 3 * one, vecTree.getValue(c3));
+        EXPECT_EQ(3 * 3 * one, vecTree.getValue(c4));
     }
 
     // Multiply the vector tree by a boolean tree.
@@ -500,19 +456,19 @@ TestTreeCombine::testCombine2()
         vecTree.combine2(outVecTree, boolTree, Local::vec3dBoolMultiply);
 
         // Product of set value (1, 1, 1) and set value 1
-        CPPUNIT_ASSERT(vecTree.isValueOn(c0));
-        CPPUNIT_ASSERT_EQUAL(one, vecTree.getValue(c0));
+        EXPECT_TRUE(vecTree.isValueOn(c0));
+        EXPECT_EQ(one, vecTree.getValue(c0));
         // Product of set value (4, 4, 4) and set value 0
-        CPPUNIT_ASSERT(vecTree.isValueOn(c1));
-        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c1));
+        EXPECT_TRUE(vecTree.isValueOn(c1));
+        EXPECT_EQ(zero, vecTree.getValue(c1));
         // Product of set value (2.5, 2.5, 2.5) and set value 1
-        CPPUNIT_ASSERT(vecTree.isValueOn(c2));
-        CPPUNIT_ASSERT_EQUAL(2.5 * one, vecTree.getValue(c2));
+        EXPECT_TRUE(vecTree.isValueOn(c2));
+        EXPECT_EQ(2.5 * one, vecTree.getValue(c2));
         // Product of bg value (3, 3, 3) and bg value 0
-        CPPUNIT_ASSERT(vecTree.isValueOff(c3));
-        CPPUNIT_ASSERT(vecTree.isValueOff(c4));
-        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c3));
-        CPPUNIT_ASSERT_EQUAL(zero, vecTree.getValue(c4));
+        EXPECT_TRUE(vecTree.isValueOff(c3));
+        EXPECT_TRUE(vecTree.isValueOff(c4));
+        EXPECT_EQ(zero, vecTree.getValue(c3));
+        EXPECT_EQ(zero, vecTree.getValue(c4));
     }
 
     // Verify that a vector tree can't be combined into a scalar tree
@@ -523,7 +479,7 @@ TestTreeCombine::testCombine2()
         };
         openvdb::FloatTree floatTree(5.0), outTree;
         openvdb::Vec3DTree vecTree(one);
-        CPPUNIT_ASSERT_THROW(outTree.combine2(floatTree, vecTree, Local2::f), openvdb::TypeError);
+        EXPECT_THROW(outTree.combine2(floatTree, vecTree, Local2::f), openvdb::TypeError);
     }
 }
 
@@ -531,8 +487,7 @@ TestTreeCombine::testCombine2()
 ////////////////////////////////////////
 
 
-void
-TestTreeCombine::testBoolTree()
+TEST_F(TestTreeCombine, testBoolTree)
 {
     openvdb::BoolGrid::Ptr sphere = openvdb::BoolGrid::create();
 
@@ -546,11 +501,11 @@ TestTreeCombine::testBoolTree()
         bGrid = sphere->copy();
 
     // CSG operations work only on level sets with a nonzero inside and outside values.
-    CPPUNIT_ASSERT_THROW(openvdb::tools::csgUnion(aGrid->tree(), bGrid->tree()),
+    EXPECT_THROW(openvdb::tools::csgUnion(aGrid->tree(), bGrid->tree()),
         openvdb::ValueError);
-    CPPUNIT_ASSERT_THROW(openvdb::tools::csgIntersection(aGrid->tree(), bGrid->tree()),
+    EXPECT_THROW(openvdb::tools::csgIntersection(aGrid->tree(), bGrid->tree()),
         openvdb::ValueError);
-    CPPUNIT_ASSERT_THROW(openvdb::tools::csgDifference(aGrid->tree(), bGrid->tree()),
+    EXPECT_THROW(openvdb::tools::csgDifference(aGrid->tree(), bGrid->tree()),
         openvdb::ValueError);
 
     openvdb::tools::compSum(aGrid->tree(), bGrid->tree());
@@ -563,7 +518,7 @@ TestTreeCombine::testBoolTree()
     for (openvdb::BoolGrid::ValueAllCIter it = aGrid->cbeginValueAll(); it; ++it) {
         if (*it != acc.getValue(it.getCoord())) ++mismatches;
     }
-    CPPUNIT_ASSERT_EQUAL(0, mismatches);
+    EXPECT_EQ(0, mismatches);
 }
 
 
@@ -604,39 +559,39 @@ TestTreeCombine::testCompRepl()
         openvdb::tools::compReplace(aTree, bTree);
 
         // a = 3 (On), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(minusOne, aTree.getValue(openvdb::Coord(0, 0, 0)));
+        EXPECT_EQ(minusOne, aTree.getValue(openvdb::Coord(0, 0, 0)));
 
         // a = 3 (On), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(three, aTree.getValue(openvdb::Coord(0, 0, 1)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 0, 1)));
+        EXPECT_EQ(three, aTree.getValue(openvdb::Coord(0, 0, 1)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 0, 1)));
 
         // a = 1 (On, = bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(one, aTree.getValue(openvdb::Coord(0, 0, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 0, 2)));
+        EXPECT_EQ(one, aTree.getValue(openvdb::Coord(0, 0, 2)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 0, 2)));
 
         // a = 1 (On, = bg), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(minusOne, aTree.getValue(openvdb::Coord(0, 1, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 1, 2)));
+        EXPECT_EQ(minusOne, aTree.getValue(openvdb::Coord(0, 1, 2)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 1, 2)));
 
         // a = 1 (bg), b = 4 (On)
-        CPPUNIT_ASSERT_EQUAL(four, aTree.getValue(openvdb::Coord(0, 1, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOn(openvdb::Coord(0, 1, 0)));
+        EXPECT_EQ(four, aTree.getValue(openvdb::Coord(0, 1, 0)));
+        EXPECT_TRUE(aTree.isValueOn(openvdb::Coord(0, 1, 0)));
 
         // a = 3 (Off), b = -1 (Off)
-        CPPUNIT_ASSERT_EQUAL(three, aTree.getValue(openvdb::Coord(1, 0, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 0, 0)));
+        EXPECT_EQ(three, aTree.getValue(openvdb::Coord(1, 0, 0)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 0, 0)));
 
         // a = 3 (Off), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(three, aTree.getValue(openvdb::Coord(1, 0, 1)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 0, 1)));
+        EXPECT_EQ(three, aTree.getValue(openvdb::Coord(1, 0, 1)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 0, 1)));
 
         // a = 1 (bg), b = 4 (Off)
-        CPPUNIT_ASSERT_EQUAL(one, aTree.getValue(openvdb::Coord(1, 1, 0)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1, 1, 0)));
+        EXPECT_EQ(one, aTree.getValue(openvdb::Coord(1, 1, 0)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1, 1, 0)));
 
         // a = 1 (bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(one, aTree.getValue(openvdb::Coord(1000, 1, 2)));
-        CPPUNIT_ASSERT(aTree.isValueOff(openvdb::Coord(1000, 1, 2)));
+        EXPECT_EQ(one, aTree.getValue(openvdb::Coord(1000, 1, 2)));
+        EXPECT_TRUE(aTree.isValueOff(openvdb::Coord(1000, 1, 2)));
     }
 
     // As above, but combining the A grid into the B grid
@@ -660,39 +615,39 @@ TestTreeCombine::testCompRepl()
         openvdb::tools::compReplace(bTree, aTree);
 
         // a = 3 (On), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(three, bTree.getValue(openvdb::Coord(0, 0, 0)));
+        EXPECT_EQ(three, bTree.getValue(openvdb::Coord(0, 0, 0)));
 
         // a = 3 (On), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(three, bTree.getValue(openvdb::Coord(0, 0, 1)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 0, 1)));
+        EXPECT_EQ(three, bTree.getValue(openvdb::Coord(0, 0, 1)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 0, 1)));
 
         // a = 1 (On, = bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(one, bTree.getValue(openvdb::Coord(0, 0, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 0, 2)));
+        EXPECT_EQ(one, bTree.getValue(openvdb::Coord(0, 0, 2)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 0, 2)));
 
         // a = 1 (On, = bg), b = -1 (On)
-        CPPUNIT_ASSERT_EQUAL(one, bTree.getValue(openvdb::Coord(0, 1, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 1, 2)));
+        EXPECT_EQ(one, bTree.getValue(openvdb::Coord(0, 1, 2)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 1, 2)));
 
         // a = 1 (bg), b = 4 (On)
-        CPPUNIT_ASSERT_EQUAL(four, bTree.getValue(openvdb::Coord(0, 1, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOn(openvdb::Coord(0, 1, 0)));
+        EXPECT_EQ(four, bTree.getValue(openvdb::Coord(0, 1, 0)));
+        EXPECT_TRUE(bTree.isValueOn(openvdb::Coord(0, 1, 0)));
 
         // a = 3 (Off), b = -1 (Off)
-        CPPUNIT_ASSERT_EQUAL(minusOne, bTree.getValue(openvdb::Coord(1, 0, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 0, 0)));
+        EXPECT_EQ(minusOne, bTree.getValue(openvdb::Coord(1, 0, 0)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 0, 0)));
 
         // a = 3 (Off), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(five, bTree.getValue(openvdb::Coord(1, 0, 1)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 0, 1)));
+        EXPECT_EQ(five, bTree.getValue(openvdb::Coord(1, 0, 1)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 0, 1)));
 
         // a = 1 (bg), b = 4 (Off)
-        CPPUNIT_ASSERT_EQUAL(four, bTree.getValue(openvdb::Coord(1, 1, 0)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1, 1, 0)));
+        EXPECT_EQ(four, bTree.getValue(openvdb::Coord(1, 1, 0)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1, 1, 0)));
 
         // a = 1 (bg), b = 5 (bg)
-        CPPUNIT_ASSERT_EQUAL(five, bTree.getValue(openvdb::Coord(1000, 1, 2)));
-        CPPUNIT_ASSERT(bTree.isValueOff(openvdb::Coord(1000, 1, 2)));
+        EXPECT_EQ(five, bTree.getValue(openvdb::Coord(1000, 1, 2)));
+        EXPECT_TRUE(bTree.isValueOff(openvdb::Coord(1000, 1, 2)));
     }
 }
 
@@ -700,8 +655,8 @@ TestTreeCombine::testCompRepl()
 ////////////////////////////////////////
 
 
-void
-TestTreeCombine::testCsg()
+#ifdef DWA_OPENVDB
+TEST_F(TestTreeCombine, testCsg)
 {
     using TreeT = openvdb::FloatTree;
     using TreePtr = TreeT::Ptr;
@@ -751,13 +706,13 @@ TestTreeCombine::testCsg()
 
     const std::string testDir("/work/rd/fx_tools/vdb_unittest/TestGridCombine::testCsg/");
     smallTree1 = Local::readFile(testDir + "small1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(smallTree1.get() != nullptr);
+    EXPECT_TRUE(smallTree1.get() != nullptr);
     smallTree2 = Local::readFile(testDir + "small2.vdb2 Cylinder");
-    CPPUNIT_ASSERT(smallTree2.get() != nullptr);
+    EXPECT_TRUE(smallTree2.get() != nullptr);
     largeTree1 = Local::readFile(testDir + "large1.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree1.get() != nullptr);
+    EXPECT_TRUE(largeTree1.get() != nullptr);
     largeTree2 = Local::readFile(testDir + "large2.vdb2 LevelSet");
-    CPPUNIT_ASSERT(largeTree2.get() != nullptr);
+    EXPECT_TRUE(largeTree2.get() != nullptr);
 
 #if TEST_CSG_VERBOSE
     std::cerr << "file read: " << timer.milliseconds() << " msec\n";
@@ -793,6 +748,7 @@ TestTreeCombine::testCsg()
     outTree = visitCsg(*largeTree1, *largeTree2, *refTree, Local::visitorDiff);
     //Local::writeFile(outTree, "large_difference_out.vdb2");
 }
+#endif
 
 
 template<typename TreeT, typename VisitorT>
@@ -839,9 +795,9 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
     aTree->print(aInfo, /*verbose=*/2);
     refTree.print(refInfo, /*verbose=*/2);
 
-    CPPUNIT_ASSERT_EQUAL(refInfo.str(), aInfo.str());
+    EXPECT_EQ(refInfo.str(), aInfo.str());
 
-    CPPUNIT_ASSERT(aTree->hasSameTopology(refTree));
+    EXPECT_TRUE(aTree->hasSameTopology(refTree));
 
     return aTree;
 }
@@ -850,8 +806,7 @@ TestTreeCombine::visitCsg(const TreeT& aInputTree, const TreeT& bInputTree,
 ////////////////////////////////////////
 
 
-void
-TestTreeCombine::testCsgCopy()
+TEST_F(TestTreeCombine, testCsgCopy)
 {
     const float voxelSize = 0.2f;
     const float radius = 3.0f;
@@ -861,7 +816,7 @@ TestTreeCombine::testCsgCopy()
         openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize);
 
     openvdb::Coord ijkA = gridA->transform().worldToIndexNodeCentered(center);
-    CPPUNIT_ASSERT(gridA->tree().getValue(ijkA) < 0.0f); // center is inside
+    EXPECT_TRUE(gridA->tree().getValue(ijkA) < 0.0f); // center is inside
 
     center.x() += 3.5f;
 
@@ -869,37 +824,36 @@ TestTreeCombine::testCsgCopy()
         openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize);
 
     openvdb::Coord ijkB = gridA->transform().worldToIndexNodeCentered(center);
-    CPPUNIT_ASSERT(gridB->tree().getValue(ijkB) < 0.0f); // center is inside
+    EXPECT_TRUE(gridB->tree().getValue(ijkB) < 0.0f); // center is inside
 
     openvdb::FloatGrid::Ptr unionGrid = openvdb::tools::csgUnionCopy(*gridA, *gridB);
     openvdb::FloatGrid::Ptr intersectionGrid = openvdb::tools::csgIntersectionCopy(*gridA, *gridB);
     openvdb::FloatGrid::Ptr differenceGrid = openvdb::tools::csgDifferenceCopy(*gridA, *gridB);
 
-    CPPUNIT_ASSERT(unionGrid.get() != nullptr);
-    CPPUNIT_ASSERT(intersectionGrid.get() != nullptr);
-    CPPUNIT_ASSERT(differenceGrid.get() != nullptr);
+    EXPECT_TRUE(unionGrid.get() != nullptr);
+    EXPECT_TRUE(intersectionGrid.get() != nullptr);
+    EXPECT_TRUE(differenceGrid.get() != nullptr);
 
-    CPPUNIT_ASSERT(!unionGrid->empty());
-    CPPUNIT_ASSERT(!intersectionGrid->empty());
-    CPPUNIT_ASSERT(!differenceGrid->empty());
+    EXPECT_TRUE(!unionGrid->empty());
+    EXPECT_TRUE(!intersectionGrid->empty());
+    EXPECT_TRUE(!differenceGrid->empty());
 
     // test inside / outside sign
 
-    CPPUNIT_ASSERT(unionGrid->tree().getValue(ijkA) < 0.0f);
-    CPPUNIT_ASSERT(unionGrid->tree().getValue(ijkB) < 0.0f);
+    EXPECT_TRUE(unionGrid->tree().getValue(ijkA) < 0.0f);
+    EXPECT_TRUE(unionGrid->tree().getValue(ijkB) < 0.0f);
 
-    CPPUNIT_ASSERT(!(intersectionGrid->tree().getValue(ijkA) < 0.0f));
-    CPPUNIT_ASSERT(!(intersectionGrid->tree().getValue(ijkB) < 0.0f));
+    EXPECT_TRUE(!(intersectionGrid->tree().getValue(ijkA) < 0.0f));
+    EXPECT_TRUE(!(intersectionGrid->tree().getValue(ijkB) < 0.0f));
 
-    CPPUNIT_ASSERT(differenceGrid->tree().getValue(ijkA) < 0.0f);
-    CPPUNIT_ASSERT(!(differenceGrid->tree().getValue(ijkB) < 0.0f));
+    EXPECT_TRUE(differenceGrid->tree().getValue(ijkA) < 0.0f);
+    EXPECT_TRUE(!(differenceGrid->tree().getValue(ijkB) < 0.0f));
 }
 
 
 ////////////////////////////////////////
 
-void
-TestTreeCombine::testCompActiveLeafVoxels()
+TEST_F(TestTreeCombine, testCompActiveLeafVoxels)
 {
     {//replace float tree (default argument)
         openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
@@ -908,21 +862,21 @@ TestTreeCombine::testCompActiveLeafVoxels()
         srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
         srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
 
-        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(1, int(dstTree.leafCount()));
+        EXPECT_EQ(2, int(srcTree.leafCount()));
+        EXPECT_EQ(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
 
         openvdb::tools::compActiveLeafVoxels(srcTree, dstTree);
 
-        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(2, int(dstTree.leafCount()));
+        EXPECT_EQ(0, int(srcTree.leafCount()));
+        EXPECT_EQ(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
     }
     {//replace float tree (lambda expression)
         openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
@@ -931,21 +885,21 @@ TestTreeCombine::testCompActiveLeafVoxels()
         srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
         srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
 
-        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(1, int(dstTree.leafCount()));
+        EXPECT_EQ(2, int(srcTree.leafCount()));
+        EXPECT_EQ(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
 
         openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](float &d, float s){d=s;});
 
-        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(2, int(dstTree.leafCount()));
+        EXPECT_EQ(0, int(srcTree.leafCount()));
+        EXPECT_EQ(2.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
     }
     {//add float tree
         openvdb::FloatTree srcTree(0.0f), dstTree(0.0f);
@@ -954,37 +908,37 @@ TestTreeCombine::testCompActiveLeafVoxels()
         srcTree.setValue(openvdb::Coord(1,1,1), 2.0f);
         srcTree.setValue(openvdb::Coord(8,8,8), 3.0f);
 
-        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(1, int(dstTree.leafCount()));
+        EXPECT_EQ(2, int(srcTree.leafCount()));
+        EXPECT_EQ(1.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(0.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
 
         openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](float &d, float s){d+=s;});
 
-        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(2, int(dstTree.leafCount()));
+        EXPECT_EQ(0, int(srcTree.leafCount()));
+        EXPECT_EQ(3.0f, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(3.0f, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
     }
     {
         using BufferT = openvdb::FloatTree::LeafNodeType::Buffer;
-        CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+        EXPECT_TRUE((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::Vec3fTree::LeafNodeType::Buffer;
-        CPPUNIT_ASSERT((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+        EXPECT_TRUE((std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::BoolTree::LeafNodeType::Buffer;
-        CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+        EXPECT_TRUE(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {
         using BufferT = openvdb::MaskTree::LeafNodeType::Buffer;
-        CPPUNIT_ASSERT(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
+        EXPECT_TRUE(!(std::is_same<BufferT::ValueType, BufferT::StorageType>::value));
     }
     {//replace bool tree
         openvdb::BoolTree srcTree(false), dstTree(false);
@@ -995,24 +949,24 @@ TestTreeCombine::testCompActiveLeafVoxels()
         //(9,8,8) is inactive but true so it should have no effect
         srcTree.setValueOnly(openvdb::Coord(9,8,8), true);
 
-        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT_EQUAL(true, srcTree.getValue(openvdb::Coord(9, 8, 8)));
-        CPPUNIT_ASSERT(!srcTree.isValueOn(openvdb::Coord(9, 8, 8)));
+        EXPECT_EQ(1, int(dstTree.leafCount()));
+        EXPECT_EQ(2, int(srcTree.leafCount()));
+        EXPECT_EQ(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(true, srcTree.getValue(openvdb::Coord(9, 8, 8)));
+        EXPECT_TRUE(!srcTree.isValueOn(openvdb::Coord(9, 8, 8)));
 
         using Word = openvdb::BoolTree::LeafNodeType::Buffer::WordType;
         openvdb::tools::compActiveLeafVoxels(srcTree, dstTree, [](Word &d, Word s){d=s;});
 
-        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(2, int(dstTree.leafCount()));
+        EXPECT_EQ(0, int(srcTree.leafCount()));
+        EXPECT_EQ(false, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
     }
     {// mask tree
         openvdb::MaskTree srcTree(false), dstTree(false);
@@ -1021,21 +975,21 @@ TestTreeCombine::testCompActiveLeafVoxels()
         srcTree.setValueOn(openvdb::Coord(1,1,1));
         srcTree.setValueOn(openvdb::Coord(8,8,8));
 
-        CPPUNIT_ASSERT_EQUAL(1, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(2, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(1, int(dstTree.leafCount()));
+        EXPECT_EQ(2, int(srcTree.leafCount()));
+        EXPECT_EQ(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(false, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(!dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
 
         openvdb::tools::compActiveLeafVoxels(srcTree, dstTree);
 
-        CPPUNIT_ASSERT_EQUAL(2, int(dstTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(0, int(srcTree.leafCount()));
-        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
-        CPPUNIT_ASSERT_EQUAL(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
-        CPPUNIT_ASSERT(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
+        EXPECT_EQ(2, int(dstTree.leafCount()));
+        EXPECT_EQ(0, int(srcTree.leafCount()));
+        EXPECT_EQ(true, dstTree.getValue(openvdb::Coord(1, 1, 1)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(1, 1, 1)));
+        EXPECT_EQ(true, dstTree.getValue(openvdb::Coord(8, 8, 8)));
+        EXPECT_TRUE(dstTree.isValueOn(openvdb::Coord(8, 8, 8)));
     }
 }
 

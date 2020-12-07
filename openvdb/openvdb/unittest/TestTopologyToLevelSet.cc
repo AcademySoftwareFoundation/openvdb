@@ -1,24 +1,16 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/tools/TopologyToLevelSet.h>
 
 
-class TopologyToLevelSet: public CppUnit::TestCase
+class TopologyToLevelSet: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TopologyToLevelSet);
-    CPPUNIT_TEST(testConversion);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testConversion();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TopologyToLevelSet);
 
-void
-TopologyToLevelSet::testConversion()
+TEST_F(TopologyToLevelSet, testConversion)
 {
     typedef openvdb::tree::Tree4<bool, 5, 4, 3>::Type   Tree543b;
     typedef openvdb::Grid<Tree543b>                     BoolGrid;
@@ -41,14 +33,13 @@ TopologyToLevelSet::testConversion()
 
     FloatGrid::Ptr sdfGrid = openvdb::tools::topologyToLevelSet(maskGrid);
 
-    CPPUNIT_ASSERT(sdfGrid.get() != NULL);
-    CPPUNIT_ASSERT(!sdfGrid->empty());
-    CPPUNIT_ASSERT_EQUAL(int(openvdb::GRID_LEVEL_SET), int(sdfGrid->getGridClass()));
+    EXPECT_TRUE(sdfGrid.get() != NULL);
+    EXPECT_TRUE(!sdfGrid->empty());
+    EXPECT_EQ(int(openvdb::GRID_LEVEL_SET), int(sdfGrid->getGridClass()));
 
     // test inside coord value
-    CPPUNIT_ASSERT(sdfGrid->tree().getValue(openvdb::Coord(3,3,3)) < 0.0f);
+    EXPECT_TRUE(sdfGrid->tree().getValue(openvdb::Coord(3,3,3)) < 0.0f);
 
     // test outside coord value
-    CPPUNIT_ASSERT(sdfGrid->tree().getValue(openvdb::Coord(10,10,10)) > 0.0f);
+    EXPECT_TRUE(sdfGrid->tree().getValue(openvdb::Coord(10,10,10)) > 0.0f);
 }
-

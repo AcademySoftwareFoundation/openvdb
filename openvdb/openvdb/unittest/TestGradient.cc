@@ -5,49 +5,19 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <sstream>
 
 
-class TestGradient: public CppUnit::TestFixture
+class TestGradient: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestGradient);
-    CPPUNIT_TEST(testISGradient);               // gradient in index space
-    CPPUNIT_TEST(testISGradientStencil);
-    CPPUNIT_TEST(testWSGradient);               // gradient in world space
-    CPPUNIT_TEST(testWSGradientStencil);
-    CPPUNIT_TEST(testWSGradientStencilFrustum);
-    CPPUNIT_TEST(testWSGradientNormSqr);        // gradient norm sqr (world space only)
-    CPPUNIT_TEST(testWSGradientNormSqrStencil); // gradient norm sqr (world space only)
-    CPPUNIT_TEST(testGradientTool);             // gradient tool
-    CPPUNIT_TEST(testGradientMaskedTool);       // gradient tool
-    CPPUNIT_TEST(testIntersectsIsoValue);       // zero-crossing
-    CPPUNIT_TEST(testOldStyleStencils);         // old stencil impl - deprecate
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testISGradient();
-    void testISGradientStencil();
-    void testWSGradient();
-    void testWSGradientStencilFrustum();
-    void testWSGradientStencil();
-    void testWSGradientNormSqr();
-    void testWSGradientNormSqrStencil();
-    void testGradientTool();
-    void testGradientMaskedTool();
-    void testIntersectsIsoValue();
-    void testOldStyleStencils();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestGradient);
 
-
-void
-TestGradient::testISGradient()
+TEST_F(TestGradient, testISGradient)
 {
     using namespace openvdb;
 
@@ -60,8 +30,8 @@ TestGradient::testISGradient()
     const float radius=10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     const Coord xyz(10, 20, 30);
 
 
@@ -69,42 +39,41 @@ TestGradient::testISGradient()
     AccessorType inAccessor = grid->getConstAccessor();
     Vec3f result;
     result = math::ISGradient<math::CD_2ND>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::CD_4TH>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::CD_6TH>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_1ST>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.02);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.02);
 
     result = math::ISGradient<math::FD_2ND>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_3RD>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_1ST>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.02);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.02);
 
     result = math::ISGradient<math::BD_2ND>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_3RD>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_WENO5>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_WENO5>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 }
 
 
-void
-TestGradient::testISGradientStencil()
+TEST_F(TestGradient, testISGradientStencil)
 {
     using namespace openvdb;
 
@@ -116,8 +85,8 @@ TestGradient::testISGradientStencil()
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     const Coord xyz(10, 20, 30);
 
 
@@ -129,42 +98,41 @@ TestGradient::testISGradientStencil()
     stencil.moveTo(xyz);
 
     result = math::ISGradient<math::CD_2ND>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::CD_4TH>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::CD_6TH>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_1ST>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.02);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.02);
 
     result = math::ISGradient<math::FD_2ND>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_3RD>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_1ST>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.02);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.02);
 
     result = math::ISGradient<math::BD_2ND>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_3RD>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::FD_WENO5>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     result = math::ISGradient<math::BD_WENO5>::result(stencil);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 }
 
 
-void
-TestGradient::testWSGradient()
+TEST_F(TestGradient, testWSGradient)
 {
     using namespace openvdb;
 
@@ -173,15 +141,15 @@ TestGradient::testWSGradient()
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(voxel_size));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const openvdb::Coord dim(32,32,32);
     const openvdb::Vec3f center(6.0f, 8.0f, 10.0f);//i.e. (12,16,20) in index space
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
     const Coord xyz(11, 17, 26);
 
     AccessorType inAccessor = grid->getConstAccessor();
@@ -194,38 +162,38 @@ TestGradient::testWSGradient()
         math::UniformScaleMap map(voxel_size);
         result = math::Gradient<math::UniformScaleMap, math::CD_2ND>::result(
             map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
         rotated_map = map.preRotate(1.5, math::X_AXIS);
         // verify the new map is an affine map
-        CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
+        EXPECT_TRUE(rotated_map->type() == math::AffineMap::mapType());
         math::AffineMap::Ptr affine_map =
             StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
         // the gradient should have the same length even after rotation
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
             *affine_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
         result = math::Gradient<math::AffineMap, math::CD_4TH>::result(
             *affine_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         math::UniformScaleTranslateMap map(voxel_size, Vec3d(0,0,0));
         result = math::Gradient<math::UniformScaleTranslateMap, math::CD_2ND>::result(
             map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         math::ScaleTranslateMap map(Vec3d(voxel_size, voxel_size, voxel_size), Vec3d(0,0,0));
         result = math::Gradient<math::ScaleTranslateMap, math::CD_2ND>::result(
             map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
 
     {
         // this map has no scale, expect result/voxel_spaceing = 1
         math::TranslationMap map;
         result = math::Gradient<math::TranslationMap, math::CD_2ND>::result(map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(voxel_size, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(voxel_size, result.length(), /*tolerance=*/0.01);
     }
 
     {
@@ -233,21 +201,21 @@ TestGradient::testWSGradient()
         math::GenericMap generic_map(*grid);
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Transform interface
         math::GenericMap generic_map(grid->transform());
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Map interface
         math::GenericMap generic_map(rotated_map);
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test a map with non-uniform SCALING AND ROTATION
@@ -266,7 +234,7 @@ TestGradient::testWSGradient()
         // math::ScaleMap map(voxel_sizes);
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
             *affine_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test a map with non-uniform SCALING
@@ -280,12 +248,11 @@ TestGradient::testWSGradient()
 
         // math::ScaleMap map(voxel_sizes);
         result = math::Gradient<math::ScaleMap, math::CD_2ND>::result(*scale_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
 }
 
-void
-TestGradient::testWSGradientStencilFrustum()
+TEST_F(TestGradient, testWSGradientStencilFrustum)
 {
     using namespace openvdb;
 
@@ -342,14 +309,14 @@ TestGradient::testWSGradientStencilFrustum()
           math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
 
     // The Gradient should be unit lenght for this case
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     math::Vec3d wsVec = transform->indexToWorld(xyz);
     math::Vec3d direction = (wsVec - wsCenter);
     direction.normalize();
 
     // test the actual direction of the gradient
-    CPPUNIT_ASSERT(direction.eq(result, 0.01 /*tolerance*/));
+    EXPECT_TRUE(direction.eq(result, 0.01 /*tolerance*/));
     }
 
     {
@@ -360,36 +327,35 @@ TestGradient::testWSGradientStencilFrustum()
           math::Gradient<math::NonlinearFrustumMap, math::CD_2ND>::result(*map, acc, xyz);
 
     // The Gradient should be unit lenght for this case
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
     math::Vec3d wsVec = transform->indexToWorld(xyz);
     math::Vec3d direction = (wsVec - wsCenter);
     direction.normalize();
 
     // test the actual direction of the gradient
-    CPPUNIT_ASSERT(direction.eq(result, 0.01 /*tolerance*/));
+    EXPECT_TRUE(direction.eq(result, 0.01 /*tolerance*/));
     }
 }
 
 
 
-void
-TestGradient::testWSGradientStencil()
+TEST_F(TestGradient, testWSGradientStencil)
 {
     using namespace openvdb;
 
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(voxel_size));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const openvdb::Coord dim(32,32,32);
     const openvdb::Vec3f center(6.0f, 8.0f ,10.0f);//i.e. (12,16,20) in index space
     const float radius = 10;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
     const Coord xyz(11, 17, 26);
 
     // try with a map
@@ -408,59 +374,59 @@ TestGradient::testWSGradientStencil()
         math::UniformScaleMap map(voxel_size);
         result = math::Gradient<math::UniformScaleMap, math::CD_2ND>::result(
             map, stencil);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
         rotated_map = map.preRotate(1.5, math::X_AXIS);
         // verify the new map is an affine map
-        CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
+        EXPECT_TRUE(rotated_map->type() == math::AffineMap::mapType());
         math::AffineMap::Ptr affine_map =
             StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
         // the gradient should have the same length even after rotation
 
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(
             *affine_map, dense_2ndOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
 
         result = math::Gradient<math::AffineMap, math::CD_4TH>::result(
             *affine_map, dense_4thOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         math::UniformScaleTranslateMap map(voxel_size, Vec3d(0,0,0));
 
         result = math::Gradient<math::UniformScaleTranslateMap, math::CD_2ND>::result(map, stencil);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         math::ScaleTranslateMap map(Vec3d(voxel_size, voxel_size, voxel_size), Vec3d(0,0,0));
         result = math::Gradient<math::ScaleTranslateMap, math::CD_2ND>::result(map, stencil);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         math::TranslationMap map;
         result = math::Gradient<math::TranslationMap, math::CD_2ND>::result(map, stencil);
         // value = 1 because the translation map assumes uniform spacing
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.5, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(0.5, result.length(), /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Grid interface
         math::GenericMap generic_map(*grid);
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, dense_2ndOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Transform interface
         math::GenericMap generic_map(grid->transform());
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, dense_2ndOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Map interface
         math::GenericMap generic_map(rotated_map);
         result = math::Gradient<math::GenericMap, math::CD_2ND>::result(
             generic_map, dense_2ndOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test a map with non-uniform SCALING AND ROTATION
@@ -477,7 +443,7 @@ TestGradient::testWSGradientStencil()
 
         stencil.moveTo(xyz);
         result = math::Gradient<math::AffineMap, math::CD_2ND>::result(*affine_map, stencil);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
     {
         // test a map with NON-UNIFORM SCALING
@@ -492,13 +458,12 @@ TestGradient::testWSGradientStencil()
         dense_2ndOrder.moveTo(xyz);
 
         result = math::Gradient<math::ScaleMap, math::CD_2ND>::result(map, dense_2ndOrder);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, result.length(), /*tolerance=*/0.01);
+        EXPECT_NEAR(1.0, result.length(), /*tolerance=*/0.01);
     }
 }
 
 
-void
-TestGradient::testWSGradientNormSqr()
+TEST_F(TestGradient, testWSGradientNormSqr)
 {
     using namespace openvdb;
 
@@ -506,15 +471,15 @@ TestGradient::testWSGradientNormSqr()
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(voxel_size));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const openvdb::Coord dim(32,32,32);
     const openvdb::Vec3f center(6.0f,8.0f,10.0f);//i.e. (12,16,20) in index space
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
     const Coord xyz(11, 17, 26);
 
     AccessorType inAccessor = grid->getConstAccessor();
@@ -524,41 +489,40 @@ TestGradient::testWSGradientNormSqr()
     FloatTree::ValueType normsqrd;
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::FIRST_BIAS>::result(
         uniform_scale, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.07);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.07);
 
     // test world space using the 13pt stencil
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::SECOND_BIAS>::result(
         uniform_scale, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.05);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.05);
 
     math::AffineMap affine(voxel_size*math::Mat3d::identity());
     normsqrd = math::GradientNormSqrd<math::AffineMap, math::FIRST_BIAS>::result(
         affine, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.07);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.07);
 
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::THIRD_BIAS>::result(
         uniform_scale, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.05);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.05);
 }
 
 
-void
-TestGradient::testWSGradientNormSqrStencil()
+TEST_F(TestGradient, testWSGradientNormSqrStencil)
 {
     using namespace openvdb;
 
     double voxel_size = 0.5;
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(voxel_size));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const openvdb::Coord dim(32,32,32);
     const openvdb::Vec3f center(6.0f, 8.0f, 10.0f);//i.e. (12,16,20) in index space
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
     const Coord xyz(11, 17, 26);
 
     math::SevenPointStencil<FloatGrid> sevenpt(*grid);
@@ -578,27 +542,26 @@ TestGradient::testWSGradientNormSqrStencil()
     FloatTree::ValueType normsqrd;
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::FIRST_BIAS>::result(
         uniform_scale, sevenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.07);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.07);
 
 
     // test gradient in index and world space using the 13pt stencil
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::SECOND_BIAS>::result(
         uniform_scale, thirteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.05);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.05);
 
     math::AffineMap affine(voxel_size*math::Mat3d::identity());
     normsqrd = math::GradientNormSqrd<math::AffineMap, math::FIRST_BIAS>::result(
         affine, dense_2ndOrder);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.07);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.07);
 
     normsqrd = math::GradientNormSqrd<math::UniformScaleMap, math::THIRD_BIAS>::result(
         uniform_scale, nineteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, normsqrd, /*tolerance=*/0.05);
+    EXPECT_NEAR(1.0, normsqrd, /*tolerance=*/0.05);
 }
 
 
-void
-TestGradient::testGradientTool()
+TEST_F(TestGradient, testGradientTool)
 {
     using namespace openvdb;
 
@@ -610,19 +573,18 @@ TestGradient::testGradientTool()
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     const Coord xyz(10, 20, 30);
 
     Vec3SGrid::Ptr grad = tools::gradient(*grid);
-    CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(grad->activeVoxelCount()));
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, grad->getConstAccessor().getValue(xyz).length(),
+    EXPECT_EQ(int(tree.activeVoxelCount()), int(grad->activeVoxelCount()));
+    EXPECT_NEAR(1.0, grad->getConstAccessor().getValue(xyz).length(),
         /*tolerance=*/0.01);
 }
 
 
-void
-TestGradient::testGradientMaskedTool()
+TEST_F(TestGradient, testGradientMaskedTool)
 {
     using namespace openvdb;
 
@@ -634,8 +596,8 @@ TestGradient::testGradientMaskedTool()
     const float radius = 10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
@@ -644,21 +606,20 @@ TestGradient::testGradientMaskedTool()
     Vec3SGrid::Ptr grad = tools::gradient(*grid, *maskGrid);
     {// outside the masked region
         const Coord xyz(10, 20, 30);
-        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, grad->getConstAccessor().getValue(xyz).length(),
+        EXPECT_TRUE(!maskbbox.isInside(xyz));
+        EXPECT_NEAR(0.0, grad->getConstAccessor().getValue(xyz).length(),
                                      /*tolerance=*/0.01);
     }
     {// inside the masked region
         const Coord xyz(38, 35, 33);
-        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, grad->getConstAccessor().getValue(xyz).length(),
+        EXPECT_TRUE(maskbbox.isInside(xyz));
+        EXPECT_NEAR(1.0, grad->getConstAccessor().getValue(xyz).length(),
                                      /*tolerance=*/0.01);
     }
 }
 
 
-void
-TestGradient::testIntersectsIsoValue()
+TEST_F(TestGradient, testIntersectsIsoValue)
 {
     using namespace openvdb;
 
@@ -670,11 +631,11 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(-1,0,0), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT( stencil.intersects(     ));
-        CPPUNIT_ASSERT( stencil.intersects( 0.0f));
-        CPPUNIT_ASSERT( stencil.intersects( 2.0f));
-        CPPUNIT_ASSERT(!stencil.intersects( 5.5f));
-        CPPUNIT_ASSERT(!stencil.intersects(-2.5f));
+        EXPECT_TRUE( stencil.intersects(     ));
+        EXPECT_TRUE( stencil.intersects( 0.0f));
+        EXPECT_TRUE( stencil.intersects( 2.0f));
+        EXPECT_TRUE(!stencil.intersects( 5.5f));
+        EXPECT_TRUE(!stencil.intersects(-2.5f));
     }
     {// test zero crossing in +x
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -684,7 +645,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(1,0,0), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
     {// test zero crossing in -y
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -694,7 +655,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(0,-1,0), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
     {// test zero crossing in y
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -704,7 +665,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(0,1,0), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
     {// test zero crossing in -z
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -714,7 +675,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(0,0,-1), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
     {// test zero crossing in z
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -724,7 +685,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(0,0,1), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
     {// test zero crossing in -x & z
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -734,7 +695,7 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy(-1,0,1), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(!stencil.intersects());
+        EXPECT_TRUE(!stencil.intersects());
     }
     {// test zero multiple crossings
         FloatGrid  grid(/*backgroundValue=*/5.0);
@@ -747,40 +708,39 @@ TestGradient::testIntersectsIsoValue()
         tree.setValue(xyz.offsetBy( 0, 0,-1), -2.0f);
         math::SevenPointStencil<FloatGrid>  stencil(grid);
         stencil.moveTo(xyz);
-        CPPUNIT_ASSERT(stencil.intersects());
+        EXPECT_TRUE(stencil.intersects());
     }
 }
 
 
-void
-TestGradient::testOldStyleStencils()
+TEST_F(TestGradient, testOldStyleStencils)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*backgroundValue=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(/*voxel size=*/0.5));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const openvdb::Coord dim(32,32,32);
     const openvdb::Vec3f center(6.0f,8.0f,10.0f);//i.e. (12,16,20) in index space
     const float radius=10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
     const Coord xyz(11, 17, 26);
 
     math::GradStencil<FloatGrid> gs(*grid);
     gs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, gs.gradient().length(), /*tolerance=*/0.01);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, gs.normSqGrad(),        /*tolerance=*/0.10);
+    EXPECT_NEAR(1.0, gs.gradient().length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, gs.normSqGrad(),        /*tolerance=*/0.10);
 
     math::WenoStencil<FloatGrid> ws(*grid);
     ws.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, ws.gradient().length(), /*tolerance=*/0.01);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, ws.normSqGrad(),        /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, ws.gradient().length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, ws.normSqGrad(),        /*tolerance=*/0.01);
 
     math::CurvatureStencil<FloatGrid> cs(*grid);
     cs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, cs.gradient().length(), /*tolerance=*/0.01);
+    EXPECT_NEAR(1.0, cs.gradient().length(), /*tolerance=*/0.01);
 }

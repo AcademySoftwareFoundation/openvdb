@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/Types.h>
@@ -9,43 +9,12 @@
 #include <iostream>
 #include <sstream>
 
-// CPPUNIT_TEST_SUITE() invokes CPPUNIT_TESTNAMER_DECL() to generate a suite name
-// from the FixtureType.  But if FixtureType is a templated type, the generated name
-// can become long and messy.  This macro overrides the normal naming logic,
-// instead invoking FixtureType::testSuiteName(), which should be a static member
-// function that returns a std::string containing the suite name for the specific
-// template instantiation.
-#undef CPPUNIT_TESTNAMER_DECL
-#define CPPUNIT_TESTNAMER_DECL( variableName, FixtureType ) \
-    CPPUNIT_NS::TestNamer variableName( FixtureType::testSuiteName() )
-
-
 template<typename T>
-class TestLeafIO: public CppUnit::TestCase
+class TestLeafIO
 {
 public:
-    static std::string testSuiteName()
-    {
-        std::string name = openvdb::typeNameAsString<T>();
-        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
-        return "TestLeafIO" + name;
-    }
-
-    CPPUNIT_TEST_SUITE(TestLeafIO);
-    CPPUNIT_TEST(testBuffer);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testBuffer();
+    static void testBuffer();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<int>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<float>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<double>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<bool>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<openvdb::Byte>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<openvdb::Vec3R>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafIO<std::string>);
-
 
 template<typename T>
 void
@@ -71,16 +40,25 @@ TestLeafIO<T>::testBuffer()
 
     leaf.readBuffers(istr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(T(1), leaf.getValue(openvdb::Coord(0, 1, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(T(1), leaf.getValue(openvdb::Coord(1, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(T(1), leaf.getValue(openvdb::Coord(0, 1, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(T(1), leaf.getValue(openvdb::Coord(1, 0, 0)), /*tolerance=*/0);
 
-    CPPUNIT_ASSERT(leaf.onVoxelCount() == 2);
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
 
 
-template<>
-void
-TestLeafIO<std::string>::testBuffer()
+class TestLeafIOTest: public ::testing::Test
+{
+};
+
+
+TEST_F(TestLeafIOTest, testBufferInt) { TestLeafIO<int>::testBuffer(); }
+TEST_F(TestLeafIOTest, testBufferFloat) { TestLeafIO<float>::testBuffer(); }
+TEST_F(TestLeafIOTest, testBufferDouble) { TestLeafIO<double>::testBuffer(); }
+TEST_F(TestLeafIOTest, testBufferBool) { TestLeafIO<bool>::testBuffer(); }
+TEST_F(TestLeafIOTest, testBufferByte) { TestLeafIO<openvdb::Byte>::testBuffer(); }
+
+TEST_F(TestLeafIOTest, testBufferString)
 {
     openvdb::tree::LeafNode<std::string, 3>
         leaf(openvdb::Coord(0, 0, 0), std::string());
@@ -103,16 +81,14 @@ TestLeafIO<std::string>::testBuffer()
 
     leaf.readBuffers(istr);
 
-    CPPUNIT_ASSERT_EQUAL(std::string("test"), leaf.getValue(openvdb::Coord(0, 1, 0)));
-    CPPUNIT_ASSERT_EQUAL(std::string("test"), leaf.getValue(openvdb::Coord(1, 0, 0)));
+    EXPECT_EQ(std::string("test"), leaf.getValue(openvdb::Coord(0, 1, 0)));
+    EXPECT_EQ(std::string("test"), leaf.getValue(openvdb::Coord(1, 0, 0)));
 
-    CPPUNIT_ASSERT(leaf.onVoxelCount() == 2);
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
 
 
-template<>
-void
-TestLeafIO<openvdb::Vec3R>::testBuffer()
+TEST_F(TestLeafIOTest, testBufferVec3R)
 {
     openvdb::tree::LeafNode<openvdb::Vec3R, 3> leaf(openvdb::Coord(0, 0, 0));
 
@@ -134,8 +110,8 @@ TestLeafIO<openvdb::Vec3R>::testBuffer()
 
     leaf.readBuffers(istr);
 
-    CPPUNIT_ASSERT(leaf.getValue(openvdb::Coord(0, 1, 0)) == openvdb::Vec3R(1, 1, 1));
-    CPPUNIT_ASSERT(leaf.getValue(openvdb::Coord(1, 0, 0)) == openvdb::Vec3R(1, 1, 1));
+    EXPECT_TRUE(leaf.getValue(openvdb::Coord(0, 1, 0)) == openvdb::Vec3R(1, 1, 1));
+    EXPECT_TRUE(leaf.getValue(openvdb::Coord(1, 0, 0)) == openvdb::Vec3R(1, 1, 1));
 
-    CPPUNIT_ASSERT(leaf.onVoxelCount() == 2);
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
