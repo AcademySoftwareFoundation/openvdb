@@ -229,6 +229,12 @@ static const std::vector<std::string> tests {
     "true ? {1,2} : {1,2,3};",
     "true ? \"foo\" : 1;",
     "true ? 1.0f : \"foo\";",
+    "{1,1} && 1 ? true : false;",
+    "{1,1} ? true : false;",
+    "{1,1} && 1 ? \"foo\" : false;",
+    "\"foo\" ? true : false;",
+    "true ? {1,1} && 1: {1,1};",
+    "true ? {1,1} : {1,1} && 1;",
     "string a; true ? a : 1;",
     "string a; true ? 1.0f : a;",
     // conditional
@@ -244,6 +250,8 @@ static const std::vector<std::string> tests {
     "vec4d a; if (a) 1;",
     "vec4f a; if (a) 1;",
     "vec4i a; if (a) 1;",
+    "if ({1,1} && 1) 1;",
+    "if (true) {1,1} && 1;",
     // loops
     "mat4d a; for (;a;) 1;",
     "mat4f a; for (;a;) 1;",
@@ -280,7 +288,10 @@ static const std::vector<std::string> tests {
     "vec3i a; do { 1; } while(a);",
     "vec4d a; do { 1; } while(a);",
     "vec4f a; do { 1; } while(a);",
-    "vec4i a; do { 1; } while(a);"
+    "vec4i a; do { 1; } while(a);",
+    // comma
+    "vec2i v; v++, 1;",
+    "vec2i v; 1, v++;"
 };
 
 class TestComputeGeneratorFailures : public CppUnit::TestCase

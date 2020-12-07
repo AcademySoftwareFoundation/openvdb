@@ -723,7 +723,7 @@ if(OPENVDB_BUILD_CORE)
 endif()
 
 if(OPENVDB_BUILD_AX)
-  add_subdirectory(openvdb_ax)
+  add_subdirectory(openvdb_ax/openvdb_ax)
 endif()
 
 if(OPENVDB_BUILD_AX_BINARIES)
