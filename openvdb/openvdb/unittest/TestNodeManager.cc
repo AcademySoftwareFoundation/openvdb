@@ -6,28 +6,15 @@
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tree/LeafManager.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 
-class TestNodeManager: public CppUnit::TestFixture
+class TestNodeManager: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestNodeManager);
-    CPPUNIT_TEST(testAll);
-    CPPUNIT_TEST(testConst);
-    CPPUNIT_TEST(testDynamic);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAll();
-    void testConst();
-    void testDynamic();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
-
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestNodeManager);
 
 
 namespace {
@@ -65,8 +52,7 @@ struct NodeCountOp {
 
 }//unnamed namespace
 
-void
-TestNodeManager::testAll()
+TEST_F(TestNodeManager, testAll)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -87,8 +73,8 @@ TestNodeManager::testAll()
     unittest_util::makeSphere<FloatGrid>(Coord(dim), center,
                                          radius, *grid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
 
-    CPPUNIT_ASSERT_EQUAL(4, int(FloatTree::DEPTH));
-    CPPUNIT_ASSERT_EQUAL(3, int(openvdb::tree::NodeManager<FloatTree>::LEVELS));
+    EXPECT_EQ(4, int(FloatTree::DEPTH));
+    EXPECT_EQ(3, int(openvdb::tree::NodeManager<FloatTree>::LEVELS));
 
     std::vector<Index64> nodeCount;
     for (openvdb::Index i=0; i<FloatTree::DEPTH; ++i) nodeCount.push_back(0);
@@ -109,10 +95,10 @@ TestNodeManager::testAll()
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
             //          << " cached=" << manager.nodeCount(i) << std::endl;
-            CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
+            EXPECT_EQ(nodeCount[i], manager.nodeCount(i));
             totalCount += nodeCount[i];
         }
-        CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+        EXPECT_EQ(totalCount, manager.nodeCount());
 
         // test the map reduce functionality
         NodeCountOp<FloatTree> bottomUpOp;
@@ -120,26 +106,26 @@ TestNodeManager::testAll()
         manager.reduceBottomUp(bottomUpOp);
         manager.reduceTopDown(topDownOp);
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
-            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager.nodeCount(i));
-            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager.nodeCount(i));
+            EXPECT_EQ(bottomUpOp.nodeCount[i], manager.nodeCount(i));
+            EXPECT_EQ(topDownOp.nodeCount[i], manager.nodeCount(i));
         }
-        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager.nodeCount());
-        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager.nodeCount());
+        EXPECT_EQ(bottomUpOp.totalCount, manager.nodeCount());
+        EXPECT_EQ(topDownOp.totalCount, manager.nodeCount());
     }
 
     {// test LeafManager constructor
         typedef openvdb::tree::LeafManager<FloatTree> LeafManagerT;
         LeafManagerT manager1(tree);
-        CPPUNIT_ASSERT_EQUAL(nodeCount[0], Index64(manager1.leafCount()));
+        EXPECT_EQ(nodeCount[0], Index64(manager1.leafCount()));
         openvdb::tree::NodeManager<LeafManagerT> manager2(manager1);
         Index64 totalCount = 0;
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
             //std::cerr << "Level=" << i << " expected=" << nodeCount[i]
             //          << " cached=" << manager2.nodeCount(i) << std::endl;
-            CPPUNIT_ASSERT_EQUAL(nodeCount[i], Index64(manager2.nodeCount(i)));
+            EXPECT_EQ(nodeCount[i], Index64(manager2.nodeCount(i)));
             totalCount += nodeCount[i];
         }
-        CPPUNIT_ASSERT_EQUAL(totalCount, Index64(manager2.nodeCount()));
+        EXPECT_EQ(totalCount, Index64(manager2.nodeCount()));
 
         // test the map reduce functionality
         NodeCountOp<FloatTree> bottomUpOp;
@@ -147,18 +133,17 @@ TestNodeManager::testAll()
         manager2.reduceBottomUp(bottomUpOp);
         manager2.reduceTopDown(topDownOp);
         for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
-            CPPUNIT_ASSERT_EQUAL(bottomUpOp.nodeCount[i], manager2.nodeCount(i));
-            CPPUNIT_ASSERT_EQUAL(topDownOp.nodeCount[i], manager2.nodeCount(i));
+            EXPECT_EQ(bottomUpOp.nodeCount[i], manager2.nodeCount(i));
+            EXPECT_EQ(topDownOp.nodeCount[i], manager2.nodeCount(i));
         }
-        CPPUNIT_ASSERT_EQUAL(bottomUpOp.totalCount, manager2.nodeCount());
-        CPPUNIT_ASSERT_EQUAL(topDownOp.totalCount, manager2.nodeCount());
+        EXPECT_EQ(bottomUpOp.totalCount, manager2.nodeCount());
+        EXPECT_EQ(topDownOp.totalCount, manager2.nodeCount());
     }
 
 }
 
 
-void
-TestNodeManager::testConst()
+TEST_F(TestNodeManager, testConst)
 {
     using namespace openvdb;
 
@@ -180,10 +165,10 @@ TestNodeManager::testConst()
 
     Index64 totalCount = 0;
     for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
-        CPPUNIT_ASSERT_EQUAL(nodeCount[i], manager.nodeCount(i));
+        EXPECT_EQ(nodeCount[i], manager.nodeCount(i));
         totalCount += nodeCount[i];
     }
-    CPPUNIT_ASSERT_EQUAL(totalCount, manager.nodeCount());
+    EXPECT_EQ(totalCount, manager.nodeCount());
 }
 
 
@@ -284,8 +269,7 @@ struct SumOp {
 
 }//unnamed namespace
 
-void
-TestNodeManager::testDynamic()
+TEST_F(TestNodeManager, testDynamic)
 {
     using openvdb::Coord;
     using openvdb::Index32;
@@ -300,46 +284,46 @@ TestNodeManager::testDynamic()
     auto child =
         std::make_unique<Internal1NodeType>(Coord(0, 0, 0), /*value=*/1.0f);
 
-    CPPUNIT_ASSERT(sourceTree.root().addChild(child.release()));
-    CPPUNIT_ASSERT_EQUAL(Index32(0), sourceTree.leafCount());
-    CPPUNIT_ASSERT_EQUAL(Index32(2), sourceTree.nonLeafCount());
+    EXPECT_TRUE(sourceTree.root().addChild(child.release()));
+    EXPECT_EQ(Index32(0), sourceTree.leafCount());
+    EXPECT_EQ(Index32(2), sourceTree.nonLeafCount());
 
     ExpandOp<Int32Tree> expandOp;
 
     { // use NodeManager::foreachTopDown
         Int32Tree tree(sourceTree);
         openvdb::tree::NodeManager<Int32Tree> manager(tree);
-        CPPUNIT_ASSERT_EQUAL(Index64(1), manager.nodeCount());
+        EXPECT_EQ(Index64(1), manager.nodeCount());
         manager.foreachTopDown(expandOp);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index32(0), tree.leafCount());
 
         // first level has been expanded, but node manager cache does not include the new nodes
         SumOp<Int32Tree> sumOp;
         manager.reduceBottomUp(sumOp);
-        CPPUNIT_ASSERT_EQUAL(Index64(32760), sumOp.totalCount);
+        EXPECT_EQ(Index64(32760), sumOp.totalCount);
     }
 
     { // use DynamicNodeManager::foreachTopDown and filter out nodes below root
         Int32Tree tree(sourceTree);
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
         RootOnlyOp<Int32Tree> rootOnlyOp;
-        CPPUNIT_ASSERT_NO_THROW(manager.foreachTopDown(rootOnlyOp));
-        CPPUNIT_ASSERT_NO_THROW(manager.reduceTopDown(rootOnlyOp));
+        EXPECT_NO_THROW(manager.foreachTopDown(rootOnlyOp));
+        EXPECT_NO_THROW(manager.reduceTopDown(rootOnlyOp));
     }
 
     { // use DynamicNodeManager::foreachTopDown
         Int32Tree tree(sourceTree);
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
         manager.foreachTopDown(expandOp);
-        CPPUNIT_ASSERT_EQUAL(Index32(32768), tree.leafCount());
+        EXPECT_EQ(Index32(32768), tree.leafCount());
 
         SumOp<Int32Tree> sumOp;
         manager.reduceTopDown(sumOp);
-        CPPUNIT_ASSERT_EQUAL(Index64(4286611448), sumOp.totalCount);
+        EXPECT_EQ(Index64(4286611448), sumOp.totalCount);
 
         SumOp<Int32Tree> zeroSumOp(true);
         manager.reduceTopDown(zeroSumOp);
-        CPPUNIT_ASSERT_EQUAL(Index64(535855096), zeroSumOp.totalCount);
+        EXPECT_EQ(Index64(535855096), zeroSumOp.totalCount);
     }
 
     { // use DynamicNodeManager::foreachTopDown but filter nodes with non-zero index
@@ -347,10 +331,10 @@ TestNodeManager::testDynamic()
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
         ExpandOp<Int32Tree> zeroExpandOp(true);
         manager.foreachTopDown(zeroExpandOp);
-        CPPUNIT_ASSERT_EQUAL(Index32(32768), tree.leafCount());
+        EXPECT_EQ(Index32(32768), tree.leafCount());
 
         SumOp<Int32Tree> sumOp;
         manager.reduceTopDown(sumOp);
-        CPPUNIT_ASSERT_EQUAL(Index64(550535160), sumOp.totalCount);
+        EXPECT_EQ(Index64(550535160), sumOp.totalCount);
     }
 }

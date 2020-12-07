@@ -1,55 +1,34 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
 namespace {
 const int GRID_DIM = 10;
 }
 
 
-class TestDivergence: public CppUnit::TestFixture
+class TestDivergence: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestDivergence);
-    CPPUNIT_TEST(testISDivergence);                    // Divergence in Index Space
-    CPPUNIT_TEST(testISDivergenceStencil);
-    CPPUNIT_TEST(testWSDivergence);                    // Divergence in World Space
-    CPPUNIT_TEST(testWSDivergenceStencil);
-    CPPUNIT_TEST(testDivergenceTool);                  // Divergence tool
-    CPPUNIT_TEST(testDivergenceMaskedTool);            // Divergence tool
-    CPPUNIT_TEST(testStaggeredDivergence);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testISDivergence();
-    void testISDivergenceStencil();
-    void testWSDivergence();
-    void testWSDivergenceStencil();
-    void testDivergenceTool();
-    void testDivergenceMaskedTool();
-    void testStaggeredDivergence();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestDivergence);
 
-
-void
-TestDivergence::testDivergenceTool()
+TEST_F(TestDivergence, testDivergenceTool)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     int dim = GRID_DIM;
     for (int x = -dim; x<dim; ++x) {
@@ -61,11 +40,11 @@ TestDivergence::testDivergenceTool()
         }
     }
 
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     FloatGrid::Ptr divGrid = tools::divergence(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(divGrid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(divGrid->activeVoxelCount()));
 
     FloatGrid::ConstAccessor accessor = divGrid->getConstAccessor();
     --dim;//ignore boundary divergence
@@ -87,14 +66,13 @@ TestDivergence::testDivergenceTool()
 
 
 
-void
-TestDivergence::testDivergenceMaskedTool()
+TEST_F(TestDivergence, testDivergenceMaskedTool)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     int dim = GRID_DIM;
     for (int x = -dim; x<dim; ++x) {
@@ -106,8 +84,8 @@ TestDivergence::testDivergenceMaskedTool()
         }
     }
 
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     /// maked region
     openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
@@ -115,7 +93,7 @@ TestDivergence::testDivergenceMaskedTool()
     maskGrid->fill(maskBBox, true /*value*/, true /*activate*/);
 
     FloatGrid::Ptr divGrid = tools::divergence(*inGrid, *maskGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(dim), int(divGrid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(dim), int(divGrid->activeVoxelCount()));
 
     FloatGrid::ConstAccessor accessor = divGrid->getConstAccessor();
     --dim;//ignore boundary divergence
@@ -141,8 +119,7 @@ TestDivergence::testDivergenceMaskedTool()
 }
 
 
-void
-TestDivergence::testStaggeredDivergence()
+TEST_F(TestDivergence, testStaggeredDivergence)
 {
     // This test is slightly different than the one above for sanity
     // checking purposes.
@@ -152,7 +129,7 @@ TestDivergence::testStaggeredDivergence()
     VectorGrid::Ptr inGrid = VectorGrid::create();
     inGrid->setGridClass( GRID_STAGGERED );
     VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     int dim = GRID_DIM;
     for (int x = -dim; x<dim; ++x) {
@@ -164,11 +141,11 @@ TestDivergence::testStaggeredDivergence()
         }
     }
 
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     FloatGrid::Ptr divGrid = tools::divergence(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(divGrid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(divGrid->activeVoxelCount()));
 
     FloatGrid::ConstAccessor accessor = divGrid->getConstAccessor();
     --dim;//ignore boundary divergence
@@ -189,8 +166,7 @@ TestDivergence::testStaggeredDivergence()
 }
 
 
-void
-TestDivergence::testISDivergence()
+TEST_F(TestDivergence, testISDivergence)
 {
     using namespace openvdb;
 
@@ -198,7 +174,7 @@ TestDivergence::testISDivergence()
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     int dim = GRID_DIM;
     for (int x = -dim; x<dim; ++x) {
@@ -211,8 +187,8 @@ TestDivergence::testISDivergence()
     }
 
     Accessor inAccessor = inGrid->getConstAccessor();
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     --dim;//ignore boundary divergence
     // test index space divergence
@@ -279,24 +255,23 @@ TestDivergence::testISDivergence()
                 ASSERT_DOUBLES_EXACTLY_EQUAL(2, d);
 
                 d = math::ISDivergence<math::FD_3RD>::result(inAccessor, xyz);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(2, d, /*tolerance=*/0.00001);
+                EXPECT_NEAR(2, d, /*tolerance=*/0.00001);
 
                 d = math::ISDivergence<math::BD_3RD>::result(inAccessor, xyz);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(2, d, /*tolerance=*/0.00001);
+                EXPECT_NEAR(2, d, /*tolerance=*/0.00001);
             }
         }
     }
 }
 
 
-void
-TestDivergence::testISDivergenceStencil()
+TEST_F(TestDivergence, testISDivergenceStencil)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     int dim = GRID_DIM;
     for (int x = -dim; x<dim; ++x) {
@@ -308,8 +283,8 @@ TestDivergence::testISDivergenceStencil()
         }
     }
 
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
     math::SevenPointStencil<VectorGrid> sevenpt(*inGrid);
     math::ThirteenPointStencil<VectorGrid> thirteenpt(*inGrid);
     math::NineteenPointStencil<VectorGrid> nineteenpt(*inGrid);
@@ -381,18 +356,17 @@ TestDivergence::testISDivergenceStencil()
                 ASSERT_DOUBLES_EXACTLY_EQUAL(2, d);
 
                 d = math::ISDivergence<math::FD_3RD>::result(nineteenpt);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(2, d, /*tolerance=*/0.00001);
+                EXPECT_NEAR(2, d, /*tolerance=*/0.00001);
 
                 d = math::ISDivergence<math::BD_3RD>::result(nineteenpt);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(2, d, /*tolerance=*/0.00001);
+                EXPECT_NEAR(2, d, /*tolerance=*/0.00001);
             }
         }
     }
 }
 
 
-void
-TestDivergence::testWSDivergence()
+TEST_F(TestDivergence, testWSDivergence)
 {
     using namespace openvdb;
 
@@ -404,7 +378,7 @@ TestDivergence::testWSDivergence()
         inGrid->setTransform(math::Transform::createLinearTransform(voxel_size));
 
         VectorTree& inTree = inGrid->tree();
-        CPPUNIT_ASSERT(inTree.empty());
+        EXPECT_TRUE(inTree.empty());
 
         int dim = GRID_DIM;
         for (int x = -dim; x<dim; ++x) {
@@ -418,8 +392,8 @@ TestDivergence::testWSDivergence()
         }
 
         Accessor inAccessor = inGrid->getConstAccessor();
-        CPPUNIT_ASSERT(!inTree.empty());
-        CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+        EXPECT_TRUE(!inTree.empty());
+        EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
         --dim;//ignore boundary divergence
 
@@ -486,7 +460,7 @@ TestDivergence::testWSDivergence()
         inGrid->setTransform(math::Transform::Ptr(new math::Transform(rotated_map)));
 
         VectorTree& inTree = inGrid->tree();
-        CPPUNIT_ASSERT(inTree.empty());
+        EXPECT_TRUE(inTree.empty());
 
         int dim = GRID_DIM;
         for (int x = -dim; x<dim; ++x) {
@@ -500,8 +474,8 @@ TestDivergence::testWSDivergence()
         }
 
         Accessor inAccessor = inGrid->getConstAccessor();
-        CPPUNIT_ASSERT(!inTree.empty());
-        CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+        EXPECT_TRUE(!inTree.empty());
+        EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
         --dim;//ignore boundary divergence
 
@@ -518,15 +492,15 @@ TestDivergence::testWSDivergence()
                     float d;
                     d = math::Divergence<math::AffineMap, math::CD_2ND>::result(
                         *map, inAccessor, xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
 
                     d = math::Divergence<math::AffineMap, math::BD_1ST>::result(
                         *map, inAccessor, xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
 
                     d = math::Divergence<math::AffineMap, math::FD_1ST>::result(
                         *map, inAccessor, xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
                 }
             }
         }
@@ -534,8 +508,7 @@ TestDivergence::testWSDivergence()
 }
 
 
-void
-TestDivergence::testWSDivergenceStencil()
+TEST_F(TestDivergence, testWSDivergenceStencil)
 {
     using namespace openvdb;
 
@@ -545,7 +518,7 @@ TestDivergence::testWSDivergenceStencil()
         inGrid->setTransform(math::Transform::createLinearTransform(voxel_size));
 
         VectorTree& inTree = inGrid->tree();
-        CPPUNIT_ASSERT(inTree.empty());
+        EXPECT_TRUE(inTree.empty());
 
         int dim = GRID_DIM;
         for (int x = -dim; x<dim; ++x) {
@@ -558,8 +531,8 @@ TestDivergence::testWSDivergenceStencil()
             }
         }
 
-        CPPUNIT_ASSERT(!inTree.empty());
-        CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+        EXPECT_TRUE(!inTree.empty());
+        EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
         --dim;//ignore boundary divergence
 
@@ -631,7 +604,7 @@ TestDivergence::testWSDivergenceStencil()
         inGrid->setTransform(math::Transform::Ptr(new math::Transform(rotated_map)));
 
         VectorTree& inTree = inGrid->tree();
-        CPPUNIT_ASSERT(inTree.empty());
+        EXPECT_TRUE(inTree.empty());
 
         int dim = GRID_DIM;
         for (int x = -dim; x<dim; ++x) {
@@ -645,8 +618,8 @@ TestDivergence::testWSDivergenceStencil()
         }
 
         //Accessor inAccessor = inGrid->getConstAccessor();
-        CPPUNIT_ASSERT(!inTree.empty());
-        CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+        EXPECT_TRUE(!inTree.empty());
+        EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
         --dim;//ignore boundary divergence
 
@@ -663,15 +636,15 @@ TestDivergence::testWSDivergenceStencil()
                     float d;
                     d = math::Divergence<math::AffineMap, math::CD_2ND>::result(
                         *map, dense_2ndOrder);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
 
                     d = math::Divergence<math::AffineMap, math::BD_1ST>::result(
                         *map, dense_2ndOrder);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
 
                     d = math::Divergence<math::AffineMap, math::FD_1ST>::result(
                         *map, dense_2ndOrder);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, d, 0.01);
+                    EXPECT_NEAR(2.0, d, 0.01);
                 }
             }
         }

@@ -1,14 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <tbb/task.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Prune.h>
 #include <type_traits>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
 
 using ValueType = float;
@@ -31,72 +31,11 @@ using TreeType = Tree4Type;
 
 using namespace openvdb::tree;
 
-class TestValueAccessor: public CppUnit::TestFixture
+class TestValueAccessor: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestValueAccessor);
-
-    CPPUNIT_TEST(testTree2Accessor);
-    CPPUNIT_TEST(testTree2AccessorRW);
-    CPPUNIT_TEST(testTree2ConstAccessor);
-    CPPUNIT_TEST(testTree2ConstAccessorRW);
-
-    CPPUNIT_TEST(testTree3Accessor);
-    CPPUNIT_TEST(testTree3AccessorRW);
-    CPPUNIT_TEST(testTree3ConstAccessor);
-    CPPUNIT_TEST(testTree3ConstAccessorRW);
-
-    CPPUNIT_TEST(testTree4Accessor);
-    CPPUNIT_TEST(testTree4AccessorRW);
-    CPPUNIT_TEST(testTree4ConstAccessor);
-    CPPUNIT_TEST(testTree4ConstAccessorRW);
-
-    CPPUNIT_TEST(testTree5Accessor);
-    CPPUNIT_TEST(testTree5AccessorRW);
-    CPPUNIT_TEST(testTree5ConstAccessor);
-    CPPUNIT_TEST(testTree5ConstAccessorRW);
-
-    CPPUNIT_TEST(testTree3Accessor2);
-    CPPUNIT_TEST(testTree3ConstAccessor2);
-    CPPUNIT_TEST(testTree4Accessor2);
-    CPPUNIT_TEST(testTree4ConstAccessor2);
-    CPPUNIT_TEST(testTree4Accessor1);
-    CPPUNIT_TEST(testTree4ConstAccessor1);
-    CPPUNIT_TEST(testTree4Accessor0);
-    CPPUNIT_TEST(testTree4ConstAccessor0);
-    CPPUNIT_TEST(testTree5Accessor2);
-    CPPUNIT_TEST(testTree5ConstAccessor2);
-    CPPUNIT_TEST(testTree4Accessor12);//cache node level 2
-    CPPUNIT_TEST(testTree5Accessor213);//cache node level 1 and 3
-
-    CPPUNIT_TEST(testMultithreadedAccessor);
-    CPPUNIT_TEST(testAccessorRegistration);
-    CPPUNIT_TEST(testGetNode);
-
-    CPPUNIT_TEST_SUITE_END();
-    // cache all node levels
-    void testTree2Accessor()        { accessorTest<ValueAccessor<Tree2Type> >(); }
-    void testTree2AccessorRW()      { accessorTest<ValueAccessorRW<Tree2Type> >(); }
-    void testTree2ConstAccessor()   { constAccessorTest<ValueAccessor<const Tree2Type> >(); }
-    void testTree2ConstAccessorRW() { constAccessorTest<ValueAccessorRW<const Tree2Type> >(); }
-    // cache all node levels
-    void testTree3Accessor()        { accessorTest<ValueAccessor<Tree3Type> >(); }
-    void testTree3AccessorRW()      { accessorTest<ValueAccessorRW<Tree3Type> >(); }
-    void testTree3ConstAccessor()   { constAccessorTest<ValueAccessor<const Tree3Type> >(); }
-    void testTree3ConstAccessorRW() { constAccessorTest<ValueAccessorRW<const Tree3Type> >(); }
-    // cache all node levels
-    void testTree4Accessor()        { accessorTest<ValueAccessor<Tree4Type> >(); }
-    void testTree4AccessorRW()      { accessorTest<ValueAccessorRW<Tree4Type> >(); }
-    void testTree4ConstAccessor()   { constAccessorTest<ValueAccessor<const Tree4Type> >(); }
-    void testTree4ConstAccessorRW() { constAccessorTest<ValueAccessorRW<const Tree4Type> >(); }
-    // cache all node levels
-    void testTree5Accessor()        { accessorTest<ValueAccessor<Tree5Type> >(); }
-    void testTree5AccessorRW()      { accessorTest<ValueAccessorRW<Tree5Type> >(); }
-    void testTree5ConstAccessor()   { constAccessorTest<ValueAccessor<const Tree5Type> >(); }
-    void testTree5ConstAccessorRW() { constAccessorTest<ValueAccessorRW<const Tree5Type> >(); }
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 
     // Test odd combinations of trees and ValueAccessors
     // cache node level 0 and 1
@@ -165,16 +104,10 @@ public:
         accessorTest<ValueAccessor2<Tree5Type, false, 1,3> >();
     }
 
-    void testMultithreadedAccessor();
-    void testAccessorRegistration();
-    void testGetNode();
-
-private:
+protected:
     template<typename AccessorT> void accessorTest();
     template<typename AccessorT> void constAccessorTest();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestValueAccessor);
 
 
 ////////////////////////////////////////
@@ -206,13 +139,13 @@ TestValueAccessor::accessorTest()
 
     {
         TreeType tree(background);
-        CPPUNIT_ASSERT(!tree.isValueOn(c0));
-        CPPUNIT_ASSERT(!tree.isValueOn(c1));
+        EXPECT_TRUE(!tree.isValueOn(c0));
+        EXPECT_TRUE(!tree.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
         tree.setValue(c0, value);
-        CPPUNIT_ASSERT(tree.isValueOn(c0));
-        CPPUNIT_ASSERT(!tree.isValueOn(c1));
+        EXPECT_TRUE(tree.isValueOn(c0));
+        EXPECT_TRUE(!tree.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
     }
@@ -221,116 +154,116 @@ TestValueAccessor::accessorTest()
         AccessorT acc(tree);
         ValueType v;
 
-        CPPUNIT_ASSERT(!tree.isValueOn(c0));
-        CPPUNIT_ASSERT(!tree.isValueOn(c1));
+        EXPECT_TRUE(!tree.isValueOn(c0));
+        EXPECT_TRUE(!tree.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c0));
-        CPPUNIT_ASSERT(!acc.isCached(c1));
-        CPPUNIT_ASSERT(!acc.probeValue(c0,v));
+        EXPECT_TRUE(!acc.isCached(c0));
+        EXPECT_TRUE(!acc.isCached(c1));
+        EXPECT_TRUE(!acc.probeValue(c0,v));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-        CPPUNIT_ASSERT(!acc.probeValue(c1,v));
+        EXPECT_TRUE(!acc.probeValue(c1,v));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-        CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c0));
-        CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c1));
-        CPPUNIT_ASSERT(!acc.isVoxel(c0));
-        CPPUNIT_ASSERT(!acc.isVoxel(c1));
+        EXPECT_EQ(-1, acc.getValueDepth(c0));
+        EXPECT_EQ(-1, acc.getValueDepth(c1));
+        EXPECT_TRUE(!acc.isVoxel(c0));
+        EXPECT_TRUE(!acc.isVoxel(c1));
 
         acc.setValue(c0, value);
 
-        CPPUNIT_ASSERT(tree.isValueOn(c0));
-        CPPUNIT_ASSERT(!tree.isValueOn(c1));
+        EXPECT_TRUE(tree.isValueOn(c0));
+        EXPECT_TRUE(!tree.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
-        CPPUNIT_ASSERT(acc.probeValue(c0,v));
+        EXPECT_TRUE(acc.probeValue(c0,v));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, v);
-        CPPUNIT_ASSERT(!acc.probeValue(c1,v));
+        EXPECT_TRUE(!acc.probeValue(c1,v));
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0)); // leaf-level voxel value
-        CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c1)); // background value
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(openvdb::Coord(7, 10, 20)));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c0)); // leaf-level voxel value
+        EXPECT_EQ(-1, acc.getValueDepth(c1)); // background value
+        EXPECT_EQ(leafDepth, acc.getValueDepth(openvdb::Coord(7, 10, 20)));
         const int depth = leafDepth == 1 ? -1 : leafDepth - 1;
-        CPPUNIT_ASSERT_EQUAL(depth, acc.getValueDepth(openvdb::Coord(8, 10, 20)));
-        CPPUNIT_ASSERT( acc.isVoxel(c0)); // leaf-level voxel value
-        CPPUNIT_ASSERT(!acc.isVoxel(c1));
-        CPPUNIT_ASSERT( acc.isVoxel(openvdb::Coord(7, 10, 20)));
-        CPPUNIT_ASSERT(!acc.isVoxel(openvdb::Coord(8, 10, 20)));
+        EXPECT_EQ(depth, acc.getValueDepth(openvdb::Coord(8, 10, 20)));
+        EXPECT_TRUE( acc.isVoxel(c0)); // leaf-level voxel value
+        EXPECT_TRUE(!acc.isVoxel(c1));
+        EXPECT_TRUE( acc.isVoxel(openvdb::Coord(7, 10, 20)));
+        EXPECT_TRUE(!acc.isVoxel(openvdb::Coord(8, 10, 20)));
 
         ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c1)); // uncached background value
-        CPPUNIT_ASSERT(!acc.isValueOn(c1)); // inactive background value
+        EXPECT_TRUE(!acc.isCached(c1)); // uncached background value
+        EXPECT_TRUE(!acc.isValueOn(c1)); // inactive background value
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-        CPPUNIT_ASSERT(
+        EXPECT_TRUE(
             (acc.numCacheLevels()>0) == acc.isCached(c0)); // active, leaf-level voxel value
-        CPPUNIT_ASSERT(acc.isValueOn(c0));
+        EXPECT_TRUE(acc.isValueOn(c0));
 
         acc.setValue(c1, value);
 
-        CPPUNIT_ASSERT(acc.isValueOn(c1));
+        EXPECT_TRUE(acc.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c1));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c0));
+        EXPECT_TRUE(!acc.isCached(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c1));
-        CPPUNIT_ASSERT(acc.isVoxel(c0));
-        CPPUNIT_ASSERT(acc.isVoxel(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
+        EXPECT_TRUE(acc.isVoxel(c0));
+        EXPECT_TRUE(acc.isVoxel(c1));
 
         tree.setValueOff(c1);
 
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
-        CPPUNIT_ASSERT( acc.isValueOn(c0));
-        CPPUNIT_ASSERT(!acc.isValueOn(c1));
+        EXPECT_TRUE(!acc.isCached(c0));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE( acc.isValueOn(c0));
+        EXPECT_TRUE(!acc.isValueOn(c1));
 
         acc.setValueOn(c1);
 
-        CPPUNIT_ASSERT(!acc.isCached(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
-        CPPUNIT_ASSERT( acc.isValueOn(c0));
-        CPPUNIT_ASSERT( acc.isValueOn(c1));
+        EXPECT_TRUE(!acc.isCached(c0));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE( acc.isValueOn(c0));
+        EXPECT_TRUE( acc.isValueOn(c1));
 
         acc.modifyValueAndActiveState(c1, Plus(-value)); // subtract value & mark inactive
-        CPPUNIT_ASSERT(!acc.isValueOn(c1));
+        EXPECT_TRUE(!acc.isValueOn(c1));
 
         acc.modifyValue(c1, Plus(-value)); // subtract value again & mark active
 
-        CPPUNIT_ASSERT(acc.isValueOn(c1));
+        EXPECT_TRUE(acc.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(-value, tree.getValue(c1));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(-value, acc.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c0));
+        EXPECT_TRUE(!acc.isCached(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c1));
-        CPPUNIT_ASSERT(acc.isVoxel(c0));
-        CPPUNIT_ASSERT(acc.isVoxel(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
+        EXPECT_TRUE(acc.isVoxel(c0));
+        EXPECT_TRUE(acc.isVoxel(c1));
 
         acc.setValueOnly(c1, 3*value);
 
-        CPPUNIT_ASSERT(acc.isValueOn(c1));
+        EXPECT_TRUE(acc.isValueOn(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, tree.getValue(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(3*value, tree.getValue(c1));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
         ASSERT_DOUBLES_EXACTLY_EQUAL(3*value, acc.getValue(c1));
-        CPPUNIT_ASSERT(!acc.isCached(c0));
+        EXPECT_TRUE(!acc.isCached(c0));
         ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-        CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0));
-        CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c1));
-        CPPUNIT_ASSERT(acc.isVoxel(c0));
-        CPPUNIT_ASSERT(acc.isVoxel(c1));
+        EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
+        EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
+        EXPECT_TRUE(acc.isVoxel(c0));
+        EXPECT_TRUE(acc.isVoxel(c1));
 
         acc.clear();
-        CPPUNIT_ASSERT(!acc.isCached(c0));
-        CPPUNIT_ASSERT(!acc.isCached(c1));
+        EXPECT_TRUE(!acc.isCached(c0));
+        EXPECT_TRUE(!acc.isCached(c1));
     }
 }
 
@@ -350,71 +283,91 @@ TestValueAccessor::constAccessorTest()
     TreeType tree(background);
     AccessorT acc(tree);
 
-    CPPUNIT_ASSERT(!tree.isValueOn(c0));
-    CPPUNIT_ASSERT(!tree.isValueOn(c1));
+    EXPECT_TRUE(!tree.isValueOn(c0));
+    EXPECT_TRUE(!tree.isValueOn(c1));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c0));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, tree.getValue(c1));
-    CPPUNIT_ASSERT(!acc.isCached(c0));
-    CPPUNIT_ASSERT(!acc.isCached(c1));
-    CPPUNIT_ASSERT(!acc.probeValue(c0,v));
+    EXPECT_TRUE(!acc.isCached(c0));
+    EXPECT_TRUE(!acc.isCached(c1));
+    EXPECT_TRUE(!acc.probeValue(c0,v));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-    CPPUNIT_ASSERT(!acc.probeValue(c1,v));
+    EXPECT_TRUE(!acc.probeValue(c1,v));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-    CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c0));
-    CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c1));
-    CPPUNIT_ASSERT(!acc.isVoxel(c0));
-    CPPUNIT_ASSERT(!acc.isVoxel(c1));
+    EXPECT_EQ(-1, acc.getValueDepth(c0));
+    EXPECT_EQ(-1, acc.getValueDepth(c1));
+    EXPECT_TRUE(!acc.isVoxel(c0));
+    EXPECT_TRUE(!acc.isVoxel(c1));
 
     tree.setValue(c0, value);
 
-    CPPUNIT_ASSERT(tree.isValueOn(c0));
-    CPPUNIT_ASSERT(!tree.isValueOn(c1));
+    EXPECT_TRUE(tree.isValueOn(c0));
+    EXPECT_TRUE(!tree.isValueOn(c1));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
-    CPPUNIT_ASSERT(!acc.isCached(c1));
-    CPPUNIT_ASSERT(!acc.isCached(c0));
-    CPPUNIT_ASSERT(acc.isValueOn(c0));
-    CPPUNIT_ASSERT(!acc.isValueOn(c1));
-    CPPUNIT_ASSERT(acc.probeValue(c0,v));
+    EXPECT_TRUE(!acc.isCached(c1));
+    EXPECT_TRUE(!acc.isCached(c0));
+    EXPECT_TRUE(acc.isValueOn(c0));
+    EXPECT_TRUE(!acc.isValueOn(c1));
+    EXPECT_TRUE(acc.probeValue(c0,v));
     ASSERT_DOUBLES_EXACTLY_EQUAL(value, v);
-    CPPUNIT_ASSERT(!acc.probeValue(c1,v));
+    EXPECT_TRUE(!acc.probeValue(c1,v));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, v);
-    CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0));
-    CPPUNIT_ASSERT_EQUAL(-1, acc.getValueDepth(c1));
-    CPPUNIT_ASSERT( acc.isVoxel(c0));
-    CPPUNIT_ASSERT(!acc.isVoxel(c1));
+    EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
+    EXPECT_EQ(-1, acc.getValueDepth(c1));
+    EXPECT_TRUE( acc.isVoxel(c0));
+    EXPECT_TRUE(!acc.isVoxel(c1));
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c0));
-    CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));
+    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
     ASSERT_DOUBLES_EXACTLY_EQUAL(background, acc.getValue(c1));
-    CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c0));
-    CPPUNIT_ASSERT(!acc.isCached(c1));
-    CPPUNIT_ASSERT(acc.isValueOn(c0));
-    CPPUNIT_ASSERT(!acc.isValueOn(c1));
+    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c0));
+    EXPECT_TRUE(!acc.isCached(c1));
+    EXPECT_TRUE(acc.isValueOn(c0));
+    EXPECT_TRUE(!acc.isValueOn(c1));
 
     tree.setValue(c1, value);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(value, acc.getValue(c1));
-    CPPUNIT_ASSERT(!acc.isCached(c0));
-    CPPUNIT_ASSERT((acc.numCacheLevels()>0) == acc.isCached(c1));
-    CPPUNIT_ASSERT(acc.isValueOn(c0));
-    CPPUNIT_ASSERT(acc.isValueOn(c1));
-    CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c0));
-    CPPUNIT_ASSERT_EQUAL(leafDepth, acc.getValueDepth(c1));
-    CPPUNIT_ASSERT(acc.isVoxel(c0));
-    CPPUNIT_ASSERT(acc.isVoxel(c1));
+    EXPECT_TRUE(!acc.isCached(c0));
+    EXPECT_TRUE((acc.numCacheLevels()>0) == acc.isCached(c1));
+    EXPECT_TRUE(acc.isValueOn(c0));
+    EXPECT_TRUE(acc.isValueOn(c1));
+    EXPECT_EQ(leafDepth, acc.getValueDepth(c0));
+    EXPECT_EQ(leafDepth, acc.getValueDepth(c1));
+    EXPECT_TRUE(acc.isVoxel(c0));
+    EXPECT_TRUE(acc.isVoxel(c1));
 
     // The next two lines should not compile, because the acc references a const tree:
     //acc.setValue(c1, value);
     //acc.setValueOff(c1);
 
     acc.clear();
-    CPPUNIT_ASSERT(!acc.isCached(c0));
-    CPPUNIT_ASSERT(!acc.isCached(c1));
+    EXPECT_TRUE(!acc.isCached(c0));
+    EXPECT_TRUE(!acc.isCached(c1));
 }
 
+    // cache all node levels
+TEST_F(TestValueAccessor, testTree2Accessor)        { accessorTest<ValueAccessor<Tree2Type> >(); }
+TEST_F(TestValueAccessor, testTree2AccessorRW)      { accessorTest<ValueAccessorRW<Tree2Type> >(); }
+TEST_F(TestValueAccessor, testTree2ConstAccessor)   { constAccessorTest<ValueAccessor<const Tree2Type> >(); }
+TEST_F(TestValueAccessor, testTree2ConstAccessorRW) { constAccessorTest<ValueAccessorRW<const Tree2Type> >(); }
+    // cache all node levels
+TEST_F(TestValueAccessor, testTree3Accessor)        { accessorTest<ValueAccessor<Tree3Type> >(); }
+TEST_F(TestValueAccessor, testTree3AccessorRW)      { accessorTest<ValueAccessorRW<Tree3Type> >(); }
+TEST_F(TestValueAccessor, testTree3ConstAccessor)   { constAccessorTest<ValueAccessor<const Tree3Type> >(); }
+TEST_F(TestValueAccessor, testTree3ConstAccessorRW) { constAccessorTest<ValueAccessorRW<const Tree3Type> >(); }
+    // cache all node levels
+TEST_F(TestValueAccessor, testTree4Accessor)        { accessorTest<ValueAccessor<Tree4Type> >(); }
+TEST_F(TestValueAccessor, testTree4AccessorRW)      { accessorTest<ValueAccessorRW<Tree4Type> >(); }
+TEST_F(TestValueAccessor, testTree4ConstAccessor)   { constAccessorTest<ValueAccessor<const Tree4Type> >(); }
+TEST_F(TestValueAccessor, testTree4ConstAccessorRW) { constAccessorTest<ValueAccessorRW<const Tree4Type> >(); }
+    // cache all node levels
+TEST_F(TestValueAccessor, testTree5Accessor)        { accessorTest<ValueAccessor<Tree5Type> >(); }
+TEST_F(TestValueAccessor, testTree5AccessorRW)      { accessorTest<ValueAccessorRW<Tree5Type> >(); }
+TEST_F(TestValueAccessor, testTree5ConstAccessor)   { constAccessorTest<ValueAccessor<const Tree5Type> >(); }
+TEST_F(TestValueAccessor, testTree5ConstAccessorRW) { constAccessorTest<ValueAccessorRW<const Tree5Type> >(); }
 
-void
-TestValueAccessor::testMultithreadedAccessor()
+
+TEST_F(TestValueAccessor, testMultithreadedAccessor)
 {
 #define MAX_COORD 5000
 
@@ -484,8 +437,7 @@ TestValueAccessor::testMultithreadedAccessor()
 }
 
 
-void
-TestValueAccessor::testAccessorRegistration()
+TEST_F(TestValueAccessor, testAccessorRegistration)
 {
     using openvdb::Index;
 
@@ -498,41 +450,40 @@ TestValueAccessor::testAccessorRegistration()
     // Set a single leaf voxel via the accessor and verify that
     // the cache is populated.
     acc.setValue(c0, value);
-    CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
+    EXPECT_EQ(Index(1), tree->leafCount());
+    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Reset the voxel to the background value and verify that no nodes
     // have been deleted and that the cache is still populated.
     tree->setValueOff(c0, background);
-    CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
+    EXPECT_EQ(Index(1), tree->leafCount());
+    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Prune the tree and verify that only the root node remains and that
     // the cache has been cleared.
     openvdb::tools::prune(*tree);
     //tree->prune();
-    CPPUNIT_ASSERT_EQUAL(Index(0), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(Index(1), tree->nonLeafCount()); // root node only
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
+    EXPECT_EQ(Index(0), tree->leafCount());
+    EXPECT_EQ(Index(1), tree->nonLeafCount()); // root node only
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 
     // Set the leaf voxel again and verify that the cache is repopulated.
     acc.setValue(c0, value);
-    CPPUNIT_ASSERT_EQUAL(Index(1), tree->leafCount());
-    CPPUNIT_ASSERT_EQUAL(tree->root().getLevel(), tree->nonLeafCount());
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
+    EXPECT_EQ(Index(1), tree->leafCount());
+    EXPECT_EQ(tree->root().getLevel(), tree->nonLeafCount());
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() != nullptr);
 
     // Delete the tree and verify that the cache has been cleared.
     tree.reset();
-    CPPUNIT_ASSERT(acc.getTree() == nullptr);
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::RootNodeType>() == nullptr);
-    CPPUNIT_ASSERT(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
+    EXPECT_TRUE(acc.getTree() == nullptr);
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::RootNodeType>() == nullptr);
+    EXPECT_TRUE(acc.getNode<openvdb::FloatTree::LeafNodeType>() == nullptr);
 }
 
 
-void
-TestValueAccessor::testGetNode()
+TEST_F(TestValueAccessor, testGetNode)
 {
     using LeafT = Tree4Type::LeafNodeType;
 
@@ -547,22 +498,22 @@ TestValueAccessor::testGetNode()
         acc.getValue(c0);
         // Verify that the cache contains a leaf node.
         LeafT* node = acc.getNode<LeafT>();
-        CPPUNIT_ASSERT(node != nullptr);
+        EXPECT_TRUE(node != nullptr);
 
         // Erase the leaf node from the cache and verify that it is gone.
         acc.eraseNode<LeafT>();
         node = acc.getNode<LeafT>();
-        CPPUNIT_ASSERT(node == nullptr);
+        EXPECT_TRUE(node == nullptr);
     }
     {
         // As above, but with a const tree.
         openvdb::tree::ValueAccessor<const Tree4Type> acc(tree);
         acc.getValue(c0);
         const LeafT* node = acc.getNode<const LeafT>();
-        CPPUNIT_ASSERT(node != nullptr);
+        EXPECT_TRUE(node != nullptr);
 
         acc.eraseNode<LeafT>();
         node = acc.getNode<const LeafT>();
-        CPPUNIT_ASSERT(node == nullptr);
+        EXPECT_TRUE(node == nullptr);
     }
 }

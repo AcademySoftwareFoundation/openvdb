@@ -221,7 +221,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_PYTHON_VERSION 2.7)
   set(MINIMUM_NUMPY_VERSION 1.12.1)
 
-  set(MINIMUM_CPPUNIT_VERSION 1.10)
+  set(MINIMUM_GOOGLETEST_VERSION 1.8)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
   set(MINIMUM_HOUDINI_VERSION 17.0)
@@ -336,7 +336,6 @@ endif()
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
-    cmake/FindCppUnit.cmake
     cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
@@ -614,7 +613,7 @@ if(USE_STATIC_DEPENDENCIES)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
-  set(CPPUNIT_USE_STATIC_LIBS ON)
+  set(GTEST_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.
   # set(GLFW_USE_STATIC_LIBS ON)
