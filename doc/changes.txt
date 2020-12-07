@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.2.0</B> - <I>In Development</I>
+<B>Version 7.2.0</B> - <I>December 9, 2020</I>
 
 @par
 New features:
@@ -19,6 +19,8 @@ New features:
 - Added @vdblink::tools::TreeToMerge TreeToMerge@endlink which provides methods
   to steal or deep-copy from a tree based on the tag dispatch class used in its
   construction.
+- Pre-release of OpenVDB AX, an open source C++ library that provides a
+  powerful and easy way of interacting with OpenVDB volume and point data.
 
 @par
 Improvements:
