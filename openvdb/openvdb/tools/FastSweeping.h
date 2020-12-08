@@ -939,6 +939,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitSdf
     SdfValueT      mAboveSign;//sign of distance values above the iso-value
 };// FastSweeping::InitSdf
 
+
 /// Private class of FastSweeping to perform multi-threaded initialization
 template <typename SdfGridT, typename ExtValueT>
 template <typename OpT>
@@ -1010,6 +1011,18 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
 #endif
     }// FastSweeping::InitExt::run
 
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT sumHelper(ExtT ext, const SdfT& d2) const { return ext; }// int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT sumHelper(ExtT ext, const SdfT& d2) const {return ExtT(d2 * ext); }// non-int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT extValHelper(ExtT extSum, const SdfT& sdfSum) const { return extSum; }// int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT extValHelper(ExtT extSum, const SdfT& sdfSum) const {return ExtT((SdfT(1) / sdfSum) * extSum); }// non-int implementation
+
     void operator()(const LeafRange& r) const
     {
         ExtAccT acc(mExtGrid->tree());
@@ -1063,10 +1076,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                                     const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
                                                     static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
                                                     static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
-                                    sum2 += ExtValueT(d2*ExtValueT(op(xform.indexToWorld(xyz))));
+                                    ExtValueT tmp = sumHelper(op(xform.indexToWorld(xyz)), d2);
+                                    sum2 += tmp;
                                 }
                             }//look over six cases
-                            ext[voxelIter.pos()] = ExtValueT((SdfValueT(1) / sum1) * sum2);
+                            ext[voxelIter.pos()] = extValHelper(sum2, sum1);
                             sdf[voxelIter.pos()] = isAbove ? h / math::Sqrt(sum1) : -h / math::Sqrt(sum1);
                         }// voxel is neighboring the iso-surface
                     }// intersecting voxels
@@ -1296,6 +1310,24 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         inline operator bool() const { return v < SdfValueT(1000); }
     };// NN
 
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return d1.v < d2.v ? v1 : v2; }// int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return ExtT(w*(d1.v*v1 + d2.v*v2)); }// non-int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& w, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
+        ExtT tmp = d1.v < d2.v ? v1 : v2;
+        SdfT sdfTmp = d1.v < d2.v ? d1.v : d2.v;
+        return sdfTmp < d3.v ? tmp : v3;
+    }// int implementation
+
+    template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
+    ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& w, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
+        return ExtT(w*(d1.v*v1 + d2.v*v2 + d3.v*v3));
+    }// non-int implementation
+
     void sweep()
     {
         typename ExtGridT::TreeType *tree2 = mParent->mExtGrid ? &mParent->mExtGrid->tree() : nullptr;
@@ -1386,8 +1418,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                     d2.v -= update;
                                     // affine combination of two neighboring extension values
                                     const SdfValueT w = SdfValueT(1)/(d1.v+d2.v);
-                                    acc2->setValue(ijk, ExtValueT(w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                                     d2.v*acc2->getValue(d2(ijk)))));
+                                    const ExtValueT v1 = acc2->getValue(d1(ijk));
+                                    const ExtValueT v2 = acc2->getValue(d2(ijk));
+                                    const ExtValueT extVal = twoNghbr(d1, d2, w, v1, v2);
+                                    acc2->setValue(ijk, extVal);
                                 }//update ext?
                             }//update sdf?
                             continue;
@@ -1411,9 +1445,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                 d3.v -= update;
                                 // affine combination of three neighboring extension values
                                 const SdfValueT w = SdfValueT(1)/(d1.v+d2.v+d3.v);
-                                acc2->setValue(ijk, ExtValueT(w*(d1.v*acc2->getValue(d1(ijk)) +
-                                                                 d2.v*acc2->getValue(d2(ijk)) +
-                                                                 d3.v*acc2->getValue(d3(ijk)))));
+                                const ExtValueT v1 = acc2->getValue(d1(ijk));
+                                const ExtValueT v2 = acc2->getValue(d2(ijk));
+                                const ExtValueT v3 = acc2->getValue(d3(ijk));
+                                const ExtValueT extVal = threeNghbr(d1, d2, d3, w, v1, v2, v3);
+                                acc2->setValue(ijk, extVal);
                             }//update ext?
                         }//update sdf?
                     }//test for non-negative determinant
