@@ -1012,13 +1012,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
     }// FastSweeping::InitExt::run
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT sumHelper(ExtT ext, const SdfT& d2) const { return ext; }// int implementation
+    ExtT sumHelper(ExtT ext, const SdfT& /* d2 */) const { return ext; }// int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT sumHelper(ExtT ext, const SdfT& d2) const {return ExtT(d2 * ext); }// non-int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT extValHelper(ExtT extSum, const SdfT& sdfSum) const { return extSum; }// int implementation
+    ExtT extValHelper(ExtT extSum, const SdfT& /* sdfSum */) const { return extSum; }// int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT extValHelper(ExtT extSum, const SdfT& sdfSum) const {return ExtT((SdfT(1) / sdfSum) * extSum); }// non-int implementation
@@ -1311,13 +1311,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
     };// NN
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return d1.v < d2.v ? v1 : v2; }// int implementation
+    ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& /* w */, const ExtT& v1, const ExtT& v2) const { return d1.v < d2.v ? v1 : v2; }// int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return ExtT(w*(d1.v*v1 + d2.v*v2)); }// non-int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& w, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
+    ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& /* w */, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
         ExtT tmp = d1.v < d2.v ? v1 : v2;
         SdfT sdfTmp = d1.v < d2.v ? d1.v : d2.v;
         return sdfTmp < d3.v ? tmp : v3;
