@@ -110,7 +110,7 @@ code is always pre-generated and provided with the AX repository within the
 <b>grammar/generated</b> subdirectory. This C/C++ code is compiled into the AX
 library. Thus, the grammar is provided for two reasons; to demonstrate how the
 syntactical rules are implemented and to provide expert users the ability to
-regenerate the C/C++ bindings (see @ref openvdbaxbuild "the build instructions").
+regenerate the C/C++ bindings (see @ref build "the build instructions").
 Importantly, AX does not install any of the files in the grammar folder; the
 parser is accessed through the @b ast module.
 

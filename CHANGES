@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 7.2.0 - In Development
+Version 7.2.0 - December 9, 2020
 
     New features:
     - Added tree::DynamicNodeManager that lazily caches the nodes at each
@@ -12,6 +12,8 @@ Version 7.2.0 - In Development
       accelerate CSG union, intersection and difference operations.
     - Added tools::TreeToMerge which provides methods to steal or deep-copy
       from a tree based on the tag dispatch class used in its construction.
+    - Pre-release of OpenVDB AX, an open source C++ library that provides a
+      powerful and easy way of interacting with OpenVDB volume and point data.
 
     Improvements:
     - util::CpuTimer now uses C++11 chrono instead of TBB.
