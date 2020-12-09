@@ -1076,7 +1076,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                                     const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
                                                     static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
                                                     static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
-                                    ExtValueT tmp = sumHelper(op(xform.indexToWorld(xyz)), d2);
+                                    ExtValueT tmp = sumHelper(ExtValueT(op(xform.indexToWorld(xyz))), d2);
                                     sum2 += tmp;
                                 }
                             }//look over six cases
