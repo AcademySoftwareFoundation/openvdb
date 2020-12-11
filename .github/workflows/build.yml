@@ -45,6 +45,8 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.8.0
     - name: install_cmake
       if: matrix.config.image == '2018'
       run: ./ci/install_cmake.sh 3.12.0
@@ -77,6 +79,8 @@ jobs:
     - name: install_cmake
       if: matrix.config.image == '2018'
       run: ./ci/install_cmake.sh 3.12.0
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -101,6 +105,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh Release 7 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
@@ -114,6 +120,8 @@ jobs:
       image: aswf/ci-openvdb:2020
     steps:
     - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: ./ci/build.sh Release 7 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -184,6 +192,9 @@ jobs:
     - name: install
       shell: bash
       run: ./ci/install_blosc.sh 1.5.0
+    - name: install
+      shell: bash
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to

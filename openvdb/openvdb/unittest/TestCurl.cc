@@ -1,54 +1,34 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1e-6);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/1e-6);
 
 namespace {
 const int GRID_DIM = 10;
 }
 
 
-class TestCurl: public CppUnit::TestFixture
+class TestCurl: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestCurl);
-    CPPUNIT_TEST(testISCurl);                    // Gradient in Index Space
-    CPPUNIT_TEST(testISCurlStencil);
-    CPPUNIT_TEST(testWSCurl);                    // Gradient in World Space
-    CPPUNIT_TEST(testWSCurlStencil);
-    CPPUNIT_TEST(testCurlTool);                  // Gradient tool
-    CPPUNIT_TEST(testCurlMaskedTool);            // Gradient tool
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testISCurl();
-    void testISCurlStencil();
-    void testWSCurl();
-    void testWSCurlStencil();
-    void testCurlTool();
-    void testCurlMaskedTool();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestCurl);
 
-
-void
-TestCurl::testCurlTool()
+TEST_F(TestCurl, testCurlTool)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -60,11 +40,11 @@ TestCurl::testCurlTool()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
 
     VectorGrid::ConstAccessor curlAccessor = curl_grid->getConstAccessor();
     --dim;//ignore boundary curl vectors
@@ -88,14 +68,13 @@ TestCurl::testCurlTool()
 }
 
 
-void
-TestCurl::testCurlMaskedTool()
+TEST_F(TestCurl, testCurlMaskedTool)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -107,8 +86,8 @@ TestCurl::testCurlMaskedTool()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     openvdb::CoordBBox maskBBox(openvdb::Coord(0), openvdb::Coord(dim));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
@@ -122,7 +101,7 @@ TestCurl::testCurlMaskedTool()
 
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid, *maskGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(dim), int(curl_grid->activeVoxelCount()));
 
     VectorGrid::ConstAccessor curlAccessor = curl_grid->getConstAccessor();
     --dim;//ignore boundary curl vectors
@@ -153,14 +132,13 @@ TestCurl::testCurlMaskedTool()
 }
 
 
-void
-TestCurl::testISCurl()
+TEST_F(TestCurl, testISCurl)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -172,11 +150,11 @@ TestCurl::testISCurl()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
 
     --dim;//ignore boundary curl vectors
     // test unit space operators
@@ -255,27 +233,26 @@ TestCurl::testISCurl()
 
                 v = math::ISCurl<math::FD_3RD>::result(inConstAccessor, xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0, v[0]);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL( 0, v[1], /*tolerance=*/0.00001);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(-2, v[2], /*tolerance=*/0.00001);
+                EXPECT_NEAR( 0, v[1], /*tolerance=*/0.00001);
+                EXPECT_NEAR(-2, v[2], /*tolerance=*/0.00001);
 
                 v = math::ISCurl<math::BD_3RD>::result(inConstAccessor, xyz);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0, v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0, v[1]);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(-2, v[2], /*tolerance=*/0.00001);
+                EXPECT_NEAR(-2, v[2], /*tolerance=*/0.00001);
             }
         }
     }
 }
 
 
-void
-TestCurl::testISCurlStencil()
+TEST_F(TestCurl, testISCurlStencil)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -287,11 +264,11 @@ TestCurl::testISCurlStencil()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
 
     math::SevenPointStencil<VectorGrid> sevenpt(*inGrid);
     math::ThirteenPointStencil<VectorGrid> thirteenpt(*inGrid);
@@ -384,25 +361,24 @@ TestCurl::testISCurlStencil()
                 v = math::ISCurl<math::FD_3RD>::result(nineteenpt);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(-2,v[2], /*tolerance=*/0.00001);
+                EXPECT_NEAR(-2,v[2], /*tolerance=*/0.00001);
 
                 v = math::ISCurl<math::BD_3RD>::result(nineteenpt);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[0]);
                 ASSERT_DOUBLES_EXACTLY_EQUAL( 0,v[1]);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(-2,v[2], /*tolerance=*/0.00001);
+                EXPECT_NEAR(-2,v[2], /*tolerance=*/0.00001);
             }
         }
     }
 }
 
-void
-TestCurl::testWSCurl()
+TEST_F(TestCurl, testWSCurl)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -414,11 +390,11 @@ TestCurl::testWSCurl()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
 
     // test with a map
     math::AffineMap map;
@@ -477,14 +453,13 @@ TestCurl::testWSCurl()
 }
 
 
-void
-TestCurl::testWSCurlStencil()
+TEST_F(TestCurl, testWSCurlStencil)
 {
     using namespace openvdb;
 
     VectorGrid::Ptr inGrid = VectorGrid::create();
     const VectorTree& inTree = inGrid->tree();
-    CPPUNIT_ASSERT(inTree.empty());
+    EXPECT_TRUE(inTree.empty());
 
     VectorGrid::Accessor inAccessor = inGrid->getAccessor();
     int dim = GRID_DIM;
@@ -496,11 +471,11 @@ TestCurl::testWSCurlStencil()
             }
         }
     }
-    CPPUNIT_ASSERT(!inTree.empty());
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
+    EXPECT_TRUE(!inTree.empty());
+    EXPECT_EQ(math::Pow3(2*dim), int(inTree.activeVoxelCount()));
 
     VectorGrid::Ptr curl_grid = tools::curl(*inGrid);
-    CPPUNIT_ASSERT_EQUAL(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
+    EXPECT_EQ(math::Pow3(2*dim), int(curl_grid->activeVoxelCount()));
 
     // test with a map
     math::AffineMap map;
