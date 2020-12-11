@@ -229,7 +229,7 @@ body:
 
 block:
       LCURLY body RCURLY    { $$ = $2; }
-    | LCURLY RCURLY         { $$ = new Block(); }
+    | LCURLY RCURLY         { $$ = newNode<Block>(&@$); }
 ;
 
 /// @brief  Syntax for a statement; a line followed by a semicolon, a
@@ -246,7 +246,7 @@ statement:
 
 expressions:
       expression      { $$ = $1; }
-    | comma_operator  { $$ = new CommaOperator(*static_cast<ExpList*>($1)); }
+    | comma_operator  { $$ = newNode<CommaOperator>(&@$, *static_cast<ExpList*>($1)); }
 ;
 
 /// @brief  Comma operator

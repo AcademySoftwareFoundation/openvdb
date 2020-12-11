@@ -1,65 +1,40 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Interpolation.h>
 #include <openvdb/math/Stencils.h>
-
-// CPPUNIT_TEST_SUITE() invokes CPPUNIT_TESTNAMER_DECL() to generate a suite name
-// from the FixtureType.  But if FixtureType is a templated type, the generated name
-// can become long and messy.  This macro overrides the normal naming logic,
-// instead invoking FixtureType::testSuiteName(), which should be a static member
-// function that returns a std::string containing the suite name for the specific
-// template instantiation.
-#undef CPPUNIT_TESTNAMER_DECL
-#define CPPUNIT_TESTNAMER_DECL( variableName, FixtureType ) \
-    CPPUNIT_NS::TestNamer variableName( FixtureType::testSuiteName() )
 
 namespace {
 // Absolute tolerance for floating-point equality comparisons
 const double TOLERANCE = 1.e-6;
 }
 
-template<typename GridType>
-class TestLinearInterp: public CppUnit::TestCase
+class TestLinearInterp: public ::testing::Test
 {
 public:
-    static std::string testSuiteName()
-    {
-        std::string name = openvdb::typeNameAsString<typename GridType::ValueType>();
-        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
-        return "TestLinearInterp" + name;
-    }
-
-    CPPUNIT_TEST_SUITE(TestLinearInterp);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST(testTree);
-    CPPUNIT_TEST(testAccessor);
-    CPPUNIT_TEST(testConstantValues);
-    CPPUNIT_TEST(testFillValues);
-    CPPUNIT_TEST(testNegativeIndices);
-    CPPUNIT_TEST(testStencilsMatch);
-    CPPUNIT_TEST_SUITE_END();
-
+    template<typename GridType>
     void test();
+    template<typename GridType>
     void testTree();
+    template<typename GridType>
     void testAccessor();
+    template<typename GridType>
     void testConstantValues();
+    template<typename GridType>
     void testFillValues();
+    template<typename GridType>
     void testNegativeIndices();
+    template<typename GridType>
     void testStencilsMatch();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::FloatGrid>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::DoubleGrid>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLinearInterp<openvdb::Vec3SGrid>);
 
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::test()
+TestLinearInterp::test()
 {
     typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
@@ -107,43 +82,43 @@ TestLinearInterp<GridType>::test()
 
         typename GridType::ValueType val =
             interpolator.sampleVoxel(10.5, 10.5, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+        EXPECT_NEAR(2.375, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+        EXPECT_NEAR(1.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+        EXPECT_NEAR(3.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+        EXPECT_NEAR(1.1, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+        EXPECT_NEAR(2.792, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+        EXPECT_NEAR(2.71, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+        EXPECT_NEAR(2.01, val, TOLERANCE);
 
     }
     {//using Sampler<1>
@@ -155,50 +130,49 @@ TestLinearInterp<GridType>::test()
 
         typename GridType::ValueType val =
             interpolator.sampleVoxel(10.5, 10.5, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+        EXPECT_NEAR(2.375, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+        EXPECT_NEAR(1.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+        EXPECT_NEAR(2.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+        EXPECT_NEAR(3.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+        EXPECT_NEAR(4.0, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+        EXPECT_NEAR(1.1, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+        EXPECT_NEAR(2.792, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+        EXPECT_NEAR(2.41, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+        EXPECT_NEAR(2.71, val, TOLERANCE);
 
         val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+        EXPECT_NEAR(2.01, val, TOLERANCE);
     }
 }
+TEST_F(TestLinearInterp, testFloat) { test<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testDouble) { test<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::test()
+TEST_F(TestLinearInterp, testVec3S)
 {
     using namespace openvdb;
 
@@ -244,48 +218,48 @@ TestLinearInterp<openvdb::Vec3SGrid>::test()
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.f)));
+    EXPECT_TRUE(val.eq(Vec3s(3.f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testTree()
+TestLinearInterp::testTree()
 {
     float fillValue = 256.0f;
     typedef typename GridType::TreeType TreeType;
@@ -328,49 +302,48 @@ TestLinearInterp<GridType>::testTree()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+    EXPECT_NEAR(2.375, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+    EXPECT_NEAR(1.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+    EXPECT_NEAR(3.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+    EXPECT_NEAR(1.1, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+    EXPECT_NEAR(2.792, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+    EXPECT_NEAR(2.71, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+    EXPECT_NEAR(2.01, val, TOLERANCE);
 }
+TEST_F(TestLinearInterp, testTreeFloat) { testTree<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testTreeDouble) { testTree<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testTree()
+TEST_F(TestLinearInterp, testTreeVec3S)
 {
     using namespace openvdb;
 
@@ -415,48 +388,48 @@ TestLinearInterp<openvdb::Vec3SGrid>::testTree()
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.f)));
+    EXPECT_TRUE(val.eq(Vec3s(3.f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testAccessor()
+TestLinearInterp::testAccessor()
 {
     float fillValue = 256.0f;
 
@@ -502,49 +475,48 @@ TestLinearInterp<GridType>::testAccessor()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+    EXPECT_NEAR(2.375, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+    EXPECT_NEAR(1.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+    EXPECT_NEAR(3.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+    EXPECT_NEAR(1.1, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+    EXPECT_NEAR(2.792, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+    EXPECT_NEAR(2.71, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+    EXPECT_NEAR(2.01, val, TOLERANCE);
 }
+TEST_F(TestLinearInterp, testAccessorFloat) { testAccessor<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testAccessorDouble) { testAccessor<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testAccessor()
+TEST_F(TestLinearInterp, testAccessorVec3S)
 {
     using namespace openvdb;
 
@@ -589,48 +561,48 @@ TestLinearInterp<openvdb::Vec3SGrid>::testAccessor()
         interpolator(acc, grid.transform());
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.0f)));
 
     val = interpolator.sampleVoxel(11.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(11.0, 11.0, 11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(3.0f)));
 
     val = interpolator.sampleVoxel(9.0, 11.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(9.0, 10.0, 9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.01f)));
 }
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testConstantValues()
+TestLinearInterp::testConstantValues()
 {
     typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
@@ -675,34 +647,33 @@ TestLinearInterp<GridType>::testConstantValues()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 }
+TEST_F(TestLinearInterp, testConstantValuesFloat) { testConstantValues<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testConstantValuesDouble) { testConstantValues<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testConstantValues()
+TEST_F(TestLinearInterp, testConstantValuesVec3S)
 {
     using namespace openvdb;
 
@@ -747,34 +718,34 @@ TestLinearInterp<openvdb::Vec3SGrid>::testConstantValues()
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0, 2.0, 2.0)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0, 2.0, 2.0)));
 }
 
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testFillValues()
+TestLinearInterp::testFillValues()
 {
     //typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
@@ -788,34 +759,33 @@ TestLinearInterp<GridType>::testFillValues()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(256.0, val, TOLERANCE);
+    EXPECT_NEAR(256.0, val, TOLERANCE);
 }
+TEST_F(TestLinearInterp, testFillValuesFloat) { testFillValues<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testFillValuesDouble) { testFillValues<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testFillValues()
+TEST_F(TestLinearInterp, testFillValuesVec3S)
 {
     using namespace openvdb;
 
@@ -829,34 +799,34 @@ TestLinearInterp<openvdb::Vec3SGrid>::testFillValues()
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(10.5, 10.5, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.0, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.1, 10.0, 10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.8, 10.8, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.1, 10.8, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.8, 10.1, 10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.5, 10.1, 10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 
     val = interpolator.sampleVoxel(10.5, 10.8, 10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(256.0, 256.0, 256.0)));
+    EXPECT_TRUE(val.eq(Vec3s(256.0, 256.0, 256.0)));
 }
 
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testNegativeIndices()
+TestLinearInterp::testNegativeIndices()
 {
     typedef typename GridType::TreeType TreeType;
     float fillValue = 256.0f;
@@ -900,49 +870,48 @@ TestLinearInterp<GridType>::testNegativeIndices()
 
     typename GridType::ValueType val =
         interpolator.sampleVoxel(-10.5, -10.5, -10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.375, val, TOLERANCE);
+    EXPECT_NEAR(2.375, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.0, -10.0, -10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, val, TOLERANCE);
+    EXPECT_NEAR(1.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-11.0, -10.0, -10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0, val, TOLERANCE);
+    EXPECT_NEAR(2.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -11.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(3.0, val, TOLERANCE);
+    EXPECT_NEAR(3.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-9.0, -11.0, -9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-9.0, -10.0, -9.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(4.0, val, TOLERANCE);
+    EXPECT_NEAR(4.0, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.1, -10.0, -10.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.1, val, TOLERANCE);
+    EXPECT_NEAR(1.1, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.8, -10.8, -10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.792, val, TOLERANCE);
+    EXPECT_NEAR(2.792, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.1, -10.8, -10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.8, -10.1, -10.5);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.41, val, TOLERANCE);
+    EXPECT_NEAR(2.41, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.5, -10.1, -10.8);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.71, val, TOLERANCE);
+    EXPECT_NEAR(2.71, val, TOLERANCE);
 
     val = interpolator.sampleVoxel(-10.5, -10.8, -10.1);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.01, val, TOLERANCE);
+    EXPECT_NEAR(2.01, val, TOLERANCE);
 }
+TEST_F(TestLinearInterp, testNegativeIndicesFloat) { testNegativeIndices<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testNegativeIndicesDouble) { testNegativeIndices<openvdb::DoubleGrid>(); }
 
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testNegativeIndices()
+TEST_F(TestLinearInterp, testNegativeIndicesVec3S)
 {
     using namespace openvdb;
 
@@ -986,49 +955,49 @@ TestLinearInterp<openvdb::Vec3SGrid>::testNegativeIndices()
     //openvdb::tools::LinearInterp<Vec3STree> interpolator(*tree);
 
     Vec3SGrid::ValueType val = interpolator.sampleVoxel(-10.5, -10.5, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.375f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.375f)));
 
     val = interpolator.sampleVoxel(-10.0, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.0f)));
 
     val = interpolator.sampleVoxel(-11.0, -11.0, -11.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(3.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(3.0f)));
 
     val = interpolator.sampleVoxel(-9.0, -11.0, -9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(-9.0, -10.0, -9.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(4.0f)));
+    EXPECT_TRUE(val.eq(Vec3s(4.0f)));
 
     val = interpolator.sampleVoxel(-10.1, -10.0, -10.0);
-    CPPUNIT_ASSERT(val.eq(Vec3s(1.1f)));
+    EXPECT_TRUE(val.eq(Vec3s(1.1f)));
 
     val = interpolator.sampleVoxel(-10.8, -10.8, -10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.792f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.792f)));
 
     val = interpolator.sampleVoxel(-10.1, -10.8, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(-10.8, -10.1, -10.5);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.41f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.41f)));
 
     val = interpolator.sampleVoxel(-10.5, -10.1, -10.8);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.71f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.71f)));
 
     val = interpolator.sampleVoxel(-10.5, -10.8, -10.1);
-    CPPUNIT_ASSERT(val.eq(Vec3s(2.01f)));
+    EXPECT_TRUE(val.eq(Vec3s(2.01f)));
 }
 
 
 template<typename GridType>
 void
-TestLinearInterp<GridType>::testStencilsMatch()
+TestLinearInterp::testStencilsMatch()
 {
     typedef typename GridType::ValueType ValueType;
 
@@ -1060,11 +1029,8 @@ TestLinearInterp<GridType>::testStencilsMatch()
 
         stencil.moveTo(pos);
         typename GridType::ValueType val2 = stencil.interpolation(pos);
-        CPPUNIT_ASSERT_EQUAL(val1, val2);
+        EXPECT_EQ(val1, val2);
     }
 }
-
-template<>
-void
-TestLinearInterp<openvdb::Vec3SGrid>::testStencilsMatch() {}
-
+TEST_F(TestLinearInterp, testStencilsMatchFloat) { testStencilsMatch<openvdb::FloatGrid>(); }
+TEST_F(TestLinearInterp, testStencilsMatchDouble) { testStencilsMatch<openvdb::DoubleGrid>(); }

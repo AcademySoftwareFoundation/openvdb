@@ -48,16 +48,6 @@
     #define OPENVDB_NO_FP_EQUALITY_WARNING_END
 #endif
 
-
-#ifdef OPENVDB_IS_POD
-#undef OPENVDB_IS_POD
-#endif
-#define OPENVDB_IS_POD(Type) \
-static_assert(std::is_standard_layout<Type>::value, \
-    #Type" must be a POD type (satisfy StandardLayoutType.)"); \
-static_assert(std::is_trivial<Type>::value, \
-    #Type" must be a POD type (satisfy TrivialType.)");
-
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
