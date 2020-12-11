@@ -170,10 +170,10 @@ if(OPENVDB_DOXYGEN_AX)
 
   list(APPEND DOXY_FILES
     doc/ax/ax.txt
+    doc/ax/axcplusplus.txt
     doc/ax/axexamples.txt
     doc/ax/axfunctionlist.txt
     doc/ax/doc.txt
-    doc/ax/openvdbaxapi.txt
     openvdb_ax/openvdb_ax
     openvdb_ax/openvdb_ax/ast
     openvdb_ax/openvdb_ax/cmd

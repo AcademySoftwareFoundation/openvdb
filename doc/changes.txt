@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.2.0</B> - <I>In Development</I>
+<B>Version 7.2.0</B> - <I>December 9, 2020</I>
 
 @par
 New features:
@@ -19,6 +19,8 @@ New features:
 - Added @vdblink::tools::TreeToMerge TreeToMerge@endlink which provides methods
   to steal or deep-copy from a tree based on the tag dispatch class used in its
   construction.
+- Pre-release of OpenVDB AX, an open source C++ library that provides a
+  powerful and easy way of interacting with OpenVDB volume and point data.
 
 @par
 Improvements:
@@ -30,9 +32,6 @@ Improvements:
   parallel breadth-first algorithms for much faster performance.
 - Extended @vdblink::tree::NodeManager NodeManager@endlink to allow for use with
   a const tree.
-- Vector, Matrix and Quaternion types now satisfy the Trivial Type requirement.
-  Their empty constructors and copy constructors have been removed (and are left
-  to the compiler to define).
 - Added @vdblink::math::Abs Abs@endlink, @vdblink::math::cwiseAdd cwiseAdd@endlink,
   @vdblink::math::cwiseLessThan cwiseLessThan@endlink and
   @vdblink::math::cwiseGreaterThan cwiseGreaterThan@endlink methods for Matrix types.
@@ -69,8 +68,6 @@ API changes:
   tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG tools
   now use the parallel breath-first algorithms.
 - Moved openvdb::TypeList from Types.h into its own header TypeList.h
-- Removed an unnecessary specialization of @vdblink::tree::NodeUnion NodeUnion@endlink
-  and CopyTraits from NodeUnion.h. Replaced std::is_pod usage with std::is_trivially_copyable.
 
 @par
 Build:
@@ -88,6 +85,7 @@ Build:
 - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
   Windows which use the multithread/DLL-specific version of the CRT.
   <I>[Reported&nbsp;by&nbsp;Tobias&nbsp;Rittig]</I>
+- Core library unit tests use GoogleTest instead of CppUnit.
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly

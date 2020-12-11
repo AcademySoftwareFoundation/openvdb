@@ -13,7 +13,8 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 
-struct Logger::Settings {
+struct Logger::Settings
+{
     size_t      mMaxErrors = 0;
     bool        mWarningsAsErrors = false;
     // message formatting settings
@@ -24,7 +25,8 @@ struct Logger::Settings {
 };
 
 
-/// @brief Wrapper around a code snippet to print individual lines from a multi line string
+/// @brief Wrapper around a code snippet to print individual lines from a multi
+///   line string
 /// @note  Assumes a null terminated c-style string input
 struct Logger::SourceCode
 {
@@ -48,15 +50,15 @@ struct Logger::SourceCode
         const size_t end = mOffsets[num];
         for (size_t i = start; i < end - 1; ++i) *os << mString[i];
     }
-    void reset(const char* string) {
+
+    void reset(const char* string)
+    {
         mString = string;
         mOffsets.clear();
         mLines = 0;
     }
 
-    bool hasString() const {
-        return static_cast<bool>(mString);
-    }
+    bool hasString() const { return static_cast<bool>(mString); }
 
 private:
 
@@ -99,8 +101,8 @@ inline std::stack<size_t> pathStackFromNode(const ast::Node* node)
     return path;
 }
 
-/// @brief Iterate through a tree, following the branch numbers from the path stack,
-///        returning a Node* to the node at this position
+/// @brief Iterate through a tree, following the branch numbers from the path
+///   stack, returning a Node* to the node at this position
 /// @parm path   Stack of child branches to follow
 /// @parm tree   Tree containing node to return
 inline const ast::Node* nodeFromPathStack(std::stack<size_t>& path,
@@ -115,15 +117,16 @@ inline const ast::Node* nodeFromPathStack(std::stack<size_t>& path,
     return nullptr;
 }
 
-/// @brief Given any node and a tree and node to location map, return the line and column
-///        number for the nodes equivalent (in terms of position in the tree) from the supplied tree
-/// @note  Requires the map to have been populated for all nodes in the supplied tree, otherwise
-///        will return 0:0
-inline const Logger::CodeLocation nodeToCodeLocation(const ast::Node* node,
-                                                     const ast::Tree::ConstPtr tree,
-                                                     const std::unordered_map<
-                                                        const ax::ast::Node*,
-                                                        Logger::CodeLocation>& map)
+/// @brief Given any node and a tree and node to location map, return the line
+///   and column number for the nodes equivalent (in terms of position in the
+///   tree) from the supplied tree
+/// @note  Requires the map to have been populated for all nodes in the supplied
+///   tree, otherwise will return 0:0
+inline const Logger::CodeLocation
+nodeToCodeLocation(const ast::Node* node,
+                const ast::Tree::ConstPtr tree,
+                const std::unordered_map
+                    <const ax::ast::Node*, Logger::CodeLocation>& map)
 {
     if (!tree) return Logger::CodeLocation(0,0);
     assert(node);
@@ -178,6 +181,8 @@ void Logger::setSourceCode(const char* code)
 bool Logger::error(const std::string& message,
                    const Logger::CodeLocation& lineCol)
 {
+    // already exceeded the error limit
+    if (this->atErrorLimit()) return false;
     mErrorOutput(format(this->getErrorPrefix() + message,
                         lineCol,
                         this->errors(),
@@ -185,7 +190,8 @@ bool Logger::error(const std::string& message,
                         this->getPrintLines(),
                         this->mCode.get()));
     ++mNumErrors;
-    if (this->getMaxErrors() > 0 && this->errors() >= this->getMaxErrors()) return false;
+    // now exceeds the limit
+    if (this->atErrorLimit()) return false;
     else return true;
 }
 

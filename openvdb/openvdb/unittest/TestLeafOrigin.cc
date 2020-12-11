@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tree/LeafNode.h>
@@ -11,31 +11,18 @@
 #include <set>
 
 
-class TestLeafOrigin: public CppUnit::TestCase
+class TestLeafOrigin: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestLeafOrigin);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST(test2Values);
-    CPPUNIT_TEST(testGetValue);
-    CPPUNIT_TEST_SUITE_END();
-
-    void test();
-    void test2Values();
-    void testGetValue();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafOrigin);
 
 
 ////////////////////////////////////////
 
 
-void
-TestLeafOrigin::test()
+TEST_F(TestLeafOrigin, test)
 {
     using namespace openvdb;
 
@@ -60,19 +47,18 @@ TestLeafOrigin::test()
             valIter; ++valIter)
         {
             Coord xyz = valIter.getCoord();
-            CPPUNIT_ASSERT_EQUAL(leafOrigin, xyz & mask);
+            EXPECT_EQ(leafOrigin, xyz & mask);
 
             iter = indices.find(xyz);
-            CPPUNIT_ASSERT(iter != indices.end());
+            EXPECT_TRUE(iter != indices.end());
             indices.erase(iter);
         }
     }
-    CPPUNIT_ASSERT(indices.empty());
+    EXPECT_TRUE(indices.empty());
 }
 
 
-void
-TestLeafOrigin::test2Values()
+TEST_F(TestLeafOrigin, test2Values)
 {
     using namespace openvdb;
 
@@ -85,13 +71,12 @@ TestLeafOrigin::test2Values()
     grid->setTransform(math::Transform::createLinearTransform(0.1));
 
     FloatTree::LeafCIter iter = tree.cbeginLeaf();
-    CPPUNIT_ASSERT_EQUAL(Coord(0, 0, 0), iter->origin());
+    EXPECT_EQ(Coord(0, 0, 0), iter->origin());
     ++iter;
-    CPPUNIT_ASSERT_EQUAL(Coord(96, 0, 0), iter->origin());
+    EXPECT_EQ(Coord(96, 0, 0), iter->origin());
 }
 
-void
-TestLeafOrigin::testGetValue()
+TEST_F(TestLeafOrigin, testGetValue)
 {
     const openvdb::Coord c0(0,-10,0), c1(100,13,0);
     const float v0=5.0f, v1=6.0f, v2=1.0f;
@@ -101,7 +86,7 @@ TestLeafOrigin::testGetValue()
     tree->setValue(c1, v1);
 
     openvdb::FloatTree::LeafCIter iter = tree->cbeginLeaf();
-    CPPUNIT_ASSERT_EQUAL(v0, iter->getValue(c0));
+    EXPECT_EQ(v0, iter->getValue(c0));
     ++iter;
-    CPPUNIT_ASSERT_EQUAL(v1, iter->getValue(c1));
+    EXPECT_EQ(v1, iter->getValue(c1));
 }

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Dense.h>
@@ -10,38 +10,19 @@
 #include <openvdb/math/Math.h>
 #include "util.h"
 
-class TestDenseSparseTools: public CppUnit::TestCase
+class TestDenseSparseTools: public ::testing::Test
 {
 public:
-    virtual void setUp();
-    virtual void tearDown() { delete mDense; }
+    void SetUp() override;
+    void TearDown() override { delete mDense; }
 
-    CPPUNIT_TEST_SUITE(TestDenseSparseTools);
-    CPPUNIT_TEST(testExtractSparseFloatTree);
-    CPPUNIT_TEST(testExtractSparseBoolTree);
-    CPPUNIT_TEST(testExtractSparseAltDenseLayout);
-    CPPUNIT_TEST(testExtractSparseMaskedTree);
-    CPPUNIT_TEST(testDenseTransform);
-    CPPUNIT_TEST(testOver);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testExtractSparseFloatTree();
-    void testExtractSparseBoolTree();
-    void testExtractSparseAltDenseLayout();
-    void testExtractSparseMaskedTree();
-    void testDenseTransform();
-    void testOver();
-
-private:
+protected:
     openvdb::tools::Dense<float>* mDense;
     openvdb::math::Coord          mijk;
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestDenseSparseTools);
 
-
-void
-TestDenseSparseTools::setUp()
+void TestDenseSparseTools::SetUp()
 {
     namespace vdbmath = openvdb::math;
 
@@ -126,8 +107,7 @@ namespace {
 }
 
 
-void
-TestDenseSparseTools::testExtractSparseFloatTree()
+TEST_F(TestDenseSparseTools, testExtractSparseFloatTree)
 {
     namespace vdbmath = openvdb::math;
 
@@ -142,24 +122,23 @@ TestDenseSparseTools::testExtractSparseFloatTree()
 
     // The result should have only one active value.
 
-    CPPUNIT_ASSERT(result->activeVoxelCount() == 1);
+    EXPECT_TRUE(result->activeVoxelCount() == 1);
 
     // The result should have only one leaf
 
-    CPPUNIT_ASSERT(result->leafCount() == 1);
+    EXPECT_TRUE(result->leafCount() == 1);
 
     // The background
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(background, result->background(), 1.e-6);
+    EXPECT_NEAR(background, result->background(), 1.e-6);
 
     // The stored value
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(testvalue, result->getValue(mijk), 1.e-6);
+    EXPECT_NEAR(testvalue, result->getValue(mijk), 1.e-6);
 }
 
 
-void
-TestDenseSparseTools::testExtractSparseBoolTree()
+TEST_F(TestDenseSparseTools, testExtractSparseBoolTree)
 {
 
     const float testvalue = 1.f;
@@ -172,24 +151,23 @@ TestDenseSparseTools::testExtractSparseBoolTree()
 
     // The result should have only one active value.
 
-    CPPUNIT_ASSERT(result->activeVoxelCount() == 1);
+    EXPECT_TRUE(result->activeVoxelCount() == 1);
 
     // The result should have only one leaf
 
-    CPPUNIT_ASSERT(result->leafCount() == 1);
+    EXPECT_TRUE(result->leafCount() == 1);
 
     // The background
 
-    CPPUNIT_ASSERT(result->background() == false);
+    EXPECT_TRUE(result->background() == false);
 
     // The stored value
 
-    CPPUNIT_ASSERT(result->getValue(mijk) == true);
+    EXPECT_TRUE(result->getValue(mijk) == true);
 }
 
 
-void
-TestDenseSparseTools::testExtractSparseAltDenseLayout()
+TEST_F(TestDenseSparseTools, testExtractSparseAltDenseLayout)
 {
     namespace vdbmath = openvdb::math;
 
@@ -206,24 +184,23 @@ TestDenseSparseTools::testExtractSparseAltDenseLayout()
 
     // The result should have only one active value.
 
-    CPPUNIT_ASSERT(result->activeVoxelCount() == 1);
+    EXPECT_TRUE(result->activeVoxelCount() == 1);
 
     // The result should have only one leaf
 
-    CPPUNIT_ASSERT(result->leafCount() == 1);
+    EXPECT_TRUE(result->leafCount() == 1);
 
     // The background
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(background, result->background(), 1.e-6);
+    EXPECT_NEAR(background, result->background(), 1.e-6);
 
     // The stored value
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(testvalue, result->getValue(mijk), 1.e-6);
+    EXPECT_NEAR(testvalue, result->getValue(mijk), 1.e-6);
 }
 
 
-void
-TestDenseSparseTools::testExtractSparseMaskedTree()
+TEST_F(TestDenseSparseTools, testExtractSparseMaskedTree)
 {
     namespace vdbmath = openvdb::math;
 
@@ -251,24 +228,23 @@ TestDenseSparseTools::testExtractSparseMaskedTree()
 
     // The result should have only one active value.
 
-    CPPUNIT_ASSERT(result->activeVoxelCount() == 1);
+    EXPECT_TRUE(result->activeVoxelCount() == 1);
 
     // The result should have only one leaf
 
-    CPPUNIT_ASSERT(result->leafCount() == 1);
+    EXPECT_TRUE(result->leafCount() == 1);
 
     // The background
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(background, result->background(), 1.e-6);
+    EXPECT_NEAR(background, result->background(), 1.e-6);
 
     // The stored value
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(testvalue, result->getValue(mijk), 1.e-6);
+    EXPECT_NEAR(testvalue, result->getValue(mijk), 1.e-6);
 }
 
 
-void
-TestDenseSparseTools::testDenseTransform()
+TEST_F(TestDenseSparseTools, testDenseTransform)
 {
 
     namespace vdbmath = openvdb::math;
@@ -299,10 +275,10 @@ TestDenseSparseTools::testDenseTransform()
                 if (smallBBox.isInside(ijk)) {
                     // the functor was applied here
                     // the value should be base * base
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), valueSqr, 1.e-6);
+                    EXPECT_NEAR(dense.getValue(ijk), valueSqr, 1.e-6);
                 } else {
                     // the original value
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), value, 1.e-6);
+                    EXPECT_NEAR(dense.getValue(ijk), value, 1.e-6);
                 }
             }
         }
@@ -310,8 +286,7 @@ TestDenseSparseTools::testDenseTransform()
 }
 
 
-void
-TestDenseSparseTools::testOver()
+TEST_F(TestDenseSparseTools, testOver)
 {
     namespace vdbmath = openvdb::math;
 
@@ -339,9 +314,9 @@ TestDenseSparseTools::testOver()
             dense, src, alpha, beta,  strength, true /*threaded*/);
 
         // Check for over value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), expected, 1.e-6);
+        EXPECT_NEAR(dense.getValue(ijk), expected, 1.e-6);
         // Check for original value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
+        EXPECT_NEAR(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
     }
 
     { // testing sparse explict sparse composite
@@ -356,9 +331,9 @@ TestDenseSparseTools::testOver()
 
         sparseToDense.sparseComposite(true);
         // Check for over value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), expected, 1.e-6);
+        EXPECT_NEAR(dense.getValue(ijk), expected, 1.e-6);
         // Check for original value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
+        EXPECT_NEAR(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
     }
 
     { // testing sparse explict dense composite
@@ -373,8 +348,8 @@ TestDenseSparseTools::testOver()
 
         sparseToDense.denseComposite(true);
         // Check for over value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(ijk), expected, 1.e-6);
+        EXPECT_NEAR(dense.getValue(ijk), expected, 1.e-6);
         // Check for original value
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
+        EXPECT_NEAR(dense.getValue(openvdb::Coord(1,1,1) + ijk), value, 1.e-6);
     }
 }

@@ -773,8 +773,8 @@ if __name__ == '__main__':
 
     args = sys.argv
 
-    # Unlike CppUnit, PyUnit doesn't use the "-t" flag to identify
-    # test names, so for consistency, strip out any "-t" arguments,
+    # PyUnit doesn't use the "-t" flag to identify test names,
+    # so for consistency, strip out any "-t" arguments,
     # so that, e.g., "TestOpenVDB.py -t TestOpenVDB.testTransform"
     # is equivalent to "TestOpenVDB.py TestOpenVDB.testTransform".
     args = [a for a in args if a != '-t']
