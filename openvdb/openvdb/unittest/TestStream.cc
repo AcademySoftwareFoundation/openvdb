@@ -8,43 +8,33 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <cstdio> // for remove()
 #include <fstream>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(a, b) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((a), (b), /*tolerance=*/0.0);
+    EXPECT_NEAR((a), (b), /*tolerance=*/0.0);
 
 
-class TestStream: public CppUnit::TestCase
+class TestStream: public ::testing::Test
 {
 public:
-    void setUp() override;
-    void tearDown() override;
+    void SetUp() override;
+    void TearDown() override;
 
-    CPPUNIT_TEST_SUITE(TestStream);
-    CPPUNIT_TEST(testWrite);
-    CPPUNIT_TEST(testRead);
-    CPPUNIT_TEST(testFileReadFromStream);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testWrite();
-    void testRead();
     void testFileReadFromStream();
 
-private:
+protected:
     static openvdb::GridPtrVecPtr createTestGrids(openvdb::MetaMap::Ptr&);
     static void verifyTestGrids(openvdb::GridPtrVecPtr, openvdb::MetaMap::Ptr);
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestStream);
 
 
 ////////////////////////////////////////
 
 
 void
-TestStream::setUp()
+TestStream::SetUp()
 {
     openvdb::uninitialize();
 
@@ -70,7 +60,7 @@ TestStream::setUp()
 
 
 void
-TestStream::tearDown()
+TestStream::TearDown()
 {
     openvdb::uninitialize();
 }
@@ -128,34 +118,34 @@ TestStream::verifyTestGrids(openvdb::GridPtrVecPtr grids, openvdb::MetaMap::Ptr 
 {
     using namespace openvdb;
 
-    CPPUNIT_ASSERT(grids.get() != nullptr);
-    CPPUNIT_ASSERT(meta.get() != nullptr);
+    EXPECT_TRUE(grids.get() != nullptr);
+    EXPECT_TRUE(meta.get() != nullptr);
 
     // Verify the metadata.
-    CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
-    CPPUNIT_ASSERT_EQUAL(std::string("Einstein"), meta->metaValue<std::string>("author"));
-    CPPUNIT_ASSERT_EQUAL(2009, meta->metaValue<int32_t>("year"));
+    EXPECT_EQ(2, int(meta->metaCount()));
+    EXPECT_EQ(std::string("Einstein"), meta->metaValue<std::string>("author"));
+    EXPECT_EQ(2009, meta->metaValue<int32_t>("year"));
 
     // Verify the grids.
-    CPPUNIT_ASSERT_EQUAL(3, int(grids->size()));
+    EXPECT_EQ(3, int(grids->size()));
 
     GridBase::Ptr grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     Int32Tree::Ptr density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != nullptr);
+    EXPECT_TRUE(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is an instance of (i.e., shares a tree with) "density".
-    CPPUNIT_ASSERT_EQUAL(density, gridPtrCast<Int32Grid>(grid)->treePtr());
+    EXPECT_EQ(density, gridPtrCast<Int32Grid>(grid)->treePtr());
 
     grid.reset();
     grid = findGridByName(*grids, "temperature");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
 
     ASSERT_DOUBLES_EXACTLY_EQUAL(5, density->getValue(Coord(0, 0, 0)));
     ASSERT_DOUBLES_EXACTLY_EQUAL(6, density->getValue(Coord(100, 0, 0)));
@@ -167,8 +157,7 @@ TestStream::verifyTestGrids(openvdb::GridPtrVecPtr grids, openvdb::MetaMap::Ptr 
 ////////////////////////////////////////
 
 
-void
-TestStream::testWrite()
+TEST_F(TestStream, testWrite)
 {
     using namespace openvdb;
 
@@ -190,8 +179,7 @@ TestStream::testWrite()
 }
 
 
-void
-TestStream::testRead()
+TEST_F(TestStream, testRead)
 {
     using namespace openvdb;
 
@@ -232,17 +220,18 @@ TestStream::testFileReadFromStream()
 
     // Read the grids back in.
     io::File file(filename);
-    CPPUNIT_ASSERT(file.inputHasGridOffsets());
-    CPPUNIT_ASSERT_THROW(file.getGrids(), IoError);
+    EXPECT_TRUE(file.inputHasGridOffsets());
+    EXPECT_THROW(file.getGrids(), IoError);
 
     file.open();
     meta = file.getMetadata();
     grids = file.getGrids();
 
-    CPPUNIT_ASSERT(!file.inputHasGridOffsets());
-    CPPUNIT_ASSERT(meta.get() != nullptr);
-    CPPUNIT_ASSERT(grids.get() != nullptr);
-    CPPUNIT_ASSERT(!grids->empty());
+    EXPECT_TRUE(!file.inputHasGridOffsets());
+    EXPECT_TRUE(meta.get() != nullptr);
+    EXPECT_TRUE(grids.get() != nullptr);
+    EXPECT_TRUE(!grids->empty());
 
     verifyTestGrids(grids, meta);
 }
+TEST_F(TestStream, testFileReadFromStream) { testFileReadFromStream(); }

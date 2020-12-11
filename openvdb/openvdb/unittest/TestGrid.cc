@@ -9,42 +9,16 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/CpuTimer.h>
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <iostream>
 #include <memory> // for std::make_unique
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
-class TestGrid: public CppUnit::TestCase
+class TestGrid: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestGrid);
-    CPPUNIT_TEST(testGridRegistry);
-    CPPUNIT_TEST(testConstPtr);
-    CPPUNIT_TEST(testGetGrid);
-    CPPUNIT_TEST(testIsType);
-    CPPUNIT_TEST(testIsTreeUnique);
-    CPPUNIT_TEST(testTransform);
-    CPPUNIT_TEST(testCopyGrid);
-    CPPUNIT_TEST(testValueConversion);
-    CPPUNIT_TEST(testClipping);
-    CPPUNIT_TEST(testApply);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testGridRegistry();
-    void testConstPtr();
-    void testGetGrid();
-    void testIsType();
-    void testIsTreeUnique();
-    void testTransform();
-    void testCopyGrid();
-    void testValueConversion();
-    void testClipping();
-    void testApply();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestGrid);
 
 
 ////////////////////////////////////////
@@ -130,8 +104,7 @@ using ProxyGrid = openvdb::Grid<ProxyTree>;
 
 ////////////////////////////////////////
 
-void
-TestGrid::testGridRegistry()
+TEST_F(TestGrid, testGridRegistry)
 {
     using namespace openvdb::tree;
 
@@ -140,128 +113,122 @@ TestGrid::testGridRegistry()
 
     openvdb::GridBase::clearRegistry();
 
-    CPPUNIT_ASSERT(!GridType::isRegistered());
+    EXPECT_TRUE(!GridType::isRegistered());
     GridType::registerGrid();
-    CPPUNIT_ASSERT(GridType::isRegistered());
-    CPPUNIT_ASSERT_THROW(GridType::registerGrid(), openvdb::KeyError);
+    EXPECT_TRUE(GridType::isRegistered());
+    EXPECT_THROW(GridType::registerGrid(), openvdb::KeyError);
     GridType::unregisterGrid();
-    CPPUNIT_ASSERT(!GridType::isRegistered());
-    CPPUNIT_ASSERT_NO_THROW(GridType::unregisterGrid());
-    CPPUNIT_ASSERT(!GridType::isRegistered());
-    CPPUNIT_ASSERT_NO_THROW(GridType::registerGrid());
-    CPPUNIT_ASSERT(GridType::isRegistered());
+    EXPECT_TRUE(!GridType::isRegistered());
+    EXPECT_NO_THROW(GridType::unregisterGrid());
+    EXPECT_TRUE(!GridType::isRegistered());
+    EXPECT_NO_THROW(GridType::registerGrid());
+    EXPECT_TRUE(GridType::isRegistered());
 
     openvdb::GridBase::clearRegistry();
 }
 
 
-void
-TestGrid::testConstPtr()
+TEST_F(TestGrid, testConstPtr)
 {
     using namespace openvdb;
 
     GridBase::ConstPtr constgrid = ProxyGrid::create();
 
-    CPPUNIT_ASSERT_EQUAL(Name("proxy"), constgrid->type());
+    EXPECT_EQ(Name("proxy"), constgrid->type());
 }
 
 
-void
-TestGrid::testGetGrid()
+TEST_F(TestGrid, testGetGrid)
 {
     using namespace openvdb;
 
     GridBase::Ptr grid = FloatGrid::create(/*bg=*/0.0);
     GridBase::ConstPtr constGrid = grid;
 
-    CPPUNIT_ASSERT(grid->baseTreePtr());
+    EXPECT_TRUE(grid->baseTreePtr());
 
-    CPPUNIT_ASSERT(!gridPtrCast<DoubleGrid>(grid));
-    CPPUNIT_ASSERT(!gridPtrCast<DoubleGrid>(grid));
+    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
+    EXPECT_TRUE(!gridPtrCast<DoubleGrid>(grid));
 
-    CPPUNIT_ASSERT(gridConstPtrCast<FloatGrid>(constGrid));
-    CPPUNIT_ASSERT(!gridConstPtrCast<DoubleGrid>(constGrid));
+    EXPECT_TRUE(gridConstPtrCast<FloatGrid>(constGrid));
+    EXPECT_TRUE(!gridConstPtrCast<DoubleGrid>(constGrid));
 }
 
 
-void
-TestGrid::testIsType()
+TEST_F(TestGrid, testIsType)
 {
     using namespace openvdb;
 
     GridBase::Ptr grid = FloatGrid::create();
-    CPPUNIT_ASSERT(grid->isType<FloatGrid>());
-    CPPUNIT_ASSERT(!grid->isType<DoubleGrid>());
+    EXPECT_TRUE(grid->isType<FloatGrid>());
+    EXPECT_TRUE(!grid->isType<DoubleGrid>());
 }
 
 
-void
-TestGrid::testIsTreeUnique()
+TEST_F(TestGrid, testIsTreeUnique)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create();
-    CPPUNIT_ASSERT(grid->isTreeUnique());
+    EXPECT_TRUE(grid->isTreeUnique());
 
     // a shallow copy shares the same tree
     FloatGrid::Ptr grid2 = grid->copy();
-    CPPUNIT_ASSERT(!grid->isTreeUnique());
-    CPPUNIT_ASSERT(!grid2->isTreeUnique());
+    EXPECT_TRUE(!grid->isTreeUnique());
+    EXPECT_TRUE(!grid2->isTreeUnique());
 
     // cleanup the shallow copy
     grid2.reset();
-    CPPUNIT_ASSERT(grid->isTreeUnique());
+    EXPECT_TRUE(grid->isTreeUnique());
 
     // copy with new tree
     GridBase::Ptr grid3 = grid->copyGridWithNewTree();
-    CPPUNIT_ASSERT(grid->isTreeUnique());
+    EXPECT_TRUE(grid->isTreeUnique());
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 8
     // shallow copy using GridBase
     GridBase::Ptr grid4 = grid->copyGrid();
-    CPPUNIT_ASSERT(!grid4->isTreeUnique());
+    EXPECT_TRUE(!grid4->isTreeUnique());
 
     // copy with new tree using GridBase
     GridBase::Ptr grid5 = grid->copyGridWithNewTree();
-    CPPUNIT_ASSERT(grid5->isTreeUnique());
+    EXPECT_TRUE(grid5->isTreeUnique());
 #endif
 }
 
 
-void
-TestGrid::testTransform()
+TEST_F(TestGrid, testTransform)
 {
     ProxyGrid grid;
 
     // Verify that the grid has a valid default transform.
-    CPPUNIT_ASSERT(grid.transformPtr());
+    EXPECT_TRUE(grid.transformPtr());
 
     // Verify that a null transform pointer is not allowed.
-    CPPUNIT_ASSERT_THROW(grid.setTransform(openvdb::math::Transform::Ptr()),
+    EXPECT_THROW(grid.setTransform(openvdb::math::Transform::Ptr()),
         openvdb::ValueError);
 
     grid.setTransform(openvdb::math::Transform::createLinearTransform());
 
-    CPPUNIT_ASSERT(grid.transformPtr());
+    EXPECT_TRUE(grid.transformPtr());
 
     // Verify that calling Transform-related Grid methods (Grid::voxelSize(), etc.)
     // is the same as calling those methods on the Transform.
 
-    CPPUNIT_ASSERT(grid.transform().voxelSize().eq(grid.voxelSize()));
-    CPPUNIT_ASSERT(grid.transform().voxelSize(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
+    EXPECT_TRUE(grid.transform().voxelSize().eq(grid.voxelSize()));
+    EXPECT_TRUE(grid.transform().voxelSize(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
         grid.voxelSize(openvdb::Vec3d(0.1, 0.2, 0.3))));
 
-    CPPUNIT_ASSERT(grid.transform().indexToWorld(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
+    EXPECT_TRUE(grid.transform().indexToWorld(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
         grid.indexToWorld(openvdb::Vec3d(0.1, 0.2, 0.3))));
-    CPPUNIT_ASSERT(grid.transform().indexToWorld(openvdb::Coord(1, 2, 3)).eq(
+    EXPECT_TRUE(grid.transform().indexToWorld(openvdb::Coord(1, 2, 3)).eq(
         grid.indexToWorld(openvdb::Coord(1, 2, 3))));
-    CPPUNIT_ASSERT(grid.transform().worldToIndex(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
+    EXPECT_TRUE(grid.transform().worldToIndex(openvdb::Vec3d(0.1, 0.2, 0.3)).eq(
         grid.worldToIndex(openvdb::Vec3d(0.1, 0.2, 0.3))));
 }
 
 
-void
-TestGrid::testCopyGrid()
+TEST_F(TestGrid, testCopyGrid)
 {
     using namespace openvdb;
 
@@ -279,8 +246,8 @@ TestGrid::testCopyGrid()
     FloatTree& tree2 = gridPtrCast<FloatGrid>(grid2)->tree();
 
     // compare topology
-    CPPUNIT_ASSERT(tree1.hasSameTopology(tree2));
-    CPPUNIT_ASSERT(tree2.hasSameTopology(tree1));
+    EXPECT_TRUE(tree1.hasSameTopology(tree2));
+    EXPECT_TRUE(tree2.hasSameTopology(tree1));
 
     // trees should be equal
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree2.getValue(Coord(1,2,3)));
@@ -292,8 +259,8 @@ TestGrid::testCopyGrid()
     tree2.setValue(changeCoord, 1.0f);
 
     // topology should no longer match
-    CPPUNIT_ASSERT(!tree1.hasSameTopology(tree2));
-    CPPUNIT_ASSERT(!tree2.hasSameTopology(tree1));
+    EXPECT_TRUE(!tree1.hasSameTopology(tree2));
+    EXPECT_TRUE(!tree2.hasSameTopology(tree1));
 
     // query changed value and make sure it's different between trees
     ASSERT_DOUBLES_EXACTLY_EQUAL(fillValue1, tree1.getValue(changeCoord));
@@ -301,9 +268,9 @@ TestGrid::testCopyGrid()
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
     // shallow-copy a const grid but supply a new transform and meta map
-    CPPUNIT_ASSERT_EQUAL(1.0, grid1->transform().voxelSize().x());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), grid1->metaCount());
-    CPPUNIT_ASSERT_EQUAL(Index(2), grid1->tree().leafCount());
+    EXPECT_EQ(1.0, grid1->transform().voxelSize().x());
+    EXPECT_EQ(size_t(0), grid1->metaCount());
+    EXPECT_EQ(Index(2), grid1->tree().leafCount());
 
     math::Transform::Ptr xform(math::Transform::createLinearTransform(/*voxelSize=*/0.25));
     MetaMap meta;
@@ -314,16 +281,15 @@ TestGrid::testCopyGrid()
     GridBase::ConstPtr grid3 = constGrid1->copyGridReplacingMetadataAndTransform(meta, xform);
     const FloatTree& tree3 = gridConstPtrCast<FloatGrid>(grid3)->tree();
 
-    CPPUNIT_ASSERT_EQUAL(0.25, grid3->transform().voxelSize().x());
-    CPPUNIT_ASSERT_EQUAL(size_t(1), grid3->metaCount());
-    CPPUNIT_ASSERT_EQUAL(Index(2), tree3.leafCount());
-    CPPUNIT_ASSERT_EQUAL(long(3), constGrid1->constTreePtr().use_count());
+    EXPECT_EQ(0.25, grid3->transform().voxelSize().x());
+    EXPECT_EQ(size_t(1), grid3->metaCount());
+    EXPECT_EQ(Index(2), tree3.leafCount());
+    EXPECT_EQ(long(3), constGrid1->constTreePtr().use_count());
 #endif
 }
 
 
-void
-TestGrid::testValueConversion()
+TEST_F(TestGrid, testValueConversion)
 {
     using namespace openvdb;
 
@@ -340,8 +306,8 @@ TestGrid::testValueConversion()
     DoubleGrid dgrid(fgrid);
     DoubleTree& dtree = dgrid.tree();
     // Compare topology.
-    CPPUNIT_ASSERT(dtree.hasSameTopology(ftree));
-    CPPUNIT_ASSERT(ftree.hasSameTopology(dtree));
+    EXPECT_TRUE(dtree.hasSameTopology(ftree));
+    EXPECT_TRUE(ftree.hasSameTopology(dtree));
     // Compare values.
     ASSERT_DOUBLES_EXACTLY_EQUAL(double(fbkgd), dtree.getValue(c2));
     ASSERT_DOUBLES_EXACTLY_EQUAL(double(fval0), dtree.getValue(c0));
@@ -351,33 +317,33 @@ TestGrid::testValueConversion()
     BoolGrid bgrid(fgrid);
     BoolTree& btree = bgrid.tree();
     // Compare topology.
-    CPPUNIT_ASSERT(btree.hasSameTopology(ftree));
-    CPPUNIT_ASSERT(ftree.hasSameTopology(btree));
+    EXPECT_TRUE(btree.hasSameTopology(ftree));
+    EXPECT_TRUE(ftree.hasSameTopology(btree));
     // Compare values.
-    CPPUNIT_ASSERT_EQUAL(bool(fbkgd), btree.getValue(c2));
-    CPPUNIT_ASSERT_EQUAL(bool(fval0), btree.getValue(c0));
-    CPPUNIT_ASSERT_EQUAL(bool(fval1), btree.getValue(c1));
+    EXPECT_EQ(bool(fbkgd), btree.getValue(c2));
+    EXPECT_EQ(bool(fval0), btree.getValue(c0));
+    EXPECT_EQ(bool(fval1), btree.getValue(c1));
 
     // Copy the FloatGrid to a Vec3SGrid.
     Vec3SGrid vgrid(fgrid);
     Vec3STree& vtree = vgrid.tree();
     // Compare topology.
-    CPPUNIT_ASSERT(vtree.hasSameTopology(ftree));
-    CPPUNIT_ASSERT(ftree.hasSameTopology(vtree));
+    EXPECT_TRUE(vtree.hasSameTopology(ftree));
+    EXPECT_TRUE(ftree.hasSameTopology(vtree));
     // Compare values.
-    CPPUNIT_ASSERT_EQUAL(Vec3s(fbkgd), vtree.getValue(c2));
-    CPPUNIT_ASSERT_EQUAL(Vec3s(fval0), vtree.getValue(c0));
-    CPPUNIT_ASSERT_EQUAL(Vec3s(fval1), vtree.getValue(c1));
+    EXPECT_EQ(Vec3s(fbkgd), vtree.getValue(c2));
+    EXPECT_EQ(Vec3s(fval0), vtree.getValue(c0));
+    EXPECT_EQ(Vec3s(fval1), vtree.getValue(c1));
 
     // Verify that a Vec3SGrid can't be copied to an Int32Grid
     // (because an Int32 can't be constructed from a Vec3S).
-    CPPUNIT_ASSERT_THROW(Int32Grid igrid2(vgrid), openvdb::TypeError);
+    EXPECT_THROW(Int32Grid igrid2(vgrid), openvdb::TypeError);
 
     // Verify that a grid can't be converted to another type with a different
     // tree configuration.
     using DTree23 = tree::Tree3<double, 2, 3>::Type;
     using DGrid23 = Grid<DTree23>;
-    CPPUNIT_ASSERT_THROW(DGrid23 d23grid(fgrid), openvdb::TypeError);
+    EXPECT_THROW(DGrid23 d23grid(fgrid), openvdb::TypeError);
 }
 
 
@@ -393,14 +359,14 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
     using ValueT = typename GridT::ValueType;
 
     const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
-    CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.min().y());
-    CPPUNIT_ASSERT_EQUAL(-6, bbox.min().z());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.max().x());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.max().y());
-    CPPUNIT_ASSERT_EQUAL(6, bbox.max().z());
-    CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
-    CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
+    EXPECT_EQ(4, bbox.min().x());
+    EXPECT_EQ(4, bbox.min().y());
+    EXPECT_EQ(-6, bbox.min().z());
+    EXPECT_EQ(4, bbox.max().x());
+    EXPECT_EQ(4, bbox.max().y());
+    EXPECT_EQ(6, bbox.max().z());
+    EXPECT_EQ(6 + 6 + 1, int(clipped.activeVoxelCount()));
+    EXPECT_EQ(2, int(clipped.constTree().leafCount()));
 
     typename GridT::ConstAccessor acc = clipped.getConstAccessor();
     const ValueT bg = clipped.background();
@@ -410,9 +376,9 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
         for (y = -10; y <= 10; ++y) {
             for (z = -10; z <= 10; ++z) {
                 if (x == 4 && y == 4 && z >= -6 && z <= 6) {
-                    CPPUNIT_ASSERT_EQUAL(fg, acc.getValue(Coord(4, 4, z)));
+                    EXPECT_EQ(fg, acc.getValue(Coord(4, 4, z)));
                 } else {
-                    CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
+                    EXPECT_EQ(bg, acc.getValue(Coord(x, y, z)));
                 }
             }
         }
@@ -421,8 +387,7 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
 
 
 // See also TestTools::testClipping()
-void
-TestGrid::testClipping()
+TEST_F(TestGrid, testClipping)
 {
     using namespace openvdb;
 
@@ -491,8 +456,7 @@ struct GridOp
 } // anonymous namespace
 
 
-void
-TestGrid::testApply()
+TEST_F(TestGrid, testApply)
 {
     using namespace openvdb;
 
@@ -513,14 +477,14 @@ TestGrid::testApply()
 
         // Verify that the functor is not applied to any of the grids.
         GridOp op;
-        CPPUNIT_ASSERT(!boolGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!boolCGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!floatGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!floatCGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!doubleGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!doubleCGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!intGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!intCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!boolGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!boolCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!floatGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!floatCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!doubleGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!doubleCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!intGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!intCGrid->apply<AllowedGridTypes>(op));
     }
     {
         using AllowedGridTypes = TypeList<FloatGrid, FloatGrid, DoubleGrid>;
@@ -528,29 +492,29 @@ TestGrid::testApply()
         // Verify that the functor is applied only to grids of the allowed types
         // and that their constness is respected.
         GridOp op;
-        CPPUNIT_ASSERT(!boolGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!intGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(floatGrid->apply<AllowedGridTypes>(op));  CPPUNIT_ASSERT(!op.isConst);
-        CPPUNIT_ASSERT(doubleGrid->apply<AllowedGridTypes>(op)); CPPUNIT_ASSERT(!op.isConst);
+        EXPECT_TRUE(!boolGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!intGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(floatGrid->apply<AllowedGridTypes>(op));  EXPECT_TRUE(!op.isConst);
+        EXPECT_TRUE(doubleGrid->apply<AllowedGridTypes>(op)); EXPECT_TRUE(!op.isConst);
 
-        CPPUNIT_ASSERT(!boolCGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(!intCGrid->apply<AllowedGridTypes>(op));
-        CPPUNIT_ASSERT(floatCGrid->apply<AllowedGridTypes>(op));  CPPUNIT_ASSERT(op.isConst);
-        CPPUNIT_ASSERT(doubleCGrid->apply<AllowedGridTypes>(op)); CPPUNIT_ASSERT(op.isConst);
+        EXPECT_TRUE(!boolCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(!intCGrid->apply<AllowedGridTypes>(op));
+        EXPECT_TRUE(floatCGrid->apply<AllowedGridTypes>(op));  EXPECT_TRUE(op.isConst);
+        EXPECT_TRUE(doubleCGrid->apply<AllowedGridTypes>(op)); EXPECT_TRUE(op.isConst);
     }
     {
         using AllowedGridTypes = TypeList<FloatGrid, DoubleGrid>;
 
         // Verify that rvalue functors are supported.
         int n = 0;
-        CPPUNIT_ASSERT(  !boolGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
-        CPPUNIT_ASSERT(   !intGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
-        CPPUNIT_ASSERT(  floatGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
-        CPPUNIT_ASSERT( doubleGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
-        CPPUNIT_ASSERT( !boolCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
-        CPPUNIT_ASSERT(  !intCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
-        CPPUNIT_ASSERT( floatCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
-        CPPUNIT_ASSERT(doubleCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
-        CPPUNIT_ASSERT_EQUAL(4, n);
+        EXPECT_TRUE(  !boolGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        EXPECT_TRUE(   !intGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        EXPECT_TRUE(  floatGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        EXPECT_TRUE( doubleGrid->apply<AllowedGridTypes>([&n](GridBase&) { ++n; }));
+        EXPECT_TRUE( !boolCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        EXPECT_TRUE(  !intCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        EXPECT_TRUE( floatCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        EXPECT_TRUE(doubleCGrid->apply<AllowedGridTypes>([&n](const GridBase&) { ++n; }));
+        EXPECT_EQ(4, n);
     }
 }

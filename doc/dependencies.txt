@@ -43,13 +43,14 @@ OpenVDB LOD             | Core Library dependencies                             
 OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW**                                     | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy*, NumPy
-OpenVDB AX              | Core Library dependencies, LLVM,                                                     | Bison, Flex
-OpenVDB UnitTests       | Core Library dependencies, CppUnit                                                   | -
+OpenVDB AX              | Core Library dependencies, LLVM                                                      | Bison, Flex
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest                                                | CppUnit***
 OpenVDB Documentation   | Doxygen                                                                              | -
 
  - @b * Boost::numpy is required for NumPy support with Boost from version 1.65
  onwards.
  - @b ** GLEW is only required for building the vdb_view binary on Windows.
+ - @b *** CppUnit is only required for building the AX unit tests.
  - @b Note - Bison and Flex are only required for re-generation of the AX
  grammar which is not typically necessary for the majority of users.
 
@@ -72,6 +73,7 @@ Bison          | 3.0.0   | 3.0.5       | General-purpose parser generator       
 Flex           | 2.6     | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
 NumPy          | 1.12.1  | 1.12.1      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
+GoogleTest     | 1.8     | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5     | 1.5         | Recommended dependency for improved disk compression              | N       | N*       | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
@@ -126,6 +128,7 @@ apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 # Optional
 apt-get install liblog4cplus-dev        # Log4cplus
+apt-get install googletest              # GoogleTest
 # vdb_view
 apt-get install libglfw3-dev            # GLFW
 # Documentation
@@ -158,6 +161,7 @@ brew install boost-python              # Boost-python
 brew install python                    # Python
 brew install numpy                     # NumPy
 # Unit Tests
+brew install gtest                     # GoogleTest
 brew install cppunit                   # CppUnit
 # vdb_view
 brew install glfw                      # GLFW
@@ -187,7 +191,7 @@ make
 make install
 @endcode
 
-@b CppUnit
+@b CppUnit (for AX Unit Tests)
 
 @code{.sh}
 #!/bin/bash

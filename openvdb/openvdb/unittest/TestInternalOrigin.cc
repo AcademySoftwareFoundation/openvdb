@@ -1,28 +1,20 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <set>
 
-class TestInternalOrigin: public CppUnit::TestCase
+class TestInternalOrigin: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestInternalOrigin);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST_SUITE_END();
-
-    void test();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestInternalOrigin);
 
-void
-TestInternalOrigin::test()
+TEST_F(TestInternalOrigin, test)
 {
     std::set<openvdb::Coord> indices;
     indices.insert(openvdb::Coord( 0,  0,  0));
@@ -49,27 +41,27 @@ TestInternalOrigin::test()
     for (Node0::ChildOnCIter iter0=tree.root().cbeginChildOn(); iter0; ++iter0) {//internal 1
         openvdb::Coord C0=iter0->origin();
         iter0.getCoord(G);
-        CPPUNIT_ASSERT_EQUAL(C0,G);
+        EXPECT_EQ(C0,G);
         for (Node1::ChildOnCIter iter1=iter0->cbeginChildOn(); iter1; ++iter1) {//internal 2
             openvdb::Coord C1=iter1->origin();
             iter1.getCoord(G);
-            CPPUNIT_ASSERT_EQUAL(C1,G);
-            CPPUNIT_ASSERT(C0 <= C1);
-            CPPUNIT_ASSERT(C1 <= C0 + openvdb::Coord(Node1::DIM,Node1::DIM,Node1::DIM));
+            EXPECT_EQ(C1,G);
+            EXPECT_TRUE(C0 <= C1);
+            EXPECT_TRUE(C1 <= C0 + openvdb::Coord(Node1::DIM,Node1::DIM,Node1::DIM));
             for (Node2::ChildOnCIter iter2=iter1->cbeginChildOn(); iter2; ++iter2) {//leafs
                 openvdb::Coord C2=iter2->origin();
                 iter2.getCoord(G);
-                CPPUNIT_ASSERT_EQUAL(C2,G);
-                CPPUNIT_ASSERT(C1 <= C2);
-                CPPUNIT_ASSERT(C2 <= C1 + openvdb::Coord(Node2::DIM,Node2::DIM,Node2::DIM));
+                EXPECT_EQ(C2,G);
+                EXPECT_TRUE(C1 <= C2);
+                EXPECT_TRUE(C2 <= C1 + openvdb::Coord(Node2::DIM,Node2::DIM,Node2::DIM));
                 for (Node3::ValueOnCIter iter3=iter2->cbeginValueOn(); iter3; ++iter3) {//leaf voxels
                     iter3.getCoord(G);
                     iter = indices.find(G);
-                    CPPUNIT_ASSERT(iter != indices.end());
+                    EXPECT_TRUE(iter != indices.end());
                     indices.erase(iter);
                 }
             }
         }
     }
-    CPPUNIT_ASSERT(indices.size() == 0);
+    EXPECT_TRUE(indices.size() == 0);
 }

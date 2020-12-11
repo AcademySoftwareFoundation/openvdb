@@ -81,7 +81,7 @@ inline std::unique_ptr<llvm::TargetMachine> initializeTargetMachine()
     }
 
     // default cpu with no additional features = "generic"
-    const std::string CPU = llvm::sys::getHostCPUName();
+    const llvm::StringRef& CPU = llvm::sys::getHostCPUName();
 
     llvm::SubtargetFeatures Features;
     llvm::StringMap<bool> HostFeatures;
@@ -205,37 +205,50 @@ void LLVMoptimise(llvm::Module* module,
 }
 
 void LLVMoptimise(llvm::Module* module,
-                  const llvm::PassBuilder::OptimizationLevel optLevel,
+                  const llvm::PassBuilder::OptimizationLevel opt,
                   const bool verify,
                   llvm::TargetMachine* TM)
 {
-    switch (optLevel) {
+    unsigned optLevel = 0, sizeLevel = 0;
+
+    // llvm::PassBuilder::OptimizationLevel is an enum in llvm 10
+    // and earlier, a class in llvm 11 and later (which holds
+    // various member data about the optimization level)
+#if LLVM_VERSION_MAJOR < 11
+    switch (opt) {
         case llvm::PassBuilder::OptimizationLevel::O0 : {
-            LLVMoptimise(module, 0, 0, verify, TM);
+            optLevel = 0; sizeLevel = 0;
             break;
         }
         case llvm::PassBuilder::OptimizationLevel::O1 : {
-            LLVMoptimise(module, 1, 0, verify, TM);
+            optLevel = 1; sizeLevel = 0;
             break;
         }
         case llvm::PassBuilder::OptimizationLevel::O2 : {
-            LLVMoptimise(module, 2, 0, verify, TM);
+            optLevel = 2; sizeLevel = 0;
             break;
         }
         case llvm::PassBuilder::OptimizationLevel::Os : {
-            LLVMoptimise(module, 2, 1, verify, TM);
+            optLevel = 2; sizeLevel = 1;
             break;
         }
         case llvm::PassBuilder::OptimizationLevel::Oz : {
-            LLVMoptimise(module, 2, 2, verify, TM);
+            optLevel = 2; sizeLevel = 2;
             break;
         }
         case llvm::PassBuilder::OptimizationLevel::O3 : {
-            LLVMoptimise(module, 3, 0, verify, TM);
+            optLevel = 3; sizeLevel = 0;
             break;
         }
         default : {}
-    }}
+    }
+#else
+    optLevel = opt.getSpeedupLevel();
+    sizeLevel = opt.getSizeLevel();
+#endif
+
+    LLVMoptimise(module, optLevel, sizeLevel, verify, TM);
+}
 
 #else
 
@@ -346,7 +359,7 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
                 ? E.getDataLayout()
                 : GV->getParent()->getDataLayout();
         llvm::Mangler::getNameWithPrefix(FullName, GV->getName(), DL);
-        return FullName.str();
+        return std::string(FullName.str());
     };
 
     /// @note  Could use InstallLazyFunctionCreator here instead as follows:

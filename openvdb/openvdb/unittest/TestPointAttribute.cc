@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
@@ -10,31 +10,18 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestPointAttribute: public CppUnit::TestCase
+class TestPointAttribute: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestPointAttribute);
-    CPPUNIT_TEST(testAppendDrop);
-    CPPUNIT_TEST(testRename);
-    CPPUNIT_TEST(testBloscCompress);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAppendDrop();
-    void testRename();
-    void testBloscCompress();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 }; // class TestPointAttribute
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointAttribute);
 
 ////////////////////////////////////////
 
 
-void
-TestPointAttribute::testAppendDrop()
+TEST_F(TestPointAttribute, testAppendDrop)
 {
     using AttributeI = TypedAttributeArray<int>;
 
@@ -47,7 +34,7 @@ TestPointAttribute::testAppendDrop()
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(4));
+    EXPECT_EQ(tree.leafCount(), Index32(4));
 
     // retrieve first and last leaf attribute sets
 
@@ -61,44 +48,44 @@ TestPointAttribute::testAppendDrop()
     const AttributeSet& attributeSet4 = leafIter->attributeSet();
 
     // check just one attribute exists (position)
-    CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+    EXPECT_EQ(attributeSet.descriptor().size(), size_t(1));
 
     { // append an attribute, different initial values and collapse
         appendAttribute<int>(tree,  "id");
 
-        CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
+        EXPECT_TRUE(tree.beginLeaf()->hasAttribute("id"));
 
         AttributeArray& array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array.isUniform());
-        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array).get(0), zeroVal<AttributeI::ValueType>());
+        EXPECT_TRUE(array.isUniform());
+        EXPECT_EQ(AttributeI::cast(array).get(0), zeroVal<AttributeI::ValueType>());
 
         dropAttribute(tree, "id");
 
         appendAttribute<int>(tree, "id", 10, /*stride*/1);
 
-        CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
+        EXPECT_TRUE(tree.beginLeaf()->hasAttribute("id"));
 
         AttributeArray& array2 = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array2.isUniform());
-        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array2).get(0), AttributeI::ValueType(10));
+        EXPECT_TRUE(array2.isUniform());
+        EXPECT_EQ(AttributeI::cast(array2).get(0), AttributeI::ValueType(10));
 
         array2.expand();
-        CPPUNIT_ASSERT(!array2.isUniform());
+        EXPECT_TRUE(!array2.isUniform());
 
         collapseAttribute<int>(tree, "id", 50);
 
         AttributeArray& array3 = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array3.isUniform());
-        CPPUNIT_ASSERT_EQUAL(AttributeI::cast(array3).get(0), AttributeI::ValueType(50));
+        EXPECT_TRUE(array3.isUniform());
+        EXPECT_EQ(AttributeI::cast(array3).get(0), AttributeI::ValueType(50));
 
         dropAttribute(tree, "id");
 
         appendAttribute<Name>(tree, "name", "test");
 
         AttributeArray& array4 = tree.beginLeaf()->attributeArray("name");
-        CPPUNIT_ASSERT(array4.isUniform());
+        EXPECT_TRUE(array4.isUniform());
         StringAttributeHandle handle(array4, attributeSet.descriptor().getMetadata());
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("test"));
+        EXPECT_EQ(handle.get(0), Name("test"));
 
         dropAttribute(tree, "name");
     }
@@ -107,16 +94,16 @@ TestPointAttribute::testAppendDrop()
         appendAttribute<int>(tree, "id", 0, /*stride=*/1);
 
         AttributeArray& array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT_EQUAL(array.stride(), Index(1));
+        EXPECT_EQ(array.stride(), Index(1));
 
         dropAttribute(tree, "id");
 
         appendAttribute<int>(tree, "id", 0, /*stride=*/10);
 
-        CPPUNIT_ASSERT(tree.beginLeaf()->hasAttribute("id"));
+        EXPECT_TRUE(tree.beginLeaf()->hasAttribute("id"));
 
         AttributeArray& array2 = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT_EQUAL(array2.stride(), Index(10));
+        EXPECT_EQ(array2.stride(), Index(10));
 
         dropAttribute(tree, "id");
     }
@@ -130,17 +117,17 @@ TestPointAttribute::testAppendDrop()
                                 /*defaultValue*/&meta,
                                 /*hidden=*/false, /*transient=*/false);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
-        CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
-        CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(2));
+        EXPECT_TRUE(attributeSet.descriptor() == attributeSet4.descriptor());
+        EXPECT_TRUE(&attributeSet.descriptor() == &attributeSet4.descriptor());
 
-        CPPUNIT_ASSERT(attributeSet.descriptor().getMetadata()["default:id"]);
+        EXPECT_TRUE(attributeSet.descriptor().getMetadata()["default:id"]);
 
         AttributeArray& array = tree.beginLeaf()->attributeArray("id");
-        CPPUNIT_ASSERT(array.isUniform());
+        EXPECT_TRUE(array.isUniform());
 
         AttributeHandle<int> handle(array);
-        CPPUNIT_ASSERT_EQUAL(0, handle.get(0));
+        EXPECT_EQ(0, handle.get(0));
     }
 
     { // append three attributes, check ordering is consistent with insertion
@@ -148,13 +135,13 @@ TestPointAttribute::testAppendDrop()
         appendAttribute<float>(tree, "test1");
         appendAttribute<float>(tree, "test2");
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(5));
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test3"), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(3));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test2"), size_t(4));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().find("id"), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().find("test3"), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().find("test1"), size_t(3));
+        EXPECT_EQ(attributeSet.descriptor().find("test2"), size_t(4));
     }
 
     { // drop an attribute by index, check ordering remains consistent
@@ -162,12 +149,12 @@ TestPointAttribute::testAppendDrop()
 
         dropAttributes(tree, indices);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(4));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(4));
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test2"), size_t(3));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().find("id"), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().find("test1"), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().find("test2"), size_t(3));
     }
 
     { // drop attributes by index, check ordering remains consistent
@@ -175,10 +162,10 @@ TestPointAttribute::testAppendDrop()
 
         dropAttributes(tree, indices);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(2));
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test1"), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().find("test1"), size_t(1));
     }
 
     { // drop last non-position attribute
@@ -186,16 +173,16 @@ TestPointAttribute::testAppendDrop()
 
         dropAttributes(tree, indices);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(1));
     }
 
     { // attempt (and fail) to drop position
         std::vector<size_t> indices{0};
 
-        CPPUNIT_ASSERT_THROW(dropAttributes(tree, indices), openvdb::KeyError);
+        EXPECT_THROW(dropAttributes(tree, indices), openvdb::KeyError);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
-        CPPUNIT_ASSERT(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(1));
+        EXPECT_TRUE(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
     }
 
     { // add back previous attributes
@@ -204,15 +191,15 @@ TestPointAttribute::testAppendDrop()
         appendAttribute<float>(tree, "test1");
         appendAttribute<float>(tree, "test2");
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(5));
     }
 
     { // attempt (and fail) to drop non-existing attribute
         std::vector<Name> names{"test1000"};
 
-        CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
+        EXPECT_THROW(dropAttributes(tree, names), openvdb::KeyError);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(5));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(5));
     }
 
     { // drop by name
@@ -220,48 +207,48 @@ TestPointAttribute::testAppendDrop()
 
         dropAttributes(tree, names);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(3));
-        CPPUNIT_ASSERT(attributeSet.descriptor() == attributeSet4.descriptor());
-        CPPUNIT_ASSERT(&attributeSet.descriptor() == &attributeSet4.descriptor());
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(3));
+        EXPECT_TRUE(attributeSet.descriptor() == attributeSet4.descriptor());
+        EXPECT_TRUE(&attributeSet.descriptor() == &attributeSet4.descriptor());
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("test3"), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().find("id"), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().find("test3"), size_t(2));
     }
 
     { // attempt (and fail) to drop position
         std::vector<Name> names{"P"};
 
-        CPPUNIT_ASSERT_THROW(dropAttributes(tree, names), openvdb::KeyError);
+        EXPECT_THROW(dropAttributes(tree, names), openvdb::KeyError);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(3));
-        CPPUNIT_ASSERT(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(3));
+        EXPECT_TRUE(attributeSet.descriptor().find("P") != AttributeSet::INVALID_POS);
     }
 
     { // drop one attribute by name
         dropAttribute(tree, "test3");
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("id"), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().find("id"), size_t(1));
     }
 
     { // drop one attribute by id
         dropAttribute(tree, 1);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().find("P"), size_t(0));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(1));
+        EXPECT_EQ(attributeSet.descriptor().find("P"), size_t(0));
     }
 
     { // attempt to add an attribute with a name that already exists
         appendAttribute<float>(tree, "test3");
-        CPPUNIT_ASSERT_THROW(appendAttribute<float>(tree, "test3"), openvdb::KeyError);
+        EXPECT_THROW(appendAttribute<float>(tree, "test3"), openvdb::KeyError);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(2));
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(2));
     }
 
     { // attempt to add an attribute with an unregistered type (Vec2R)
-        CPPUNIT_ASSERT_THROW(appendAttribute<Vec2R>(tree, "unregistered"), openvdb::KeyError);
+        EXPECT_THROW(appendAttribute<Vec2R>(tree, "unregistered"), openvdb::KeyError);
     }
 
     { // append attributes marked as hidden, transient, group and string
@@ -276,30 +263,29 @@ TestPointAttribute::testAppendDrop()
         const AttributeArray& arrayTransient = leafIter->attributeArray("testTransient");
         const AttributeArray& arrayString = leafIter->attributeArray("testString");
 
-        CPPUNIT_ASSERT(arrayHidden.isHidden());
-        CPPUNIT_ASSERT(!arrayTransient.isHidden());
+        EXPECT_TRUE(arrayHidden.isHidden());
+        EXPECT_TRUE(!arrayTransient.isHidden());
 
-        CPPUNIT_ASSERT(!arrayHidden.isTransient());
-        CPPUNIT_ASSERT(arrayTransient.isTransient());
-        CPPUNIT_ASSERT(!arrayString.isTransient());
+        EXPECT_TRUE(!arrayHidden.isTransient());
+        EXPECT_TRUE(arrayTransient.isTransient());
+        EXPECT_TRUE(!arrayString.isTransient());
 
-        CPPUNIT_ASSERT(!isGroup(arrayHidden));
-        CPPUNIT_ASSERT(!isGroup(arrayTransient));
-        CPPUNIT_ASSERT(!isGroup(arrayString));
+        EXPECT_TRUE(!isGroup(arrayHidden));
+        EXPECT_TRUE(!isGroup(arrayTransient));
+        EXPECT_TRUE(!isGroup(arrayString));
 
-        CPPUNIT_ASSERT(!isString(arrayHidden));
-        CPPUNIT_ASSERT(!isString(arrayTransient));
-        CPPUNIT_ASSERT(isString(arrayString));
+        EXPECT_TRUE(!isString(arrayHidden));
+        EXPECT_TRUE(!isString(arrayTransient));
+        EXPECT_TRUE(isString(arrayString));
     }
 
     { // collapsing non-existing attribute throws exception
-        CPPUNIT_ASSERT_THROW(collapseAttribute<int>(tree, "unknown", 0), openvdb::KeyError);
-        CPPUNIT_ASSERT_THROW(collapseAttribute<Name>(tree, "unknown", "unknown"), openvdb::KeyError);
+        EXPECT_THROW(collapseAttribute<int>(tree, "unknown", 0), openvdb::KeyError);
+        EXPECT_THROW(collapseAttribute<Name>(tree, "unknown", "unknown"), openvdb::KeyError);
     }
 }
 
-void
-TestPointAttribute::testRename()
+TEST_F(TestPointAttribute, testRename)
 {
     std::vector<Vec3s> positions{{1, 1, 1}, {1, 10, 1}, {10, 1, 1}, {10, 10, 1}};
 
@@ -310,7 +296,7 @@ TestPointAttribute::testRename()
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(4));
+    EXPECT_EQ(tree.leafCount(), Index32(4));
 
     const openvdb::TypedMetadata<float> defaultValue(5.0f);
 
@@ -329,28 +315,28 @@ TestPointAttribute::testRename()
     { // rename one attribute
         renameAttribute(tree, "test1", "test1renamed");
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet.descriptor().size(), size_t(4));
-        CPPUNIT_ASSERT(attributeSet.descriptor().find("test1") == AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(attributeSet.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
+        EXPECT_EQ(attributeSet.descriptor().size(), size_t(4));
+        EXPECT_TRUE(attributeSet.descriptor().find("test1") == AttributeSet::INVALID_POS);
+        EXPECT_TRUE(attributeSet.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
 
-        CPPUNIT_ASSERT_EQUAL(attributeSet4.descriptor().size(), size_t(4));
-        CPPUNIT_ASSERT(attributeSet4.descriptor().find("test1") == AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(attributeSet4.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
+        EXPECT_EQ(attributeSet4.descriptor().size(), size_t(4));
+        EXPECT_TRUE(attributeSet4.descriptor().find("test1") == AttributeSet::INVALID_POS);
+        EXPECT_TRUE(attributeSet4.descriptor().find("test1renamed") != AttributeSet::INVALID_POS);
 
         renameAttribute(tree, "test1renamed", "test1");
     }
 
     { // rename non-existing, matching and existing attributes
-        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "nonexist", "newname"), openvdb::KeyError);
-        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "test1", "test1"), openvdb::KeyError);
-        CPPUNIT_ASSERT_THROW(renameAttribute(tree, "test2", "test1"), openvdb::KeyError);
+        EXPECT_THROW(renameAttribute(tree, "nonexist", "newname"), openvdb::KeyError);
+        EXPECT_THROW(renameAttribute(tree, "test1", "test1"), openvdb::KeyError);
+        EXPECT_THROW(renameAttribute(tree, "test2", "test1"), openvdb::KeyError);
     }
 
     { // rename multiple attributes
         std::vector<Name> oldNames{"test1", "test2"};
         std::vector<Name> newNames{"test1renamed"};
 
-        CPPUNIT_ASSERT_THROW(renameAttributes(tree, oldNames, newNames), openvdb::ValueError);
+        EXPECT_THROW(renameAttributes(tree, oldNames, newNames), openvdb::ValueError);
 
         newNames.push_back("test2renamed");
         renameAttributes(tree, oldNames, newNames);
@@ -360,16 +346,15 @@ TestPointAttribute::testRename()
     }
 
     { // rename an attribute with a default value
-        CPPUNIT_ASSERT(attributeSet.descriptor().hasDefaultValue("test1"));
+        EXPECT_TRUE(attributeSet.descriptor().hasDefaultValue("test1"));
 
         renameAttribute(tree, "test1", "test1renamed");
 
-        CPPUNIT_ASSERT(attributeSet.descriptor().hasDefaultValue("test1renamed"));
+        EXPECT_TRUE(attributeSet.descriptor().hasDefaultValue("test1renamed"));
     }
 }
 
-void
-TestPointAttribute::testBloscCompress()
+TEST_F(TestPointAttribute, testBloscCompress)
 {
     std::vector<Vec3s> positions;
     for (float i = 1.f; i < 6.f; i += 0.1f) {
@@ -386,7 +371,7 @@ TestPointAttribute::testBloscCompress()
     PointDataTree& tree = grid->tree();
 
     // check two leaves
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index32(2));
 
     // retrieve first and last leaf attribute sets
 
@@ -408,7 +393,7 @@ TestPointAttribute::testBloscCompress()
 
         const int size = leafIter->attributeArray("id").size();
 
-        CPPUNIT_ASSERT_EQUAL(size, 102);
+        EXPECT_EQ(size, 102);
 
         for (int i = 0; i < size; i++) {
             handleCompact.set(i, 5);
@@ -424,7 +409,7 @@ TestPointAttribute::testBloscCompress()
 
         const int size = leafIter2->attributeArray("id").size();
 
-        CPPUNIT_ASSERT_EQUAL(size, 102);
+        EXPECT_EQ(size, 102);
 
         for (int i = 0; i < size; i++) {
             handleCompact.set(i, 10);
@@ -435,6 +420,6 @@ TestPointAttribute::testBloscCompress()
 
     compactAttributes(tree);
 
-    CPPUNIT_ASSERT(leafIter->attributeArray("compact").isUniform());
-    CPPUNIT_ASSERT(leafIter2->attributeArray("compact").isUniform());
+    EXPECT_TRUE(leafIter->attributeArray("compact").isUniform());
+    EXPECT_TRUE(leafIter2->attributeArray("compact").isUniform());
 }
