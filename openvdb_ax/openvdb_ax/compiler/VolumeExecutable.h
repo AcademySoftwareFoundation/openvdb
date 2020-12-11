@@ -96,7 +96,7 @@ public:
     ////////////////////////////////////////////////////////
 
     // @brief deprecated methods
-    OPENVDB_DEPRECATED void
+    [[deprecated]] void
     execute(openvdb::GridPtrVec& grids,
         const IterType iter,
         const bool create) const
@@ -107,7 +107,7 @@ public:
         copy.execute(grids);
     }
 
-    OPENVDB_DEPRECATED void
+    [[deprecated]] void
     execute(openvdb::GridPtrVec& grids,
         const IterType iter) const
     {

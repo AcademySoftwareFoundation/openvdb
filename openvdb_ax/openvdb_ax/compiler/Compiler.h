@@ -178,7 +178,7 @@ public:
 
     /// @brief deprecated methods
     template <typename ExecutableT>
-    OPENVDB_DEPRECATED
+    [[deprecated]]
     typename ExecutableT::Ptr
     compile(const ast::Tree& syntaxTree,
             const CustomData::Ptr data,
@@ -197,7 +197,7 @@ public:
     }
 
     template <typename ExecutableT>
-    OPENVDB_DEPRECATED
+    [[deprecated]]
     typename ExecutableT::Ptr
     compile(const std::string& code,
             const CustomData::Ptr data,

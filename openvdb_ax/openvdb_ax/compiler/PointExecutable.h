@@ -84,7 +84,7 @@ public:
     ////////////////////////////////////////////////////////
 
     // @brief deprecated methods
-    OPENVDB_DEPRECATED void
+    [[deprecated]] void
     execute(points::PointDataGrid& grid,
         const std::string* const group,
         const bool create) const
@@ -95,7 +95,7 @@ public:
         copy.execute(grid);
     }
 
-    OPENVDB_DEPRECATED void
+    [[deprecated]] void
     execute(points::PointDataGrid& grid,
         const std::string* const group) const
     {
