@@ -71,6 +71,12 @@
             "suppresses this message"))
     #endif
 #endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_6
+    #if OPENVDB_ABI_VERSION_NUMBER == 6
+        PRAGMA(message("NOTE: ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 "
+            "suppresses this message"))
+    #endif
+#endif
 
 #if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
     /// @brief The version namespace name for this library version
