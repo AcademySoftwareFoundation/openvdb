@@ -1,0 +1,13 @@
+
+vec2i@test1[0] = vec2i@test2[1];
+vec2i@test2[1] = vec2i@test1[0];
+
+vec3i@test3[1] = vec3i@test3[2];
+vec3i@test4[2] = vec3i@test4[0];
+vec3i@test3[0] = vec3i@test4[1];
+
+vec4i@test5[0] = vec4i@test6[2];
+vec4i@test5[3] = vec4i@test5[1];
+vec4i@test5[2] = vec4i@test6[3];
+vec4i@test6[1] = vec4i@test6[0];
+

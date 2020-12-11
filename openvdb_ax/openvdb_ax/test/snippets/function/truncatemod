@@ -1,0 +1,15 @@
+
+int@itest1 = truncatemod(7,5);
+int@itest2 = truncatemod(-7,5);
+int@itest3 = truncatemod(7,-5);
+int@itest4 = truncatemod(-7,-5);
+
+float@ftest1 = truncatemod(7.2f,5.7f);
+float@ftest2 = truncatemod(-7.2f,5.7f);
+float@ftest3 = truncatemod(7.2f,-5.7f);
+float@ftest4 = truncatemod(-7.2f,-5.7f);
+
+double@dtest1 = truncatemod(7.2,5.7);
+double@dtest2 = truncatemod(-7.2,5.7);
+double@dtest3 = truncatemod(7.2,-5.7);
+double@dtest4 = truncatemod(-7.2,-5.7);

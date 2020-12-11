@@ -7,12 +7,8 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
-
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
+cmake_minimum_required(VERSION 3.12)
+project(OpenVDBDocs LANGUAGES NONE)
 
 # If OPENVDB_DOXYGEN_HOUDINI is set, the Houdini documentation is also
 # built. You can provide this module a value for Houdini_VERSION which will
@@ -22,24 +18,104 @@ endif()
 # USE_HOUDINI=ON will define Houdini_VERSION. If Houdini_VERSION is not set,
 # all documentation is included.
 option(OPENVDB_DOXYGEN_HOUDINI "Build Houdini documentation" ON)
+option(OPENVDB_DOXYGEN_AX "Build AX documentation" ON)
 
-# Add the doxygen command if required - do this here so we guarantee
-# not to error on unrelated build issues
-find_package(Doxygen REQUIRED)
-if(DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION)
-  message(WARNING "The doxygen-config doxyfile has been generated with version "
-    "\"${MINIMUM_DOXYGEN_VERSION}\". Found Doxygen version \"${DOXYGEN_VERSION}\". "
-    "Documentation may contain errors."
-  )
+find_package(Doxygen REQUIRED doxygen)
+if(MINIMUM_DOXYGEN_VERSION)
+  if(DOXYGEN_VERSION VERSION_LESS MINIMUM_DOXYGEN_VERSION)
+    message(WARNING "The doxygen-config doxyfile has been generated with version "
+      "\"${MINIMUM_DOXYGEN_VERSION}\". Found Doxygen version \"${DOXYGEN_VERSION}\". "
+      "Documentation may contain errors."
+    )
+  endif()
 endif()
 
-# @todo use cmake doxygen functions available from cmake 3.9
-file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config DOXYGEN_CONFIG_CONTENT)
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
+set(DOXY_FILES
+  openvdb/openvdb
+  openvdb/openvdb/io
+  openvdb/openvdb/math
+  openvdb/openvdb/points
+  openvdb/openvdb/python/pyopenvdb.h
+  openvdb/openvdb/tools
+  openvdb/openvdb/tree
+  openvdb/openvdb/util
+  doc/build.txt
+  doc/changes.txt
+  doc/codingstyle.txt
+  doc/dependencies.txt
+  doc/doc.txt
+  doc/examplecode.txt
+  doc/faq.txt
+  doc/math.txt
+  doc/points.txt
+  doc/python.txt)
+
+set(DOXYGEN_PROJECT_NAME "OpenVDB")
+set(DOXYGEN_PROJECT_NUMBER "7.2.0")
+set(DOXYGEN_PROJECT_BRIEF "")
+set(DOXYGEN_FILE_PATTERNS "*.h") # headers only
+set(DOXYGEN_IMAGE_PATH "doc/img")
+set(DOXYGEN_RECURSIVE NO)
+
+set(DOXYGEN_GENERATE_HTML YES)
+set(DOXYGEN_GENERATE_MAN NO)
+set(DOXYGEN_GENERATE_LATEX NO)
+
+set(DOXYGEN_HTML_COLORSTYLE_HUE 4)
+set(DOXYGEN_HTML_COLORSTYLE_SAT 222)
+set(DOXYGEN_HTML_TIMESTAMP NO) # for simpler website diffs
+
+set(DOXYGEN_EXTRACT_ALL YES)
+set(DOXYGEN_EXTRACT_STATIC YES)
+set(DOXYGEN_EXTRACT_LOCAL_CLASSES NO)
+
+set(DOXYGEN_ALPHABETICAL_INDEX NO)
+set(DOXYGEN_DISTRIBUTE_GROUP_DOC YES)
+set(DOXYGEN_FULL_PATH_NAMES NO)
+set(DOXYGEN_GENERATE_TODOLIST NO)
+set(DOXYGEN_HIDE_IN_BODY_DOCS YES)
+set(DOXYGEN_HIDE_SCOPE_NAMES YES)
+set(DOXYGEN_INLINE_INHERITED_MEMB YES)
+set(DOXYGEN_MACRO_EXPANSION YES)
+set(DOXYGEN_CLASS_DIAGRAMS NO) # @todo use dot with class diagrams for relevant classes
+set(DOXYGEN_ENABLED_SECTIONS "")
+
+set(DOXYGEN_QUIET YES)
+
+set(DOXYGEN_ALIASES
+  [[ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)"]]
+  [[xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)"]]
+  [[const="<tt>const</tt>"]]
+  [["vdbnamespace=openvdb::v7_2"]]
+  [["hunamespace=houdini_utils"]]
+  [["hvdbnamespace=openvdb_houdini"]]
+  # Use this command to create a link to an OpenVDB class, function, etc.
+  # Usage is "@vdblink{<symbol>,<text>}", where <symbol> is a fully namespace-
+  # qualified symbol minus the openvdb and version number namespace components
+  # and <text> is the text of the link.
+  # Example: @vdblink{tree::RootNode,root node}
+  [[vdblink{2}="@link @vdbnamespace::\1 \2@endlink"]]
+  # Deprecated; use the two-argument overload defined above.
+  [[vdblink="@link @vdbnamespace"]]
+  # Use these commands to create links to OpenVDB Houdini symbols.
+  # Usage is "@hulink{<symbol>,<text>}", where <symbol> is the name of
+  # a symbol in the houdini_utils namespace and <text> is the text of the link
+  # (and likewise for @hvdblink).
+  # Example: @hulink{ParmFactory::setDefault(),setDefault}
+  # These stub implementations are used when Houdini support is disabled;
+  # see doxygen-config-houdini for the full implementations.
+  [[hulink{2}="<B>\2</B>"]]
+  [[hvdblink{2}="<B>\2</B>"]]
+  )
+
+set(DOXYGEN_PREDEFINED
+  "OPENVDB_VERSION_NAME=v7_2"
+  "OPENVDB_ABI_VERSION_NUMBER=7"
+  [[__declspec(x):= __attribute__(x):=]]
+  "OPENVDB_USE_LOG4CPLUS=")
+
 if(OPENVDB_DOXYGEN_HOUDINI)
   # Append Houdini-specific settings to the Doxygen config file.
-  file(READ ${CMAKE_CURRENT_SOURCE_DIR}/doxygen-config-houdini DOXYGEN_CONFIG_CONTENT)
-  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config ${DOXYGEN_CONFIG_CONTENT})
   if(Houdini_VERSION)
     # Extract the components of the Houdini version number into a list.
     string(REPLACE "." ";" HOUDINI_VERSION_COMPONENTS ${Houdini_VERSION})
@@ -55,23 +131,68 @@ if(OPENVDB_DOXYGEN_HOUDINI)
   # Append Houdini version number macros to the Doxygen config file so that
   # the generated documentation reflects the API for that version
   # (i.e, taking into account any conditionally compiled blocks).
-  set(DOXYGEN_CONFIG_CONTENT
-    "PREDEFINED += UT_MAJOR_VERSION_INT=${HVERS_MAJOR}\n"
-    "PREDEFINED += UT_MINOR_VERSION_INT=${HVERS_MINOR}\n"
-    "PREDEFINED += UT_VERSION_INT=${HVERS_INT}\n\n")
-  file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-      ${DOXYGEN_CONFIG_CONTENT})
-endif()
-file(APPEND ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-  "QUIET=YES\nOUTPUT_DIRECTORY=${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc\n"
-)
+  list(APPEND DOXYGEN_PREDEFINED "UT_MAJOR_VERSION_INT=${HVERS_MAJOR}")
+  list(APPEND DOXYGEN_PREDEFINED "UT_MINOR_VERSION_INT=${HVERS_MINOR}")
+  list(APPEND DOXYGEN_PREDEFINED "UT_VERSION_INT=${HVERS_INT}")
 
-add_custom_target(doc ALL
-  COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/openvdb/cmake-doxygen-config
-  WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-  COMMENT "Generating API documentation with Doxygen" VERBATIM
-)
+  list(APPEND DOXYGEN_ALIASES
+    [[hulink{2}="@link @hunamespace::\1 \2@endlink"]]
+    [[hvdblink{2}="@link @hvdbnamespace::\1 \2@endlink"]]
+    # Deprecated; use the two-argument overloads defined above.
+    [[hulink="@link @hunamespace"]]
+    [[hvdblink="@link @hvdbnamespace"]]
+    )
+
+  list(APPEND DOXYGEN_ENABLED_SECTIONS "OPENVDB_HOUDINI")
+
+  list(APPEND DOXY_FILES
+    doc/houdini.txt
+    openvdb_houdini/openvdb_houdini/AttributeTransferUtil.h
+    openvdb_houdini/openvdb_houdini/GEO_PrimVDB.h
+    openvdb_houdini/openvdb_houdini/GT_GEOPrimCollectVDB.h
+    openvdb_houdini/openvdb_houdini/GU_PrimVDB.h
+    openvdb_houdini/openvdb_houdini/GU_VDBPointTools.h
+    openvdb_houdini/openvdb_houdini/GeometryUtil.h
+    openvdb_houdini/openvdb_houdini/OP_NodeChain.h
+    openvdb_houdini/openvdb_houdini/ParmFactory.h
+    openvdb_houdini/openvdb_houdini/PointUtils.h
+    openvdb_houdini/openvdb_houdini/SOP_NodeVDB.h
+    openvdb_houdini/openvdb_houdini/SOP_VDBVerbUtils.h
+    openvdb_houdini/openvdb_houdini/UT_VDBTools.h
+    openvdb_houdini/openvdb_houdini/UT_VDBUtils.h
+    openvdb_houdini/openvdb_houdini/Utils.h)
+endif()
+
+if(OPENVDB_DOXYGEN_AX)
+  set(DOXYGEN_EXTRA_PACKAGES amsmath) # for math formatting
+  set(DOXYGEN_FORMULA_FONTSIZE 14)
+  list(APPEND DOXYGEN_ENABLED_SECTIONS "OPENVDB_AX")
+
+  list(APPEND DOXY_FILES
+    doc/ax/ax.txt
+    doc/ax/axcplusplus.txt
+    doc/ax/axexamples.txt
+    doc/ax/axfunctionlist.txt
+    doc/ax/doc.txt
+    openvdb_ax/openvdb_ax
+    openvdb_ax/openvdb_ax/ast
+    openvdb_ax/openvdb_ax/cmd
+    openvdb_ax/openvdb_ax/codegen
+    openvdb_ax/openvdb_ax/compiler
+    openvdb_ax/openvdb_ax/grammar
+    openvdb_ax/openvdb_ax/grammar/generated
+    openvdb_ax/openvdb_ax/math
+    openvdb_ax/openvdb_ax/test)
+endif()
+
+set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)
+
+# Always add to build target (can't use USE_STAMP_FILE as we include
+# complete directories in DOXY_FILES)
+doxygen_add_docs(doc ${DOXY_FILES}
+  ALL WORKING_DIRECTORY ${CMAKE_SOURCE_DIR}
+  COMMENT "Generating API documentation with Doxygen")
 
 # Suppress "Installing..." messages for all but one of the hundreds of generated files.
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html/index.html DESTINATION doc/html)
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/openvdb/doc/html DESTINATION doc MESSAGE_NEVER)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/html/index.html DESTINATION doc/html)
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html DESTINATION doc MESSAGE_NEVER)

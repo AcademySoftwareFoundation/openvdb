@@ -171,8 +171,6 @@ process(const openvdb::GridBase::Ptr& baseGrid, openvdb::GridPtrVec& outGrids, c
     else if (Vec3IGrid::Ptr  g4 = GridBase::grid<Vec3IGrid>(baseGrid))  { mipmap = mip(*g4, opts); }
     else if (Int32Grid::Ptr  g5 = GridBase::grid<Int32Grid>(baseGrid))  { mipmap = mip(*g5, opts); }
     else if (Int64Grid::Ptr  g6 = GridBase::grid<Int64Grid>(baseGrid))  { mipmap = mip(*g6, opts); }
-    else if (BoolGrid::Ptr   g7 = GridBase::grid<BoolGrid>(baseGrid))   { mipmap = mip(*g7, opts); }
-    else if (MaskGrid::Ptr   g8 = GridBase::grid<MaskGrid>(baseGrid))   { mipmap = mip(*g8, opts); }
     else {
         std::string operation = "skipped";
         if (opts.keep) {

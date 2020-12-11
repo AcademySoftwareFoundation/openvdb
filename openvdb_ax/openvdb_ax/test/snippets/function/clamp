@@ -1,0 +1,4 @@
+
+double@double_test1 = clamp(-2.5, -1.5, 1.5);
+double@double_test2 = clamp(0.0, -1.5, 1.5);
+double@double_test3 = clamp(2.5, -1.5, 1.5);

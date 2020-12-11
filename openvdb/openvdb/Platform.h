@@ -40,15 +40,6 @@
 /// OpenVDB now requires C++11
 #define OPENVDB_HAS_CXX11 1
 
-/// For compilers that need templated function specializations to have
-/// storage qualifiers, we need to declare the specializations as static inline.
-/// Otherwise, we'll get linker errors about multiply defined symbols.
-#if defined(__GNUC__) && OPENVDB_CHECK_GCC(4, 4)
-    #define OPENVDB_STATIC_SPECIALIZATION
-#else
-    #define OPENVDB_STATIC_SPECIALIZATION static
-#endif
-
 
 /// SIMD Intrinsic Headers
 #if defined(OPENVDB_USE_SSE42) || defined(OPENVDB_USE_AVX)
@@ -224,5 +215,55 @@
 #else
     #define OPENVDB_HOUDINI_API OPENVDB_IMPORT
 #endif
+
+#if defined(__ICC)
+
+// Use these defines to bracket a region of code that has safe static accesses.
+// Keep the region as small as possible.
+#define OPENVDB_START_THREADSAFE_STATIC_REFERENCE   __pragma(warning(disable:1710))
+#define OPENVDB_FINISH_THREADSAFE_STATIC_REFERENCE  __pragma(warning(default:1710))
+#define OPENVDB_START_THREADSAFE_STATIC_WRITE       __pragma(warning(disable:1711))
+#define OPENVDB_FINISH_THREADSAFE_STATIC_WRITE      __pragma(warning(default:1711))
+#define OPENVDB_START_THREADSAFE_STATIC_ADDRESS     __pragma(warning(disable:1712))
+#define OPENVDB_FINISH_THREADSAFE_STATIC_ADDRESS    __pragma(warning(default:1712))
+
+// Use these defines to bracket a region of code that has unsafe static accesses.
+// Keep the region as small as possible.
+#define OPENVDB_START_NON_THREADSAFE_STATIC_REFERENCE   __pragma(warning(disable:1710))
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_REFERENCE  __pragma(warning(default:1710))
+#define OPENVDB_START_NON_THREADSAFE_STATIC_WRITE       __pragma(warning(disable:1711))
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_WRITE      __pragma(warning(default:1711))
+#define OPENVDB_START_NON_THREADSAFE_STATIC_ADDRESS     __pragma(warning(disable:1712))
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_ADDRESS    __pragma(warning(default:1712))
+
+// Simpler version for one-line cases
+#define OPENVDB_THREADSAFE_STATIC_REFERENCE(CODE) \
+    __pragma(warning(disable:1710)); CODE; __pragma(warning(default:1710))
+#define OPENVDB_THREADSAFE_STATIC_WRITE(CODE) \
+    __pragma(warning(disable:1711)); CODE; __pragma(warning(default:1711))
+#define OPENVDB_THREADSAFE_STATIC_ADDRESS(CODE) \
+    __pragma(warning(disable:1712)); CODE; __pragma(warning(default:1712))
+
+#else // GCC does not support these compiler warnings
+
+#define OPENVDB_START_THREADSAFE_STATIC_REFERENCE
+#define OPENVDB_FINISH_THREADSAFE_STATIC_REFERENCE
+#define OPENVDB_START_THREADSAFE_STATIC_WRITE
+#define OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
+#define OPENVDB_START_THREADSAFE_STATIC_ADDRESS
+#define OPENVDB_FINISH_THREADSAFE_STATIC_ADDRESS
+
+#define OPENVDB_START_NON_THREADSAFE_STATIC_REFERENCE
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_REFERENCE
+#define OPENVDB_START_NON_THREADSAFE_STATIC_WRITE
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_WRITE
+#define OPENVDB_START_NON_THREADSAFE_STATIC_ADDRESS
+#define OPENVDB_FINISH_NON_THREADSAFE_STATIC_ADDRESS
+
+#define OPENVDB_THREADSAFE_STATIC_REFERENCE(CODE) CODE
+#define OPENVDB_THREADSAFE_STATIC_WRITE(CODE) CODE
+#define OPENVDB_THREADSAFE_STATIC_ADDRESS(CODE) CODE
+
+#endif // defined(__ICC)
 
 #endif // OPENVDB_PLATFORM_HAS_BEEN_INCLUDED

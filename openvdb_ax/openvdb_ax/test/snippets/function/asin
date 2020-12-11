@@ -1,0 +1,2 @@
+double@test1 = asin(-0.5);
+float@test2 = asin(-0.5f);

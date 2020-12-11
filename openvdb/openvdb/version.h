@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file version.h
+/// @file openvdb/version.h
 /// @brief Library and file format version numbers
 ///
 /// @details
@@ -48,8 +48,8 @@
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 7
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.

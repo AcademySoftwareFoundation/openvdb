@@ -1,0 +1,11 @@
+
+string@string_test2 = string@string_test1; // set to test - string_test only existing string attribute
+
+string@string_test1 = "new value";
+
+string@string_test3 = string@string_test1; // "new value", string_test3 created
+string@string_test4 = string@string_test3; // "new value"
+
+string@string_test6 = string@string_test5; // empty strings, both created
+
+

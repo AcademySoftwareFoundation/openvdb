@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -65,6 +65,11 @@ option(OPENVDB_BUILD_UNITTESTS "Build the OpenVDB unit tests" OFF)
 option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
+
+option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
+option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
+option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
+
 option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
 the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
@@ -74,7 +79,6 @@ option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BU
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
-
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
@@ -86,6 +90,9 @@ option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
 know it to be required.]=] ON)
+option(USE_ZLIB [=[
+Use zlib while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
+openvdb build configuration to decide on zlib support. ZLib can only be disabled if Blosc is also disabled. ]=] ON)
 option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
@@ -147,58 +154,31 @@ elseif(NOT ${OPENVDB_SIMD} IN_LIST _OPENVDB_SIMD_OPTIONS)
   set(OPENVDB_SIMD None CACHE STRING FORCE)
 endif()
 
+if(USE_BLOSC AND NOT USE_ZLIB)
+  message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
+endif()
+
 # Top-level location for all openvdb headers
 set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
-option(OPENVDB_BUILD_HOUDINI_SOPS "Build the Houdini plugin  (deprecated - see OPENVDB_BUILD_HOUDINI_PLUGIN)" OFF)
-option(OPENVDB_ENABLE_3_ABI_COMPATIBLE "Build with OpenVDB ABI 3 (deprecated - see OPENVDB_ABI_VERSION_NUMBER)" OFF)
-
-# Alias deprecated vars
-
 if(OPENVDB_BUILD_HOUDINI_SOPS)
-  # Support for legacy OPENVDB_BUILD_HOUDINI_SOPS variable
-  message(DEPRECATION "The OPENVDB_BUILD_HOUDINI_SOPS option is deprecated and will be removed. "
-    "Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
-  set(OPENVDB_BUILD_HOUDINI_PLUGIN ON)
+  message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
-
-if(OPENVDB_ENABLE_3_ABI_COMPATIBLE)
-  message(DEPRECATION "OPENVDB_ENABLE_3_ABI_COMPATIBLE is deprecated and will be removed. Use "
-    "-D OPENVDB_ABI_VERSION_NUMBER=N, where N is the abi version.")
-  if(OPENVDB_ABI_VERSION_NUMBER)
-    if(NOT (${OPENVDB_ABI_VERSION_NUMBER} EQUAL 3))
-      message(WARNING "OPENVDB_ABI_VERSION_NUMBER holds a different ABI value to "
-        "OPENVDB_ENABLE_3_ABI_COMPATIBLE, which will be ignored.")
-    endif()
-  else()
-    # Don't bother setting the docstring as we'll update it later
-    set(OPENVDB_ABI_VERSION_NUMBER "3" CACHE STRING "" FORCE)
-  endif()
-endif()
-
 if(DEFINED USE_SYSTEM_LIBRARY_PATHS)
-  message(DEPRECATION "The USE_SYSTEM_LIBRARY_PATHS option is deprecated and will be removed. "
-    "Use DISABLE_CMAKE_SEARCH_PATHS.")
-  if(USE_SYSTEM_LIBRARY_PATHS)
-    set(DISABLE_CMAKE_SEARCH_PATHS OFF)
-  else()
-    set(DISABLE_CMAKE_SEARCH_PATHS ON)
-  endif()
+  message(FATAL_ERROR "The USE_SYSTEM_LIBRARY_PATHS option has been removed. Use DISABLE_CMAKE_SEARCH_PATHS.")
 endif()
 
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
   OPENVDB_CXX_STRICT
-  OPENVDB_ENABLE_3_ABI_COMPATIBLE
   OPENVDB_ENABLE_RPATH
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
   USE_CCACHE
-  OPENVDB_BUILD_HOUDINI_SOPS
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
@@ -236,11 +216,12 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_OPENEXR_VERSION 2.2)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2017.0)
+  set(MINIMUM_LLVM_VERSION 6.0.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
   set(MINIMUM_NUMPY_VERSION 1.12.1)
 
-  set(MINIMUM_CPPUNIT_VERSION 1.10)
+  set(MINIMUM_GOOGLETEST_VERSION 1.8)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
   set(MINIMUM_HOUDINI_VERSION 17.0)
@@ -252,7 +233,9 @@ endif()
 
 # VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
 
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.12)
+# Note: CMake 3.15 chosen as possible next version due to Windows support
+# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
 #set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
@@ -341,7 +324,6 @@ enable_testing()
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 
 # Add backports to support older versions of CMake
-#  FindOpenGL.cmake is needed if CMake < 3.8
 #  FindNumPy.cmake is needed if CMake < 3.14
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
@@ -354,7 +336,6 @@ endif()
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
-    cmake/FindCppUnit.cmake
     cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
@@ -371,7 +352,8 @@ endif()
 
 # Configure DCC installation if necessary
 
-if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR
+   OPENVDB_BUILD_HOUDINI_ABITESTS)
   set(USE_HOUDINI ON)
 endif()
 
@@ -399,6 +381,9 @@ endif()
 if(NOT (
     OPENVDB_BUILD_CORE OR
     OPENVDB_BUILD_BINARIES OR
+    OPENVDB_BUILD_AX OR
+    OPENVDB_BUILD_AX_BINARIES OR
+    OPENVDB_BUILD_AX_UNITTESTS OR
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
@@ -628,7 +613,7 @@ if(USE_STATIC_DEPENDENCIES)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
-  set(CPPUNIT_USE_STATIC_LIBS ON)
+  set(GTEST_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.
   # set(GLFW_USE_STATIC_LIBS ON)
@@ -662,6 +647,22 @@ else()
     PATCH   OpenVDB_PATCH_VERSION
   )
   message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
+endif()
+
+# Locate openvdb_ax if necessary
+
+if(WIN32)
+  if(OPENVDB_BUILD_AX OR
+     OPENVDB_BUILD_AX_BINARIES OR
+     OPENVDB_BUILD_AX_UNITTESTS)
+    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
+  endif()
+endif()
+
+if(NOT OPENVDB_BUILD_AX AND
+   (OPENVDB_BUILD_AX_BINARIES OR
+    OPENVDB_BUILD_AX_UNITTESTS))
+  find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
 endif()
 
 # Validate the OpenVDB ABI Version. If OpenVDB_ABI is not set, we're either building
@@ -719,6 +720,18 @@ determine the ABI number. You may set this to force a given ABI number.]=] FORCE
 
 if(OPENVDB_BUILD_CORE)
   add_subdirectory(openvdb/openvdb)
+endif()
+
+if(OPENVDB_BUILD_AX)
+  add_subdirectory(openvdb_ax/openvdb_ax)
+endif()
+
+if(OPENVDB_BUILD_AX_BINARIES)
+  add_subdirectory(openvdb_ax/openvdb_ax/cmd)
+endif()
+
+if(OPENVDB_BUILD_AX_UNITTESTS)
+  add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()
 
 if(OPENVDB_BUILD_PYTHON_MODULE)

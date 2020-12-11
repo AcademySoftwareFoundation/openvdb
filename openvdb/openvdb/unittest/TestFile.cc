@@ -13,7 +13,7 @@
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <algorithm> // for std::sort()
 #include <cstdio> // for remove() and rename()
@@ -37,76 +37,24 @@
 #endif
 
 
-class TestFile: public CppUnit::TestCase
+class TestFile: public ::testing::Test
 {
 public:
-    void setUp() override {}
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestFile);
-    CPPUNIT_TEST(testHeader);
-    CPPUNIT_TEST(testWriteGrid);
-    CPPUNIT_TEST(testWriteMultipleGrids);
-    CPPUNIT_TEST(testWriteFloatAsHalf);
-    CPPUNIT_TEST(testWriteInstancedGrids);
-    CPPUNIT_TEST(testReadGridDescriptors);
-    CPPUNIT_TEST(testGridNaming);
-    CPPUNIT_TEST(testEmptyFile);
-    CPPUNIT_TEST(testEmptyGridIO);
-    CPPUNIT_TEST(testOpen);
-    CPPUNIT_TEST(testNonVdbOpen);
-    CPPUNIT_TEST(testGetMetadata);
-    CPPUNIT_TEST(testReadAll);
-    CPPUNIT_TEST(testWriteOpenFile);
-    CPPUNIT_TEST(testReadGridMetadata);
-    CPPUNIT_TEST(testReadGrid);
-    CPPUNIT_TEST(testReadClippedGrid);
-    CPPUNIT_TEST(testMultiPassIO);
-    CPPUNIT_TEST(testHasGrid);
-    CPPUNIT_TEST(testNameIterator);
-    CPPUNIT_TEST(testReadOldFileFormat);
-    CPPUNIT_TEST(testCompression);
-    CPPUNIT_TEST(testAsync);
-#ifdef OPENVDB_USE_BLOSC
-    CPPUNIT_TEST(testBlosc);
-#endif
-    CPPUNIT_TEST(testDelayedLoadMetadata);
-    CPPUNIT_TEST_SUITE_END();
+    void SetUp() override {}
+    void TearDown() override { openvdb::uninitialize(); }
 
     void testHeader();
     void testWriteGrid();
     void testWriteMultipleGrids();
-    void testWriteFloatAsHalf();
-    void testWriteInstancedGrids();
     void testReadGridDescriptors();
-    void testGridNaming();
-    void testEmptyFile();
     void testEmptyGridIO();
     void testOpen();
-    void testNonVdbOpen();
-    void testGetMetadata();
-    void testReadAll();
-    void testWriteOpenFile();
-    void testReadGridMetadata();
-    void testReadGrid();
-    void testReadClippedGrid();
-    void testMultiPassIO();
-    void testHasGrid();
-    void testNameIterator();
-    void testReadOldFileFormat();
-    void testCompression();
-    void testAsync();
-#ifdef OPENVDB_USE_BLOSC
-    void testBlosc();
-#endif
     void testDelayedLoadMetadata();
+    void testNonVdbOpen();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestFile);
 
 
 ////////////////////////////////////////
-
 
 void
 TestFile::testHeader()
@@ -124,29 +72,30 @@ TestFile::testHeader()
 
     file.writeHeader(ostr, /*seekable=*/true);
     // Verify that a file gets a new UUID each time it is written.
-    CPPUNIT_ASSERT(!file.isIdentical(uuidStr));
+    EXPECT_TRUE(!file.isIdentical(uuidStr));
     uuidStr = file.getUniqueTag();
 
     std::istringstream istr(ostr.str(), std::ios_base::binary);
 
     bool unique=true;
-    CPPUNIT_ASSERT_NO_THROW(unique=file.readHeader(istr));
+    EXPECT_NO_THROW(unique=file.readHeader(istr));
 
-    CPPUNIT_ASSERT(!unique);//reading same file again
+    EXPECT_TRUE(!unique);//reading same file again
 
     uint32_t version = openvdb::OPENVDB_FILE_VERSION;
 
-    CPPUNIT_ASSERT_EQUAL(version, file.fileVersion());
-    CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MAJOR_VERSION, file.libraryVersion().first);
-    CPPUNIT_ASSERT_EQUAL(openvdb::OPENVDB_LIBRARY_MINOR_VERSION, file.libraryVersion().second);
-    CPPUNIT_ASSERT_EQUAL(uuidStr, file.getUniqueTag());
+    EXPECT_EQ(version, file.fileVersion());
+    EXPECT_EQ(openvdb::OPENVDB_LIBRARY_MAJOR_VERSION, file.libraryVersion().first);
+    EXPECT_EQ(openvdb::OPENVDB_LIBRARY_MINOR_VERSION, file.libraryVersion().second);
+    EXPECT_EQ(uuidStr, file.getUniqueTag());
 
     //std::cerr << "\nuuid=" << uuidStr << std::endl;
 
-    CPPUNIT_ASSERT(file.isIdentical(uuidStr));
+    EXPECT_TRUE(file.isIdentical(uuidStr));
 
     remove("something.vdb2");
 }
+TEST_F(TestFile, testHeader) { testHeader(); }
 
 
 void
@@ -178,7 +127,7 @@ TestFile::testWriteGrid()
     StringMetadata::registerType();
     const std::string meta0Val, meta1Val("Hello, world.");
     Metadata::Ptr stringMetadata = Metadata::createMetadata(typeNameAsString<std::string>());
-    CPPUNIT_ASSERT(stringMetadata);
+    EXPECT_TRUE(stringMetadata);
     if (stringMetadata) {
         grid->insertMeta("meta0", *stringMetadata);
         grid->metaValue<std::string>("meta0") = meta0Val;
@@ -192,9 +141,9 @@ TestFile::testWriteGrid()
     // Write out the grid.
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
 
-    CPPUNIT_ASSERT(gd.getGridPos() != 0);
-    CPPUNIT_ASSERT(gd.getBlockPos() != 0);
-    CPPUNIT_ASSERT(gd.getEndPos() != 0);
+    EXPECT_TRUE(gd.getGridPos() != 0);
+    EXPECT_TRUE(gd.getBlockPos() != 0);
+    EXPECT_TRUE(gd.getEndPos() != 0);
 
     // Read in the grid descriptor.
     GridDescriptor gd2;
@@ -205,7 +154,7 @@ TestFile::testWriteGrid()
     io::setCurrentVersion(istr);
 
     GridBase::Ptr gd2_grid;
-    CPPUNIT_ASSERT_THROW(gd2.read(istr), openvdb::LookupError);
+    EXPECT_THROW(gd2.read(istr), openvdb::LookupError);
 
     // Register the grid and the transform and the blocks.
     GridBase::clearRegistry();
@@ -222,13 +171,13 @@ TestFile::testWriteGrid()
     math::NonlinearFrustumMap::registerMap();
 
     istr.seekg(0, std::ios_base::beg);
-    CPPUNIT_ASSERT_NO_THROW(gd2_grid = gd2.read(istr));
+    EXPECT_NO_THROW(gd2_grid = gd2.read(istr));
 
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), gd2.gridName());
-    CPPUNIT_ASSERT_EQUAL(GridType::gridType(), gd2_grid->type());
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), gd2.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), gd2.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), gd2.getEndPos());
+    EXPECT_EQ(gd.gridName(), gd2.gridName());
+    EXPECT_EQ(GridType::gridType(), gd2_grid->type());
+    EXPECT_EQ(gd.getGridPos(), gd2.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), gd2.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), gd2.getEndPos());
 
     // Position the stream to beginning of the grid storage and read the grid.
     gd2.seekToGrid(istr);
@@ -243,33 +192,33 @@ TestFile::testWriteGrid()
     }
 
     // Ensure that we have the same metadata.
-    CPPUNIT_ASSERT_EQUAL(grid->metaCount(), gd2_grid->metaCount());
-    CPPUNIT_ASSERT((*gd2_grid)["meta0"]);
-    CPPUNIT_ASSERT((*gd2_grid)["meta1"]);
-    CPPUNIT_ASSERT_EQUAL(meta0Val, gd2_grid->metaValue<std::string>("meta0"));
-    CPPUNIT_ASSERT_EQUAL(meta1Val, gd2_grid->metaValue<std::string>("meta1"));
+    EXPECT_EQ(grid->metaCount(), gd2_grid->metaCount());
+    EXPECT_TRUE((*gd2_grid)["meta0"]);
+    EXPECT_TRUE((*gd2_grid)["meta1"]);
+    EXPECT_EQ(meta0Val, gd2_grid->metaValue<std::string>("meta0"));
+    EXPECT_EQ(meta1Val, gd2_grid->metaValue<std::string>("meta1"));
 
     // Ensure that we have the same topology and transform.
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().leafCount(), gd2_grid->baseTree().leafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().nonLeafCount(), gd2_grid->baseTree().nonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().treeDepth(), gd2_grid->baseTree().treeDepth());
 
-    //CPPUNIT_ASSERT_EQUAL(0.1, gd2_grid->getTransform()->getVoxelSizeX());
-    //CPPUNIT_ASSERT_EQUAL(0.1, gd2_grid->getTransform()->getVoxelSizeY());
-    //CPPUNIT_ASSERT_EQUAL(0.1, gd2_grid->getTransform()->getVoxelSizeZ());
+    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeX());
+    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeY());
+    //EXPECT_EQ(0.1, gd2_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
     gd2.seekToBlocks(istr);
     gd2_grid->readBuffers(istr);
     TreeType::Ptr tree2 = DynamicPtrCast<TreeType>(gd2_grid->baseTreePtr());
-    CPPUNIT_ASSERT(tree2.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(10, tree2->getValue(Coord(10, 1, 2)));
-    CPPUNIT_ASSERT_EQUAL(5, tree2->getValue(Coord(0, 0, 0)));
+    EXPECT_TRUE(tree2.get() != nullptr);
+    EXPECT_EQ(10, tree2->getValue(Coord(10, 1, 2)));
+    EXPECT_EQ(5, tree2->getValue(Coord(0, 0, 0)));
 
-    CPPUNIT_ASSERT_EQUAL(1, tree2->getValue(Coord(1000, 1000, 16000)));
+    EXPECT_EQ(1, tree2->getValue(Coord(1000, 1000, 16000)));
     // Clear registries.
     GridBase::clearRegistry();
     Metadata::clearRegistry();
@@ -277,6 +226,7 @@ TestFile::testWriteGrid()
 
     remove("something.vdb2");
 }
+TEST_F(TestFile, testWriteGrid) { testWriteGrid(); }
 
 
 void
@@ -317,13 +267,13 @@ TestFile::testWriteMultipleGrids()
     file.writeGrid(gd, grid, ostr, /*seekable=*/true);
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
 
-    CPPUNIT_ASSERT(gd.getGridPos() != 0);
-    CPPUNIT_ASSERT(gd.getBlockPos() != 0);
-    CPPUNIT_ASSERT(gd.getEndPos() != 0);
+    EXPECT_TRUE(gd.getGridPos() != 0);
+    EXPECT_TRUE(gd.getBlockPos() != 0);
+    EXPECT_TRUE(gd.getEndPos() != 0);
 
-    CPPUNIT_ASSERT(gd2.getGridPos() != 0);
-    CPPUNIT_ASSERT(gd2.getBlockPos() != 0);
-    CPPUNIT_ASSERT(gd2.getEndPos() != 0);
+    EXPECT_TRUE(gd2.getGridPos() != 0);
+    EXPECT_TRUE(gd2.getBlockPos() != 0);
+    EXPECT_TRUE(gd2.getEndPos() != 0);
 
     // register the grid
     GridBase::clearRegistry();
@@ -345,14 +295,14 @@ TestFile::testWriteMultipleGrids()
     io::setCurrentVersion(istr);
 
     GridBase::Ptr gd_in_grid;
-    CPPUNIT_ASSERT_NO_THROW(gd_in_grid = gd_in.read(istr));
+    EXPECT_NO_THROW(gd_in_grid = gd_in.read(istr));
 
     // Ensure read in the right values.
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), gd_in.gridName());
-    CPPUNIT_ASSERT_EQUAL(GridType::gridType(), gd_in_grid->type());
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), gd_in.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), gd_in.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), gd_in.getEndPos());
+    EXPECT_EQ(gd.gridName(), gd_in.gridName());
+    EXPECT_EQ(GridType::gridType(), gd_in_grid->type());
+    EXPECT_EQ(gd.getGridPos(), gd_in.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), gd_in.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), gd_in.getEndPos());
 
     // Position the stream to beginning of the grid storage and read the grid.
     gd_in.seekToGrid(istr);
@@ -362,25 +312,25 @@ TestFile::testWriteMultipleGrids()
     gd_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().leafCount(), gd_in_grid->baseTree().leafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().nonLeafCount(), gd_in_grid->baseTree().nonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid->baseTree().treeDepth(), gd_in_grid->baseTree().treeDepth());
 
-    // CPPUNIT_ASSERT_EQUAL(0.1, gd_in_grid->getTransform()->getVoxelSizeX());
-    // CPPUNIT_ASSERT_EQUAL(0.1, gd_in_grid->getTransform()->getVoxelSizeY());
-    // CPPUNIT_ASSERT_EQUAL(0.1, gd_in_grid->getTransform()->getVoxelSizeZ());
+    // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeX());
+    // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeY());
+    // EXPECT_EQ(0.1, gd_in_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
     gd_in.seekToBlocks(istr);
     gd_in_grid->readBuffers(istr);
     TreeType::Ptr grid_in = DynamicPtrCast<TreeType>(gd_in_grid->baseTreePtr());
-    CPPUNIT_ASSERT(grid_in.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(10, grid_in->getValue(Coord(10, 1, 2)));
-    CPPUNIT_ASSERT_EQUAL(5, grid_in->getValue(Coord(0, 0, 0)));
-    CPPUNIT_ASSERT_EQUAL(1, grid_in->getValue(Coord(1000, 1000, 16000)));
+    EXPECT_TRUE(grid_in.get() != nullptr);
+    EXPECT_EQ(10, grid_in->getValue(Coord(10, 1, 2)));
+    EXPECT_EQ(5, grid_in->getValue(Coord(0, 0, 0)));
+    EXPECT_EQ(1, grid_in->getValue(Coord(1000, 1000, 16000)));
 
     /////////////////////////////////////////////////////////////////
     // Now read in the second grid descriptor. Make use of hte end offset.
@@ -390,14 +340,14 @@ TestFile::testWriteMultipleGrids()
 
     GridDescriptor gd2_in;
     GridBase::Ptr gd2_in_grid;
-    CPPUNIT_ASSERT_NO_THROW(gd2_in_grid = gd2_in.read(istr));
+    EXPECT_NO_THROW(gd2_in_grid = gd2_in.read(istr));
 
     // Ensure that we read in the right values.
-    CPPUNIT_ASSERT_EQUAL(gd2.gridName(), gd2_in.gridName());
-    CPPUNIT_ASSERT_EQUAL(TreeType::treeType(), gd2_in_grid->type());
-    CPPUNIT_ASSERT_EQUAL(gd2.getGridPos(), gd2_in.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getBlockPos(), gd2_in.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getEndPos(), gd2_in.getEndPos());
+    EXPECT_EQ(gd2.gridName(), gd2_in.gridName());
+    EXPECT_EQ(TreeType::treeType(), gd2_in_grid->type());
+    EXPECT_EQ(gd2.getGridPos(), gd2_in.getGridPos());
+    EXPECT_EQ(gd2.getBlockPos(), gd2_in.getBlockPos());
+    EXPECT_EQ(gd2.getEndPos(), gd2_in.getEndPos());
 
     // Position the stream to beginning of the grid storage and read the grid.
     gd2_in.seekToGrid(istr);
@@ -407,24 +357,24 @@ TestFile::testWriteMultipleGrids()
     gd2_in_grid->readTopology(istr);
 
     // Ensure that we have the same topology and transform.
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid2->baseTree().leafCount(), gd2_in_grid->baseTree().leafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid2->baseTree().nonLeafCount(), gd2_in_grid->baseTree().nonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         grid2->baseTree().treeDepth(), gd2_in_grid->baseTree().treeDepth());
-    // CPPUNIT_ASSERT_EQUAL(0.2, gd2_in_grid->getTransform()->getVoxelSizeX());
-    // CPPUNIT_ASSERT_EQUAL(0.2, gd2_in_grid->getTransform()->getVoxelSizeY());
-    // CPPUNIT_ASSERT_EQUAL(0.2, gd2_in_grid->getTransform()->getVoxelSizeZ());
+    // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeX());
+    // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeY());
+    // EXPECT_EQ(0.2, gd2_in_grid->getTransform()->getVoxelSizeZ());
 
     // Read in the data blocks.
     gd2_in.seekToBlocks(istr);
     gd2_in_grid->readBuffers(istr);
     TreeType::Ptr grid2_in = DynamicPtrCast<TreeType>(gd2_in_grid->baseTreePtr());
-    CPPUNIT_ASSERT(grid2_in.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
-    CPPUNIT_ASSERT_EQUAL(10, grid2_in->getValue(Coord(0, 0, 0)));
-    CPPUNIT_ASSERT_EQUAL(2, grid2_in->getValue(Coord(100000, 100000, 16000)));
+    EXPECT_TRUE(grid2_in.get() != nullptr);
+    EXPECT_EQ(50, grid2_in->getValue(Coord(1000, 1000, 1000)));
+    EXPECT_EQ(10, grid2_in->getValue(Coord(0, 0, 0)));
+    EXPECT_EQ(2, grid2_in->getValue(Coord(100000, 100000, 16000)));
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -432,10 +382,10 @@ TestFile::testWriteMultipleGrids()
     math::MapRegistry::clear();
     remove("something.vdb2");
 }
+TEST_F(TestFile, testWriteMultipleGrids) { testWriteMultipleGrids(); }
 
 
-void
-TestFile::testWriteFloatAsHalf()
+TEST_F(TestFile, testWriteFloatAsHalf)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -452,12 +402,12 @@ TestFile::testWriteFloatAsHalf()
     // Create two test grids.
     GridType::Ptr grid1 = createGrid<GridType>(/*bg=*/Vec3s(1, 1, 1));
     TreeType& tree1 = grid1->tree();
-    CPPUNIT_ASSERT(grid1.get() != nullptr);
+    EXPECT_TRUE(grid1.get() != nullptr);
     grid1->setTransform(math::Transform::createLinearTransform(0.1));
     grid1->setName("grid1");
 
     GridType::Ptr grid2 = createGrid<GridType>(/*bg=*/Vec3s(2, 2, 2));
-    CPPUNIT_ASSERT(grid2.get() != nullptr);
+    EXPECT_TRUE(grid2.get() != nullptr);
     TreeType& tree2 = grid2->tree();
     grid2->setTransform(math::Transform::createLinearTransform(0.2));
     // Flag this grid for 16-bit float output.
@@ -492,21 +442,20 @@ TestFile::testWriteFloatAsHalf()
             bgrid2 = vdbFile.readGrid("grid2");
         vdbFile.close();
 
-        CPPUNIT_ASSERT(bgrid1.get() != nullptr);
-        CPPUNIT_ASSERT(bgrid1->isType<GridType>());
-        CPPUNIT_ASSERT(bgrid2.get() != nullptr);
-        CPPUNIT_ASSERT(bgrid2->isType<GridType>());
+        EXPECT_TRUE(bgrid1.get() != nullptr);
+        EXPECT_TRUE(bgrid1->isType<GridType>());
+        EXPECT_TRUE(bgrid2.get() != nullptr);
+        EXPECT_TRUE(bgrid2->isType<GridType>());
 
         const TreeType& btree1 = StaticPtrCast<GridType>(bgrid1)->tree();
-        CPPUNIT_ASSERT_EQUAL(Vec3s(10, 10, 10), btree1.getValue(Coord(10, 10, 10)));
+        EXPECT_EQ(Vec3s(10, 10, 10), btree1.getValue(Coord(10, 10, 10)));
         const TreeType& btree2 = StaticPtrCast<GridType>(bgrid2)->tree();
-        CPPUNIT_ASSERT_EQUAL(Vec3s(10, 10, 10), btree2.getValue(Coord(10, 10, 10)));
+        EXPECT_EQ(Vec3s(10, 10, 10), btree2.getValue(Coord(10, 10, 10)));
     }
 }
 
 
-void
-TestFile::testWriteInstancedGrids()
+TEST_F(TestFile, testWriteInstancedGrids)
 {
     using namespace openvdb;
 
@@ -570,78 +519,78 @@ TestFile::testWriteInstancedGrids()
     meta = file.getMetadata();
 
     // Verify the metadata.
-    CPPUNIT_ASSERT(meta.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
-    CPPUNIT_ASSERT_EQUAL(std::string("Einstein"), meta->metaValue<std::string>("author"));
-    CPPUNIT_ASSERT_EQUAL(2009, meta->metaValue<int32_t>("year"));
+    EXPECT_TRUE(meta.get() != nullptr);
+    EXPECT_EQ(2, int(meta->metaCount()));
+    EXPECT_EQ(std::string("Einstein"), meta->metaValue<std::string>("author"));
+    EXPECT_EQ(2009, meta->metaValue<int32_t>("year"));
 
     // Verify the grids.
-    CPPUNIT_ASSERT(grids.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
+    EXPECT_TRUE(grids.get() != nullptr);
+    EXPECT_EQ(4, int(grids->size()));
 
     GridBase::Ptr grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     Int32Tree::Ptr density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != nullptr);
+    EXPECT_TRUE(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is an instance of (i.e., shares a tree with) "density".
-    CPPUNIT_ASSERT_EQUAL(density, gridPtrCast<Int32Grid>(grid)->treePtr());
+    EXPECT_EQ(density, gridPtrCast<Int32Grid>(grid)->treePtr());
 
     grid.reset();
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
 
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
     // Verify that the second unnamed grid is an instance of the first.
-    CPPUNIT_ASSERT_EQUAL(temperature, gridPtrCast<FloatGrid>(grid)->treePtr());
+    EXPECT_EQ(temperature, gridPtrCast<FloatGrid>(grid)->treePtr());
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
 
     // Reread with instancing disabled.
     file.close();
     file.setInstancingEnabled(false);
     file.open();
     grids = file.getGrids();
-    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
+    EXPECT_EQ(4, int(grids->size()));
 
     grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != nullptr);
+    EXPECT_TRUE(density.get() != nullptr);
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
     // Verify that "density_copy" is *not* an instance of "density".
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
 
     // Verify that the two unnamed grids are not instances of each other.
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 
     // Rewrite with instancing disabled, then reread with instancing enabled.
     file.close();
@@ -662,33 +611,33 @@ TestFile::testWriteInstancedGrids()
     file.setInstancingEnabled(true);
     file.open();
     grids = file.getGrids();
-    CPPUNIT_ASSERT_EQUAL(4, int(grids->size()));
+    EXPECT_EQ(4, int(grids->size()));
 
     // Verify that "density_copy" is not an instance of "density".
     grid = findGridByName(*grids, "density");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     density = gridPtrCast<Int32Grid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != nullptr);
-    CPPUNIT_ASSERT(density->unallocatedLeafCount() > 0);
-    CPPUNIT_ASSERT_EQUAL(density->leafCount(), density->unallocatedLeafCount());
+    EXPECT_TRUE(density.get() != nullptr);
+    EXPECT_TRUE(density->unallocatedLeafCount() > 0);
+    EXPECT_EQ(density->leafCount(), density->unallocatedLeafCount());
     grid = findGridByName(*grids, "density_copy");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<Int32Grid>(grid)->treePtr() != density);
 
     // Verify that the two unnamed grids are not instances of each other.
     grid = findGridByName(*grids, "");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
     grid.reset();
     for (GridPtrVec::reverse_iterator it = grids->rbegin(); !grid && it != grids->rend(); ++it) {
         // Search for the second unnamed grid starting from the end of the list.
         if ((*it)->getName() == "") grid = *it;
     }
-    CPPUNIT_ASSERT(grid.get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
-    CPPUNIT_ASSERT(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
+    EXPECT_TRUE(grid.get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr().get() != nullptr);
+    EXPECT_TRUE(gridPtrCast<FloatGrid>(grid)->treePtr() != temperature);
 }
 
 
@@ -753,20 +702,20 @@ TestFile::testReadGridDescriptors()
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    CPPUNIT_ASSERT(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.gridDescriptors().end());
     GridDescriptor file2gd = it->second;
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), file2gd.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), file2gd.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), file2gd.getEndPos());
+    EXPECT_EQ(gd.gridName(), file2gd.gridName());
+    EXPECT_EQ(gd.getGridPos(), file2gd.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), file2gd.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    CPPUNIT_ASSERT(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.gridDescriptors().end());
     file2gd = it->second;
-    CPPUNIT_ASSERT_EQUAL(gd2.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT_EQUAL(gd2.getGridPos(), file2gd.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getBlockPos(), file2gd.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getEndPos(), file2gd.getEndPos());
+    EXPECT_EQ(gd2.gridName(), file2gd.gridName());
+    EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
+    EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
+    EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -774,10 +723,10 @@ TestFile::testReadGridDescriptors()
 
     remove("something.vdb2");
 }
+TEST_F(TestFile, testReadGridDescriptors) { testReadGridDescriptors(); }
 
 
-void
-TestFile::testGridNaming()
+TEST_F(TestFile, testGridNaming)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -828,10 +777,10 @@ TestFile::testGridNaming()
 
         int n = 0;
         for (File::NameIterator i = file.beginName(), e = file.endName(); i != e; ++i, ++n) {
-            CPPUNIT_ASSERT(file.hasGrid(i.gridName()));
+            EXPECT_TRUE(file.hasGrid(i.gridName()));
         }
         // Verify that the file contains three grids.
-        CPPUNIT_ASSERT_EQUAL(3, n);
+        EXPECT_EQ(3, n);
 
         // Read each grid.
         for (n = -1; n <= 2; ++n) {
@@ -843,43 +792,43 @@ TestFile::testGridNaming()
                 name = GridDescriptor::nameAsString(GridDescriptor::addSuffix(name, n));
             }
 
-            CPPUNIT_ASSERT(file.hasGrid(name));
+            EXPECT_TRUE(file.hasGrid(name));
 
             // Read the current grid.
             GridBase::ConstPtr grid = file.readGrid(name);
-            CPPUNIT_ASSERT(grid.get() != nullptr);
+            EXPECT_TRUE(grid.get() != nullptr);
 
             // Verify that the grid is named "grid".
-            CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
-            CPPUNIT_ASSERT_EQUAL((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
+            EXPECT_EQ(openvdb::Name("grid"), grid->getName());
+            EXPECT_EQ((n < 0 ? 0 : n), grid->metaValue<openvdb::Int32>("index"));
         }
 
         // Read all three grids at once.
         GridPtrVecPtr allGrids = file.getGrids();
-        CPPUNIT_ASSERT(allGrids.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(3, int(allGrids->size()));
+        EXPECT_TRUE(allGrids.get() != nullptr);
+        EXPECT_EQ(3, int(allGrids->size()));
 
         GridBase::ConstPtr firstGrid;
         std::vector<int> indices;
         for (GridPtrVecCIter i = allGrids->begin(), e = allGrids->end(); i != e; ++i) {
             GridBase::ConstPtr grid = *i;
-            CPPUNIT_ASSERT(grid.get() != nullptr);
+            EXPECT_TRUE(grid.get() != nullptr);
 
             indices.push_back(grid->metaValue<openvdb::Int32>("index"));
 
             // If instancing is enabled, verify that all grids share the same tree.
             if (instancing) {
                 if (!firstGrid) firstGrid = grid;
-                CPPUNIT_ASSERT_EQUAL(firstGrid->baseTreePtr(), grid->baseTreePtr());
+                EXPECT_EQ(firstGrid->baseTreePtr(), grid->baseTreePtr());
             }
         }
         // Verify that three distinct grids were read,
         // by examining their "index" metadata.
-        CPPUNIT_ASSERT_EQUAL(3, int(indices.size()));
+        EXPECT_EQ(3, int(indices.size()));
         std::sort(indices.begin(), indices.end());
-        CPPUNIT_ASSERT_EQUAL(0, indices[0]);
-        CPPUNIT_ASSERT_EQUAL(1, indices[1]);
-        CPPUNIT_ASSERT_EQUAL(2, indices[2]);
+        EXPECT_EQ(0, indices[0]);
+        EXPECT_EQ(1, indices[1]);
+        EXPECT_EQ(2, indices[2]);
     }
 
     {
@@ -896,33 +845,32 @@ TestFile::testGridNaming()
 
         // Verify that the grid can be read and that its index is 0.
         GridBase::ConstPtr grid = file.readGrid(weirdName);
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(weirdName, grid->getName());
-        CPPUNIT_ASSERT_EQUAL(0, grid->metaValue<openvdb::Int32>("index"));
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_EQ(weirdName, grid->getName());
+        EXPECT_EQ(0, grid->metaValue<openvdb::Int32>("index"));
 
         // Verify that the other grids can still be read successfully.
         grid = file.readGrid("grid[0]");
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_EQ(openvdb::Name("grid"), grid->getName());
         // Because there are now only two grids named "grid", the one with
         // index 1 is now "grid[0]".
-        CPPUNIT_ASSERT_EQUAL(1, grid->metaValue<openvdb::Int32>("index"));
+        EXPECT_EQ(1, grid->metaValue<openvdb::Int32>("index"));
 
         grid = file.readGrid("grid[1]");
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Name("grid"), grid->getName());
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_EQ(openvdb::Name("grid"), grid->getName());
         // Because there are now only two grids named "grid", the one with
         // index 2 is now "grid[1]".
-        CPPUNIT_ASSERT_EQUAL(2, grid->metaValue<openvdb::Int32>("index"));
+        EXPECT_EQ(2, grid->metaValue<openvdb::Int32>("index"));
 
         // Verify that there is no longer a third grid named "grid".
-        CPPUNIT_ASSERT_THROW(file.readGrid("grid[2]"), openvdb::KeyError);
+        EXPECT_THROW(file.readGrid("grid[2]"), openvdb::KeyError);
     }
 }
 
 
-void
-TestFile::testEmptyFile()
+TEST_F(TestFile, testEmptyFile)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -940,11 +888,11 @@ TestFile::testEmptyFile()
     GridPtrVecPtr grids = file.getGrids();
     MetaMap::Ptr meta = file.getMetadata();
 
-    CPPUNIT_ASSERT(grids.get() != nullptr);
-    CPPUNIT_ASSERT(grids->empty());
+    EXPECT_TRUE(grids.get() != nullptr);
+    EXPECT_TRUE(grids->empty());
 
-    CPPUNIT_ASSERT(meta.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(0, int(meta->metaCount()));
+    EXPECT_TRUE(meta.get() != nullptr);
+    EXPECT_EQ(0, int(meta->metaCount()));
 }
 
 
@@ -987,10 +935,10 @@ TestFile::testEmptyGridIO()
     file.writeGrid(gd2, grid2, ostr, /*seekable=*/true);
 
     // Ensure that the block offset and the end offsets are equivalent.
-    CPPUNIT_ASSERT_EQUAL(0, int(grid->baseTree().leafCount()));
-    CPPUNIT_ASSERT_EQUAL(0, int(grid2->baseTree().leafCount()));
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), gd.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getEndPos(), gd2.getBlockPos());
+    EXPECT_EQ(0, int(grid->baseTree().leafCount()));
+    EXPECT_EQ(0, int(grid2->baseTree().leafCount()));
+    EXPECT_EQ(gd.getEndPos(), gd.getBlockPos());
+    EXPECT_EQ(gd2.getEndPos(), gd2.getBlockPos());
 
     // Register the grid and the transform and the blocks.
     GridBase::clearRegistry();
@@ -1013,7 +961,7 @@ TestFile::testEmptyGridIO()
 
     // Compare with the initial grid descriptors.
     File::NameMapCIter it = file2.findDescriptor("temperature");
-    CPPUNIT_ASSERT(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.gridDescriptors().end());
     GridDescriptor file2gd = it->second;
     file2gd.seekToGrid(istr);
     GridBase::Ptr gd_grid = GridBase::createGrid(file2gd.gridType());
@@ -1021,17 +969,17 @@ TestFile::testEmptyGridIO()
     gd_grid->readMeta(istr);
     gd_grid->readTransform(istr);
     gd_grid->readTopology(istr);
-    CPPUNIT_ASSERT_EQUAL(gd.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT(gd_grid.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(0, int(gd_grid->baseTree().leafCount()));
-    //CPPUNIT_ASSERT_EQUAL(8, int(gd_grid->baseTree().nonLeafCount()));
-    CPPUNIT_ASSERT_EQUAL(4, int(gd_grid->baseTree().treeDepth()));
-    CPPUNIT_ASSERT_EQUAL(gd.getGridPos(), file2gd.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getBlockPos(), file2gd.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd.getEndPos(), file2gd.getEndPos());
+    EXPECT_EQ(gd.gridName(), file2gd.gridName());
+    EXPECT_TRUE(gd_grid.get() != nullptr);
+    EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
+    //EXPECT_EQ(8, int(gd_grid->baseTree().nonLeafCount()));
+    EXPECT_EQ(4, int(gd_grid->baseTree().treeDepth()));
+    EXPECT_EQ(gd.getGridPos(), file2gd.getGridPos());
+    EXPECT_EQ(gd.getBlockPos(), file2gd.getBlockPos());
+    EXPECT_EQ(gd.getEndPos(), file2gd.getEndPos());
 
     it = file2.findDescriptor("density");
-    CPPUNIT_ASSERT(it != file2.gridDescriptors().end());
+    EXPECT_TRUE(it != file2.gridDescriptors().end());
     file2gd = it->second;
     file2gd.seekToGrid(istr);
     gd_grid = GridBase::createGrid(file2gd.gridType());
@@ -1039,23 +987,23 @@ TestFile::testEmptyGridIO()
     gd_grid->readMeta(istr);
     gd_grid->readTransform(istr);
     gd_grid->readTopology(istr);
-    CPPUNIT_ASSERT_EQUAL(gd2.gridName(), file2gd.gridName());
-    CPPUNIT_ASSERT(gd_grid.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(0, int(gd_grid->baseTree().leafCount()));
-    //CPPUNIT_ASSERT_EQUAL(8, int(gd_grid->nonLeafCount()));
-    CPPUNIT_ASSERT_EQUAL(4, int(gd_grid->baseTree().treeDepth()));
-    CPPUNIT_ASSERT_EQUAL(gd2.getGridPos(), file2gd.getGridPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getBlockPos(), file2gd.getBlockPos());
-    CPPUNIT_ASSERT_EQUAL(gd2.getEndPos(), file2gd.getEndPos());
+    EXPECT_EQ(gd2.gridName(), file2gd.gridName());
+    EXPECT_TRUE(gd_grid.get() != nullptr);
+    EXPECT_EQ(0, int(gd_grid->baseTree().leafCount()));
+    //EXPECT_EQ(8, int(gd_grid->nonLeafCount()));
+    EXPECT_EQ(4, int(gd_grid->baseTree().treeDepth()));
+    EXPECT_EQ(gd2.getGridPos(), file2gd.getGridPos());
+    EXPECT_EQ(gd2.getBlockPos(), file2gd.getBlockPos());
+    EXPECT_EQ(gd2.getEndPos(), file2gd.getEndPos());
 
     // Clear registries.
     GridBase::clearRegistry();
     math::MapRegistry::clear();
 }
+TEST_F(TestFile, testEmptyGridIO) { testEmptyGridIO(); }
 
 
-void
-TestFile::testOpen()
+void TestFile::testOpen()
 {
     using namespace openvdb;
 
@@ -1095,10 +1043,10 @@ TestFile::testOpen()
     grids.push_back(grid);
     grids.push_back(grid2);
 
-    CPPUNIT_ASSERT(findGridByName(grids, "density") == grid);
-    CPPUNIT_ASSERT(findGridByName(grids, "temperature") == grid2);
-    CPPUNIT_ASSERT(meta.metaValue<std::string>("author") == "Einstein");
-    CPPUNIT_ASSERT_EQUAL(2009, meta.metaValue<int32_t>("year"));
+    EXPECT_TRUE(findGridByName(grids, "density") == grid);
+    EXPECT_TRUE(findGridByName(grids, "temperature") == grid2);
+    EXPECT_TRUE(meta.metaValue<std::string>("author") == "Einstein");
+    EXPECT_EQ(2009, meta.metaValue<int32_t>("year"));
 
     // Register grid and transform.
     GridBase::clearRegistry();
@@ -1122,48 +1070,48 @@ TestFile::testOpen()
     vdbfile.write(grids, meta);
 
     // Now we can read in the file.
-    CPPUNIT_ASSERT(!vdbfile.open());//opening the same file
+    EXPECT_TRUE(!vdbfile.open());//opening the same file
     // Can't open same file multiple times without closing.
-    CPPUNIT_ASSERT_THROW(vdbfile.open(), openvdb::IoError);
+    EXPECT_THROW(vdbfile.open(), openvdb::IoError);
     vdbfile.close();
-    CPPUNIT_ASSERT(!vdbfile.open());//opening the same file
+    EXPECT_TRUE(!vdbfile.open());//opening the same file
 
-    CPPUNIT_ASSERT(vdbfile.isOpen());
+    EXPECT_TRUE(vdbfile.isOpen());
 
     uint32_t version = OPENVDB_FILE_VERSION;
 
-    CPPUNIT_ASSERT_EQUAL(version, vdbfile.fileVersion());
-    CPPUNIT_ASSERT_EQUAL(version, io::getFormatVersion(vdbfile.inputStream()));
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MAJOR_VERSION, vdbfile.libraryVersion().first);
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MINOR_VERSION, vdbfile.libraryVersion().second);
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MAJOR_VERSION,
+    EXPECT_EQ(version, vdbfile.fileVersion());
+    EXPECT_EQ(version, io::getFormatVersion(vdbfile.inputStream()));
+    EXPECT_EQ(OPENVDB_LIBRARY_MAJOR_VERSION, vdbfile.libraryVersion().first);
+    EXPECT_EQ(OPENVDB_LIBRARY_MINOR_VERSION, vdbfile.libraryVersion().second);
+    EXPECT_EQ(OPENVDB_LIBRARY_MAJOR_VERSION,
         io::getLibraryVersion(vdbfile.inputStream()).first);
-    CPPUNIT_ASSERT_EQUAL(OPENVDB_LIBRARY_MINOR_VERSION,
+    EXPECT_EQ(OPENVDB_LIBRARY_MINOR_VERSION,
         io::getLibraryVersion(vdbfile.inputStream()).second);
 
     // Ensure that we read in the vdb metadata.
-    CPPUNIT_ASSERT(vdbfile.getMetadata());
-    CPPUNIT_ASSERT(vdbfile.getMetadata()->metaValue<std::string>("author") == "Einstein");
-    CPPUNIT_ASSERT_EQUAL(2009, vdbfile.getMetadata()->metaValue<int32_t>("year"));
+    EXPECT_TRUE(vdbfile.getMetadata());
+    EXPECT_TRUE(vdbfile.getMetadata()->metaValue<std::string>("author") == "Einstein");
+    EXPECT_EQ(2009, vdbfile.getMetadata()->metaValue<int32_t>("year"));
 
     // Ensure we got the grid descriptors.
-    CPPUNIT_ASSERT_EQUAL(1, int(vdbfile.gridDescriptors().count("density")));
-    CPPUNIT_ASSERT_EQUAL(1, int(vdbfile.gridDescriptors().count("temperature")));
+    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("density")));
+    EXPECT_EQ(1, int(vdbfile.gridDescriptors().count("temperature")));
 
     io::File::NameMapCIter it = vdbfile.findDescriptor("density");
-    CPPUNIT_ASSERT(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
     io::GridDescriptor gd = it->second;
-    CPPUNIT_ASSERT_EQUAL(IntTree::treeType(), gd.gridType());
+    EXPECT_EQ(IntTree::treeType(), gd.gridType());
 
     it = vdbfile.findDescriptor("temperature");
-    CPPUNIT_ASSERT(it != vdbfile.gridDescriptors().end());
+    EXPECT_TRUE(it != vdbfile.gridDescriptors().end());
     gd = it->second;
-    CPPUNIT_ASSERT_EQUAL(FloatTree::treeType(), gd.gridType());
+    EXPECT_EQ(FloatTree::treeType(), gd.gridType());
 
     // Ensure we throw an error if there is no file.
     io::File vdbfile2("somethingelses.vdb2");
-    CPPUNIT_ASSERT_THROW(vdbfile2.open(), openvdb::IoError);
-    CPPUNIT_ASSERT_THROW(vdbfile2.inputStream(), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.open(), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.inputStream(), openvdb::IoError);
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -1172,13 +1120,14 @@ TestFile::testOpen()
 
     // Test closing the file.
     vdbfile.close();
-    CPPUNIT_ASSERT(vdbfile.isOpen() == false);
-    CPPUNIT_ASSERT(vdbfile.fileMetadata().get() == nullptr);
-    CPPUNIT_ASSERT_EQUAL(0, int(vdbfile.gridDescriptors().size()));
-    CPPUNIT_ASSERT_THROW(vdbfile.inputStream(), openvdb::IoError);
+    EXPECT_TRUE(vdbfile.isOpen() == false);
+    EXPECT_TRUE(vdbfile.fileMetadata().get() == nullptr);
+    EXPECT_EQ(0, int(vdbfile.gridDescriptors().size()));
+    EXPECT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
     remove("something.vdb2");
 }
+TEST_F(TestFile, testOpen) { testOpen(); }
 
 
 void
@@ -1192,15 +1141,15 @@ TestFile::testNonVdbOpen()
     file.close();
 
     openvdb::io::File vdbfile("dummy.vdb2");
-    CPPUNIT_ASSERT_THROW(vdbfile.open(), openvdb::IoError);
-    CPPUNIT_ASSERT_THROW(vdbfile.inputStream(), openvdb::IoError);
+    EXPECT_THROW(vdbfile.open(), openvdb::IoError);
+    EXPECT_THROW(vdbfile.inputStream(), openvdb::IoError);
 
     remove("dummy.vdb2");
 }
+TEST_F(TestFile, testNonVdbOpen) { testNonVdbOpen(); }
 
 
-void
-TestFile::testGetMetadata()
+TEST_F(TestFile, testGetMetadata)
 {
     using namespace openvdb;
 
@@ -1220,16 +1169,16 @@ TestFile::testGetMetadata()
     vdbfile.write(grids, meta);
 
     // Check if reading without opening the file
-    CPPUNIT_ASSERT_THROW(vdbfile.getMetadata(), openvdb::IoError);
+    EXPECT_THROW(vdbfile.getMetadata(), openvdb::IoError);
 
     vdbfile.open();
 
     MetaMap::Ptr meta2 = vdbfile.getMetadata();
 
-    CPPUNIT_ASSERT_EQUAL(2, int(meta2->metaCount()));
+    EXPECT_EQ(2, int(meta2->metaCount()));
 
-    CPPUNIT_ASSERT(meta2->metaValue<std::string>("author") == "Einstein");
-    CPPUNIT_ASSERT_EQUAL(2009, meta2->metaValue<int32_t>("year"));
+    EXPECT_TRUE(meta2->metaValue<std::string>("author") == "Einstein");
+    EXPECT_EQ(2009, meta2->metaValue<int32_t>("year"));
 
     // Clear registry.
     Metadata::clearRegistry();
@@ -1238,8 +1187,7 @@ TestFile::testGetMetadata()
 }
 
 
-void
-TestFile::testReadAll()
+TEST_F(TestFile, testReadAll)
 {
     using namespace openvdb;
 
@@ -1287,39 +1235,39 @@ TestFile::testReadAll()
     vdbfile.write(grids, meta);
 
     io::File vdbfile2("something.vdb2");
-    CPPUNIT_ASSERT_THROW(vdbfile2.getGrids(), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.getGrids(), openvdb::IoError);
 
     vdbfile2.open();
-    CPPUNIT_ASSERT(vdbfile2.isOpen());
+    EXPECT_TRUE(vdbfile2.isOpen());
 
     GridPtrVecPtr grids2 = vdbfile2.getGrids();
     MetaMap::Ptr meta2 = vdbfile2.getMetadata();
 
     // Ensure we have the metadata.
-    CPPUNIT_ASSERT_EQUAL(2, int(meta2->metaCount()));
-    CPPUNIT_ASSERT(meta2->metaValue<std::string>("author") == "Einstein");
-    CPPUNIT_ASSERT_EQUAL(2009, meta2->metaValue<int32_t>("year"));
+    EXPECT_EQ(2, int(meta2->metaCount()));
+    EXPECT_TRUE(meta2->metaValue<std::string>("author") == "Einstein");
+    EXPECT_EQ(2009, meta2->metaValue<int32_t>("year"));
 
     // Ensure we got the grids.
-    CPPUNIT_ASSERT_EQUAL(2, int(grids2->size()));
+    EXPECT_EQ(2, int(grids2->size()));
 
     GridBase::Ptr grid;
     grid.reset();
     grid = findGridByName(*grids2, "density");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     IntTree::Ptr density = gridPtrCast<IntGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(density.get() != nullptr);
+    EXPECT_TRUE(density.get() != nullptr);
 
     grid.reset();
     grid = findGridByName(*grids2, "temperature");
-    CPPUNIT_ASSERT(grid.get() != nullptr);
+    EXPECT_TRUE(grid.get() != nullptr);
     FloatTree::Ptr temperature = gridPtrCast<FloatGrid>(grid)->treePtr();
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(5, density->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(6, density->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(10, temperature->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(11, temperature->getValue(Coord(0, 100, 0)), /*tolerance=*/0);
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -1332,8 +1280,7 @@ TestFile::testReadAll()
 }
 
 
-void
-TestFile::testWriteOpenFile()
+TEST_F(TestFile, testWriteOpenFile)
 {
     using namespace openvdb;
 
@@ -1351,30 +1298,30 @@ TestFile::testWriteOpenFile()
     vdbfile.write(GridPtrVec(), *meta);
 
     io::File vdbfile2("something.vdb2");
-    CPPUNIT_ASSERT_THROW(vdbfile2.getGrids(), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.getGrids(), openvdb::IoError);
 
     vdbfile2.open();
-    CPPUNIT_ASSERT(vdbfile2.isOpen());
+    EXPECT_TRUE(vdbfile2.isOpen());
 
     GridPtrVecPtr grids = vdbfile2.getGrids();
     meta = vdbfile2.getMetadata();
 
     // Ensure we have the metadata.
-    CPPUNIT_ASSERT(meta.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(2, int(meta->metaCount()));
-    CPPUNIT_ASSERT(meta->metaValue<std::string>("author") == "Einstein");
-    CPPUNIT_ASSERT_EQUAL(2009, meta->metaValue<int32_t>("year"));
+    EXPECT_TRUE(meta.get() != nullptr);
+    EXPECT_EQ(2, int(meta->metaCount()));
+    EXPECT_TRUE(meta->metaValue<std::string>("author") == "Einstein");
+    EXPECT_EQ(2009, meta->metaValue<int32_t>("year"));
 
     // Ensure we got the grids.
-    CPPUNIT_ASSERT(grids.get() != nullptr);
-    CPPUNIT_ASSERT_EQUAL(0, int(grids->size()));
+    EXPECT_TRUE(grids.get() != nullptr);
+    EXPECT_EQ(0, int(grids->size()));
 
     // Cannot write an open file.
-    CPPUNIT_ASSERT_THROW(vdbfile2.write(*grids), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.write(*grids), openvdb::IoError);
 
     vdbfile2.close();
 
-    CPPUNIT_ASSERT_NO_THROW(vdbfile2.write(*grids));
+    EXPECT_NO_THROW(vdbfile2.write(*grids));
 
     // Clear registries.
     Metadata::clearRegistry();
@@ -1383,8 +1330,7 @@ TestFile::testWriteOpenFile()
 }
 
 
-void
-TestFile::testReadGridMetadata()
+TEST_F(TestFile, testReadGridMetadata)
 {
     using namespace openvdb;
 
@@ -1441,57 +1387,57 @@ TestFile::testReadGridMetadata()
         io::File vdbfile(filename);
 
         // Verify that reading from an unopened file generates an exception.
-        CPPUNIT_ASSERT_THROW(vdbfile.readGridMetadata("igrid"), openvdb::IoError);
-        CPPUNIT_ASSERT_THROW(vdbfile.readGridMetadata("noname"), openvdb::IoError);
-        CPPUNIT_ASSERT_THROW(vdbfile.readAllGridMetadata(), openvdb::IoError);
+        EXPECT_THROW(vdbfile.readGridMetadata("igrid"), openvdb::IoError);
+        EXPECT_THROW(vdbfile.readGridMetadata("noname"), openvdb::IoError);
+        EXPECT_THROW(vdbfile.readAllGridMetadata(), openvdb::IoError);
 
         vdbfile.open();
 
-        CPPUNIT_ASSERT(vdbfile.isOpen());
+        EXPECT_TRUE(vdbfile.isOpen());
 
         // Verify that reading a nonexistent grid generates an exception.
-        CPPUNIT_ASSERT_THROW(vdbfile.readGridMetadata("noname"), openvdb::KeyError);
+        EXPECT_THROW(vdbfile.readGridMetadata("noname"), openvdb::KeyError);
 
         // Read all grids and store them in a list.
         GridPtrVecPtr gridMetadata = vdbfile.readAllGridMetadata();
-        CPPUNIT_ASSERT(gridMetadata.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(2, int(gridMetadata->size()));
+        EXPECT_TRUE(gridMetadata.get() != nullptr);
+        EXPECT_EQ(2, int(gridMetadata->size()));
 
         // Read individual grids and append them to the list.
         GridBase::Ptr grid = vdbfile.readGridMetadata("igrid");
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(std::string("igrid"), grid->getName());
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_EQ(std::string("igrid"), grid->getName());
         gridMetadata->push_back(grid);
 
         grid = vdbfile.readGridMetadata("fgrid");
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_EQUAL(std::string("fgrid"), grid->getName());
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_EQ(std::string("fgrid"), grid->getName());
         gridMetadata->push_back(grid);
 
         // Verify that the grids' metadata and transforms match the original grids'.
         for (size_t i = 0, N = gridMetadata->size(); i < N; ++i) {
             grid = (*gridMetadata)[i];
 
-            CPPUNIT_ASSERT(grid.get() != nullptr);
-            CPPUNIT_ASSERT(grid->getName() == "igrid" || grid->getName() == "fgrid");
-            CPPUNIT_ASSERT(grid->baseTreePtr().get() != nullptr);
+            EXPECT_TRUE(grid.get() != nullptr);
+            EXPECT_TRUE(grid->getName() == "igrid" || grid->getName() == "fgrid");
+            EXPECT_TRUE(grid->baseTreePtr().get() != nullptr);
 
             // Since we didn't read the grid's topology, the tree should be empty.
-            CPPUNIT_ASSERT_EQUAL(0, int(grid->constBaseTreePtr()->leafCount()));
-            CPPUNIT_ASSERT_EQUAL(0, int(grid->constBaseTreePtr()->activeVoxelCount()));
+            EXPECT_EQ(0, int(grid->constBaseTreePtr()->leafCount()));
+            EXPECT_EQ(0, int(grid->constBaseTreePtr()->activeVoxelCount()));
 
             // Retrieve the source grid of the same name.
             GridBase::ConstPtr srcGrid = srcGridMap[grid->getName()];
 
             // Compare grid types and transforms.
-            CPPUNIT_ASSERT_EQUAL(srcGrid->type(), grid->type());
-            CPPUNIT_ASSERT_EQUAL(srcGrid->transform(), grid->transform());
+            EXPECT_EQ(srcGrid->type(), grid->type());
+            EXPECT_EQ(srcGrid->transform(), grid->transform());
 
             // Compare metadata, ignoring fields that were added when the file was written.
             MetaMap::Ptr
                 statsMetadata = grid->getStatsMetadata(),
                 otherMetadata = grid->copyMeta(); // shallow copy
-            CPPUNIT_ASSERT(statsMetadata->metaCount() != 0);
+            EXPECT_TRUE(statsMetadata->metaCount() != 0);
             statsMetadata->insertMeta(GridBase::META_FILE_COMPRESSION, StringMetadata(""));
             for (MetaMap::ConstMetaIterator it = grid->beginMeta(), end = grid->endMeta();
                 it != end; ++it)
@@ -1507,22 +1453,21 @@ TestFile::testReadGridMetadata()
                     otherMetadata->removeMeta("file_delayed_load");
                 }
             }
-            CPPUNIT_ASSERT_EQUAL(srcGrid->str(), otherMetadata->str());
+            EXPECT_EQ(srcGrid->str(), otherMetadata->str());
 
             const CoordBBox srcBBox = srcGrid->evalActiveVoxelBoundingBox();
-            CPPUNIT_ASSERT_EQUAL(srcBBox.min().asVec3i(), grid->metaValue<Vec3i>("file_bbox_min"));
-            CPPUNIT_ASSERT_EQUAL(srcBBox.max().asVec3i(), grid->metaValue<Vec3i>("file_bbox_max"));
-            CPPUNIT_ASSERT_EQUAL(srcGrid->activeVoxelCount(),
+            EXPECT_EQ(srcBBox.min().asVec3i(), grid->metaValue<Vec3i>("file_bbox_min"));
+            EXPECT_EQ(srcBBox.max().asVec3i(), grid->metaValue<Vec3i>("file_bbox_max"));
+            EXPECT_EQ(srcGrid->activeVoxelCount(),
                 Index64(grid->metaValue<Int64>("file_voxel_count")));
-            CPPUNIT_ASSERT_EQUAL(srcGrid->memUsage(),
+            EXPECT_EQ(srcGrid->memUsage(),
                 Index64(grid->metaValue<Int64>("file_mem_bytes")));
         }
     }
 }
 
 
-void
-TestFile::testReadGrid()
+TEST_F(TestFile, testReadGrid)
 {
     using namespace openvdb;
 
@@ -1573,31 +1518,31 @@ TestFile::testReadGrid()
 
     vdbfile2.open();
 
-    CPPUNIT_ASSERT(vdbfile2.isOpen());
+    EXPECT_TRUE(vdbfile2.isOpen());
 
     // Get Temperature
     GridBase::Ptr temperature = vdbfile2.readGrid("temperature");
 
-    CPPUNIT_ASSERT(temperature.get() != nullptr);
+    EXPECT_TRUE(temperature.get() != nullptr);
 
     FloatTree::Ptr typedTemperature = gridPtrCast<FloatGrid>(temperature)->treePtr();
 
-    CPPUNIT_ASSERT(typedTemperature.get() != nullptr);
+    EXPECT_TRUE(typedTemperature.get() != nullptr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(10, typedTemperature->getValue(Coord(0, 0, 0)), 0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(11, typedTemperature->getValue(Coord(0, 100, 0)), 0);
+    EXPECT_NEAR(10, typedTemperature->getValue(Coord(0, 0, 0)), 0);
+    EXPECT_NEAR(11, typedTemperature->getValue(Coord(0, 100, 0)), 0);
 
     // Get Density
     GridBase::Ptr density = vdbfile2.readGrid("density");
 
-    CPPUNIT_ASSERT(density.get() != nullptr);
+    EXPECT_TRUE(density.get() != nullptr);
 
     IntTree::Ptr typedDensity = gridPtrCast<IntGrid>(density)->treePtr();
 
-    CPPUNIT_ASSERT(typedDensity.get() != nullptr);
+    EXPECT_TRUE(typedDensity.get() != nullptr);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(5,typedDensity->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(6,typedDensity->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(5,typedDensity->getValue(Coord(0, 0, 0)), /*tolerance=*/0);
+    EXPECT_NEAR(6,typedDensity->getValue(Coord(100, 0, 0)), /*tolerance=*/0);
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -1622,14 +1567,14 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
     using ValueT = typename GridT::ValueType;
 
     const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
-    CPPUNIT_ASSERT_EQUAL(4, bbox.min().x());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.min().y());
-    CPPUNIT_ASSERT_EQUAL(-6, bbox.min().z());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.max().x());
-    CPPUNIT_ASSERT_EQUAL(4, bbox.max().y());
-    CPPUNIT_ASSERT_EQUAL(6, bbox.max().z());
-    CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
-    CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
+    EXPECT_EQ(4, bbox.min().x());
+    EXPECT_EQ(4, bbox.min().y());
+    EXPECT_EQ(-6, bbox.min().z());
+    EXPECT_EQ(4, bbox.max().x());
+    EXPECT_EQ(4, bbox.max().y());
+    EXPECT_EQ(6, bbox.max().z());
+    EXPECT_EQ(6 + 6 + 1, int(clipped.activeVoxelCount()));
+    EXPECT_EQ(2, int(clipped.constTree().leafCount()));
 
     typename GridT::ConstAccessor acc = clipped.getConstAccessor();
     const ValueT bg = clipped.background();
@@ -1639,9 +1584,9 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
         for (y = -10; y <= 10; ++y) {
             for (z = -10; z <= 10; ++z) {
                 if (x == 4 && y == 4 && z >= -6 && z <= 6) {
-                    CPPUNIT_ASSERT_EQUAL(fg, acc.getValue(Coord(4, 4, z)));
+                    EXPECT_EQ(fg, acc.getValue(Coord(4, 4, z)));
                 } else {
-                    CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
+                    EXPECT_EQ(bg, acc.getValue(Coord(x, y, z)));
                 }
             }
         }
@@ -1650,8 +1595,7 @@ validateClippedGrid(const GridT& clipped, const typename GridT::ValueType& fg)
 
 
 // See also TestGrid::testClipping()
-void
-TestFile::testReadClippedGrid()
+TEST_F(TestFile, testReadClippedGrid)
 {
     using namespace openvdb;
 
@@ -1707,19 +1651,19 @@ TestFile::testReadClippedGrid()
 
         // Read and clip each grid.
 
-        CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("bgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_NO_THROW(bgrid = gridPtrCast<BoolGrid>(grid));
+        EXPECT_NO_THROW(grid = vdbfile.readGrid("bgrid", clipBox));
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_NO_THROW(bgrid = gridPtrCast<BoolGrid>(grid));
         validateClippedGrid(*bgrid, bfg);
 
-        CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("fgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_NO_THROW(fgrid = gridPtrCast<FloatGrid>(grid));
+        EXPECT_NO_THROW(grid = vdbfile.readGrid("fgrid", clipBox));
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_NO_THROW(fgrid = gridPtrCast<FloatGrid>(grid));
         validateClippedGrid(*fgrid, ffg);
 
-        CPPUNIT_ASSERT_NO_THROW(grid = vdbfile.readGrid("vgrid", clipBox));
-        CPPUNIT_ASSERT(grid.get() != nullptr);
-        CPPUNIT_ASSERT_NO_THROW(vgrid = gridPtrCast<Vec3SGrid>(grid));
+        EXPECT_NO_THROW(grid = vdbfile.readGrid("vgrid", clipBox));
+        EXPECT_TRUE(grid.get() != nullptr);
+        EXPECT_NO_THROW(vgrid = gridPtrCast<Vec3SGrid>(grid));
         validateClippedGrid(*vgrid, vfg);
     }
 }
@@ -1794,7 +1738,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
         // Read in the stored pass number.
         uint32_t readPass;
         is.read(reinterpret_cast<char*>(&readPass), sizeof(uint32_t));
-        CPPUNIT_ASSERT_EQUAL(pass, readPass);
+        EXPECT_EQ(pass, readPass);
         // Record the pass number.
         mReadPasses.push_back(readPass);
 
@@ -1802,7 +1746,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
             // Read in the node's origin.
             openvdb::Coord origin;
             is.read(reinterpret_cast<char*>(&origin), sizeof(openvdb::Coord));
-            CPPUNIT_ASSERT_EQUAL(origin, this->origin());
+            EXPECT_EQ(origin, this->origin());
         }
     }
 
@@ -1825,7 +1769,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
         }
 
         // Record the pass number.
-        CPPUNIT_ASSERT(mWritePassesPtr);
+        EXPECT_TRUE(mWritePassesPtr);
         const_cast<std::vector<int>&>(*mWritePassesPtr).push_back(pass);
 
         // Write out the pass number.
@@ -1849,8 +1793,7 @@ struct MultiPassLeafNode: public openvdb::tree::LeafNode<T, Log2Dim>, openvdb::i
 } // anonymous namespace
 
 
-void
-TestFile::testMultiPassIO()
+TEST_F(TestFile, testMultiPassIO)
 {
     using namespace openvdb;
 
@@ -1864,7 +1807,7 @@ TestFile::testMultiPassIO()
     MultiPassGrid::TreeType& tree = grid->tree();
     tree.setValue(Coord(0, 0, 0), 5);
     tree.setValue(Coord(0, 10, 0), 5);
-    CPPUNIT_ASSERT_EQUAL(2, int(tree.leafCount()));
+    EXPECT_EQ(2, int(tree.leafCount()));
 
     const GridPtrVec grids{grid};
 
@@ -1885,13 +1828,13 @@ TestFile::testMultiPassIO()
     {
         // Verify that passes are written to a file in the correct order.
         io::File(filename).write(grids);
-        CPPUNIT_ASSERT_EQUAL(6, int(writePasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, writePasses[0]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(0, writePasses[1]); // leaf 1
-        CPPUNIT_ASSERT_EQUAL(1, writePasses[2]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(1, writePasses[3]); // leaf 1
-        CPPUNIT_ASSERT_EQUAL(2, writePasses[4]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(2, writePasses[5]); // leaf 1
+        EXPECT_EQ(6, int(writePasses.size()));
+        EXPECT_EQ(0, writePasses[0]); // leaf 0
+        EXPECT_EQ(0, writePasses[1]); // leaf 1
+        EXPECT_EQ(1, writePasses[2]); // leaf 0
+        EXPECT_EQ(1, writePasses[3]); // leaf 1
+        EXPECT_EQ(2, writePasses[4]); // leaf 0
+        EXPECT_EQ(2, writePasses[5]); // leaf 1
     }
     {
         // Verify that passes are read in the correct order.
@@ -1900,15 +1843,15 @@ TestFile::testMultiPassIO()
         const auto newGrid = GridBase::grid<MultiPassGrid>(file.readGrid("test"));
 
         auto leafIter = newGrid->tree().beginLeaf();
-        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
-        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
-        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
+        EXPECT_EQ(0, leafIter->mReadPasses[0]);
+        EXPECT_EQ(1, leafIter->mReadPasses[1]);
+        EXPECT_EQ(2, leafIter->mReadPasses[2]);
         ++leafIter;
-        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
-        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
-        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
+        EXPECT_EQ(0, leafIter->mReadPasses[0]);
+        EXPECT_EQ(1, leafIter->mReadPasses[1]);
+        EXPECT_EQ(2, leafIter->mReadPasses[2]);
     }
     {
         // Verify that when using multi-pass and bbox clipping that each leaf node
@@ -1917,15 +1860,15 @@ TestFile::testMultiPassIO()
         file.open();
         const auto newGrid = GridBase::grid<MultiPassGrid>(
             file.readGrid("test", BBoxd(Vec3d(0), Vec3d(1))));
-        CPPUNIT_ASSERT_EQUAL(Index32(1), newGrid->tree().leafCount());
+        EXPECT_EQ(Index32(1), newGrid->tree().leafCount());
 
         auto leafIter = newGrid->tree().beginLeaf();
-        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
-        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
-        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
+        EXPECT_EQ(0, leafIter->mReadPasses[0]);
+        EXPECT_EQ(1, leafIter->mReadPasses[1]);
+        EXPECT_EQ(2, leafIter->mReadPasses[2]);
         ++leafIter;
-        CPPUNIT_ASSERT(!leafIter); // second leaf node has now been clipped
+        EXPECT_TRUE(!leafIter); // second leaf node has now been clipped
     }
 
     // Clear the pass data.
@@ -1937,31 +1880,31 @@ TestFile::testMultiPassIO()
         std::ostringstream ostr(std::ios_base::binary);
         io::Stream(ostr).write(grids);
 
-        CPPUNIT_ASSERT_EQUAL(6, int(writePasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, writePasses[0]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(0, writePasses[1]); // leaf 1
-        CPPUNIT_ASSERT_EQUAL(1, writePasses[2]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(1, writePasses[3]); // leaf 1
-        CPPUNIT_ASSERT_EQUAL(2, writePasses[4]); // leaf 0
-        CPPUNIT_ASSERT_EQUAL(2, writePasses[5]); // leaf 1
+        EXPECT_EQ(6, int(writePasses.size()));
+        EXPECT_EQ(0, writePasses[0]); // leaf 0
+        EXPECT_EQ(0, writePasses[1]); // leaf 1
+        EXPECT_EQ(1, writePasses[2]); // leaf 0
+        EXPECT_EQ(1, writePasses[3]); // leaf 1
+        EXPECT_EQ(2, writePasses[4]); // leaf 0
+        EXPECT_EQ(2, writePasses[5]); // leaf 1
 
         std::istringstream is(ostr.str(), std::ios_base::binary);
         io::Stream strm(is);
         const auto streamedGrids = strm.getGrids();
-        CPPUNIT_ASSERT_EQUAL(1, int(streamedGrids->size()));
+        EXPECT_EQ(1, int(streamedGrids->size()));
 
         const auto newGrid = gridPtrCast<MultiPassGrid>(*streamedGrids->begin());
-        CPPUNIT_ASSERT(bool(newGrid));
+        EXPECT_TRUE(bool(newGrid));
         auto leafIter = newGrid->tree().beginLeaf();
-        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
-        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
-        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
+        EXPECT_EQ(0, leafIter->mReadPasses[0]);
+        EXPECT_EQ(1, leafIter->mReadPasses[1]);
+        EXPECT_EQ(2, leafIter->mReadPasses[2]);
         ++leafIter;
-        CPPUNIT_ASSERT_EQUAL(3, int(leafIter->mReadPasses.size()));
-        CPPUNIT_ASSERT_EQUAL(0, leafIter->mReadPasses[0]);
-        CPPUNIT_ASSERT_EQUAL(1, leafIter->mReadPasses[1]);
-        CPPUNIT_ASSERT_EQUAL(2, leafIter->mReadPasses[2]);
+        EXPECT_EQ(3, int(leafIter->mReadPasses.size()));
+        EXPECT_EQ(0, leafIter->mReadPasses[0]);
+        EXPECT_EQ(1, leafIter->mReadPasses[1]);
+        EXPECT_EQ(2, leafIter->mReadPasses[2]);
     }
 }
 
@@ -1969,8 +1912,7 @@ TestFile::testMultiPassIO()
 ////////////////////////////////////////
 
 
-void
-TestFile::testHasGrid()
+TEST_F(TestFile, testHasGrid)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -2034,14 +1976,14 @@ TestFile::testHasGrid()
 
     io::File vdbfile2("something.vdb2");
 
-    CPPUNIT_ASSERT_THROW(vdbfile2.hasGrid("density"), openvdb::IoError);
+    EXPECT_THROW(vdbfile2.hasGrid("density"), openvdb::IoError);
 
     vdbfile2.open();
 
-    CPPUNIT_ASSERT(vdbfile2.hasGrid("density"));
-    CPPUNIT_ASSERT(vdbfile2.hasGrid("temperature"));
-    CPPUNIT_ASSERT(!vdbfile2.hasGrid("Temperature"));
-    CPPUNIT_ASSERT(!vdbfile2.hasGrid("densitY"));
+    EXPECT_TRUE(vdbfile2.hasGrid("density"));
+    EXPECT_TRUE(vdbfile2.hasGrid("temperature"));
+    EXPECT_TRUE(!vdbfile2.hasGrid("Temperature"));
+    EXPECT_TRUE(!vdbfile2.hasGrid("densitY"));
 
     // Clear registries.
     GridBase::clearRegistry();
@@ -2054,8 +1996,7 @@ TestFile::testHasGrid()
 }
 
 
-void
-TestFile::testNameIterator()
+TEST_F(TestFile, testNameIterator)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -2109,7 +2050,7 @@ TestFile::testNameIterator()
     io::File vdbfile(filename);
 
     // Verify that name iteration fails if the file is not open.
-    CPPUNIT_ASSERT_THROW(vdbfile.beginName(), openvdb::IoError);
+    EXPECT_THROW(vdbfile.beginName(), openvdb::IoError);
 
     vdbfile.open();
 
@@ -2117,20 +2058,19 @@ TestFile::testNameIterator()
     Name names[6] = { "[0]", "[1]", "density", "level_set[0]", "level_set[1]", "temperature" };
     int count = 0;
     for (io::File::NameIterator iter = vdbfile.beginName(); iter != vdbfile.endName(); ++iter) {
-        CPPUNIT_ASSERT_EQUAL(names[count], *iter);
-        CPPUNIT_ASSERT_EQUAL(names[count], iter.gridName());
+        EXPECT_EQ(names[count], *iter);
+        EXPECT_EQ(names[count], iter.gridName());
         ++count;
         grid = vdbfile.readGrid(*iter);
-        CPPUNIT_ASSERT(grid);
+        EXPECT_TRUE(grid);
     }
-    CPPUNIT_ASSERT_EQUAL(6, count);
+    EXPECT_EQ(6, count);
 
     vdbfile.close();
 }
 
 
-void
-TestFile::testReadOldFileFormat()
+TEST_F(TestFile, testReadOldFileFormat)
 {
     /// @todo Save some old-format (prior to OPENVDB_FILE_VERSION) .vdb2 files
     /// to /work/rd/fx_tools/vdb_unittest/TestFile::testReadOldFileFormat/
@@ -2138,8 +2078,7 @@ TestFile::testReadOldFileFormat()
 }
 
 
-void
-TestFile::testCompression()
+TEST_F(TestFile, testCompression)
 {
     using namespace openvdb;
     using namespace openvdb::io;
@@ -2155,16 +2094,16 @@ TestFile::testCompression()
     intGrid->fill(CoordBBox(Coord(6), Coord(43)), /*value=*/0, /*active=*/false);
     intGrid->fill(CoordBBox(Coord(21), Coord(22)), /*value=*/1, /*active=*/false);
     intGrid->fill(CoordBBox(Coord(23), Coord(24)), /*value=*/2, /*active=*/false);
-    CPPUNIT_ASSERT_EQUAL(8, int(IntGrid::TreeType::LeafNodeType::DIM));
+    EXPECT_EQ(8, int(IntGrid::TreeType::LeafNodeType::DIM));
 
     FloatGrid::Ptr lsGrid = createLevelSet<FloatGrid>();
     unittest_util::makeSphere(/*dim=*/Coord(100), /*ctr=*/Vec3f(50, 50, 50), /*r=*/20.0,
         *lsGrid, unittest_util::SPHERE_SPARSE_NARROW_BAND);
-    CPPUNIT_ASSERT_EQUAL(int(GRID_LEVEL_SET), int(lsGrid->getGridClass()));
+    EXPECT_EQ(int(GRID_LEVEL_SET), int(lsGrid->getGridClass()));
 
     FloatGrid::Ptr fogGrid = lsGrid->deepCopy();
     tools::sdfToFogVolume(*fogGrid);
-    CPPUNIT_ASSERT_EQUAL(int(GRID_FOG_VOLUME), int(fogGrid->getGridClass()));
+    EXPECT_EQ(int(GRID_FOG_VOLUME), int(fogGrid->getGridClass()));
 
 
     GridPtrVec grids;
@@ -2186,7 +2125,7 @@ TestFile::testCompression()
         // Get the size of the file in bytes.
         struct stat buf;
         buf.st_size = 0;
-        CPPUNIT_ASSERT_EQUAL(0, ::stat(filename, &buf));
+        EXPECT_EQ(0, ::stat(filename, &buf));
         uncompressedSize = buf.st_size;
     }
 
@@ -2195,9 +2134,17 @@ TestFile::testCompression()
     // See io/Compression.h for the flag values.
 
 #ifdef OPENVDB_USE_BLOSC
-    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+    #ifdef OPENVDB_USE_ZLIB
+        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3,0x4,0x6};
+    #else
+        std::vector<uint32_t> validFlags{0x0,0x2,0x4,0x6};
+    #endif
 #else
-    std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+    #ifdef OPENVDB_USE_ZLIB
+        std::vector<uint32_t> validFlags{0x0,0x1,0x2,0x3};
+    #else
+        std::vector<uint32_t> validFlags{0x0,0x2};
+    #endif
 #endif
     for (uint32_t flags : validFlags) {
 
@@ -2213,9 +2160,9 @@ TestFile::testCompression()
             size_t compressedSize = 0;
             struct stat buf;
             buf.st_size = 0;
-            CPPUNIT_ASSERT_EQUAL(0, ::stat(filename, &buf));
+            EXPECT_EQ(0, ::stat(filename, &buf));
             compressedSize = buf.st_size;
-            CPPUNIT_ASSERT(compressedSize < size_t(0.75 * double(uncompressedSize)));
+            EXPECT_TRUE(compressedSize < size_t(0.75 * double(uncompressedSize)));
         }
         {
             // Verify that the grids can be read back successfully.
@@ -2224,49 +2171,49 @@ TestFile::testCompression()
             vdbfile.open();
 
             GridPtrVecPtr inGrids = vdbfile.getGrids();
-            CPPUNIT_ASSERT_EQUAL(3, int(inGrids->size()));
+            EXPECT_EQ(3, int(inGrids->size()));
 
             // Verify that the original and input grids are equal.
             {
                 const IntGrid::Ptr grid = gridPtrCast<IntGrid>((*inGrids)[0]);
-                CPPUNIT_ASSERT(grid.get() != nullptr);
-                CPPUNIT_ASSERT_EQUAL(int(intGrid->getGridClass()), int(grid->getGridClass()));
+                EXPECT_TRUE(grid.get() != nullptr);
+                EXPECT_EQ(int(intGrid->getGridClass()), int(grid->getGridClass()));
 
-                CPPUNIT_ASSERT(grid->tree().hasSameTopology(intGrid->tree()));
+                EXPECT_TRUE(grid->tree().hasSameTopology(intGrid->tree()));
 
-                CPPUNIT_ASSERT_EQUAL(
+                EXPECT_EQ(
                     intGrid->tree().getValue(Coord(0)),
                     grid->tree().getValue(Coord(0)));
                 // Verify that leaf nodes with more than two distinct inactive values
                 // are handled correctly (FX-7085).
-                CPPUNIT_ASSERT_EQUAL(
+                EXPECT_EQ(
                     intGrid->tree().getValue(Coord(6)),
                     grid->tree().getValue(Coord(6)));
-                CPPUNIT_ASSERT_EQUAL(
+                EXPECT_EQ(
                     intGrid->tree().getValue(Coord(21)),
                     grid->tree().getValue(Coord(21)));
-                CPPUNIT_ASSERT_EQUAL(
+                EXPECT_EQ(
                     intGrid->tree().getValue(Coord(23)),
                     grid->tree().getValue(Coord(23)));
 
                 // Verify that the only active value in this grid is 999.
                 Int32 minVal = -1, maxVal = -1;
                 grid->evalMinMax(minVal, maxVal);
-                CPPUNIT_ASSERT_EQUAL(999, minVal);
-                CPPUNIT_ASSERT_EQUAL(999, maxVal);
+                EXPECT_EQ(999, minVal);
+                EXPECT_EQ(999, maxVal);
             }
             for (int idx = 1; idx <= 2; ++idx) {
                 const FloatGrid::Ptr
                     grid = gridPtrCast<FloatGrid>((*inGrids)[idx]),
                     refGrid = gridPtrCast<FloatGrid>(grids[idx]);
-                CPPUNIT_ASSERT(grid.get() != nullptr);
-                CPPUNIT_ASSERT_EQUAL(int(refGrid->getGridClass()), int(grid->getGridClass()));
+                EXPECT_TRUE(grid.get() != nullptr);
+                EXPECT_EQ(int(refGrid->getGridClass()), int(grid->getGridClass()));
 
-                CPPUNIT_ASSERT(grid->tree().hasSameTopology(refGrid->tree()));
+                EXPECT_TRUE(grid->tree().hasSameTopology(refGrid->tree()));
 
                 FloatGrid::ConstAccessor refAcc = refGrid->getConstAccessor();
                 for (FloatGrid::ValueAllCIter it = grid->cbeginValueAll(); it; ++it) {
-                    CPPUNIT_ASSERT_EQUAL(refAcc.getValue(it.getCoord()), *it);
+                    EXPECT_EQ(refAcc.getValue(it.getCoord()), *it);
                 }
             }
         }
@@ -2334,8 +2281,8 @@ struct TestAsyncHelper
             // size matches the reference file's size.
             struct stat buf;
             buf.st_size = 0;
-            CPPUNIT_ASSERT_EQUAL(0, ::stat(filenames[id].c_str(), &buf));
-            CPPUNIT_ASSERT_EQUAL(Index64(refFileSize), Index64(buf.st_size));
+            EXPECT_EQ(0, ::stat(filenames[id].c_str(), &buf));
+            EXPECT_EQ(Index64(refFileSize), Index64(buf.st_size));
         }
 
         if (status == io::Queue::SUCCEEDED || status == io::Queue::FAILED) {
@@ -2347,8 +2294,7 @@ struct TestAsyncHelper
 } // unnamed namespace
 
 
-void
-TestFile::testAsync()
+TEST_F(TestFile, testAsync)
 {
     using namespace openvdb;
 
@@ -2380,7 +2326,7 @@ TestFile::testAsync()
         // Record the size of the reference file.
         struct stat buf;
         buf.st_size = 0;
-        CPPUNIT_ASSERT_EQUAL(0, ::stat(filename, &buf));
+        EXPECT_EQ(0, ::stat(filename, &buf));
         refFileSize = buf.st_size;
     }
 
@@ -2414,8 +2360,8 @@ TestFile::testAsync()
                 helper.validate(id, status);
             }
         }
-        CPPUNIT_ASSERT(helper.ids.empty());
-        CPPUNIT_ASSERT(queue.empty());
+        EXPECT_TRUE(helper.ids.empty());
+        EXPECT_TRUE(queue.empty());
     }
     {
         // Output multiple files using asynchronous I/O.
@@ -2456,7 +2402,7 @@ TestFile::testAsync()
         // the next write() call should time out immediately with an exception.
         // (It is possible, though highly unlikely, for the previous task to complete
         // in time for this write() to actually succeed.)
-        CPPUNIT_ASSERT_THROW(queue.write(grids, io::Stream(file2)), openvdb::RuntimeError);
+        EXPECT_THROW(queue.write(grids, io::Stream(file2)), openvdb::RuntimeError);
 
         while (!queue.empty()) {
             tbb::this_tbb_thread::sleep(tbb::tick_count::interval_t(1.0/*sec*/));
@@ -2468,8 +2414,7 @@ TestFile::testAsync()
 #ifdef OPENVDB_USE_BLOSC
 // This tests for a data corruption bug that existed in versions of Blosc prior to 1.5.0
 // (see https://github.com/Blosc/c-blosc/pull/63).
-void
-TestFile::testBlosc()
+TEST_F(TestFile, testBlosc)
 {
     openvdb::initialize();
 
@@ -2555,15 +2500,15 @@ TestFile::testBlosc()
                 /*dest=*/compresseddata.get(),
                 /*destsize=*/compbufbytes);
 
-            CPPUNIT_ASSERT(compressedbytes > 0);
+            EXPECT_TRUE(compressedbytes > 0);
 
             // Decompress the data.
             ::memset(outdata.get(), 0, decompbufbytes);
             int outbytes = blosc_decompress(
                 compresseddata.get(), outdata.get(), decompbufbytes);
 
-            CPPUNIT_ASSERT(outbytes > 0);
-            CPPUNIT_ASSERT_EQUAL(int(inbytes), outbytes);
+            EXPECT_TRUE(outbytes > 0);
+            EXPECT_EQ(int(inbytes), outbytes);
 
             // Compare original and decompressed data.
             int diff = 0;
@@ -2571,10 +2516,11 @@ TestFile::testBlosc()
                 if (outdata[i] != indata[i]) ++diff;
             }
             if (diff > 0) {
-                const char* mesg = "Your version of the Blosc library is most likely"
+                if (diff != 0) {
+                    FAIL() << "Your version of the Blosc library is most likely"
                     " out of date; please install the latest version.  "
                     "(Earlier versions have a bug that can cause data corruption.)";
-                CPPUNIT_ASSERT_MESSAGE(mesg, diff == 0);
+                }
                 return;
             }
         }
@@ -2622,7 +2568,7 @@ TestFile::testDelayedLoadMetadata()
         io::Archive::readGrid(grid, gd2, istr, clipBbox);
 
         // Verify clipping is working as expected.
-        CPPUNIT_ASSERT(grid->baseTreePtr()->leafCount() < lsGrid->tree().leafCount());
+        EXPECT_TRUE(grid->baseTreePtr()->leafCount() < lsGrid->tree().leafCount());
 
         file.writeGrid(gd, grid, ostr2, /*seekable=*/true);
     }
@@ -2646,7 +2592,7 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     // To test the version mechanism, a stream metadata object is created with
@@ -2666,7 +2612,7 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     { // read using library version of 5.0
@@ -2679,7 +2625,7 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     { // read using library version of 4.9
@@ -2692,7 +2638,7 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     { // read using library version of 6.1
@@ -2705,7 +2651,7 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(!((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     { // read using library version of 6.2
@@ -2718,8 +2664,10 @@ TestFile::testDelayedLoadMetadata()
         gd2.seekToGrid(istr);
         io::Archive::readGrid(grid, gd2, istr);
 
-        CPPUNIT_ASSERT(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
+        EXPECT_TRUE(((*grid)[GridBase::META_FILE_DELAYED_LOAD]));
     }
 
     remove("something.vdb2");
 }
+TEST_F(TestFile, testDelayedLoadMetadata) { testDelayedLoadMetadata(); }
+

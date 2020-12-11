@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/tools/PointIndexGrid.h>
 
 #include <vector>
@@ -10,20 +10,10 @@
 #include "util.h" // for genPoints
 
 
-struct TestPointIndexGrid: public CppUnit::TestCase
+struct TestPointIndexGrid: public ::testing::Test
 {
-    CPPUNIT_TEST_SUITE(TestPointIndexGrid);
-    CPPUNIT_TEST(testPointIndexGrid);
-    CPPUNIT_TEST(testPointIndexFilter);
-    CPPUNIT_TEST(testWorldSpaceSearchAndUpdate);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testPointIndexGrid();
-    void testPointIndexFilter();
-    void testWorldSpaceSearchAndUpdate();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointIndexGrid);
 
 ////////////////////////////////////////
 
@@ -95,8 +85,7 @@ private:
 ////////////////////////////////////////
 
 
-void
-TestPointIndexGrid::testPointIndexGrid()
+TEST_F(TestPointIndexGrid, testPointIndexGrid)
 {
     const float voxelSize = 0.01f;
     const openvdb::math::Transform::Ptr transform =
@@ -127,8 +116,8 @@ TestPointIndexGrid::testPointIndexGrid()
     ConstAccessor acc = pointGridPtr->getConstAccessor();
     PointIndexIterator it(bbox, acc);
 
-    CPPUNIT_ASSERT(it.test());
-    CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+    EXPECT_TRUE(it.test());
+    EXPECT_EQ(points.size(), it.size());
 
     // fractional bbox search
 
@@ -140,8 +129,8 @@ TestPointIndexGrid::testPointIndexGrid()
 
     it.searchAndUpdate(region, acc, pointList, *transform);
 
-    CPPUNIT_ASSERT(it.test());
-    CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+    EXPECT_TRUE(it.test());
+    EXPECT_EQ(points.size(), it.size());
 
     {
         std::vector<uint32_t> vec;
@@ -150,8 +139,8 @@ TestPointIndexGrid::testPointIndexGrid()
             vec.push_back(*it);
         }
 
-        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
-        CPPUNIT_ASSERT(!hasDuplicates(vec));
+        EXPECT_EQ(vec.size(), it.size());
+        EXPECT_TRUE(!hasDuplicates(vec));
     }
 
     // radial search
@@ -159,8 +148,8 @@ TestPointIndexGrid::testPointIndexGrid()
     double radius = region.extents().x() * 0.5;
     it.searchAndUpdate(center, radius, acc, pointList, *transform);
 
-    CPPUNIT_ASSERT(it.test());
-    CPPUNIT_ASSERT_EQUAL(points.size(), it.size());
+    EXPECT_TRUE(it.test());
+    EXPECT_EQ(points.size(), it.size());
 
     {
         std::vector<uint32_t> vec;
@@ -169,15 +158,15 @@ TestPointIndexGrid::testPointIndexGrid()
             vec.push_back(*it);
         }
 
-        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
-        CPPUNIT_ASSERT(!hasDuplicates(vec));
+        EXPECT_EQ(vec.size(), it.size());
+        EXPECT_TRUE(!hasDuplicates(vec));
     }
 
 
     center = region.min();
     it.searchAndUpdate(center, radius, acc, pointList, *transform);
 
-    CPPUNIT_ASSERT(it.test());
+    EXPECT_TRUE(it.test());
 
     {
         std::vector<uint32_t> vec;
@@ -186,8 +175,8 @@ TestPointIndexGrid::testPointIndexGrid()
             vec.push_back(*it);
         }
 
-        CPPUNIT_ASSERT_EQUAL(vec.size(), it.size());
-        CPPUNIT_ASSERT(!hasDuplicates(vec));
+        EXPECT_EQ(vec.size(), it.size());
+        EXPECT_TRUE(!hasDuplicates(vec));
 
         // check that no points where missed.
 
@@ -201,9 +190,9 @@ TestPointIndexGrid::testPointIndexGrid()
         for (size_t n = 0, N = indexMask.size(); n < N; ++n) {
             v = center - transform->worldToIndex(points[n]);
             if (indexMask[n] == 0) {
-                CPPUNIT_ASSERT(!(v.lengthSqr() < r2));
+                EXPECT_TRUE(!(v.lengthSqr() < r2));
             } else {
-                CPPUNIT_ASSERT(v.lengthSqr() < r2);
+                EXPECT_TRUE(v.lengthSqr() < r2);
             }
         }
     }
@@ -211,23 +200,22 @@ TestPointIndexGrid::testPointIndexGrid()
 
     // Check partitioning
 
-    CPPUNIT_ASSERT(openvdb::tools::isValidPartition(pointList, *pointGridPtr));
+    EXPECT_TRUE(openvdb::tools::isValidPartition(pointList, *pointGridPtr));
 
     points[10000].x() += 1.5; // manually modify a few points.
     points[20000].x() += 1.5;
     points[30000].x() += 1.5;
 
-    CPPUNIT_ASSERT(!openvdb::tools::isValidPartition(pointList, *pointGridPtr));
+    EXPECT_TRUE(!openvdb::tools::isValidPartition(pointList, *pointGridPtr));
 
     PointIndexGrid::Ptr pointGrid2Ptr =
         openvdb::tools::getValidPointIndexGrid<PointIndexGrid>(pointList, pointGridPtr);
 
-    CPPUNIT_ASSERT(openvdb::tools::isValidPartition(pointList, *pointGrid2Ptr));
+    EXPECT_TRUE(openvdb::tools::isValidPartition(pointList, *pointGrid2Ptr));
 }
 
 
-void
-TestPointIndexGrid::testPointIndexFilter()
+TEST_F(TestPointIndexGrid, testPointIndexFilter)
 {
     // generate points
     const float voxelSize = 0.01f;
@@ -264,12 +252,11 @@ TestPointIndexGrid::testPointIndexFilter()
         sum += accumulator.result();
     }
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(sum, double(points.size()), 1e-6);
+    EXPECT_NEAR(sum, double(points.size()), 1e-6);
 }
 
 
-void
-TestPointIndexGrid::testWorldSpaceSearchAndUpdate()
+TEST_F(TestPointIndexGrid, testWorldSpaceSearchAndUpdate)
 {
     // Create random particles in a cube.
     openvdb::math::Rand01<> rnd(0);
@@ -311,6 +298,6 @@ TestPointIndexGrid::testWorldSpaceSearchAndUpdate()
         indexListB.insert(*pointIndexIter);
     }
 
-    CPPUNIT_ASSERT_EQUAL(indexListA.size(), indexListB.size());
+    EXPECT_EQ(indexListA.size(), indexListB.size());
 }
 

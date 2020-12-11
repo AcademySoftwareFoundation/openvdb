@@ -1,0 +1,2 @@
+
+v@P.y *= 1.0f; // multiply @P.y in world-space by one.

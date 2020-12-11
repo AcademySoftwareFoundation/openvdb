@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
@@ -34,11 +34,12 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
+find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
 set(OPENVDB_TEST_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  CppUnit::cppunit
+  GTest::GTest
+  GTest::Main
 )
 
 if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
@@ -72,6 +73,7 @@ set(UNITTEST_SOURCE_FILES
   TestDivergence.cc
   TestDoubleMetadata.cc
   TestExceptions.cc
+  TestFastSweeping.cc
   TestFile.cc
   TestFindActiveValues.cc
   TestFloatMetadata.cc
@@ -101,6 +103,7 @@ set(UNITTEST_SOURCE_FILES
   TestMat4Metadata.cc
   TestMath.cc
   TestMeanCurvature.cc
+  TestMerge.cc
   TestMeshToVolume.cc
   TestMetadata.cc
   TestMetadataIO.cc
@@ -157,13 +160,20 @@ set(UNITTEST_SOURCE_FILES
 
 add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 
+# Blosc and ZLib are hidden dependencies for the core library
+# (not exposed in headers), so we need to manually link them in
+# here to provide header access for the relevant unit tests
+
 if(USE_BLOSC OR OpenVDB_USES_BLOSC)
-  # Blosc is a hidden dependency for the core library (not exposed in headers)
-  # so we need to manually link it in here to provide header access for the
-  # blosc relevant unit tests
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
   list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
   target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
+endif()
+
+if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
+  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
+  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_ZLIB")
 endif()
 
 target_link_libraries(vdb_test
@@ -179,7 +189,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}
-    ${CppUnit_LIBRARY_DIRS}
+    ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
     list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)

@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 project(OpenVDBCore LANGUAGES CXX)
 
 # Monitoring <PackageName>_ROOT variables
@@ -77,8 +77,6 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
   endif()
 endif()
 
-find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
-
 if(USE_LOG4CPLUS)
   find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
 endif()
@@ -97,6 +95,10 @@ else()
     "enable blosc for optimal builds of OpenVDB and to support compatible "
     "serialization of other OpenVDB installations."
   )
+endif()
+
+if(USE_BLOSC OR USE_ZLIB)
+  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()
 
 if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
@@ -166,9 +168,12 @@ if(USE_BLOSC)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
 endif()
 
+if(USE_BLOSC OR USE_ZLIB)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
+endif()
+
 list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
   TBB::tbb
-  ZLIB::ZLIB
 )
 
 if(UNIX)
@@ -227,6 +232,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
   Platform.h
   PlatformConfig.h
   Types.h
+  TypeList.h
   version.h
 )
 
@@ -313,6 +319,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetTracker.h
   tools/LevelSetUtil.h
   tools/Mask.h
+  tools/Merge.h
   tools/MeshToVolume.h
   tools/Morphology.h
   tools/MultiResGrid.h
@@ -400,6 +407,10 @@ if(USE_BLOSC)
   list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_USE_BLOSC)
 endif()
 
+if(USE_BLOSC OR USE_ZLIB)
+  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_USE_ZLIB)
+endif()
+
 # Public defines
 if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
@@ -429,7 +440,7 @@ if(OPENVDB_CORE_STATIC)
   )
 
   target_compile_definitions(openvdb_static
-    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES}
+    PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_STATICLIB
     PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
   )
 

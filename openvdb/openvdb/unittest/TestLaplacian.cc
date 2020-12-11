@@ -5,48 +5,25 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <sstream>
 
 
-class TestLaplacian: public CppUnit::TestFixture
+class TestLaplacian: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestLaplacian);
-    CPPUNIT_TEST(testISLaplacian);                    // Laplacian in Index Space
-    CPPUNIT_TEST(testISLaplacianStencil);
-    CPPUNIT_TEST(testWSLaplacian);                    // Laplacian in World Space
-    CPPUNIT_TEST(testWSLaplacianFrustum);             // Laplacian in World Space
-    CPPUNIT_TEST(testWSLaplacianStencil);
-    CPPUNIT_TEST(testLaplacianTool);                  // Laplacian tool
-    CPPUNIT_TEST(testLaplacianMaskedTool);                  // Laplacian tool
-    CPPUNIT_TEST(testOldStyleStencils);               // old stencil impl
-    CPPUNIT_TEST_SUITE_END();
-
-    void testISLaplacian();
-    void testISLaplacianStencil();
-    void testWSLaplacian();
-    void testWSLaplacianFrustum();
-    void testWSLaplacianStencil();
-    void testLaplacianTool();
-    void testLaplacianMaskedTool();
-    void testOldStyleStencils();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLaplacian);
-
-void
-TestLaplacian::testISLaplacian()
+TEST_F(TestLaplacian, testISLaplacian)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
@@ -54,8 +31,8 @@ TestLaplacian::testISLaplacian()
         center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     Coord xyz(35,10,40);
 
@@ -63,24 +40,23 @@ TestLaplacian::testISLaplacian()
     FloatGrid::ConstAccessor inAccessor = grid->getConstAccessor();
     FloatGrid::ValueType result;
     result = math::ISLaplacian<math::CD_SECOND>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 
     result = math::ISLaplacian<math::CD_FOURTH>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 
     result = math::ISLaplacian<math::CD_SIXTH>::result(inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 }
 
 
-void
-TestLaplacian::testISLaplacianStencil()
+TEST_F(TestLaplacian, testISLaplacianStencil)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
@@ -88,8 +64,8 @@ TestLaplacian::testISLaplacianStencil()
         center(static_cast<float>(c[0]), static_cast<float>(c[1]), static_cast<float>(c[2]));
     const float radius=0;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     Coord xyz(35,10,40);
 
@@ -99,28 +75,27 @@ TestLaplacian::testISLaplacianStencil()
     math::SevenPointStencil<FloatGrid> sevenpt(*grid);
     sevenpt.moveTo(xyz);
     result = math::ISLaplacian<math::CD_SECOND>::result(sevenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 
     math::ThirteenPointStencil<FloatGrid> thirteenpt(*grid);
     thirteenpt.moveTo(xyz);
     result = math::ISLaplacian<math::CD_FOURTH>::result(thirteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 
     math::NineteenPointStencil<FloatGrid> nineteenpt(*grid);
     nineteenpt.moveTo(xyz);
     result = math::ISLaplacian<math::CD_SIXTH>::result(nineteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20.0, result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20.0, result, /*tolerance=*/0.01);
 }
 
 
-void
-TestLaplacian::testWSLaplacian()
+TEST_F(TestLaplacian, testWSLaplacian)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
@@ -129,8 +104,8 @@ TestLaplacian::testWSLaplacian()
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     Coord xyz(35,10,40);
 
@@ -141,50 +116,50 @@ TestLaplacian::testWSLaplacian()
     math::UniformScaleMap map;
     math::MapBase::Ptr rotated_map = map.preRotate(1.5, math::X_AXIS);
     // verify the new map is an affine map
-    CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
+    EXPECT_TRUE(rotated_map->type() == math::AffineMap::mapType());
     math::AffineMap::Ptr affine_map = StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
     // the laplacian is invariant to rotation
     result = math::Laplacian<math::AffineMap, math::CD_SECOND>::result(
         *affine_map, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::AffineMap, math::CD_FOURTH>::result(
         *affine_map, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::AffineMap, math::CD_SIXTH>::result(
         *affine_map, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     // test uniform map
     math::UniformScaleMap uniform;
 
     result = math::Laplacian<math::UniformScaleMap, math::CD_SECOND>::result(
         uniform, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::UniformScaleMap, math::CD_FOURTH>::result(
         uniform, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::UniformScaleMap, math::CD_SIXTH>::result(
         uniform, inAccessor, xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     // test the GenericMap Grid interface
     {
         math::GenericMap generic_map(*grid);
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
         result = math::Laplacian<math::GenericMap, math::CD_FOURTH>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Transform interface
         math::GenericMap generic_map(grid->transform());
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     }
     {
@@ -192,14 +167,13 @@ TestLaplacian::testWSLaplacian()
         math::GenericMap generic_map(rotated_map);
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(
             generic_map, inAccessor, xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     }
 
 }
 
 
-void
-TestLaplacian::testWSLaplacianFrustum()
+TEST_F(TestLaplacian, testWSLaplacianFrustum)
 {
     using namespace openvdb;
 
@@ -215,20 +189,20 @@ TestLaplacian::testWSLaplacianFrustum()
         StaticPtrCast<math::NonlinearFrustumMap, math::MapBase>(
             frustum.preScale(Vec3d(10,10,10))->postTranslate(trans));
 
-    CPPUNIT_ASSERT(!map->hasUniformScale());
+    EXPECT_TRUE(!map->hasUniformScale());
 
     math::Vec3d result;
     result = map->voxelSize();
 
-    CPPUNIT_ASSERT( math::isApproxEqual(result.x(), 0.1));
-    CPPUNIT_ASSERT( math::isApproxEqual(result.y(), 0.1));
-    CPPUNIT_ASSERT( math::isApproxEqual(result.z(), 0.5, 0.0001));
+    EXPECT_TRUE( math::isApproxEqual(result.x(), 0.1));
+    EXPECT_TRUE( math::isApproxEqual(result.y(), 0.1));
+    EXPECT_TRUE( math::isApproxEqual(result.z(), 0.5, 0.0001));
 
 
     // Create a tree
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/0.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     // Load cos(x)sin(y)cos(z)
     Coord ijk(10,10,10);
@@ -250,18 +224,17 @@ TestLaplacian::testWSLaplacianFrustum()
 
     // The exact solution of Laplacian( cos(x)sin(y)cos(z) ) = -3 cos(x) sin(y) cos(z)
 
-    CPPUNIT_ASSERT( math::isApproxEqual(test_result, expected_result, /*tolerance=*/0.02f) );
+    EXPECT_TRUE( math::isApproxEqual(test_result, expected_result, /*tolerance=*/0.02f) );
 }
 
 
-void
-TestLaplacian::testWSLaplacianStencil()
+TEST_F(TestLaplacian, testWSLaplacianStencil)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64,64,64);
     const Coord c(35,30,40);
@@ -270,8 +243,8 @@ TestLaplacian::testWSLaplacianStencil()
     const float radius=0.0f;//point at {35,30,40}
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     Coord xyz(35,10,40);
 
@@ -281,7 +254,7 @@ TestLaplacian::testWSLaplacianStencil()
     math::UniformScaleMap map;
     math::MapBase::Ptr rotated_map = map.preRotate(1.5, math::X_AXIS);
     // verify the new map is an affine map
-    CPPUNIT_ASSERT(rotated_map->type() == math::AffineMap::mapType());
+    EXPECT_TRUE(rotated_map->type() == math::AffineMap::mapType());
     math::AffineMap::Ptr affine_map = StaticPtrCast<math::AffineMap, math::MapBase>(rotated_map);
 
     // the laplacian is invariant to rotation
@@ -299,55 +272,54 @@ TestLaplacian::testWSLaplacianStencil()
     dense_6th.moveTo(xyz);
 
     result = math::Laplacian<math::AffineMap, math::CD_SECOND>::result(*affine_map, dense_2nd);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::AffineMap, math::CD_FOURTH>::result(*affine_map, dense_4th);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::AffineMap, math::CD_SIXTH>::result(*affine_map, dense_6th);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     // test uniform map
     math::UniformScaleMap uniform;
 
     result = math::Laplacian<math::UniformScaleMap, math::CD_SECOND>::result(uniform, sevenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::UniformScaleMap, math::CD_FOURTH>::result(uniform, thirteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     result = math::Laplacian<math::UniformScaleMap, math::CD_SIXTH>::result(uniform, nineteenpt);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+    EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     // test the GenericMap Grid interface
     {
         math::GenericMap generic_map(*grid);
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, dense_2nd);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
         result = math::Laplacian<math::GenericMap, math::CD_FOURTH>::result(generic_map, dense_4th);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     }
     {
         // test the GenericMap Transform interface
         math::GenericMap generic_map(grid->transform());
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, dense_2nd);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
 
     }
     {
         // test the GenericMap Map interface
         math::GenericMap generic_map(rotated_map);
         result = math::Laplacian<math::GenericMap, math::CD_SECOND>::result(generic_map, dense_2nd);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/20., result, /*tolerance=*/0.01);
+        EXPECT_NEAR(2.0/20., result, /*tolerance=*/0.01);
     }
 }
 
 
-void
-TestLaplacian::testOldStyleStencils()
+TEST_F(TestLaplacian, testOldStyleStencils)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*backgroundValue=*/5.0);
     grid->setTransform(math::Transform::createLinearTransform(/*voxel size=*/0.5));
-    CPPUNIT_ASSERT(grid->empty());
+    EXPECT_TRUE(grid->empty());
 
     const Coord dim(32, 32, 32);
     const Coord c(35,30,40);
@@ -355,8 +327,8 @@ TestLaplacian::testOldStyleStencils()
     const float radius=10.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!grid->empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
+    EXPECT_TRUE(!grid->empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(grid->activeVoxelCount()));
 
     math::GradStencil<FloatGrid> gs(*grid);
     math::WenoStencil<FloatGrid> ws(*grid);
@@ -364,72 +336,70 @@ TestLaplacian::testOldStyleStencils()
 
     Coord xyz(20,16,20);//i.e. 8 voxel or 4 world units away from the center
     gs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/4.0, gs.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/4.0, gs.laplacian(), 0.01);// 2/distance from center
 
     ws.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/4.0, ws.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/4.0, ws.laplacian(), 0.01);// 2/distance from center
 
     cs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/4.0, cs.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/4.0, cs.laplacian(), 0.01);// 2/distance from center
 
     xyz.reset(12,16,10);//i.e. 10 voxel or 5 world units away from the center
     gs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/5.0, gs.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/5.0, gs.laplacian(), 0.01);// 2/distance from center
 
     ws.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/5.0, ws.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/5.0, ws.laplacian(), 0.01);// 2/distance from center
 
     cs.moveTo(xyz);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0/5.0, cs.laplacian(), 0.01);// 2/distance from center
+    EXPECT_NEAR(2.0/5.0, cs.laplacian(), 0.01);// 2/distance from center
 }
 
 
-void
-TestLaplacian::testLaplacianTool()
+TEST_F(TestLaplacian, testLaplacianTool)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64, 64, 64);
     const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
     const float radius=0.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     FloatGrid::Ptr lap = tools::laplacian(*grid);
-    CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(lap->activeVoxelCount()));
+    EXPECT_EQ(int(tree.activeVoxelCount()), int(lap->activeVoxelCount()));
 
     Coord xyz(35,30,30);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+    EXPECT_NEAR(
         2.0/10.0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
 
     xyz.reset(35,10,40);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+    EXPECT_NEAR(
         2.0/20.0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
 }
 
-void
-TestLaplacian::testLaplacianMaskedTool()
+TEST_F(TestLaplacian, testLaplacianMaskedTool)
 {
     using namespace openvdb;
 
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
     FloatTree& tree = grid->tree();
-    CPPUNIT_ASSERT(tree.empty());
+    EXPECT_TRUE(tree.empty());
 
     const Coord dim(64, 64, 64);
     const openvdb::Vec3f center(35.0f, 30.0f, 40.0f);
     const float radius=0.0f;
     unittest_util::makeSphere<FloatGrid>(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT(!tree.empty());
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_TRUE(!tree.empty());
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
     const openvdb::CoordBBox maskbbox(openvdb::Coord(35, 30, 30), openvdb::Coord(41, 41, 41));
     BoolGrid::Ptr maskGrid = BoolGrid::create(false);
@@ -441,21 +411,21 @@ TestLaplacian::testLaplacianMaskedTool()
     {// outside the masked region
         Coord xyz(34,30,30);
 
-        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        EXPECT_TRUE(!maskbbox.isInside(xyz));
+        EXPECT_NEAR(
             0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
 
         xyz.reset(35,10,40);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        EXPECT_NEAR(
             0, lap->getConstAccessor().getValue(xyz),0.01);// 2/distance from center
     }
 
     {// inside the masked region
         Coord xyz(35,30,30);
 
-        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        EXPECT_TRUE(maskbbox.isInside(xyz));
+        EXPECT_NEAR(
             2.0/10.0, lap->getConstAccessor().getValue(xyz), 0.01);// 2/distance from center
 
     }

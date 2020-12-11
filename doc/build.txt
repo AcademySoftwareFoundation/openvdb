@@ -8,6 +8,7 @@
   - @ref buildDependencies
   - @ref buildMixingDepInstalls
   - @ref buildBloscSupport
+  - @ref buildZLibSupport
   - @ref buildVCPKG
 - @ref buildComponents
 - @ref buildGuide
@@ -142,16 +143,21 @@ provide direct include/lib paths to isolated software locations.
 
 @subsection buildBloscSupport Blosc Support
 
-Blosc is one of the optional dependencies of all OpenVDB components. It is the
-only dependency which is enabled by default. The documented build steps below
-treat blosc as a required dependency. There are two reasons for this:
+Blosc is an optional dependency of all OpenVDB components. The documented
+build steps below treat blosc as a required dependency. There are two reasons
+for this:
 
  - Blosc produces significantly smaller `.vdb` files
  - If Blosc is disabled, you will not be able to read or use any `.vdb` files
    that were created using blosc compression. This includes OpenVDB files from
    Houdini.
 
-You can disable Blosc using `-D USE_BLOSC=OFF`.
+@subsection buildZLibSupport ZLIB Support
+
+ZLIB is an optional dependency of all OpenVDB components. The documented build
+steps below treat ZLib as a required dependency.
+
+You can disable ZLib using `-D USE_ZLIB=OFF` if Blosc is also disabled using `-D USE_BLOSC=OFF`.
 
 @subsection buildVCPKG Building Dependencies using VCPKG
 
@@ -165,18 +171,24 @@ The following table lists all targets (mainly library and binary components)
 which can be built through the CMake build system. They can be set when using
 CMake from the command line with `-D VAR=ON/OFF` or with a CMake gui:
 
-Component               | Description                                                            | CMake Variable                                    | Default    |
------------------------ | ---------------------------------------------------------------------- | ------------------------------------------------- | ---------- |
-OpenVDB Core Library    | The Core OpenVDB shared/static library                                 | OPENVDB_BUILD_CORE                                | ON         |
-OpenVDB Print           | Command line binary for displaying information about OpenVDB files     | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_PRINT  | ON / ON    |
-OpenVDB LOD             | Command line binary for generating volume mipmaps from an OpenVDB grid | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_LOD    | ON / OFF   |
-OpenVDB Render          | Command line binary for ray-tracing OpenVDB grids                      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_RENDER | ON / OFF   |
-OpenVDB View            | Command line binary for displaying OpenVDB grids in a GL viewport      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_VIEW   | ON / OFF   |
-OpenVDB Python          | Python module for OpenVDB C++ Python bindings                          | OPENVDB_BUILD_PYTHON_MODULE                       | OFF        |
-OpenVDB UnitTests       | OpenVDB's Unit Test suite                                              | OPENVDB_BUILD_UNITTESTS                           | OFF        |
-OpenVDB Houdini Plugin  | The OpenVDB Houdini shared library and OpenVDB Nodes                   | OPENVDB_BUILD_HOUDINI_PLUGIN                      | OFF        |
-OpenVDB Maya Plugin     | The Maya OpenVDB Nodes                                                 | OPENVDB_BUILD_MAYA_PLUGIN                         | OFF        |
-Documentation           | The OpenVDB doxygen documentation                                      | OPENVDB_BUILD_DOCS                                | OFF        |
+Component                 | Description                                                            | CMake Variable                                    | Default    |
+------------------------- | ---------------------------------------------------------------------- | ------------------------------------------------- | ---------- |
+OpenVDB Core Library      | The Core OpenVDB shared/static library                                 | OPENVDB_BUILD_CORE                                | ON         |
+OpenVDB Print             | Command line binary for displaying information about OpenVDB files     | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_PRINT  | ON / ON    |
+OpenVDB LOD               | Command line binary for generating volume mipmaps from an OpenVDB grid | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_LOD    | ON / OFF   |
+OpenVDB Render            | Command line binary for ray-tracing OpenVDB grids                      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_RENDER | ON / OFF   |
+OpenVDB View              | Command line binary for displaying OpenVDB grids in a GL viewport      | OPENVDB_BUILD_BINARIES / OPENVDB_BUILD_VDB_VIEW   | ON / OFF   |
+OpenVDB Python            | Python module for OpenVDB C++ Python bindings                          | OPENVDB_BUILD_PYTHON_MODULE                       | OFF        |
+OpenVDB UnitTests         | OpenVDB's Unit Test suite                                              | OPENVDB_BUILD_UNITTESTS                           | OFF        |
+OpenVDB Houdini Plugin    | The OpenVDB Houdini shared library and OpenVDB Nodes                   | OPENVDB_BUILD_HOUDINI_PLUGIN                      | OFF        |
+OpenVDB Maya Plugin       | The Maya OpenVDB Nodes                                                 | OPENVDB_BUILD_MAYA_PLUGIN                         | OFF        |
+OpenVDB AX Library        | The OpenVDB AX library                                                 | OPENVDB_BUILD_AX                                  | OFF        |
+OpenVDB AX Binary         | Command line binary for running OpenVDB AX code                        | OPENVDB_BUILD_AX_BINARIES                         | OFF        |
+OpenVDB AX Grammar        | Allows for re-generation of AX grammar, typically not required         | OPENVDB_BUILD_AX_GRAMMAR                          | OFF        |
+OpenVDB AX Unit Tests     | OpenVDB AX's Unit Test suite                                           | OPENVDB_BUILD_AX_UNITTESTS                        | OFF        |
+Documentation             | The OpenVDB doxygen documentation                                      | OPENVDB_BUILD_DOCS                                | OFF        |
+
+
 
 @section buildGuide Building With CMake
 
@@ -203,8 +215,9 @@ Developers may wish to build a standalone version of OpenVDB to take advantage
 of newer dependencies and newer library features. See
 [here](@ref buildBuildStandalone) for more information.
 
-@b Note: Blosc is treated as a required dependency in these install instructions.
-See the [blosc support](@ref buildBloscSupport) section for more information.
+@b Note: Blosc and ZLib are treated as required dependencies in these install
+instructions. See the [blosc support](@ref buildBloscSupport) and
+[zlib support](@ref buildZLibSupport) sections for more information.
 
 @subsection buildBuildHouMaya Building Against Houdini/Maya
 
@@ -238,16 +251,18 @@ Package        | Description                                                    
 CMake          | Cross-platform family of tools designed to help build software  | All                |
 C++14 Compiler | Matching Houdini compiler and version                           | All                |
 Boost          | Components: system, iostreams, python, thread                   | All                |
-CppUnit        | A unit testing framework module for C++                         | Unit Tests         |
+GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
+CppUnit        | A unit testing framework module for C++                         | Unit Tests (AX)    |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
 Doxygen        | Documentation generation from C++                               | Documentation      |
 Log4cplus      | An optional dependency for improved OpenVDB Logging             | Optional (All)     |
 NumPy          | Scientific computing with Python                                | Optional (Python)  |
+LLVM           | Target-independent code generation                              | OpenVDB AX         |
 
 At a minimum, boost, a matching C++14 compiler and CMake will be required. See
 the full [dependency list](@ref dependencies) for help with downloading and
-installing the above software. Note that as Blosc is provided as part of the
-Houdini installation `USE_BLOSC` should be left `ON`.
+installing the above software. Note that as Blosc and ZLib are provided as part
+of the Houdini installation `USE_BLOSC` and `USE_ZLIB` should be left `ON`.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've
@@ -321,12 +336,15 @@ Boost          | Components: system, iostreams, python, thread                  
 IlmBase        | Used half precision floating points and EXR serialization support | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
-CppUnit        | A unit testing framework module for C++                           | Unit Tests                       |
+GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
+CppUnit        | A unit testing framework module for C++                           | Unit Tests (AX)                  |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | Optional (Core) / OpenVDB Render |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
+LLVM           | Target-independent code generation                                | OpenVDB AX                       |
+
 
 * See [blosc support](@ref buildBloscSupport)
 
@@ -468,7 +486,7 @@ You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
 OpenVDB as a dependency:
 
 @code{.cmake}
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)

@@ -1,0 +1,3 @@
+vec3d p = {4.3,5.7,-6.2};
+vec3d@test1 = curlsimplexnoise(p);
+vec3d@test2 = curlsimplexnoise(4.3,5.7,-6.2);

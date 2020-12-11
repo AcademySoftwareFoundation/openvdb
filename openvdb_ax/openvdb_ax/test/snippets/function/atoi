@@ -1,0 +1,13 @@
+i@test1 = atoi("");
+i@test2 = atoi("-0");
+i@test3 = atoi("+0");
+i@test4 = atoi("-1");
+i@test5 = atoi("1");
+i@test6 = atoi("1s");
+i@test7 = atoi("1s");
+i@test8 = atoi(" 1");
+i@test9 = atoi("1s1");
+i@test10 = atoi("1 1");
+i@test11 = atoi("11");
+i@test12 = atoi("2147483647"); // int max
+i@test13 = atoi("-2147483648");

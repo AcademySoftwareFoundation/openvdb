@@ -1,0 +1,2 @@
+double@test1 = tanh(1.0);
+float@test2 = tanh(1.0f);
