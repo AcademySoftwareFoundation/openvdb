@@ -207,7 +207,7 @@ set(MINIMUM_CXX_STANDARD 14)
 set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2018 of the VFX platform where avaiable
+  # @note  Currently tracking CY2019 of the VFX platform where available
   set(MINIMUM_GCC_VERSION 6.3.1)
   set(MINIMUM_CLANG_VERSION 3.8)
   set(MINIMUM_ICC_VERSION 17)

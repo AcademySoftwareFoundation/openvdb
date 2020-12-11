@@ -2,8 +2,9 @@
 
 set -ex
 
-RELEASE="$1"
-EXTRAS="$2"
+RELEASE="$1"; shift
+EXTRAS="$1"; shift
+CMAKE_EXTRA="$@"
 
 # print versions
 bash --version
@@ -30,6 +31,7 @@ if [ -d "hou" ]; then
         -DOPENVDB_BUILD_PYTHON_MODULE=${EXTRAS} \
         -DOPENVDB_BUILD_UNITTESTS=${EXTRAS} \
         -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
+        ${CMAKE_EXTRA} \
          ..
 
     # Can only build using one thread with GCC due to memory constraints

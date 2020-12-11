@@ -50,7 +50,7 @@ jobs:
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build_houdini.sh Release ON
+      run: ./ci/build_houdini.sh Release ON -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
     - name: test
       run: ./ci/test.sh
     - name: write_houdini_cache
