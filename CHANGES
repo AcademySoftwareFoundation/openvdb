@@ -1,6 +1,11 @@
 OpenVDB Version History
 =======================
 
+Next Version - To Be Done
+
+    Houdini:
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+
 Version 7.2.0 - December 9, 2020
 
     New features:
