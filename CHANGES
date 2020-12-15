@@ -1,6 +1,20 @@
 OpenVDB Version History
 =======================
 
+
+Version 8.0.0 - In development
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 6 for
+      Houdini 18.0 and 7 for Houdini 18.5.
+
+    Build:
+    - As of this release, VFX Reference Platform 2018 is no longer supported.
+      CMake now issues deprecation warnings for 2019 VFX Reference Platform
+      version dependencies.
+
+
 Version 7.2.0 - December 9, 2020
 
     New features:
