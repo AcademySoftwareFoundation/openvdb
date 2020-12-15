@@ -1310,19 +1310,23 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         inline operator bool() const { return v < SdfValueT(1000); }
     };// NN
 
+    /// @note   Extending an integer field is based on the nearest-neighbor interpolation
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& /* w */, const ExtT& v1, const ExtT& v2) const { return d1.v < d2.v ? v1 : v2; }// int implementation
 
+    /// @note   Extending a non-integer field is based on a weighted interpolation
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT twoNghbr(const NN& d1, const NN& d2, const SdfT& w, const ExtT& v1, const ExtT& v2) const { return ExtT(w*(d1.v*v1 + d2.v*v2)); }// non-int implementation
 
+    /// @note   Extending an integer field is based on the nearest-neighbor interpolation
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& /* w */, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
-        ExtT tmp = d1.v < d2.v ? v1 : v2;
-        SdfT sdfTmp = d1.v < d2.v ? d1.v : d2.v;
-        return sdfTmp < d3.v ? tmp : v3;
+        Vec3R d(d1, d2, d3);
+        Vec3R v(v1, v2, v3);
+        return v[math::MinIndex(d)];
     }// int implementation
 
+    /// @note   Extending a non-integer field is based on a weighted interpolation
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& w, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
         return ExtT(w*(d1.v*v1 + d2.v*v2 + d3.v*v3));
