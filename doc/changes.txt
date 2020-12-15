@@ -8,14 +8,10 @@
 
 @par
 <BLOCKQUOTE>
-Some changes in this release (see @ref v8_0_0_ABI_changes "ABI changes" below)
-alter the grid&nbsp;ABI so that it is incompatible with earlier versions of
-the OpenVDB library, such as the ones built into Houdini up to and including
-Houdini&nbsp;18.5.
-To preserve ABI compatibility, when compiling OpenVDB or any dependent code
-define the macro <TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where,
-for example, <I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for
-Houdini&nbsp;18.5.
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
 </BLOCKQUOTE>
 
 @par
