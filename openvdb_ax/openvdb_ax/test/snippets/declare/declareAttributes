@@ -1,0 +1,14 @@
+@float_test1;
+int32@int_test1;
+
+int16@short_test = 1s;
+int32@int_test2 = 5;
+int64@long_test = 3l;
+
+float@float_test2 = 0.2f;
+double@double_test = 0.3;
+
+f@float_test3 = 10.0f;
+@float_test4 = 10.0f;
+
+i@int_test3 = 10;

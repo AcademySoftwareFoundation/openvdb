@@ -2,9 +2,23 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v7_1_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 7.1.1</B> - <I>In Development</I>
+<B>Version 8.0.0</B> - <I>In development</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
+</BLOCKQUOTE>
+
+@par
+Build:
+- As of this release, VFX Reference Platform 2018 is no longer supported.
+  CMake now issues deprecation warnings for 2019 VFX Reference Platform
+  version dependencies.
 
 @par
 New features:
@@ -16,9 +30,40 @@ New features:
   a vector containing all the active tiles in a tree that intersects a given
   CoordBBox.
 
+@htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.0</B> - <I>December 9, 2020</I>
+
+@par
+New features:
+- Added @vdblink::tree::DynamicNodeManager DynamicNodeManager@endlink that
+  lazily caches the nodes at each level of the tree to allow for efficient
+  threading of topology-changing top-down workflows.
+- Added @vdblink::tools::CsgUnionOp CsgUnionOp@endlink,
+  @vdblink::tools::CsgIntersectionOp CsgIntersectionOp@endlink and
+  @vdblink::tools::CsgDifferenceOp CsgDifferenceOp@endlink that use a parallel
+  breadth-first algorithm to accelerate CSG union, intersection and difference
+  operations.
+- Added @vdblink::tools::TreeToMerge TreeToMerge@endlink which provides methods
+  to steal or deep-copy from a tree based on the tag dispatch class used in its
+  construction.
+- Pre-release of OpenVDB AX, an open source C++ library that provides a
+  powerful and easy way of interacting with OpenVDB volume and point data.
+
 @par
 Improvements:
 - util::CpuTimer now uses C++11 chrono instead of TBB.
+- Threaded the construction of LeafManager and NodeManager linear arrays.
+- @vdblink::tools::csgUnion() csgUnion@endlink,
+  @vdblink::tools::csgIntersection() csgIntersection@endlink and
+  @vdblink::tools::csgDifference() csgDifference@endlink now use the new
+  parallel breadth-first algorithms for much faster performance.
+- Extended @vdblink::tree::NodeManager NodeManager@endlink to allow for use with
+  a const tree.
+- Added @vdblink::math::Abs Abs@endlink, @vdblink::math::cwiseAdd cwiseAdd@endlink,
+  @vdblink::math::cwiseLessThan cwiseLessThan@endlink and
+  @vdblink::math::cwiseGreaterThan cwiseGreaterThan@endlink methods for Matrix types.
+  Matrix grids can now be instantiated.
 
 @par
 Houdini:
@@ -34,6 +79,23 @@ Houdini:
 Bug Fixes:
 - Fixed a bug which could cause recursive compile time instantiations of
   TypeList objects, manifesting in longer compile times.
+- Deprecated @vdblink::util::PagedArray::push_back util::PagedArray::push_back@endlink
+  due to a race condition. Instead use
+  @vdblink::util::PagedArray::ValueBuffer::push_back util::PagedArray::ValueBuffer::push_back@endlink
+  which is faster and thread-safe.
+- Fixed various cases of undefined behavior in some LevelSetUtil methods
+  [Reported&nbsp;by&nbsp;fkemmler]
+
+@par
+API changes:
+- Deprecated tree::LeafManager::getNodes. This method is no longer used when
+  constructing a NodeManager from a LeafManager.
+- Deprecated Tree::visitActiveBBox, Tree::visit and Tree::visit2 methods in
+  favor of using a tree::DynamicNodeManager.
+- Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
+  tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG tools
+  now use the parallel breath-first algorithms.
+- Moved openvdb::TypeList from Types.h into its own header TypeList.h
 
 @par
 Build:
@@ -51,6 +113,7 @@ Build:
 - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
   Windows which use the multithread/DLL-specific version of the CRT.
   <I>[Reported&nbsp;by&nbsp;Tobias&nbsp;Rittig]</I>
+- Core library unit tests use GoogleTest instead of CppUnit.
 
 
 @htmlonly <a name="v7_1_0_changes"></a>@endhtmlonly

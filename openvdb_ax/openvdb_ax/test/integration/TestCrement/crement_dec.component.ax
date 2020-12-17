@@ -1,0 +1,40 @@
+
+vec2i@testvec2i1[0] = --vec2i@testvec2i2[0];
+vec2i@testvec2i1[1] = vec2i@testvec2i2[1]--;
+
+vec2f@testvec2f1[0] = --vec2f@testvec2f2[0];
+vec2f@testvec2f1[1] = vec2f@testvec2f2[1]--;
+
+vec2d@testvec2d1[0] = --vec2d@testvec2d2[0];
+vec2d@testvec2d1[1] = vec2d@testvec2d2[1]--;
+
+vec3i@testvec3i1[0] = --vec3i@testvec3i2[0];
+vec3i@testvec3i1[1] = vec3i@testvec3i2[1]--;
+
+vec3f@testvec3f1[0] = --vec3f@testvec3f2[0];
+vec3f@testvec3f1[1] = vec3f@testvec3f2[1]--;
+
+vec3d@testvec3d1[0] = --vec3d@testvec3d2[0];
+vec3d@testvec3d1[1] = vec3d@testvec3d2[1]--;
+
+vec4i@testvec4i1[0] = --vec4i@testvec4i2[0];
+vec4i@testvec4i1[1] = vec4i@testvec4i2[1]--;
+
+vec4f@testvec4f1[0] = --vec4f@testvec4f2[0];
+vec4f@testvec4f1[1] = vec4f@testvec4f2[1]--;
+
+vec4d@testvec4d1[0] = --vec4d@testvec4d2[0];
+vec4d@testvec4d1[1] = vec4d@testvec4d2[1]--;
+
+mat3f@testmat3f1[0] = --mat3f@testmat3f2[0];
+mat3f@testmat3f1[1] = mat3f@testmat3f2[1]--;
+
+mat3d@testmat3d1[0] = --mat3d@testmat3d2[0];
+mat3d@testmat3d1[1] = mat3d@testmat3d2[1]--;
+
+mat4f@testmat4f1[0] = --mat4f@testmat4f2[0];
+mat4f@testmat4f1[1] = mat4f@testmat4f2[1]--;
+
+mat4d@testmat4d1[0] = --mat4d@testmat4d2[0];
+mat4d@testmat4d1[1] = mat4d@testmat4d2[1]--;
+

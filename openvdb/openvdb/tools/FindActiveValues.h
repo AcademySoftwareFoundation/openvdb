@@ -698,7 +698,7 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline bool
+inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);

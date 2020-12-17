@@ -1,0 +1,15 @@
+
+vec2f@test1 += {1.1f, 2.3f};
+vec2f@test2 -= {1.1f, 2.3f};
+vec2f@test3 *= {1.1f, 2.3f};
+vec2f@test4 /= {1.1f, 2.3f};
+vec2f@test5 %= {1.1f, 2.3f};
+
+vec2f local1 = {1.1f, 2.3f},
+    local2 = {4.1f, 5.3f};
+
+local1 += local2;
+vec2f@test6 = local1;
+vec2f@test7 += vec2f@test8;
+vec2f@test9 += local2;
+

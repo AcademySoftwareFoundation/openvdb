@@ -1,34 +1,21 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
 #include <openvdb/math/ConjGradient.h>
 
 
-class TestConjGradient: public CppUnit::TestCase
+class TestConjGradient: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestConjGradient);
-    CPPUNIT_TEST(testJacobi);
-    CPPUNIT_TEST(testIncompleteCholesky);
-    CPPUNIT_TEST(testVectorDotProduct);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testJacobi();
-    void testIncompleteCholesky();
-    void testVectorDotProduct();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestConjGradient);
 
 
 ////////////////////////////////////////
 
 
-void
-TestConjGradient::testJacobi()
+TEST_F(TestConjGradient, testJacobi)
 {
     using namespace openvdb;
 
@@ -51,7 +38,7 @@ TestConjGradient::testJacobi()
     A.setValue(4, 2,  2.0);
     A.setValue(4, 4,  8.0);
 
-    CPPUNIT_ASSERT(A.isFinite());
+    EXPECT_TRUE(A.isFinite());
 
     MatrixType::VectorType
         x(rows, 0.0),
@@ -70,14 +57,13 @@ TestConjGradient::testJacobi()
     math::pcg::State result = math::pcg::solve(
         A, b, x, precond, math::pcg::terminationDefaults<double>());
 
-    CPPUNIT_ASSERT(result.success);
-    CPPUNIT_ASSERT(result.iterations <= 20);
-    CPPUNIT_ASSERT(x.eq(expected, 1.0e-5));
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.iterations <= 20);
+    EXPECT_TRUE(x.eq(expected, 1.0e-5));
 }
 
 
-void
-TestConjGradient::testIncompleteCholesky()
+TEST_F(TestConjGradient, testIncompleteCholesky)
 {
     using namespace openvdb;
 
@@ -101,7 +87,7 @@ TestConjGradient::testIncompleteCholesky()
     A.setValue(4, 2,  2.0);
     A.setValue(4, 4,  8.0);
 
-    CPPUNIT_ASSERT(A.isFinite());
+    EXPECT_TRUE(A.isFinite());
 
     CholeskyPrecond precond(A);
     {
@@ -129,7 +115,7 @@ TestConjGradient::testIncompleteCholesky()
         }
 #endif
 
-        CPPUNIT_ASSERT(lower.eq(expected, 1.0e-5));
+        EXPECT_TRUE(lower.eq(expected, 1.0e-5));
     }
     {
         const CholeskyPrecond::TriangularMatrix upper = precond.upperMatrix();
@@ -158,7 +144,7 @@ TestConjGradient::testIncompleteCholesky()
         }
 #endif
 
-        CPPUNIT_ASSERT(upper.eq(expected, 1.0e-5));
+        EXPECT_TRUE(upper.eq(expected, 1.0e-5));
     }
 
     MatrixType::VectorType
@@ -176,13 +162,12 @@ TestConjGradient::testIncompleteCholesky()
     math::pcg::State result = math::pcg::solve(
         A, b, x, precond, math::pcg::terminationDefaults<double>());
 
-    CPPUNIT_ASSERT(result.success);
-    CPPUNIT_ASSERT(result.iterations <= 20);
-    CPPUNIT_ASSERT(x.eq(expected, 1.0e-5));
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.iterations <= 20);
+    EXPECT_TRUE(x.eq(expected, 1.0e-5));
 }
 
-void
-TestConjGradient::testVectorDotProduct()
+TEST_F(TestConjGradient, testVectorDotProduct)
 {
     using namespace openvdb;
 
@@ -196,7 +181,7 @@ TestConjGradient::testVectorDotProduct()
 
         VectorType::ValueType result = aVec.dot(bVec);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(result, 6.0 * length, 1.0e-7);
+        EXPECT_NEAR(result, 6.0 * length, 1.0e-7);
     }
     // Test long vector  - runs in parallel
     {
@@ -206,6 +191,6 @@ TestConjGradient::testVectorDotProduct()
 
         VectorType::ValueType result = aVec.dot(bVec);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(result, 6.0 * length, 1.0e-7);
+        EXPECT_NEAR(result, 6.0 * length, 1.0e-7);
     }
 }

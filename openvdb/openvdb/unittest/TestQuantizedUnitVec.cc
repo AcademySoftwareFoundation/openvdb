@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/QuantizedUnitVec.h>
 #include <openvdb/math/Math.h>
@@ -12,21 +12,12 @@
 #include <ctime>
 
 
-class TestQuantizedUnitVec: public CppUnit::TestFixture
+class TestQuantizedUnitVec: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestQuantizedUnitVec);
-    CPPUNIT_TEST(testQuantization);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testQuantization();
-
-private:
+protected:
     // Generate a random number in the range [0, 1].
     double randNumber() { return double(rand()) / (double(RAND_MAX) + 1.0); }
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuantizedUnitVec);
 
 
 ////////////////////////////////////////
@@ -43,8 +34,7 @@ const uint16_t
 ////////////////////////////////////////
 
 
-void
-TestQuantizedUnitVec::testQuantization()
+TEST_F(TestQuantizedUnitVec, testQuantization)
 {
     using namespace openvdb;
     using namespace openvdb::math;
@@ -57,38 +47,38 @@ TestQuantizedUnitVec::testQuantization()
 
     uint16_t quantizedVec = QuantizedUnitVec::pack(unitVec);
 
-    CPPUNIT_ASSERT((quantizedVec & MASK_XSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_YSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_ZSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_XSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_YSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_ZSIGN));
 
     unitVec[0] = -unitVec[0];
     unitVec[2] = -unitVec[2];
     quantizedVec = QuantizedUnitVec::pack(unitVec);
 
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_XSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_YSIGN));
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_ZSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_XSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_YSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_ZSIGN));
 
     unitVec[1] = -unitVec[1];
     quantizedVec = QuantizedUnitVec::pack(unitVec);
 
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_XSIGN));
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_YSIGN));
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_ZSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_XSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_YSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_ZSIGN));
 
     QuantizedUnitVec::flipSignBits(quantizedVec);
 
-    CPPUNIT_ASSERT((quantizedVec & MASK_XSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_YSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_ZSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_XSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_YSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_ZSIGN));
 
     unitVec[2] = -unitVec[2];
     quantizedVec = QuantizedUnitVec::pack(unitVec);
     QuantizedUnitVec::flipSignBits(quantizedVec);
 
-    CPPUNIT_ASSERT((quantizedVec & MASK_XSIGN));
-    CPPUNIT_ASSERT((quantizedVec & MASK_YSIGN));
-    CPPUNIT_ASSERT(!(quantizedVec & MASK_ZSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_XSIGN));
+    EXPECT_TRUE((quantizedVec & MASK_YSIGN));
+    EXPECT_TRUE(!(quantizedVec & MASK_ZSIGN));
 
     //
     // Check conversion error
@@ -127,20 +117,20 @@ TestQuantizedUnitVec::testQuantization()
             n0[1] = float(std::sin(theta)*std::sin(phi));
             n0[2] = float(std::cos(theta));
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, n0.length(), 1e-6);
+            EXPECT_NEAR(1.0, n0.length(), 1e-6);
 
             n1 = QuantizedUnitVec::unpack(QuantizedUnitVec::pack(n0));
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, n1.length(), 1e-6);
+            EXPECT_NEAR(1.0, n1.length(), 1e-6);
 
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(n0[0], n1[0], tol);
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(n0[1], n1[1], tol);
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(n0[2], n1[2], tol);
+            EXPECT_NEAR(n0[0], n1[0], tol);
+            EXPECT_NEAR(n0[1], n1[1], tol);
+            EXPECT_NEAR(n0[2], n1[2], tol);
 
             float sumDiff = std::abs(n0[0] - n1[0]) + std::abs(n0[1] - n1[1])
                 + std::abs(n0[2] - n1[2]);
 
-            CPPUNIT_ASSERT(sumDiff < (2.0 * tol));
+            EXPECT_TRUE(sumDiff < (2.0 * tol));
         }
     }
 }

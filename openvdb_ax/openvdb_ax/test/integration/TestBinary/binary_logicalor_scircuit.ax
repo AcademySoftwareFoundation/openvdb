@@ -1,0 +1,10 @@
+
+int@scircuit1 = 0;
+int@scircuit2 = 1;
+int@scircuit3 = 2;
+int@scircuit1++ || ++int@scircuit2;
+++int@scircuit1 || ++int@scircuit3;
+int@scircuit4 = 1;
+int@scircuit5 = 1;
+true || int@scircuit4 = 2;
+false || int@scircuit5 = 2;

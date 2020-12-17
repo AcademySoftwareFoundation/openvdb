@@ -1,0 +1,2 @@
+
+v@P.y -= 0.0f; // decrement @P.y in world-space by zero.

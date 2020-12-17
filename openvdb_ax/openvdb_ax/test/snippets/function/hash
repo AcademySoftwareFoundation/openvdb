@@ -1,0 +1,5 @@
+
+int64@test1 = hash("");
+int64@test2 = hash("0");
+int64@test3 = hash("abc");
+int64@test4 = hash("123");

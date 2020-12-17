@@ -27,7 +27,7 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <tbb/atomic.h>
 #include <algorithm> // for std::sort
 #include <random>
@@ -39,71 +39,14 @@
 //#define TestTools_DATA_PATH "/usr/pic1/Data/OpenVDB/LevelSetModels/"
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
-class TestTools: public CppUnit::TestFixture
+class TestTools: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestTools);
-    CPPUNIT_TEST(testDilateVoxels);
-    CPPUNIT_TEST(testDilateActiveValues);
-    CPPUNIT_TEST(testErodeVoxels);
-    CPPUNIT_TEST(testActivate);
-    CPPUNIT_TEST(testFilter);
-    CPPUNIT_TEST(testFloatApply);
-    CPPUNIT_TEST(testInteriorMask);
-    CPPUNIT_TEST(testLevelSetSphere);
-    CPPUNIT_TEST(testLevelSetPlatonic);
-    CPPUNIT_TEST(testLevelSetAdvect);
-    CPPUNIT_TEST(testLevelSetMeasure);
-    CPPUNIT_TEST(testLevelSetMorph);
-    CPPUNIT_TEST(testMagnitude);
-    CPPUNIT_TEST(testMaskedMagnitude);
-    CPPUNIT_TEST(testNormalize);
-    CPPUNIT_TEST(testMaskedNormalize);
-    CPPUNIT_TEST(testPointAdvect);
-    CPPUNIT_TEST(testPointScatter);
-    CPPUNIT_TEST(testPrune);
-    CPPUNIT_TEST(testVolumeAdvect);
-    CPPUNIT_TEST(testTransformValues);
-    CPPUNIT_TEST(testVectorApply);
-    CPPUNIT_TEST(testAccumulate);
-    CPPUNIT_TEST(testUtil);
-    CPPUNIT_TEST(testVectorTransformer);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testDilateVoxels();
-    void testDilateActiveValues();
-    void testErodeVoxels();
-    void testActivate();
-    void testFilter();
-    void testFloatApply();
-    void testInteriorMask();
-    void testLevelSetSphere();
-    void testLevelSetPlatonic();
-    void testLevelSetAdvect();
-    void testLevelSetMeasure();
-    void testLevelSetMorph();
-    void testMagnitude();
-    void testMaskedMagnitude();
-    void testNormalize();
-    void testMaskedNormalize();
-    void testPointAdvect();
-    void testPointScatter();
-    void testPrune();
-    void testVolumeAdvect();
-    void testTransformValues();
-    void testVectorApply();
-    void testAccumulate();
-    void testUtil();
-    void testVectorTransformer();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestTools);
 
 
 #if 0
@@ -140,8 +83,7 @@ private:
 #endif
 
 
-void
-TestTools::testDilateVoxels()
+TEST_F(TestTools, testDilateVoxels)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -152,38 +94,38 @@ TestTools::testDilateVoxels()
 
     Tree543f::Ptr tree(new Tree543f);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
-    CPPUNIT_ASSERT(tree->empty());
+    EXPECT_TRUE(tree->empty());
 
     const openvdb::Index leafDim = Tree543f::LeafNodeType::DIM;
-    CPPUNIT_ASSERT_EQUAL(1 << 3, int(leafDim));
+    EXPECT_EQ(1 << 3, int(leafDim));
 
     {
         // Set and dilate a single voxel at the center of a leaf node.
         tree->clear();
         tree->setValue(Coord(leafDim >> 1), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeVoxelCount());
         openvdb::tools::dilateVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(7), tree->activeVoxelCount());
     }
     {
         // Create an active, leaf node-sized tile.
         tree->clear();
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(0), tree->leafCount());
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
         tree->setValue(Coord(leafDim, leafDim - 1, leafDim - 1), 1.0);
 
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1),
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim + 1),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
         openvdb::tools::dilateVoxels(*tree);
 
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim + 1 + 5),
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim + 1 + 5),
                              tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -195,10 +137,10 @@ TestTools::testDilateVoxels()
                 i & 2 ? leafDim - 1 : 0,
                 i & 4 ? leafDim - 1 : 0);
             tree->setValue(xyz, 1.0);
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+            EXPECT_EQ(Index64(1), tree->activeVoxelCount());
 
             openvdb::tools::dilateVoxels(*tree);
-            CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+            EXPECT_EQ(Index64(7), tree->activeVoxelCount());
         }
     }
     {
@@ -206,9 +148,9 @@ TestTools::testDilateVoxels()
         tree->setValue(Coord(0), 1.0);
         tree->setValue(Coord( 1, 0, 0), 1.0);
         tree->setValue(Coord(-1, 0, 0), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index64(3), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(3), tree->activeVoxelCount());
         openvdb::tools::dilateVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(Index64(17), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(17), tree->activeVoxelCount());
     }
     {
         struct Info { int activeVoxelCount, leafCount, nonLeafCount; };
@@ -230,9 +172,9 @@ TestTools::testDilateVoxels()
         tree->clear();
         tree->setValue(Coord(leafDim >> 1), 1.0);
         for (int i = 0; i < 11; ++i) {
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].activeVoxelCount, int(tree->activeVoxelCount()));
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].leafCount,        int(tree->leafCount()));
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].nonLeafCount,     int(tree->nonLeafCount()));
+            EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree->activeVoxelCount()));
+            EXPECT_EQ(iterInfo[i].leafCount,        int(tree->leafCount()));
+            EXPECT_EQ(iterInfo[i].nonLeafCount,     int(tree->nonLeafCount()));
 
             openvdb::tools::dilateVoxels(*tree);
         }
@@ -247,7 +189,7 @@ TestTools::testDilateVoxels()
                                             unittest_util::SPHERE_DENSE_NARROW_BAND);
         const openvdb::Index64 count = grid.tree().activeVoxelCount();
         openvdb::tools::dilateVoxels(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() > count);
     }
 
     {// dilate a fog volume of a sphere
@@ -262,7 +204,7 @@ TestTools::testDilateVoxels()
         //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
         //grid.print(std::cerr,5);
         openvdb::tools::dilateVoxels(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() > count);
         //std::cerr << "\nAfter: active voxel count = "
         //    << grid.tree().activeVoxelCount() << std::endl;
     }
@@ -277,7 +219,7 @@ TestTools::testDilateVoxels()
 //         //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
 //         //grid->print(std::cerr,5);
 //         openvdb::tools::dilateVoxels(grid->tree());
-//         CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+//         EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
 //         //std::cerr << "\nAfter: active voxel count = "
 //         //    << grid->tree().activeVoxelCount() << std::endl;
 //     }
@@ -288,10 +230,10 @@ TestTools::testDilateVoxels()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::Morphology<Tree543f> m(tree1);
                     m.dilateVoxels6();
                     for (int i=-1; i<=1; ++i) {
@@ -302,14 +244,14 @@ TestTools::testDilateVoxels()
                                            + openvdb::math::Abs(d[1])
                                            + openvdb::math::Abs(d[2]);
                                 if (n<=1) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6), tree1.activeVoxelCount());
                 }
             }
         }
@@ -320,10 +262,10 @@ TestTools::testDilateVoxels()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::Morphology<Tree543f> m(tree1);
                     m.dilateVoxels18();
                     for (int i=-1; i<=1; ++i) {
@@ -334,14 +276,14 @@ TestTools::testDilateVoxels()
                                            + openvdb::math::Abs(d[1])
                                            + openvdb::math::Abs(d[2]);
                                 if (n<=2) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6 + 12), tree1.activeVoxelCount());
                 }
             }
         }
@@ -352,10 +294,10 @@ TestTools::testDilateVoxels()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::Morphology<Tree543f> m(tree1);
                     m.dilateVoxels26();
                     for (int i=-1; i<=1; ++i) {
@@ -366,14 +308,14 @@ TestTools::testDilateVoxels()
                                             + openvdb::math::Abs(d[1])
                                             + openvdb::math::Abs(d[2]);
                                 if (n<=3) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
                 }
             }
         }
@@ -393,7 +335,7 @@ TestTools::testDilateVoxels()
         t.start("sphere dilateVoxels6");
         openvdb::tools::dilateVoxels(grid->tree());
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         // grid->print(std::cerr, 3);
     }
     {// dialte a narrow band of a sphere
@@ -409,7 +351,7 @@ TestTools::testDilateVoxels()
         t.start("sphere dilateVoxels18");
         openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         //grid->print(std::cerr, 3);
     }
     {// dialte a narrow band of a sphere
@@ -425,7 +367,7 @@ TestTools::testDilateVoxels()
         t.start("sphere dilateVoxels26");
         openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         //grid->print(std::cerr, 3);
     }
     */
@@ -458,14 +400,13 @@ TestTools::testDilateVoxels()
             openvdb::tools::dilateVoxels(mask, 1, openvdb::tools::NN_FACE);
             timer.stop();
             //mask.print(std::cout, 3);
-            CPPUNIT_ASSERT_EQUAL(model->activeVoxelCount(), mask.activeVoxelCount());
+            EXPECT_EQ(model->activeVoxelCount(), mask.activeVoxelCount());
         }
     }
 #endif
 }
 
-void
-TestTools::testDilateActiveValues()
+TEST_F(TestTools, testDilateActiveValues)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -476,64 +417,64 @@ TestTools::testDilateActiveValues()
 
     Tree543f::Ptr tree(new Tree543f);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
-    CPPUNIT_ASSERT(tree->empty());
+    EXPECT_TRUE(tree->empty());
 
     const openvdb::Index leafDim = Tree543f::LeafNodeType::DIM;
-    CPPUNIT_ASSERT_EQUAL(1 << 3, int(leafDim));
+    EXPECT_EQ(1 << 3, int(leafDim));
 
     {
         // Set and dilate a single voxel at the center of a leaf node.
         tree->clear();
         tree->setValue(Coord(leafDim >> 1), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeVoxelCount());
         openvdb::tools::dilateActiveValues(*tree);
-        CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(7), tree->activeVoxelCount());
     }
     {
         // Create an active, leaf node-sized tile.
         tree->clear();
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(0), tree->leafCount());
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
         // This has no effect
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(0), tree->leafCount());
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
     }
     {
         // Create an active, leaf node-sized tile.
         tree->clear();
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(0), tree->leafCount());
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::EXPAND_TILES);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1+6), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeTileCount());
+        EXPECT_EQ(Index32(1+6), tree->leafCount());
+        EXPECT_EQ(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(0), tree->activeTileCount());
 
     }
     {
         // Create an active, leaf node-sized tile.
         tree->clear();
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(0), tree->leafCount());
+        EXPECT_EQ(Index64(leafDim * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
         // Adds 6 faces of voxels, each of size leafDim^2
         openvdb::tools::dilateActiveValues(*tree, 1, openvdb::tools::NN_FACE, openvdb::tools::PRESERVE_TILES);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(6), tree->leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
-        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeTileCount());
+        EXPECT_EQ(Index32(6), tree->leafCount());
+        EXPECT_EQ(Index64((leafDim + 6) * leafDim * leafDim), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1), tree->activeTileCount());
 
     }
     {
@@ -546,10 +487,10 @@ TestTools::testDilateActiveValues()
                 i & 2 ? leafDim - 1 : 0,
                 i & 4 ? leafDim - 1 : 0);
             tree->setValue(xyz, 1.0);
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
+            EXPECT_EQ(Index64(1), tree->activeVoxelCount());
 
             openvdb::tools::dilateActiveValues(*tree);
-            CPPUNIT_ASSERT_EQUAL(Index64(7), tree->activeVoxelCount());
+            EXPECT_EQ(Index64(7), tree->activeVoxelCount());
         }
     }
     {
@@ -557,9 +498,9 @@ TestTools::testDilateActiveValues()
         tree->setValue(Coord(0), 1.0);
         tree->setValue(Coord( 1, 0, 0), 1.0);
         tree->setValue(Coord(-1, 0, 0), 1.0);
-        CPPUNIT_ASSERT_EQUAL(Index64(3), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(3), tree->activeVoxelCount());
         openvdb::tools::dilateActiveValues(*tree);
-        CPPUNIT_ASSERT_EQUAL(Index64(17), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(17), tree->activeVoxelCount());
     }
     {
         struct Info { int activeVoxelCount, leafCount, nonLeafCount; };
@@ -581,9 +522,9 @@ TestTools::testDilateActiveValues()
         tree->clear();
         tree->setValue(Coord(leafDim >> 1), 1.0);
         for (int i = 0; i < 11; ++i) {
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].activeVoxelCount, int(tree->activeVoxelCount()));
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].leafCount,        int(tree->leafCount()));
-            CPPUNIT_ASSERT_EQUAL(iterInfo[i].nonLeafCount,     int(tree->nonLeafCount()));
+            EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree->activeVoxelCount()));
+            EXPECT_EQ(iterInfo[i].leafCount,        int(tree->leafCount()));
+            EXPECT_EQ(iterInfo[i].nonLeafCount,     int(tree->nonLeafCount()));
 
             openvdb::tools::dilateActiveValues(*tree);
         }
@@ -598,7 +539,7 @@ TestTools::testDilateActiveValues()
                                             unittest_util::SPHERE_DENSE_NARROW_BAND);
         const openvdb::Index64 count = grid.tree().activeVoxelCount();
         openvdb::tools::dilateActiveValues(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() > count);
     }
 
     {// dilate a fog volume of a sphere
@@ -613,7 +554,7 @@ TestTools::testDilateActiveValues()
         //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
         //grid.print(std::cerr,5);
         openvdb::tools::dilateActiveValues(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() > count);
         //std::cerr << "\nAfter: active voxel count = "
         //    << grid.tree().activeVoxelCount() << std::endl;
     }
@@ -628,7 +569,7 @@ TestTools::testDilateActiveValues()
 //         //std::cerr << "\nBefore: active voxel count = " << count << std::endl;
 //         //grid->print(std::cerr,5);
 //         openvdb::tools::dilateActiveValues(grid->tree());
-//         CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+//         EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
 //         //std::cerr << "\nAfter: active voxel count = "
 //         //    << grid->tree().activeVoxelCount() << std::endl;
 //     }
@@ -639,10 +580,10 @@ TestTools::testDilateActiveValues()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE);
                     //openvdb::tools::Morphology<Tree543f> m(tree1);
                     //m.dilateVoxels6();
@@ -654,14 +595,14 @@ TestTools::testDilateActiveValues()
                                            + openvdb::math::Abs(d[1])
                                            + openvdb::math::Abs(d[2]);
                                 if (n<=1) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6), tree1.activeVoxelCount());
                 }
             }
         }
@@ -672,10 +613,10 @@ TestTools::testDilateActiveValues()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE_EDGE);
                     //openvdb::tools::Morphology<Tree543f> m(tree1);
                     //m.dilateVoxels18();
@@ -687,14 +628,14 @@ TestTools::testDilateActiveValues()
                                            + openvdb::math::Abs(d[1])
                                            + openvdb::math::Abs(d[2]);
                                 if (n<=2) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6 + 12), tree1.activeVoxelCount());
                 }
             }
         }
@@ -705,10 +646,10 @@ TestTools::testDilateActiveValues()
                 for (int z=0; z<8; ++z) {
                     const openvdb::Coord ijk(x,y,z);
                     Tree543f tree1(0.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree1.activeVoxelCount());
                     tree1.setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree1.activeVoxelCount());
-                    CPPUNIT_ASSERT(tree1.isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree1.activeVoxelCount());
+                    EXPECT_TRUE(tree1.isValueOn(ijk));
                     openvdb::tools::dilateActiveValues(tree1, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
                     //openvdb::tools::Morphology<Tree543f> m(tree1);
                     //m.dilateVoxels26();
@@ -720,14 +661,14 @@ TestTools::testDilateActiveValues()
                                             + openvdb::math::Abs(d[1])
                                             + openvdb::math::Abs(d[2]);
                                 if (n<=3) {
-                                    CPPUNIT_ASSERT( tree1.isValueOn(xyz));
+                                    EXPECT_TRUE( tree1.isValueOn(xyz));
                                 } else {
-                                    CPPUNIT_ASSERT(!tree1.isValueOn(xyz));
+                                    EXPECT_TRUE(!tree1.isValueOn(xyz));
                                 }
                             }
                         }
                     }
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6 + 12 + 8), tree1.activeVoxelCount());
                 }
             }
         }
@@ -748,7 +689,7 @@ TestTools::testDilateActiveValues()
         openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE);
         //openvdb::tools::dilateVoxels(grid->tree());
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         // grid->print(std::cerr, 3);
     }
     {// dialte a narrow band of a sphere
@@ -765,7 +706,7 @@ TestTools::testDilateActiveValues()
         openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
         //openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE);
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         //grid->print(std::cerr, 3);
     }
     {// dialte a narrow band of a sphere
@@ -782,7 +723,7 @@ TestTools::testDilateActiveValues()
         openvdb::tools::dilateActiveValues(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
         //openvdb::tools::dilateVoxels(grid->tree(), 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
         t.stop();
-        CPPUNIT_ASSERT(grid->tree().activeVoxelCount() > count);
+        EXPECT_TRUE(grid->tree().activeVoxelCount() > count);
         //grid->print(std::cerr, 3);
         }
     */
@@ -814,15 +755,14 @@ TestTools::testDilateActiveValues()
             openvdb::tools::dilateActiveValues(mask, 1, openvdb::tools::NN_FACE);
             timer.stop();
             //mask.print(std::cout, 3);
-            CPPUNIT_ASSERT_EQUAL(model->activeVoxelCount(), mask.activeVoxelCount());
+            EXPECT_EQ(model->activeVoxelCount(), mask.activeVoxelCount());
         }
     }
 #endif
 
 }
 
-void
-TestTools::testErodeVoxels()
+TEST_F(TestTools, testErodeVoxels)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -833,46 +773,46 @@ TestTools::testErodeVoxels()
 
     TreeType::Ptr tree(new TreeType);
     openvdb::tools::changeBackground(*tree, /*background=*/5.0);
-    CPPUNIT_ASSERT(tree->empty());
+    EXPECT_TRUE(tree->empty());
 
     const int leafDim = TreeType::LeafNodeType::DIM;
-    CPPUNIT_ASSERT_EQUAL(1 << 3, leafDim);
+    EXPECT_EQ(1 << 3, leafDim);
 
     {
         // Set, dilate and erode a single voxel at the center of a leaf node.
         tree->clear();
-        CPPUNIT_ASSERT_EQUAL(0, int(tree->activeVoxelCount()));
+        EXPECT_EQ(0, int(tree->activeVoxelCount()));
 
         tree->setValue(Coord(leafDim >> 1), 1.0);
-        CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+        EXPECT_EQ(1, int(tree->activeVoxelCount()));
 
         openvdb::tools::dilateVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(7, int(tree->activeVoxelCount()));
+        EXPECT_EQ(7, int(tree->activeVoxelCount()));
 
         openvdb::tools::erodeVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+        EXPECT_EQ(1, int(tree->activeVoxelCount()));
 
         openvdb::tools::erodeVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(0, int(tree->activeVoxelCount()));
+        EXPECT_EQ(0, int(tree->activeVoxelCount()));
     }
     {
         // Create an active, leaf node-sized tile.
         tree->clear();
         tree->fill(CoordBBox(Coord(0), Coord(leafDim - 1)), 1.0);
-        CPPUNIT_ASSERT_EQUAL(0, int(tree->leafCount()));
-        CPPUNIT_ASSERT_EQUAL(leafDim * leafDim * leafDim, int(tree->activeVoxelCount()));
+        EXPECT_EQ(0, int(tree->leafCount()));
+        EXPECT_EQ(leafDim * leafDim * leafDim, int(tree->activeVoxelCount()));
 
         tree->setValue(Coord(leafDim, leafDim - 1, leafDim - 1), 1.0);
-        CPPUNIT_ASSERT_EQUAL(1, int(tree->leafCount()));
-        CPPUNIT_ASSERT_EQUAL(leafDim * leafDim * leafDim + 1,int(tree->activeVoxelCount()));
+        EXPECT_EQ(1, int(tree->leafCount()));
+        EXPECT_EQ(leafDim * leafDim * leafDim + 1,int(tree->activeVoxelCount()));
 
         openvdb::tools::dilateVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(3, int(tree->leafCount()));
-        CPPUNIT_ASSERT_EQUAL(leafDim * leafDim * leafDim + 1 + 5,int(tree->activeVoxelCount()));
+        EXPECT_EQ(3, int(tree->leafCount()));
+        EXPECT_EQ(leafDim * leafDim * leafDim + 1 + 5,int(tree->activeVoxelCount()));
 
         openvdb::tools::erodeVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(1, int(tree->leafCount()));
-        CPPUNIT_ASSERT_EQUAL(leafDim * leafDim * leafDim + 1, int(tree->activeVoxelCount()));
+        EXPECT_EQ(1, int(tree->leafCount()));
+        EXPECT_EQ(leafDim * leafDim * leafDim + 1, int(tree->activeVoxelCount()));
     }
     {
         // Set and dilate a single voxel at each of the eight corners of a leaf node.
@@ -884,13 +824,13 @@ TestTools::testErodeVoxels()
                 i & 2 ? leafDim - 1 : 0,
                 i & 4 ? leafDim - 1 : 0);
             tree->setValue(xyz, 1.0);
-            CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+            EXPECT_EQ(1, int(tree->activeVoxelCount()));
 
             openvdb::tools::dilateVoxels(*tree);
-            CPPUNIT_ASSERT_EQUAL(7, int(tree->activeVoxelCount()));
+            EXPECT_EQ(7, int(tree->activeVoxelCount()));
 
             openvdb::tools::erodeVoxels(*tree);
-            CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
+            EXPECT_EQ(1, int(tree->activeVoxelCount()));
         }
     }
     {
@@ -899,20 +839,20 @@ TestTools::testErodeVoxels()
         tree->setValue(Coord(0), 1.0);
         tree->setValue(Coord( 1, 0, 0), 1.0);
         tree->setValue(Coord(-1, 0, 0), 1.0);
-        CPPUNIT_ASSERT_EQUAL(3, int(tree->activeVoxelCount()));
+        EXPECT_EQ(3, int(tree->activeVoxelCount()));
 
         openvdb::tools::dilateVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(17, int(tree->activeVoxelCount()));
+        EXPECT_EQ(17, int(tree->activeVoxelCount()));
 
         openvdb::tools::erodeVoxels(*tree);
-        CPPUNIT_ASSERT_EQUAL(3, int(tree->activeVoxelCount()));
+        EXPECT_EQ(3, int(tree->activeVoxelCount()));
     }
     {
         struct Info {
             void test(TreeType::Ptr aTree) {
-                CPPUNIT_ASSERT_EQUAL(activeVoxelCount, int(aTree->activeVoxelCount()));
-                CPPUNIT_ASSERT_EQUAL(leafCount,        int(aTree->leafCount()));
-                CPPUNIT_ASSERT_EQUAL(nonLeafCount,     int(aTree->nonLeafCount()));
+                EXPECT_EQ(activeVoxelCount, int(aTree->activeVoxelCount()));
+                EXPECT_EQ(leafCount,        int(aTree->leafCount()));
+                EXPECT_EQ(nonLeafCount,     int(aTree->nonLeafCount()));
             }
             int activeVoxelCount, leafCount, nonLeafCount;
         };
@@ -972,7 +912,7 @@ TestTools::testErodeVoxels()
                                             unittest_util::SPHERE_DENSE_NARROW_BAND);
         const openvdb::Index64 count = grid.tree().activeVoxelCount();
         openvdb::tools::erodeVoxels(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() < count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() < count);
     }
 
     {// erode a fog volume of a sphere
@@ -985,7 +925,7 @@ TestTools::testErodeVoxels()
         openvdb::tools::sdfToFogVolume(grid);
         const openvdb::Index64 count = grid.tree().activeVoxelCount();
         openvdb::tools::erodeVoxels(grid.tree());
-        CPPUNIT_ASSERT(grid.tree().activeVoxelCount() < count);
+        EXPECT_TRUE(grid.tree().activeVoxelCount() < count);
     }
 
     {//erode6
@@ -994,15 +934,15 @@ TestTools::testErodeVoxels()
                 for (int z=0; z<8; ++z) {
                     tree->clear();
                     const openvdb::Coord ijk(x,y,z);
-                    CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                    EXPECT_EQ(Index64(0), tree->activeVoxelCount());
                     tree->setValue(ijk, 1.0f);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree->activeVoxelCount());
+                    EXPECT_TRUE(tree->isValueOn(ijk));
                     openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6), tree->activeVoxelCount());
+                    EXPECT_EQ(Index64(1 + 6), tree->activeVoxelCount());
                     openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE);
-                    CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                    CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                    EXPECT_EQ(Index64(1), tree->activeVoxelCount());
+                    EXPECT_TRUE(tree->isValueOn(ijk));
                 }
             }
         }
@@ -1017,19 +957,19 @@ TestTools::testErodeVoxels()
                     for (int z=0; z<8; ++z) {
                         const openvdb::Coord ijk(x,y,z);
                         tree->clear();
-                        CPPUNIT_ASSERT_EQUAL(Index64(0), tree->activeVoxelCount());
+                        EXPECT_EQ(Index64(0), tree->activeVoxelCount());
                         tree->setValue(ijk, 1.0f);
-                        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                        CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                        EXPECT_EQ(Index64(1), tree->activeVoxelCount());
+                        EXPECT_TRUE(tree->isValueOn(ijk));
                         //openvdb::tools::dilateVoxels(*tree, iter, openvdb::tools::NN_FACE_EDGE);
                         openvdb::tools::dilateVoxels(*tree, iter, openvdb::tools::NN_FACE);
                         //std::cerr << "Dilated to: " << tree->activeVoxelCount() << std::endl;
                         //if (iter==1) {
-                        //    CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12), tree->activeVoxelCount());
+                        //    EXPECT_EQ(Index64(1 + 6 + 12), tree->activeVoxelCount());
                         //}
                         openvdb::tools::erodeVoxels( *tree, iter, openvdb::tools::NN_FACE_EDGE);
-                        CPPUNIT_ASSERT_EQUAL(Index64(1), tree->activeVoxelCount());
-                        CPPUNIT_ASSERT(tree->isValueOn(ijk));
+                        EXPECT_EQ(Index64(1), tree->activeVoxelCount());
+                        EXPECT_TRUE(tree->isValueOn(ijk));
                     }
                 }
             }
@@ -1042,19 +982,18 @@ TestTools::testErodeVoxels()
         tree->clear();
         tree->setValue(openvdb::Coord(3,4,5), 1.0f);
         openvdb::tools::dilateVoxels(*tree, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
-        CPPUNIT_ASSERT_EQUAL(Index64(1 + 6 + 12 + 8), tree->activeVoxelCount());
+        EXPECT_EQ(Index64(1 + 6 + 12 + 8), tree->activeVoxelCount());
         openvdb::tools::erodeVoxels( *tree, 1, openvdb::tools::NN_FACE_EDGE_VERTEX);
         //openvdb::tools::dilateVoxels(*tree, 12, openvdb::tools::NN_FACE_EDGE);
         //openvdb::tools::erodeVoxels( *tree, 12, openvdb::tools::NN_FACE_EDGE);
-        CPPUNIT_ASSERT_EQUAL(1, int(tree->activeVoxelCount()));
-        CPPUNIT_ASSERT(tree->isValueOn(openvdb::Coord(3,4,5)));
+        EXPECT_EQ(1, int(tree->activeVoxelCount()));
+        EXPECT_TRUE(tree->isValueOn(openvdb::Coord(3,4,5)));
         }
 #endif
 }
 
 
-void
-TestTools::testActivate()
+TEST_F(TestTools, testActivate)
 {
     using namespace openvdb;
 
@@ -1069,26 +1008,25 @@ TestTools::testActivate()
 
     // Mark some background voxels as active.
     tree.fill(bbox2, background, /*active=*/true);
-    CPPUNIT_ASSERT_EQUAL(bbox2.volume() + bbox1.volume(), tree.activeVoxelCount());
+    EXPECT_EQ(bbox2.volume() + bbox1.volume(), tree.activeVoxelCount());
 
     // Deactivate all voxels with the background value.
     tools::deactivate(tree, background, /*tolerance=*/Vec3s(1.0e-6f));
     // Verify that there are no longer any active voxels with the background value.
-    CPPUNIT_ASSERT_EQUAL(bbox1.volume(), tree.activeVoxelCount());
+    EXPECT_EQ(bbox1.volume(), tree.activeVoxelCount());
 
     // Set some voxels to the foreground value but leave them inactive.
     tree.fill(bbox2, foreground, /*active=*/false);
     // Verify that there are no active voxels with the background value.
-    CPPUNIT_ASSERT_EQUAL(bbox1.volume(), tree.activeVoxelCount());
+    EXPECT_EQ(bbox1.volume(), tree.activeVoxelCount());
 
     // Activate all voxels with the foreground value.
     tools::activate(tree, foreground);
     // Verify that the expected number of voxels are active.
-    CPPUNIT_ASSERT_EQUAL(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
+    EXPECT_EQ(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
 }
 
-void
-TestTools::testFilter()
+TEST_F(TestTools, testFilter)
 {
     openvdb::FloatGrid::Ptr referenceGrid = openvdb::FloatGrid::create(/*background=*/5.0);
 
@@ -1099,7 +1037,7 @@ TestTools::testFilter()
         dim, center, radius, *referenceGrid, unittest_util::SPHERE_DENSE);
     const openvdb::FloatTree& sphere = referenceGrid->tree();
 
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(sphere.activeVoxelCount()));
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(sphere.activeVoxelCount()));
     openvdb::Coord xyz;
 
     {// test Filter::offsetFilter
@@ -1117,7 +1055,7 @@ TestTools::testFilter()
                     xyz[2]=z;
                     float delta = sphere.getValue(xyz) + offset - tree.getValue(xyz);
                     //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
+                    EXPECT_NEAR(0.0f, delta, /*tolerance=*/0.0001);
                 }
             }
         }
@@ -1131,7 +1069,7 @@ TestTools::testFilter()
                     xyz[2]=z;
                     float delta = sphere.getValue(xyz) - tree.getValue(xyz);
                     //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
+                    EXPECT_NEAR(0.0f, delta, /*tolerance=*/0.0001);
                 }
             }
         }
@@ -1163,9 +1101,9 @@ TestTools::testFilter()
                     }
                     std::sort(tmp.begin(), tmp.end());
                     stencil.moveTo(xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    EXPECT_NEAR(
                         tmp[(tmp.size()-1)/2], stencil.median(), /*tolerance=*/0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    EXPECT_NEAR(
                         stencil.median(), filteredTree.getValue(xyz), /*tolerance=*/0.0001);
                     tmp.clear();
                 }
@@ -1199,9 +1137,9 @@ TestTools::testFilter()
                         }
                     }
                     stencil.moveTo(xyz);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    EXPECT_NEAR(
                         sum/count, stencil.mean(), /*tolerance=*/0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                    EXPECT_NEAR(
                         stencil.mean(), filteredTree.getValue(xyz), 0.0001);
                 }
             }
@@ -1211,8 +1149,7 @@ TestTools::testFilter()
 }
 
 
-void
-TestTools::testInteriorMask()
+TEST_F(TestTools, testInteriorMask)
 {
     using namespace openvdb;
 
@@ -1233,18 +1170,17 @@ TestTools::testInteriorMask()
     // For a non-level-set grid, tools::interiorMask() should return
     // a mask of the active voxels.
     auto mask = tools::interiorMask(lsgrid);
-    CPPUNIT_ASSERT_EQUAL(extBand.volume() - inside.volume(), mask->activeVoxelCount());
+    EXPECT_EQ(extBand.volume() - inside.volume(), mask->activeVoxelCount());
 
     // For a level set, tools::interiorMask() should return a mask
     // of the interior of the isosurface.
     lsgrid.setGridClass(GRID_LEVEL_SET);
     mask = tools::interiorMask(lsgrid);
-    CPPUNIT_ASSERT_EQUAL(intBand.volume(), mask->activeVoxelCount());
+    EXPECT_EQ(intBand.volume(), mask->activeVoxelCount());
 }
 
 
-void
-TestTools::testLevelSetSphere()
+TEST_F(TestTools, testLevelSetSphere)
 {
     const float radius = 4.3f;
     const openvdb::Vec3f center(15.8f, 13.2f, 16.7f);
@@ -1268,24 +1204,23 @@ TestTools::testLevelSetSphere()
                 const float val1 = grid1->tree().getValue(openvdb::Coord(i,j,k));
                 const float val2 = grid2->tree().getValue(openvdb::Coord(i,j,k));
                 if (dist > outside) {
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL( outside, val1, 0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL( outside, val2, 0.0001);
+                    EXPECT_NEAR( outside, val1, 0.0001);
+                    EXPECT_NEAR( outside, val2, 0.0001);
                 } else if (dist < inside) {
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL( inside, val1, 0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL( inside, val2, 0.0001);
+                    EXPECT_NEAR( inside, val1, 0.0001);
+                    EXPECT_NEAR( inside, val2, 0.0001);
                 } else {
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val1, 0.0001);
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(  dist, val2, 0.0001);
+                    EXPECT_NEAR(  dist, val1, 0.0001);
+                    EXPECT_NEAR(  dist, val2, 0.0001);
                 }
             }
         }
     }
 
-    CPPUNIT_ASSERT_EQUAL(grid1->activeVoxelCount(), grid2->activeVoxelCount());
+    EXPECT_EQ(grid1->activeVoxelCount(), grid2->activeVoxelCount());
 }// testLevelSetSphere
 
-void
-TestTools::testLevelSetPlatonic()
+TEST_F(TestTools, testLevelSetPlatonic)
 {
     using namespace openvdb;
 
@@ -1303,53 +1238,52 @@ TestTools::testLevelSetPlatonic()
     {// test tetrahedron
         FloatGrid::Ptr ls = tools::createLevelSetTetrahedron<FloatGrid>(scale, center,
                                                                         voxelSize, width);
-        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
-        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(), ls->tree().getValue(ijk), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(), ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(background, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
     {// test cube
         FloatGrid::Ptr ls = tools::createLevelSetCube<FloatGrid>(scale, center,
                                                                  voxelSize, width);
-        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
-        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(background, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
     {// test octahedron
         FloatGrid::Ptr ls = tools::createLevelSetOctahedron<FloatGrid>(scale, center,
                                                                        voxelSize, width);
-        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
-        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(background, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
     {// test icosahedron
         FloatGrid::Ptr ls = tools::createLevelSetIcosahedron<FloatGrid>(scale, center,
                                                                         voxelSize, width);
-        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
-        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(background, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
     {// test dodecahedron
         FloatGrid::Ptr ls = tools::createLevelSetDodecahedron<FloatGrid>(scale, center,
                                                                          voxelSize, width);
-        CPPUNIT_ASSERT(ls->activeVoxelCount() > 0);
-        CPPUNIT_ASSERT(ls->tree().isValueOff(ijk));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(-ls->background(),ls->tree().getValue(ijk), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(background, ls->background(), 1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
+        EXPECT_TRUE(ls->activeVoxelCount() > 0);
+        EXPECT_TRUE(ls->tree().isValueOff(ijk));
+        EXPECT_NEAR(-ls->background(),ls->tree().getValue(ijk), 1e-6);
+        EXPECT_NEAR(background, ls->background(), 1e-6);
+        EXPECT_NEAR(ls->background(),ls->tree().getValue(Coord(0)), 1e-6);
     }
 
 }// testLevelSetPlatonic
 
-void
-TestTools::testLevelSetAdvect()
+TEST_F(TestTools, testLevelSetAdvect)
 {
     // Uncomment sections below to run this (time-consuming) test
     using namespace openvdb;
@@ -1372,28 +1306,28 @@ TestTools::testLevelSetAdvect()
         ASSERT_DOUBLES_EXACTLY_EQUAL( gamma, grid->background());
         ASSERT_DOUBLES_EXACTLY_EQUAL( halfWidth, tracker.getHalfWidth());
 
-        CPPUNIT_ASSERT(!tracker.resize());
+        EXPECT_TRUE(!tracker.resize());
 
         {// check range of on values in a sphere w/o mask
             tools::CheckRange<GridT, true, true, GridT::ValueOnCIter> c(-gamma, gamma);
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c);
             //std::cerr << "Values out of range:\n" << str;
-            CPPUNIT_ASSERT(str.empty());
-            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
-            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+            EXPECT_TRUE(str.empty());
+            EXPECT_EQ(0, int(d.valueCount()));
+            EXPECT_EQ(0, int(d.failureCount()));
         }
         {// check norm of gradient of sphere w/o mask
             tools::CheckNormGrad<GridT> c(*grid, 0.9f, 1.1f);
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c, false, true, false, false);
             //std::cerr << "NormGrad:\n" << str;
-            CPPUNIT_ASSERT(str.empty());
-            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
-            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+            EXPECT_TRUE(str.empty());
+            EXPECT_EQ(0, int(d.valueCount()));
+            EXPECT_EQ(0, int(d.failureCount()));
         }
 
-        CPPUNIT_ASSERT(tracker.resize(4));
+        EXPECT_TRUE(tracker.resize(4));
 
         ASSERT_DOUBLES_EXACTLY_EQUAL( 4*voxelSize, grid->background());
         ASSERT_DOUBLES_EXACTLY_EQUAL( 4.0f, tracker.getHalfWidth());
@@ -1404,18 +1338,18 @@ TestTools::testLevelSetAdvect()
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c);
             //std::cerr << "Values out of range:\n" << str;
-            CPPUNIT_ASSERT(str.empty());
-            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
-            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+            EXPECT_TRUE(str.empty());
+            EXPECT_EQ(0, int(d.valueCount()));
+            EXPECT_EQ(0, int(d.failureCount()));
         }
         {// check norm of gradient of sphere w/o mask
             tools::CheckNormGrad<GridT> c(*grid, 0.4f, 1.1f);
             tools::Diagnose<GridT> d(*grid);
             std::string str = d.check(c, false, true, false, false);
             //std::cerr << "NormGrad:\n" << str;
-            CPPUNIT_ASSERT(str.empty());
-            CPPUNIT_ASSERT_EQUAL(0, int(d.valueCount()));
-            CPPUNIT_ASSERT_EQUAL(0, int(d.failureCount()));
+            EXPECT_TRUE(str.empty());
+            EXPECT_EQ(0, int(d.valueCount()));
+            EXPECT_EQ(0, int(d.failureCount()));
         }
     }
     /*
@@ -1509,8 +1443,7 @@ TestTools::testLevelSetAdvect()
 
 ////////////////////////////////////////
 
-void
-TestTools::testLevelSetMorph()
+TEST_F(TestTools, testLevelSetMorph)
 {
     using GridT = openvdb::FloatGrid;
     {//test morphing overlapping but aligned spheres
@@ -1550,9 +1483,9 @@ TestTools::testLevelSetMorph()
             s.add( invDx*(*it - target->tree().getValue(it.getCoord())) );
         }
         //s.print("Morph");
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, s.min(), 0.50);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, s.max(), 0.50);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, s.avg(), 0.02);
+        EXPECT_NEAR(0.0, s.min(), 0.50);
+        EXPECT_NEAR(0.0, s.max(), 0.50);
+        EXPECT_NEAR(0.0, s.avg(), 0.02);
         /*
         openvdb::math::Histogram h(s, 30);
         for (GridT::ValueOnCIter it = source->tree().cbeginValueOn(); it; ++it) {
@@ -1635,8 +1568,7 @@ TestTools::testLevelSetMorph()
 
 ////////////////////////////////////////
 
-void
-TestTools::testLevelSetMeasure()
+TEST_F(TestTools, testLevelSetMeasure)
 {
     const double percentage = 0.1/100.0;//i.e. 0.1%
     using GridT = openvdb::FloatGrid;
@@ -1658,8 +1590,8 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
     //std::cerr << "\nVolume of sphere = " << volume << "  " << v << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
 
     // Test area, volume and average mean curvature of sphere in world units
     mean = 1.0/r;
@@ -1668,9 +1600,9 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "radius in world units = " << r << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << mean << "  " << cm << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(), percentage*mean);
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
 
     // Test area, volume, average mean curvature and average gaussian curvature of sphere in world units
     gauss = 1.0/(r*r);
@@ -1680,11 +1612,11 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "Avg mean curvature of sphere = " << mean << "  " << cm << std::endl;
     //std::cerr << "Avg gaussian curvature of sphere = " << gauss << "  " << cg << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  m.area(), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(), percentage*mean);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(gauss, m.avgGaussianCurvature(), percentage*gauss);
-    CPPUNIT_ASSERT_EQUAL(0, m.genus());
+    EXPECT_NEAR(area,  m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
+    EXPECT_NEAR(gauss, m.avgGaussianCurvature(), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
 
     // Test measures of sphere in voxel units
     r /= voxelSize;
@@ -1695,9 +1627,9 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "Volume of sphere = " << volume << "  " << v << std::endl;
     //std::cerr << "Avg mean curvature of sphere = " << curv << "  " << cm << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(false), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(false), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(false), percentage*mean);
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
 
     gauss = 1.0/(r*r);
     //std::cerr << "\nArea of sphere = " << area << "  " << a << std::endl;
@@ -1706,11 +1638,11 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "Avg mean curvature of sphere = " << mean << "  " << cm << std::endl;
     //std::cerr << "Avg gaussian curvature of sphere = " << gauss << "  " << cg << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(false), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(false), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(false), percentage*mean);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
-    CPPUNIT_ASSERT_EQUAL(0, m.genus());
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
 
     // Second sphere
     C = openvdb::Vec3f(5.4f, 6.4f, 8.4f);
@@ -1729,14 +1661,14 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "Avg mean curvature of sphere = " << mean << "  " << cm << std::endl;
     //std::cerr << "Avg gaussian curvature of sphere = " << gauss << "  " << cg << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(), percentage*mean);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(gauss,  m.avgGaussianCurvature(), percentage*gauss);
-    CPPUNIT_ASSERT_EQUAL(0, m.genus());
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere),  percentage*area);
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere),percentage*volume);
-    //CPPUNIT_ASSERT_EQUAL(0, openvdb::tools::levelSetGenus(*sphere));
+    EXPECT_NEAR(area,   m.area(), percentage*area);
+    EXPECT_NEAR(volume, m.volume(), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(), percentage*gauss);
+    EXPECT_EQ(0, m.genus());
+    //EXPECT_NEAR(area,  openvdb::tools::levelSetArea(*sphere),  percentage*area);
+    //EXPECT_NEAR(volume,openvdb::tools::levelSetVolume(*sphere),percentage*volume);
+    //EXPECT_EQ(0, openvdb::tools::levelSetGenus(*sphere));
 
      // Test all measures of sphere in voxel units
     r /= voxelSize;
@@ -1750,15 +1682,15 @@ TestTools::testLevelSetMeasure()
     //std::cerr << "Avg mean curvature of sphere = " << mean << "  " << cm << std::endl;
     //std::cerr << "Avg gaussian curvature of sphere = " << gauss << "  " << cg << std::endl;
     // Test accuracy of computed measures to within 0.1% of the exact measure.
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,   m.area(false), percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume, m.volume(false), percentage*volume);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(mean,   m.avgMeanCurvature(false), percentage*mean);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(area,  openvdb::tools::levelSetArea(*sphere,false),
+    EXPECT_NEAR(area,   m.area(false), percentage*area);
+    EXPECT_NEAR(volume, m.volume(false), percentage*volume);
+    EXPECT_NEAR(mean,   m.avgMeanCurvature(false), percentage*mean);
+    EXPECT_NEAR(gauss,  m.avgGaussianCurvature(false), percentage*gauss);
+    EXPECT_NEAR(area,  openvdb::tools::levelSetArea(*sphere,false),
                                  percentage*area);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(volume,openvdb::tools::levelSetVolume(*sphere,false),
+    EXPECT_NEAR(volume,openvdb::tools::levelSetVolume(*sphere,false),
                                  percentage*volume);
-    CPPUNIT_ASSERT_EQUAL(0, openvdb::tools::levelSetGenus(*sphere));
+    EXPECT_EQ(0, openvdb::tools::levelSetGenus(*sphere));
 
     // Read level set from file
     /*
@@ -1797,84 +1729,83 @@ TestTools::testLevelSetMeasure()
    {// testing total genus of multiple disjoint level set spheres with different radius
      const float dx = 0.5f, r = 50.0f;
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+     EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=3; ++i) {
        auto sphere = openvdb::tools::createLevelSetSphere<GridT>(r+float(i)*5.0f , openvdb::Vec3f(100.0f*float(i)), dx);
        openvdb::tools::csgUnion(*grid, *sphere);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);// since they are not overlapping re-normalization is not required
        //std::cerr << "Euler characteristics of " << i << " sphere(s) = " << x << std::endl;
-       CPPUNIT_ASSERT_EQUAL(2*i, x);
+       EXPECT_EQ(2*i, x);
      }
    }
    {// testing total genus of multiple disjoint level set cubes of different size
      const float dx = 0.5f, size = 50.0f;
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+     EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=2; ++i) {
        auto shape = openvdb::tools::createLevelSetCube<openvdb::FloatGrid>(size, openvdb::Vec3f(100.0f*float(i)), dx);
        openvdb::tools::csgUnion(*grid, *shape);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);
        //std::cerr << "Euler characteristics of " << i << " cubes(s) = " << x << std::endl;
-       CPPUNIT_ASSERT_EQUAL(2*i, x);
+       EXPECT_EQ(2*i, x);
      }
    }
    {// testing Euler characteristic and total genus of multiple intersecting (connected) level set spheres
      const float dx = 0.5f, r = 50.0f;
      auto grid = openvdb::createLevelSet<openvdb::FloatGrid>(dx);
-     CPPUNIT_ASSERT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
+     EXPECT_THROW(openvdb::tools::levelSetGenus(*grid), openvdb::RuntimeError);
      for (int i=1; i<=4; ++i) {
        auto sphere = openvdb::tools::createLevelSetSphere<GridT>( r , openvdb::Vec3f(30.0f*float(i), 0.0f, 0.0f), dx);
        openvdb::tools::csgUnion(*grid, *sphere);
        const int genus = openvdb::tools::levelSetGenus(*grid);
        const int x = openvdb::tools::levelSetEulerCharacteristic(*grid);
        //std::cerr << "Genus of " << i << " sphere(s) = " << genus << std::endl;
-       CPPUNIT_ASSERT_EQUAL(0, genus);
+       EXPECT_EQ(0, genus);
        //std::cerr << "Euler characteristics of " << i << " sphere(s) = " << genus << std::endl;
-       CPPUNIT_ASSERT_EQUAL(2, x);
+       EXPECT_EQ(2, x);
      }
    }
 
 }//testLevelSetMeasure
 
-void
-TestTools::testMagnitude()
+TEST_F(TestTools, testMagnitude)
 {
     using namespace openvdb;
     {
         FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
         FloatTree& tree = grid->tree();
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_TRUE(tree.empty());
 
         const Coord dim(64,64,64);
         const Vec3f center(35.0f, 30.0f, 40.0f);
         const float radius=0.0f;
         unittest_util::makeSphere(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-        CPPUNIT_ASSERT(!tree.empty());
-        CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+        EXPECT_TRUE(!tree.empty());
+        EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
         VectorGrid::Ptr gradGrid = tools::gradient(*grid);
-        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
+        EXPECT_EQ(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
 
         FloatGrid::Ptr mag = tools::magnitude(*gradGrid);
-        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(mag->activeVoxelCount()));
+        EXPECT_EQ(int(tree.activeVoxelCount()), int(mag->activeVoxelCount()));
 
         FloatGrid::ConstAccessor accessor = mag->getConstAccessor();
 
         Coord xyz(35,30,30);
         float v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        EXPECT_NEAR(1.0, v, 0.01);
 
         xyz.reset(35,10,40);
         v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        EXPECT_NEAR(1.0, v, 0.01);
     }
     {
         // Test on a grid with (only) tile values.
 
         Vec3fGrid grid;
         Vec3fTree& tree = grid.tree();
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_TRUE(tree.empty());
 
         const Vec3f v(1.f, 2.f, 2.f);
         const float expectedLength = v.length();
@@ -1882,38 +1813,37 @@ TestTools::testMagnitude()
         tree.addTile(/*level=*/1, Coord(-100), v, /*active=*/true);
         tree.addTile(/*level=*/1, Coord(100), v, /*active=*/true);
 
-        CPPUNIT_ASSERT(!tree.empty());
+        EXPECT_TRUE(!tree.empty());
 
         FloatGrid::Ptr length = tools::magnitude(grid);
 
-        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(length->activeVoxelCount()));
+        EXPECT_EQ(int(tree.activeVoxelCount()), int(length->activeVoxelCount()));
 
         for (auto it = length->cbeginValueOn(); it; ++it) {
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedLength, *it, 1.0e-6);
+            EXPECT_NEAR(expectedLength, *it, 1.0e-6);
         }
     }
 }
 
 
-void
-TestTools::testMaskedMagnitude()
+TEST_F(TestTools, testMaskedMagnitude)
 {
     using namespace openvdb;
     {
         FloatGrid::Ptr grid = FloatGrid::create(/*background=*/5.0);
         FloatTree& tree = grid->tree();
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_TRUE(tree.empty());
 
         const Coord dim(64,64,64);
         const Vec3f center(35.0f, 30.0f, 40.0f);
         const float radius=0.0f;
         unittest_util::makeSphere(dim, center, radius, *grid, unittest_util::SPHERE_DENSE);
 
-        CPPUNIT_ASSERT(!tree.empty());
-        CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+        EXPECT_TRUE(!tree.empty());
+        EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
 
         VectorGrid::Ptr gradGrid = tools::gradient(*grid);
-        CPPUNIT_ASSERT_EQUAL(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
+        EXPECT_EQ(int(tree.activeVoxelCount()), int(gradGrid->activeVoxelCount()));
 
         // create a masking grid
         const CoordBBox maskbbox(Coord(35, 30, 30), Coord(41, 41, 41));
@@ -1927,22 +1857,22 @@ TestTools::testMaskedMagnitude()
 
         // test in the masked region
         Coord xyz(35,30,30);
-        CPPUNIT_ASSERT(maskbbox.isInside(xyz));
+        EXPECT_TRUE(maskbbox.isInside(xyz));
         float v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v, 0.01);
+        EXPECT_NEAR(1.0, v, 0.01);
 
         // test outside the masked region
         xyz.reset(35,10,40);
-        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+        EXPECT_TRUE(!maskbbox.isInside(xyz));
         v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, v, 0.01);
+        EXPECT_NEAR(0.0, v, 0.01);
     }
     {
         // Test on a grid with (only) tile values.
 
         Vec3fGrid grid;
         Vec3fTree& tree = grid.tree();
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_TRUE(tree.empty());
 
         const Vec3f v(1.f, 2.f, 2.f);
         const float expectedLength = v.length();
@@ -1951,24 +1881,23 @@ TestTools::testMaskedMagnitude()
         const int expectedActiveVoxelCount = int(tree.activeVoxelCount());
         tree.addTile(/*level=*/1, Coord(-100), v, /*active=*/true);
 
-        CPPUNIT_ASSERT(!tree.empty());
+        EXPECT_TRUE(!tree.empty());
 
         BoolGrid mask;
         mask.fill(CoordBBox(Coord(90), Coord(200)), true, true);
 
         FloatGrid::Ptr length = tools::magnitude(grid, mask);
 
-        CPPUNIT_ASSERT_EQUAL(expectedActiveVoxelCount, int(length->activeVoxelCount()));
+        EXPECT_EQ(expectedActiveVoxelCount, int(length->activeVoxelCount()));
 
         for (auto it = length->cbeginValueOn(); it; ++it) {
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(expectedLength, *it, 1.0e-6);
+            EXPECT_NEAR(expectedLength, *it, 1.0e-6);
         }
     }
 }
 
 
-void
-TestTools::testNormalize()
+TEST_F(TestTools, testNormalize)
 {
     openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(5.0);
     openvdb::FloatTree& tree = grid->tree();
@@ -1979,7 +1908,7 @@ TestTools::testNormalize()
     unittest_util::makeSphere<openvdb::FloatGrid>(
         dim,center,radius,*grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     openvdb::Coord xyz(10, 20, 30);
 
     openvdb::VectorGrid::Ptr grad = openvdb::tools::gradient(*grid);
@@ -2000,18 +1929,17 @@ TestTools::testNormalize()
     xyz = openvdb::Coord(35,10,40);
     Vec3Type v = accessor.getValue(xyz);
     //std::cerr << "\nPassed testNormalize(" << xyz << ")=" << v.length() << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0,v.length(),0.001);
+    EXPECT_NEAR(2.0,v.length(),0.001);
     openvdb::VectorGrid::Ptr norm = openvdb::tools::normalize(*grad);
 
     accessor = norm->getConstAccessor();
     v = accessor.getValue(xyz);
     //std::cerr << "\nPassed testNormalize(" << xyz << ")=" << v.length() << std::endl;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v.length(), 0.0001);
+    EXPECT_NEAR(1.0, v.length(), 0.0001);
 }
 
 
-void
-TestTools::testMaskedNormalize()
+TEST_F(TestTools, testMaskedNormalize)
 {
     openvdb::FloatGrid::Ptr grid = openvdb::FloatGrid::create(5.0);
     openvdb::FloatTree& tree = grid->tree();
@@ -2022,7 +1950,7 @@ TestTools::testMaskedNormalize()
     unittest_util::makeSphere<openvdb::FloatGrid>(
         dim,center,radius,*grid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
+    EXPECT_EQ(dim[0]*dim[1]*dim[2], int(tree.activeVoxelCount()));
     openvdb::Coord xyz(10, 20, 30);
 
     openvdb::VectorGrid::Ptr grad = openvdb::tools::gradient(*grid);
@@ -2049,29 +1977,28 @@ TestTools::testMaskedNormalize()
     openvdb::BoolGrid::Ptr maskGrid = openvdb::BoolGrid::create(false);
     maskGrid->fill(maskbbox, true/*value*/, true/*activate*/);
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0,v.length(),0.001);
+    EXPECT_NEAR(2.0,v.length(),0.001);
 
     // compute the normalized valued in the masked region
     openvdb::VectorGrid::Ptr norm = openvdb::tools::normalize(*grad, *maskGrid);
 
     accessor = norm->getConstAccessor();
     { // outside the masked region
-        CPPUNIT_ASSERT(!maskbbox.isInside(xyz));
+        EXPECT_TRUE(!maskbbox.isInside(xyz));
         v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, v.length(), 0.0001);
+        EXPECT_NEAR(0.0, v.length(), 0.0001);
     }
     { // inside the masked region
         xyz.reset(35, 30, 30);
         v = accessor.getValue(xyz);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(1.0, v.length(), 0.0001);
+        EXPECT_NEAR(1.0, v.length(), 0.0001);
     }
 }
 
 ////////////////////////////////////////
 
 
-void
-TestTools::testPointAdvect()
+TEST_F(TestTools, testPointAdvect)
 {
     {
         // Setup:    Advect a number of points in a uniform velocity field (1,1,1).
@@ -2108,7 +2035,7 @@ TestTools::testPointAdvect()
             // check locations
             for (size_t i = 0; i < numPoints; i++) {
                 openvdb::Vec3f expected(float(i + 1), float(i + 1), float(i + 1));
-                CPPUNIT_ASSERT_EQUAL(expected, pointList[i]);
+                EXPECT_EQ(expected, pointList[i]);
             }
             // reset values
             for (size_t i = 0; i < numPoints; i++) {
@@ -2182,7 +2109,7 @@ TestTools::testPointAdvect()
         for (unsigned int i = 0; i < numPoints; i++) {
             openvdb::Vec3d expected(i, i, 0);  // location (i, i, i) projected on to x-y plane
             for (int n=0; n<3; ++n) {
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[n], pointList[i][n], /*tolerance=*/1e-6);
+                EXPECT_NEAR(expected[n], pointList[i][n], /*tolerance=*/1e-6);
             }
         }
 
@@ -2200,7 +2127,7 @@ TestTools::testPointAdvect()
             for (unsigned int i = 0; i < numPoints; i++) {
                 openvdb::Vec3d expected(i+1, i+1, 0); // location (i,i,i) projected onto x-y plane
                 for (int n=0; n<3; ++n) {
-                    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected[n], pointList[i][n], /*tolerance=*/1e-6);
+                    EXPECT_NEAR(expected[n], pointList[i][n], /*tolerance=*/1e-6);
                 }
             }
             // reset values
@@ -2225,8 +2152,7 @@ namespace {
 }
 
 
-void
-TestTools::testPointScatter()
+TEST_F(TestTools, testPointScatter)
 {
     using GridType = openvdb::FloatGrid;
     const openvdb::Coord dim(64, 64, 64);
@@ -2245,24 +2171,24 @@ TestTools::testPointScatter()
         PointList points;
         openvdb::tools::UniformPointScatter<PointList, RandGen> scatter(points, pointCount, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT_EQUAL( pointCount, scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( pointCount, points.size() );
+        EXPECT_EQ( pointCount, scatter.getPointCount() );
+        EXPECT_EQ( pointCount, points.size() );
     }
     {// test uniform density scattering
         const float density = 1.0f;//per volume = per voxel since voxel size = 1
         PointList points;
         openvdb::tools::UniformPointScatter<PointList, RandGen> scatter(points, density, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount(), scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount(), points.size() );
+        EXPECT_EQ( scatter.getVoxelCount(), scatter.getPointCount() );
+        EXPECT_EQ( scatter.getVoxelCount(), points.size() );
     }
     {// test non-uniform density scattering
         const float density = 1.0f;//per volume = per voxel since voxel size = 1
         PointList points;
         openvdb::tools::NonUniformPointScatter<PointList, RandGen> scatter(points, density, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT( scatter.getVoxelCount() < scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), points.size() );
+        EXPECT_TRUE( scatter.getVoxelCount() < scatter.getPointCount() );
+        EXPECT_EQ( scatter.getPointCount(), points.size() );
     }
      {// test dense uniform scattering
         const size_t pointsPerVoxel = 8;
@@ -2270,15 +2196,14 @@ TestTools::testPointScatter()
         openvdb::tools::DenseUniformPointScatter<PointList, RandGen>
             scatter(points, pointsPerVoxel, mtRand);
         scatter.operator()<GridType>(*grid);
-        CPPUNIT_ASSERT_EQUAL( scatter.getVoxelCount()*pointsPerVoxel, scatter.getPointCount() );
-        CPPUNIT_ASSERT_EQUAL( scatter.getPointCount(), points.size() );
+        EXPECT_EQ( scatter.getVoxelCount()*pointsPerVoxel, scatter.getPointCount() );
+        EXPECT_EQ( scatter.getPointCount(), points.size() );
     }
 }
 
 ////////////////////////////////////////
 
-void
-TestTools::testVolumeAdvect()
+TEST_F(TestTools, testVolumeAdvect)
 {
     using namespace openvdb;
 
@@ -2291,60 +2216,60 @@ TestTools::testVolumeAdvect()
         GridT::Ptr density0 = GridT::create(0.0f);
         density0->transform().preScale(Vec3d(1.0, 2.0, 3.0));//i.e. non-uniform voxels
         AdvT a(velocity);
-        CPPUNIT_ASSERT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
+        EXPECT_THROW((a.advect<GridT, SamplerT>(*density0, 0.1f)), RuntimeError);
     }
 
     {// test spatialOrder and temporalOrder
         AdvT a(velocity);
 
         // Default should be SEMI
-        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(1, a.spatialOrder());
+        EXPECT_EQ(1, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::SEMI);
-        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(1, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(1, a.spatialOrder());
+        EXPECT_EQ(1, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::MID);
-        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(1, a.spatialOrder());
+        EXPECT_EQ(2, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::RK3);
-        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(3, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(1, a.spatialOrder());
+        EXPECT_EQ(3, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::RK4);
-        CPPUNIT_ASSERT_EQUAL(1, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(4, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(1, a.spatialOrder());
+        EXPECT_EQ(4, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::MAC);
-        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT( a.isLimiterOn());
+        EXPECT_EQ(2, a.spatialOrder());
+        EXPECT_EQ(2, a.temporalOrder());
+        EXPECT_TRUE( a.isLimiterOn());
 
         a.setIntegrator(tools::Scheme::BFECC);
-        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT( a.isLimiterOn());
+        EXPECT_EQ(2, a.spatialOrder());
+        EXPECT_EQ(2, a.temporalOrder());
+        EXPECT_TRUE( a.isLimiterOn());
 
         a.setLimiter(tools::Scheme::NO_LIMITER);
-        CPPUNIT_ASSERT_EQUAL(2, a.spatialOrder());
-        CPPUNIT_ASSERT_EQUAL(2, a.temporalOrder());
-        CPPUNIT_ASSERT(!a.isLimiterOn());
+        EXPECT_EQ(2, a.spatialOrder());
+        EXPECT_EQ(2, a.temporalOrder());
+        EXPECT_TRUE(!a.isLimiterOn());
     }
 
     {//test RK4 advect without a mask
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
-        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        EXPECT_TRUE( density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE(!density0->tree().isValueOn(Coord(24,3,3)));
 
         AdvT a(velocity);
         a.setIntegrator(tools::Scheme::RK4);
@@ -2359,18 +2284,18 @@ TestTools::testVolumeAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f);
-        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
-        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord(3,3,3)), 0.0f);
+        EXPECT_TRUE(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        EXPECT_TRUE(!density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE( density0->tree().isValueOn(Coord(24,3,3)));
     }
     {//test MAC advect without a mask
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
-        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        EXPECT_TRUE( density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE(!density0->tree().isValueOn(Coord(24,3,3)));
 
         AdvT a(velocity);
         a.setIntegrator(tools::Scheme::BFECC);
@@ -2385,18 +2310,18 @@ TestTools::testVolumeAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 0.0f);
-        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
-        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord(3,3,3)), 0.0f);
+        EXPECT_TRUE(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        EXPECT_TRUE(!density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE( density0->tree().isValueOn(Coord(24,3,3)));
     }
     {//test advect with a mask
         GridT::Ptr density0 = GridT::create(0.0f), density1;
         density0->fill(CoordBBox(Coord(0),Coord(6)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(24,3,3)), 0.0f);
-        CPPUNIT_ASSERT( density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT(!density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord( 3,3,3)), 1.0f);
+        EXPECT_EQ(density0->tree().getValue(Coord(24,3,3)), 0.0f);
+        EXPECT_TRUE( density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE(!density0->tree().isValueOn(Coord(24,3,3)));
 
         BoolGrid::Ptr mask = BoolGrid::create(false);
         mask->fill(CoordBBox(Coord(4,0,0),Coord(30,8,8)), true);
@@ -2417,10 +2342,10 @@ TestTools::testVolumeAdvect()
             //file.write(grids);
             density0 = density1;
         }
-        CPPUNIT_ASSERT_EQUAL(density0->tree().getValue(Coord(3,3,3)), 1.0f);
-        CPPUNIT_ASSERT(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
-        CPPUNIT_ASSERT(density0->tree().isValueOn(Coord( 3,3,3)));
-        CPPUNIT_ASSERT(density0->tree().isValueOn(Coord(24,3,3)));
+        EXPECT_EQ(density0->tree().getValue(Coord(3,3,3)), 1.0f);
+        EXPECT_TRUE(density0->tree().getValue(Coord(24,3,3)) > 0.0f);
+        EXPECT_TRUE(density0->tree().isValueOn(Coord( 3,3,3)));
+        EXPECT_TRUE(density0->tree().isValueOn(Coord(24,3,3)));
     }
 
     /*
@@ -2458,8 +2383,7 @@ TestTools::testVolumeAdvect()
 ////////////////////////////////////////
 
 
-void
-TestTools::testFloatApply()
+TEST_F(TestTools, testFloatApply)
 {
     using ValueIter = openvdb::FloatTree::ValueOnIter;
 
@@ -2488,14 +2412,14 @@ TestTools::testFloatApply()
     openvdb::tools::foreach(tree.begin<ValueIter>(), Local::visit, /*threaded=*/true);
 
     float expected = Local::op(background);
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, tree.background(), /*tolerance=*/0.0);
+    //EXPECT_NEAR(expected, tree.background(), /*tolerance=*/0.0);
     //expected = Local::op(-background);
-    //CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, -tree.background(), /*tolerance=*/0.0);
+    //EXPECT_NEAR(expected, -tree.background(), /*tolerance=*/0.0);
 
     for (openvdb::FloatTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
         xyz = it.getCoord();
         expected = Local::op(float(xyz[0] + xyz[1] + xyz[2]));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, it.getValue(), /*tolerance=*/0.0);
+        EXPECT_NEAR(expected, it.getValue(), /*tolerance=*/0.0);
     }
 }
 
@@ -2516,8 +2440,7 @@ struct MatMul {
 }
 
 
-void
-TestTools::testVectorApply()
+TEST_F(TestTools, testVectorApply)
 {
     using ValueIter = openvdb::VectorTree::ValueOnIter;
 
@@ -2545,7 +2468,7 @@ TestTools::testVectorApply()
     for (openvdb::VectorTree::ValueOnCIter it = tree.cbeginValueOn(); it; ++it) {
         xyz = it.getCoord();
         expected = op.xform(openvdb::Vec3s(float(xyz[0]), float(xyz[1]), float(xyz[2])));
-        CPPUNIT_ASSERT_EQUAL(expected, it.getValue());
+        EXPECT_EQ(expected, it.getValue());
     }
 }
 
@@ -2578,8 +2501,7 @@ struct AccumLeafVoxelCount {
 }
 
 
-void
-TestTools::testAccumulate()
+TEST_F(TestTools, testAccumulate)
 {
     using namespace openvdb;
 
@@ -2591,19 +2513,19 @@ TestTools::testAccumulate()
     {
         AccumSum op;
         tools::accumulate(tree.cbeginValueOn(), op, /*threaded=*/false);
-        CPPUNIT_ASSERT_EQUAL(expected, op.sum);
-        CPPUNIT_ASSERT_EQUAL(0, op.joins);
+        EXPECT_EQ(expected, op.sum);
+        EXPECT_EQ(0, op.joins);
     }
     {
         AccumSum op;
         tools::accumulate(tree.cbeginValueOn(), op, /*threaded=*/true);
-        CPPUNIT_ASSERT_EQUAL(expected, op.sum);
+        EXPECT_EQ(expected, op.sum);
     }
     {
         AccumLeafVoxelCount op;
         tree::LeafManager<Int32Tree> mgr(tree);
         tools::accumulate(mgr.leafRange().begin(), op, /*threaded=*/true);
-        CPPUNIT_ASSERT_EQUAL(tree.activeLeafVoxelCount(), op.count);
+        EXPECT_EQ(tree.activeLeafVoxelCount(), op.count);
     }
 }
 
@@ -2642,8 +2564,7 @@ struct FloatToVec
 }
 
 
-void
-TestTools::testTransformValues()
+TEST_F(TestTools, testTransformValues)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -2680,18 +2601,18 @@ TestTools::testTransformValues()
 
         // The tile count is accurate only if the functor is shared.  Otherwise,
         // it is initialized to zero in the main thread and never changed.
-        CPPUNIT_ASSERT_EQUAL(shareOp ? 3 : 0, int(op.numTiles));
+        EXPECT_EQ(shareOp ? 3 : 0, int(op.numTiles));
 
         Vec3s expected;
         for (Tree323v::ValueOnCIter it = vtree.cbeginValueOn(); it; ++it) {
             xyz = it.getCoord();
             expected = op.toVec(float(xyz[0] + xyz[1] + xyz[2]));
-            CPPUNIT_ASSERT_EQUAL(expected, it.getValue());
+            EXPECT_EQ(expected, it.getValue());
         }
         // Check values inside the tiles.
-        CPPUNIT_ASSERT_EQUAL(op.toVec(3 * 1024), vtree.getValue(Coord(1024 + 4)));
-        CPPUNIT_ASSERT_EQUAL(op.toVec(3 * 2048), vtree.getValue(Coord(2048 + 16)));
-        CPPUNIT_ASSERT_EQUAL(op.toVec(3 * 3072), vtree.getValue(Coord(3072 + 128)));
+        EXPECT_EQ(op.toVec(3 * 1024), vtree.getValue(Coord(1024 + 4)));
+        EXPECT_EQ(op.toVec(3 * 2048), vtree.getValue(Coord(2048 + 16)));
+        EXPECT_EQ(op.toVec(3 * 3072), vtree.getValue(Coord(3072 + 128)));
     }
 }
 
@@ -2699,8 +2620,7 @@ TestTools::testTransformValues()
 ////////////////////////////////////////
 
 
-void
-TestTools::testUtil()
+TEST_F(TestTools, testUtil)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -2720,13 +2640,13 @@ TestTools::testUtil()
     const size_t voxelCountA = treeA.activeVoxelCount();
     const size_t voxelCountB = treeB.activeVoxelCount();
 
-    CPPUNIT_ASSERT_EQUAL(voxelCountA, voxelCountB);
+    EXPECT_EQ(voxelCountA, voxelCountB);
 
     CharTree::Ptr tree = openvdb::util::leafTopologyDifference(treeA, treeB);
-    CPPUNIT_ASSERT(tree->activeVoxelCount() == 0);
+    EXPECT_TRUE(tree->activeVoxelCount() == 0);
 
     tree = openvdb::util::leafTopologyIntersection(treeA, treeB);
-    CPPUNIT_ASSERT(tree->activeVoxelCount() == voxelCountA);
+    EXPECT_TRUE(tree->activeVoxelCount() == voxelCountA);
 
     treeA.fill(CoordBBox(Coord(-10), Coord(22)), true);
     treeA.voxelizeActiveTiles();
@@ -2734,18 +2654,17 @@ TestTools::testUtil()
     const size_t voxelCount = treeA.activeVoxelCount();
 
     tree = openvdb::util::leafTopologyDifference(treeA, treeB);
-    CPPUNIT_ASSERT(tree->activeVoxelCount() == (voxelCount - voxelCountA));
+    EXPECT_TRUE(tree->activeVoxelCount() == (voxelCount - voxelCountA));
 
     tree = openvdb::util::leafTopologyIntersection(treeA, treeB);
-    CPPUNIT_ASSERT(tree->activeVoxelCount() == voxelCountA);
+    EXPECT_TRUE(tree->activeVoxelCount() == voxelCountA);
 }
 
 
 ////////////////////////////////////////
 
 
-void
-TestTools::testVectorTransformer()
+TEST_F(TestTools, testVectorTransformer)
 {
     using namespace openvdb;
 
@@ -2777,65 +2696,65 @@ TestTools::testVectorTransformer()
     }
 
         // Verify that grid values are in world space by default.
-        CPPUNIT_ASSERT(grid.isInWorldSpace());
+        EXPECT_TRUE(grid.isInWorldSpace());
 
         resetGrid();
         grid.setVectorType(VEC_INVARIANT);
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(refVec0));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(refVec1));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(refVec2));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(refVec3));
+        EXPECT_TRUE(acc.getValue(Coord(0)).eq(refVec0));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(refVec1));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(refVec2));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(refVec3));
 
         resetGrid();
         grid.setVectorType(VEC_COVARIANT);
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(invXform.transform3x3(refVec0)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(invXform.transform3x3(refVec1)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(invXform.transform3x3(refVec2)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(invXform.transform3x3(refVec3)));
+        EXPECT_TRUE(acc.getValue(Coord(0)).eq(invXform.transform3x3(refVec0)));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(invXform.transform3x3(refVec1)));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(invXform.transform3x3(refVec2)));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(invXform.transform3x3(refVec3)));
 
         resetGrid();
         grid.setVectorType(VEC_COVARIANT_NORMALIZE);
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT_EQUAL(refVec0, acc.getValue(Coord(0)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(invXform.transform3x3(refVec1).unit()));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(invXform.transform3x3(refVec2).unit()));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(invXform.transform3x3(refVec3).unit()));
+        EXPECT_EQ(refVec0, acc.getValue(Coord(0)));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(invXform.transform3x3(refVec1).unit()));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(invXform.transform3x3(refVec2).unit()));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(invXform.transform3x3(refVec3).unit()));
 
         resetGrid();
         grid.setVectorType(VEC_CONTRAVARIANT_RELATIVE);
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(xform.transform3x3(refVec0)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(xform.transform3x3(refVec1)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(xform.transform3x3(refVec2)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(xform.transform3x3(refVec3)));
+        EXPECT_TRUE(acc.getValue(Coord(0)).eq(xform.transform3x3(refVec0)));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(xform.transform3x3(refVec1)));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(xform.transform3x3(refVec2)));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(xform.transform3x3(refVec3)));
 
         resetGrid();
         grid.setVectorType(VEC_CONTRAVARIANT_ABSOLUTE);
         /// @todo This doesn't really test the behavior w.r.t. homogeneous coords.
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(xform.transformH(refVec0)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(xform.transformH(refVec1)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(xform.transformH(refVec2)));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(xform.transformH(refVec3)));
+        EXPECT_TRUE(acc.getValue(Coord(0)).eq(xform.transformH(refVec0)));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(xform.transformH(refVec1)));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(xform.transformH(refVec2)));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(xform.transformH(refVec3)));
 
         // Verify that transformVectors() has no effect on local-space grids.
         resetGrid();
         grid.setVectorType(VEC_CONTRAVARIANT_RELATIVE);
         grid.setIsInWorldSpace(false);
         tools::transformVectors(grid, xform);
-        CPPUNIT_ASSERT(acc.getValue(Coord(0)).eq(refVec0));
-        CPPUNIT_ASSERT(acc.getValue(Coord(1)).eq(refVec1));
-        CPPUNIT_ASSERT(acc.getValue(Coord(2)).eq(refVec2));
-        CPPUNIT_ASSERT(acc.getValue(Coord(3)).eq(refVec3));
+        EXPECT_TRUE(acc.getValue(Coord(0)).eq(refVec0));
+        EXPECT_TRUE(acc.getValue(Coord(1)).eq(refVec1));
+        EXPECT_TRUE(acc.getValue(Coord(2)).eq(refVec2));
+        EXPECT_TRUE(acc.getValue(Coord(3)).eq(refVec3));
 
 #undef resetGrid
     }
     {
         // Verify that transformVectors() operates only on vector-valued grids.
         FloatGrid scalarGrid;
-        CPPUNIT_ASSERT_THROW(tools::transformVectors(scalarGrid, xform), TypeError);
+        EXPECT_THROW(tools::transformVectors(scalarGrid, xform), TypeError);
     }
 }
 
@@ -2843,8 +2762,7 @@ TestTools::testVectorTransformer()
 ////////////////////////////////////////
 
 
-void
-TestTools::testPrune()
+TEST_F(TestTools, testPrune)
 {
     /// @todo Add more unit-tests!
 
@@ -2854,18 +2772,18 @@ TestTools::testPrune()
         const float value = 5.345f;
 
         FloatTree tree(value);
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_TRUE(tree.empty());
 
         tree.fill(CoordBBox(Coord(-10), Coord(10)), value, /*active=*/false);
-        CPPUNIT_ASSERT(!tree.empty());
+        EXPECT_TRUE(!tree.empty());
 
         tools::prune(tree);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.nonLeafCount()); // root node
-        CPPUNIT_ASSERT(tree.empty());
+        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index32(1), tree.nonLeafCount()); // root node
+        EXPECT_TRUE(tree.empty());
     }
 
     {// Prune a tree with a single leaf node with random values in the range [0,1]
@@ -2886,18 +2804,18 @@ TestTools::testPrune()
         FloatTree tree(val);
         tree.addLeaf(leaf);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index32(1), tree.leafCount());
+        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree);// tolerance is zero
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index32(1), tree.leafCount());
+        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
 
         tools::prune(tree, tol);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(3), tree.nonLeafCount()); // root+2*internal
+        EXPECT_EQ(Index32(0), tree.leafCount());
+        EXPECT_EQ(Index32(3), tree.nonLeafCount()); // root+2*internal
 
         std::sort(data.begin(), data.end());
         const float median = data[(LeafNodeT::NUM_VALUES-1)>>1];
@@ -2917,7 +2835,7 @@ TestTools::testPrune()
         timer.start("\nSerial tolerance prune");
         grid->tree().prune();
         timer.stop();
-        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+        EXPECT_EQ(leafCount, grid->tree().leafCount());
     }
     {// Benchmark parallel prune
         util::CpuTimer timer;
@@ -2930,7 +2848,7 @@ TestTools::testPrune()
         timer.start("\nParallel tolerance prune");
         tools::prune(grid->tree());
         timer.stop();
-        CPPUNIT_ASSERT_EQUAL(leafCount, grid->tree().leafCount());
+        EXPECT_EQ(leafCount, grid->tree().leafCount());
     }
     */
 }

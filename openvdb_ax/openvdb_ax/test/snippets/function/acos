@@ -1,0 +1,2 @@
+double@test1 = acos(0.5);
+float@test2 = acos(0.5f);

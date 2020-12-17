@@ -1,0 +1,7 @@
+
+int16@test1 = ++int16@test2;
+int16@test3 = int16@test4++;
+int16@test5 = (int16@test6++, int16@test7++, ++int16@test6);
+int16@test8 = (++int16@test6, ++int16@test7, int16@test6++);
+++int16@test9 = int16@test9;
+

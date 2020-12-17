@@ -232,6 +232,7 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
   Platform.h
   PlatformConfig.h
   Types.h
+  TypeList.h
   version.h
 )
 
@@ -318,6 +319,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/LevelSetTracker.h
   tools/LevelSetUtil.h
   tools/Mask.h
+  tools/Merge.h
   tools/MeshToVolume.h
   tools/Morphology.h
   tools/MultiResGrid.h
