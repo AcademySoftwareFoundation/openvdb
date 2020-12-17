@@ -40,6 +40,9 @@ New features:
 - Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
   a vector containing all the active tiles in a tree that intersects a given
   CoordBBox.
+- Added @vdblink{tree::Tree::activeTileNodeCount,Tree::activeTileNodeCount},
+  which counts the number and type of active tiles in a tree very efficiently.
+  <I>[Contributed by Megidd]</I>
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par

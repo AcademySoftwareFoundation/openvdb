@@ -27,7 +27,8 @@ Version 8.0.0 - In development
       CoordBBox.
     - Added tools::activeTiles that returns a vector containing all the active
       tiles in a tree that intersects a given CoordBBox.
-
+    - Added Tree::activeTileNodeCount, which counts the number and type of
+      active tiles in a tree very efficiently. [Contributed by Megidd]
 
 Version 7.2.0 - December 9, 2020
 
