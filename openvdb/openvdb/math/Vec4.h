@@ -28,9 +28,7 @@ public:
     using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
-    /// @note destructor, copy constructor, assignment operator and
-    ///   move constructor are left to be defined by the compiler (default)
-    Vec4() = default;
+    Vec4() {}
 
     /// @brief Construct a vector all of whose components have the given value.
     explicit Vec4(T val) { this->mm[0] = this->mm[1] = this->mm[2] = this->mm[3] = val; }
@@ -560,11 +558,6 @@ using Vec4i = Vec4<int32_t>;
 using Vec4ui = Vec4<uint32_t>;
 using Vec4s = Vec4<float>;
 using Vec4d = Vec4<double>;
-
-OPENVDB_IS_POD(Vec4i)
-OPENVDB_IS_POD(Vec4ui)
-OPENVDB_IS_POD(Vec4s)
-OPENVDB_IS_POD(Vec4d)
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

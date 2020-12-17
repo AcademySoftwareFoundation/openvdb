@@ -11,7 +11,6 @@
 #include <cmath>
 #include <sstream>
 #include <string>
-#include <type_traits>
 
 
 namespace openvdb {
@@ -26,18 +25,36 @@ struct Conversion {};
 /// @class Tuple "Tuple.h"
 /// A base class for homogenous tuple types
 template<int SIZE, typename T>
-class Tuple
-{
+class Tuple {
 public:
     using value_type = T;
     using ValueType = T;
 
     static const int size = SIZE;
 
-    /// Trivial constructor, the Tuple is NOT initialized
-    /// @note destructor, copy constructor, assignment operator and
-    ///   move constructor are left to be defined by the compiler (default)
-    Tuple() = default;
+    /// @brief Default ctor.  Does nothing.
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default constructor.
+    Tuple() {}
+
+    /// Copy constructor.  Used when the class signature matches exactly.
+    Tuple(Tuple const& src) {
+        for (int i = 0; i < SIZE; ++i) {
+            mm[i] = src.mm[i];
+        }
+    }
+
+    /// @brief Assignment operator
+    /// @details This is required because declaring a copy (or other) constructor
+    /// prevents the compiler from synthesizing a default assignment operator.
+    Tuple& operator=(Tuple const& src) {
+        if (&src != this) {
+            for (int i = 0; i < SIZE; ++i) {
+                mm[i] = src.mm[i];
+            }
+        }
+        return *this;
+    }
 
     /// @brief Conversion constructor.
     /// @details Tuples with different value types and different sizes can be

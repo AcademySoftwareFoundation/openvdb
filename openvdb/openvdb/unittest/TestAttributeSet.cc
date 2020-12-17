@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/AttributeGroup.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/openvdb.h>
@@ -11,25 +11,15 @@
 #include <iostream>
 #include <sstream>
 
-class TestAttributeSet: public CppUnit::TestCase
+class TestAttributeSet: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 
-    CPPUNIT_TEST_SUITE(TestAttributeSet);
-    CPPUNIT_TEST(testAttributeSetDescriptor);
-    CPPUNIT_TEST(testAttributeSet);
-    CPPUNIT_TEST(testAttributeSetGroups);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAttributeSetDescriptor();
     void testAttributeSet();
-    void testAttributeSetGroups();
+    void testAttributeSetDescriptor();
 }; // class TestAttributeSet
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeSet);
 
 
 ////////////////////////////////////////
@@ -160,7 +150,7 @@ TestAttributeSet::testAttributeSetDescriptor()
 
     { // error on invalid construction
         Descriptor::Ptr invalidDescr = Descriptor::create(AttributeVec3f::attributeType());
-        CPPUNIT_ASSERT_THROW(invalidDescr->duplicateAppend("P", AttributeS::attributeType()),
+        EXPECT_THROW(invalidDescr->duplicateAppend("P", AttributeS::attributeType()),
             openvdb::KeyError);
     }
 
@@ -174,35 +164,35 @@ TestAttributeSet::testAttributeSetDescriptor()
     descrB = descrB->duplicateAppend("density", AttributeS::attributeType());
     descrB = descrB->duplicateAppend("id", AttributeI::attributeType());
 
-    CPPUNIT_ASSERT_EQUAL(descrA->size(), descrB->size());
+    EXPECT_EQ(descrA->size(), descrB->size());
 
-    CPPUNIT_ASSERT(*descrA == *descrB);
+    EXPECT_TRUE(*descrA == *descrB);
 
     descrB->setGroup("test", size_t(0));
     descrB->setGroup("test2", size_t(1));
 
     Descriptor descrC(*descrB);
 
-    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
-    CPPUNIT_ASSERT(descrC.hasGroup("test"));
-    CPPUNIT_ASSERT(*descrB == descrC);
+    EXPECT_TRUE(descrB->hasSameAttributes(descrC));
+    EXPECT_TRUE(descrC.hasGroup("test"));
+    EXPECT_TRUE(*descrB == descrC);
 
     descrC.dropGroup("test");
     descrC.dropGroup("test2");
 
-    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
-    CPPUNIT_ASSERT(!descrC.hasGroup("test"));
-    CPPUNIT_ASSERT(*descrB != descrC);
+    EXPECT_TRUE(!descrB->hasSameAttributes(descrC));
+    EXPECT_TRUE(!descrC.hasGroup("test"));
+    EXPECT_TRUE(*descrB != descrC);
 
     descrC.setGroup("test2", size_t(1));
     descrC.setGroup("test3", size_t(0));
 
-    CPPUNIT_ASSERT(!descrB->hasSameAttributes(descrC));
+    EXPECT_TRUE(!descrB->hasSameAttributes(descrC));
 
     descrC.dropGroup("test3");
     descrC.setGroup("test", size_t(0));
 
-    CPPUNIT_ASSERT(descrB->hasSameAttributes(descrC));
+    EXPECT_TRUE(descrB->hasSameAttributes(descrC));
 
     Descriptor::Inserter names;
     names.add("P", AttributeVec3f::attributeType());
@@ -214,14 +204,14 @@ TestAttributeSet::testAttributeSetDescriptor()
     Descriptor::NameAndTypeVec rebuildNames;
     descrA->appendTo(rebuildNames);
 
-    CPPUNIT_ASSERT_EQUAL(rebuildNames.size(), names.vec.size());
+    EXPECT_EQ(rebuildNames.size(), names.vec.size());
 
     for (auto itA = rebuildNames.cbegin(), itB = names.vec.cbegin(),
               itEndA = rebuildNames.cend(), itEndB = names.vec.cend();
               itA != itEndA && itB != itEndB; ++itA, ++itB) {
-        CPPUNIT_ASSERT_EQUAL(itA->name, itB->name);
-        CPPUNIT_ASSERT_EQUAL(itA->type.first, itB->type.first);
-        CPPUNIT_ASSERT_EQUAL(itA->type.second, itB->type.second);
+        EXPECT_EQ(itA->name, itB->name);
+        EXPECT_EQ(itA->type.first, itB->type.first);
+        EXPECT_EQ(itA->type.second, itB->type.second);
     }
 
     Descriptor::NameToPosMap groupMap;
@@ -242,7 +232,7 @@ TestAttributeSet::testAttributeSetDescriptor()
                 .add("id", AttributeI::attributeType())
                 .vec, groupMap, metadata);
 
-        CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr2));
+        EXPECT_TRUE(!descr1->hasSameAttributes(*descr2));
 
         // test different names, should be false
         Descriptor::Ptr descr3 = Descriptor::create(Descriptor::Inserter()
@@ -251,7 +241,7 @@ TestAttributeSet::testAttributeSetDescriptor()
                 .add("id", AttributeI::attributeType())
                 .vec, groupMap, metadata);
 
-        CPPUNIT_ASSERT(!descr1->hasSameAttributes(*descr3));
+        EXPECT_TRUE(!descr1->hasSameAttributes(*descr3));
 
         // test same names and types but different order, should be true
         Descriptor::Ptr descr4 = Descriptor::create(Descriptor::Inserter()
@@ -260,14 +250,14 @@ TestAttributeSet::testAttributeSetDescriptor()
                 .add("P", AttributeVec3f::attributeType())
                 .vec, groupMap, metadata);
 
-        CPPUNIT_ASSERT(descr1->hasSameAttributes(*descr4));
+        EXPECT_TRUE(descr1->hasSameAttributes(*descr4));
     }
 
     { // Test uniqueName
         Descriptor::Inserter names2;
         Descriptor::Ptr emptyDescr = Descriptor::create(AttributeVec3f::attributeType());
         const openvdb::Name uniqueNameEmpty = emptyDescr->uniqueName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test"));
+        EXPECT_EQ(uniqueNameEmpty, openvdb::Name("test"));
 
         names2.add("test", AttributeS::attributeType());
         names2.add("test1", AttributeI::attributeType());
@@ -275,36 +265,36 @@ TestAttributeSet::testAttributeSetDescriptor()
         Descriptor::Ptr descr1 = Descriptor::create(names2.vec, groupMap, metadata);
 
         const openvdb::Name uniqueName1 = descr1->uniqueName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueName1, openvdb::Name("test0"));
+        EXPECT_EQ(uniqueName1, openvdb::Name("test0"));
 
         Descriptor::Ptr descr2 = descr1->duplicateAppend(uniqueName1, AttributeI::attributeType());
 
         const openvdb::Name uniqueName2 = descr2->uniqueName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
+        EXPECT_EQ(uniqueName2, openvdb::Name("test2"));
     }
 
     { // Test name validity
 
-        CPPUNIT_ASSERT(Descriptor::validName("test1"));
-        CPPUNIT_ASSERT(Descriptor::validName("abc_def"));
-        CPPUNIT_ASSERT(Descriptor::validName("abc|def"));
-        CPPUNIT_ASSERT(Descriptor::validName("abc:def"));
+        EXPECT_TRUE(Descriptor::validName("test1"));
+        EXPECT_TRUE(Descriptor::validName("abc_def"));
+        EXPECT_TRUE(Descriptor::validName("abc|def"));
+        EXPECT_TRUE(Descriptor::validName("abc:def"));
 
-        CPPUNIT_ASSERT(!Descriptor::validName(""));
-        CPPUNIT_ASSERT(!Descriptor::validName("test1!"));
-        CPPUNIT_ASSERT(!Descriptor::validName("abc=def"));
-        CPPUNIT_ASSERT(!Descriptor::validName("abc def"));
-        CPPUNIT_ASSERT(!Descriptor::validName("abc*def"));
+        EXPECT_TRUE(!Descriptor::validName(""));
+        EXPECT_TRUE(!Descriptor::validName("test1!"));
+        EXPECT_TRUE(!Descriptor::validName("abc=def"));
+        EXPECT_TRUE(!Descriptor::validName("abc def"));
+        EXPECT_TRUE(!Descriptor::validName("abc*def"));
     }
 
     { // Test enforcement of valid names
         Descriptor::Ptr descr = Descriptor::create(Descriptor::Inserter().add(
             "test1", AttributeS::attributeType()).vec, groupMap, metadata);
-        CPPUNIT_ASSERT_THROW(descr->rename("test1", "test1!"), openvdb::RuntimeError);
-        CPPUNIT_ASSERT_THROW(descr->setGroup("group1!", 1), openvdb::RuntimeError);
+        EXPECT_THROW(descr->rename("test1", "test1!"), openvdb::RuntimeError);
+        EXPECT_THROW(descr->setGroup("group1!", 1), openvdb::RuntimeError);
 
         Descriptor::NameAndType invalidAttr("test1!", AttributeS::attributeType());
-        CPPUNIT_ASSERT_THROW(descr->duplicateAppend(invalidAttr.name, invalidAttr.type),
+        EXPECT_THROW(descr->duplicateAppend(invalidAttr.name, invalidAttr.type),
             openvdb::RuntimeError);
 
         const openvdb::Index64 offset(0);
@@ -334,17 +324,17 @@ TestAttributeSet::testAttributeSetDescriptor()
         // read the streams back
         Descriptor inputDescr;
         std::istringstream attrIstr(attrOstr.str(), std::ios_base::binary);
-        CPPUNIT_ASSERT_THROW(inputDescr.read(attrIstr), openvdb::IoError);
+        EXPECT_THROW(inputDescr.read(attrIstr), openvdb::IoError);
         std::istringstream groupIstr(groupOstr.str(), std::ios_base::binary);
-        CPPUNIT_ASSERT_THROW(inputDescr.read(groupIstr), openvdb::IoError);
+        EXPECT_THROW(inputDescr.read(groupIstr), openvdb::IoError);
     }
 
     { // Test empty string parse
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "");
-        CPPUNIT_ASSERT(testStringVector(includeNames));
-        CPPUNIT_ASSERT(testStringVector(excludeNames));
+        EXPECT_TRUE(testStringVector(includeNames));
+        EXPECT_TRUE(testStringVector(excludeNames));
     }
 
     { // Test single token parse
@@ -352,63 +342,63 @@ TestAttributeSet::testAttributeSetDescriptor()
         std::vector<std::string> excludeNames;
         bool includeAll = false;
         Descriptor::parseNames(includeNames, excludeNames, includeAll, "group1");
-        CPPUNIT_ASSERT(!includeAll);
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group1"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames));
+        EXPECT_TRUE(!includeAll);
+        EXPECT_TRUE(testStringVector(includeNames, "group1"));
+        EXPECT_TRUE(testStringVector(excludeNames));
     }
 
     { // Test parse with two include tokens
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "group1 group2");
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group1", "group2"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames));
+        EXPECT_TRUE(testStringVector(includeNames, "group1", "group2"));
+        EXPECT_TRUE(testStringVector(excludeNames));
     }
 
     { // Test parse with one include and one ^ exclude token
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "group1 ^group2");
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group1"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames, "group2"));
+        EXPECT_TRUE(testStringVector(includeNames, "group1"));
+        EXPECT_TRUE(testStringVector(excludeNames, "group2"));
     }
 
     { // Test parse with one include and one ! exclude token
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "group1 !group2");
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group1"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames, "group2"));
+        EXPECT_TRUE(testStringVector(includeNames, "group1"));
+        EXPECT_TRUE(testStringVector(excludeNames, "group2"));
     }
 
     { // Test parse one include and one exclude backwards
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "^group1 group2");
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group2"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames, "group1"));
+        EXPECT_TRUE(testStringVector(includeNames, "group2"));
+        EXPECT_TRUE(testStringVector(excludeNames, "group1"));
     }
 
     { // Test parse with two exclude tokens
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "^group1 ^group2");
-        CPPUNIT_ASSERT(testStringVector(includeNames));
-        CPPUNIT_ASSERT(testStringVector(excludeNames, "group1", "group2"));
+        EXPECT_TRUE(testStringVector(includeNames));
+        EXPECT_TRUE(testStringVector(excludeNames, "group1", "group2"));
     }
 
     { // Test parse multiple includes and excludes at the same time
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
         Descriptor::parseNames(includeNames, excludeNames, "group1 ^group2 ^group3 group4");
-        CPPUNIT_ASSERT(testStringVector(includeNames, "group1", "group4"));
-        CPPUNIT_ASSERT(testStringVector(excludeNames, "group2", "group3"));
+        EXPECT_TRUE(testStringVector(includeNames, "group1", "group4"));
+        EXPECT_TRUE(testStringVector(excludeNames, "group2", "group3"));
     }
 
     { // Test parse misplaced negate character failure
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
-        CPPUNIT_ASSERT_THROW(Descriptor::parseNames(includeNames, excludeNames, "group1 ^ group2"),
+        EXPECT_THROW(Descriptor::parseNames(includeNames, excludeNames, "group1 ^ group2"),
             openvdb::RuntimeError);
     }
 
@@ -417,57 +407,57 @@ TestAttributeSet::testAttributeSetDescriptor()
         std::vector<std::string> excludeNames;
         bool includeAll = false;
         Descriptor::parseNames(includeNames, excludeNames, includeAll, "*");
-        CPPUNIT_ASSERT(includeAll);
-        CPPUNIT_ASSERT(testStringVector(includeNames));
-        CPPUNIT_ASSERT(testStringVector(excludeNames));
+        EXPECT_TRUE(includeAll);
+        EXPECT_TRUE(testStringVector(includeNames));
+        EXPECT_TRUE(testStringVector(excludeNames));
     }
 
     { // Test parse invalid character failure
         std::vector<std::string> includeNames;
         std::vector<std::string> excludeNames;
-        CPPUNIT_ASSERT_THROW(Descriptor::parseNames(includeNames, excludeNames, "group$1"),
+        EXPECT_THROW(Descriptor::parseNames(includeNames, excludeNames, "group$1"),
             openvdb::RuntimeError);
     }
 
     { //  Test hasGroup(), setGroup(), dropGroup(), clearGroups()
         Descriptor descr;
 
-        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
+        EXPECT_TRUE(!descr.hasGroup("test1"));
 
         descr.setGroup("test1", 1);
 
-        CPPUNIT_ASSERT(descr.hasGroup("test1"));
-        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(1));
+        EXPECT_TRUE(descr.hasGroup("test1"));
+        EXPECT_EQ(descr.groupMap().at("test1"), size_t(1));
 
         descr.setGroup("test5", 5);
 
-        CPPUNIT_ASSERT(descr.hasGroup("test1"));
-        CPPUNIT_ASSERT(descr.hasGroup("test5"));
-        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test5"), size_t(5));
+        EXPECT_TRUE(descr.hasGroup("test1"));
+        EXPECT_TRUE(descr.hasGroup("test5"));
+        EXPECT_EQ(descr.groupMap().at("test1"), size_t(1));
+        EXPECT_EQ(descr.groupMap().at("test5"), size_t(5));
 
         descr.setGroup("test1", 2);
 
-        CPPUNIT_ASSERT(descr.hasGroup("test1"));
-        CPPUNIT_ASSERT(descr.hasGroup("test5"));
-        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test1"), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(descr.groupMap().at("test5"), size_t(5));
+        EXPECT_TRUE(descr.hasGroup("test1"));
+        EXPECT_TRUE(descr.hasGroup("test5"));
+        EXPECT_EQ(descr.groupMap().at("test1"), size_t(2));
+        EXPECT_EQ(descr.groupMap().at("test5"), size_t(5));
 
         descr.dropGroup("test1");
 
-        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
-        CPPUNIT_ASSERT(descr.hasGroup("test5"));
+        EXPECT_TRUE(!descr.hasGroup("test1"));
+        EXPECT_TRUE(descr.hasGroup("test5"));
 
         descr.setGroup("test3", 3);
 
-        CPPUNIT_ASSERT(descr.hasGroup("test3"));
-        CPPUNIT_ASSERT(descr.hasGroup("test5"));
+        EXPECT_TRUE(descr.hasGroup("test3"));
+        EXPECT_TRUE(descr.hasGroup("test5"));
 
         descr.clearGroups();
 
-        CPPUNIT_ASSERT(!descr.hasGroup("test1"));
-        CPPUNIT_ASSERT(!descr.hasGroup("test3"));
-        CPPUNIT_ASSERT(!descr.hasGroup("test5"));
+        EXPECT_TRUE(!descr.hasGroup("test1"));
+        EXPECT_TRUE(!descr.hasGroup("test3"));
+        EXPECT_TRUE(!descr.hasGroup("test5"));
     }
 
     // I/O test
@@ -480,9 +470,10 @@ TestAttributeSet::testAttributeSetDescriptor()
     std::istringstream istr(ostr.str(), std::ios_base::binary);
     inputDescr.read(istr);
 
-    CPPUNIT_ASSERT_EQUAL(descrA->size(), inputDescr.size());
-    CPPUNIT_ASSERT(*descrA == inputDescr);
+    EXPECT_EQ(descrA->size(), inputDescr.size());
+    EXPECT_TRUE(*descrA == inputDescr);
 }
+TEST_F(TestAttributeSet, testAttributeSetDescriptor) { testAttributeSetDescriptor(); }
 
 
 void
@@ -504,11 +495,11 @@ TestAttributeSet::testAttributeSet()
         Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
         descr = descr->duplicateAppend("test", AttributeI::attributeType());
         AttributeSet attrSet(descr);
-        CPPUNIT_ASSERT_EQUAL(attrSet.size(), size_t(2));
+        EXPECT_EQ(attrSet.size(), size_t(2));
 
         Descriptor::Ptr newDescr = Descriptor::create(AttributeVec3s::attributeType());
-        CPPUNIT_ASSERT_THROW(attrSet.resetDescriptor(newDescr), openvdb::LookupError);
-        CPPUNIT_ASSERT_NO_THROW(
+        EXPECT_THROW(attrSet.resetDescriptor(newDescr), openvdb::LookupError);
+        EXPECT_NO_THROW(
             attrSet.resetDescriptor(newDescr, /*allowMismatchingDescriptors=*/true));
     }
 
@@ -521,8 +512,8 @@ TestAttributeSet::testAttributeSet()
             "transient", AttributeS::attributeType());
         array2->setTransient(true);
         AttributeSet attrSet2(attrSet, size_t(1));
-        CPPUNIT_ASSERT(attrSet2.getConst("hidden")->isHidden());
-        CPPUNIT_ASSERT(attrSet2.getConst("transient")->isTransient());
+        EXPECT_TRUE(attrSet2.getConst("hidden")->isHidden());
+        EXPECT_TRUE(attrSet2.getConst("transient")->isTransient());
     }
 
     // construct
@@ -531,15 +522,15 @@ TestAttributeSet::testAttributeSet()
         Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
         AttributeSet invalidAttrSetA(descr, /*arrayLength=*/50);
 
-        CPPUNIT_ASSERT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
+        EXPECT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
             /*stride=*/0, /*constantStride=*/true), openvdb::ValueError);
-        CPPUNIT_ASSERT(invalidAttrSetA.find("id") == AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
+        EXPECT_TRUE(invalidAttrSetA.find("id") == AttributeSet::INVALID_POS);
+        EXPECT_THROW(invalidAttrSetA.appendAttribute("id", AttributeI::attributeType(),
             /*stride=*/49, /*constantStride=*/false), openvdb::ValueError);
-        CPPUNIT_ASSERT_NO_THROW(
+        EXPECT_NO_THROW(
             invalidAttrSetA.appendAttribute("testStride1", AttributeI::attributeType(),
             /*stride=*/50, /*constantStride=*/false));
-        CPPUNIT_ASSERT_NO_THROW(
+        EXPECT_NO_THROW(
             invalidAttrSetA.appendAttribute("testStride2", AttributeI::attributeType(),
             /*stride=*/51, /*constantStride=*/false));
     }
@@ -557,53 +548,53 @@ TestAttributeSet::testAttributeSet()
         attrSet.appendAttribute("boolDynamic", AttributeB::attributeType(), /*size=*/100, false);
         attrSet.appendAttribute("intDynamic", AttributeI::attributeType(), /*size=*/300, false);
 
-        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet.getConst("float1")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet.getConst("int1")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet.getConst("float3")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet.getConst("vector3")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet.getConst("bool100")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet.getConst("boolDynamic")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet.getConst("intDynamic")->type().first);
+        EXPECT_EQ(std::string("float"), attrSet.getConst("float1")->type().first);
+        EXPECT_EQ(std::string("int32"), attrSet.getConst("int1")->type().first);
+        EXPECT_EQ(std::string("float"), attrSet.getConst("float3")->type().first);
+        EXPECT_EQ(std::string("vec3s"), attrSet.getConst("vector")->type().first);
+        EXPECT_EQ(std::string("vec3s"), attrSet.getConst("vector3")->type().first);
+        EXPECT_EQ(std::string("bool"), attrSet.getConst("bool100")->type().first);
+        EXPECT_EQ(std::string("bool"), attrSet.getConst("boolDynamic")->type().first);
+        EXPECT_EQ(std::string("int32"), attrSet.getConst("intDynamic")->type().first);
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("float1")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("int1")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet.getConst("float3")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet.getConst("vector")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet.getConst("vector3")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet.getConst("bool100")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet.getConst("float1")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet.getConst("int1")->stride());
+        EXPECT_EQ(openvdb::Index(3), attrSet.getConst("float3")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet.getConst("vector")->stride());
+        EXPECT_EQ(openvdb::Index(3), attrSet.getConst("vector3")->stride());
+        EXPECT_EQ(openvdb::Index(100), attrSet.getConst("bool100")->stride());
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSet.getConst("float1")->size());
+        EXPECT_EQ(openvdb::Index(50), attrSet.getConst("float1")->size());
 
         // error as the new length is greater than the data size of the
         // 'boolDynamic' attribute
-        CPPUNIT_ASSERT_THROW(AttributeSet(attrSet, /*arrayLength=*/200), openvdb::ValueError);
+        EXPECT_THROW(AttributeSet(attrSet, /*arrayLength=*/200), openvdb::ValueError);
 
         AttributeSet attrSet2(attrSet, /*arrayLength=*/100);
 
-        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet2.getConst("float1")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet2.getConst("int1")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("float"), attrSet2.getConst("float3")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("vec3s"), attrSet2.getConst("vector3")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet2.getConst("bool100")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("bool"), attrSet2.getConst("boolDynamic")->type().first);
-        CPPUNIT_ASSERT_EQUAL(std::string("int32"), attrSet2.getConst("intDynamic")->type().first);
+        EXPECT_EQ(std::string("float"), attrSet2.getConst("float1")->type().first);
+        EXPECT_EQ(std::string("int32"), attrSet2.getConst("int1")->type().first);
+        EXPECT_EQ(std::string("float"), attrSet2.getConst("float3")->type().first);
+        EXPECT_EQ(std::string("vec3s"), attrSet2.getConst("vector")->type().first);
+        EXPECT_EQ(std::string("vec3s"), attrSet2.getConst("vector3")->type().first);
+        EXPECT_EQ(std::string("bool"), attrSet2.getConst("bool100")->type().first);
+        EXPECT_EQ(std::string("bool"), attrSet2.getConst("boolDynamic")->type().first);
+        EXPECT_EQ(std::string("int32"), attrSet2.getConst("intDynamic")->type().first);
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("float1")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("int1")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet2.getConst("float3")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(1), attrSet2.getConst("vector")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(3), attrSet2.getConst("vector3")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("bool100")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), attrSet2.getConst("boolDynamic")->stride());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), attrSet2.getConst("intDynamic")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet2.getConst("float1")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet2.getConst("int1")->stride());
+        EXPECT_EQ(openvdb::Index(3), attrSet2.getConst("float3")->stride());
+        EXPECT_EQ(openvdb::Index(1), attrSet2.getConst("vector")->stride());
+        EXPECT_EQ(openvdb::Index(3), attrSet2.getConst("vector3")->stride());
+        EXPECT_EQ(openvdb::Index(100), attrSet2.getConst("bool100")->stride());
+        EXPECT_EQ(openvdb::Index(0), attrSet2.getConst("boolDynamic")->stride());
+        EXPECT_EQ(openvdb::Index(0), attrSet2.getConst("intDynamic")->stride());
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("float1")->size());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("boolDynamic")->size());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("intDynamic")->size());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(100), attrSet2.getConst("boolDynamic")->dataSize());
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(300), attrSet2.getConst("intDynamic")->dataSize());
+        EXPECT_EQ(openvdb::Index(100), attrSet2.getConst("float1")->size());
+        EXPECT_EQ(openvdb::Index(100), attrSet2.getConst("boolDynamic")->size());
+        EXPECT_EQ(openvdb::Index(100), attrSet2.getConst("intDynamic")->size());
+        EXPECT_EQ(openvdb::Index(100), attrSet2.getConst("boolDynamic")->dataSize());
+        EXPECT_EQ(openvdb::Index(300), attrSet2.getConst("intDynamic")->dataSize());
     }
 
     Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
@@ -618,41 +609,41 @@ TestAttributeSet::testAttributeSet()
 
     attrSetA2.appendAttribute("id", AttributeI::attributeType());
 
-    CPPUNIT_ASSERT(attrSetA == attrSetA2);
+    EXPECT_TRUE(attrSetA == attrSetA2);
 
     // expand uniform values and check equality
 
     attrSetA.get("P")->expand();
     attrSetA2.get("P")->expand();
 
-    CPPUNIT_ASSERT(attrSetA == attrSetA2);
+    EXPECT_TRUE(attrSetA == attrSetA2);
 
-    CPPUNIT_ASSERT_EQUAL(size_t(2), attrSetA.size());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSetA.get(0)->size());
-    CPPUNIT_ASSERT_EQUAL(openvdb::Index(50), attrSetA.get(1)->size());
+    EXPECT_EQ(size_t(2), attrSetA.size());
+    EXPECT_EQ(openvdb::Index(50), attrSetA.get(0)->size());
+    EXPECT_EQ(openvdb::Index(50), attrSetA.get(1)->size());
 
     { // copy
-        CPPUNIT_ASSERT(!attrSetA.isShared(0));
-        CPPUNIT_ASSERT(!attrSetA.isShared(1));
+        EXPECT_TRUE(!attrSetA.isShared(0));
+        EXPECT_TRUE(!attrSetA.isShared(1));
 
         AttributeSet attrSetB(attrSetA);
 
-        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+        EXPECT_TRUE(matchingAttributeSets(attrSetA, attrSetB));
 
-        CPPUNIT_ASSERT(attrSetA.isShared(0));
-        CPPUNIT_ASSERT(attrSetA.isShared(1));
-        CPPUNIT_ASSERT(attrSetB.isShared(0));
-        CPPUNIT_ASSERT(attrSetB.isShared(1));
+        EXPECT_TRUE(attrSetA.isShared(0));
+        EXPECT_TRUE(attrSetA.isShared(1));
+        EXPECT_TRUE(attrSetB.isShared(0));
+        EXPECT_TRUE(attrSetB.isShared(1));
 
         attrSetB.makeUnique(0);
         attrSetB.makeUnique(1);
 
-        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+        EXPECT_TRUE(matchingAttributeSets(attrSetA, attrSetB));
 
-        CPPUNIT_ASSERT(!attrSetA.isShared(0));
-        CPPUNIT_ASSERT(!attrSetA.isShared(1));
-        CPPUNIT_ASSERT(!attrSetB.isShared(0));
-        CPPUNIT_ASSERT(!attrSetB.isShared(1));
+        EXPECT_TRUE(!attrSetA.isShared(0));
+        EXPECT_TRUE(!attrSetA.isShared(1));
+        EXPECT_TRUE(!attrSetB.isShared(0));
+        EXPECT_TRUE(!attrSetB.isShared(1));
     }
 
     { // attribute insertion
@@ -671,11 +662,11 @@ TestAttributeSet::testAttributeSet()
             attrSetB.descriptor().duplicateAppend("test", AttributeS::attributeType());
 
         // should throw if we attempt to add the same attribute name but a different type
-        CPPUNIT_ASSERT_THROW(
+        EXPECT_THROW(
             descrB->insert("test", AttributeI::attributeType()), openvdb::KeyError);
 
         // shouldn't throw if we attempt to add the same attribute name and type
-        CPPUNIT_ASSERT_NO_THROW(descrB->insert("test", AttributeS::attributeType()));
+        EXPECT_NO_THROW(descrB->insert("test", AttributeS::attributeType()));
 
         openvdb::TypedMetadata<AttributeS::ValueType> defaultValueTest(5);
 
@@ -683,11 +674,11 @@ TestAttributeSet::testAttributeSet()
 
         openvdb::TypedMetadata<int> defaultValueInt(5);
 
-        CPPUNIT_ASSERT_THROW(descrB->setDefaultValue("test", defaultValueInt), openvdb::TypeError);
+        EXPECT_THROW(descrB->setDefaultValue("test", defaultValueInt), openvdb::TypeError);
 
         // add a default value with a name that does not exist
 
-        CPPUNIT_ASSERT_THROW(descrB->setDefaultValue("badname", defaultValueTest),
+        EXPECT_THROW(descrB->setDefaultValue("badname", defaultValueTest),
             openvdb::LookupError);
 
         // add a default value for test of 5
@@ -696,15 +687,15 @@ TestAttributeSet::testAttributeSet()
 
         {
             openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:test"];
-            CPPUNIT_ASSERT(meta);
-            CPPUNIT_ASSERT(meta->typeName() == "float");
+            EXPECT_TRUE(meta);
+            EXPECT_TRUE(meta->typeName() == "float");
         }
 
         // ensure attribute order persists
 
-        CPPUNIT_ASSERT_EQUAL(descrB->find("P"), size_t(0));
-        CPPUNIT_ASSERT_EQUAL(descrB->find("id"), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(descrB->find("test"), size_t(2));
+        EXPECT_EQ(descrB->find("P"), size_t(0));
+        EXPECT_EQ(descrB->find("id"), size_t(1));
+        EXPECT_EQ(descrB->find("test"), size_t(2));
 
         { // simple method
             AttributeSet attrSetC(attrSetB);
@@ -715,7 +706,7 @@ TestAttributeSet::testAttributeSet()
             attrSetC.appendAttribute("test", AttributeS::attributeType(), /*stride=*/1,
                                         /*constantStride=*/true, defaultValueTest.copy().get());
 
-            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *descrB));
+            EXPECT_TRUE(attributeSetMatchesDescriptor(attrSetC, *descrB));
         }
         { // descriptor-sharing method
             AttributeSet attrSetC(attrSetB);
@@ -725,7 +716,7 @@ TestAttributeSet::testAttributeSet()
 
             attrSetC.appendAttribute(attrSetC.descriptor(), descrB, size_t(2));
 
-            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+            EXPECT_TRUE(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
 
         // add a default value for pos of (1, 3, 1)
@@ -737,19 +728,19 @@ TestAttributeSet::testAttributeSet()
 
         {
             openvdb::Metadata::Ptr meta = descrB->getMetadata()["default:P"];
-            CPPUNIT_ASSERT(meta);
-            CPPUNIT_ASSERT(meta->typeName() == "vec3s");
-            CPPUNIT_ASSERT_EQUAL(descrB->getDefaultValue<AttributeVec3s::ValueType>("P"),
+            EXPECT_TRUE(meta);
+            EXPECT_TRUE(meta->typeName() == "vec3s");
+            EXPECT_EQ(descrB->getDefaultValue<AttributeVec3s::ValueType>("P"),
                 defaultValuePos.value());
         }
 
         // remove default value
 
-        CPPUNIT_ASSERT(descrB->hasDefaultValue("test"));
+        EXPECT_TRUE(descrB->hasDefaultValue("test"));
 
         descrB->removeDefaultValue("test");
 
-        CPPUNIT_ASSERT(!descrB->hasDefaultValue("test"));
+        EXPECT_TRUE(!descrB->hasDefaultValue("test"));
     }
 
     { // attribute removal
@@ -769,8 +760,8 @@ TestAttributeSet::testAttributeSet()
         attrSetB.appendAttribute("test3", AttributeI::attributeType());
 
         // check default value of "test" attribute has been applied
-        CPPUNIT_ASSERT_EQUAL(7, attrSetB.descriptor().getDefaultValue<int>("test"));
-        CPPUNIT_ASSERT_EQUAL(7, AttributeI::cast(*attrSetB.getConst("test")).get(0));
+        EXPECT_EQ(7, attrSetB.descriptor().getDefaultValue<int>("test"));
+        EXPECT_EQ(7, AttributeI::cast(*attrSetB.getConst("test")).get(0));
 
         descr1 = attrSetB.descriptorPtr();
 
@@ -793,9 +784,9 @@ TestAttributeSet::testAttributeSet()
         std::vector<size_t> toDrop{
             descr1->find("test"), descr1->find("test2"), descr1->find("test3")};
 
-        CPPUNIT_ASSERT_EQUAL(toDrop[0], size_t(1));
-        CPPUNIT_ASSERT_EQUAL(toDrop[1], size_t(3));
-        CPPUNIT_ASSERT_EQUAL(toDrop[2], size_t(5));
+        EXPECT_EQ(toDrop[0], size_t(1));
+        EXPECT_EQ(toDrop[1], size_t(3));
+        EXPECT_EQ(toDrop[2], size_t(5));
 
         { // simple method
             AttributeSet attrSetC(attrSetB);
@@ -805,23 +796,23 @@ TestAttributeSet::testAttributeSet()
             attrSetC.makeUnique(2);
             attrSetC.makeUnique(3);
 
-            CPPUNIT_ASSERT(attrSetC.descriptor().getMetadata()["default:test"]);
+            EXPECT_TRUE(attrSetC.descriptor().getMetadata()["default:test"]);
 
             attrSetC.dropAttributes(toDrop);
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            EXPECT_EQ(attrSetC.size(), size_t(3));
 
-            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+            EXPECT_TRUE(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
 
             // check default values have been removed for the relevant attributes
 
             const Descriptor& descrC = attrSetC.descriptor();
 
-            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test"]);
-            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test2"]);
-            CPPUNIT_ASSERT(!descrC.getMetadata()["default:test3"]);
+            EXPECT_TRUE(!descrC.getMetadata()["default:test"]);
+            EXPECT_TRUE(!descrC.getMetadata()["default:test2"]);
+            EXPECT_TRUE(!descrC.getMetadata()["default:test3"]);
 
-            CPPUNIT_ASSERT(descrC.getMetadata()["default:id"]);
+            EXPECT_TRUE(descrC.getMetadata()["default:id"]);
         }
 
         { // reverse removal order
@@ -837,9 +828,9 @@ TestAttributeSet::testAttributeSet()
 
             attrSetC.dropAttributes(toDropReverse);
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            EXPECT_EQ(attrSetC.size(), size_t(3));
 
-            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+            EXPECT_TRUE(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
 
         { // descriptor-sharing method
@@ -854,9 +845,9 @@ TestAttributeSet::testAttributeSet()
 
             attrSetC.dropAttributes(toDrop, attrSetC.descriptor(), descrB);
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
+            EXPECT_EQ(attrSetC.size(), size_t(3));
 
-            CPPUNIT_ASSERT(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
+            EXPECT_TRUE(attributeSetMatchesDescriptor(attrSetC, *targetDescr));
         }
 
         { // remove attribute
@@ -867,47 +858,47 @@ TestAttributeSet::testAttributeSet()
             attrSetC.appendAttribute("test4", AttributeI::attributeType());
             attrSetC.appendAttribute("test5", AttributeI::attributeType());
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(5));
+            EXPECT_EQ(attrSetC.size(), size_t(5));
 
             { // remove test2
                 AttributeArray::Ptr array = attrSetC.removeAttribute(1);
-                CPPUNIT_ASSERT(array);
-                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+                EXPECT_TRUE(array);
+                EXPECT_EQ(array.use_count(), long(1));
             }
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(4));
-            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(4));
+            EXPECT_EQ(attrSetC.size(), size_t(4));
+            EXPECT_EQ(attrSetC.descriptor().size(), size_t(4));
 
             { // remove test5
                 AttributeArray::Ptr array = attrSetC.removeAttribute("test5");
-                CPPUNIT_ASSERT(array);
-                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+                EXPECT_TRUE(array);
+                EXPECT_EQ(array.use_count(), long(1));
             }
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
-            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+            EXPECT_EQ(attrSetC.size(), size_t(3));
+            EXPECT_EQ(attrSetC.descriptor().size(), size_t(3));
 
             { // remove test3 unsafely
                 AttributeArray::Ptr array = attrSetC.removeAttributeUnsafe(1);
-                CPPUNIT_ASSERT(array);
-                CPPUNIT_ASSERT_EQUAL(array.use_count(), long(1));
+                EXPECT_TRUE(array);
+                EXPECT_EQ(array.use_count(), long(1));
             }
 
             // array of attributes and descriptor are not updated
 
-            CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(3));
-            CPPUNIT_ASSERT_EQUAL(attrSetC.descriptor().size(), size_t(3));
+            EXPECT_EQ(attrSetC.size(), size_t(3));
+            EXPECT_EQ(attrSetC.descriptor().size(), size_t(3));
 
             const auto& nameToPosMap = attrSetC.descriptor().map();
 
-            CPPUNIT_ASSERT_EQUAL(nameToPosMap.size(), size_t(3));
-            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test1"), size_t(0));
-            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test3"), size_t(1)); // this array does not exist
-            CPPUNIT_ASSERT_EQUAL(nameToPosMap.at("test4"), size_t(2));
+            EXPECT_EQ(nameToPosMap.size(), size_t(3));
+            EXPECT_EQ(nameToPosMap.at("test1"), size_t(0));
+            EXPECT_EQ(nameToPosMap.at("test3"), size_t(1)); // this array does not exist
+            EXPECT_EQ(nameToPosMap.at("test4"), size_t(2));
 
-            CPPUNIT_ASSERT(attrSetC.getConst(0));
-            CPPUNIT_ASSERT(!attrSetC.getConst(1)); // this array does not exist
-            CPPUNIT_ASSERT(attrSetC.getConst(2));
+            EXPECT_TRUE(attrSetC.getConst(0));
+            EXPECT_TRUE(!attrSetC.getConst(1)); // this array does not exist
+            EXPECT_TRUE(attrSetC.getConst(2));
         }
 
         { // test duplicateDrop configures group mapping
@@ -926,7 +917,7 @@ TestAttributeSet::testAttributeSet()
 
             Descriptor::Ptr descriptor = attrSetC.descriptorPtr();
             size_t count = descriptor->count(GroupAttributeArray::attributeType());
-            CPPUNIT_ASSERT_EQUAL(count, size_t(4));
+            EXPECT_EQ(count, size_t(4));
 
             descriptor->setGroup("test_group1", /*offset*/0); // __group1
             descriptor->setGroup("test_group2", /*offset=8*/GROUP_BITS); // __group2
@@ -935,21 +926,21 @@ TestAttributeSet::testAttributeSet()
 
             descriptor = descriptor->duplicateDrop({ 1, 2, 3 });
             count = descriptor->count(GroupAttributeArray::attributeType());
-            CPPUNIT_ASSERT_EQUAL(count, size_t(2));
+            EXPECT_EQ(count, size_t(2));
 
-            CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor->size());
-            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group1"));
-            CPPUNIT_ASSERT(!descriptor->hasGroup("test_group2"));
-            CPPUNIT_ASSERT(descriptor->hasGroup("test_group3"));
-            CPPUNIT_ASSERT(descriptor->hasGroup("test_group4"));
+            EXPECT_EQ(size_t(3), descriptor->size());
+            EXPECT_TRUE(!descriptor->hasGroup("test_group1"));
+            EXPECT_TRUE(!descriptor->hasGroup("test_group2"));
+            EXPECT_TRUE(descriptor->hasGroup("test_group3"));
+            EXPECT_TRUE(descriptor->hasGroup("test_group4"));
 
-            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group1"), size_t(AttributeSet::INVALID_POS));
-            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group2"), size_t(AttributeSet::INVALID_POS));
-            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group3"), size_t(1));
-            CPPUNIT_ASSERT_EQUAL(descriptor->find("__group4"), size_t(2));
+            EXPECT_EQ(descriptor->find("__group1"), size_t(AttributeSet::INVALID_POS));
+            EXPECT_EQ(descriptor->find("__group2"), size_t(AttributeSet::INVALID_POS));
+            EXPECT_EQ(descriptor->find("__group3"), size_t(1));
+            EXPECT_EQ(descriptor->find("__group4"), size_t(2));
 
-            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group3"), size_t(0));
-            CPPUNIT_ASSERT_EQUAL(descriptor->groupOffset("test_group4"), size_t(GROUP_BITS + GROUP_BITS/2));
+            EXPECT_EQ(descriptor->groupOffset("test_group3"), size_t(0));
+            EXPECT_EQ(descriptor->groupOffset("test_group4"), size_t(GROUP_BITS + GROUP_BITS/2));
         }
     }
 
@@ -958,12 +949,12 @@ TestAttributeSet::testAttributeSet()
     // this replace call should not take effect since the new attribute
     // array type does not match with the descriptor type for the given position.
     AttributeArray::Ptr floatAttr(new AttributeS(15));
-    CPPUNIT_ASSERT(attrSetA.replace(1, floatAttr) == AttributeSet::INVALID_POS);
+    EXPECT_TRUE(attrSetA.replace(1, floatAttr) == AttributeSet::INVALID_POS);
 
     AttributeArray::Ptr intAttr(new AttributeI(10));
-    CPPUNIT_ASSERT(attrSetA.replace(1, intAttr) != AttributeSet::INVALID_POS);
+    EXPECT_TRUE(attrSetA.replace(1, intAttr) != AttributeSet::INVALID_POS);
 
-    CPPUNIT_ASSERT_EQUAL(openvdb::Index(10), attrSetA.get(1)->size());
+    EXPECT_EQ(openvdb::Index(10), attrSetA.get(1)->size());
 
     { // reorder attribute set
         Descriptor::Ptr descr1 = Descriptor::create(AttributeVec3s::attributeType());
@@ -984,11 +975,11 @@ TestAttributeSet::testAttributeSet()
         attrSetB1.appendAttribute("test", AttributeI::attributeType());
         attrSetB1.appendAttribute("id", AttributeI::attributeType());
 
-        CPPUNIT_ASSERT(attrSetA1 != attrSetB1);
+        EXPECT_TRUE(attrSetA1 != attrSetB1);
 
         attrSetB1.reorderAttributes(descr1);
 
-        CPPUNIT_ASSERT(attrSetA1 == attrSetB1);
+        EXPECT_TRUE(attrSetA1 == attrSetB1);
     }
 
     { // metadata test
@@ -1003,8 +994,8 @@ TestAttributeSet::testAttributeSet()
         AttributeSet attrSetB1(descr2A);
         AttributeSet attrSetC1(attrSetA1);
 
-        CPPUNIT_ASSERT(attrSetA1 != attrSetB1);
-        CPPUNIT_ASSERT(attrSetA1 == attrSetC1);
+        EXPECT_TRUE(attrSetA1 != attrSetB1);
+        EXPECT_TRUE(attrSetA1 == attrSetC1);
     }
 
     // add some metadata and register the type
@@ -1020,7 +1011,7 @@ TestAttributeSet::testAttributeSet()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrSetB.read(istr);
 
-        CPPUNIT_ASSERT(matchingAttributeSets(attrSetA, attrSetB));
+        EXPECT_TRUE(matchingAttributeSets(attrSetA, attrSetB));
     }
 
     { // I/O transient test
@@ -1036,7 +1027,7 @@ TestAttributeSet::testAttributeSet()
 
         // ensures transient attribute is not written out
 
-        CPPUNIT_ASSERT_EQUAL(attrSetB.size(), size_t(1));
+        EXPECT_EQ(attrSetB.size(), size_t(1));
 
         std::ostringstream ostr2(std::ios_base::binary);
         attrSetA.write(ostr2, /*transient=*/true);
@@ -1045,13 +1036,13 @@ TestAttributeSet::testAttributeSet()
         std::istringstream istr2(ostr2.str(), std::ios_base::binary);
         attrSetC.read(istr2);
 
-        CPPUNIT_ASSERT_EQUAL(attrSetC.size(), size_t(2));
+        EXPECT_EQ(attrSetC.size(), size_t(2));
     }
 }
+TEST_F(TestAttributeSet, testAttributeSet) { testAttributeSet(); }
 
 
-void
-TestAttributeSet::testAttributeSetGroups()
+TEST_F(TestAttributeSet, testAttributeSetGroups)
 {
     // Define and register some common attribute types
     using AttributeI        = TypedAttributeArray<int32_t>;
@@ -1066,7 +1057,7 @@ TestAttributeSet::testAttributeSetGroups()
         Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
         AttributeSet attrSet(descr, /*arrayLength=*/3);
         attrSet.appendAttribute("id", AttributeI::attributeType());
-        CPPUNIT_ASSERT(!descr->hasGroup("test1"));
+        EXPECT_TRUE(!descr->hasGroup("test1"));
     }
 
     { // group offset
@@ -1074,12 +1065,12 @@ TestAttributeSet::testAttributeSetGroups()
 
         descr->setGroup("test1", 1);
 
-        CPPUNIT_ASSERT(descr->hasGroup("test1"));
-        CPPUNIT_ASSERT_EQUAL(descr->groupMap().at("test1"), size_t(1));
+        EXPECT_TRUE(descr->hasGroup("test1"));
+        EXPECT_EQ(descr->groupMap().at("test1"), size_t(1));
 
         AttributeSet attrSet(descr);
 
-        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test1"), size_t(1));
+        EXPECT_EQ(attrSet.groupOffset("test1"), size_t(1));
     }
 
     { // group index
@@ -1105,56 +1096,56 @@ TestAttributeSet::testAttributeSetGroups()
         }
 
         Descriptor::GroupIndex index15 = attrSet.groupIndex(15);
-        CPPUNIT_ASSERT_EQUAL(index15.first, size_t(5));
-        CPPUNIT_ASSERT_EQUAL(index15.second, uint8_t(7));
+        EXPECT_EQ(index15.first, size_t(5));
+        EXPECT_EQ(index15.second, uint8_t(7));
 
-        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index15), size_t(15));
-        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test15"), size_t(15));
+        EXPECT_EQ(attrSet.groupOffset(index15), size_t(15));
+        EXPECT_EQ(attrSet.groupOffset("test15"), size_t(15));
 
         Descriptor::GroupIndex index15b = attrSet.groupIndex("test15");
-        CPPUNIT_ASSERT_EQUAL(index15b.first, size_t(5));
-        CPPUNIT_ASSERT_EQUAL(index15b.second, uint8_t(7));
+        EXPECT_EQ(index15b.first, size_t(5));
+        EXPECT_EQ(index15b.second, uint8_t(7));
 
         Descriptor::GroupIndex index16 = attrSet.groupIndex(16);
-        CPPUNIT_ASSERT_EQUAL(index16.first, size_t(7));
-        CPPUNIT_ASSERT_EQUAL(index16.second, uint8_t(0));
+        EXPECT_EQ(index16.first, size_t(7));
+        EXPECT_EQ(index16.second, uint8_t(0));
 
-        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset(index16), size_t(16));
-        CPPUNIT_ASSERT_EQUAL(attrSet.groupOffset("test16"), size_t(16));
+        EXPECT_EQ(attrSet.groupOffset(index16), size_t(16));
+        EXPECT_EQ(attrSet.groupOffset("test16"), size_t(16));
 
         Descriptor::GroupIndex index16b = attrSet.groupIndex("test16");
-        CPPUNIT_ASSERT_EQUAL(index16b.first, size_t(7));
-        CPPUNIT_ASSERT_EQUAL(index16b.second, uint8_t(0));
+        EXPECT_EQ(index16b.first, size_t(7));
+        EXPECT_EQ(index16b.second, uint8_t(0));
 
         // check out of range exception
 
-        CPPUNIT_ASSERT_NO_THROW(attrSet.groupIndex(23));
-        CPPUNIT_ASSERT_THROW(attrSet.groupIndex(24), LookupError);
+        EXPECT_NO_THROW(attrSet.groupIndex(23));
+        EXPECT_THROW(attrSet.groupIndex(24), LookupError);
 
         // check group attribute indices (group attributes are appended with indices 3, 5, 7)
 
         std::vector<size_t> groupIndices = attrSet.groupAttributeIndices();
 
-        CPPUNIT_ASSERT_EQUAL(size_t(3), groupIndices.size());
-        CPPUNIT_ASSERT_EQUAL(size_t(3), groupIndices[0]);
-        CPPUNIT_ASSERT_EQUAL(size_t(5), groupIndices[1]);
-        CPPUNIT_ASSERT_EQUAL(size_t(7), groupIndices[2]);
+        EXPECT_EQ(size_t(3), groupIndices.size());
+        EXPECT_EQ(size_t(3), groupIndices[0]);
+        EXPECT_EQ(size_t(5), groupIndices[1]);
+        EXPECT_EQ(size_t(7), groupIndices[2]);
     }
 
     { // group unique name
         Descriptor::Ptr descr = Descriptor::create(AttributeVec3s::attributeType());
         const openvdb::Name uniqueNameEmpty = descr->uniqueGroupName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueNameEmpty, openvdb::Name("test"));
+        EXPECT_EQ(uniqueNameEmpty, openvdb::Name("test"));
 
         descr->setGroup("test", 1);
         descr->setGroup("test1", 2);
 
         const openvdb::Name uniqueName1 = descr->uniqueGroupName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueName1, openvdb::Name("test0"));
+        EXPECT_EQ(uniqueName1, openvdb::Name("test0"));
         descr->setGroup(uniqueName1, 3);
 
         const openvdb::Name uniqueName2 = descr->uniqueGroupName("test");
-        CPPUNIT_ASSERT_EQUAL(uniqueName2, openvdb::Name("test2"));
+        EXPECT_EQ(uniqueName2, openvdb::Name("test2"));
     }
 
     { // group rename
@@ -1163,19 +1154,19 @@ TestAttributeSet::testAttributeSetGroups()
         descr->setGroup("test1", 2);
 
         size_t pos = descr->renameGroup("test", "test1");
-        CPPUNIT_ASSERT(pos == AttributeSet::INVALID_POS);
-        CPPUNIT_ASSERT(descr->hasGroup("test"));
-        CPPUNIT_ASSERT(descr->hasGroup("test1"));
+        EXPECT_TRUE(pos == AttributeSet::INVALID_POS);
+        EXPECT_TRUE(descr->hasGroup("test"));
+        EXPECT_TRUE(descr->hasGroup("test1"));
 
         pos = descr->renameGroup("test", "test2");
-        CPPUNIT_ASSERT_EQUAL(pos, size_t(1));
-        CPPUNIT_ASSERT(!descr->hasGroup("test"));
-        CPPUNIT_ASSERT(descr->hasGroup("test1"));
-        CPPUNIT_ASSERT(descr->hasGroup("test2"));
+        EXPECT_EQ(pos, size_t(1));
+        EXPECT_TRUE(!descr->hasGroup("test"));
+        EXPECT_TRUE(descr->hasGroup("test1"));
+        EXPECT_TRUE(descr->hasGroup("test2"));
     }
 
     // typically 8 bits per group
-    CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT), Descriptor::groupBits());
+    EXPECT_EQ(size_t(CHAR_BIT), Descriptor::groupBits());
 
     { // unused groups and compaction
         AttributeSet attrSet(Descriptor::create(AttributeVec3s::attributeType()));
@@ -1189,24 +1180,24 @@ TestAttributeSet::testAttributeSetGroups()
 
         // no groups
 
-        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
-        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(1)));
-        CPPUNIT_ASSERT_EQUAL(size_t(5), descriptor.unusedGroupOffset(/*hint=*/size_t(5)));
-        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
-        CPPUNIT_ASSERT_EQUAL(false,
+        EXPECT_EQ(size_t(CHAR_BIT*2), descriptor.unusedGroups());
+        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset());
+        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(1)));
+        EXPECT_EQ(size_t(5), descriptor.unusedGroupOffset(/*hint=*/size_t(5)));
+        EXPECT_EQ(true, descriptor.canCompactGroups());
+        EXPECT_EQ(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
         // add one group in first slot
 
         descriptor.setGroup("test0", size_t(0));
 
-        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset());
+        EXPECT_EQ(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
+        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset());
         // hint already in use
-        CPPUNIT_ASSERT_EQUAL(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(0)));
-        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
-        CPPUNIT_ASSERT_EQUAL(false,
+        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(0)));
+        EXPECT_EQ(true, descriptor.canCompactGroups());
+        EXPECT_EQ(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
         descriptor.dropGroup("test0");
@@ -1215,20 +1206,20 @@ TestAttributeSet::testAttributeSetGroups()
 
         descriptor.setGroup("test7", size_t(7));
 
-        CPPUNIT_ASSERT_EQUAL(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset());
-        CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroupOffset(/*hint=*/size_t(6)));
-        CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroupOffset(/*hint=*/size_t(7)));
-        CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset(/*hint=*/size_t(8)));
-        CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
+        EXPECT_EQ(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
+        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset());
+        EXPECT_EQ(size_t(6), descriptor.unusedGroupOffset(/*hint=*/size_t(6)));
+        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset(/*hint=*/size_t(7)));
+        EXPECT_EQ(size_t(8), descriptor.unusedGroupOffset(/*hint=*/size_t(8)));
+        EXPECT_EQ(true, descriptor.canCompactGroups());
         // note that requiresGroupMove() is not particularly clever because it
         // blindly recommends moving the group even if it ultimately remains in
         // the same attribute
-        CPPUNIT_ASSERT_EQUAL(true,
+        EXPECT_EQ(true,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
-        CPPUNIT_ASSERT_EQUAL(Name("test7"), sourceName);
-        CPPUNIT_ASSERT_EQUAL(size_t(7), sourceOffset);
-        CPPUNIT_ASSERT_EQUAL(size_t(0), targetOffset);
+        EXPECT_EQ(Name("test7"), sourceName);
+        EXPECT_EQ(size_t(7), sourceOffset);
+        EXPECT_EQ(size_t(0), targetOffset);
 
         descriptor.dropGroup("test7");
 
@@ -1236,7 +1227,7 @@ TestAttributeSet::testAttributeSetGroups()
 
         if (CHAR_BIT == 8) {
 
-            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.availableGroups());
+            EXPECT_EQ(size_t(16), descriptor.availableGroups());
 
             // add all but one group in the first attribute
 
@@ -1249,39 +1240,39 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test6", size_t(6));
             // no test7
 
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroupOffset());
-            CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
-            CPPUNIT_ASSERT_EQUAL(false,
+            EXPECT_EQ(size_t(9), descriptor.unusedGroups());
+            EXPECT_EQ(size_t(7), descriptor.unusedGroupOffset());
+            EXPECT_EQ(true, descriptor.canCompactGroups());
+            EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
             descriptor.setGroup("test7", size_t(7));
 
-            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(8), descriptor.unusedGroupOffset());
-            CPPUNIT_ASSERT_EQUAL(true, descriptor.canCompactGroups());
-            CPPUNIT_ASSERT_EQUAL(false,
+            EXPECT_EQ(size_t(8), descriptor.unusedGroups());
+            EXPECT_EQ(size_t(8), descriptor.unusedGroupOffset());
+            EXPECT_EQ(true, descriptor.canCompactGroups());
+            EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
             descriptor.setGroup("test8", size_t(8));
 
-            CPPUNIT_ASSERT_EQUAL(size_t(7), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
-            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
-            CPPUNIT_ASSERT_EQUAL(false,
+            EXPECT_EQ(size_t(7), descriptor.unusedGroups());
+            EXPECT_EQ(size_t(9), descriptor.unusedGroupOffset());
+            EXPECT_EQ(false, descriptor.canCompactGroups());
+            EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
             // out-of-order
             descriptor.setGroup("test13", size_t(13));
 
-            CPPUNIT_ASSERT_EQUAL(size_t(6), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(size_t(9), descriptor.unusedGroupOffset());
-            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
-            CPPUNIT_ASSERT_EQUAL(true,
+            EXPECT_EQ(size_t(6), descriptor.unusedGroups());
+            EXPECT_EQ(size_t(9), descriptor.unusedGroupOffset());
+            EXPECT_EQ(false, descriptor.canCompactGroups());
+            EXPECT_EQ(true,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
-            CPPUNIT_ASSERT_EQUAL(Name("test13"), sourceName);
-            CPPUNIT_ASSERT_EQUAL(size_t(13), sourceOffset);
-            CPPUNIT_ASSERT_EQUAL(size_t(9), targetOffset);
+            EXPECT_EQ(Name("test13"), sourceName);
+            EXPECT_EQ(size_t(13), sourceOffset);
+            EXPECT_EQ(size_t(9), targetOffset);
 
             descriptor.setGroup("test9", size_t(9));
             descriptor.setGroup("test10", size_t(10));
@@ -1291,19 +1282,19 @@ TestAttributeSet::testAttributeSetGroups()
             descriptor.setGroup("test15", size_t(15), /*checkValidOffset=*/true);
 
             // attempt to use an existing group offset
-            CPPUNIT_ASSERT_THROW(descriptor.setGroup("test1000", size_t(15),
+            EXPECT_THROW(descriptor.setGroup("test1000", size_t(15),
                 /*checkValidOffset=*/true), RuntimeError);
 
-            CPPUNIT_ASSERT_EQUAL(size_t(0), descriptor.unusedGroups());
-            CPPUNIT_ASSERT_EQUAL(std::numeric_limits<size_t>::max(), descriptor.unusedGroupOffset());
-            CPPUNIT_ASSERT_EQUAL(false, descriptor.canCompactGroups());
-            CPPUNIT_ASSERT_EQUAL(false,
+            EXPECT_EQ(size_t(0), descriptor.unusedGroups());
+            EXPECT_EQ(std::numeric_limits<size_t>::max(), descriptor.unusedGroupOffset());
+            EXPECT_EQ(false, descriptor.canCompactGroups());
+            EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
 
-            CPPUNIT_ASSERT_EQUAL(size_t(16), descriptor.availableGroups());
+            EXPECT_EQ(size_t(16), descriptor.availableGroups());
 
             // attempt to use a group offset that is out-of-range
-            CPPUNIT_ASSERT_THROW(descriptor.setGroup("test16", size_t(16),
+            EXPECT_THROW(descriptor.setGroup("test16", size_t(16),
                 /*checkValidOffset=*/true), RuntimeError);
         }
     }
@@ -1313,40 +1304,40 @@ TestAttributeSet::testAttributeSetGroups()
         Descriptor descr2;
 
         // no groups - no collisions
-        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(!descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
 
         descr1.setGroup("test1", 0);
 
         // only one descriptor has groups - no collision
-        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(!descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
 
         descr2.setGroup("test1", 0);
 
         // both descriptors have same group - no collision
-        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(!descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
 
         descr1.setGroup("test2", 1);
         descr2.setGroup("test2", 2);
 
         // test2 has different index - collision
-        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(descr2.groupIndexCollision(descr1));
 
         descr2.setGroup("test2", 1);
 
         // overwrite test2 value to remove collision
-        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(!descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
 
         // overwrite test1 value to introduce collision
         descr1.setGroup("test1", 4);
 
         // first index has collision
-        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(descr2.groupIndexCollision(descr1));
 
         // add some additional groups
         descr1.setGroup("test0", 2);
@@ -1355,13 +1346,13 @@ TestAttributeSet::testAttributeSetGroups()
         descr2.setGroup("test9", 9);
 
         // first index still has collision
-        CPPUNIT_ASSERT(descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(descr2.groupIndexCollision(descr1));
 
         descr1.setGroup("test1", 0);
 
         // first index no longer has collision
-        CPPUNIT_ASSERT(!descr1.groupIndexCollision(descr2));
-        CPPUNIT_ASSERT(!descr2.groupIndexCollision(descr1));
+        EXPECT_TRUE(!descr1.groupIndexCollision(descr2));
+        EXPECT_TRUE(!descr2.groupIndexCollision(descr1));
     }
 }

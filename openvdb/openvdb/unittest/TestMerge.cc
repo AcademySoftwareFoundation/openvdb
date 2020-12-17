@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <openvdb/openvdb.h>
 
@@ -9,23 +9,9 @@
 
 using namespace openvdb;
 
-class TestMerge: public CppUnit::TestCase
+class TestMerge: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestMerge);
-    CPPUNIT_TEST(testTreeToMerge);
-    CPPUNIT_TEST(testCsgUnion);
-    CPPUNIT_TEST(testCsgIntersection);
-    CPPUNIT_TEST(testCsgDifference);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testTreeToMerge();
-    void testCsgUnion();
-    void testCsgIntersection();
-    void testCsgDifference();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMerge);
 
 namespace
 {
@@ -79,8 +65,7 @@ auto getChildCount = [](const auto& node) -> Index
 } // namespace
 
 
-void
-TestMerge::testTreeToMerge()
+TEST_F(TestMerge, testTreeToMerge)
 {
     using RootChildNode = FloatTree::RootNodeType::ChildNodeType;
     using LeafNode = FloatTree::LeafNodeType;
@@ -88,115 +73,115 @@ TestMerge::testTreeToMerge()
     { // non-const tree
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index(1), grid->tree().leafCount());
 
         tools::TreeToMerge<FloatTree> treeToMerge{grid->tree(), Steal()};
-        CPPUNIT_ASSERT_EQUAL(&grid->constTree().root(), treeToMerge.rootPtr());
+        EXPECT_EQ(&grid->constTree().root(), treeToMerge.rootPtr());
 
         // probe root child
 
         const RootChildNode* nodePtr = treeToMerge.probeConstNode<RootChildNode>(Coord(8));
-        CPPUNIT_ASSERT(nodePtr);
-        CPPUNIT_ASSERT_EQUAL(grid->constTree().probeConstNode<RootChildNode>(Coord(8)), nodePtr);
+        EXPECT_TRUE(nodePtr);
+        EXPECT_EQ(grid->constTree().probeConstNode<RootChildNode>(Coord(8)), nodePtr);
 
         // probe leaf node
 
         const LeafNode* leafNode = treeToMerge.probeConstNode<LeafNode>(Coord(8));
-        CPPUNIT_ASSERT(leafNode);
-        CPPUNIT_ASSERT_EQUAL(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
+        EXPECT_TRUE(leafNode);
+        EXPECT_EQ(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
+        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
         // steal leaf node
 
         std::unique_ptr<LeafNode> leafNodePtr = treeToMerge.stealOrDeepCopyNode<LeafNode>(Coord(8));
-        CPPUNIT_ASSERT(leafNodePtr);
-        CPPUNIT_ASSERT_EQUAL(Index(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(leafNodePtr->origin(), Coord(8));
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
+        EXPECT_TRUE(leafNodePtr);
+        EXPECT_EQ(Index(0), grid->tree().leafCount());
+        EXPECT_EQ(leafNodePtr->origin(), Coord(8));
+        EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
         // steal root child
 
         grid->tree().touchLeaf(Coord(8));
         std::unique_ptr<RootChildNode> node2Ptr = treeToMerge.stealOrDeepCopyNode<RootChildNode>(Coord(8));
-        CPPUNIT_ASSERT(node2Ptr);
-        CPPUNIT_ASSERT_EQUAL(Index(0), grid->tree().root().childCount());
+        EXPECT_TRUE(node2Ptr);
+        EXPECT_EQ(Index(0), grid->tree().root().childCount());
 
         // attempt to add leaf node tile (set value)
 
         grid->tree().touchLeaf(Coord(8));
-        CPPUNIT_ASSERT_EQUAL(Index64(0), grid->tree().activeTileCount());
+        EXPECT_EQ(Index64(0), grid->tree().activeTileCount());
         treeToMerge.addTile<LeafNode>(Coord(8), 1.6f, true);
         // value has not been set
-        CPPUNIT_ASSERT_EQUAL(3.0f, grid->tree().probeConstLeaf(Coord(8))->getFirstValue());
+        EXPECT_EQ(3.0f, grid->tree().probeConstLeaf(Coord(8))->getFirstValue());
 
         // add root child tile
 
         treeToMerge.addTile<RootChildNode>(Coord(8), 1.7f, true);
-        CPPUNIT_ASSERT_EQUAL(Index64(1), grid->tree().activeTileCount());
+        EXPECT_EQ(Index64(1), grid->tree().activeTileCount());
 
         // tile in node that does not exist
 
         grid->tree().clear();
         treeToMerge.addTile<RootChildNode>(Coord(0), 1.8f, true);
-        CPPUNIT_ASSERT_EQUAL(Index64(0), grid->tree().activeTileCount());
+        EXPECT_EQ(Index64(0), grid->tree().activeTileCount());
     }
 
     { // const tree
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index(1), grid->tree().leafCount());
 
         tools::TreeToMerge<FloatTree> treeToMerge{grid->constTree(), DeepCopy(), /*initialize=*/false};
-        CPPUNIT_ASSERT(!treeToMerge.hasMask());
+        EXPECT_TRUE(!treeToMerge.hasMask());
         treeToMerge.initializeMask();
-        CPPUNIT_ASSERT(treeToMerge.hasMask());
-        CPPUNIT_ASSERT_EQUAL(&grid->constTree().root(), treeToMerge.rootPtr());
+        EXPECT_TRUE(treeToMerge.hasMask());
+        EXPECT_EQ(&grid->constTree().root(), treeToMerge.rootPtr());
 
         // probe root child
 
         const RootChildNode* nodePtr = treeToMerge.probeConstNode<RootChildNode>(Coord(8));
-        CPPUNIT_ASSERT(nodePtr);
-        CPPUNIT_ASSERT_EQUAL(grid->constTree().probeConstNode<RootChildNode>(Coord(8)), nodePtr);
+        EXPECT_TRUE(nodePtr);
+        EXPECT_EQ(grid->constTree().probeConstNode<RootChildNode>(Coord(8)), nodePtr);
 
         // probe leaf node
 
         const LeafNode* leafNode = treeToMerge.probeConstNode<LeafNode>(Coord(8));
-        CPPUNIT_ASSERT(leafNode);
-        CPPUNIT_ASSERT_EQUAL(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
+        EXPECT_TRUE(leafNode);
+        EXPECT_EQ(grid->constTree().probeConstLeaf(Coord(8)), leafNode);
+        EXPECT_EQ(Index(1), grid->tree().leafCount());
+        EXPECT_EQ(Index(1), grid->tree().root().childCount());
 
         { // deep copy leaf node
             tools::TreeToMerge<FloatTree> treeToMerge2{grid->constTree(), DeepCopy()};
             std::unique_ptr<LeafNode> leafNodePtr = treeToMerge2.stealOrDeepCopyNode<LeafNode>(Coord(8));
-            CPPUNIT_ASSERT(leafNodePtr);
-            CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount()); // leaf has not been stolen
-            CPPUNIT_ASSERT_EQUAL(leafNodePtr->origin(), Coord(8));
-            CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
+            EXPECT_TRUE(leafNodePtr);
+            EXPECT_EQ(Index(1), grid->tree().leafCount()); // leaf has not been stolen
+            EXPECT_EQ(leafNodePtr->origin(), Coord(8));
+            EXPECT_EQ(Index(1), grid->tree().root().childCount());
         }
 
         { // deep copy root child
             tools::TreeToMerge<FloatTree> treeToMerge2{grid->constTree(), DeepCopy()};
             grid->tree().touchLeaf(Coord(8));
             std::unique_ptr<RootChildNode> node2Ptr = treeToMerge2.stealOrDeepCopyNode<RootChildNode>(Coord(8));
-            CPPUNIT_ASSERT(node2Ptr);
-            CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().root().childCount());
+            EXPECT_TRUE(node2Ptr);
+            EXPECT_EQ(Index(1), grid->tree().root().childCount());
         }
 
         { // add root child tile
             tools::TreeToMerge<FloatTree> treeToMerge2{grid->constTree(), DeepCopy()};
-            CPPUNIT_ASSERT(treeToMerge2.probeConstNode<RootChildNode>(Coord(8)));
+            EXPECT_TRUE(treeToMerge2.probeConstNode<RootChildNode>(Coord(8)));
             treeToMerge2.addTile<RootChildNode>(Coord(8), 1.7f, true);
-            CPPUNIT_ASSERT(!treeToMerge2.probeConstNode<RootChildNode>(Coord(8))); // tile has been added to mask
-            CPPUNIT_ASSERT_EQUAL(Index64(0), grid->tree().activeTileCount());
+            EXPECT_TRUE(!treeToMerge2.probeConstNode<RootChildNode>(Coord(8))); // tile has been added to mask
+            EXPECT_EQ(Index64(0), grid->tree().activeTileCount());
         }
 
         // tile in node that does not exist
 
         grid->tree().clear();
         treeToMerge.addTile<RootChildNode>(Coord(0), 1.8f, true);
-        CPPUNIT_ASSERT_EQUAL(Index64(0), grid->tree().activeTileCount());
+        EXPECT_EQ(Index64(0), grid->tree().activeTileCount());
     }
 
     { // non-const tree shared pointer
@@ -207,37 +192,37 @@ TestMerge::testTreeToMerge()
 
             // verify tree shared ownership
 
-            CPPUNIT_ASSERT(treeToMerge.treeToSteal());
-            CPPUNIT_ASSERT(!treeToMerge.treeToDeepCopy());
-            CPPUNIT_ASSERT(treeToMerge.rootPtr());
-            CPPUNIT_ASSERT(treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
+            EXPECT_TRUE(treeToMerge.treeToSteal());
+            EXPECT_TRUE(!treeToMerge.treeToDeepCopy());
+            EXPECT_TRUE(treeToMerge.rootPtr());
+            EXPECT_TRUE(treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
         }
 
         // empty tree
         FloatTree tree;
         tools::TreeToMerge<FloatTree> treeToMerge(tree, DeepCopy());
-        CPPUNIT_ASSERT(!treeToMerge.treeToSteal());
-        CPPUNIT_ASSERT(treeToMerge.treeToDeepCopy());
-        CPPUNIT_ASSERT(treeToMerge.rootPtr());
-        CPPUNIT_ASSERT(!treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
+        EXPECT_TRUE(!treeToMerge.treeToSteal());
+        EXPECT_TRUE(treeToMerge.treeToDeepCopy());
+        EXPECT_TRUE(treeToMerge.rootPtr());
+        EXPECT_TRUE(!treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
 
         {
             FloatTree::Ptr emptyPtr;
-            CPPUNIT_ASSERT_THROW(treeToMerge.reset(emptyPtr, Steal()), RuntimeError);
+            EXPECT_THROW(treeToMerge.reset(emptyPtr, Steal()), RuntimeError);
 
             FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
             grid->tree().touchLeaf(Coord(8));
-            CPPUNIT_ASSERT_EQUAL(Index(1), grid->tree().leafCount());
+            EXPECT_EQ(Index(1), grid->tree().leafCount());
 
             treeToMerge.reset(grid->treePtr(), Steal());
         }
 
         // verify tree shared ownership
 
-        CPPUNIT_ASSERT(treeToMerge.treeToSteal());
-        CPPUNIT_ASSERT(!treeToMerge.treeToDeepCopy());
-        CPPUNIT_ASSERT(treeToMerge.rootPtr());
-        CPPUNIT_ASSERT(treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
+        EXPECT_TRUE(treeToMerge.treeToSteal());
+        EXPECT_TRUE(!treeToMerge.treeToDeepCopy());
+        EXPECT_TRUE(treeToMerge.rootPtr());
+        EXPECT_TRUE(treeToMerge.probeConstNode<FloatTree::LeafNodeType>(Coord(8)));
 
         // verify tree pointers are updated on reset()
 
@@ -245,22 +230,21 @@ TestMerge::testTreeToMerge()
         tools::TreeToMerge<FloatTree> treeToMerge2(tree2, DeepCopy());
         treeToMerge2.initializeMask(); // no-op
 
-        CPPUNIT_ASSERT(!treeToMerge2.treeToSteal());
-        CPPUNIT_ASSERT(treeToMerge2.treeToDeepCopy());
-        CPPUNIT_ASSERT_EQUAL(Index(0), treeToMerge2.treeToDeepCopy()->leafCount());
+        EXPECT_TRUE(!treeToMerge2.treeToSteal());
+        EXPECT_TRUE(treeToMerge2.treeToDeepCopy());
+        EXPECT_EQ(Index(0), treeToMerge2.treeToDeepCopy()->leafCount());
 
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         grid->tree().touchLeaf(Coord(8));
         treeToMerge2.reset(grid->treePtr(), Steal());
 
-        CPPUNIT_ASSERT(treeToMerge2.treeToSteal());
-        CPPUNIT_ASSERT(!treeToMerge2.treeToDeepCopy());
-        CPPUNIT_ASSERT_EQUAL(Index(1), treeToMerge2.treeToSteal()->leafCount());
+        EXPECT_TRUE(treeToMerge2.treeToSteal());
+        EXPECT_TRUE(!treeToMerge2.treeToDeepCopy());
+        EXPECT_EQ(Index(1), treeToMerge2.treeToSteal()->leafCount());
     }
 }
 
-void
-TestMerge::testCsgUnion()
+TEST_F(TestMerge, testCsgUnion)
 {
     { // construction
         FloatTree tree1;
@@ -269,25 +253,25 @@ TestMerge::testCsgUnion()
 
         { // one non-const tree (steal)
             tools::CsgUnionOp<FloatTree> mergeOp(tree1, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one non-const tree (deep-copy)
             tools::CsgUnionOp<FloatTree> mergeOp(tree1, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one const tree (deep-copy)
             tools::CsgUnionOp<FloatTree> mergeOp(tree2, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // vector of tree pointers
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+            EXPECT_EQ(size_t(2), mergeOp.size());
         }
         { // deque of tree pointers
             std::deque<FloatTree*> trees{&tree1, &tree2};
             tools::CsgUnionOp<FloatTree> mergeOp(trees, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+            EXPECT_EQ(size_t(2), mergeOp.size());
         }
         { // vector of TreesToMerge (to mix const and non-const trees)
             std::vector<tools::TreeToMerge<FloatTree>> trees;
@@ -295,19 +279,19 @@ TestMerge::testCsgUnion()
             trees.emplace_back(tree3, DeepCopy()); // const tree
             trees.emplace_back(tree2, Steal());
             tools::CsgUnionOp<FloatTree> mergeOp(trees);
-            CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp.size());
+            EXPECT_EQ(size_t(3), mergeOp.size());
         }
         { // implicit copy constructor
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
             tools::CsgUnionOp<FloatTree> mergeOp2(mergeOp);
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+            EXPECT_EQ(size_t(2), mergeOp2.size());
         }
         { // implicit assignment operator
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
             tools::CsgUnionOp<FloatTree> mergeOp2 = mergeOp;
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+            EXPECT_EQ(size_t(2), mergeOp2.size());
         }
     }
 
@@ -317,12 +301,12 @@ TestMerge::testCsgUnion()
         std::vector<FloatTree*> trees;
         tools::CsgUnionOp<FloatTree> mergeOp(trees, Steal());
 
-        CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp.size());
+        EXPECT_EQ(size_t(0), mergeOp.size());
 
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), root.getTableSize());
+        EXPECT_EQ(Index(0), root.getTableSize());
     }
 
     { // merge two different outside root tiles from one grid into an empty grid
@@ -333,10 +317,10 @@ TestMerge::testCsgUnion()
         root2.addTile(Coord(0, 0, 0), grid->background(), false);
         root2.addTile(Coord(8192, 0, 0), grid->background(), true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(1), getActiveTileCount(root2));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
         std::vector<FloatTree*> trees{&grid2->tree()};
@@ -344,12 +328,12 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getOutsideTileCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(2), getOutsideTileCount(root));
     }
 
     { // merge two different outside root tiles from two grids into an empty grid
@@ -367,17 +351,17 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getOutsideTileCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(2), getOutsideTileCount(root));
 
         // background values of merge trees should be ignored, only important
         // that the values are greater than zero and thus an outside tile
         for (auto iter = root.cbeginValueAll(); iter; ++iter) {
-            CPPUNIT_ASSERT_EQUAL(grid->background(), iter.getValue());
+            EXPECT_EQ(grid->background(), iter.getValue());
         }
     }
 
@@ -396,11 +380,11 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // merge order is important - tile should be active
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
 
         root.clear();
         // reverse tree order
@@ -408,8 +392,8 @@ TestMerge::testCsgUnion()
         tools::CsgUnionOp<FloatTree> mergeOp2(trees2, Steal());
         nodeManager.foreachTopDown(mergeOp2);
         // merge order is important - tile should now be inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
     }
 
     { // merge an outside root tile to a grid which already has this tile
@@ -424,11 +408,11 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid should not replace existing tile - tile should remain inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
     }
 
     { // merge an inside root tile to a grid which has an outside tile, inside takes precedence
@@ -439,20 +423,20 @@ TestMerge::testCsgUnion()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), -123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid replace existing tile - tile should now be active and inside
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
     }
 
     { // merge two grids with an outside and an inside tile, inside takes precedence
@@ -470,13 +454,13 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid should not replace existing tile - tile should remain inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
     }
 
     { // merge two child nodes into an empty grid
@@ -489,17 +473,17 @@ TestMerge::testCsgUnion()
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
         root2.addChild(new RootChildType(Coord(8192, 0, 0), -123.0f, true));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root2));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(2), getChildCount(root));
     }
 
     { // merge a child node into a grid with an outside tile
@@ -512,16 +496,16 @@ TestMerge::testCsgUnion()
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root2));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(0), getTileCount(root));
     }
 
     { // merge a child node into a grid with an existing child node
@@ -534,18 +518,18 @@ TestMerge::testCsgUnion()
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(8192, 0, 0), 1.9f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root2));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->cbeginValueAll());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->cbeginValueAll().getItem(0));
-        CPPUNIT_ASSERT_EQUAL(1.9f, (++root.cbeginChildOn())->cbeginValueAll().getItem(0));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getChildCount(root));
+        EXPECT_TRUE(root.cbeginChildOn()->cbeginValueAll());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->cbeginValueAll().getItem(0));
+        EXPECT_EQ(1.9f, (++root.cbeginChildOn())->cbeginValueAll().getItem(0));
     }
 
     { // merge an inside tile and an outside tile into a grid with two child nodes
@@ -560,21 +544,21 @@ TestMerge::testCsgUnion()
         root2.addTile(Coord(0, 0, 0), 15.0f, false); // should not replace child
         root2.addTile(Coord(8192, 0, 0), -25.0f, false); // should replace child
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), getTileCount(root2));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildAll().isChildNode());
-        CPPUNIT_ASSERT(!(++root.cbeginChildAll()).isChildNode());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_TRUE(root.cbeginChildAll().isChildNode());
+        EXPECT_TRUE(!(++root.cbeginChildAll()).isChildNode());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->getFirstValue());
         // inside tile value replaced with negative background
-        CPPUNIT_ASSERT_EQUAL(-grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(-grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge two child nodes into a grid with an inside tile and an outside tile
@@ -589,20 +573,20 @@ TestMerge::testCsgUnion()
         root2.addChild(new RootChildType(Coord(0, 0, 0), 123.0f, false));
         root2.addChild(new RootChildType(Coord(8192, 0, 0), 1.9f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(2), getChildCount(root2));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildAll().isChildNode());
-        CPPUNIT_ASSERT(!(++root.cbeginChildAll()).isChildNode());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->getFirstValue());
-        CPPUNIT_ASSERT_EQUAL(-grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_TRUE(root.cbeginChildAll().isChildNode());
+        EXPECT_TRUE(!(++root.cbeginChildAll()).isChildNode());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(-grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge two internal nodes into a grid with an inside tile and an outside tile
@@ -624,26 +608,26 @@ TestMerge::testCsgUnion()
         rootChild2->addTile(9, -19.0f, true);
         root2.addChild(rootChild2.release());
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getActiveTileCount(*root.cbeginChildOn()));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->isChildMaskOn(0));
-        CPPUNIT_ASSERT(!root.cbeginChildOn()->isChildMaskOn(1));
-        CPPUNIT_ASSERT_EQUAL(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
-        CPPUNIT_ASSERT_EQUAL(-14.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
+        EXPECT_EQ(Index(1), getChildCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_TRUE(root.cbeginChildOn()->isChildMaskOn(0));
+        EXPECT_TRUE(!root.cbeginChildOn()->isChildMaskOn(1));
+        EXPECT_EQ(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(-14.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getChildCount(*root2.cbeginChildOn()));
     }
 
     { // merge two internal nodes into a grid with an inside tile and an outside tile
@@ -665,26 +649,26 @@ TestMerge::testCsgUnion()
         rootChild2->addTile(9, -19.0f, true);
         root2.addChild(rootChild2.release());
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getActiveTileCount(*root.cbeginChildOn()));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->isChildMaskOn(0));
-        CPPUNIT_ASSERT(!root.cbeginChildOn()->isChildMaskOn(1));
-        CPPUNIT_ASSERT_EQUAL(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
-        CPPUNIT_ASSERT_EQUAL(-14.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
+        EXPECT_EQ(Index(1), getChildCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_TRUE(root.cbeginChildOn()->isChildMaskOn(0));
+        EXPECT_TRUE(!root.cbeginChildOn()->isChildMaskOn(1));
+        EXPECT_EQ(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(-14.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getChildCount(*root2.cbeginChildOn()));
     }
 
     { // merge a leaf node into an empty grid
@@ -693,15 +677,15 @@ TestMerge::testCsgUnion()
 
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         tools::CsgUnionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid2->tree().leafCount());
     }
 
     { // merge a leaf node into a grid with a partially constructed leaf node
@@ -719,7 +703,7 @@ TestMerge::testCsgUnion()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(-2.3f, testLeaf->getValue(10));
+        EXPECT_EQ(-2.3f, testLeaf->getValue(10));
     }
 
     { // merge three leaf nodes from different grids
@@ -754,12 +738,12 @@ TestMerge::testCsgUnion()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(2.0f, testLeaf->getValue(5));
-        CPPUNIT_ASSERT(testLeaf->isValueOn(5));
-        CPPUNIT_ASSERT_EQUAL(2.0f, testLeaf->getValue(7));
-        CPPUNIT_ASSERT(testLeaf->isValueOn(7));
-        CPPUNIT_ASSERT_EQUAL(2.0f, testLeaf->getValue(9));
-        CPPUNIT_ASSERT(!testLeaf->isValueOn(9));
+        EXPECT_EQ(2.0f, testLeaf->getValue(5));
+        EXPECT_TRUE(testLeaf->isValueOn(5));
+        EXPECT_EQ(2.0f, testLeaf->getValue(7));
+        EXPECT_TRUE(testLeaf->isValueOn(7));
+        EXPECT_EQ(2.0f, testLeaf->getValue(9));
+        EXPECT_TRUE(!testLeaf->isValueOn(9));
     }
 
     { // merge a leaf node into an empty grid from a const grid
@@ -768,8 +752,8 @@ TestMerge::testCsgUnion()
 
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         // merge from a const tree
 
@@ -780,14 +764,13 @@ TestMerge::testCsgUnion()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
         // leaf has been deep copied not stolen
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
     }
 }
 
-void
-TestMerge::testCsgIntersection()
+TEST_F(TestMerge, testCsgIntersection)
 {
     { // construction
         FloatTree tree1;
@@ -796,25 +779,25 @@ TestMerge::testCsgIntersection()
 
         { // one non-const tree (steal)
             tools::CsgIntersectionOp<FloatTree> mergeOp(tree1, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one non-const tree (deep-copy)
             tools::CsgIntersectionOp<FloatTree> mergeOp(tree1, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one const tree (deep-copy)
             tools::CsgIntersectionOp<FloatTree> mergeOp(tree2, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // vector of tree pointers
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+            EXPECT_EQ(size_t(2), mergeOp.size());
         }
         { // deque of tree pointers
             std::deque<FloatTree*> trees{&tree1, &tree2};
             tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp.size());
+            EXPECT_EQ(size_t(2), mergeOp.size());
         }
         { // vector of TreesToMerge (to mix const and non-const trees)
             std::vector<tools::TreeToMerge<FloatTree>> trees;
@@ -822,19 +805,19 @@ TestMerge::testCsgIntersection()
             trees.emplace_back(tree3, DeepCopy()); // const tree
             trees.emplace_back(tree2, Steal());
             tools::CsgIntersectionOp<FloatTree> mergeOp(trees);
-            CPPUNIT_ASSERT_EQUAL(size_t(3), mergeOp.size());
+            EXPECT_EQ(size_t(3), mergeOp.size());
         }
         { // implicit copy constructor
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
             tools::CsgIntersectionOp<FloatTree> mergeOp2(mergeOp);
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+            EXPECT_EQ(size_t(2), mergeOp2.size());
         }
         { // implicit assignment operator
             std::vector<FloatTree*> trees{&tree1, &tree2};
             tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
             tools::CsgIntersectionOp<FloatTree> mergeOp2 = mergeOp;
-            CPPUNIT_ASSERT_EQUAL(size_t(2), mergeOp2.size());
+            EXPECT_EQ(size_t(2), mergeOp2.size());
         }
     }
 
@@ -844,12 +827,12 @@ TestMerge::testCsgIntersection()
         std::vector<FloatTree*> trees;
         tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
 
-        CPPUNIT_ASSERT_EQUAL(size_t(0), mergeOp.size());
+        EXPECT_EQ(size_t(0), mergeOp.size());
 
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), root.getTableSize());
+        EXPECT_EQ(Index(0), root.getTableSize());
     }
 
     { // merge two different outside root tiles from one grid into an empty grid
@@ -860,10 +843,10 @@ TestMerge::testCsgIntersection()
         root2.addTile(Coord(0, 0, 0), grid->background(), false);
         root2.addTile(Coord(8192, 0, 0), grid->background(), true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(1), getActiveTileCount(root2));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
         std::vector<FloatTree*> trees{&grid2->tree()};
@@ -871,12 +854,12 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getOutsideTileCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(2), getOutsideTileCount(root));
     }
 
     { // merge two different outside root tiles from two grids into an empty grid
@@ -894,17 +877,17 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getOutsideTileCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(2), getOutsideTileCount(root));
 
         // background values of merge trees should be ignored, only important
         // that the values are greater than zero and thus an outside tile
         for (auto iter = root.cbeginValueAll(); iter; ++iter) {
-            CPPUNIT_ASSERT_EQUAL(grid->background(), iter.getValue());
+            EXPECT_EQ(grid->background(), iter.getValue());
         }
     }
 
@@ -923,11 +906,11 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // merge order is important - tile should be active
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
 
         root.clear();
         // reverse tree order
@@ -935,8 +918,8 @@ TestMerge::testCsgIntersection()
         tools::CsgIntersectionOp<FloatTree> mergeOp2(trees2, Steal());
         nodeManager.foreachTopDown(mergeOp2);
         // merge order is important - tile should now be inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
     }
 
     { // merge an outside root tile to a grid which already has this tile
@@ -951,11 +934,11 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid should not replace existing tile - tile should remain inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
     }
 
     { // merge an outside root tile to a grid which has an inside tile, outside takes precedence
@@ -966,20 +949,20 @@ TestMerge::testCsgIntersection()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), 123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid replace existing tile - tile should now be active and outside
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
     }
 
     { // merge two grids with an outside and an inside tile, outside takes precedence
@@ -997,13 +980,13 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid should not replace existing tile - tile should remain inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
     }
 
     { // merge two child nodes into an empty grid
@@ -1016,17 +999,17 @@ TestMerge::testCsgIntersection()
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
         root2.addChild(new RootChildType(Coord(8192, 0, 0), -123.0f, true));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root2));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(2), getChildCount(root));
     }
 
     { // merge a child node into a grid with an outside tile
@@ -1039,16 +1022,16 @@ TestMerge::testCsgIntersection()
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root2));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(0), getTileCount(root));
     }
 
     { // merge a child node into a grid with an existing child node
@@ -1061,18 +1044,18 @@ TestMerge::testCsgIntersection()
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(8192, 0, 0), 1.9f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root2));
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root2));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->cbeginValueAll());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->cbeginValueAll().getItem(0));
-        CPPUNIT_ASSERT_EQUAL(1.9f, (++root.cbeginChildOn())->cbeginValueAll().getItem(0));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(2), getChildCount(root));
+        EXPECT_TRUE(root.cbeginChildOn()->cbeginValueAll());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->cbeginValueAll().getItem(0));
+        EXPECT_EQ(1.9f, (++root.cbeginChildOn())->cbeginValueAll().getItem(0));
     }
 
     { // merge an inside tile and an outside tile into a grid with two child nodes
@@ -1087,21 +1070,21 @@ TestMerge::testCsgIntersection()
         root2.addTile(Coord(0, 0, 0), -15.0f, false); // should not replace child
         root2.addTile(Coord(8192, 0, 0), 25.0f, false); // should replace child
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), getTileCount(root2));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildAll().isChildNode());
-        CPPUNIT_ASSERT(!(++root.cbeginChildAll()).isChildNode());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_TRUE(root.cbeginChildAll().isChildNode());
+        EXPECT_TRUE(!(++root.cbeginChildAll()).isChildNode());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->getFirstValue());
         // outside tile value replaced with background
-        CPPUNIT_ASSERT_EQUAL(grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge two child nodes into a grid with an inside tile and an outside tile
@@ -1116,20 +1099,20 @@ TestMerge::testCsgIntersection()
         root2.addChild(new RootChildType(Coord(0, 0, 0), 123.0f, false));
         root2.addChild(new RootChildType(Coord(8192, 0, 0), 1.9f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
+        EXPECT_EQ(Index(2), getTileCount(root));
+        EXPECT_EQ(Index(2), getChildCount(root2));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildAll().isChildNode());
-        CPPUNIT_ASSERT(!(++root.cbeginChildAll()).isChildNode());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->getFirstValue());
-        CPPUNIT_ASSERT_EQUAL(grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_TRUE(root.cbeginChildAll().isChildNode());
+        EXPECT_TRUE(!(++root.cbeginChildAll()).isChildNode());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge two internal nodes into a grid with an inside tile and an outside tile
@@ -1152,26 +1135,26 @@ TestMerge::testCsgIntersection()
         rootChild2->addTile(9, 19.0f, true);
         root2.addChild(rootChild2.release());
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getActiveTileCount(*root.cbeginChildOn()));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->isChildMaskOn(0));
-        CPPUNIT_ASSERT(!root.cbeginChildOn()->isChildMaskOn(1));
-        CPPUNIT_ASSERT_EQUAL(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
-        CPPUNIT_ASSERT_EQUAL(15.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
+        EXPECT_EQ(Index(1), getChildCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_TRUE(root.cbeginChildOn()->isChildMaskOn(0));
+        EXPECT_TRUE(!root.cbeginChildOn()->isChildMaskOn(1));
+        EXPECT_EQ(29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(15.0f, root.cbeginChildOn()->cbeginValueAll().getValue());
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getChildCount(*root2.cbeginChildOn()));
     }
 
     { // merge a leaf node into an empty grid
@@ -1180,15 +1163,15 @@ TestMerge::testCsgIntersection()
 
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         tools::CsgIntersectionOp<FloatTree> mergeOp{grid2->tree(), Steal()};
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid2->tree().leafCount());
     }
 
     { // merge a leaf node into a grid with a partially constructed leaf node
@@ -1206,7 +1189,7 @@ TestMerge::testCsgIntersection()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(6.4f, testLeaf->getValue(10));
+        EXPECT_EQ(6.4f, testLeaf->getValue(10));
     }
 
     { // merge three leaf nodes from different grids
@@ -1241,12 +1224,12 @@ TestMerge::testCsgIntersection()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(4.0f, testLeaf->getValue(5));
-        CPPUNIT_ASSERT(!testLeaf->isValueOn(5));
-        CPPUNIT_ASSERT_EQUAL(4.0f, testLeaf->getValue(7));
-        CPPUNIT_ASSERT(!testLeaf->isValueOn(7));
-        CPPUNIT_ASSERT_EQUAL(4.0f, testLeaf->getValue(9));
-        CPPUNIT_ASSERT(testLeaf->isValueOn(9));
+        EXPECT_EQ(4.0f, testLeaf->getValue(5));
+        EXPECT_TRUE(!testLeaf->isValueOn(5));
+        EXPECT_EQ(4.0f, testLeaf->getValue(7));
+        EXPECT_TRUE(!testLeaf->isValueOn(7));
+        EXPECT_EQ(4.0f, testLeaf->getValue(9));
+        EXPECT_TRUE(testLeaf->isValueOn(9));
     }
 
     { // merge a leaf node into an empty grid from a const grid
@@ -1255,8 +1238,8 @@ TestMerge::testCsgIntersection()
 
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         // merge from a const tree
 
@@ -1267,14 +1250,13 @@ TestMerge::testCsgIntersection()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
         // leaf has been deep copied not stolen
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
     }
 }
 
-void
-TestMerge::testCsgDifference()
+TEST_F(TestMerge, testCsgDifference)
 {
     using RootChildType = FloatTree::RootNodeType::ChildNodeType;
 
@@ -1284,37 +1266,37 @@ TestMerge::testCsgDifference()
 
         { // one non-const tree (steal)
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree1, Steal());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one non-const tree (deep-copy)
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree1, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one const tree (deep-copy)
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one non-const tree wrapped in TreeToMerge
             tools::TreeToMerge<FloatTree> tree3(tree1, Steal());
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree3);
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // one const tree wrapped in TreeToMerge
             tools::TreeToMerge<FloatTree> tree4(tree2, DeepCopy());
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree4);
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
         }
         { // implicit copy constructor
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
             tools::CsgDifferenceOp<FloatTree> mergeOp2(mergeOp);
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
+            EXPECT_EQ(size_t(1), mergeOp2.size());
         }
         { // implicit assignment operator
             tools::CsgDifferenceOp<FloatTree> mergeOp(tree2, DeepCopy());
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp.size());
+            EXPECT_EQ(size_t(1), mergeOp.size());
             tools::CsgDifferenceOp<FloatTree> mergeOp2 = mergeOp;
-            CPPUNIT_ASSERT_EQUAL(size_t(1), mergeOp2.size());
+            EXPECT_EQ(size_t(1), mergeOp2.size());
         }
     }
 
@@ -1326,17 +1308,17 @@ TestMerge::testCsgDifference()
         root2.addTile(Coord(0, 0, 0), grid->background(), false);
         root2.addTile(Coord(8192, 0, 0), grid->background(), true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(1), getActiveTileCount(root2));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root2));
 
         // test container constructor here
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), root.getTableSize());
+        EXPECT_EQ(Index(0), root.getTableSize());
     }
 
     { // merge an outside root tile to a grid which already has this tile
@@ -1351,13 +1333,13 @@ TestMerge::testCsgDifference()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // tile in merge grid should not replace existing tile - tile should remain inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
     }
 
     { // merge an outside root tile to a grid which has an inside tile (noop)
@@ -1368,19 +1350,19 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), 123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
     }
 
     { // merge an outside root tile to a grid which has a child (noop)
@@ -1391,15 +1373,15 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), 123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root));
     }
 
     { // merge a child to a grid which has an outside root tile (noop)
@@ -1410,20 +1392,20 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(0), getChildCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
     }
 
     { // merge an inside root tile to a grid which has an outside tile (noop)
@@ -1434,19 +1416,19 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), -123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
     }
 
     { // merge two grids with inside tiles, active state should be carried across
@@ -1461,15 +1443,15 @@ TestMerge::testCsgDifference()
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
         // inside tile should now be inactive
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(0), getActiveTileCount(root));
+        EXPECT_EQ(Index(1), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
 
-        CPPUNIT_ASSERT_EQUAL(grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge an inside root tile to a grid which has a child, inside tile has precedence
@@ -1480,21 +1462,21 @@ TestMerge::testCsgDifference()
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), -123.0f, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInactiveTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(0), getChildCount(root));
+        EXPECT_EQ(Index(1), getActiveTileCount(root));
+        EXPECT_EQ(Index(0), getInactiveTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
 
-        CPPUNIT_ASSERT_EQUAL(grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge a child to a grid which has an inside root tile, child should be stolen
@@ -1508,25 +1490,25 @@ TestMerge::testCsgDifference()
         childPtr->addTile(Index(1), 1.3f, true);
         root2.addChild(childPtr.release());
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getOutsideTileCount(root));
+        EXPECT_EQ(Index(1), getInsideTileCount(root));
+        EXPECT_EQ(Index(0), getOutsideTileCount(root));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp, true);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getChildCount(root2));
+        EXPECT_EQ(Index(1), root.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(0), getChildCount(root2));
 
-        CPPUNIT_ASSERT(!root.cbeginChildOn()->isValueOn(Index(0)));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->isValueOn(Index(1)));
+        EXPECT_TRUE(!root.cbeginChildOn()->isValueOn(Index(0)));
+        EXPECT_TRUE(root.cbeginChildOn()->isValueOn(Index(1)));
 
         auto iter = root.cbeginChildOn()->cbeginValueAll();
-        CPPUNIT_ASSERT_EQUAL(-3.0f, iter.getValue());
+        EXPECT_EQ(-3.0f, iter.getValue());
         ++iter;
-        CPPUNIT_ASSERT_EQUAL(-1.3f, iter.getValue());
+        EXPECT_EQ(-1.3f, iter.getValue());
     }
 
     { // merge two child nodes into a grid with two inside tiles
@@ -1541,17 +1523,17 @@ TestMerge::testCsgDifference()
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
         root2.addChild(new RootChildType(Coord(8192, 0, 0), -123.0f, true));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root2.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root2));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root2));
+        EXPECT_EQ(Index(2), root2.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root2));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(0), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(0), getTileCount(root));
+        EXPECT_EQ(Index(2), getChildCount(root));
     }
 
     { // merge an inside tile and an outside tile into a grid with two child nodes
@@ -1566,23 +1548,23 @@ TestMerge::testCsgDifference()
         root2.addTile(Coord(0, 0, 0), 15.0f, false); // should not replace child
         root2.addTile(Coord(8192, 0, 0), -25.0f, false); // should replace child
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getTileCount(root2));
+        EXPECT_EQ(Index(2), getChildCount(root));
+        EXPECT_EQ(Index(2), getTileCount(root2));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), root.getTableSize());
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(root));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getOutsideTileCount(root));
-        CPPUNIT_ASSERT(root.cbeginChildAll().isChildNode());
-        CPPUNIT_ASSERT(!(++root.cbeginChildAll()).isChildNode());
-        CPPUNIT_ASSERT_EQUAL(123.0f, root.cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(Index(2), root.getTableSize());
+        EXPECT_EQ(Index(1), getChildCount(root));
+        EXPECT_EQ(Index(1), getTileCount(root));
+        EXPECT_EQ(Index(0), getInsideTileCount(root));
+        EXPECT_EQ(Index(1), getOutsideTileCount(root));
+        EXPECT_TRUE(root.cbeginChildAll().isChildNode());
+        EXPECT_TRUE(!(++root.cbeginChildAll()).isChildNode());
+        EXPECT_EQ(123.0f, root.cbeginChildOn()->getFirstValue());
         // outside tile value replaced with negative background
-        CPPUNIT_ASSERT_EQUAL(grid->background(), root.cbeginValueAll().getValue());
+        EXPECT_EQ(grid->background(), root.cbeginValueAll().getValue());
     }
 
     { // merge two internal nodes into a grid with an inside tile and an outside tile
@@ -1606,29 +1588,29 @@ TestMerge::testCsgDifference()
         rootChild2->addTile(9, 19.0f, true);
         root2.addChild(rootChild2.release());
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getActiveTileCount(*root.cbeginChildOn()));
 
-        CPPUNIT_ASSERT_EQUAL(Index(2), getChildCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getInsideTileCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(2), getActiveTileCount(*root2.cbeginChildOn()));
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(0), getInsideTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT_EQUAL(Index(1), getActiveTileCount(*root.cbeginChildOn()));
-        CPPUNIT_ASSERT(root.cbeginChildOn()->isChildMaskOn(0));
-        CPPUNIT_ASSERT(!root.cbeginChildOn()->isChildMaskOn(1));
-        CPPUNIT_ASSERT_EQUAL(-29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
+        EXPECT_EQ(Index(1), getChildCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(0), getInsideTileCount(*root.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getActiveTileCount(*root.cbeginChildOn()));
+        EXPECT_TRUE(root.cbeginChildOn()->isChildMaskOn(0));
+        EXPECT_TRUE(!root.cbeginChildOn()->isChildMaskOn(1));
+        EXPECT_EQ(-29.0f, root.cbeginChildOn()->cbeginChildOn()->getFirstValue());
         auto iter = root.cbeginChildOn()->cbeginValueAll();
-        CPPUNIT_ASSERT_EQUAL(15.0f, iter.getValue());
+        EXPECT_EQ(15.0f, iter.getValue());
         ++iter;
-        CPPUNIT_ASSERT_EQUAL(3.0f, iter.getValue());
+        EXPECT_EQ(3.0f, iter.getValue());
 
-        CPPUNIT_ASSERT_EQUAL(Index(1), getChildCount(*root2.cbeginChildOn()));
+        EXPECT_EQ(Index(1), getChildCount(*root2.cbeginChildOn()));
     }
 
     { // merge a leaf node into a grid with an inside tile
@@ -1637,15 +1619,15 @@ TestMerge::testCsgDifference()
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid2->tree().leafCount());
     }
 
     { // merge two leaf nodes into a grid
@@ -1654,15 +1636,15 @@ TestMerge::testCsgDifference()
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->tree(), Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* leaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT(leaf);
+        EXPECT_TRUE(leaf);
     }
 
     { // merge a leaf node into a grid with a partially constructed leaf node
@@ -1680,7 +1662,7 @@ TestMerge::testCsgDifference()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(3.0f, testLeaf->getValue(10));
+        EXPECT_EQ(3.0f, testLeaf->getValue(10));
     }
 
     { // merge two leaf nodes from different grids
@@ -1709,12 +1691,12 @@ TestMerge::testCsgDifference()
         nodeManager.foreachTopDown(mergeOp);
 
         const auto* testLeaf = grid->tree().probeConstLeaf(Coord(0, 0, 0));
-        CPPUNIT_ASSERT_EQUAL(98.0f, testLeaf->getValue(5));
-        CPPUNIT_ASSERT(!testLeaf->isValueOn(5));
-        CPPUNIT_ASSERT_EQUAL(2.0f, testLeaf->getValue(7));
-        CPPUNIT_ASSERT(testLeaf->isValueOn(7));
-        CPPUNIT_ASSERT_EQUAL(100.0f, testLeaf->getValue(9));
-        CPPUNIT_ASSERT(!testLeaf->isValueOn(9));
+        EXPECT_EQ(98.0f, testLeaf->getValue(5));
+        EXPECT_TRUE(!testLeaf->isValueOn(5));
+        EXPECT_EQ(2.0f, testLeaf->getValue(7));
+        EXPECT_TRUE(testLeaf->isValueOn(7));
+        EXPECT_EQ(100.0f, testLeaf->getValue(9));
+        EXPECT_TRUE(!testLeaf->isValueOn(9));
     }
 
     { // merge a leaf node into a grid with an inside tile from a const tree
@@ -1723,14 +1705,14 @@ TestMerge::testCsgDifference()
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
-        CPPUNIT_ASSERT_EQUAL(Index32(0), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(0), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
 
         tools::CsgDifferenceOp<FloatTree> mergeOp(grid2->constTree(), DeepCopy());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
 
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid->tree().leafCount());
-        CPPUNIT_ASSERT_EQUAL(Index32(1), grid2->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid->tree().leafCount());
+        EXPECT_EQ(Index32(1), grid2->tree().leafCount());
     }
 }

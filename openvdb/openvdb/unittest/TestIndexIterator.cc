@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/IndexIterator.h>
 
 #include <openvdb/Types.h>
@@ -15,24 +15,9 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestIndexIterator: public CppUnit::TestCase
+class TestIndexIterator: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestIndexIterator);
-    CPPUNIT_TEST(testNullFilter);
-    CPPUNIT_TEST(testValueIndexIterator);
-    CPPUNIT_TEST(testFilterIndexIterator);
-    CPPUNIT_TEST(testProfile);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testNullFilter();
-    void testValueIndexIterator();
-    void testFilterIndexIterator();
-    void testProfile();
 }; // class TestIndexIterator
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexIterator);
 
 
 ////////////////////////////////////////
@@ -90,19 +75,17 @@ private:
 ////////////////////////////////////////
 
 
-void
-TestIndexIterator::testNullFilter()
+TEST_F(TestIndexIterator, testNullFilter)
 {
     NullFilter filter;
-    CPPUNIT_ASSERT(filter.initialized());
-    CPPUNIT_ASSERT(filter.state() == index::ALL);
+    EXPECT_TRUE(filter.initialized());
+    EXPECT_TRUE(filter.state() == index::ALL);
     int a;
-    CPPUNIT_ASSERT(filter.valid(a));
+    EXPECT_TRUE(filter.valid(a));
 }
 
 
-void
-TestIndexIterator::testValueIndexIterator()
+TEST_F(TestIndexIterator, testValueIndexIterator)
 {
     using namespace openvdb::tree;
 
@@ -122,36 +105,36 @@ TestIndexIterator::testValueIndexIterator()
 
         IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
-        CPPUNIT_ASSERT(iter);
+        EXPECT_TRUE(iter);
 
-        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size));
+        EXPECT_EQ(iterCount(iter), Index64(size));
 
         // check assignment operator
         auto iter2 = iter;
-        CPPUNIT_ASSERT_EQUAL(iterCount(iter2), Index64(size));
+        EXPECT_EQ(iterCount(iter2), Index64(size));
 
         ++iter;
 
         // check coord value
         Coord xyz;
         iter.getCoord(xyz);
-        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(0, 0, 1));
-        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(0, 0, 1));
+        EXPECT_EQ(xyz, openvdb::Coord(0, 0, 1));
+        EXPECT_EQ(iter.getCoord(), openvdb::Coord(0, 0, 1));
 
         // check iterators retrieval
-        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 0, 1));
-        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(2));
+        EXPECT_EQ(iter.valueIter().getCoord(), openvdb::Coord(0, 0, 1));
+        EXPECT_EQ(iter.end(), Index32(2));
 
         ++iter;
 
         // check coord value
         iter.getCoord(xyz);
-        CPPUNIT_ASSERT_EQUAL(xyz, openvdb::Coord(0, 1, 0));
-        CPPUNIT_ASSERT_EQUAL(iter.getCoord(), openvdb::Coord(0, 1, 0));
+        EXPECT_EQ(xyz, openvdb::Coord(0, 1, 0));
+        EXPECT_EQ(iter.getCoord(), openvdb::Coord(0, 1, 0));
 
         // check iterators retrieval
-        CPPUNIT_ASSERT_EQUAL(iter.valueIter().getCoord(), openvdb::Coord(0, 1, 0));
-        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(3));
+        EXPECT_EQ(iter.valueIter().getCoord(), openvdb::Coord(0, 1, 0));
+        EXPECT_EQ(iter.end(), Index32(3));
     }
 
     { // one per even voxel offsets, only these active
@@ -174,9 +157,9 @@ TestIndexIterator::testValueIndexIterator()
 
             IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
-            CPPUNIT_ASSERT(iter);
+            EXPECT_TRUE(iter);
 
-            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size/2));
+            EXPECT_EQ(iterCount(iter), Index64(size/2));
         }
     }
 
@@ -200,9 +183,9 @@ TestIndexIterator::testValueIndexIterator()
 
             IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
-            CPPUNIT_ASSERT(iter);
+            EXPECT_TRUE(iter);
 
-            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(3));
+            EXPECT_EQ(iterCount(iter), Index64(3));
         }
     }
 
@@ -226,9 +209,9 @@ TestIndexIterator::testValueIndexIterator()
 
             IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
-            CPPUNIT_ASSERT(iter);
+            EXPECT_TRUE(iter);
 
-            CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(size/2));
+            EXPECT_EQ(iterCount(iter), Index64(size/2));
         }
     }
 
@@ -243,9 +226,9 @@ TestIndexIterator::testValueIndexIterator()
 
         IndexIter<ValueOnIter, NullFilter>::ValueIndexIter iter(valueIter);
 
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
-        CPPUNIT_ASSERT_EQUAL(iterCount(iter), Index64(0));
+        EXPECT_EQ(iterCount(iter), Index64(0));
     }
 }
 
@@ -285,28 +268,27 @@ struct ConstantIter
 };
 
 
-void
-TestIndexIterator::testFilterIndexIterator()
+TEST_F(TestIndexIterator, testFilterIndexIterator)
 {
     { // index iterator with even filter
         EvenIndexFilter filter;
         ValueVoxelCIter indexIter(0, 5);
         IndexIter<ValueVoxelCIter, EvenIndexFilter> iter(indexIter, filter);
 
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(0));
+        EXPECT_TRUE(iter);
+        EXPECT_EQ(*iter, Index32(0));
 
-        CPPUNIT_ASSERT(iter.next());
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(2));
+        EXPECT_TRUE(iter.next());
+        EXPECT_EQ(*iter, Index32(2));
 
-        CPPUNIT_ASSERT(iter.next());
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(4));
+        EXPECT_TRUE(iter.next());
+        EXPECT_EQ(*iter, Index32(4));
 
-        CPPUNIT_ASSERT(!iter.next());
+        EXPECT_TRUE(!iter.next());
 
-        CPPUNIT_ASSERT_EQUAL(iter.end(), Index32(5));
-        CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(1)), iter.filter().valid(ConstantIter(1)));
-        CPPUNIT_ASSERT_EQUAL(filter.valid(ConstantIter(2)), iter.filter().valid(ConstantIter(2)));
+        EXPECT_EQ(iter.end(), Index32(5));
+        EXPECT_EQ(filter.valid(ConstantIter(1)), iter.filter().valid(ConstantIter(1)));
+        EXPECT_EQ(filter.valid(ConstantIter(2)), iter.filter().valid(ConstantIter(2)));
     }
 
     { // index iterator with odd filter
@@ -314,17 +296,16 @@ TestIndexIterator::testFilterIndexIterator()
         ValueVoxelCIter indexIter(0, 5);
         IndexIter<ValueVoxelCIter, OddIndexFilter> iter(indexIter, filter);
 
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(1));
+        EXPECT_EQ(*iter, Index32(1));
 
-        CPPUNIT_ASSERT(iter.next());
-        CPPUNIT_ASSERT_EQUAL(*iter, Index32(3));
+        EXPECT_TRUE(iter.next());
+        EXPECT_EQ(*iter, Index32(3));
 
-        CPPUNIT_ASSERT(!iter.next());
+        EXPECT_TRUE(!iter.next());
     }
 }
 
-void
-TestIndexIterator::testProfile()
+TEST_F(TestIndexIterator, testProfile)
 {
     using namespace openvdb::util;
     using namespace openvdb::math;
@@ -344,7 +325,7 @@ TestIndexIterator::testProfile()
         for (int i = 0; i < elements; i++) {
             sum += i;
         }
-        CPPUNIT_ASSERT(sum);
+        EXPECT_TRUE(sum);
     }
 
     { // index iterator
@@ -354,7 +335,7 @@ TestIndexIterator::testProfile()
         for (; iter; ++iter) {
             sum += *iter;
         }
-        CPPUNIT_ASSERT(sum);
+        EXPECT_TRUE(sum);
     }
 
     using LeafNode = LeafNode<unsigned, 3>;
@@ -380,7 +361,7 @@ TestIndexIterator::testProfile()
             }
             offset++;
         }
-        CPPUNIT_ASSERT(sum);
+        EXPECT_TRUE(sum);
     }
 
     { // value on iterator (all on)
@@ -391,6 +372,6 @@ TestIndexIterator::testProfile()
         for (; iter; ++iter) {
             sum += *iter;
         }
-        CPPUNIT_ASSERT(sum);
+        EXPECT_TRUE(sum);
     }
 }

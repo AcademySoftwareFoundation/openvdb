@@ -118,6 +118,7 @@ its default system search routine if it cannot find a dependency with the provid
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_5 "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
@@ -183,6 +184,7 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI_5
+  OPENVDB_USE_DEPRECATED_ABI_6
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
   OPENVDB_CODE_COVERAGE
@@ -200,38 +202,38 @@ mark_as_advanced(
 set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
-set(MINIMUM_OPENVDB_ABI_VERSION 5)
+set(MINIMUM_OPENVDB_ABI_VERSION 6)
 set(MINIMUM_CXX_STANDARD 14)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 6)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2018 of the VFX platform where avaiable
+  # @note  Currently tracking CY2019 of the VFX platform where available
   set(MINIMUM_GCC_VERSION 6.3.1)
   set(MINIMUM_CLANG_VERSION 3.8)
   set(MINIMUM_ICC_VERSION 17)
   set(MINIMUM_MSVC_VERSION 19.10)
 
-  set(MINIMUM_BOOST_VERSION 1.61)
-  set(MINIMUM_ILMBASE_VERSION 2.2)
-  set(MINIMUM_OPENEXR_VERSION 2.2)
+  set(MINIMUM_BOOST_VERSION 1.66)
+  set(MINIMUM_ILMBASE_VERSION 2.3)
+  set(MINIMUM_OPENEXR_VERSION 2.3)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
-  set(MINIMUM_TBB_VERSION 2017.0)
+  set(MINIMUM_TBB_VERSION 2018.0)
   set(MINIMUM_LLVM_VERSION 6.0.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7)
-  set(MINIMUM_NUMPY_VERSION 1.12.1)
+  set(MINIMUM_NUMPY_VERSION 1.14.0)
 
-  set(MINIMUM_CPPUNIT_VERSION 1.10)
+  set(MINIMUM_GOOGLETEST_VERSION 1.8)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 17.0)
+  set(MINIMUM_HOUDINI_VERSION 18.0)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 19 deprecations to transition to MINIMUM_* variables in OpenVDB 8.0.0
+# VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
 # Note: CMake 3.15 chosen as possible next version due to Windows support
 # with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
@@ -242,12 +244,13 @@ set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 #set(FUTURE_MINIMUM_ICC_VERSION 17)
 #set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
 
-set(FUTURE_MINIMUM_ILMBASE_VERSION 2.3)
-set(FUTURE_MINIMUM_OPENEXR_VERSION 2.3)
-set(FUTURE_MINIMUM_BOOST_VERSION 1.66)
-set(FUTURE_MINIMUM_TBB_VERSION 2018.0)
-set(FUTURE_MINIMUM_NUMPY_VERSION 1.14.0)
-set(FUTURE_MINIMUM_HOUDINI_VERSION 18.0)
+set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.70)
+set(FUTURE_MINIMUM_TBB_VERSION 2019.0)
+set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
 
 #########################################################################
 
@@ -336,7 +339,6 @@ endif()
 if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
-    cmake/FindCppUnit.cmake
     cmake/FindJemalloc.cmake
     cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
@@ -614,7 +616,7 @@ if(USE_STATIC_DEPENDENCIES)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)
-  set(CPPUNIT_USE_STATIC_LIBS ON)
+  set(GTEST_USE_STATIC_LIBS ON)
   set(Boost_USE_STATIC_LIBS ON)
   # @todo  glfw needs custom support.
   # set(GLFW_USE_STATIC_LIBS ON)
@@ -694,15 +696,18 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
 endif()
 
 if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if(OPENVDB_USE_DEPRECATED_ABI_5)
+  if((OpenVDB_ABI EQUAL 5 AND OPENVDB_USE_DEPRECATED_ABI_5) OR
+     (OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
     message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
       "are deprecated and will soon be removed.")
   else()
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 to ON to suppress this error.")
+      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 or
+      OPENVDB_USE_DEPRECATED_ABI_6 to ON to suppress this error.")
   endif()
   # global target definition
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_5)
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_6)
 endif()
 
 # The ABI is a global target definition, applicable to all components, so just add it
@@ -724,7 +729,7 @@ if(OPENVDB_BUILD_CORE)
 endif()
 
 if(OPENVDB_BUILD_AX)
-  add_subdirectory(openvdb_ax)
+  add_subdirectory(openvdb_ax/openvdb_ax)
 endif()
 
 if(OPENVDB_BUILD_AX_BINARIES)

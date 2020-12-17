@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <set>
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
@@ -10,48 +10,13 @@
 #include "util.h" // for unittest_util::makeSphere()
 
 
-class TestLeafBool: public CppUnit::TestCase
+class TestLeafBool: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestLeafBool);
-    CPPUNIT_TEST(testGetValue);
-    CPPUNIT_TEST(testSetValue);
-    CPPUNIT_TEST(testProbeValue);
-    CPPUNIT_TEST(testIterators);
-    CPPUNIT_TEST(testIteratorGetCoord);
-    CPPUNIT_TEST(testEquivalence);
-    CPPUNIT_TEST(testGetOrigin);
-    CPPUNIT_TEST(testNegativeIndexing);
-    CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testTopologyCopy);
-    CPPUNIT_TEST(testMerge);
-    CPPUNIT_TEST(testCombine);
-    CPPUNIT_TEST(testBoolTree);
-    CPPUNIT_TEST(testMedian);
-    //CPPUNIT_TEST(testFilter);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testGetValue();
-    void testSetValue();
-    void testProbeValue();
-    void testIterators();
-    void testEquivalence();
-    void testGetOrigin();
-    void testIteratorGetCoord();
-    void testNegativeIndexing();
-    void testIO();
-    void testTopologyCopy();
-    void testMerge();
-    void testCombine();
-    void testBoolTree();
-    void testMedian();
-    //void testFilter();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafBool);
 
 typedef openvdb::tree::LeafNode<bool, 3> LeafType;
 
@@ -59,19 +24,18 @@ typedef openvdb::tree::LeafNode<bool, 3> LeafType;
 ////////////////////////////////////////
 
 
-void
-TestLeafBool::testGetValue()
+TEST_F(TestLeafBool, testGetValue)
 {
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
-            CPPUNIT_ASSERT_EQUAL(false, leaf.getValue(leaf.offsetToLocalCoord(n)));
+            EXPECT_EQ(false, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/true);
         for (openvdb::Index n = 0; n < leaf.numValues(); ++n) {
-            CPPUNIT_ASSERT_EQUAL(true, leaf.getValue(leaf.offsetToLocalCoord(n)));
+            EXPECT_EQ(true, leaf.getValue(leaf.offsetToLocalCoord(n)));
         }
     }
     {// test Buffer::data()
@@ -79,7 +43,7 @@ TestLeafBool::testGetValue()
         leaf.fill(true);
         LeafType::Buffer::WordType* w = leaf.buffer().data();
         for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
-            CPPUNIT_ASSERT_EQUAL(~LeafType::Buffer::WordType(0), w[n]);
+            EXPECT_EQ(~LeafType::Buffer::WordType(0), w[n]);
         }
     }
     {// test const Buffer::data()
@@ -88,57 +52,54 @@ TestLeafBool::testGetValue()
         const LeafType& cleaf = leaf;
         const LeafType::Buffer::WordType* w = cleaf.buffer().data();
         for (openvdb::Index n = 0; n < LeafType::Buffer::WORD_COUNT; ++n) {
-            CPPUNIT_ASSERT_EQUAL(~LeafType::Buffer::WordType(0), w[n]);
+            EXPECT_EQ(~LeafType::Buffer::WordType(0), w[n]);
         }
     }
 }
 
 
-void
-TestLeafBool::testSetValue()
+TEST_F(TestLeafBool, testSetValue)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), false);
 
     openvdb::Coord xyz(0, 0, 0);
-    CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
+    EXPECT_TRUE(!leaf.isValueOn(xyz));
     leaf.setValueOn(xyz);
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    EXPECT_TRUE(leaf.isValueOn(xyz));
 
     xyz.reset(7, 7, 7);
-    CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
+    EXPECT_TRUE(!leaf.isValueOn(xyz));
     leaf.setValueOn(xyz);
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    EXPECT_TRUE(leaf.isValueOn(xyz));
     leaf.setValueOn(xyz, /*value=*/true); // value argument should be ignored
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    EXPECT_TRUE(leaf.isValueOn(xyz));
     leaf.setValueOn(xyz, /*value=*/false); // value argument should be ignored
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    EXPECT_TRUE(leaf.isValueOn(xyz));
 
     leaf.setValueOff(xyz);
-    CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
+    EXPECT_TRUE(!leaf.isValueOn(xyz));
 
     xyz.reset(2, 3, 6);
     leaf.setValueOn(xyz);
-    CPPUNIT_ASSERT(leaf.isValueOn(xyz));
+    EXPECT_TRUE(leaf.isValueOn(xyz));
 
     leaf.setValueOff(xyz);
-    CPPUNIT_ASSERT(!leaf.isValueOn(xyz));
+    EXPECT_TRUE(!leaf.isValueOn(xyz));
 }
 
 
-void
-TestLeafBool::testProbeValue()
+TEST_F(TestLeafBool, testProbeValue)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.setValueOn(openvdb::Coord(1, 6, 5));
 
     bool val;
-    CPPUNIT_ASSERT(leaf.probeValue(openvdb::Coord(1, 6, 5), val));
-    CPPUNIT_ASSERT(!leaf.probeValue(openvdb::Coord(1, 6, 4), val));
+    EXPECT_TRUE(leaf.probeValue(openvdb::Coord(1, 6, 5), val));
+    EXPECT_TRUE(!leaf.probeValue(openvdb::Coord(1, 6, 4), val));
 }
 
 
-void
-TestLeafBool::testIterators()
+TEST_F(TestLeafBool, testIterators)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     leaf.setValueOn(openvdb::Coord(1, 2, 3));
@@ -147,54 +108,52 @@ TestLeafBool::testIterators()
     for (LeafType::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
         sum += iter.getCoord();
     }
-    CPPUNIT_ASSERT_EQUAL(openvdb::Coord(1 + 5, 2 + 2, 3 + 3), sum);
+    EXPECT_EQ(openvdb::Coord(1 + 5, 2 + 2, 3 + 3), sum);
 
     openvdb::Index count = 0;
     for (LeafType::ValueOffIter iter = leaf.beginValueOff(); iter; ++iter, ++count);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues() - 2, count);
+    EXPECT_EQ(leaf.numValues() - 2, count);
 
     count = 0;
     for (LeafType::ValueAllIter iter = leaf.beginValueAll(); iter; ++iter, ++count);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), count);
+    EXPECT_EQ(leaf.numValues(), count);
 
     count = 0;
     for (LeafType::ChildOnIter iter = leaf.beginChildOn(); iter; ++iter, ++count);
-    CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), count);
+    EXPECT_EQ(openvdb::Index(0), count);
 
     count = 0;
     for (LeafType::ChildOffIter iter = leaf.beginChildOff(); iter; ++iter, ++count);
-    CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), count);
+    EXPECT_EQ(openvdb::Index(0), count);
 
     count = 0;
     for (LeafType::ChildAllIter iter = leaf.beginChildAll(); iter; ++iter, ++count);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), count);
+    EXPECT_EQ(leaf.numValues(), count);
 }
 
 
-void
-TestLeafBool::testIteratorGetCoord()
+TEST_F(TestLeafBool, testIteratorGetCoord)
 {
     using namespace openvdb;
 
     LeafType leaf(openvdb::Coord(8, 8, 0));
 
-    CPPUNIT_ASSERT_EQUAL(Coord(8, 8, 0), leaf.origin());
+    EXPECT_EQ(Coord(8, 8, 0), leaf.origin());
 
     leaf.setValueOn(Coord(1, 2, 3), -3);
     leaf.setValueOn(Coord(5, 2, 3),  4);
 
     LeafType::ValueOnIter iter = leaf.beginValueOn();
     Coord xyz = iter.getCoord();
-    CPPUNIT_ASSERT_EQUAL(Coord(9, 10, 3), xyz);
+    EXPECT_EQ(Coord(9, 10, 3), xyz);
 
     ++iter;
     xyz = iter.getCoord();
-    CPPUNIT_ASSERT_EQUAL(Coord(13, 10, 3), xyz);
+    EXPECT_EQ(Coord(13, 10, 3), xyz);
 }
 
 
-void
-TestLeafBool::testEquivalence()
+TEST_F(TestLeafBool, testEquivalence)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -202,18 +161,18 @@ TestLeafBool::testEquivalence()
         LeafType leaf(Coord(0, 0, 0), false); // false and inactive
         LeafType leaf2(Coord(0, 0, 0), true); // true and inactive
 
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
 
         leaf.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), true, /*active=*/false);
-        CPPUNIT_ASSERT(leaf == leaf2); // true and inactive
+        EXPECT_TRUE(leaf == leaf2); // true and inactive
 
         leaf.setValuesOn(); // true and active
 
         leaf2.fill(CoordBBox(Coord(0), Coord(LeafType::DIM - 1)), false); // false and active
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
 
         leaf.negate(); // false and active
-        CPPUNIT_ASSERT(leaf == leaf2);
+        EXPECT_TRUE(leaf == leaf2);
 
         // Set some values.
         leaf.setValueOn(Coord(0, 0, 0), true);
@@ -226,101 +185,98 @@ TestLeafBool::testEquivalence()
         leaf2.setValueOn(Coord(1, 1, 0), true);
         leaf2.setValueOn(Coord(1, 1, 2), true);
 
-        CPPUNIT_ASSERT(leaf == leaf2);
+        EXPECT_TRUE(leaf == leaf2);
 
         leaf2.setValueOn(Coord(0, 0, 1), true);
 
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
 
         leaf2.setValueOff(Coord(0, 0, 1), false);
 
-        CPPUNIT_ASSERT(leaf != leaf2);
+        EXPECT_TRUE(leaf != leaf2);
 
         leaf2.setValueOn(Coord(0, 0, 1));
 
-        CPPUNIT_ASSERT(leaf == leaf2);
+        EXPECT_TRUE(leaf == leaf2);
     }
     {// test LeafNode<bool>::operator==()
         LeafType leaf1(Coord(0            , 0, 0), true); // true and inactive
         LeafType leaf2(Coord(1            , 0, 0), true); // true and inactive
         LeafType leaf3(Coord(LeafType::DIM, 0, 0), true); // true and inactive
         LeafType leaf4(Coord(0            , 0, 0), true, true);//true and active
-        CPPUNIT_ASSERT(leaf1 == leaf2);
-        CPPUNIT_ASSERT(leaf1 != leaf3);
-        CPPUNIT_ASSERT(leaf2 != leaf3);
-        CPPUNIT_ASSERT(leaf1 != leaf4);
-        CPPUNIT_ASSERT(leaf2 != leaf4);
-        CPPUNIT_ASSERT(leaf3 != leaf4);
+        EXPECT_TRUE(leaf1 == leaf2);
+        EXPECT_TRUE(leaf1 != leaf3);
+        EXPECT_TRUE(leaf2 != leaf3);
+        EXPECT_TRUE(leaf1 != leaf4);
+        EXPECT_TRUE(leaf2 != leaf4);
+        EXPECT_TRUE(leaf3 != leaf4);
     }
 
 }
 
 
-void
-TestLeafBool::testGetOrigin()
+TEST_F(TestLeafBool, testGetOrigin)
 {
     {
         LeafType leaf(openvdb::Coord(1, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(0, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(0, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(0, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(8, 0, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(8, 1, 0), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(8, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(1024, 1, 3), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(128*8, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(128*8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(1023, 1, 3), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(127*8, 0, 0), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(127*8, 0, 0), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(512, 512, 512), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(512, 512, 512), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(512, 512, 512), leaf.origin());
     }
     {
         LeafType leaf(openvdb::Coord(2, 52, 515), 1);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Coord(0, 48, 512), leaf.origin());
+        EXPECT_EQ(openvdb::Coord(0, 48, 512), leaf.origin());
     }
 }
 
 
-void
-TestLeafBool::testNegativeIndexing()
+TEST_F(TestLeafBool, testNegativeIndexing)
 {
     using namespace openvdb;
 
     LeafType leaf(openvdb::Coord(-9, -2, -8));
 
-    CPPUNIT_ASSERT_EQUAL(Coord(-16, -8, -8), leaf.origin());
+    EXPECT_EQ(Coord(-16, -8, -8), leaf.origin());
 
     leaf.setValueOn(Coord(1, 2, 3));
     leaf.setValueOn(Coord(5, 2, 3));
 
-    CPPUNIT_ASSERT(leaf.isValueOn(Coord(1, 2, 3)));
-    CPPUNIT_ASSERT(leaf.isValueOn(Coord(5, 2, 3)));
+    EXPECT_TRUE(leaf.isValueOn(Coord(1, 2, 3)));
+    EXPECT_TRUE(leaf.isValueOn(Coord(5, 2, 3)));
 
     LeafType::ValueOnIter iter = leaf.beginValueOn();
     Coord xyz = iter.getCoord();
-    CPPUNIT_ASSERT_EQUAL(Coord(-15, -6, -5), xyz);
+    EXPECT_EQ(Coord(-15, -6, -5), xyz);
 
     ++iter;
     xyz = iter.getCoord();
-    CPPUNIT_ASSERT_EQUAL(Coord(-11, -6, -5), xyz);
+    EXPECT_EQ(Coord(-11, -6, -5), xyz);
 }
 
 
-void
-TestLeafBool::testIO()
+TEST_F(TestLeafBool, testIO)
 {
     LeafType leaf(openvdb::Coord(1, 3, 5));
     const openvdb::Coord origin = leaf.origin();
@@ -342,17 +298,16 @@ TestLeafBool::testIO()
 
     leaf.readBuffers(istr);
 
-    CPPUNIT_ASSERT_EQUAL(origin, leaf.origin());
+    EXPECT_EQ(origin, leaf.origin());
 
-    CPPUNIT_ASSERT(leaf.isValueOn(openvdb::Coord(0, 1, 0)));
-    CPPUNIT_ASSERT(leaf.isValueOn(openvdb::Coord(1, 0, 0)));
+    EXPECT_TRUE(leaf.isValueOn(openvdb::Coord(0, 1, 0)));
+    EXPECT_TRUE(leaf.isValueOn(openvdb::Coord(1, 0, 0)));
 
-    CPPUNIT_ASSERT(leaf.onVoxelCount() == 2);
+    EXPECT_TRUE(leaf.onVoxelCount() == 2);
 }
 
 
-void
-TestLeafBool::testTopologyCopy()
+TEST_F(TestLeafBool, testTopologyCopy)
 {
     using openvdb::Coord;
 
@@ -368,47 +323,45 @@ TestLeafBool::testTopologyCopy()
     }
 
     LeafType leaf(fleaf, openvdb::TopologyCopy());
-    CPPUNIT_ASSERT_EQUAL(fleaf.onVoxelCount(), leaf.onVoxelCount());
+    EXPECT_EQ(fleaf.onVoxelCount(), leaf.onVoxelCount());
 
-    CPPUNIT_ASSERT(leaf.hasSameTopology(&fleaf));
+    EXPECT_TRUE(leaf.hasSameTopology(&fleaf));
 
     for (LeafType::ValueOnIter iter = leaf.beginValueOn(); iter; ++iter) {
         coords.erase(iter.getCoord());
     }
-    CPPUNIT_ASSERT(coords.empty());
+    EXPECT_TRUE(coords.empty());
 }
 
 
-void
-TestLeafBool::testMerge()
+TEST_F(TestLeafBool, testMerge)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0));
     for (openvdb::Index n = 0; n < leaf.numValues(); n += 10) {
         leaf.setValueOn(n);
     }
-    CPPUNIT_ASSERT(!leaf.isValueMaskOn());
-    CPPUNIT_ASSERT(!leaf.isValueMaskOff());
+    EXPECT_TRUE(!leaf.isValueMaskOn());
+    EXPECT_TRUE(!leaf.isValueMaskOff());
     bool val = false, active = false;
-    CPPUNIT_ASSERT(!leaf.isConstant(val, active));
+    EXPECT_TRUE(!leaf.isConstant(val, active));
 
     LeafType leaf2(leaf);
     leaf2.getValueMask().toggle();
-    CPPUNIT_ASSERT(!leaf2.isValueMaskOn());
-    CPPUNIT_ASSERT(!leaf2.isValueMaskOff());
+    EXPECT_TRUE(!leaf2.isValueMaskOn());
+    EXPECT_TRUE(!leaf2.isValueMaskOff());
     val = active = false;
-    CPPUNIT_ASSERT(!leaf2.isConstant(val, active));
+    EXPECT_TRUE(!leaf2.isConstant(val, active));
 
     leaf.merge<openvdb::MERGE_ACTIVE_STATES>(leaf2);
-    CPPUNIT_ASSERT(leaf.isValueMaskOn());
-    CPPUNIT_ASSERT(!leaf.isValueMaskOff());
+    EXPECT_TRUE(leaf.isValueMaskOn());
+    EXPECT_TRUE(!leaf.isValueMaskOff());
     val = active = false;
-    CPPUNIT_ASSERT(leaf.isConstant(val, active));
-    CPPUNIT_ASSERT(active);
+    EXPECT_TRUE(leaf.isConstant(val, active));
+    EXPECT_TRUE(active);
 }
 
 
-void
-TestLeafBool::testCombine()
+TEST_F(TestLeafBool, testCombine)
 {
     struct Local {
         static void op(openvdb::CombineArgs<bool>& args) {
@@ -421,8 +374,8 @@ TestLeafBool::testCombine()
     for (openvdb::Index n = 0; n < leaf.numValues(); n += 10) {
         leaf.setValueOn(n);
     }
-    CPPUNIT_ASSERT(!leaf.isValueMaskOn());
-    CPPUNIT_ASSERT(!leaf.isValueMaskOff());
+    EXPECT_TRUE(!leaf.isValueMaskOn());
+    EXPECT_TRUE(!leaf.isValueMaskOff());
     const LeafType::NodeMaskType savedMask = leaf.getValueMask();
     OPENVDB_LOG_DEBUG_RUNTIME(leaf.str());
 
@@ -430,19 +383,18 @@ TestLeafBool::testCombine()
     for (openvdb::Index n = 0; n < leaf.numValues(); n += 4) {
         leaf2.setValueOn(n);
     }
-    CPPUNIT_ASSERT(!leaf2.isValueMaskOn());
-    CPPUNIT_ASSERT(!leaf2.isValueMaskOff());
+    EXPECT_TRUE(!leaf2.isValueMaskOn());
+    EXPECT_TRUE(!leaf2.isValueMaskOff());
     OPENVDB_LOG_DEBUG_RUNTIME(leaf2.str());
 
     leaf.combine(leaf2, Local::op);
     OPENVDB_LOG_DEBUG_RUNTIME(leaf.str());
 
-    CPPUNIT_ASSERT(leaf.getValueMask() == (savedMask ^ leaf2.getValueMask()));
+    EXPECT_TRUE(leaf.getValueMask() == (savedMask ^ leaf2.getValueMask()));
 }
 
 
-void
-TestLeafBool::testBoolTree()
+TEST_F(TestLeafBool, testBoolTree)
 {
     using namespace openvdb;
 
@@ -454,13 +406,13 @@ TestLeafBool::testBoolTree()
         io::File vdbFile("/hosts/whitestar/usr/pic1/VDB/bunny_0256.vdb2");
         vdbFile.open();
         inGrid = gridPtrCast<FloatGrid>(vdbFile.readGrid("LevelSet"));
-        CPPUNIT_ASSERT(inGrid.get() != NULL);
+        EXPECT_TRUE(inGrid.get() != NULL);
         inTree = inGrid->treePtr();
-        CPPUNIT_ASSERT(inTree.get() != NULL);
+        EXPECT_TRUE(inTree.get() != NULL);
     }
 #else
     FloatGrid::Ptr inGrid = FloatGrid::create();
-    CPPUNIT_ASSERT(inGrid.get() != NULL);
+    EXPECT_TRUE(inGrid.get() != NULL);
     FloatTree& inTree = inGrid->tree();
     inGrid->setName("LevelSet");
 
@@ -476,7 +428,7 @@ TestLeafBool::testBoolTree()
         floatTreeVoxelCount = inTree.activeVoxelCount();
 
     TreeBase::Ptr outTree(new BoolTree(inTree, false, true, TopologyCopy()));
-    CPPUNIT_ASSERT(outTree.get() != NULL);
+    EXPECT_TRUE(outTree.get() != NULL);
 
     BoolGrid::Ptr outGrid = BoolGrid::create(*inGrid); // copy transform and metadata
     outGrid->setTree(outTree);
@@ -496,8 +448,8 @@ TestLeafBool::testBoolTree()
     vdbFile.close();
 #endif
 
-    CPPUNIT_ASSERT_EQUAL(floatTreeLeafCount, boolTreeLeafCount);
-    CPPUNIT_ASSERT_EQUAL(floatTreeVoxelCount, boolTreeVoxelCount);
+    EXPECT_EQ(floatTreeLeafCount, boolTreeLeafCount);
+    EXPECT_EQ(floatTreeVoxelCount, boolTreeVoxelCount);
 
     //std::cerr << "\nboolTree mem=" << boolTreeMem << " bytes" << std::endl;
     //std::cerr << "floatTree mem=" << floatTreeMem << " bytes" << std::endl;
@@ -506,65 +458,64 @@ TestLeafBool::testBoolTree()
     // to use (2 mask bits/voxel / ((32 value bits + 1 mask bit)/voxel)) = ~1/16
     // as much memory as the FloatTree.  Considering total memory usage, verify that
     // the BoolTree is no more than 1/10 the size of the FloatTree.
-    CPPUNIT_ASSERT(boolTreeMem * 10 <= floatTreeMem);
+    EXPECT_TRUE(boolTreeMem * 10 <= floatTreeMem);
 }
 
-void
-TestLeafBool::testMedian()
+TEST_F(TestLeafBool, testMedian)
 {
     using namespace openvdb;
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
     bool state = false;
 
-    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT(!leaf.medianAll());
+    EXPECT_EQ(Index(0), leaf.medianOn(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_EQ(leaf.numValues(), leaf.medianOff(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_TRUE(!leaf.medianAll());
 
     leaf.setValue(Coord(0,0,0), true);
-    CPPUNIT_ASSERT_EQUAL(Index(1), leaf.medianOn(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-1, leaf.medianOff(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT(!leaf.medianAll());
+    EXPECT_EQ(Index(1), leaf.medianOn(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_EQ(leaf.numValues()-1, leaf.medianOff(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_TRUE(!leaf.medianAll());
 
     leaf.setValue(Coord(0,0,1), true);
-    CPPUNIT_ASSERT_EQUAL(Index(2), leaf.medianOn(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-2, leaf.medianOff(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT(!leaf.medianAll());
+    EXPECT_EQ(Index(2), leaf.medianOn(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_EQ(leaf.numValues()-2, leaf.medianOff(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_TRUE(!leaf.medianAll());
 
     leaf.setValue(Coord(5,0,1), true);
-    CPPUNIT_ASSERT_EQUAL(Index(3), leaf.medianOn(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues()-3, leaf.medianOff(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT(!leaf.medianAll());
+    EXPECT_EQ(Index(3), leaf.medianOn(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_EQ(leaf.numValues()-3, leaf.medianOff(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_TRUE(!leaf.medianAll());
 
     leaf.fill(false, false);
-    CPPUNIT_ASSERT_EQUAL(Index(0), leaf.medianOn(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT_EQUAL(leaf.numValues(), leaf.medianOff(state));
-    CPPUNIT_ASSERT(state == false);
-    CPPUNIT_ASSERT(!leaf.medianAll());
+    EXPECT_EQ(Index(0), leaf.medianOn(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_EQ(leaf.numValues(), leaf.medianOff(state));
+    EXPECT_TRUE(state == false);
+    EXPECT_TRUE(!leaf.medianAll());
 
     for (Index i=0; i<leaf.numValues()/2; ++i) {
         leaf.setValueOn(i, true);
-        CPPUNIT_ASSERT(!leaf.medianAll());
-        CPPUNIT_ASSERT_EQUAL(Index(i+1), leaf.medianOn(state));
-        CPPUNIT_ASSERT(state == false);
-        CPPUNIT_ASSERT_EQUAL(leaf.numValues()-i-1, leaf.medianOff(state));
-        CPPUNIT_ASSERT(state == false);
+        EXPECT_TRUE(!leaf.medianAll());
+        EXPECT_EQ(Index(i+1), leaf.medianOn(state));
+        EXPECT_TRUE(state == false);
+        EXPECT_EQ(leaf.numValues()-i-1, leaf.medianOff(state));
+        EXPECT_TRUE(state == false);
     }
     for (Index i=leaf.numValues()/2; i<leaf.numValues(); ++i) {
         leaf.setValueOn(i, true);
-        CPPUNIT_ASSERT(leaf.medianAll());
-        CPPUNIT_ASSERT_EQUAL(Index(i+1), leaf.medianOn(state));
-        CPPUNIT_ASSERT(state == true);
-        CPPUNIT_ASSERT_EQUAL(leaf.numValues()-i-1, leaf.medianOff(state));
-        CPPUNIT_ASSERT(state == false);
+        EXPECT_TRUE(leaf.medianAll());
+        EXPECT_EQ(Index(i+1), leaf.medianOn(state));
+        EXPECT_TRUE(state == true);
+        EXPECT_EQ(leaf.numValues()-i-1, leaf.medianOff(state));
+        EXPECT_TRUE(state == false);
     }
 }
 
@@ -574,9 +525,9 @@ TestLeafBool::testMedian()
 //     using namespace openvdb;
 
 //     BoolGrid::Ptr grid = BoolGrid::create();
-//     CPPUNIT_ASSERT(grid.get() != NULL);
+//     EXPECT_TRUE(grid.get() != NULL);
 //     BoolTree::Ptr tree = grid->treePtr();
-//     CPPUNIT_ASSERT(tree.get() != NULL);
+//     EXPECT_TRUE(tree.get() != NULL);
 //     grid->setName("filtered");
 
 //     unittest_util::makeSphere<BoolGrid>(/*dim=*/Coord(32),
@@ -602,5 +553,5 @@ TestLeafBool::testMedian()
 
 //     // Verify that offsetting all active voxels by 1 (true) has no effect,
 //     // since the active voxels were all true to begin with.
-//     CPPUNIT_ASSERT(tree->hasSameTopology(*copyOfTree));
+//     EXPECT_TRUE(tree->hasSameTopology(*copyOfTree));
 // }

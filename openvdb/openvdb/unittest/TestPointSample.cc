@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
@@ -12,25 +12,12 @@
 
 using namespace openvdb;
 
-class TestPointSample: public CppUnit::TestCase
+class TestPointSample: public ::testing::Test
 {
 public:
-
-    void setUp() override { initialize(); }
-    void tearDown() override { uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestPointSample);
-    CPPUNIT_TEST(testPointSample);
-    CPPUNIT_TEST(testPointSampleWithGroups);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testPointSample();
-    void testPointSampleWithGroups();
-
+    void SetUp() override { initialize(); }
+    void TearDown() override { uninitialize(); }
 }; // class TestPointSample
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointSample);
 
 
 namespace
@@ -61,8 +48,7 @@ testAttribute(points::PointDataGrid& points, const std::string& attributeName,
 } // anonymous namespace
 
 
-void
-TestPointSample::testPointSample()
+TEST_F(TestPointSample, testPointSample)
 {
     using points::PointDataGrid;
     using points::NullCodec;
@@ -80,14 +66,14 @@ TestPointSample::testPointSample()
         PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
             pointPositions, *transform);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         // bool
 
         points::AttributeHandle<bool>::Ptr boolHandle =
             testAttribute<bool>(*points, "test_bool", transform, true);
 
-        CPPUNIT_ASSERT(boolHandle->get(0));
+        EXPECT_TRUE(boolHandle->get(0));
 
         // int16
 
@@ -98,7 +84,7 @@ TestPointSample::testPointSample()
         points::AttributeHandle<int16_t>::Ptr int16Handle =
             testAttribute<int16_t>(*points, "test_int16", transform, int16_t(10));
 
-        CPPUNIT_ASSERT_EQUAL(int16Handle->get(0), int16_t(10));
+        EXPECT_EQ(int16Handle->get(0), int16_t(10));
 #endif
 
         // int32
@@ -106,42 +92,42 @@ TestPointSample::testPointSample()
         points::AttributeHandle<Int32>::Ptr int32Handle =
             testAttribute<Int32>(*points, "test_Int32", transform, Int32(3));
 
-        CPPUNIT_ASSERT_EQUAL(Int32(3), int32Handle->get(0));
+        EXPECT_EQ(Int32(3), int32Handle->get(0));
 
         // int64
 
         points::AttributeHandle<Int64>::Ptr int64Handle =
             testAttribute<Int64>(*points, "test_Int64", transform, Int64(2));
 
-        CPPUNIT_ASSERT_EQUAL(Int64(2), int64Handle->get(0));
+        EXPECT_EQ(Int64(2), int64Handle->get(0));
 
         // double
 
         points::AttributeHandle<double>::Ptr doubleHandle =
             testAttribute<double>(*points, "test_double", transform, 4.0);
 
-        CPPUNIT_ASSERT_EQUAL(4.0, doubleHandle->get(0));
+        EXPECT_EQ(4.0, doubleHandle->get(0));
 
         // Vec3i
 
         points::AttributeHandle<math::Vec3i>::Ptr vec3iHandle =
             testAttribute<Vec3i>(*points, "test_vec3i", transform, math::Vec3i(9, 8, 7));
 
-        CPPUNIT_ASSERT_EQUAL(vec3iHandle->get(0), math::Vec3i(9, 8, 7));
+        EXPECT_EQ(vec3iHandle->get(0), math::Vec3i(9, 8, 7));
 
         // Vec3f
 
         points::AttributeHandle<Vec3f>::Ptr vec3fHandle =
             testAttribute<Vec3f>(*points, "test_vec3f", transform, Vec3f(111.0f, 222.0f, 333.0f));
 
-        CPPUNIT_ASSERT_EQUAL(vec3fHandle->get(0), Vec3f(111.0f, 222.0f, 333.0f));
+        EXPECT_EQ(vec3fHandle->get(0), Vec3f(111.0f, 222.0f, 333.0f));
 
         // Vec3d
 
         points::AttributeHandle<Vec3d>::Ptr vec3dHandle =
             testAttribute<Vec3d>(*points, "test_vec3d", transform, Vec3d(1.0, 2.0, 3.0));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3d(1.0, 2.0, 3.0), vec3dHandle->get(0)));
+        EXPECT_TRUE(math::isApproxEqual(Vec3d(1.0, 2.0, 3.0), vec3dHandle->get(0)));
     }
 
     {
@@ -162,7 +148,7 @@ TestPointSample::testPointSample()
             points::AttributeHandle<Vec3f>::create(
                 points->tree().cbeginLeaf()->attributeArray("test"));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(Vec3f(0.0f, 0.0f, 0.0f), handle->get(0)));
+        EXPECT_TRUE(math::isApproxEqual(Vec3f(0.0f, 0.0f, 0.0f), handle->get(0)));
     }
 
     {
@@ -172,13 +158,13 @@ TestPointSample::testPointSample()
         PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
             pointPositions, *transform);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         FloatGrid::Ptr testGrid = FloatGrid::create(1.0);
 
         points::appendAttribute<float>(points->tree(), "test");
 
-        CPPUNIT_ASSERT_NO_THROW(points::boxSample(*points, *testGrid, "test"));
+        EXPECT_NO_THROW(points::boxSample(*points, *testGrid, "test"));
     }
 
     {
@@ -189,29 +175,27 @@ TestPointSample::testPointSample()
         PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
             pointPositions, *transform);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         FloatGrid::Ptr testGrid = FloatGrid::create(1.0);
 
-        CPPUNIT_ASSERT_THROW_MESSAGE("Cannot sample onto the \"P\" attribute",
-            points::boxSample(*points, *testGrid, "P"), RuntimeError);
+        EXPECT_THROW(points::boxSample(*points, *testGrid, "P"), RuntimeError);
 
         // name of the grid is used if no attribute is provided
 
         testGrid->setName("test_grid");
 
-        CPPUNIT_ASSERT(!points->tree().cbeginLeaf()->hasAttribute("test_grid"));
+        EXPECT_TRUE(!points->tree().cbeginLeaf()->hasAttribute("test_grid"));
 
         points::boxSample(*points, *testGrid);
 
-        CPPUNIT_ASSERT(points->tree().cbeginLeaf()->hasAttribute("test_grid"));
+        EXPECT_TRUE(points->tree().cbeginLeaf()->hasAttribute("test_grid"));
 
         // name fails if the grid is called "P"
 
         testGrid->setName("P");
 
-        CPPUNIT_ASSERT_THROW_MESSAGE("Cannot sample onto the \"P\" attribute",
-            points::boxSample(*points, *testGrid), RuntimeError);
+        EXPECT_THROW(points::boxSample(*points, *testGrid), RuntimeError);
     }
 
     {
@@ -223,7 +207,7 @@ TestPointSample::testPointSample()
         PointDataGrid::Ptr points = points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(
             pointPositions, *transform);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         FloatGrid::Ptr testGrid = FloatGrid::create();
 
@@ -239,7 +223,7 @@ TestPointSample::testPointSample()
             points::AttributeHandle<float>::create(
                 points->tree().cbeginLeaf()->attributeArray("test"));
 
-        CPPUNIT_ASSERT(handle.get());
+        EXPECT_TRUE(handle.get());
 
         FloatGrid::ConstAccessor testGridAccessor = testGrid->getConstAccessor();
 
@@ -249,11 +233,11 @@ TestPointSample::testPointSample()
 
         float expected = tools::PointSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(0), 1e-6);
+        EXPECT_NEAR(expected, handle->get(0), 1e-6);
 
         expected = tools::PointSampler::sample(testGridAccessor, Vec3f(1.1f, 0.3f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(1), 1e-6);
+        EXPECT_NEAR(expected, handle->get(1), 1e-6);
 
         // check tri-linear sampling
 
@@ -261,11 +245,11 @@ TestPointSample::testPointSample()
 
         expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(0), 1e-6);
+        EXPECT_NEAR(expected, handle->get(0), 1e-6);
 
         expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(1.1f, 0.3f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(1), 1e-6);
+        EXPECT_NEAR(expected, handle->get(1), 1e-6);
 
         // check tri-quadratic sampling
 
@@ -273,11 +257,11 @@ TestPointSample::testPointSample()
 
         expected = tools::QuadraticSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(0), 1e-6);
+        EXPECT_NEAR(expected, handle->get(0), 1e-6);
 
         expected = tools::QuadraticSampler::sample(testGridAccessor, Vec3f(1.1f, 0.3f, 0.0f));
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(1), 1e-6);
+        EXPECT_NEAR(expected, handle->get(1), 1e-6);
     }
 
     {
@@ -290,7 +274,7 @@ TestPointSample::testPointSample()
             points::createPointDataGrid<points::NullCodec, PointDataGrid, Vec3f>(pointPositions,
                 *transform);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         VectorGrid::Ptr testGrid = VectorGrid::create();
 
@@ -305,7 +289,7 @@ TestPointSample::testPointSample()
             points::AttributeHandle<Vec3f>::create(
                 points->tree().cbeginLeaf()->attributeArray("test"));
 
-        CPPUNIT_ASSERT(handle.get());
+        EXPECT_TRUE(handle.get());
 
         Vec3fGrid::ConstAccessor testGridAccessor = testGrid->getConstAccessor();
 
@@ -316,11 +300,11 @@ TestPointSample::testPointSample()
         Vec3f expected = tools::StaggeredPointSampler::sample(testGridAccessor,
             Vec3f(0.03f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(0)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(0)));
 
         expected = tools::StaggeredPointSampler::sample(testGridAccessor, Vec3f(0.0f, 0.03f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(1)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(1)));
 
         // tri-linear staggered sampling
 
@@ -329,11 +313,11 @@ TestPointSample::testPointSample()
         expected = tools::StaggeredBoxSampler::sample(testGridAccessor,
             Vec3f(0.03f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(0)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(0)));
 
         expected = tools::StaggeredBoxSampler::sample(testGridAccessor, Vec3f(0.0f, 0.03f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(1)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(1)));
 
         // tri-quadratic staggered sampling
 
@@ -342,12 +326,12 @@ TestPointSample::testPointSample()
         expected = tools::StaggeredQuadraticSampler::sample(testGridAccessor,
           Vec3f(0.03f, 0.0f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(0)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(0)));
 
         expected = tools::StaggeredQuadraticSampler::sample(testGridAccessor,
             Vec3f(0.0f, 0.03f, 0.0f));
 
-        CPPUNIT_ASSERT(math::isApproxEqual(expected, handle->get(1)));
+        EXPECT_TRUE(math::isApproxEqual(expected, handle->get(1)));
     }
 
     {
@@ -360,7 +344,7 @@ TestPointSample::testPointSample()
             points::createPointDataGrid<NullCodec, PointDataGrid, Vec3f>(pointPositions,
                 *transform2);
 
-        CPPUNIT_ASSERT(points);
+        EXPECT_TRUE(points);
 
         FloatGrid::Ptr testFloatGrid = FloatGrid::create();
 
@@ -374,7 +358,7 @@ TestPointSample::testPointSample()
         points::AttributeHandle<int>::Ptr handle = points::AttributeHandle<int>::create(
             points->tree().cbeginLeaf()->attributeArray("testint"));
 
-        CPPUNIT_ASSERT(handle.get());
+        EXPECT_TRUE(handle.get());
 
         FloatGrid::ConstAccessor testFloatGridAccessor = testFloatGrid->getConstAccessor();
 
@@ -384,7 +368,7 @@ TestPointSample::testPointSample()
             Vec3f(0.3f, 0.0f, 0.0f));
         const int expected = static_cast<int>(math::Round(sampledValue));
 
-        CPPUNIT_ASSERT_EQUAL(expected, handle->get(0));
+        EXPECT_EQ(expected, handle->get(0));
 
         // check mismatching grid type using vector types
 
@@ -404,7 +388,7 @@ TestPointSample::testPointSample()
         const Vec3d expected2 = static_cast<Vec3d>(tools::BoxSampler::sample(testVec3fGridAccessor,
             Vec3f(0.3f, 0.0f, 0.0f)));
 
-        CPPUNIT_ASSERT(math::isExactlyEqual(expected2, handle2->get(0)));
+        EXPECT_TRUE(math::isExactlyEqual(expected2, handle2->get(0)));
 
         // check implicit casting of types for sampling using sampleGrid()
 
@@ -413,7 +397,7 @@ TestPointSample::testPointSample()
         points::AttributeHandle<Vec3d>::Ptr handle3 = points::AttributeHandle<Vec3d>::create(
             points->tree().cbeginLeaf()->attributeArray("testvec3d2"));
 
-        CPPUNIT_ASSERT(math::isExactlyEqual(expected2, handle3->get(0)));
+        EXPECT_TRUE(math::isExactlyEqual(expected2, handle3->get(0)));
 
         // check explicit casting of types for sampling using sampleGrid()
 
@@ -422,29 +406,26 @@ TestPointSample::testPointSample()
         points::AttributeHandle<Vec3d>::Ptr handle4 = points::AttributeHandle<Vec3d>::create(
             points->tree().cbeginLeaf()->attributeArray("testvec3d3"));
 
-        CPPUNIT_ASSERT(math::isExactlyEqual(expected2, handle4->get(0)));
+        EXPECT_TRUE(math::isExactlyEqual(expected2, handle4->get(0)));
 
         // check invalid casting of types
 
         points::appendAttribute<float>(points->tree(), "testfloat");
 
-        // The following is a substitute for CPPUNIT_ASSERT_THROW_MESSAGE(),
-        // which generates a compiler warning when the expected exception type
-        // is std::exception.
         try {
             points::boxSample(*points, *testVec3fGrid, "testfloat");
-            CPPUNIT_FAIL("expected exception not thrown:"
-                " cannot sample a vec3s grid on to a float attribute");
+            FAIL() << "expected exception not thrown:"
+                " cannot sample a vec3s grid on to a float attribute";
         } catch (std::exception&) {
         } catch (...) {
-            CPPUNIT_FAIL("expected std::exception or derived");
+            FAIL() << "expected std::exception or derived";
         }
 
         // check invalid existing attribute type (Vec4s attribute)
 
         points::TypedAttributeArray<Vec4s>::registerType();
         points::appendAttribute<Vec4s>(points->tree(), "testv4f");
-        CPPUNIT_ASSERT_THROW(points::boxSample(*points, *testVec3fGrid, "testv4f"), TypeError);
+        EXPECT_THROW(points::boxSample(*points, *testVec3fGrid, "testv4f"), TypeError);
     }
 
     { // sample a non-standard grid type (a Vec4<float> grid)
@@ -474,12 +455,11 @@ TestPointSample::testPointSample()
         const Vec4s expected2 = static_cast<Vec4s>(tools::BoxSampler::sample(testVec4fGridAccessor,
             Vec3f(0.3f, 0.0f, 0.0f)));
 
-        CPPUNIT_ASSERT(math::isExactlyEqual(expected2, handle2->get(0)));
+        EXPECT_TRUE(math::isExactlyEqual(expected2, handle2->get(0)));
     }
 }
 
-void
-TestPointSample::testPointSampleWithGroups()
+TEST_F(TestPointSample, testPointSampleWithGroups)
 {
     using points::PointDataGrid;
 
@@ -490,7 +470,7 @@ TestPointSample::testPointSampleWithGroups()
     PointDataGrid::Ptr points = points::createPointDataGrid<points::NullCodec,
             PointDataGrid, Vec3f>(pointPositions, *transform);
 
-    CPPUNIT_ASSERT(points);
+    EXPECT_TRUE(points);
 
     DoubleGrid::Ptr testGrid = DoubleGrid::create();
 
@@ -524,12 +504,12 @@ TestPointSample::testPointSampleWithGroups()
 
     double expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(0.3f, 0.0f, 0.0f));
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(0), 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, handle->get(1), 1e-6);
+    EXPECT_NEAR(expected, handle->get(0), 1e-6);
+    EXPECT_NEAR(0.0, handle->get(1), 1e-6);
 
     expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(0.0f, 0.0f, 0.0f));
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle->get(2), 1e-6);
+    EXPECT_NEAR(expected, handle->get(2), 1e-6);
 
     points::appendAttribute<double>(points->tree(), "test_exclude");
 
@@ -542,10 +522,10 @@ TestPointSample::testPointSampleWithGroups()
         points::AttributeHandle<double>::create(
             points->tree().cbeginLeaf()->attributeArray("test_exclude"));
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, handle2->get(0), 1e-6);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0, handle2->get(2), 1e-6);
+    EXPECT_NEAR(0.0, handle2->get(0), 1e-6);
+    EXPECT_NEAR(0.0, handle2->get(2), 1e-6);
 
     expected = tools::BoxSampler::sample(testGridAccessor, Vec3f(0.0f, 0.3f, 0.0f));
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, handle2->get(1), 1e-6);
+    EXPECT_NEAR(expected, handle2->get(1), 1e-6);
 }
