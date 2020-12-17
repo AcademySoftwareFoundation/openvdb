@@ -13,12 +13,17 @@ Version 8.0.0 - In development
     - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
       accessed from the GridBase.
 
+    API changes:
+    - Removed a number of deprecated point, volume and AX methods.
+
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
       version dependencies.
     - Added a missing header include to resolve an undefined size_t build error
       on GCC10.
+    - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
+      attribute.
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
