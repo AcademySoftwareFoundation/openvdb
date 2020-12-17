@@ -176,10 +176,7 @@ endif()
 # If boost >= 1.65, find the required numpy boost component and link that in.
 # Use the same system as above, first trying without the suffix, then with.
 
-if(USE_NUMPY AND (
-  (${Boost_VERSION} VERSION_EQUAL 1.65) OR
-  (${Boost_VERSION} VERSION_GREATER 1.65)))
-
+if(USE_NUMPY)
   find_package(Boost ${MINIMUM_BOOST_VERSION}
     QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
   )

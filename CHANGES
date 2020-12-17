@@ -1,6 +1,34 @@
 OpenVDB Version History
 =======================
 
+
+Version 8.0.0 - In development
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 6 for
+      Houdini 18.0 and 7 for Houdini 18.5.
+
+    ABI changes:
+    - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
+      accessed from the GridBase.
+    - Private method RootNode::getChildCount() has been removed as of ABI=8.
+
+    Build:
+    - As of this release, VFX Reference Platform 2018 is no longer supported.
+      CMake now issues deprecation warnings for 2019 VFX Reference Platform
+      version dependencies.
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
+
+    New features:
+    - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
+      if respectively active voxels or tiles in a tree intersect a given
+      CoordBBox.
+    - Added tools::activeTiles that returns a vector containing all the active
+      tiles in a tree that intersects a given CoordBBox.
+
+
 Version 7.2.0 - December 9, 2020
 
     New features:
