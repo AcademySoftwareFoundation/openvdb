@@ -205,7 +205,7 @@ public:
     /// Length of the vector
     T length() const
     {
-        return sqrt(
+        return std::sqrt(
             this->mm[0]*this->mm[0] +
             this->mm[1]*this->mm[1] +
             this->mm[2]*this->mm[2] +

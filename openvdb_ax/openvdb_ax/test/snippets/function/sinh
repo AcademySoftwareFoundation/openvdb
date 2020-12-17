@@ -1,0 +1,2 @@
+double@test1 = sinh(1.0);
+float@test2 = sinh(1.0f);

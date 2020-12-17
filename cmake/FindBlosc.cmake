@@ -251,7 +251,7 @@ if(Blosc_FOUND)
     if(BLOSC_USE_EXTERNAL_SOURCES)
       set_target_properties(Blosc::blosc PROPERTIES
         INTERFACE_LINK_DIRECTORIES "${Blosc_LIBRARY_DIRS}"
-        INTERFACE_LINK_LIBRARIES "lz4;snappy;zlib;zstd"
+        INTERFACE_LINK_LIBRARIES "lz4;snappy;zlib;zstd_static"
       )
     endif()
   endif()

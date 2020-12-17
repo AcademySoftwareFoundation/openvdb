@@ -1,0 +1,5 @@
+int32@test1 = int32(bool@testbool);
+int32@test2 = int32(int64@testint64);
+int32@test3 = int32(float@testfloat);
+int32@test4 = int32(double@testdouble);
+

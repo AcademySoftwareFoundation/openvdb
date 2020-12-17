@@ -1,0 +1,12 @@
+
+float temp1 = 4.7f;
+float temp2 = -4.3f;
+int temp3 = 3;
+
+@float_test1 = pow(1.0, 1.0);
+@float_test2 = pow(3.0, -2.1);
+i@int_test1 = pow(temp3, 5);
+@float_test3 = pow(temp1, temp2);
+@float_test4 = pow(temp1, temp3);
+@float_test5 = pow(5, -5);
+

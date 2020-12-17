@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/util/CpuTimer.h>
 
@@ -12,32 +12,12 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestAttributeArrayString: public CppUnit::TestCase
+class TestAttributeArrayString: public ::testing::Test
 {
 public:
-    virtual void setUp() { openvdb::initialize(); }
-    virtual void tearDown() { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestAttributeArrayString);
-    CPPUNIT_TEST(testStringMetaCache);
-    CPPUNIT_TEST(testStringMetaInserter);
-    CPPUNIT_TEST(testStringAttribute);
-    CPPUNIT_TEST(testStringAttributeHandle);
-    CPPUNIT_TEST(testStringAttributeWriteHandle);
-    CPPUNIT_TEST(testProfile);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testStringMetaCache();
-    void testStringMetaInserter();
-    void testStringAttribute();
-    void testStringAttributeHandle();
-    void testStringAttributeWriteHandle();
-    void testProfile();
-
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 }; // class TestAttributeArrayString
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArrayString);
 
 
 ////////////////////////////////////////
@@ -61,21 +41,20 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 ////////////////////////////////////////
 
 
-void
-TestAttributeArrayString::testStringMetaCache()
+TEST_F(TestAttributeArrayString, testStringMetaCache)
 {
     { // cache with manual insertion
         StringMetaCache cache;
-        CPPUNIT_ASSERT(cache.empty());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), cache.size());
+        EXPECT_TRUE(cache.empty());
+        EXPECT_EQ(size_t(0), cache.size());
 
         cache.insert("test", 1);
 
-        CPPUNIT_ASSERT(!cache.empty());
-        CPPUNIT_ASSERT_EQUAL(size_t(1), cache.size());
+        EXPECT_TRUE(!cache.empty());
+        EXPECT_EQ(size_t(1), cache.size());
 
         auto it = cache.map().find("test");
-        CPPUNIT_ASSERT(it != cache.map().end());
+        EXPECT_TRUE(it != cache.map().end());
     }
 
     { // cache with metadata insertion and reset
@@ -86,17 +65,17 @@ TestAttributeArrayString::testStringMetaCache()
         inserter.insert("test2");
 
         StringMetaCache cache(metadata);
-        CPPUNIT_ASSERT(!cache.empty());
-        CPPUNIT_ASSERT_EQUAL(size_t(2), cache.size());
+        EXPECT_TRUE(!cache.empty());
+        EXPECT_EQ(size_t(2), cache.size());
 
         auto it = cache.map().find("test1");
-        CPPUNIT_ASSERT(it != cache.map().end());
-        CPPUNIT_ASSERT_EQUAL(Name("test1"), it->first);
-        CPPUNIT_ASSERT_EQUAL(Index(1), it->second);
+        EXPECT_TRUE(it != cache.map().end());
+        EXPECT_EQ(Name("test1"), it->first);
+        EXPECT_EQ(Index(1), it->second);
         it = cache.map().find("test2");
-        CPPUNIT_ASSERT(it != cache.map().end());
-        CPPUNIT_ASSERT_EQUAL(Name("test2"), it->first);
-        CPPUNIT_ASSERT_EQUAL(Index(2), it->second);
+        EXPECT_TRUE(it != cache.map().end());
+        EXPECT_EQ(Name("test2"), it->first);
+        EXPECT_EQ(Index(2), it->second);
 
         MetaMap metadata2;
 
@@ -104,15 +83,14 @@ TestAttributeArrayString::testStringMetaCache()
         inserter2.insert("test3");
 
         cache.reset(metadata2);
-        CPPUNIT_ASSERT_EQUAL(size_t(1), cache.size());
+        EXPECT_EQ(size_t(1), cache.size());
         it = cache.map().find("test3");
-        CPPUNIT_ASSERT(it != cache.map().end());
+        EXPECT_TRUE(it != cache.map().end());
     }
 }
 
 
-void
-TestAttributeArrayString::testStringMetaInserter()
+TEST_F(TestAttributeArrayString, testStringMetaInserter)
 {
     MetaMap metadata;
 
@@ -120,29 +98,29 @@ TestAttributeArrayString::testStringMetaInserter()
 
     { // insert one value
         Index index = inserter.insert("test");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(1));
-        CPPUNIT_ASSERT_EQUAL(Index(1), index);
-        CPPUNIT_ASSERT(inserter.hasIndex(1));
-        CPPUNIT_ASSERT(inserter.hasKey("test"));
+        EXPECT_EQ(metadata.metaCount(), size_t(1));
+        EXPECT_EQ(Index(1), index);
+        EXPECT_TRUE(inserter.hasIndex(1));
+        EXPECT_TRUE(inserter.hasKey("test"));
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test"));
     }
 
     { // insert another value
         Index index = inserter.insert("test2");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(Index(2), index);
-        CPPUNIT_ASSERT(inserter.hasIndex(1));
-        CPPUNIT_ASSERT(inserter.hasKey("test"));
-        CPPUNIT_ASSERT(inserter.hasIndex(2));
-        CPPUNIT_ASSERT(inserter.hasKey("test2"));
+        EXPECT_EQ(metadata.metaCount(), size_t(2));
+        EXPECT_EQ(Index(2), index);
+        EXPECT_TRUE(inserter.hasIndex(1));
+        EXPECT_TRUE(inserter.hasKey("test"));
+        EXPECT_TRUE(inserter.hasIndex(2));
+        EXPECT_TRUE(inserter.hasKey("test2"));
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test"));
         meta = metadata.getMetadata<StringMetadata>("string:1");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test2"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test2"));
     }
 
     // remove a value and reset the cache
@@ -152,51 +130,51 @@ TestAttributeArrayString::testStringMetaInserter()
 
     { // re-insert value
         Index index = inserter.insert("test3");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
-        CPPUNIT_ASSERT_EQUAL(Index(2), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(2));
+        EXPECT_EQ(Index(2), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test"));
         meta = metadata.getMetadata<StringMetadata>("string:1");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test3"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test3"));
     }
 
     { // insert and remove to create a gap
         Index index = inserter.insert("test4");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
-        CPPUNIT_ASSERT_EQUAL(Index(3), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(3));
+        EXPECT_EQ(Index(3), index);
         metadata.removeMeta("string:1");
         inserter.resetCache();
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(2));
+        EXPECT_EQ(metadata.metaCount(), size_t(2));
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test"));
         meta = metadata.getMetadata<StringMetadata>("string:2");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test4"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test4"));
     }
 
     { // insert to fill gap
         Index index = inserter.insert("test10");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
-        CPPUNIT_ASSERT_EQUAL(Index(2), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(3));
+        EXPECT_EQ(Index(2), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test"));
         meta = metadata.getMetadata<StringMetadata>("string:1");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test10"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test10"));
         meta = metadata.getMetadata<StringMetadata>("string:2");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test4"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test4"));
     }
 
     { // insert existing value
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        EXPECT_EQ(metadata.metaCount(), size_t(3));
         Index index = inserter.insert("test10");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
-        CPPUNIT_ASSERT_EQUAL(Index(2), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(3));
+        EXPECT_EQ(Index(2), index);
     }
 
     metadata.removeMeta("string:0");
@@ -207,100 +185,99 @@ TestAttributeArrayString::testStringMetaInserter()
         metadata.insertMeta("int:1", Int32Metadata(5));
         metadata.insertMeta("irrelevant", StringMetadata("irrelevant"));
         inserter.resetCache();
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(3));
+        EXPECT_EQ(metadata.metaCount(), size_t(3));
         Index index = inserter.insert("test15");
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(Index(1), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(4));
+        EXPECT_EQ(Index(1), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:0");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test15"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test15"));
         meta = metadata.getMetadata<StringMetadata>("string:1");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test10"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test10"));
     }
 
     { // insert using a hint
         Index index = inserter.insert("test1000", 1000);
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(5));
-        CPPUNIT_ASSERT_EQUAL(Index(1000), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(5));
+        EXPECT_EQ(Index(1000), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:999");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1000"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test1000"));
     }
 
     { // insert using same hint (fail to use hint this time)
         Index index = inserter.insert("test1001", 1000);
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(6));
-        CPPUNIT_ASSERT_EQUAL(Index(3), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(6));
+        EXPECT_EQ(Index(3), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:2");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1001"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test1001"));
     }
 
     { // insert using next adjacent hint
         Index index = inserter.insert("test1002", 1001);
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(7));
-        CPPUNIT_ASSERT_EQUAL(Index(1001), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(7));
+        EXPECT_EQ(Index(1001), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:1000");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test1002"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test1002"));
     }
 
     { // insert using previous adjacent hint
         Index index = inserter.insert("test999", 999);
-        CPPUNIT_ASSERT_EQUAL(metadata.metaCount(), size_t(8));
-        CPPUNIT_ASSERT_EQUAL(Index(999), index);
+        EXPECT_EQ(metadata.metaCount(), size_t(8));
+        EXPECT_EQ(Index(999), index);
         StringMetadata::Ptr meta = metadata.getMetadata<StringMetadata>("string:998");
-        CPPUNIT_ASSERT(meta);
-        CPPUNIT_ASSERT_EQUAL(meta->value(), openvdb::Name("test999"));
+        EXPECT_TRUE(meta);
+        EXPECT_EQ(meta->value(), openvdb::Name("test999"));
     }
 }
 
 
-void
-TestAttributeArrayString::testStringAttribute()
+TEST_F(TestAttributeArrayString, testStringAttribute)
 {
     { // Typed class API
 
         const Index count = 50;
         StringAttributeArray attr(count);
 
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(isString(attr));
+        EXPECT_TRUE(!attr.isTransient());
+        EXPECT_TRUE(!attr.isHidden());
+        EXPECT_TRUE(isString(attr));
 
         attr.setTransient(true);
-        CPPUNIT_ASSERT(attr.isTransient());
-        CPPUNIT_ASSERT(!attr.isHidden());
-        CPPUNIT_ASSERT(isString(attr));
+        EXPECT_TRUE(attr.isTransient());
+        EXPECT_TRUE(!attr.isHidden());
+        EXPECT_TRUE(isString(attr));
 
         attr.setHidden(true);
-        CPPUNIT_ASSERT(attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(isString(attr));
+        EXPECT_TRUE(attr.isTransient());
+        EXPECT_TRUE(attr.isHidden());
+        EXPECT_TRUE(isString(attr));
 
         attr.setTransient(false);
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
-        CPPUNIT_ASSERT(isString(attr));
+        EXPECT_TRUE(!attr.isTransient());
+        EXPECT_TRUE(attr.isHidden());
+        EXPECT_TRUE(isString(attr));
 
         StringAttributeArray attrB(attr);
 
-        CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
-        CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-        CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-        CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-        CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(isString(attr), isString(attrB));
+        EXPECT_TRUE(matchingNamePairs(attr.type(), attrB.type()));
+        EXPECT_EQ(attr.size(), attrB.size());
+        EXPECT_EQ(attr.memUsage(), attrB.memUsage());
+        EXPECT_EQ(attr.isUniform(), attrB.isUniform());
+        EXPECT_EQ(attr.isTransient(), attrB.isTransient());
+        EXPECT_EQ(attr.isHidden(), attrB.isHidden());
+        EXPECT_EQ(isString(attr), isString(attrB));
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
         AttributeArray& baseAttr(attr);
-        CPPUNIT_ASSERT_EQUAL(Name(typeNameAsString<Index>()), baseAttr.valueType());
-        CPPUNIT_ASSERT_EQUAL(Name("str"), baseAttr.codecType());
-        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.valueTypeSize());
-        CPPUNIT_ASSERT_EQUAL(Index(4), baseAttr.storageTypeSize());
-        CPPUNIT_ASSERT(!baseAttr.valueTypeIsFloatingPoint());
+        EXPECT_EQ(Name(typeNameAsString<Index>()), baseAttr.valueType());
+        EXPECT_EQ(Name("str"), baseAttr.codecType());
+        EXPECT_EQ(Index(4), baseAttr.valueTypeSize());
+        EXPECT_EQ(Index(4), baseAttr.storageTypeSize());
+        EXPECT_TRUE(!baseAttr.valueTypeIsFloatingPoint());
 #endif
     }
 
@@ -322,103 +299,102 @@ TestAttributeArrayString::testStringAttribute()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrB.read(istr);
 
-        CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
-        CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-        CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
-        CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
-        CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
-        CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
-        CPPUNIT_ASSERT_EQUAL(isString(attrA), isString(attrB));
+        EXPECT_TRUE(matchingNamePairs(attrA.type(), attrB.type()));
+        EXPECT_EQ(attrA.size(), attrB.size());
+        EXPECT_EQ(attrA.memUsage(), attrB.memUsage());
+        EXPECT_EQ(attrA.isUniform(), attrB.isUniform());
+        EXPECT_EQ(attrA.isTransient(), attrB.isTransient());
+        EXPECT_EQ(attrA.isHidden(), attrB.isHidden());
+        EXPECT_EQ(isString(attrA), isString(attrB));
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+            EXPECT_EQ(attrA.get(i), attrB.get(i));
         }
     }
 }
 
 
-void
-TestAttributeArrayString::testStringAttributeHandle()
+TEST_F(TestAttributeArrayString, testStringAttributeHandle)
 {
     MetaMap metadata;
 
     StringAttributeArray attr(4);
     StringAttributeHandle handle(attr, metadata);
 
-    CPPUNIT_ASSERT_EQUAL(handle.size(), Index(4));
-    CPPUNIT_ASSERT_EQUAL(handle.size(), attr.size());
-    CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
-    CPPUNIT_ASSERT(handle.hasConstantStride());
+    EXPECT_EQ(handle.size(), Index(4));
+    EXPECT_EQ(handle.size(), attr.size());
+    EXPECT_EQ(Index(1), handle.stride());
+    EXPECT_TRUE(handle.hasConstantStride());
 
     { // index 0 should always be an empty string
         Name value = handle.get(0);
 
-        CPPUNIT_ASSERT_EQUAL(value, Name(""));
+        EXPECT_EQ(value, Name(""));
     }
 
     // set first element to 101
 
-    CPPUNIT_ASSERT(handle.isUniform());
+    EXPECT_TRUE(handle.isUniform());
 
     attr.set(2, 102);
 
-    CPPUNIT_ASSERT(!handle.isUniform());
+    EXPECT_TRUE(!handle.isUniform());
 
     { // index 101 does not exist as metadata is empty
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
-        CPPUNIT_ASSERT_THROW(handle.get(2), LookupError);
+        EXPECT_EQ(handle.get(0), Name(""));
+        EXPECT_THROW(handle.get(2), LookupError);
     }
 
     { // add an element to the metadata for 101
         metadata.insertMeta("string:101", StringMetadata("test101"));
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
 
-        CPPUNIT_ASSERT_NO_THROW(handle.get(2));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("test101"));
+        EXPECT_NO_THROW(handle.get(2));
+        EXPECT_EQ(handle.get(2), Name("test101"));
 
         Name name;
         handle.get(name, 2);
 
-        CPPUNIT_ASSERT_EQUAL(name, Name("test101"));
+        EXPECT_EQ(name, Name("test101"));
     }
 
     { // add a second element to the metadata
         metadata.insertMeta("string:102", StringMetadata("test102"));
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
 
-        CPPUNIT_ASSERT_NO_THROW(handle.get(2));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("test101"));
+        EXPECT_NO_THROW(handle.get(2));
+        EXPECT_EQ(handle.get(2), Name("test101"));
 
         Name name;
         handle.get(name, 2);
 
-        CPPUNIT_ASSERT_EQUAL(name, Name("test101"));
+        EXPECT_EQ(name, Name("test101"));
     }
 
     { // set two more values in the array
         attr.set(0, 103);
         attr.set(1, 103);
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("test102"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("test102"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("test101"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name(""));
+        EXPECT_EQ(handle.get(0), Name("test102"));
+        EXPECT_EQ(handle.get(1), Name("test102"));
+        EXPECT_EQ(handle.get(2), Name("test101"));
+        EXPECT_EQ(handle.get(3), Name(""));
     }
 
     { // change a value
         attr.set(1, 102);
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("test102"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("test101"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("test101"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name(""));
+        EXPECT_EQ(handle.get(0), Name("test102"));
+        EXPECT_EQ(handle.get(1), Name("test101"));
+        EXPECT_EQ(handle.get(2), Name("test101"));
+        EXPECT_EQ(handle.get(3), Name(""));
     }
 
     { // cannot use a StringAttributeHandle with a non-string attribute
         TypedAttributeArray<float> invalidAttr(50);
-        CPPUNIT_ASSERT_THROW(StringAttributeHandle(invalidAttr, metadata), TypeError);
+        EXPECT_THROW(StringAttributeHandle(invalidAttr, metadata), TypeError);
     }
 
     // Test stride and hasConstantStride methods for string handles
@@ -427,26 +403,25 @@ TestAttributeArrayString::testStringAttributeHandle()
         StringAttributeArray attr(3, 2, true);
         StringAttributeHandle handle(attr, metadata);
 
-        CPPUNIT_ASSERT_EQUAL(Index(3), handle.size());
-        CPPUNIT_ASSERT_EQUAL(handle.size(), attr.size());
-        CPPUNIT_ASSERT_EQUAL(Index(2), handle.stride());
-        CPPUNIT_ASSERT(handle.hasConstantStride());
+        EXPECT_EQ(Index(3), handle.size());
+        EXPECT_EQ(handle.size(), attr.size());
+        EXPECT_EQ(Index(2), handle.stride());
+        EXPECT_TRUE(handle.hasConstantStride());
     }
 
     {
         StringAttributeArray attr(4, 10, false);
         StringAttributeHandle handle(attr, metadata);
 
-        CPPUNIT_ASSERT_EQUAL(Index(10), handle.size());
-        CPPUNIT_ASSERT_EQUAL(Index(4), attr.size());
-        CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
-        CPPUNIT_ASSERT(!handle.hasConstantStride());
+        EXPECT_EQ(Index(10), handle.size());
+        EXPECT_EQ(Index(4), attr.size());
+        EXPECT_EQ(Index(1), handle.stride());
+        EXPECT_TRUE(!handle.hasConstantStride());
     }
 }
 
 
-void
-TestAttributeArrayString::testStringAttributeWriteHandle()
+TEST_F(TestAttributeArrayString, testStringAttributeWriteHandle)
 {
     MetaMap metadata;
 
@@ -460,108 +435,107 @@ TestAttributeArrayString::testStringAttributeWriteHandle()
     }
 
     { // no string values set
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(1), Name(""));
+        EXPECT_EQ(handle.get(2), Name(""));
+        EXPECT_EQ(handle.get(3), Name(""));
     }
 
     { // cache not reset since metadata changed
-        CPPUNIT_ASSERT_THROW(handle.set(1, "testB"), LookupError);
+        EXPECT_THROW(handle.set(1, "testB"), LookupError);
     }
 
     { // empty string always has index 0
-        CPPUNIT_ASSERT(handle.contains(""));
+        EXPECT_TRUE(handle.contains(""));
     }
 
     { // cache won't contain metadata until it has been reset
-        CPPUNIT_ASSERT(!handle.contains("testA"));
-        CPPUNIT_ASSERT(!handle.contains("testB"));
-        CPPUNIT_ASSERT(!handle.contains("testC"));
+        EXPECT_TRUE(!handle.contains("testA"));
+        EXPECT_TRUE(!handle.contains("testB"));
+        EXPECT_TRUE(!handle.contains("testC"));
     }
 
     handle.resetCache();
 
     { // empty string always has index 0 regardless of cache reset
-        CPPUNIT_ASSERT(handle.contains(""));
+        EXPECT_TRUE(handle.contains(""));
     }
 
     { // cache now reset
-        CPPUNIT_ASSERT(handle.contains("testA"));
-        CPPUNIT_ASSERT(handle.contains("testB"));
-        CPPUNIT_ASSERT(handle.contains("testC"));
+        EXPECT_TRUE(handle.contains("testA"));
+        EXPECT_TRUE(handle.contains("testB"));
+        EXPECT_TRUE(handle.contains("testC"));
 
-        CPPUNIT_ASSERT_NO_THROW(handle.set(1, "testB"));
+        EXPECT_NO_THROW(handle.set(1, "testB"));
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("testB"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(1), Name("testB"));
+        EXPECT_EQ(handle.get(2), Name(""));
+        EXPECT_EQ(handle.get(3), Name(""));
     }
 
     { // add another value
         handle.set(2, "testC");
 
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("testB"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("testC"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(1), Name("testB"));
+        EXPECT_EQ(handle.get(2), Name("testC"));
+        EXPECT_EQ(handle.get(3), Name(""));
     }
 
     handle.resetCache();
 
     { // compact tests
-        CPPUNIT_ASSERT(!handle.compact());
+        EXPECT_TRUE(!handle.compact());
         handle.set(0, "testA");
         handle.set(1, "testA");
         handle.set(2, "testA");
         handle.set(3, "testA");
-        CPPUNIT_ASSERT(handle.compact());
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.compact());
+        EXPECT_TRUE(handle.isUniform());
     }
 
     { // expand tests
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.isUniform());
         handle.expand();
-        CPPUNIT_ASSERT(!handle.isUniform());
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("testA"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("testA"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("testA"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name("testA"));
+        EXPECT_TRUE(!handle.isUniform());
+        EXPECT_EQ(handle.get(0), Name("testA"));
+        EXPECT_EQ(handle.get(1), Name("testA"));
+        EXPECT_EQ(handle.get(2), Name("testA"));
+        EXPECT_EQ(handle.get(3), Name("testA"));
     }
 
     { // fill tests
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
         handle.set(3, "testB");
         handle.fill("testC");
-        CPPUNIT_ASSERT(!handle.isUniform());
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("testC"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(1), Name("testC"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(2), Name("testC"));
-        CPPUNIT_ASSERT_EQUAL(handle.get(3), Name("testC"));
+        EXPECT_TRUE(!handle.isUniform());
+        EXPECT_EQ(handle.get(0), Name("testC"));
+        EXPECT_EQ(handle.get(1), Name("testC"));
+        EXPECT_EQ(handle.get(2), Name("testC"));
+        EXPECT_EQ(handle.get(3), Name("testC"));
     }
 
     { // collapse tests
         handle.set(2, "testB");
         handle.collapse("testA");
-        CPPUNIT_ASSERT(handle.isUniform());
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name("testA"));
+        EXPECT_TRUE(handle.isUniform());
+        EXPECT_EQ(handle.get(0), Name("testA"));
         handle.expand();
         handle.set(2, "testB");
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
         handle.collapse();
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
     }
 
     { // empty string tests
         handle.collapse("");
-        CPPUNIT_ASSERT_EQUAL(handle.get(0), Name(""));
+        EXPECT_EQ(handle.get(0), Name(""));
     }
 }
 
 
-void
-TestAttributeArrayString::testProfile()
+TEST_F(TestAttributeArrayString, testProfile)
 {
 #ifdef PROFILE
     struct Timer : public openvdb::util::CpuTimer {};

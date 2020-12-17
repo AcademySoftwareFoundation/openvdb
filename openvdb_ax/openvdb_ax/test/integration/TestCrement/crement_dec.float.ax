@@ -1,0 +1,7 @@
+
+float@test1 = --float@test2;
+float@test3 = float@test4--;
+float@test5 = (float@test6--, float@test7--, --float@test6);
+float@test8 = (--float@test6, --float@test7, float@test6--);
+--float@test9 = float@test9;
+

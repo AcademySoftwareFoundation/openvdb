@@ -5,7 +5,7 @@
 ///
 /// @author Peter Cucka
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tree/Tree.h>
 #include <map>
@@ -14,20 +14,11 @@
 #include <type_traits>
 
 
-class TestTreeVisitor: public CppUnit::TestCase
+class TestTreeVisitor: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestTreeVisitor);
-    CPPUNIT_TEST(testVisitTreeBool);
-    CPPUNIT_TEST(testVisitTreeInt32);
-    CPPUNIT_TEST(testVisitTreeFloat);
-    CPPUNIT_TEST(testVisitTreeVec2I);
-    CPPUNIT_TEST(testVisitTreeVec3S);
-    CPPUNIT_TEST(testVisit2Trees);
-    CPPUNIT_TEST_SUITE_END();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 
     void testVisitTreeBool() { visitTree<openvdb::BoolTree>(); }
     void testVisitTreeInt32() { visitTree<openvdb::Int32Tree>(); }
@@ -36,13 +27,10 @@ public:
     void testVisitTreeVec3S() { visitTree<openvdb::VectorTree>(); }
     void testVisit2Trees();
 
-private:
+protected:
     template<typename TreeT> TreeT createTestTree() const;
     template<typename TreeT> void visitTree();
 };
-
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestTreeVisitor);
 
 
 ////////////////////////////////////////
@@ -69,9 +57,9 @@ TestTreeVisitor::createTestTree() const
 
     // Verify that the bounding box of all On values is 200 x 200 x 200.
     openvdb::CoordBBox bbox;
-    CPPUNIT_ASSERT(tree.evalActiveVoxelBoundingBox(bbox));
-    CPPUNIT_ASSERT(bbox.min() == openvdb::Coord(0, 0, 0));
-    CPPUNIT_ASSERT(bbox.max() == openvdb::Coord(200, 200, 200));
+    EXPECT_TRUE(tree.evalActiveVoxelBoundingBox(bbox));
+    EXPECT_TRUE(bbox.min() == openvdb::Coord(0, 0, 0));
+    EXPECT_TRUE(bbox.max() == openvdb::Coord(200, 200, 200));
 
     return tree;
 }
@@ -103,7 +91,7 @@ public:
     bool operator()(IterT& iter)
     {
         incrementIterUseCount(std::is_const<typename IterT::NodeType>::value);
-        CPPUNIT_ASSERT(iter.getParentNode() != nullptr);
+        EXPECT_TRUE(iter.getParentNode() != nullptr);
 
         if (mSkipLeafNodes && iter.parent().getLevel() == 1) return true;
 
@@ -172,15 +160,17 @@ template<typename TreeT>
 void
 TestTreeVisitor::visitTree()
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
     TreeT tree = createTestTree<TreeT>();
     {
         // Traverse the tree, accumulating node counts.
         Visitor visitor;
         const_cast<const TreeT&>(tree).visit(visitor);
 
-        CPPUNIT_ASSERT(visitor.usedOnlyConstIterators());
-        CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.leafCount());
-        CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.nonLeafCount());
+        EXPECT_TRUE(visitor.usedOnlyConstIterators());
+        EXPECT_EQ(tree.leafCount(), visitor.leafCount());
+        EXPECT_EQ(tree.nonLeafCount(), visitor.nonLeafCount());
     }
     {
         // Traverse the tree, accumulating node counts as above,
@@ -188,9 +178,9 @@ TestTreeVisitor::visitTree()
         Visitor visitor;
         tree.visit(visitor);
 
-        CPPUNIT_ASSERT(visitor.usedOnlyNonConstIterators());
-        CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.leafCount());
-        CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.nonLeafCount());
+        EXPECT_TRUE(visitor.usedOnlyNonConstIterators());
+        EXPECT_EQ(tree.leafCount(), visitor.leafCount());
+        EXPECT_EQ(tree.nonLeafCount(), visitor.nonLeafCount());
     }
     {
         // Traverse the tree, accumulating counts of non-leaf nodes only.
@@ -198,10 +188,12 @@ TestTreeVisitor::visitTree()
         visitor.setSkipLeafNodes(true);
         const_cast<const TreeT&>(tree).visit(visitor);
 
-        CPPUNIT_ASSERT(visitor.usedOnlyConstIterators());
-        CPPUNIT_ASSERT_EQUAL(0U, visitor.leafCount()); // leaf nodes were skipped
-        CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.nonLeafCount());
+        EXPECT_TRUE(visitor.usedOnlyConstIterators());
+        EXPECT_EQ(0U, visitor.leafCount()); // leaf nodes were skipped
+        EXPECT_EQ(tree.nonLeafCount(), visitor.nonLeafCount());
     }
+
+    OPENVDB_NO_DEPRECATION_WARNING_END
 }
 
 
@@ -236,8 +228,8 @@ public:
     template<typename AIterT, typename BIterT>
     int operator()(AIterT& aIter, BIterT& bIter)
     {
-        CPPUNIT_ASSERT(aIter.getParentNode() != nullptr);
-        CPPUNIT_ASSERT(bIter.getParentNode() != nullptr);
+        EXPECT_TRUE(aIter.getParentNode() != nullptr);
+        EXPECT_TRUE(bIter.getParentNode() != nullptr);
 
         typename AIterT::NodeType& aNode = aIter.parent();
         typename BIterT::NodeType& bNode = bIter.parent();
@@ -277,9 +269,16 @@ private:
 } // unnamed namespace
 
 
-void
-TestTreeVisitor::testVisit2Trees()
+TEST_F(TestTreeVisitor, testVisitTreeBool) { visitTree<openvdb::BoolTree>(); }
+TEST_F(TestTreeVisitor, testVisitTreeInt32) { visitTree<openvdb::Int32Tree>(); }
+TEST_F(TestTreeVisitor, testVisitTreeFloat) { visitTree<openvdb::FloatTree>(); }
+TEST_F(TestTreeVisitor, testVisitTreeVec2I) { visitTree<openvdb::Vec2ITree>(); }
+TEST_F(TestTreeVisitor, testVisitTreeVec3S) { visitTree<openvdb::VectorTree>(); }
+
+TEST_F(TestTreeVisitor, testVisit2Trees)
 {
+    OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+
     using TreeT = openvdb::FloatTree;
     using Tree2T = openvdb::VectorTree;
     using ValueT = TreeT::ValueType;
@@ -293,11 +292,11 @@ TestTreeVisitor::testVisit2Trees()
     Visitor2 visitor;
     tree.visit2(tree2, visitor);
 
-    //CPPUNIT_ASSERT(visitor.usedOnlyConstIterators());
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.aLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), visitor.bLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.aNonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.bNonLeafCount());
+    //EXPECT_TRUE(visitor.usedOnlyConstIterators());
+    EXPECT_EQ(tree.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.bNonLeafCount());
 
     visitor.reset();
 
@@ -307,38 +306,40 @@ TestTreeVisitor::testVisit2Trees()
     // Traverse both trees.
     tree.visit2(tree2, visitor);
 
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.aLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), visitor.bLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.aNonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.bNonLeafCount());
+    EXPECT_EQ(tree.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.bNonLeafCount());
 
     visitor.reset();
 
     // Traverse the two trees in the opposite order.
     tree2.visit2(tree, visitor);
 
-    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), visitor.aLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.bLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.aNonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.bNonLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(tree.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.bNonLeafCount());
 
     // Repeat, skipping leaf nodes of tree2.
     visitor.reset();
     visitor.setSkipALeafNodes(true);
     tree2.visit2(tree, visitor);
 
-    CPPUNIT_ASSERT_EQUAL(0U, visitor.aLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), visitor.bLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.aNonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.bNonLeafCount());
+    EXPECT_EQ(0U, visitor.aLeafCount());
+    EXPECT_EQ(tree.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.bNonLeafCount());
 
     // Repeat, skipping leaf nodes of tree.
     visitor.reset();
     visitor.setSkipBLeafNodes(true);
     tree2.visit2(tree, visitor);
 
-    CPPUNIT_ASSERT_EQUAL(tree2.leafCount(), visitor.aLeafCount());
-    CPPUNIT_ASSERT_EQUAL(0U, visitor.bLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree2.nonLeafCount(), visitor.aNonLeafCount());
-    CPPUNIT_ASSERT_EQUAL(tree.nonLeafCount(), visitor.bNonLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(0U, visitor.bLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.bNonLeafCount());
+
+    OPENVDB_NO_DEPRECATION_WARNING_END
 }

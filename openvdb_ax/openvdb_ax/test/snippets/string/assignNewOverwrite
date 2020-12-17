@@ -1,0 +1,7 @@
+
+string value = "new_value";   // A value which shouldn't exist on the string attribute
+string@string_test1 = value;
+string@string_test2 = value;
+
+string@string_test1 = "next_value"; // re-assign the value to one of the strings
+

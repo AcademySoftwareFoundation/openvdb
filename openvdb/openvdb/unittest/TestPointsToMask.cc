@@ -5,23 +5,17 @@
 #include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/util/CpuTimer.h>
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <vector>
 #include <algorithm>
 #include <cmath>
 #include "util.h" // for genPoints
 
 
-struct TestPointsToMask: public CppUnit::TestCase
+struct TestPointsToMask: public ::testing::Test
 {
-    CPPUNIT_TEST_SUITE(TestPointsToMask);
-    CPPUNIT_TEST(testPointsToMask);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testPointsToMask();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointsToMask);
 
 ////////////////////////////////////////
 
@@ -46,8 +40,7 @@ protected:
 ////////////////////////////////////////
 
 
-void
-TestPointsToMask::testPointsToMask()
+TEST_F(TestPointsToMask, testPointsToMask)
 {
     {// BoolGrid
         // generate one point
@@ -60,18 +53,18 @@ TestPointsToMask::testPointsToMask()
         openvdb::BoolGrid grid( false );
         const float voxelSize = 0.1f;
         grid.setTransform( openvdb::math::Transform::createLinearTransform(voxelSize) );
-        CPPUNIT_ASSERT( grid.empty() );
+        EXPECT_TRUE( grid.empty() );
 
         // generate mask from points
         openvdb::tools::PointsToMask<openvdb::BoolGrid> mask( grid );
         mask.addPoints( pointList );
-        CPPUNIT_ASSERT(!grid.empty() );
-        CPPUNIT_ASSERT_EQUAL( 1, int(grid.activeVoxelCount()) );
+        EXPECT_TRUE(!grid.empty() );
+        EXPECT_EQ( 1, int(grid.activeVoxelCount()) );
         openvdb::BoolGrid::ValueOnCIter iter = grid.cbeginValueOn();
         //std::cerr << "Coord = " << iter.getCoord() << std::endl;
         const openvdb::Coord p(-200, 45, 67);
-        CPPUNIT_ASSERT( iter.getCoord() == p );
-        CPPUNIT_ASSERT(grid.tree().isValueOn( p ) );
+        EXPECT_TRUE( iter.getCoord() == p );
+        EXPECT_TRUE(grid.tree().isValueOn( p ) );
     }
 
     {// MaskGrid
@@ -85,18 +78,18 @@ TestPointsToMask::testPointsToMask()
         openvdb::MaskGrid grid( false );
         const float voxelSize = 0.1f;
         grid.setTransform( openvdb::math::Transform::createLinearTransform(voxelSize) );
-        CPPUNIT_ASSERT( grid.empty() );
+        EXPECT_TRUE( grid.empty() );
 
         // generate mask from points
         openvdb::tools::PointsToMask<> mask( grid );
         mask.addPoints( pointList );
-        CPPUNIT_ASSERT(!grid.empty() );
-        CPPUNIT_ASSERT_EQUAL( 1, int(grid.activeVoxelCount()) );
+        EXPECT_TRUE(!grid.empty() );
+        EXPECT_EQ( 1, int(grid.activeVoxelCount()) );
         openvdb::TopologyGrid::ValueOnCIter iter = grid.cbeginValueOn();
         //std::cerr << "Coord = " << iter.getCoord() << std::endl;
         const openvdb::Coord p(-200, 45, 67);
-        CPPUNIT_ASSERT( iter.getCoord() == p );
-        CPPUNIT_ASSERT(grid.tree().isValueOn( p ) );
+        EXPECT_TRUE( iter.getCoord() == p );
+        EXPECT_TRUE(grid.tree().isValueOn( p ) );
     }
 
 
@@ -116,7 +109,7 @@ TestPointsToMask::testPointsToMask()
         // construct an empty mask grid
         openvdb::BoolGrid grid( false );
         grid.setTransform( xform );
-        CPPUNIT_ASSERT( grid.empty() );
+        EXPECT_TRUE( grid.empty() );
 
         // generate mask from points
         openvdb::tools::PointsToMask<openvdb::BoolGrid> mask( grid );
@@ -124,7 +117,7 @@ TestPointsToMask::testPointsToMask()
         mask.addPoints( pointList, 0 );
         //timer.stop();
 
-        CPPUNIT_ASSERT(!grid.empty() );
+        EXPECT_TRUE(!grid.empty() );
         //grid.print(std::cerr, 3);
         voxelCount = grid.activeVoxelCount();
     }
@@ -132,7 +125,7 @@ TestPointsToMask::testPointsToMask()
         // construct an empty mask grid
         openvdb::BoolGrid grid( false );
         grid.setTransform( xform );
-        CPPUNIT_ASSERT( grid.empty() );
+        EXPECT_TRUE( grid.empty() );
 
         // generate mask from points
         openvdb::tools::PointsToMask<openvdb::BoolGrid> mask( grid );
@@ -140,15 +133,15 @@ TestPointsToMask::testPointsToMask()
         mask.addPoints( pointList );
         //timer.stop();
 
-        CPPUNIT_ASSERT(!grid.empty() );
+        EXPECT_TRUE(!grid.empty() );
         //grid.print(std::cerr, 3);
-        CPPUNIT_ASSERT_EQUAL( voxelCount, grid.activeVoxelCount() );
+        EXPECT_EQ( voxelCount, grid.activeVoxelCount() );
     }
     {// parallel MaskGrid
         // construct an empty mask grid
         openvdb::MaskGrid grid( false );
         grid.setTransform( xform );
-        CPPUNIT_ASSERT( grid.empty() );
+        EXPECT_TRUE( grid.empty() );
 
         // generate mask from points
         openvdb::tools::PointsToMask<> mask( grid );
@@ -156,17 +149,17 @@ TestPointsToMask::testPointsToMask()
         mask.addPoints( pointList );
         //timer.stop();
 
-        CPPUNIT_ASSERT(!grid.empty() );
+        EXPECT_TRUE(!grid.empty() );
         //grid.print(std::cerr, 3);
-        CPPUNIT_ASSERT_EQUAL( voxelCount, grid.activeVoxelCount() );
+        EXPECT_EQ( voxelCount, grid.activeVoxelCount() );
     }
     {// parallel create TopologyGrid
         //timer.start("\nParallel Create MaskGrid");
         openvdb::MaskGrid::Ptr grid = openvdb::tools::createPointMask(pointList, *xform);
         //timer.stop();
 
-        CPPUNIT_ASSERT(!grid->empty() );
+        EXPECT_TRUE(!grid->empty() );
         //grid->print(std::cerr, 3);
-        CPPUNIT_ASSERT_EQUAL( voxelCount, grid->activeVoxelCount() );
+        EXPECT_EQ( voxelCount, grid->activeVoxelCount() );
     }
 }

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointConversion.h>
@@ -13,26 +13,15 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestPointMask: public CppUnit::TestCase
+class TestPointMask: public ::testing::Test
 {
 public:
-
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestPointMask);
-    CPPUNIT_TEST(testMask);
-    CPPUNIT_TEST(testMaskDeformer);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testMask();
-    void testMaskDeformer();
-
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 }; // class TestPointMask
 
 
-void
-TestPointMask::testMask()
+TEST_F(TestPointMask, testMask)
 {
     std::vector<Vec3s> positions =  {
                                         {1, 1, 1},
@@ -57,22 +46,22 @@ TestPointMask::testMask()
     { // simple topology copy
         auto mask = convertPointsToMask(*points);
 
-        CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
     }
 
     { // mask grid instead of bool grid
         auto mask = convertPointsToMask<PointDataGrid, MaskGrid>(*points);
 
-        CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
     }
 
     { // identical transform
         auto mask = convertPointsToMask(*points, *transform);
 
-        CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
     }
 
     // assign point 3 to new group "test"
@@ -91,14 +80,14 @@ TestPointMask::testMask()
             points->tree().cbeginLeaf()->attributeSet());
         auto mask = convertPointsToMask(*points, filter);
 
-        CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(1));
+        EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(1));
 
         MultiGroupFilter filter2(excludeGroups, includeGroups,
             points->tree().cbeginLeaf()->attributeSet());
         mask = convertPointsToMask(*points, filter2);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(3));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(3));
     }
 
     { // use a much larger voxel size that splits the points into two regions
@@ -108,19 +97,19 @@ TestPointMask::testMask()
 
         auto mask = convertPointsToMask(*points, *newTransform);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(2));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(2));
 
         MultiGroupFilter filter(includeGroups, excludeGroups,
             points->tree().cbeginLeaf()->attributeSet());
         mask = convertPointsToMask(*points, *newTransform, filter);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(1));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(1));
 
         MultiGroupFilter filter2(excludeGroups, includeGroups,
             points->tree().cbeginLeaf()->attributeSet());
         mask = convertPointsToMask(*points, *newTransform, filter2);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(2));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(2));
     }
 }
 
@@ -176,8 +165,7 @@ struct DeformerTraits<YOffsetDeformer<false>> {
 } // namespace openvdb
 
 
-void
-TestPointMask::testMaskDeformer()
+TEST_F(TestPointMask, testMaskDeformer)
 {
     // This test validates internal functionality that is used in various applications, such as
     // building masks and producing count grids. Note that by convention, methods that live
@@ -222,10 +210,10 @@ TestPointMask::testMaskDeformer()
 
         auto mask2 = convertPointsToMask(*points);
 
-        CPPUNIT_ASSERT_EQUAL(points->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT(mask->tree().hasSameTopology(mask2->tree()));
-        CPPUNIT_ASSERT(mask->tree().hasSameTopology(points->tree()));
+        EXPECT_EQ(points->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
+        EXPECT_TRUE(mask->tree().hasSameTopology(mask2->tree()));
+        EXPECT_TRUE(mask->tree().hasSameTopology(points->tree()));
     }
 
     { // static voxel deformer
@@ -235,9 +223,9 @@ TestPointMask::testMaskDeformer()
         auto mask = point_mask_internal::convertPointsToScalar<MaskGrid>(
             *points, *transform, nullFilter, deformer);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(1));
-        CPPUNIT_ASSERT(!mask->tree().cbeginLeaf()->isValueOn(Coord(9, 13, 105)));
-        CPPUNIT_ASSERT(mask->tree().cbeginLeaf()->isValueOn(Coord(9, 13, 106)));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(1));
+        EXPECT_TRUE(!mask->tree().cbeginLeaf()->isValueOn(Coord(9, 13, 105)));
+        EXPECT_TRUE(mask->tree().cbeginLeaf()->isValueOn(Coord(9, 13, 106)));
     }
 
     { // +y offset deformer
@@ -253,8 +241,8 @@ TestPointMask::testMaskDeformer()
         auto maskWS = point_mask_internal::convertPointsToScalar<MaskGrid>(
             *points, *transform, nullFilter, deformerWS);
 
-        CPPUNIT_ASSERT_EQUAL(mask->tree().activeVoxelCount(), Index64(4));
-        CPPUNIT_ASSERT_EQUAL(maskWS->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(maskWS->tree().activeVoxelCount(), Index64(4));
 
         std::vector<Coord> maskVoxels;
         std::vector<Coord> maskVoxelsWS;
@@ -282,17 +270,17 @@ TestPointMask::testMaskDeformer()
         std::sort(maskVoxelsWS.begin(), maskVoxelsWS.end());
         std::sort(pointVoxels.begin(), pointVoxels.end());
 
-        CPPUNIT_ASSERT_EQUAL(maskVoxels.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(maskVoxelsWS.size(), size_t(4));
-        CPPUNIT_ASSERT_EQUAL(pointVoxels.size(), size_t(4));
+        EXPECT_EQ(maskVoxels.size(), size_t(4));
+        EXPECT_EQ(maskVoxelsWS.size(), size_t(4));
+        EXPECT_EQ(pointVoxels.size(), size_t(4));
 
         for (int i = 0; i < int(pointVoxels.size()); i++) {
             Coord newCoord(pointVoxels[i]);
             newCoord.x() = static_cast<Int32>(newCoord.x() + offset.x());
             newCoord.y() = static_cast<Int32>(math::Round(newCoord.y() + offset.y()));
             newCoord.z() = static_cast<Int32>(newCoord.z() + offset.z());
-            CPPUNIT_ASSERT_EQUAL(maskVoxels[i], newCoord);
-            CPPUNIT_ASSERT_EQUAL(maskVoxelsWS[i], newCoord);
+            EXPECT_EQ(maskVoxels[i], newCoord);
+            EXPECT_EQ(maskVoxelsWS[i], newCoord);
         }
 
         // use a different transform to verify deformers and transforms can be used together
@@ -304,7 +292,7 @@ TestPointMask::testMaskDeformer()
         auto mask2 = point_mask_internal::convertPointsToScalar<MaskGrid>(
             *points, *newTransform, nullFilter, deformer);
 
-        CPPUNIT_ASSERT_EQUAL(mask2->tree().activeVoxelCount(), Index64(4));
+        EXPECT_EQ(mask2->tree().activeVoxelCount(), Index64(4));
 
         std::vector<Coord> maskVoxels2;
 
@@ -321,7 +309,7 @@ TestPointMask::testMaskDeformer()
             newCoord.x() = static_cast<Int32>((newCoord.x() + offset.x()) * 5);
             newCoord.y() = static_cast<Int32>(math::Round((newCoord.y() + offset.y()) * 5));
             newCoord.z() = static_cast<Int32>((newCoord.z() + offset.z()) * 5);
-            CPPUNIT_ASSERT_EQUAL(maskVoxels2[i], newCoord);
+            EXPECT_EQ(maskVoxels2[i], newCoord);
         }
 
         // only use points in group "test"
@@ -334,7 +322,7 @@ TestPointMask::testMaskDeformer()
         auto mask3 = point_mask_internal::convertPointsToScalar<MaskGrid>(
             *points, *transform, filter, deformer);
 
-        CPPUNIT_ASSERT_EQUAL(mask3->tree().activeVoxelCount(), Index64(1));
+        EXPECT_EQ(mask3->tree().activeVoxelCount(), Index64(1));
 
         for (auto leaf = mask3->tree().cbeginLeaf(); leaf; ++leaf) {
             for (auto iter = leaf->cbeginValueOn(); iter; ++iter) {
@@ -342,11 +330,8 @@ TestPointMask::testMaskDeformer()
                 newCoord.x() = static_cast<Int32>(newCoord.x() + offset.x());
                 newCoord.y() = static_cast<Int32>(math::Round(newCoord.y() + offset.y()));
                 newCoord.z() = static_cast<Int32>(newCoord.z() + offset.z());
-                CPPUNIT_ASSERT_EQUAL(iter.getCoord(), newCoord);
+                EXPECT_EQ(iter.getCoord(), newCoord);
             }
         }
     }
 }
-
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointMask);

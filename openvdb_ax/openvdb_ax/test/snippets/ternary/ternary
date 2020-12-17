@@ -1,0 +1,45 @@
+
+bool@ternary_test1 = true ? true : false;
+bool@ternary_test2 = false ? false : true;
+int@ternary_test3 = true ? 3 : 2 ? 1 : 0;
+int@ternary_test4 = (true ? 3 : 2) ? 1 : 0;
+int@ternary_test5 = true ? false ? 3 : 2 : true ? 3 : 2;
+float@ternary_test6 = 1 > 0 ? 10.f : 5.f;
+double@ternary_test7 = true ? 0.75 : 3s;
+vec3i@ternary_test8 = true ? {1,2,3} : {4,5,6};
+vec3d@ternary_test9 = false ? {1,2,3} : {4.5,5.5,6.5};
+int@ternary_test10 = true ? : 123;
+int@ternary_test11 = false ? : 123;
+
+// variable loading
+int a = 2;
+int@ternary_test12 = a ? : 123;
+int@ternary_test13 = a ? a : 123;
+int@ternary_test14 = a ? 123 : a;
+float@ternary_test15 = a ? a : 1.5f;
+float@ternary_test16 = a ? 1.5f : a;
+
+vec3i vec = {1,2,3};
+vec3i@ternary_test17 = true ? vec : {4,5,6};
+vec3i@ternary_test18 = true ? {4,5,6} : vec;
+
+string@ternary_test19 = true ? "foo" : "bar";
+string fooStr = "foo";
+string@ternary_test20 = true ? fooStr : "bar";
+string@ternary_test21 = true ? "bar" : fooStr;
+
+// array extension/casting
+vec3f@ternary_test22 = true ? 1.5f : {1,2,3};
+vec3f@ternary_test23 = false ? {1,2,3} : 1.6f;
+mat3d@ternary_test24 = true ? 1.8 : {1,2,3,4,5,6,7,8,9};
+mat3d@ternary_test25 = false ? {1,2,3,4,5,6,7,8,9} : 1.9;
+mat4d@ternary_test26 = true ? 1.8 : {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16};
+mat4d@ternary_test27 = false ? {1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16} : 1.9;
+
+float c = 1.76f;
+vec3f@ternary_test28 = true ? c : {1,2,3};
+vec3f@ternary_test29 = false ? {1,2,3} : c;
+float@ternary_test30 = length(true ? 1.3f : {1,2,3});
+float@ternary_test31 = length(false ? {1,2,3} : 1.3f);
+float@ternary_test32 = length(true ? {1.5f,2.5f,3.5f} : 1);
+float@ternary_test33 = length(false ? 1 : {1.5f,2.5f,3.5f});

@@ -1,0 +1,6 @@
+int@return_test1 = 1;
+return;
+
+int@return_test1 = 1000;
+if (1 != 0) int@return_test1 = 3;
+else        int@return_test1 = 5;

@@ -1,0 +1,30 @@
+
+mat3d inputd = {
+    1.0, -1.0, 0.0,
+    2.0, 2.0, 0.0,
+    0.0, 0.0, -1.0
+};
+
+mat3d ud,vd;
+vec3d sigmad;
+svd(inputd, ud, sigmad, vd);
+
+mat3f inputf = {
+    1.0f, -1.0f, 0.0f,
+    2.0f, 2.0f, 0.0f,
+    0.0f, 0.0f, -1.0f
+};
+
+mat3f uf,vf;
+vec3f sigmaf;
+svd(inputf, uf, sigmaf, vf);
+
+mat3d@test1 = ud;
+mat3d@test2 = vd;
+
+mat3f@test3 = uf;
+mat3f@test4 = vf;
+
+vec3d@test5 = sigmad;
+vec3f@test6 = sigmaf;
+
