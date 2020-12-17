@@ -35,21 +35,17 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2018', abi: '5', build: 'Release',     test: 'ON'  }
           - { cxx: clang++, image: '2019', abi: '6', build: 'Release',     test: 'ON'  }
           - { cxx: clang++, image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2021', abi: '7', build: 'Release',     test: 'ON'  } # @todo, bump to abi 8
-          - { cxx: clang++, image: '2020', abi: '7', build: 'DebugNoInfo', test: 'OFF' } # tests take too long..
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'DebugNoInfo', test: 'OFF' } # tests take too long..
           - { cxx: g++,     image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: g++,     image: '2021', abi: '7', build: 'Release',     test: 'ON'  } # @todo, bump to abi 8
+          - { cxx: g++,     image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.8.0
-    - name: install_cmake
-      if: matrix.config.image == '2018'
-      run: ./ci/install_cmake.sh 3.12.0
     - name: build
       run: ./ci/build.sh ${{ matrix.config.build }} ${{ matrix.config.abi }} ON None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
@@ -68,17 +64,15 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2018', hou: '17_5', build: 'Release', extras: 'ON'  }
-          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON'  }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON'  }
-          - { cxx: clang++, image: '2019', hou: '18_5', build: 'Debug',   extras: 'OFF' }
-          - { cxx: g++,     image: '2019', hou: '18_5', build: 'Release', extras: 'OFF' }
+          # disable dependency version checks for H18.0 as it ships with OpenEXR 2.2,
+          # not OpenEXR 2.3 as stated in the VFX Reference Platform 2019
+          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
+          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
-    - name: install_cmake
-      if: matrix.config.image == '2018'
-      run: ./ci/install_cmake.sh 3.12.0
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
@@ -93,37 +87,37 @@ jobs:
     - name: houdini
       run: ./ci/install_houdini.sh
     - name: build
-      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }}
+      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
     - name: test
       run: ./ci/test.sh
 
-  testabi7lite:
+  testabi8lite:
     runs-on: ubuntu-16.04
     env:
       CXX: clang++
     container:
-      image: aswf/ci-openvdb:2020
+      image: aswf/ci-openvdb:2021
     steps:
     - uses: actions/checkout@v1
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build.sh Release 7 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
+      run: ./ci/build.sh Release 8 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_ZLIB=OFF
     - name: test
       run: ./ci/test.sh
 
-  testabi7sse:
+  testabi8sse:
     runs-on: ubuntu-16.04
     env:
       CXX: clang++
     container:
-      image: aswf/ci-openvdb:2020
+      image: aswf/ci-openvdb:2021
     steps:
     - uses: actions/checkout@v1
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build.sh Release 7 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
+      run: ./ci/build.sh Release 8 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
       run: ./ci/test.sh
 
@@ -199,7 +193,7 @@ jobs:
       shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to
       # the version of clang installed
-      run: ./ci/build.sh Release 7 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=OFF
+      run: ./ci/build.sh Release 8 ON SSE42 "core,python,bin,test" -DOPENVDB_CXX_STRICT=OFF
     - name: test
       shell: bash
       run: ./ci/test.sh

@@ -9,26 +9,12 @@
 #define OPENVDB_PYGRID_HAS_BEEN_INCLUDED
 
 #include <boost/python.hpp>
-#ifndef DWA_BOOST_VERSION
-#include <boost/version.hpp>
-#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
-#endif
 #ifdef PY_OPENVDB_USE_NUMPY
-  #if DWA_BOOST_VERSION >= 1065000
-    // boost::python::numeric was replaced with boost::python::numpy in Boost 1.65.
-    // (boost::python::numpy requires NumPy 1.7 or later.)
-    #include <boost/python/numpy.hpp>
-    //#include <arrayobject.h> // for PyArray_Descr (see pyGrid::arrayTypeId())
-    #define PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-  #else
-    #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
-    #define NO_IMPORT_ARRAY // NumPy gets initialized during module initialization
-    #include <numpyconfig.h>
-    #ifdef NPY_1_7_API_VERSION
-      #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-    #endif
-    #include <arrayobject.h> // for PyArrayObject
-  #endif
+// boost::python::numeric was replaced with boost::python::numpy in Boost 1.65.
+// (boost::python::numpy requires NumPy 1.7 or later.)
+#include <boost/python/numpy.hpp>
+//#include <arrayobject.h> // for PyArray_Descr (see pyGrid::arrayTypeId())
+#define PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
   #include "openvdb/tools/MeshToVolume.h"
   #include "openvdb/tools/VolumeToMesh.h" // for tools::volumeToMesh()
 #endif

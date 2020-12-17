@@ -2,6 +2,24 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 8.0.0</B> - <I>In development</I>
+
+@par
+<BLOCKQUOTE>
+This version introduces ABI changes relative to older major releases, so to
+preserve ABI compatibility it might be necessary to define the macro
+<TT>OPENVDB_ABI_VERSION_NUMBER=</TT><I>N</I>, where, for example,
+<I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
+</BLOCKQUOTE>
+
+@par
+Build:
+- As of this release, VFX Reference Platform 2018 is no longer supported.
+  CMake now issues deprecation warnings for 2019 VFX Reference Platform
+  version dependencies.
+
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.2.0</B> - <I>December 9, 2020</I>
