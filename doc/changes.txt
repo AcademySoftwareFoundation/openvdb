@@ -14,11 +14,19 @@ preserve ABI compatibility it might be necessary to define the macro
 <I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
 </BLOCKQUOTE>
 
+@anchor v8_0_0_ABI_changes
+@par
+ABI changes:
+- @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
+  of ABI=8 so that it can be accessed from the GridBase.
+
 @par
 Build:
 - As of this release, VFX Reference Platform 2018 is no longer supported.
   CMake now issues deprecation warnings for 2019 VFX Reference Platform
   version dependencies.
+- Added a missing header include to resolve an undefined size_t build error
+  on GCC10.
 
 @par
 New features:

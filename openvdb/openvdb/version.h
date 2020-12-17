@@ -43,6 +43,7 @@
 #define OPENVDB_VERSION_HAS_BEEN_INCLUDED
 
 #include "Platform.h"
+#include <cstddef> // size_t
 #include <cstdint> // uint32_t
 
 

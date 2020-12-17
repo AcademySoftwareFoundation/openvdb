@@ -184,6 +184,16 @@ TEST_F(TestGrid, testIsTreeUnique)
     // copy with new tree
     GridBase::Ptr grid3 = grid->copyGridWithNewTree();
     EXPECT_TRUE(grid->isTreeUnique());
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    // shallow copy using GridBase
+    GridBase::Ptr grid4 = grid->copyGrid();
+    EXPECT_TRUE(!grid4->isTreeUnique());
+
+    // copy with new tree using GridBase
+    GridBase::Ptr grid5 = grid->copyGridWithNewTree();
+    EXPECT_TRUE(grid5->isTreeUnique());
+#endif
 }
 
 

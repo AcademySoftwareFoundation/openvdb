@@ -121,6 +121,40 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
+  testabi8gcc10:
+    runs-on: ubuntu-20.04
+    env:
+      CXX: g++-10
+    steps:
+    - uses: actions/checkout@v1
+    - name: install_boost
+      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
+    - name: install_tbb
+      run: sudo apt-get -q install -y libtbb-dev
+    - name: install_gtest
+      run: sudo apt-get -q install -y libgtest-dev
+    - name: build
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+    - name: test
+      run: ./ci/test.sh
+
+  testabi8clang10:
+    runs-on: ubuntu-20.04
+    env:
+      CXX: clang++-10
+    steps:
+    - uses: actions/checkout@v1
+    - name: install_boost
+      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
+    - name: install_tbb
+      run: sudo apt-get -q install -y libtbb-dev
+    - name: install_gtest
+      run: sudo apt-get -q install -y libgtest-dev
+    - name: build
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+    - name: test
+      run: ./ci/test.sh
+
   testwindows2019md:
     runs-on: windows-2019
     env:
