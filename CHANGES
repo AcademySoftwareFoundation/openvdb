@@ -27,6 +27,8 @@ Version 8.0.0 - In development
     - Added tools::activeTiles that returns a vector containing all the active
       tiles in a tree that intersects a given CoordBBox.
 
+    Improvements:
+    - Made LeafManager class non-virtual.
 
 Version 7.2.0 - December 9, 2020
 
