@@ -14,6 +14,13 @@ Version 8.0.0 - In development
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
       version dependencies.
 
+    New features:
+    - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
+      if respectively active voxels or tiles in a tree intersect a given
+      CoordBBox.
+    - Added tools::activeTiles that returns a vector containing all the active
+      tiles in a tree that intersects a given CoordBBox.
+
 
 Version 7.2.0 - December 9, 2020
 
