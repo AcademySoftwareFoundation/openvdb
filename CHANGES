@@ -13,6 +13,8 @@ Version 8.0.0 - In development
     - As of this release, VFX Reference Platform 2018 is no longer supported.
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
       version dependencies.
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
