@@ -299,6 +299,8 @@ TestGridTransformer::testDecomposition()
                                     outM.setTranslation(outT);
                                     CPPUNIT_ASSERT(outM.eq(m));
                                 }
+                                tools::GridTransformer transformer(m);
+                                CPPUNIT_ASSERT(transformer.getTransform().eq(m));
                             }
                         }
                     }
