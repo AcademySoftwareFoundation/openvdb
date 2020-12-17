@@ -56,6 +56,51 @@ TEST_F(TestFindActiveValues, testBasic)
     const openvdb::CoordBBox bbox(min[0], min[1], min[2],
                                   max[0], max[1], max[2]);
 
+    EXPECT_TRUE( openvdb::tools::noActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveVoxels(tree, bbox));
+
+    tree.setValue(min.offsetBy(-1), 1.0f);
+    EXPECT_TRUE( openvdb::tools::noActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveVoxels(tree, bbox));
+
+    tree.setValue(max.offsetBy( 1), 1.0f);
+    EXPECT_TRUE( openvdb::tools::noActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveVoxels(tree, bbox));
+
+    tree.setValue(min, 1.0f);
+    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(openvdb::tools::anyActiveVoxels(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveTiles(tree, bbox));
+
+    tree.setValue(max, 1.0f);
+    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(openvdb::tools::anyActiveVoxels(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveTiles(tree, bbox));
+    auto tiles = openvdb::tools::activeTiles(tree, bbox);
+    EXPECT_TRUE( tiles.size() == 0u );
+
+    tree.sparseFill(bbox, 1.0f);
+    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(openvdb::tools::anyActiveVoxels(tree, bbox));
+    EXPECT_TRUE(openvdb::tools::anyActiveTiles( tree, bbox));
+    tiles = openvdb::tools::activeTiles(tree, bbox);
+    EXPECT_TRUE( tiles.size() != 0u );
+    for (auto &t : tiles) {
+        EXPECT_TRUE( t.level == 1);
+        EXPECT_TRUE( t.bbox.volume() == openvdb::math::Pow3(uint64_t(8)) );
+        //std::cerr << "bbox = " << t.bbox << ", level = " << t.level << std::endl;
+    }
+
+    tree.denseFill(bbox, 1.0f);
+    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
+    EXPECT_TRUE(openvdb::tools::anyActiveVoxels(tree, bbox));
+    EXPECT_TRUE(!openvdb::tools::anyActiveTiles(tree, bbox));
+    tiles = openvdb::tools::activeTiles(tree, bbox);
+    EXPECT_TRUE( tiles.size() == 0u );
+/*
     EXPECT_TRUE(openvdb::tools::noActiveValues(tree, bbox));
 
     tree.setValue(min.offsetBy(-1), 1.0f);
@@ -66,6 +111,7 @@ TEST_F(TestFindActiveValues, testBasic)
     EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
     tree.setValue(max, 1.0f);
     EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
+*/
 }
 
 TEST_F(TestFindActiveValues, testSphere1)
@@ -93,6 +139,10 @@ TEST_F(TestFindActiveValues, testSphere1)
 
     const openvdb::CoordBBox e(openvdb::Coord(0), openvdb::Coord(dim));
     EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, e));
+    EXPECT_TRUE(!openvdb::tools::anyActiveTiles(tree, e));
+
+    auto tiles = openvdb::tools::activeTiles(tree, e);
+    EXPECT_TRUE( tiles.size() == 0u );
 }
 
 TEST_F(TestFindActiveValues, testSphere2)
@@ -132,7 +182,7 @@ TEST_F(TestFindActiveValues, testSphere2)
         auto bbox = openvdb::CoordBBox::createCube(openvdb::Coord(0), 1);
         //openvdb::util::CpuTimer timer("\nInscribed cube (class)");
         int count = 0;
-        while(op.none(bbox)) {
+        while(op.noActiveValues(bbox)) {
             ++count;
             bbox.expand(1);
         }
@@ -166,17 +216,20 @@ TEST_F(TestFindActiveValues, testSparseBox)
 {
     {//test active tiles in a sparsely filled box
         const int half_dim = 256;
-        const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim));
+        const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim-1));
         openvdb::FloatTree tree;
         EXPECT_TRUE(tree.activeTileCount() == 0);
         EXPECT_TRUE(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
+
         tree.sparseFill(bbox, 1.0f, true);
+
         op.update(tree);//tree was modified so op needs to be updated
         EXPECT_TRUE(tree.activeTileCount() > 0);
         EXPECT_TRUE(tree.getValueDepth(openvdb::Coord(0)) == 1);//upper internal tile value
         for (int i=1; i<half_dim; ++i) {
-            EXPECT_TRUE(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+            EXPECT_TRUE( op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
+            EXPECT_TRUE(!op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
         }
         EXPECT_TRUE(op.count(bbox) == bbox.volume());
 
@@ -185,15 +238,32 @@ TEST_F(TestFindActiveValues, testSparseBox)
         //openvdb::util::CpuTimer timer;
         for (bool test = true; test; ) {
             //timer.restart();
-            test = op.any(bbox2);
+            test = op.anyActiveValues(bbox2);
             //t = std::max(t, timer.restart());
             if (test) bbox2.translate(openvdb::Coord(1));
         }
         //std::cerr << "bbox = " << bbox2 << std::endl;
         //openvdb::util::printTime(std::cout, t, "The slowest sparse test ", "\n", true, 4, 3);
-        EXPECT_TRUE(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
+        EXPECT_TRUE(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim), 1));
+
+        EXPECT_TRUE( openvdb::tools::anyActiveTiles(tree, bbox) );
+
+        auto tiles = openvdb::tools::activeTiles(tree, bbox);
+        EXPECT_TRUE( tiles.size() == openvdb::math::Pow3(size_t(4)) ); // {-256, -129} -> {-128, 0} -> {0, 127} -> {128, 255}
+        //std::cerr << "bbox " << bbox << " overlaps with " << tiles.size() << " active tiles " << std::endl;
+        openvdb::CoordBBox tmp;
+        for (auto &t : tiles) {
+            EXPECT_TRUE( t.state );
+            EXPECT_TRUE( t.level == 2);// tiles at level 1 are 8^3, at level 2 they are 128^3, and at level 3 they are 4096^3
+            EXPECT_TRUE( t.value == 1.0f);
+            EXPECT_TRUE( t.bbox.volume() == openvdb::math::Pow3(openvdb::Index64(128)) );
+            tmp.expand( t.bbox );
+            //std::cerr << t.bbox << std::endl;
+        }
+        //std::cerr << tmp << std::endl;
+        EXPECT_TRUE( tmp == bbox );// uniion of all the active tiles should equal the bbox of the sparseFill operation!
     }
-}
+}// testSparseBox
 
 TEST_F(TestFindActiveValues, testDenseBox)
 {
@@ -201,14 +271,19 @@ TEST_F(TestFindActiveValues, testDenseBox)
       const int half_dim = 256;
       const openvdb::CoordBBox bbox(openvdb::Coord(-half_dim), openvdb::Coord(half_dim));
       openvdb::FloatTree tree;
+
       EXPECT_TRUE(tree.activeTileCount() == 0);
       EXPECT_TRUE(tree.getValueDepth(openvdb::Coord(0)) == -1);//background value
+
       tree.denseFill(bbox, 1.0f, true);
+
       EXPECT_TRUE(tree.activeTileCount() == 0);
+
       openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
       EXPECT_TRUE(tree.getValueDepth(openvdb::Coord(0)) == 3);// leaf value
       for (int i=1; i<half_dim; ++i) {
-          EXPECT_TRUE(op.any(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
+          EXPECT_TRUE(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
+          EXPECT_TRUE(op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
       }
       EXPECT_TRUE(op.count(bbox) == bbox.volume());
 
@@ -217,15 +292,18 @@ TEST_F(TestFindActiveValues, testDenseBox)
       //openvdb::util::CpuTimer timer;
       for (bool test = true; test; ) {
           //timer.restart();
-          test = op.any(bbox2);
+          test = op.anyActiveValues(bbox2);
           //t = std::max(t, timer.restart());
           if (test) bbox2.translate(openvdb::Coord(1));
       }
       //std::cerr << "bbox = " << bbox2 << std::endl;
       //openvdb::util::printTime(std::cout, t, "The slowest dense test ", "\n", true, 4, 3);
       EXPECT_TRUE(bbox2 == openvdb::CoordBBox::createCube(openvdb::Coord(half_dim + 1), 1));
+
+      auto tiles = openvdb::tools::activeTiles(tree, bbox);
+      EXPECT_TRUE( tiles.size() == 0u );
     }
-}
+}// testDenseBox
 
 TEST_F(TestFindActiveValues, testBenchmarks)
 {
@@ -240,7 +318,7 @@ TEST_F(TestFindActiveValues, testBenchmarks)
       //util::CpuTimer timer;
       for (auto b = CoordBBox::createCube(Coord(-half_dim), bbox_size); true; b.translate(Coord(1))) {
           //timer.restart();
-          bool test = op.any(b);
+          bool test = op.anyActiveValues(b);
           //t = std::max(t, timer.restart());
           if (!test) break;
       }
@@ -258,7 +336,7 @@ TEST_F(TestFindActiveValues, testBenchmarks)
       //openvdb::util::CpuTimer timer;
       for (auto b = CoordBBox::createCube(Coord(-half_dim), bbox_size); true; b.translate(Coord(1))) {
           //timer.restart();
-          bool test = op.any(b);
+          bool test = op.anyActiveValues(b);
           //t = std::max(t, timer.restart());
           if (!test) break;
       }
@@ -271,10 +349,10 @@ TEST_F(TestFindActiveValues, testBenchmarks)
       tree.denseFill(CoordBBox::createCube(Coord(0), 256), 1.0f, true);
       tools::FindActiveValues<FloatTree> op(tree);
       //openvdb::util::CpuTimer timer("new test");
-      EXPECT_TRUE(op.none(CoordBBox::createCube(Coord(256), 1)));
+      EXPECT_TRUE(op.noActiveValues(CoordBBox::createCube(Coord(256), 1)));
       //timer.stop();
     }
-}
+}// testBenchmarks
 
 // Copyright (c) Ken Museth
 // All rights reserved. This software is distributed under the
