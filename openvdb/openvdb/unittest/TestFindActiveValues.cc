@@ -77,18 +77,6 @@ TEST_F(TestFindActiveValues, testBasic)
     EXPECT_TRUE(!openvdb::tools::anyActiveTiles(tree, bbox));
     tiles = openvdb::tools::activeTiles(tree, bbox);
     EXPECT_TRUE( tiles.size() == 0u );
-/*
-    EXPECT_TRUE(openvdb::tools::noActiveValues(tree, bbox));
-
-    tree.setValue(min.offsetBy(-1), 1.0f);
-    EXPECT_TRUE(openvdb::tools::noActiveValues(tree, bbox));
-    tree.setValue(max.offsetBy( 1), 1.0f);
-    EXPECT_TRUE(openvdb::tools::noActiveValues(tree, bbox));
-    tree.setValue(min, 1.0f);
-    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
-    tree.setValue(max, 1.0f);
-    EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
-*/
 }
 
 TEST_F(TestFindActiveValues, testSphere1)
