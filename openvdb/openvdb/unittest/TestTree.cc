@@ -2899,7 +2899,7 @@ TEST_F(TestTree, testNodeCount)
 }
 #endif
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
 TEST_F(TestTree, testActiveTileCount)
 {
     //openvdb::util::CpuTimer timer;// use for benchmark test
@@ -2921,8 +2921,7 @@ TEST_F(TestTree, testActiveTileCount)
     it.setMaxDepth(openvdb::FloatTree::ValueOnCIter::LEAF_DEPTH - 1);
     for (; it; ++it) ++(activeTileCount1[dims.size() - 1 - it.getDepth()]);
     //timer.restart("New technique");// use for benchmark test
-    std::vector<openvdb::Index32> activeTileCount2;
-    tree.activeTileCount(activeTileCount2);
+    std::vector<openvdb::Index32> activeTileCount2 = tree.activeTileNodeCount();
     //timer.stop();// use for benchmark test
     EXPECT_EQ(activeTileCount1.size(), activeTileCount2.size());
     //for (size_t i=0; i<activeTileCount2.size(); ++i) std::cerr << "activeTileCount1("<<i<<") OLD/NEW: " << activeTileCount1[i] << "/" << activeTileCount2[i] << std::endl;

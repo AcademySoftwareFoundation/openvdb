@@ -486,7 +486,7 @@ public:
     Index64 offLeafVoxelCount() const;
     Index64 onTileCount() const;
     void nodeCount(std::vector<Index32> &vec) const;
-    void activeTileCount(std::vector<Index32>& vec) const;
+    void activeTileNodeCount(std::vector<Index32>& vec) const;
 
     bool isValueOn(const Coord& xyz) const;
 
@@ -1648,13 +1648,13 @@ RootNode<ChildT>::nodeCount(std::vector<Index32> &vec) const
 
 template<typename ChildT>
 inline void
-RootNode<ChildT>::activeTileCount(std::vector<Index32>& vec) const
+RootNode<ChildT>::activeTileNodeCount(std::vector<Index32>& vec) const
 {
     assert(vec.size() > LEVEL);
     Index32 sum = 0;
     for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
         if (isChild(i)) {
-            getChild(i).activeTileCount(vec);
+            getChild(i).activeTileNodeCount(vec);
         } else if (isTileOn(i)) ++sum;
     }
     vec[LEVEL] = 0;// zero tiles at root level

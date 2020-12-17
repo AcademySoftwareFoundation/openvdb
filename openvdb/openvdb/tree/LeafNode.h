@@ -132,7 +132,7 @@ public:
     /// no-op
     void nodeCount(std::vector<Index32> &) const {}
     /// no-op
-    void activeTileCount(std::vector<Index32>&) const {}
+    void activeTileNodeCount(std::vector<Index32>&) const {}
     /// Return the non-leaf count for this node, which is zero.
     static Index32 nonLeafCount() { return 0; }
     /// Return the child count for this node, which is zero.

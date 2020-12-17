@@ -112,7 +112,7 @@ public:
     /// no-op
     void nodeCount(std::vector<Index32> &) const {}
     /// no-op
-    void activeTileCount(std::vector<Index32>&) const {}
+    void activeTileNodeCount(std::vector<Index32>&) const {}
     static Index32 nonLeafCount() { return 0; }
 
     /// Return the number of active voxels.
