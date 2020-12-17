@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/Primitives.h>
 
 /// @brief Creates a NanoVDB grids of a level set sphere and accesses a value.
 ///

@@ -26,9 +26,9 @@ bool operator!=(const GridAssetUrl& a, const GridAssetUrl& b)
     return a.fullname() != b.fullname();
 }
 
-GridAssetUrl GridAssetUrl::asSequence(int frame) const
+std::string GridAssetUrl::getSequencePath(int frame) const
 {
-    return GridAssetUrl(updateUrlWithFrame(frame));
+    return urlGetPath(updateUrlWithFrame(frame));
 }
 
 std::string GridAssetUrl::fullname() const

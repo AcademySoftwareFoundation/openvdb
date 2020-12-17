@@ -56,6 +56,13 @@ public:
     ///
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
     const GridMetaData* gridMetaData() const { return reinterpret_cast<const GridMetaData*>(data()); }
+
+    /// @brief Returns the GridType handled by this instance, and GridType::End if empty
+    GridType gridType() const 
+    { 
+        const GridMetaData* ptr = this->gridMetaData();
+        return ptr ? ptr->gridType() : GridType::End; 
+    }
 };
 
 // --------------------------> GridHandle <------------------------------------

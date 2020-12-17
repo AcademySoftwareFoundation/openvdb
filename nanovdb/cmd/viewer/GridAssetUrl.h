@@ -43,17 +43,19 @@ public:
     }
 
     inline std::string        url() const { return mScheme + "://" + mPath; }
-    inline std::string        path() const { return mPath; }
-    inline std::string        scheme() const { return mScheme; }
-    inline const std::string& gridName() const { return mGridName; }
+    inline std::string&       path() { return mPath; }
+    inline std::string&       scheme() { return mScheme; }
     inline std::string&       gridName() { return mGridName; }
+    inline const std::string& path() const { return mPath; }
+    inline const std::string& scheme() const { return mScheme; }
+    inline const std::string& gridName() const { return mGridName; }
     inline int                frameStart() const { return mFrameStart; }
     inline int                frameEnd() const { return mFrameEnd; }
     inline bool               isSequence() const { return mIsSequence; }
     inline int                frameStep() const { return mFrameStep; }
 
-    GridAssetUrl asSequence(int frame) const;
-    std::string  fullname() const;
+    std::string getSequencePath(int frame) const;
+    std::string fullname() const;
 
     std::string updateUrlWithFrame(int frame) const;
 
@@ -63,8 +65,8 @@ private:
     std::string mScheme;
     std::string mPath;
     std::string mGridName;
-    bool        mIsSequence;
-    int         mFrameStart;
-    int         mFrameEnd;
-    int         mFrameStep;
+    bool        mIsSequence = false;
+    int         mFrameStart = 0;
+    int         mFrameEnd = -1;
+    int         mFrameStep = 0;
 };

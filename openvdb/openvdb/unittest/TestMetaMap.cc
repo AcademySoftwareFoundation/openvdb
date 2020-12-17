@@ -1,42 +1,18 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Metadata.h>
 #include <openvdb/MetaMap.h>
 
-class TestMetaMap: public CppUnit::TestCase
+class TestMetaMap: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestMetaMap);
-    CPPUNIT_TEST(testInsert);
-    CPPUNIT_TEST(testRemove);
-    CPPUNIT_TEST(testGetMetadata);
-    CPPUNIT_TEST(testIO);
-    CPPUNIT_TEST(testEmptyIO);
-    CPPUNIT_TEST(testCopyConstructor);
-    CPPUNIT_TEST(testCopyConstructorEmpty);
-    CPPUNIT_TEST(testAssignment);
-    CPPUNIT_TEST(testEquality);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testInsert();
-    void testRemove();
-    void testGetMetadata();
-    void testIO();
-    void testEmptyIO();
-    void testCopyConstructor();
-    void testCopyConstructorEmpty();
-    void testAssignment();
-    void testEquality();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetaMap);
 
-void
-TestMetaMap::testInsert()
+TEST_F(TestMetaMap, testInsert)
 {
     using namespace openvdb;
 
@@ -49,24 +25,23 @@ TestMetaMap::testInsert()
     int i = 1;
     for( ; iter != meta.endMeta(); ++iter, ++i) {
         if(i == 1) {
-            CPPUNIT_ASSERT(iter->first.compare("meta1") == 0);
+            EXPECT_TRUE(iter->first.compare("meta1") == 0);
             std::string val = meta.metaValue<std::string>("meta1");
-            CPPUNIT_ASSERT(val == "testing");
+            EXPECT_TRUE(val == "testing");
         } else if(i == 2) {
-            CPPUNIT_ASSERT(iter->first.compare("meta2") == 0);
+            EXPECT_TRUE(iter->first.compare("meta2") == 0);
             int32_t val = meta.metaValue<int32_t>("meta2");
-            CPPUNIT_ASSERT(val == 20);
+            EXPECT_TRUE(val == 20);
         } else if(i == 3) {
-            CPPUNIT_ASSERT(iter->first.compare("meta3") == 0);
+            EXPECT_TRUE(iter->first.compare("meta3") == 0);
             float val = meta.metaValue<float>("meta3");
-            //CPPUNIT_ASSERT(val == 2.0);
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0f,val,0);
+            //EXPECT_TRUE(val == 2.0);
+            EXPECT_NEAR(2.0f,val,0);
         }
     }
 }
 
-void
-TestMetaMap::testRemove()
+TEST_F(TestMetaMap, testRemove)
 {
     using namespace openvdb;
 
@@ -81,14 +56,14 @@ TestMetaMap::testRemove()
     int i = 1;
     for( ; iter != meta.endMeta(); ++iter, ++i) {
         if(i == 1) {
-            CPPUNIT_ASSERT(iter->first.compare("meta1") == 0);
+            EXPECT_TRUE(iter->first.compare("meta1") == 0);
             std::string val = meta.metaValue<std::string>("meta1");
-            CPPUNIT_ASSERT(val == "testing");
+            EXPECT_TRUE(val == "testing");
         } else if(i == 2) {
-            CPPUNIT_ASSERT(iter->first.compare("meta3") == 0);
+            EXPECT_TRUE(iter->first.compare("meta3") == 0);
             float val = meta.metaValue<float>("meta3");
-            //CPPUNIT_ASSERT(val == 2.0);
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0f,val,0);
+            //EXPECT_TRUE(val == 2.0);
+            EXPECT_NEAR(2.0f,val,0);
         }
     }
 
@@ -96,19 +71,18 @@ TestMetaMap::testRemove()
 
     iter = meta.beginMeta();
     for( ; iter != meta.endMeta(); ++iter, ++i) {
-        CPPUNIT_ASSERT(iter->first.compare("meta3") == 0);
+        EXPECT_TRUE(iter->first.compare("meta3") == 0);
         float val = meta.metaValue<float>("meta3");
-        //CPPUNIT_ASSERT(val == 2.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0f,val,0);
+        //EXPECT_TRUE(val == 2.0);
+        EXPECT_NEAR(2.0f,val,0);
     }
 
     meta.removeMeta("meta3");
 
-    CPPUNIT_ASSERT_EQUAL(0, int(meta.metaCount()));
+    EXPECT_EQ(0, int(meta.metaCount()));
 }
 
-void
-TestMetaMap::testGetMetadata()
+TEST_F(TestMetaMap, testGetMetadata)
 {
     using namespace openvdb;
 
@@ -118,28 +92,27 @@ TestMetaMap::testGetMetadata()
     meta.insertMeta("meta3", DoubleMetadata(2.0));
 
     Metadata::Ptr metadata = meta["meta2"];
-    CPPUNIT_ASSERT(metadata);
-    CPPUNIT_ASSERT(metadata->typeName().compare("int32") == 0);
+    EXPECT_TRUE(metadata);
+    EXPECT_TRUE(metadata->typeName().compare("int32") == 0);
 
     DoubleMetadata::Ptr dm = meta.getMetadata<DoubleMetadata>("meta3");
-    //CPPUNIT_ASSERT(dm->value() == 2.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0,dm->value(),0);
+    //EXPECT_TRUE(dm->value() == 2.0);
+    EXPECT_NEAR(2.0,dm->value(),0);
 
     const DoubleMetadata::Ptr cdm = meta.getMetadata<DoubleMetadata>("meta3");
-    //CPPUNIT_ASSERT(dm->value() == 2.0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(2.0,cdm->value(),0);
+    //EXPECT_TRUE(dm->value() == 2.0);
+    EXPECT_NEAR(2.0,cdm->value(),0);
 
-    CPPUNIT_ASSERT(!meta.getMetadata<StringMetadata>("meta2"));
+    EXPECT_TRUE(!meta.getMetadata<StringMetadata>("meta2"));
 
-    CPPUNIT_ASSERT_THROW(meta.metaValue<int32_t>("meta3"),
+    EXPECT_THROW(meta.metaValue<int32_t>("meta3"),
                          openvdb::TypeError);
 
-    CPPUNIT_ASSERT_THROW(meta.metaValue<double>("meta5"),
+    EXPECT_THROW(meta.metaValue<double>("meta5"),
                          openvdb::LookupError);
 }
 
-void
-TestMetaMap::testIO()
+TEST_F(TestMetaMap, testIO)
 {
     using namespace openvdb;
 
@@ -159,8 +132,8 @@ TestMetaMap::testIO()
     // though the values cannot be retrieved.
     MetaMap meta2;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
-    CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-    CPPUNIT_ASSERT_EQUAL(3, int(meta2.metaCount()));
+    EXPECT_NO_THROW(meta2.readMeta(istr));
+    EXPECT_EQ(3, int(meta2.metaCount()));
 
     // Verify that writing metadata of unknown type (i.e., UnknownMetadata) is possible.
     std::ostringstream ostrUnknown(std::ios_base::binary);
@@ -170,9 +143,9 @@ TestMetaMap::testIO()
     // the value of the registered type can be retrieved.
     Int32Metadata::registerType();
     istr.seekg(0, std::ios_base::beg);
-    CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-    CPPUNIT_ASSERT_EQUAL(3, int(meta2.metaCount()));
-    CPPUNIT_ASSERT_EQUAL(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
+    EXPECT_NO_THROW(meta2.readMeta(istr));
+    EXPECT_EQ(3, int(meta2.metaCount()));
+    EXPECT_EQ(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
 
     // Register the remaining types.
     StringMetadata::registerType();
@@ -183,20 +156,20 @@ TestMetaMap::testIO()
         istr.seekg(0, std::ios_base::beg);
         meta2.clearMetadata();
 
-        CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
-        CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
+        EXPECT_NO_THROW(meta2.readMeta(istr));
+        EXPECT_EQ(meta.metaCount(), meta2.metaCount());
 
         std::string val = meta.metaValue<std::string>("meta1");
         std::string val2 = meta2.metaValue<std::string>("meta1");
-        CPPUNIT_ASSERT_EQUAL(0, val.compare(val2));
+        EXPECT_EQ(0, val.compare(val2));
 
         int intval = meta.metaValue<int>("meta2");
         int intval2 = meta2.metaValue<int>("meta2");
-        CPPUNIT_ASSERT_EQUAL(intval, intval2);
+        EXPECT_EQ(intval, intval2);
 
         double dval = meta.metaValue<double>("meta3");
         double dval2 = meta2.metaValue<double>("meta3");
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(dval, dval2,0);
+        EXPECT_NEAR(dval, dval2,0);
     }
     {
         // Verify that metadata that was written as UnknownMetadata can
@@ -204,13 +177,13 @@ TestMetaMap::testIO()
         std::istringstream istrUnknown(ostrUnknown.str(), std::ios_base::binary);
 
         meta2.clearMetadata();
-        CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istrUnknown));
+        EXPECT_NO_THROW(meta2.readMeta(istrUnknown));
 
-        CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
-        CPPUNIT_ASSERT_EQUAL(
+        EXPECT_EQ(meta.metaCount(), meta2.metaCount());
+        EXPECT_EQ(
             meta.metaValue<std::string>("meta1"), meta2.metaValue<std::string>("meta1"));
-        CPPUNIT_ASSERT_EQUAL(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        EXPECT_EQ(meta.metaValue<int>("meta2"), meta2.metaValue<int>("meta2"));
+        EXPECT_NEAR(
             meta.metaValue<double>("meta3"), meta2.metaValue<double>("meta3"), 0.0);
     }
 
@@ -218,8 +191,7 @@ TestMetaMap::testIO()
     Metadata::clearRegistry();
 }
 
-void
-TestMetaMap::testEmptyIO()
+TEST_F(TestMetaMap, testEmptyIO)
 {
     using namespace openvdb;
 
@@ -231,13 +203,12 @@ TestMetaMap::testEmptyIO()
     // Read in the metadata;
     MetaMap meta2;
     std::istringstream istr(ostr.str(), std::ios_base::binary);
-    CPPUNIT_ASSERT_NO_THROW(meta2.readMeta(istr));
+    EXPECT_NO_THROW(meta2.readMeta(istr));
 
-    CPPUNIT_ASSERT(meta2.metaCount() == 0);
+    EXPECT_TRUE(meta2.metaCount() == 0);
 }
 
-void
-TestMetaMap::testCopyConstructor()
+TEST_F(TestMetaMap, testCopyConstructor)
 {
     using namespace openvdb;
 
@@ -249,24 +220,23 @@ TestMetaMap::testCopyConstructor()
     // copy constructor
     MetaMap meta2(meta);
 
-    CPPUNIT_ASSERT(meta.metaCount() == meta2.metaCount());
+    EXPECT_TRUE(meta.metaCount() == meta2.metaCount());
 
     std::string str = meta.metaValue<std::string>("meta1");
     std::string str2 = meta2.metaValue<std::string>("meta1");
-    CPPUNIT_ASSERT(str == str2);
+    EXPECT_TRUE(str == str2);
 
-    CPPUNIT_ASSERT(meta.metaValue<int32_t>("meta2") ==
+    EXPECT_TRUE(meta.metaValue<int32_t>("meta2") ==
             meta2.metaValue<int32_t>("meta2"));
 
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(meta.metaValue<float>("meta3"),
+    EXPECT_NEAR(meta.metaValue<float>("meta3"),
                                  meta2.metaValue<float>("meta3"),0);
-    //CPPUNIT_ASSERT(meta.metaValue<float>("meta3") ==
+    //EXPECT_TRUE(meta.metaValue<float>("meta3") ==
     //        meta2.metaValue<float>("meta3"));
 }
 
 
-void
-TestMetaMap::testCopyConstructorEmpty()
+TEST_F(TestMetaMap, testCopyConstructorEmpty)
 {
     using namespace openvdb;
 
@@ -274,13 +244,12 @@ TestMetaMap::testCopyConstructorEmpty()
 
     MetaMap meta2(meta);
 
-    CPPUNIT_ASSERT(meta.metaCount() == 0);
-    CPPUNIT_ASSERT(meta2.metaCount() == meta.metaCount());
+    EXPECT_TRUE(meta.metaCount() == 0);
+    EXPECT_TRUE(meta2.metaCount() == meta.metaCount());
 }
 
 
-void
-TestMetaMap::testAssignment()
+TEST_F(TestMetaMap, testAssignment)
 {
     using namespace openvdb;
 
@@ -292,28 +261,27 @@ TestMetaMap::testAssignment()
 
     // Create an empty map.
     MetaMap meta2;
-    CPPUNIT_ASSERT_EQUAL(0, int(meta2.metaCount()));
+    EXPECT_EQ(0, int(meta2.metaCount()));
 
     // Copy the first map to the second.
     meta2 = meta;
-    CPPUNIT_ASSERT_EQUAL(meta.metaCount(), meta2.metaCount());
+    EXPECT_EQ(meta.metaCount(), meta2.metaCount());
 
     // Verify that the contents of the two maps are the same.
-    CPPUNIT_ASSERT_EQUAL(
+    EXPECT_EQ(
         meta.metaValue<std::string>("meta1"), meta2.metaValue<std::string>("meta1"));
-    CPPUNIT_ASSERT_EQUAL(meta.metaValue<int32_t>("meta2"), meta2.metaValue<int32_t>("meta2"));
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(
+    EXPECT_EQ(meta.metaValue<int32_t>("meta2"), meta2.metaValue<int32_t>("meta2"));
+    EXPECT_NEAR(
         meta.metaValue<float>("meta3"), meta2.metaValue<float>("meta3"), /*tolerance=*/0);
 
     // Verify that changing one map doesn't affect the other.
     meta.insertMeta("meta1", StringMetadata("changed"));
     std::string str = meta.metaValue<std::string>("meta1");
-    CPPUNIT_ASSERT_EQUAL(std::string("testing"), meta2.metaValue<std::string>("meta1"));
+    EXPECT_EQ(std::string("testing"), meta2.metaValue<std::string>("meta1"));
 }
 
 
-void
-TestMetaMap::testEquality()
+TEST_F(TestMetaMap, testEquality)
 {
     using namespace openvdb;
 
@@ -327,37 +295,37 @@ TestMetaMap::testEquality()
     MetaMap meta2;
 
     // Verify that the two maps differ.
-    CPPUNIT_ASSERT(meta != meta2);
-    CPPUNIT_ASSERT(meta2 != meta);
+    EXPECT_TRUE(meta != meta2);
+    EXPECT_TRUE(meta2 != meta);
 
     // Copy the first map to the second.
     meta2 = meta;
 
     // Verify that the two maps are equivalent.
-    CPPUNIT_ASSERT(meta == meta2);
-    CPPUNIT_ASSERT(meta2 == meta);
+    EXPECT_TRUE(meta == meta2);
+    EXPECT_TRUE(meta2 == meta);
 
     // Modify the first map.
     meta.removeMeta("meta1");
     meta.insertMeta("abc", DoubleMetadata(2.0));
 
     // Verify that the two maps differ.
-    CPPUNIT_ASSERT(meta != meta2);
-    CPPUNIT_ASSERT(meta2 != meta);
+    EXPECT_TRUE(meta != meta2);
+    EXPECT_TRUE(meta2 != meta);
 
     // Modify the second map and verify that the two maps differ.
     meta2 = meta;
     meta2.insertMeta("meta2", Int32Metadata(42));
-    CPPUNIT_ASSERT(meta != meta2);
-    CPPUNIT_ASSERT(meta2 != meta);
+    EXPECT_TRUE(meta != meta2);
+    EXPECT_TRUE(meta2 != meta);
 
     meta2 = meta;
     meta2.insertMeta("meta3", FloatMetadata(2.0001f));
-    CPPUNIT_ASSERT(meta != meta2);
-    CPPUNIT_ASSERT(meta2 != meta);
+    EXPECT_TRUE(meta != meta2);
+    EXPECT_TRUE(meta2 != meta);
 
     meta2 = meta;
     meta2.insertMeta("abc", DoubleMetadata(2.0001));
-    CPPUNIT_ASSERT(meta != meta2);
-    CPPUNIT_ASSERT(meta2 != meta);
+    EXPECT_TRUE(meta != meta2);
+    EXPECT_TRUE(meta2 != meta);
 }

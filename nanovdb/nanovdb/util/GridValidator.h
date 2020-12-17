@@ -71,7 +71,7 @@ const std::string& GridValidator<ValueT>::operator()(const NanoGrid<ValueT> &gri
     this->checkRoot();
     if (detailed) {
         this->template checkNodes<Node2>();
-        this->template checkNodes<Node2>();
+        this->template checkNodes<Node1>();
     }
     return mErrorStr;
 }
@@ -89,13 +89,20 @@ void GridValidator<ValueT>::checkGrid(bool detailed)
         mErrorStr = ss.str();
     } else if (!validateChecksum(*mGrid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
         mErrorStr.assign("Mis-matching checksum");
-    } else if (data->mMajor != NANOVDB_MAJOR_VERSION_NUMBER) {
-        ss << "Invalid major version number: Expected " << NANOVDB_MAJOR_VERSION_NUMBER << ", but read " << data->mMajor;
+    } else if ( data->mVersion >= Version(29,0,0) && data->mVersion.getMajor() != NANOVDB_MAJOR_VERSION_NUMBER) {
+        ss << "Invalid major version number: Expected " << NANOVDB_MAJOR_VERSION_NUMBER << ", but read " << data->mVersion.c_str();
+        mErrorStr = ss.str();
+    } else if ( data->mVersion < Version(29,0,0) && data->mVersion.id() != 28u) {
+        ss << "Invalid old major version number: Expected 28 or newer, but read " << data->mVersion.id();
         mErrorStr = ss.str();
     } else if (data->mGridClass >= GridClass::End) {
-        mErrorStr.assign("Invalid Grid Class");
+        mErrorStr.assign("Invalid GridClass");
+     } else if (data->mGridType >= GridType::End) {
+        mErrorStr.assign("Invalid GridType");
     } else if (data->mGridType != mapToGridType<ValueT>()) {
-        mErrorStr.assign("Invalid Grid Type");
+        mErrorStr.assign("Invalid combination of ValueType and GridType");
+    } else if (!isValid(data->mGridType, data->mGridClass)) {
+        mErrorStr.assign("Invalid combination of GridType and GridClass");
     } else if ( (const void*)(&(mGrid->tree())) != (const void*)(mGrid+1) ) {
         mErrorStr.assign("Invalid Tree pointer");
     }

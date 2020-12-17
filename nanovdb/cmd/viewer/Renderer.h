@@ -76,6 +76,10 @@ struct RendererParams
     std::string           mGoldPrefix;
     bool                  mUseTurntable = false;
     float                 mTurntableRate = 1;
+    float                 mCameraDistance = std::numeric_limits<float>::max();
+    nanovdb::Vec3f        mCameraTarget = nanovdb::Vec3f(std::numeric_limits<float>::max());
+    nanovdb::Vec3f        mCameraRotation = nanovdb::Vec3f(std::numeric_limits<float>::max());
+    float                 mCameraFov = std::numeric_limits<float>::max();
     MaterialClass         mMaterialOverride = MaterialClass::kAuto;
     bool                  mUseAccumulation = true;
     int                   mRenderLauncherType = 0;

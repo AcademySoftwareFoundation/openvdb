@@ -32,6 +32,7 @@ enum class MaterialClass { kAuto = 0,
                            kPointsFast,
                            kBlackBodyVolumePathTracer,
                            kFogVolumeFast,
+                           kVoxels,
                            kCameraDiagnostic,
                            kNumTypes };
 

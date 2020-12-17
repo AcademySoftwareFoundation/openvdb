@@ -63,6 +63,7 @@ option(NANOVDB_USE_TBB "Build with TBB support" ON)
 option(NANOVDB_USE_BLOSC "Build with BLOSC support" ON)
 option(NANOVDB_USE_ZLIB "Build with ZLIB support" ON)
 option(NANOVDB_USE_OPTIX "Build with OptiX support" ON)
+option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" ON)
 
 option(NANOVDB_ALLOW_FETCHCONTENT
        "Allow FetchContent to download missing dependencies" ON)
@@ -108,6 +109,27 @@ if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
     endif()
   endif()
 endif()
+
+# ---------------------------------------------------------------
+if(NANOVDB_USE_MAGICAVOXEL)
+  if(NANOVDB_ALLOW_FETCHCONTENT)
+    if(NOT ogt_POPULATED)
+      message(STATUS "Downloading ogt...")
+
+      FetchContent_Declare(
+        ogt
+        GIT_REPOSITORY https://github.com/jpaver/opengametools.git
+        GIT_TAG master)
+
+      FetchContent_GetProperties(ogt)
+      if(NOT ogt_POPULATED)
+        FetchContent_Populate(ogt)
+        set(NANOVDB_OGT_INCLUDE_DIRECTORY ${ogt_SOURCE_DIR}/src)
+        set(NANOVDB_USE_MAGICAVOXEL_FLAG "NANOVDB_USE_MAGICAVOXEL")
+      endif()
+    endif()
+  endif()
+endif(NANOVDB_USE_MAGICAVOXEL)
 
 # -----------------------------------------------------------------------
 if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
@@ -178,6 +200,7 @@ if(NANOVDB_USE_OPTIX AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(OptiX)
   if(OptiX_FOUND)
     set(NANOVDB_OPTIX_INCLUDE_DIRECTORY ${OptiX_INCLUDE_DIR})
+    set(NANOVDB_OPTIX_LINK_LIBRARY ${OptiX_LIBRARIES})
     set(NANOVDB_USE_OPTIX_FLAG "NANOVDB_USE_OPTIX")
   endif()
 endif()

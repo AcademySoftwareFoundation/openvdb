@@ -18,10 +18,13 @@ else()
   set(bit_dest "")
 endif()
 
+unset(OptiX_INSTALL_DIR CACHE)
+
 find_path(OptiX_INSTALL_DIR
   NAMES include/optix.h
   PATHS 
   "${OptiX_ROOT}"
+  "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.2.0"
   "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.1.0"
   "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.0.0"
   NO_DEFAULT_PATH
@@ -31,5 +34,10 @@ find_path(OptiX_INSTALL_DIR
 
 if (OptiX_INSTALL_DIR)
   set (OptiX_INCLUDE_DIR "${OptiX_INSTALL_DIR}/include")
-  set(OptiX_FOUND true)
 endif()
+
+include(FindPackageHandleStandardArgs)
+find_package_handle_standard_args(OptiX
+  FOUND_VAR OptiX_FOUND
+  REQUIRED_VARS OptiX_INCLUDE_DIR
+  )

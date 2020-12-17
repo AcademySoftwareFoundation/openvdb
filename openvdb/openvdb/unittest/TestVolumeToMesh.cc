@@ -1,33 +1,22 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/Exceptions.h>
 
 #include <vector>
 
-class TestVolumeToMesh: public CppUnit::TestCase
+class TestVolumeToMesh: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestVolumeToMesh);
-    CPPUNIT_TEST(testAuxiliaryDataCollection);
-    CPPUNIT_TEST(testUniformMeshing);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAuxiliaryDataCollection();
-    void testUniformMeshing();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToMesh);
 
 
 ////////////////////////////////////////
 
 
-void
-TestVolumeToMesh::testAuxiliaryDataCollection()
+TEST_F(TestVolumeToMesh, testAuxiliaryDataCollection)
 {
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type  FloatTreeType;
     typedef FloatTreeType::ValueConverter<bool>::Type   BoolTreeType;
@@ -43,7 +32,7 @@ TestVolumeToMesh::testAuxiliaryDataCollection()
     openvdb::tools::volume_to_mesh_internal::identifySurfaceIntersectingVoxels(
         intersectionTree, inputTree, iso);
 
-    CPPUNIT_ASSERT_EQUAL(size_t(8), size_t(intersectionTree.activeVoxelCount()));
+    EXPECT_EQ(size_t(8), size_t(intersectionTree.activeVoxelCount()));
 
     typedef FloatTreeType::ValueConverter<openvdb::Int16>::Type   Int16TreeType;
     typedef FloatTreeType::ValueConverter<openvdb::Index32>::Type Index32TreeType;
@@ -56,16 +45,15 @@ TestVolumeToMesh::testAuxiliaryDataCollection()
 
     const int flags = int(signFlagsTree.getValue(ijk));
 
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::INSIDE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::EDGES));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::XEDGE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::YEDGE));
-    CPPUNIT_ASSERT(bool(flags & openvdb::tools::volume_to_mesh_internal::ZEDGE));
+    EXPECT_TRUE(bool(flags & openvdb::tools::volume_to_mesh_internal::INSIDE));
+    EXPECT_TRUE(bool(flags & openvdb::tools::volume_to_mesh_internal::EDGES));
+    EXPECT_TRUE(bool(flags & openvdb::tools::volume_to_mesh_internal::XEDGE));
+    EXPECT_TRUE(bool(flags & openvdb::tools::volume_to_mesh_internal::YEDGE));
+    EXPECT_TRUE(bool(flags & openvdb::tools::volume_to_mesh_internal::ZEDGE));
 }
 
 
-void
-TestVolumeToMesh::testUniformMeshing()
+TEST_F(TestVolumeToMesh, testUniformMeshing)
 {
     typedef openvdb::tree::Tree4<float, 5, 4, 3>::Type  FloatTreeType;
     typedef openvdb::Grid<FloatTreeType>                FloatGridType;
@@ -84,8 +72,8 @@ TestVolumeToMesh::testUniformMeshing()
 
     openvdb::tools::volumeToMesh(grid, points, quads);
 
-    CPPUNIT_ASSERT(!points.empty());
-    CPPUNIT_ASSERT_EQUAL(size_t(216), quads.size());
+    EXPECT_TRUE(!points.empty());
+    EXPECT_EQ(size_t(216), quads.size());
 
 
     points.clear();
@@ -100,8 +88,8 @@ TestVolumeToMesh::testUniformMeshing()
 
     openvdb::tools::volumeToMesh(grid, points, quads);
 
-    CPPUNIT_ASSERT(!points.empty());
-    CPPUNIT_ASSERT_EQUAL(size_t(384), quads.size());
+    EXPECT_TRUE(!points.empty());
+    EXPECT_EQ(size_t(384), quads.size());
 
 
     points.clear();
@@ -121,6 +109,6 @@ TestVolumeToMesh::testUniformMeshing()
 
     openvdb::tools::volumeToMesh(maskGrid, points, quads);
 
-    CPPUNIT_ASSERT(!points.empty());
-    CPPUNIT_ASSERT_EQUAL(size_t(384), quads.size());
+    EXPECT_TRUE(!points.empty());
+    EXPECT_EQ(size_t(384), quads.size());
 }

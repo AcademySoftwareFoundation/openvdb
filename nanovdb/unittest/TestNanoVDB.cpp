@@ -9,21 +9,27 @@
 #include <algorithm> // for std::is_sorted
 #define _USE_MATH_DEFINES
 #include <cmath>
-#include <cstdlib> 
+#include <cstdlib>
 
 #include "gtest/gtest.h"
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/GridStats.h>
 #include <nanovdb/util/GridValidator.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
 #include <nanovdb/util/SampleFromVoxels.h>
+#if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
+#endif
+#define PNANOVDB_C
+#include <nanovdb/PNanoVDB.h>
 #include <nanovdb/util/Range.h>
 #include <nanovdb/util/GridChecksum.h>
 #include "../examples/ex_util/CpuTimer.h"
+#include "pnanovdb_validate_strides.h"
 
 inline std::ostream&
 operator<<(std::ostream& os, const nanovdb::Coord& ijk)
@@ -85,6 +91,134 @@ protected:
     nanovdb::CpuTimer<> mTimer;
 }; // TestNanoVDB
 
+template <typename T>
+class TestOffsets : public ::testing::Test
+{
+protected:
+    TestOffsets() {}
+
+    ~TestOffsets() override {}
+
+    void SetUp() override
+    {
+    }
+
+    void TearDown() override
+    {
+    }
+
+}; // TestOffsets<T>
+
+using MyTypes = ::testing::Types<float, 
+                                 double, 
+                                 int16_t, 
+                                 int32_t, 
+                                 int64_t, 
+                                 nanovdb::Vec3f, 
+                                 nanovdb::Vec3d,
+                                 nanovdb::ValueMask,
+                                 bool,
+                                 int16_t, 
+                                 uint32_t>;
+
+TYPED_TEST_SUITE(TestOffsets, MyTypes);
+
+TEST_F(TestNanoVDB, Version)
+{
+    EXPECT_EQ( 4u, sizeof(uint32_t));
+    EXPECT_EQ( 4u, sizeof(nanovdb::Version));
+    {// default constructor
+        nanovdb::Version v;
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), v.getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), v.getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), v.getPatch());
+        std::stringstream ss;
+        ss << NANOVDB_MAJOR_VERSION_NUMBER << "." 
+           << NANOVDB_MINOR_VERSION_NUMBER << "."
+           << NANOVDB_PATCH_VERSION_NUMBER;
+        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        //std::cerr << v.c_str() << std::endl;
+    }
+    {// detailed constructor
+        const uint32_t major = (1u << 11) - 1;// maximum allowed value
+        const uint32_t minor = (1u << 11) - 1;// maximum allowed value
+        const uint32_t patch = (1u << 10) - 1;// maximum allowed value
+        nanovdb::Version v( major, minor, patch);
+        EXPECT_EQ(major, v.getMajor());
+        EXPECT_EQ(minor, v.getMinor());
+        EXPECT_EQ(patch, v.getPatch());
+        std::stringstream ss;
+        ss << major << "." << minor << "." << patch;
+        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        //std::cerr << v.c_str() << std::endl;
+    }
+    {// smallest possible version number
+        const uint32_t major = 1u;
+        const uint32_t minor = 0u;
+        const uint32_t patch = 0u;
+        nanovdb::Version v( major, minor, patch);
+        EXPECT_EQ(major, v.getMajor());
+        EXPECT_EQ(minor, v.getMinor());
+        EXPECT_EQ(patch, v.getPatch());
+        std::stringstream ss;
+        ss << major << "." << minor << "." << patch;
+        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        //std::cerr << "version.data = " << v.id() << std::endl;
+    }
+    {// test comparison operators
+        EXPECT_EQ( nanovdb::Version(28, 2, 7), nanovdb::Version( 28, 2, 7) );
+        EXPECT_LE( nanovdb::Version(28, 2, 7), nanovdb::Version( 28, 2, 7) );
+        EXPECT_GE( nanovdb::Version(28, 2, 7), nanovdb::Version( 28, 2, 7) );
+        EXPECT_LT( nanovdb::Version(28, 2, 7), nanovdb::Version( 28, 2, 8) );
+        EXPECT_LT( nanovdb::Version(28, 2, 7), nanovdb::Version( 28, 3, 7) );
+        EXPECT_LT( nanovdb::Version(28, 2, 7), nanovdb::Version( 29, 2, 7) );
+        EXPECT_LT( nanovdb::Version(28, 2, 7), nanovdb::Version( 29, 3, 8) );
+        EXPECT_GT( nanovdb::Version(29, 0, 0), nanovdb::Version( 28, 2, 8) ); 
+    }
+
+    // nanovdb::Version was introduce in 29.0.0! For backwards compatibility with 28.X.X
+    // we need to distinguish between old formats (either uint32_t or two uint16_t) and 
+    // the new format (nanovdb::Version which internally stored a single uint32_t).
+    {   
+        // Define a struct that memory-maps all three possible representations
+        struct T {
+            union {
+                nanovdb::Version version;
+                uint32_t id; 
+                struct {uint16_t major, minor;};
+            };
+            T(uint32_t _major) : id(_major) {}
+            T(uint32_t _major, uint32_t _minor) : major(_major), minor(_minor) {}
+            T(uint32_t _major, uint32_t _minor, uint32_t _patch) : version(_major, _minor, _patch) {}
+        };
+        EXPECT_EQ( sizeof(uint32_t), sizeof(T) );
+        // Verify that T(1,0,0).id() is the smallest instance of Version
+        for (uint32_t major = 1; major < 30; ++major) {
+            for (uint32_t minor = 0; minor < 10; ++minor) {
+                for (uint32_t patch = 0; patch < 10; ++patch) {
+                    T tmp(major, minor, patch);
+                    EXPECT_LE(T(1,0,0).id, tmp.id);
+                    EXPECT_LE(T(1,0,0).version, tmp.version);
+                }
+            }
+        }
+        // Verify that all relevant "uint16_t major,minor" instances are smaller than T(29,0,0)
+        for (uint32_t major = 1; major <= 28; ++major) {
+            for (uint32_t minor = 0; minor < 30; ++minor) {
+                T tmp(major, minor);
+                EXPECT_LT(tmp.id, T(29,0,0).id);
+                EXPECT_LT(tmp.version, T(29,0,0).version);
+            }
+        }
+        // Verify that all relevant "uint32_t major" instances are smaller than T(29,0,0)
+        for (uint32_t major = 1; major <= 28; ++major) {
+            T tmp(major);
+            EXPECT_LT(tmp.id, T(29,0,0).id);
+            EXPECT_LT(tmp.version, T(29,0,0).version);
+        }
+    }
+}
+
 TEST_F(TestNanoVDB, Basic)
 {
     { // CHAR_BIT
@@ -134,9 +268,6 @@ TEST_F(TestNanoVDB, Assumptions)
 
 TEST_F(TestNanoVDB, Magic)
 {
-    EXPECT_EQ(28, NANOVDB_MAJOR_VERSION_NUMBER);
-    EXPECT_EQ( 1, NANOVDB_MINOR_VERSION_NUMBER);
-    EXPECT_EQ( 2, NANOVDB_PATCH_VERSION_NUMBER);
     EXPECT_EQ(0x304244566f6e614eUL, NANOVDB_MAGIC_NUMBER); // Magic number: "NanoVDB0" in hex)
     EXPECT_EQ(0x4e616e6f56444230UL, nanovdb::io::reverseEndianness(NANOVDB_MAGIC_NUMBER));
 
@@ -372,6 +503,76 @@ TEST_F(TestNanoVDB, Range3D)
     EXPECT_EQ(r1[2], r2[2]);
 }
 
+TEST_F(TestNanoVDB, PackedRGBA8)
+{
+    EXPECT_EQ(sizeof(uint32_t), sizeof(nanovdb::PackedRGBA8));
+    {
+        nanovdb::PackedRGBA8 p;
+        EXPECT_EQ(0u, p[0]);
+        EXPECT_EQ(0u, p[1]);
+        EXPECT_EQ(0u, p[2]);
+        EXPECT_EQ(0u, p[3]);
+        EXPECT_EQ(0u, p.c[0]);
+        EXPECT_EQ(0u, p.c[1]);
+        EXPECT_EQ(0u, p.c[2]);
+        EXPECT_EQ(0u, p.c[3]);
+        EXPECT_EQ(0u, p.r);
+        EXPECT_EQ(0u, p.g);
+        EXPECT_EQ(0u, p.b);
+        EXPECT_EQ(0u, p.a);
+        EXPECT_EQ(0u, p.packed);
+        EXPECT_EQ(nanovdb::PackedRGBA8(), p);
+    }
+    {
+        nanovdb::PackedRGBA8 p(uint8_t(1));
+        EXPECT_EQ(1u, p[0]);
+        EXPECT_EQ(1u, p[1]);
+        EXPECT_EQ(1u, p[2]);
+        EXPECT_EQ(1u, p[3]);
+        EXPECT_EQ(1u, p.c[0]);
+        EXPECT_EQ(1u, p.c[1]);
+        EXPECT_EQ(1u, p.c[2]);
+        EXPECT_EQ(1u, p.c[3]);
+        EXPECT_EQ(1u, p.r);
+        EXPECT_EQ(1u, p.g);
+        EXPECT_EQ(1u, p.b);
+        EXPECT_EQ(1u, p.a);
+        EXPECT_LT(nanovdb::PackedRGBA8(), p);
+    }
+    {
+        nanovdb::PackedRGBA8 p(uint8_t(1), uint8_t(2), uint8_t(3), uint8_t(4));
+        EXPECT_EQ(1u, p[0]);
+        EXPECT_EQ(2u, p[1]);
+        EXPECT_EQ(3u, p[2]);
+        EXPECT_EQ(4u, p[3]);
+        EXPECT_EQ(1u, p.c[0]);
+        EXPECT_EQ(2u, p.c[1]);
+        EXPECT_EQ(3u, p.c[2]);
+        EXPECT_EQ(4u, p.c[3]);
+        EXPECT_EQ(1u, p.r);
+        EXPECT_EQ(2u, p.g);
+        EXPECT_EQ(3u, p.b);
+        EXPECT_EQ(4u, p.a);
+        EXPECT_LT(nanovdb::PackedRGBA8(), p);
+    }
+    {
+        nanovdb::PackedRGBA8 p(0.0f, 1.0f, 0.5f, 0.1f);
+        EXPECT_EQ(0u, p[0]);
+        EXPECT_EQ(255u, p[1]);
+        EXPECT_EQ(127u, p[2]);
+        EXPECT_EQ(25u, p[3]);
+        EXPECT_EQ(0u, p.c[0]);
+        EXPECT_EQ(255u, p.c[1]);
+        EXPECT_EQ(127u, p.c[2]);
+        EXPECT_EQ(25u, p.c[3]);
+        EXPECT_EQ(0u, p.r);
+        EXPECT_EQ(255u, p.g);
+        EXPECT_EQ(127u, p.b);
+        EXPECT_EQ(25u, p.a);
+        EXPECT_LT(nanovdb::PackedRGBA8(), p);
+    }
+}
+
 TEST_F(TestNanoVDB, Coord)
 {
     EXPECT_EQ(size_t(3 * 4), nanovdb::Coord::memUsage()); // due to padding
@@ -556,6 +757,9 @@ TEST_F(TestNanoVDB, Vec3)
 
     EXPECT_EQ(1.0 + 4.0 + 9.0, xyz.lengthSqr());
     EXPECT_EQ(sqrt(1.0 + 4.0 + 9.0), xyz.length());
+
+    EXPECT_EQ(nanovdb::Vec3f(1, 2, 3), nanovdb::Vec3f(1, 2, 3));
+    EXPECT_NE(nanovdb::Vec3f(1, 2, 3), nanovdb::Vec3f(1, 2, 4));
 }
 
 TEST_F(TestNanoVDB, Vec4)
@@ -612,6 +816,9 @@ TEST_F(TestNanoVDB, Vec4)
 
     EXPECT_EQ(1.0 + 4.0 + 9.0 + 16.0, xyz.lengthSqr());
     EXPECT_EQ(sqrt(1.0 + 4.0 + 9.0 + 16.0), xyz.length());
+
+    EXPECT_EQ(nanovdb::Vec4f(1, 2, 3, 4), nanovdb::Vec4f(1, 2, 3, 4));
+    EXPECT_NE(nanovdb::Vec4f(1, 2, 3, 4), nanovdb::Vec4f(1, 2, 3, 5));
 }
 
 TEST_F(TestNanoVDB, Extrema)
@@ -1059,6 +1266,48 @@ TEST_F(TestNanoVDB, LeafNode)
 
 } // LeafNode
 
+TEST_F(TestNanoVDB, LeafNodeBool)
+{
+    using LeafT = nanovdb::LeafNode<bool>;
+    EXPECT_EQ(8u, LeafT::dim());
+    EXPECT_EQ(512u, LeafT::voxelCount());
+    EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 * 8 + // mValueMask
+                                                       8 * 8 + // mMask
+                                                       3 * 4 + // mBBoxMin
+                                                       4 * 1), // mBBoxDif[3] + mFlags
+              sizeof(LeafT));
+
+    // allocate buffer
+    std::unique_ptr<uint8_t[]> buffer(new uint8_t[LeafT::memUsage()]);
+    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer.get());
+
+    { // set members of the leaf node
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        data.mValueMask.setOff();
+        data.mValues.setOn();
+
+        for (uint32_t i = 256; i < LeafT::voxelCount(); ++i) {
+            data.mValueMask.setOn(i);
+            data.mValues.setOff(i);
+        }
+    }
+
+    // check values
+    auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer.get())->values();
+    EXPECT_EQ(nullptr, ptr);
+    for (uint32_t i = 0; i < LeafT::voxelCount(); ++i) {
+        if (i < 256) {
+            EXPECT_FALSE(leaf->valueMask().isOn(i));
+            EXPECT_TRUE(leaf->getValue(i));
+        } else {
+            EXPECT_TRUE(leaf->valueMask().isOn(i));
+            EXPECT_FALSE(leaf->getValue(i));
+        }
+    }
+    EXPECT_EQ(false, leaf->valueMin());
+    EXPECT_EQ(false, leaf->valueMax());
+} // LeafNodeBool
+
 TEST_F(TestNanoVDB, LeafNodeValueMask)
 {
     using LeafT = nanovdb::LeafNode<nanovdb::ValueMask>;
@@ -1089,14 +1338,14 @@ TEST_F(TestNanoVDB, LeafNodeValueMask)
     for (uint32_t i = 0; i < LeafT::voxelCount(); ++i) {
         if (i < 256) {
             EXPECT_FALSE(leaf->valueMask().isOn(i));
-            EXPECT_EQ(true, leaf->getValue(i));
+            EXPECT_FALSE(leaf->getValue(i));
         } else {
             EXPECT_TRUE(leaf->valueMask().isOn(i));
-            EXPECT_EQ(true, leaf->getValue(i));
+            EXPECT_TRUE(leaf->getValue(i));
         }
     }
-    EXPECT_EQ(true, leaf->valueMin());
-    EXPECT_EQ(true, leaf->valueMax());
+    EXPECT_EQ(false, leaf->valueMin());
+    EXPECT_EQ(false, leaf->valueMax());
 } // LeafNodeValueMask
 
 TEST_F(TestNanoVDB, InternalNode)
@@ -1207,6 +1456,7 @@ TEST_F(TestNanoVDB, RootNode)
     using NodeT2 = nanovdb::InternalNode<NodeT1>;
     using NodeT3 = nanovdb::RootNode<NodeT2>;
     using CoordT = NodeT3::CoordType;
+    using KeyT   = NodeT3::DataType::KeyT;
 
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint64_t) + sizeof(uint32_t) + (5 * sizeof(float))), NodeT3::memUsage(0));
 
@@ -1227,18 +1477,308 @@ TEST_F(TestNanoVDB, RootNode)
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint64_t) + sizeof(uint32_t) + (3 * sizeof(float))), root->memUsage()); // background, min, max, tileCount + bbox
     EXPECT_EQ(1.234f, root->getValue(CoordT(1, 2, 3)));
 
-    { // test RootData::CoordToKey
-        auto key = [](int i, int j, int k) { return NodeT3::DataType::CoordToKey(CoordT(i, j, k)); };
-        EXPECT_TRUE(key(0, 0, 0) < key(4096, 0, 0));
-        EXPECT_TRUE(key(0, 0, 0) < key(0, 4096, 0));
-        EXPECT_TRUE(key(0, 0, 0) < key(0, 0, 4096));
-        EXPECT_TRUE(key(0, 0, 0) == key(4095, 4095, 4095));
+    { // test RootData::CoordToKey and RotData::KetToCoord
+        const int dim = NodeT2::DIM;// dimension of the root's child nodes
+        EXPECT_EQ(4096, dim);
+        auto coordToKey = [](int i, int j, int k) { return NodeT3::DataType::CoordToKey(CoordT(i, j, k)); };
+        auto keyToCoord = [](KeyT key) { return NodeT3::DataType::KeyToCoord(key); };
+        EXPECT_TRUE(coordToKey(0, 0, 0) <  coordToKey(dim, 0, 0));
+        EXPECT_TRUE(coordToKey(0, 0, 0) <  coordToKey(0, dim, 0));
+        EXPECT_TRUE(coordToKey(0, 0, 0) <  coordToKey(0, 0, dim));
+        EXPECT_TRUE(coordToKey(0, 0, 0) == coordToKey(dim-1, dim-1, dim-1));
 #ifdef USE_SINGLE_ROOT_KEY
-        EXPECT_EQ(0u, key(0, 0, 0));
-        EXPECT_EQ(1u, key(4095, 4095, 4096));
+        EXPECT_TRUE((std::is_same<uint64_t, KeyT>::value));
+
+        EXPECT_EQ(uint64_t(0), coordToKey(0, 0, 0));
+        EXPECT_EQ(uint64_t(0), coordToKey(dim-1, dim-1, dim-1));
+        
+        EXPECT_EQ(uint64_t(1), coordToKey(0, 0, dim));
+        EXPECT_EQ(uint64_t(1), coordToKey(dim-1, dim-1, dim));
+
+        EXPECT_EQ(uint64_t(1)<<21, coordToKey(0, dim, 0));
+        EXPECT_EQ(uint64_t(1)<<21, coordToKey(dim-1, dim, dim-1));
+
+        EXPECT_EQ(uint64_t(1)<<42, coordToKey(dim, 0, 0));
+        EXPECT_EQ(uint64_t(1)<<42, coordToKey(dim, dim-1, dim-1));
+
+        EXPECT_EQ(CoordT(0,0,0), keyToCoord(0u));
+        //std::cerr << "keyToCoord(1u) = " << keyToCoord(1u) << std::endl;
+        EXPECT_EQ(CoordT(0, 0, dim), keyToCoord(1u));
+        EXPECT_EQ(CoordT(0, dim, 0), keyToCoord(uint64_t(1)<<21));
+        EXPECT_EQ(CoordT(dim, 0, 0), keyToCoord(uint64_t(1)<<42));
 #endif
     }
 } // RootNode
+
+TEST_F(TestNanoVDB, Offsets)
+{
+    { // check GridData memory alignment, total 672 bytes
+    /*
+    static const int MaxNameSize = 256;
+    uint64_t         mMagic; // 8B magic to validate it is valid grid data.
+    uint64_t         mChecksum; // 8B. Checksum of grid buffer.
+    Version          mVersion;// 4B. version numbers
+    uint32_t         mFlags; // 4B. flags for grid.
+    uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
+    char             mGridName[MaxNameSize]; // 256B
+    Map              mMap; // 264B. affine transformation between index and world space in both single and double precision
+    BBox<Vec3R>      mWorldBBox; // 48B. floating-point AABB of active values in WORLD SPACE (2 x 3 doubles)
+    Vec3R            mVoxelSize; // 24B. size of a voxel in world units
+    GridClass        mGridClass; // 4B.
+    GridType         mGridType; //  4B.
+    uint64_t         mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures that follow this grid.
+    uint32_t         mBlindMetadataCount; // 4B. count of GridBlindMetaData structures that follow this grid.
+    */
+        int offset = 0;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mMagic), offset);
+        offset += 8;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mChecksum), offset);
+        offset += 8;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mVersion), offset);
+        offset += 4;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mFlags), offset);
+        offset += 4;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridSize), offset);
+        offset += 8;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridName), offset);
+        offset += 256;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mMap), offset);
+        offset += 264;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mWorldBBox), offset);
+        offset += 48;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mVoxelSize), offset);
+        offset += 24;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridClass), offset);
+        offset += 4;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridType), offset);
+        offset += 4;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mBlindMetadataOffset), offset);
+        offset += 8;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mBlindMetadataCount), offset);
+        offset += 4;
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        //std::cerr << "Offset = " << offset << std::endl;
+        EXPECT_EQ(offset, (int)sizeof(nanovdb::GridData));
+    }
+    {// check TreeData memory alignment, total 64 bytes
+        /*
+        template<int ROOT_LEVEL = 3>
+        struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
+        {
+            static_assert(ROOT_LEVEL == 3, "Root level is assumed to be three");
+            uint64_t mBytes[ROOT_LEVEL + 1]; // 32B. byte offsets to nodes of type: leaf, lower internal, upper internal, and root
+            uint32_t mCount[ROOT_LEVEL + 1]; // 16B. total number of nodes of type: leaf, lower internal, upper internal, and root
+            uint32_t mPFSum[ROOT_LEVEL + 1]; // 16B. reversed prefix sum of mCount - useful for accessing blind data associated with nodes
+        };
+        */
+        int offset = 0;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::TreeData<>, mBytes), offset);
+        offset += 32;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::TreeData<>, mCount), offset);
+        offset += 16;
+        EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::TreeData<>, mPFSum), offset);
+        offset += 16;
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        //std::cerr << "Offset = " << offset << std::endl;
+        EXPECT_EQ(offset, (int)sizeof(nanovdb::TreeData<>));
+    }
+}
+
+template <typename ValueT>
+void checkLeaf(int &offset);
+
+TYPED_TEST(TestOffsets, NanoVDB)
+{
+    using ValueType = TypeParam;
+    using T = typename nanovdb::TensorTraits<ValueType>::ElementType;
+    using StatsT = typename nanovdb::FloatTraits<ValueType>::FloatType;
+    static const size_t ALIGNMENT = sizeof(T) > sizeof(StatsT) ? sizeof(T) : sizeof(StatsT);
+    //std::cerr << "Alignment = " << ALIGNMENT << std::endl;
+    {// check memory layout of RootData
+        using DataT = typename nanovdb::NanoRoot<ValueType>::DataType;
+        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        int offsets[] = {
+            NANOVDB_OFFSETOF(DataT, mBBox),
+            NANOVDB_OFFSETOF(DataT, mActiveVoxelCount),
+            NANOVDB_OFFSETOF(DataT, mTileCount),
+            NANOVDB_OFFSETOF(DataT, mBackground),
+            NANOVDB_OFFSETOF(DataT, mMinimum),
+            NANOVDB_OFFSETOF(DataT, mMaximum),
+            NANOVDB_OFFSETOF(DataT, mAverage),
+            NANOVDB_OFFSETOF(DataT, mStdDevi)
+        };
+        //for (int i : offsets) std::cout << i << " ";
+        const int *p = offsets;
+        int offset = 0;
+        EXPECT_EQ(*p++, offset);
+        offset += 24;
+        EXPECT_EQ(*p++, offset);
+        offset += 8;
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(uint32_t);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        EXPECT_EQ(offset, (int)sizeof(DataT));
+    }
+    {// check  memory layout of upper internal nodes
+        using DataT = typename nanovdb::NanoNode2<ValueType>::DataType;
+        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        int offsets[] = {
+            NANOVDB_OFFSETOF(DataT, mBBox),
+            NANOVDB_OFFSETOF(DataT, mOffset),
+            NANOVDB_OFFSETOF(DataT, mFlags),
+            NANOVDB_OFFSETOF(DataT, mValueMask),
+            NANOVDB_OFFSETOF(DataT, mChildMask),
+            NANOVDB_OFFSETOF(DataT, mMinimum),
+            NANOVDB_OFFSETOF(DataT, mMaximum),
+            NANOVDB_OFFSETOF(DataT, mAverage),
+            NANOVDB_OFFSETOF(DataT, mStdDevi),
+            NANOVDB_OFFSETOF(DataT, mTable),
+        };
+        //for (int i : offsets) std::cout << i << " ";
+        int offset = 0, *p = offsets;
+        EXPECT_EQ(*p++, offset);
+        offset += 24;
+        EXPECT_EQ(*p++, offset);
+        offset += 4;
+        EXPECT_EQ(*p++, offset);
+        offset += 4;
+        EXPECT_EQ(*p++, offset);
+        offset += 4096;// = 32*32*32/8
+        EXPECT_EQ(*p++, offset);
+        offset += 4096;// = 32*32*32/8
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<32>(offset);
+        EXPECT_EQ(*p++, offset);
+        const size_t tile_size = nanovdb::Max(sizeof(uint32_t), sizeof(ValueType));
+        EXPECT_EQ(sizeof(typename DataT::Tile), tile_size);
+        offset += (32*32*32)*tile_size;
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        EXPECT_EQ(sizeof(DataT), (size_t)offset);
+    }
+    {// check  memory lower of upper internal nodes
+        using DataT = typename nanovdb::NanoNode1<ValueType>::DataType;
+        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        int offsets[] = {
+            NANOVDB_OFFSETOF(DataT, mBBox),
+            NANOVDB_OFFSETOF(DataT, mOffset),
+            NANOVDB_OFFSETOF(DataT, mFlags),
+            NANOVDB_OFFSETOF(DataT, mValueMask),
+            NANOVDB_OFFSETOF(DataT, mChildMask),
+            NANOVDB_OFFSETOF(DataT, mMinimum),
+            NANOVDB_OFFSETOF(DataT, mMaximum),
+            NANOVDB_OFFSETOF(DataT, mAverage),
+            NANOVDB_OFFSETOF(DataT, mStdDevi),
+            NANOVDB_OFFSETOF(DataT, mTable),
+        };
+        //for (int i : offsets) std::cout << i << " ";
+        int offset = 0, *p = offsets;
+        EXPECT_EQ(*p++, offset);
+        offset += 24;
+        EXPECT_EQ(*p++, offset);
+        offset += 4;
+        EXPECT_EQ(*p++, offset);
+        offset += 4;
+        EXPECT_EQ(*p++, offset);
+        offset += 512;// = 16*16*16/8
+        EXPECT_EQ(*p++, offset);
+        offset += 512;// = 16*16*16/8
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(ValueType);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+        EXPECT_EQ(*p++, offset);
+        offset += sizeof(StatsT);
+        offset = nanovdb::AlignUp<32>(offset);
+        EXPECT_EQ(*p++, offset);
+        const size_t tile_size = nanovdb::Max(sizeof(uint32_t), sizeof(ValueType));
+        EXPECT_EQ(sizeof(typename DataT::Tile), tile_size);
+        offset += (16*16*16)*tile_size;
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        EXPECT_EQ(sizeof(DataT), (size_t)offset);
+    }
+    {// check  memory of leaf nodes
+        using DataT = typename nanovdb::LeafNode<ValueType>::DataType;
+        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::FloatType>::value));
+        int offsets[] = {
+            NANOVDB_OFFSETOF(DataT, mBBoxMin),
+            NANOVDB_OFFSETOF(DataT, mBBoxDif),
+            NANOVDB_OFFSETOF(DataT, mFlags),
+            NANOVDB_OFFSETOF(DataT, mValueMask),
+        };
+        //for (int i : offsets) std::cout << i << " ";
+        int offset = 0, *p = offsets;
+        EXPECT_EQ(*p++, offset);
+        offset += 12;
+        EXPECT_EQ(*p++, offset);
+        offset += 3;
+        EXPECT_EQ(*p++, offset);
+        offset += 1;
+        EXPECT_EQ(*p++, offset);
+        offset += 64;// = 8*8*8/8
+        checkLeaf<ValueType>(offset);
+        offset = nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(offset);
+        EXPECT_EQ(sizeof(DataT), (size_t)offset);
+    }
+}
+
+template<typename ValueType>
+void checkLeaf(int &offset)
+{
+    using DataT = typename nanovdb::LeafNode<ValueType>::DataType;
+    using T = typename nanovdb::TensorTraits<ValueType>::ElementType;
+    using StatsT = typename nanovdb::FloatTraits<ValueType>::FloatType;
+    static const size_t ALIGNMENT = sizeof(T) > sizeof(StatsT) ? sizeof(T) : sizeof(StatsT);
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mMinimum), offset);
+    offset += sizeof(ValueType);
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mMaximum), offset);
+    offset += sizeof(ValueType);
+    offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mAverage), offset);
+    offset += sizeof(StatsT);
+    offset = nanovdb::AlignUp<ALIGNMENT>(offset);
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mStdDevi), offset);
+    offset += sizeof(StatsT);
+    offset = nanovdb::AlignUp<32>(offset);
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mValues), offset);
+    offset += (8*8*8)*sizeof(ValueType);    
+}
+
+template<>
+void checkLeaf<bool>(int &offset)
+{
+    using DataT = typename nanovdb::LeafNode<bool>::DataType;
+    EXPECT_EQ(NANOVDB_OFFSETOF(DataT, mValues), offset);
+    offset += 64;// = 8*8*8/8
+}
+
+template<>
+void checkLeaf<nanovdb::ValueMask>(int &) {}
 
 TEST_F(TestNanoVDB, Grid)
 {
@@ -1251,7 +1791,7 @@ TEST_F(TestNanoVDB, Grid)
     using CoordT = LeafT::CoordType;
 
     {
-        // This is just for visual insepction
+        // This is just for visual inspection
         /*
         this->printType<GridT>("Grid");
         this->printType<TreeT>("Tree");
@@ -1272,66 +1812,6 @@ TEST_F(TestNanoVDB, Grid)
             Size of Lower InternalNode: 17472 bytes which is 32 byte aligned
             Size of Leaf: 2144 bytes which is 32 byte aligned
         */
-    }
-
-    { // check GridData memory alignment
-        /*
-    static const int MaxNameSize = 256;
-    uint64_t         mMagic; // 8B magic to validate it is valid grid data.
-    uint64_t         mChecksum; // 8B. Checksum of grid buffer.
-    uint32_t         mMajor;// 4B. major version number
-    uint32_t         mFlags; // 4B. flags for grid.
-    uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
-    char             mGridName[MaxNameSize]; // 256B
-    Map              mMap; // 264B. affine transformation between index and world space in both single and double precision
-    BBox<Vec3R>      mWorldBBox; // 48B. floating-point AABB of active values in WORLD SPACE (2 x 3 doubles)
-    Vec3R            mVoxelSize; // 24B. size of a voxel in world units
-    GridClass        mGridClass; // 4B.
-    GridType         mGridType; //  4B.
-    uint64_t         mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures that follow this grid.
-    uint32_t         mBlindMetadataCount; // 4B. count of GridBlindMetaData structures that follow this grid.
-    */
-        int offset = 0;
-        int off;
-        off = offsetof(nanovdb::GridData, mMagic);
-        EXPECT_EQ(off, offset);
-        offset += 8;
-        off = offsetof(nanovdb::GridData, mChecksum);
-        EXPECT_EQ(off, offset);
-        offset += 8;
-        off = offsetof(nanovdb::GridData, mMajor);
-        EXPECT_EQ(off, offset);
-        offset += 4;
-        off = offsetof(nanovdb::GridData, mFlags);
-        EXPECT_EQ(off, offset);
-        offset += 4;
-        off = offsetof(nanovdb::GridData, mGridSize);
-        EXPECT_EQ(off, offset);
-        offset += 8;
-        off = offsetof(nanovdb::GridData, mGridName);
-        EXPECT_EQ(off, offset);
-        offset += 256;
-        off = offsetof(nanovdb::GridData, mMap);
-        EXPECT_EQ(off, offset);
-        offset += 264;
-        off = offsetof(nanovdb::GridData, mWorldBBox);
-        EXPECT_EQ(off, offset);
-        offset += 48;
-        off = offsetof(nanovdb::GridData, mVoxelSize);
-        EXPECT_EQ(off, offset);
-        offset += 24;
-        off = offsetof(nanovdb::GridData, mGridClass);
-        EXPECT_EQ(off, offset);
-        offset += 4;
-        off = offsetof(nanovdb::GridData, mGridType);
-        EXPECT_EQ(off, offset);
-        offset += 4;
-        off = offsetof(nanovdb::GridData, mBlindMetadataOffset);
-        EXPECT_EQ(off, offset);
-        offset += 8;
-        off = offsetof(nanovdb::GridData, mBlindMetadataCount);
-        EXPECT_EQ(off, offset);
-        offset += 4;
     }
 
     EXPECT_EQ(sizeof(GridT), nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(8 + 8 + 4 + 4 + 8 + nanovdb::GridData::MaxNameSize + 48 + sizeof(nanovdb::Map) + 24 + 4 + 4 + 8 + 4));
@@ -1439,6 +1919,7 @@ TEST_F(TestNanoVDB, Grid)
                 {0.0, 0.0, 1 / dx, 0.0}, // row 2
                 {-Tx, -Ty, -Tz, 1.0}, // row 3
             };
+            data->mFlags = 0;
             data->mBlindMetadataOffset = 0;
             data->mBlindMetadataCount = 0;
             data->mVoxelSize = nanovdb::Vec3R(dx);
@@ -1446,10 +1927,11 @@ TEST_F(TestNanoVDB, Grid)
             data->mGridClass = nanovdb::GridClass::Unknown;
             data->mGridType = nanovdb::GridType::Float;
             data->mMagic = NANOVDB_MAGIC_NUMBER;
-            data->mMajor = NANOVDB_MAJOR_VERSION_NUMBER;
+            data->mVersion = nanovdb::Version();
             const std::string name("");
             memcpy(data->mGridName, name.c_str(), name.size() + 1);
         }
+
         EXPECT_EQ(tree, &grid->tree());
         const nanovdb::Vec3R p1(1.0, 2.0, 3.0);
         const auto           p2 = grid->worldToIndex(p1);
@@ -1478,6 +1960,11 @@ TEST_F(TestNanoVDB, Grid)
         EXPECT_EQ(nanovdb::Vec3R(0.0, 0.0, 0.0), p4);
         const auto p5 = grid->indexToWorld(p4);
         EXPECT_EQ(p1, p5);
+
+        //EXPECT_TRUE(grid->version().isValid());
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), grid->version().getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), grid->version().getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), grid->version().getPatch());
 
         EXPECT_EQ(nanovdb::GridClass::Unknown, grid->gridClass());
         EXPECT_EQ(nanovdb::GridType::Float, grid->gridType());
@@ -1572,6 +2059,10 @@ TEST_F(TestNanoVDB, GridBuilderBasic0)
         EXPECT_EQ("test", std::string(meta->gridName()));
         EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
         EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
+        //EXPECT_TRUE(meta->version().isValid());
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), meta->version().getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), meta->version().getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), meta->version().getPatch());
         auto* dstGrid = handle.grid<float>();
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ(0u, dstGrid->activeVoxelCount());
@@ -1598,6 +2089,10 @@ TEST_F(TestNanoVDB, GridBuilderBasic1)
         auto* meta = handle.gridMetaData();
         EXPECT_TRUE(meta);
         EXPECT_FALSE(meta->isEmpty());
+        //EXPECT_TRUE(meta->version().isValid());
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), meta->version().getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), meta->version().getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), meta->version().getPatch());
         EXPECT_EQ("", std::string(meta->gridName()));
         EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
         EXPECT_EQ(nanovdb::GridClass::Unknown, meta->gridClass());
@@ -1631,6 +2126,10 @@ TEST_F(TestNanoVDB, GridBuilderBasic2)
         auto* meta = handle.gridMetaData();
         EXPECT_TRUE(meta);
         EXPECT_FALSE(meta->isEmpty());
+        //EXPECT_TRUE(meta->version().isValid());
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), meta->version().getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), meta->version().getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), meta->version().getPatch());
         EXPECT_EQ("test", std::string(meta->gridName()));
         EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
         EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
@@ -1678,6 +2177,10 @@ TEST_F(TestNanoVDB, GridBuilderBasicDense)
         auto* meta = handle.gridMetaData();
         EXPECT_TRUE(meta);
         EXPECT_FALSE(meta->isEmpty());
+        //EXPECT_TRUE(meta->version().isValid());
+        EXPECT_EQ(uint32_t(NANOVDB_MAJOR_VERSION_NUMBER), meta->version().getMajor());
+        EXPECT_EQ(uint32_t(NANOVDB_MINOR_VERSION_NUMBER), meta->version().getMinor());
+        EXPECT_EQ(uint32_t(NANOVDB_PATCH_VERSION_NUMBER), meta->version().getPatch());
         EXPECT_EQ("test", std::string(meta->gridName()));
         EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
         EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
@@ -2188,6 +2691,40 @@ TEST_F(TestNanoVDB, createFogVolumeBox)
 
 } // createFogVolumeBox
 
+TEST_F(TestNanoVDB, createLevelSetOctahedron)
+{
+    auto handle = nanovdb::createLevelSetOctahedron<float>(100.0f, nanovdb::Vec3d(50), 1.0f, 3.0f, nanovdb::Vec3d(0), "octahedron");
+    EXPECT_TRUE(handle);
+    auto* meta = handle.gridMetaData();
+    EXPECT_TRUE(meta);
+    EXPECT_EQ("octahedron", std::string(meta->gridName()));
+    EXPECT_EQ(nanovdb::GridType::Float, meta->gridType());
+    EXPECT_EQ(nanovdb::GridClass::LevelSet, meta->gridClass());
+    auto* dstGrid = handle.grid<float>();
+    EXPECT_TRUE(dstGrid);
+    EXPECT_TRUE(dstGrid->hasBBox());
+    EXPECT_TRUE(dstGrid->hasMinMax());
+    EXPECT_TRUE(dstGrid->hasAverage());
+    EXPECT_TRUE(dstGrid->hasStdDeviation());
+
+    EXPECT_EQ(nanovdb::Coord(50 - 100/2 - 2), dstGrid->indexBBox()[0]);
+    EXPECT_EQ(nanovdb::Coord(50 + 100/2 + 2), dstGrid->indexBBox()[1]);
+
+    auto dstAcc = dstGrid->getAccessor();
+    EXPECT_EQ(-3.0f, dstAcc.getValue(nanovdb::Coord(50)));
+    EXPECT_FALSE(dstAcc.isActive(nanovdb::Coord(50)));
+    EXPECT_EQ(2.0f, dstAcc.getValue(nanovdb::Coord(102, 50, 50)));
+    EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(102, 50, 50)));
+    EXPECT_EQ(0.0f, dstAcc.getValue(nanovdb::Coord(100, 50, 50)));
+    EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(100, 50, 50)));
+    EXPECT_EQ(1.0f, dstAcc.getValue(nanovdb::Coord(101, 50, 50)));
+    EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(101, 50, 50)));
+    EXPECT_EQ(-nanovdb::Sqrt(4.0f/3.0f), dstAcc.getValue(nanovdb::Coord(98, 50, 50)));
+    EXPECT_TRUE(dstAcc.isActive(nanovdb::Coord(98, 50, 50)));
+
+} // createLevelSetOctahedron
+
+#if !defined(_MSC_VER)
 TEST_F(TestNanoVDB, CNanoVDBSize)
 {
     // Verify the sizes of structures are what we expect.
@@ -2207,11 +2744,308 @@ TEST_F(TestNanoVDB, CNanoVDBSize)
     EXPECT_EQ(sizeof(cnanovdb_node1F3), sizeof(nanovdb::InternalNode<nanovdb::LeafNode<nanovdb::Vec3f>>));
     EXPECT_EQ(sizeof(cnanovdb_node2F3), sizeof(nanovdb::InternalNode<nanovdb::InternalNode<nanovdb::LeafNode<nanovdb::Vec3f>>>));
     EXPECT_EQ(sizeof(cnanovdb_rootdataF3), sizeof(nanovdb::NanoRoot<nanovdb::Vec3f>));
-
     EXPECT_EQ(sizeof(cnanovdb_treedata), sizeof(nanovdb::NanoTree<float>));
     EXPECT_EQ(sizeof(cnanovdb_gridblindmetadata), sizeof(nanovdb::GridBlindMetaData));
     EXPECT_EQ(sizeof(cnanovdb_griddata), sizeof(nanovdb::NanoGrid<float>));
 } // CNanoVDBSize
+
+TEST_F(TestNanoVDB, PNanoVDB_Basic)
+{
+    EXPECT_EQ(NANOVDB_MAGIC_NUMBER, PNANOVDB_MAGIC_NUMBER);
+
+    EXPECT_EQ(NANOVDB_MAJOR_VERSION_NUMBER, PNANOVDB_MAJOR_VERSION_NUMBER);
+    EXPECT_EQ(NANOVDB_MINOR_VERSION_NUMBER, PNANOVDB_MINOR_VERSION_NUMBER);
+    EXPECT_EQ(NANOVDB_PATCH_VERSION_NUMBER, PNANOVDB_PATCH_VERSION_NUMBER);
+
+    EXPECT_EQ((int)nanovdb::GridType::Unknown, PNANOVDB_GRID_TYPE_UNKNOWN);
+    EXPECT_EQ((int)nanovdb::GridType::Float,   PNANOVDB_GRID_TYPE_FLOAT);
+    EXPECT_EQ((int)nanovdb::GridType::Double,  PNANOVDB_GRID_TYPE_DOUBLE);
+    EXPECT_EQ((int)nanovdb::GridType::Int16,   PNANOVDB_GRID_TYPE_INT16);
+    EXPECT_EQ((int)nanovdb::GridType::Int32,   PNANOVDB_GRID_TYPE_INT32);
+    EXPECT_EQ((int)nanovdb::GridType::Int64,   PNANOVDB_GRID_TYPE_INT64);
+    EXPECT_EQ((int)nanovdb::GridType::Vec3f,   PNANOVDB_GRID_TYPE_VEC3F);
+    EXPECT_EQ((int)nanovdb::GridType::Vec3d,   PNANOVDB_GRID_TYPE_VEC3D);
+    EXPECT_EQ((int)nanovdb::GridType::Mask,    PNANOVDB_GRID_TYPE_MASK);
+    EXPECT_EQ((int)nanovdb::GridType::FP16,    PNANOVDB_GRID_TYPE_FP16);
+    EXPECT_EQ((int)nanovdb::GridType::UInt32,  PNANOVDB_GRID_TYPE_UINT32);
+    EXPECT_EQ((int)nanovdb::GridType::Boolean, PNANOVDB_GRID_TYPE_BOOLEAN);
+    EXPECT_EQ((int)nanovdb::GridType::PackedRGBA8,   PNANOVDB_GRID_TYPE_PACKED_RGBA8);
+    EXPECT_EQ((int)nanovdb::GridType::End,     PNANOVDB_GRID_TYPE_END);
+
+    EXPECT_EQ((int)nanovdb::GridClass::Unknown,    PNANOVDB_GRID_CLASS_UNKNOWN);
+    EXPECT_EQ((int)nanovdb::GridClass::LevelSet,   PNANOVDB_GRID_CLASS_LEVEL_SET);
+    EXPECT_EQ((int)nanovdb::GridClass::FogVolume,  PNANOVDB_GRID_CLASS_FOG_VOLUME);
+    EXPECT_EQ((int)nanovdb::GridClass::Staggered,  PNANOVDB_GRID_CLASS_STAGGERED);
+    EXPECT_EQ((int)nanovdb::GridClass::PointIndex, PNANOVDB_GRID_CLASS_POINT_INDEX);
+    EXPECT_EQ((int)nanovdb::GridClass::PointData,  PNANOVDB_GRID_CLASS_POINT_DATA);
+    EXPECT_EQ((int)nanovdb::GridClass::Topology,   PNANOVDB_GRID_CLASS_TOPOLOGY);
+    EXPECT_EQ((int)nanovdb::GridClass::VoxelVolume,PNANOVDB_GRID_CLASS_VOXEL_VOLUME);
+    EXPECT_EQ((int)nanovdb::GridClass::End,        PNANOVDB_GRID_CLASS_END);
+
+    // check some basic types
+    EXPECT_EQ(sizeof(pnanovdb_map_t),   sizeof(nanovdb::Map));
+    EXPECT_EQ(sizeof(pnanovdb_coord_t), sizeof(nanovdb::Coord));
+    EXPECT_EQ(sizeof(pnanovdb_vec3_t),  sizeof(nanovdb::Vec3f));
+
+    // check nanovdb::Map
+    EXPECT_EQ((int)sizeof(nanovdb::Map), PNANOVDB_MAP_SIZE);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mMatF),    PNANOVDB_MAP_OFF_MATF);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mInvMatF), PNANOVDB_MAP_OFF_INVMATF);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mVecF),    PNANOVDB_MAP_OFF_VECF);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mTaperF),  PNANOVDB_MAP_OFF_TAPERF);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mMatD),    PNANOVDB_MAP_OFF_MATD);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mInvMatD), PNANOVDB_MAP_OFF_INVMATD);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mVecD),    PNANOVDB_MAP_OFF_VECD);
+    EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::Map, mTaperD),  PNANOVDB_MAP_OFF_TAPERD);
+
+    EXPECT_EQ((int)sizeof(pnanovdb_map_t), PNANOVDB_MAP_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, matf),    PNANOVDB_MAP_OFF_MATF);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, invmatf), PNANOVDB_MAP_OFF_INVMATF);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, vecf),    PNANOVDB_MAP_OFF_VECF);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, taperf),  PNANOVDB_MAP_OFF_TAPERF);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, matd),    PNANOVDB_MAP_OFF_MATD);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, invmatd), PNANOVDB_MAP_OFF_INVMATD);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, vecd),    PNANOVDB_MAP_OFF_VECD);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_map_t, taperd),  PNANOVDB_MAP_OFF_TAPERD);
+
+	EXPECT_TRUE(validate_strides(printf));// checks strides and prints out new ones if they have changed
+}
+
+template <typename ValueT>
+void validateLeaf(pnanovdb_grid_type_t grid_type) 
+{
+    using nodedata0_t = typename nanovdb::LeafData<ValueT, nanovdb::Coord, nanovdb::Mask, 3>;
+    EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mMinimum), (int)pnanovdb_grid_type_constants[grid_type].node0_off_min);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mMaximum), (int)pnanovdb_grid_type_constants[grid_type].node0_off_max);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mAverage), (int)pnanovdb_grid_type_constants[grid_type].node0_off_ave);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mStdDevi), (int)pnanovdb_grid_type_constants[grid_type].node0_off_stddev);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mValues),  (int)pnanovdb_grid_type_constants[grid_type].node0_off_table);
+}
+
+// template specializations for bool types
+template <> 
+void validateLeaf<bool>(pnanovdb_grid_type_t grid_type)
+{
+	using nodedata0_t = typename nanovdb::LeafData<bool, nanovdb::Coord, nanovdb::Mask, 3>;
+	using node0_t = typename nanovdb::LeafNode<bool>;
+
+	EXPECT_EQ(sizeof(node0_t), (pnanovdb_grid_type_constants[grid_type].node0_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxMin), PNANOVDB_NODE0_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxDif), PNANOVDB_NODE0_OFF_BBOX_DIF_AND_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mValueMask), PNANOVDB_NODE0_OFF_VALUE_MASK);
+}
+
+// template specializations for nanovdb::ValueMask types
+template <>
+void validateLeaf<nanovdb::ValueMask>(pnanovdb_grid_type_t grid_type)
+{
+	using nodedata0_t = typename nanovdb::LeafData<nanovdb::ValueMask, nanovdb::Coord, nanovdb::Mask, 3>;
+	using node0_t = typename nanovdb::LeafNode<nanovdb::ValueMask>;
+
+	EXPECT_EQ(sizeof(node0_t), (pnanovdb_grid_type_constants[grid_type].node0_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxMin), PNANOVDB_NODE0_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxDif), PNANOVDB_NODE0_OFF_BBOX_DIF_AND_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mValueMask), PNANOVDB_NODE0_OFF_VALUE_MASK);
+}
+
+TYPED_TEST(TestOffsets, PNanoVDB)
+{
+    using ValueType = TypeParam;
+    pnanovdb_grid_type_t grid_type;
+    if (std::is_same<float, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_FLOAT;
+    } else if (std::is_same<double, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_DOUBLE;
+    } else if (std::is_same<int16_t, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_INT16;
+    } else if (std::is_same<int32_t, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_INT32;
+    } else if (std::is_same<int64_t, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_INT64;
+    } else if (std::is_same<nanovdb::Vec3f, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_VEC3F;
+    } else if (std::is_same<nanovdb::Vec3d, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_VEC3D;
+    } else if (std::is_same<uint32_t, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_UINT32;
+    } else if (std::is_same<nanovdb::ValueMask, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_MASK;
+    } else if (std::is_same<bool, TypeParam>::value) {
+        grid_type = PNANOVDB_GRID_TYPE_BOOLEAN;
+    } else {
+        EXPECT_TRUE(false);
+    }
+    static const uint32_t rootLevel = 3u;
+	using nodedata0_t = typename nanovdb::LeafData<ValueType, nanovdb::Coord, nanovdb::Mask, 3>;
+    using node0_t = typename nanovdb::LeafNode<ValueType>;
+    using nodedata1_t = typename nanovdb::InternalData<node0_t, node0_t::LOG2DIM + 1>;
+    using node1_t = typename nanovdb::InternalNode<node0_t>;
+    using nodedata2_t = typename nanovdb::InternalData<node1_t, node1_t::LOG2DIM + 1>;
+    using node2_t = typename nanovdb::InternalNode<node1_t>;
+    using rootdata_t = typename nanovdb::RootData<node2_t>;
+    using root_t = typename nanovdb::RootNode<node2_t>;
+    using rootdata_tile_t = typename nanovdb::RootData<node2_t>::Tile;
+    using root_tile_t = typename nanovdb::RootNode<node2_t>::Tile;
+    using treedata_t = typename nanovdb::TreeData<rootLevel>;
+    using tree_t = typename nanovdb::Tree<root_t>;
+
+    // grid
+    EXPECT_EQ((int)sizeof(nanovdb::GridData), PNANOVDB_GRID_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mMagic), PNANOVDB_GRID_OFF_MAGIC);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mChecksum), PNANOVDB_GRID_OFF_CHECKSUM);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mVersion), PNANOVDB_GRID_OFF_VERSION);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mFlags), PNANOVDB_GRID_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridSize), PNANOVDB_GRID_OFF_GRID_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridName), PNANOVDB_GRID_OFF_GRID_NAME);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mWorldBBox), PNANOVDB_GRID_OFF_WORLD_BBOX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mMap), PNANOVDB_GRID_OFF_MAP);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mVoxelSize), PNANOVDB_GRID_OFF_VOXEL_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridClass), PNANOVDB_GRID_OFF_GRID_CLASS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mGridType), PNANOVDB_GRID_OFF_GRID_TYPE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mBlindMetadataOffset), PNANOVDB_GRID_OFF_BLIND_METADATA_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridData, mBlindMetadataCount), PNANOVDB_GRID_OFF_BLIND_METADATA_COUNT);
+
+    EXPECT_EQ((int)sizeof(pnanovdb_grid_t), PNANOVDB_GRID_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, magic), PNANOVDB_GRID_OFF_MAGIC);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, checksum), PNANOVDB_GRID_OFF_CHECKSUM);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, version), PNANOVDB_GRID_OFF_VERSION);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, flags), PNANOVDB_GRID_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, grid_size), PNANOVDB_GRID_OFF_GRID_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, grid_name), PNANOVDB_GRID_OFF_GRID_NAME);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, map), PNANOVDB_GRID_OFF_MAP);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, world_bbox), PNANOVDB_GRID_OFF_WORLD_BBOX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, voxel_size), PNANOVDB_GRID_OFF_VOXEL_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, grid_class), PNANOVDB_GRID_OFF_GRID_CLASS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, grid_type), PNANOVDB_GRID_OFF_GRID_TYPE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, blind_metadata_offset), PNANOVDB_GRID_OFF_BLIND_METADATA_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_grid_t, blind_metadata_count), PNANOVDB_GRID_OFF_BLIND_METADATA_COUNT);
+	
+    // test GridBlindMetaData
+    EXPECT_EQ((int)sizeof(nanovdb::GridBlindMetaData), PNANOVDB_GRIDBLINDMETADATA_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mByteOffset), PNANOVDB_GRIDBLINDMETADATA_OFF_BYTE_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mElementCount), PNANOVDB_GRIDBLINDMETADATA_OFF_ELEMENT_COUNT);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mFlags), PNANOVDB_GRIDBLINDMETADATA_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mSemantic), PNANOVDB_GRIDBLINDMETADATA_OFF_SEMANTIC);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mDataClass), PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_CLASS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mDataType), PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_TYPE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nanovdb::GridBlindMetaData, mName), PNANOVDB_GRIDBLINDMETADATA_OFF_NAME);
+
+    EXPECT_EQ((int)sizeof(pnanovdb_gridblindmetadata_t), PNANOVDB_GRIDBLINDMETADATA_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, byte_offset), PNANOVDB_GRIDBLINDMETADATA_OFF_BYTE_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, element_count), PNANOVDB_GRIDBLINDMETADATA_OFF_ELEMENT_COUNT);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, flags), PNANOVDB_GRIDBLINDMETADATA_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, semantic), PNANOVDB_GRIDBLINDMETADATA_OFF_SEMANTIC);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, data_class), PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_CLASS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, data_type), PNANOVDB_GRIDBLINDMETADATA_OFF_DATA_TYPE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_gridblindmetadata_t, name), PNANOVDB_GRIDBLINDMETADATA_OFF_NAME);
+
+    // test tree
+	EXPECT_EQ((int)sizeof(tree_t), PNANOVDB_TREE_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mBytes[0]), PNANOVDB_TREE_OFF_BYTES0);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mBytes[1]), PNANOVDB_TREE_OFF_BYTES1);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mBytes[2]), PNANOVDB_TREE_OFF_BYTES2);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mBytes[3]), PNANOVDB_TREE_OFF_BYTES3);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mCount[0]), PNANOVDB_TREE_OFF_COUNT0);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mCount[1]), PNANOVDB_TREE_OFF_COUNT1);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mCount[2]), PNANOVDB_TREE_OFF_COUNT2);
+	EXPECT_EQ(NANOVDB_OFFSETOF(treedata_t, mCount[3]), PNANOVDB_TREE_OFF_COUNT3);
+
+    EXPECT_EQ((int)sizeof(pnanovdb_tree_t), PNANOVDB_TREE_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, bytes0), PNANOVDB_TREE_OFF_BYTES0);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, bytes1), PNANOVDB_TREE_OFF_BYTES1);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, bytes2), PNANOVDB_TREE_OFF_BYTES2);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, bytes3), PNANOVDB_TREE_OFF_BYTES3);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, count0), PNANOVDB_TREE_OFF_COUNT0);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, count1), PNANOVDB_TREE_OFF_COUNT1);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, count2), PNANOVDB_TREE_OFF_COUNT2);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_tree_t, count3), PNANOVDB_TREE_OFF_COUNT3);
+
+    // background value can start at pad1
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_t, pad1), PNANOVDB_ROOT_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_t, bbox_min), PNANOVDB_ROOT_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_t, bbox_max), PNANOVDB_ROOT_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_t, active_voxel_count), PNANOVDB_ROOT_OFF_ACTIVE_VOXEL_COUNT);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_t, tile_count), PNANOVDB_ROOT_OFF_TILE_COUNT);
+
+	EXPECT_EQ((int)sizeof(pnanovdb_root_tile_t), PNANOVDB_ROOT_TILE_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_tile_t, key), PNANOVDB_ROOT_TILE_OFF_KEY);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_tile_t, child_id), PNANOVDB_ROOT_TILE_OFF_CHILD_ID);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_root_tile_t, state), PNANOVDB_ROOT_TILE_OFF_STATE);
+
+	EXPECT_EQ((int)sizeof(pnanovdb_node2_t), PNANOVDB_NODE2_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, bbox_min), PNANOVDB_NODE2_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, bbox_max), PNANOVDB_NODE2_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, offset), PNANOVDB_NODE2_OFF_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, flags), PNANOVDB_NODE2_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, value_mask), PNANOVDB_NODE2_OFF_VALUE_MASK);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node2_t, child_mask), PNANOVDB_NODE2_OFF_CHILD_MASK);
+
+	EXPECT_EQ((int)sizeof(pnanovdb_node1_t), PNANOVDB_NODE1_SIZE);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, bbox_min), PNANOVDB_NODE1_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, bbox_max), PNANOVDB_NODE1_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, offset), PNANOVDB_NODE1_OFF_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, flags), PNANOVDB_NODE1_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, value_mask), PNANOVDB_NODE1_OFF_VALUE_MASK);
+	EXPECT_EQ(NANOVDB_OFFSETOF(pnanovdb_node1_t, child_mask), PNANOVDB_NODE1_OFF_CHILD_MASK);
+
+	EXPECT_EQ((uint)sizeof(root_t), (pnanovdb_grid_type_constants[grid_type].root_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_t, mBBox.mCoord[0]), PNANOVDB_ROOT_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_t, mBBox.mCoord[1]), PNANOVDB_ROOT_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_t, mActiveVoxelCount), PNANOVDB_ROOT_OFF_ACTIVE_VOXEL_COUNT);
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_t, mTileCount), PNANOVDB_ROOT_OFF_TILE_COUNT);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_t, mBackground), pnanovdb_grid_type_constants[grid_type].root_off_background);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_t, mMinimum), pnanovdb_grid_type_constants[grid_type].root_off_min);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_t, mMaximum), pnanovdb_grid_type_constants[grid_type].root_off_max);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_t, mAverage), pnanovdb_grid_type_constants[grid_type].root_off_ave);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_t, mStdDevi), pnanovdb_grid_type_constants[grid_type].root_off_stddev);
+
+	EXPECT_EQ((uint)sizeof(root_tile_t), (pnanovdb_grid_type_constants[grid_type].root_tile_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_tile_t, key), PNANOVDB_ROOT_TILE_OFF_KEY);
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_tile_t, childID), PNANOVDB_ROOT_TILE_OFF_CHILD_ID);
+	EXPECT_EQ(NANOVDB_OFFSETOF(rootdata_tile_t, state), PNANOVDB_ROOT_TILE_OFF_STATE);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(rootdata_tile_t, value), pnanovdb_grid_type_constants[grid_type].root_tile_off_value);
+
+	EXPECT_EQ((uint)sizeof(node2_t), (pnanovdb_grid_type_constants[grid_type].node2_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mBBox.mCoord[0]), PNANOVDB_NODE2_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mBBox.mCoord[1]), PNANOVDB_NODE2_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mOffset), PNANOVDB_NODE2_OFF_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mFlags), PNANOVDB_NODE2_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mValueMask), PNANOVDB_NODE2_OFF_VALUE_MASK);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata2_t, mChildMask), PNANOVDB_NODE2_OFF_CHILD_MASK);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata2_t, mMinimum), pnanovdb_grid_type_constants[grid_type].node2_off_min);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata2_t, mMaximum), pnanovdb_grid_type_constants[grid_type].node2_off_max);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata2_t, mAverage), pnanovdb_grid_type_constants[grid_type].node2_off_ave);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata2_t, mStdDevi), pnanovdb_grid_type_constants[grid_type].node2_off_stddev);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata2_t, mTable), pnanovdb_grid_type_constants[grid_type].node2_off_table);
+
+	EXPECT_EQ((uint)sizeof(node1_t), (pnanovdb_grid_type_constants[grid_type].node1_size));
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mBBox.mCoord[0]), PNANOVDB_NODE1_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mBBox.mCoord[1]), PNANOVDB_NODE1_OFF_BBOX_MAX);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mOffset), PNANOVDB_NODE1_OFF_OFFSET);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mFlags), PNANOVDB_NODE1_OFF_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mValueMask), PNANOVDB_NODE1_OFF_VALUE_MASK);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata1_t, mChildMask), PNANOVDB_NODE1_OFF_CHILD_MASK);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata1_t, mMinimum), pnanovdb_grid_type_constants[grid_type].node1_off_min);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata1_t, mMaximum), pnanovdb_grid_type_constants[grid_type].node1_off_max);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata1_t, mAverage), pnanovdb_grid_type_constants[grid_type].node1_off_ave);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata1_t, mStdDevi), pnanovdb_grid_type_constants[grid_type].node1_off_stddev);
+	EXPECT_EQ((uint)NANOVDB_OFFSETOF(nodedata1_t, mTable), pnanovdb_grid_type_constants[grid_type].node1_off_table);
+
+    EXPECT_EQ(8u*sizeof(rootdata_t::mAverage),  pnanovdb_grid_type_stat_strides_bits[grid_type]);
+	EXPECT_EQ(8u*sizeof(rootdata_t::mStdDevi),  pnanovdb_grid_type_stat_strides_bits[grid_type]);
+    EXPECT_EQ(8u*sizeof(nodedata2_t::mAverage), pnanovdb_grid_type_stat_strides_bits[grid_type]);
+	EXPECT_EQ(8u*sizeof(nodedata2_t::mStdDevi), pnanovdb_grid_type_stat_strides_bits[grid_type]);
+    EXPECT_EQ(8u*sizeof(nodedata1_t::mAverage), pnanovdb_grid_type_stat_strides_bits[grid_type]);
+	EXPECT_EQ(8u*sizeof(nodedata1_t::mStdDevi), pnanovdb_grid_type_stat_strides_bits[grid_type]);
+
+    // leaf nodes
+    EXPECT_EQ(sizeof(node0_t), (pnanovdb_grid_type_constants[grid_type].node0_size));
+    EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxMin), PNANOVDB_NODE0_OFF_BBOX_MIN);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mBBoxDif), PNANOVDB_NODE0_OFF_BBOX_DIF_AND_FLAGS);
+	EXPECT_EQ(NANOVDB_OFFSETOF(nodedata0_t, mValueMask), PNANOVDB_NODE0_OFF_VALUE_MASK);
+    validateLeaf<ValueType>(grid_type);
+}
+#endif
 
 TEST_F(TestNanoVDB, GridStats)
 {

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-	\file RenderFunctions.h
+	\file RenderGridUtils.h
 
 	\author Wil Braithwaite
 
@@ -92,5 +92,6 @@ struct RenderGridRgba32fFn
         compositeFn(outPixel, color, numAccumulations, sceneParams);
     }
 };
+
 }
 } // namespace render::grid

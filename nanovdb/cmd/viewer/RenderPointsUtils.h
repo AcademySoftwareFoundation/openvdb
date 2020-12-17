@@ -89,8 +89,6 @@ struct PointIntegrator
             const typename TreeT::LeafNodeType* node;
             float                               t0 = 0, t1 = 0;
             while (marcher.step(&node, t0, t1)) {
-                if (t0 >= t1)
-                    continue;
 
                 if (node->valueMax() == 0)
                     continue;
@@ -197,7 +195,7 @@ struct RenderPointsRgba32fFn
             color[2] = envRadiance;
 
         } else {
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
 
             const auto& tree = grid->tree();

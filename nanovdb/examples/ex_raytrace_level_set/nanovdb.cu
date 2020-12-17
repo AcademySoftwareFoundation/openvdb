@@ -21,8 +21,6 @@ using BufferT = nanovdb::HostBuffer;
 
 void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int width, int height, BufferT& imageBuffer)
 {
-    auto hdl2 = nanovdb::createLevelSetSphere();
-
     using GridT = nanovdb::FloatGrid;
     using CoordT = nanovdb::Coord;
     using RealT = float;

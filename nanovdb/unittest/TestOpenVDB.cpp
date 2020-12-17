@@ -189,6 +189,59 @@ TEST_F(TestOpenVDB, Basic)
     }
 }
 
+TEST_F(TestOpenVDB, TypeConversion)
+{
+    {// Coord
+        constexpr bool test = std::is_same<nanovdb::Coord, nanovdb::TypeConverter<openvdb::Coord>::Type>::value;
+        EXPECT_TRUE(test);
+        const openvdb::Coord ijk1(1, 2, -4);
+        nanovdb::Coord ijk2(-2, 7, 9);
+        EXPECT_NE(ijk2, nanovdb::Coord(1, 2, -4));
+        ijk2 = ijk1;
+        EXPECT_EQ(ijk2, nanovdb::Coord(1, 2, -4));
+    } 
+    {// Vec3f
+        constexpr bool test1 = std::is_same<nanovdb::Vec3f, nanovdb::TypeConverter<openvdb::Vec3f>::Type>::value;
+        EXPECT_TRUE(test1);
+        constexpr bool test2 = std::is_same<nanovdb::Vec3d, nanovdb::TypeConverter<openvdb::Vec3f>::Type>::value;
+        EXPECT_FALSE(test2);
+        const openvdb::Vec3f xyz1(1, 2, -4);
+        nanovdb::Vec3f xyz2(-2, 7, 9);
+        EXPECT_NE(xyz2, nanovdb::Vec3f(1, 2, -4));
+        xyz2 = xyz1;
+        EXPECT_EQ(xyz2, nanovdb::Vec3f(1, 2, -4));
+    }
+    {// Vec4d
+        constexpr bool test1 = std::is_same<nanovdb::Vec4d, nanovdb::TypeConverter<openvdb::Vec4d>::Type>::value;
+        EXPECT_TRUE(test1);
+        constexpr bool test2 = std::is_same<nanovdb::Vec4f, nanovdb::TypeConverter<openvdb::Vec4d>::Type>::value;
+        EXPECT_FALSE(test2);
+        const openvdb::Vec4d xyz1(1, 2, -4, 7);
+        nanovdb::Vec4d xyz2(-2, 7, 9, -4);
+        EXPECT_NE(xyz2, nanovdb::Vec4d(1, 2, -4, 7));
+        xyz2 = xyz1;
+        EXPECT_EQ(xyz2, nanovdb::Vec4d(1, 2, -4, 7));
+    }
+    {// MaskValue
+        constexpr bool test1 = std::is_same<nanovdb::ValueMask, nanovdb::TypeConverter<openvdb::ValueMask>::Type>::value;
+        EXPECT_TRUE(test1);
+        constexpr bool test2 = std::is_same<nanovdb::Vec3f, nanovdb::TypeConverter<openvdb::ValueMask>::Type>::value;
+        EXPECT_FALSE(test2);
+        EXPECT_EQ(sizeof(nanovdb::ValueMask), sizeof(openvdb::ValueMask));
+    }
+    {// Mask
+        openvdb::util::NodeMask<3> mask1;
+        nanovdb::Mask<3> mask2, mask3;
+        for (int i=0; i<256; ++i) {
+            mask1.setOn(i);
+            mask2.setOn(i);
+        }
+        EXPECT_NE(mask2, mask3);
+        mask3 = mask2;
+        EXPECT_EQ(mask2, mask3);
+    }
+}
+
 TEST_F(TestOpenVDB, Grid)
 {
     using LeafT = nanovdb::LeafNode<float>;
@@ -1045,10 +1098,34 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(0u, grid.activeVoxelCount());
         handles.push_back(nanovdb::openToNanoVDB(grid));
     }
+    { // add a ValueMask grid
+        openvdb::MaskGrid grid(false);
+        grid.setName("Mask grid");
+        const openvdb::Coord min(-10,-450,-90), max(10, 450, 90);
+        grid.tree().setValue(min, true);
+        EXPECT_EQ(1u, grid.activeVoxelCount());
+        grid.tree().setValue(max, true);
+        EXPECT_EQ(2u, grid.activeVoxelCount());
+        openvdb::CoordBBox bbox;
+        grid.tree().evalActiveVoxelBoundingBox(bbox);
+        //std::cerr << bbox << std::endl;
+        EXPECT_EQ(openvdb::CoordBBox(min, max), bbox);
+        handles.push_back(nanovdb::openToNanoVDB(grid));
+    }
+    { // add a bool grid
+        openvdb::BoolGrid grid(false);
+        grid.setName("Bool grid");
+        grid.tree().setValue(openvdb::Coord(-10,-450,-90), false);
+        EXPECT_EQ(1u, grid.activeVoxelCount());
+        grid.tree().setValue(openvdb::Coord( 10, 450, 90), true);
+        EXPECT_EQ(2u, grid.activeVoxelCount());
+        handles.push_back(nanovdb::openToNanoVDB(grid));
+    }
     { // add a Vec3f grid
         openvdb::Vec3fGrid grid(openvdb::Vec3f(0.0f, 0.0f, -1.0f));
         grid.setName("Float vector grid");
         grid.setGridClass(openvdb::GRID_STAGGERED);
+        EXPECT_EQ(0u, grid.activeVoxelCount());
         grid.tree().setValue(openvdb::Coord(-256), openvdb::Vec3f(1.0f, 0.0f, 0.0f));
         EXPECT_EQ(1u, grid.activeVoxelCount());
         handles.push_back(nanovdb::openToNanoVDB(grid));
@@ -1087,14 +1164,14 @@ TEST_F(TestOpenVDB, MultiFile)
         //mTimer.start("nanovdb::io::readGridMetaData");
         auto meta = nanovdb::io::readGridMetaData("data/multi.nvdb");
         //mTimer.stop();
-        EXPECT_EQ(15u, meta.size());
+        EXPECT_EQ(17u, meta.size());
         EXPECT_EQ(std::string("Double grid"), meta.back().gridName);
     }
     { // read in32 grid and test values
         //mTimer.start("Reading multiple grids from file");
         auto handles = nanovdb::io::readGrids("data/multi.nvdb");
         //mTimer.stop();
-        EXPECT_EQ(15u, handles.size());
+        EXPECT_EQ(17u, handles.size());
         auto& handle = handles.front();
         EXPECT_EQ(std::string("Int32 grid"), handle.gridMetaData()->gridName());
         EXPECT_FALSE(handle.grid<float>());
@@ -1111,6 +1188,10 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(-1, tree.getValue(ijk + nanovdb::Coord(1, 0, 0)));
         EXPECT_EQ(10, tree.root().valueMin());
         EXPECT_EQ(10, tree.root().valueMax());
+        EXPECT_TRUE(grid->tree().isActive(ijk));
+        EXPECT_FALSE(grid->tree().isActive(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_FALSE(grid->tree().isActive(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_FALSE(grid->tree().isActive(ijk + nanovdb::Coord(1, 0, 0)));
         const nanovdb::CoordBBox bbox(ijk, ijk);
         EXPECT_EQ(bbox, grid->indexBBox());
         EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
@@ -1136,7 +1217,7 @@ TEST_F(TestOpenVDB, MultiFile)
         //mTimer.start("Reading multiple grids from file");
         auto handles = nanovdb::io::readGrids("data/multi.nvdb");
         //mTimer.stop();
-        EXPECT_EQ(15u, handles.size());
+        EXPECT_EQ(17u, handles.size());
         auto& handle = handles[1];
         EXPECT_TRUE(handle);
         EXPECT_EQ(std::string("Int32 grid, empty"), handle.gridMetaData()->gridName());
@@ -1151,6 +1232,10 @@ TEST_F(TestOpenVDB, MultiFile)
         const nanovdb::Coord ijk(-256);
         EXPECT_EQ(-4, grid->tree().getValue(ijk));
         EXPECT_EQ(-4, grid->tree().getValue(ijk + nanovdb::Coord(1, 0, 0)));
+        EXPECT_FALSE(grid->tree().isActive(ijk));
+        EXPECT_FALSE(grid->tree().isActive(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_FALSE(grid->tree().isActive(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_FALSE(grid->tree().isActive(ijk + nanovdb::Coord(1, 0, 0)));
         EXPECT_EQ(-4, grid->tree().root().valueMin());
         EXPECT_EQ(-4, grid->tree().root().valueMax());
         EXPECT_EQ(nanovdb::Coord(std::numeric_limits<int>::max()), grid->indexBBox().min());
@@ -1162,15 +1247,101 @@ TEST_F(TestOpenVDB, MultiFile)
         EXPECT_EQ(1u, grid->tree().nodeCount(3)); // always a root node
         EXPECT_FALSE(grid->isLevelSet());
         EXPECT_FALSE(grid->isFogVolume());
+        EXPECT_FALSE(grid->isMask());
         EXPECT_TRUE(grid->isUnknown());
         EXPECT_FALSE(grid->isStaggered());
+    }
+    { // read mask grid and test values
+        //mTimer.start("Reading multiple grids from file");
+        auto handles = nanovdb::io::readGrids("data/multi.nvdb");
+        //mTimer.stop();
+        EXPECT_EQ(17u, handles.size());
+        auto& handle = handles[2];
+        EXPECT_TRUE(handle);
+        EXPECT_EQ(std::string("Mask grid"), handle.gridMetaData()->gridName());
+        EXPECT_FALSE(handle.grid<float>());
+        EXPECT_FALSE(handle.grid<double>());
+        EXPECT_FALSE(handle.grid<int64_t>());
+        EXPECT_FALSE(handle.grid<int32_t>());
+        EXPECT_FALSE(handle.grid<nanovdb::Vec3f>());
+        EXPECT_FALSE(handle.grid<nanovdb::Vec3d>());
+        auto* grid = handle.grid<nanovdb::ValueMask>();
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(2u, grid->activeVoxelCount());
+        const nanovdb::Coord ijk(-256);
+        EXPECT_EQ(false, grid->tree().getValue(ijk));
+        EXPECT_EQ(true, grid->tree().getValue(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_EQ(true, grid->tree().getValue(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_EQ(false, grid->tree().getValue(ijk + nanovdb::Coord(1, 0, 0)));
+        EXPECT_FALSE(grid->tree().isActive(ijk));
+        EXPECT_TRUE(grid->tree().isActive(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_TRUE(grid->tree().isActive(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_FALSE(grid->tree().isActive(ijk + nanovdb::Coord(1, 0, 0)));
+        EXPECT_EQ(false, grid->tree().root().valueMin());
+        EXPECT_EQ(false, grid->tree().root().valueMax());
+        EXPECT_EQ(nanovdb::Coord(-10,-450,-90), grid->indexBBox().min());
+        EXPECT_EQ(nanovdb::Coord( 10, 450, 90), grid->indexBBox().max());
+        EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
+        EXPECT_EQ(2u, grid->tree().nodeCount(0));
+        EXPECT_EQ(2u, grid->tree().nodeCount(1));
+        EXPECT_EQ(2u, grid->tree().nodeCount(2));
+        EXPECT_EQ(1u, grid->tree().nodeCount(3)); // always a root node
+        EXPECT_FALSE(grid->isLevelSet());
+        EXPECT_FALSE(grid->isFogVolume());
+        EXPECT_FALSE(grid->isUnknown());
+        EXPECT_FALSE(grid->isStaggered());
+        EXPECT_TRUE(grid->isMask());
+    }
+    { // read bool grid and test values
+        //mTimer.start("Reading multiple grids from file");
+        auto handles = nanovdb::io::readGrids("data/multi.nvdb");
+        //mTimer.stop();
+        EXPECT_EQ(17u, handles.size());
+        auto& handle = handles[3];
+        EXPECT_TRUE(handle);
+        EXPECT_EQ(std::string("Bool grid"), handle.gridMetaData()->gridName());
+        EXPECT_FALSE(handle.grid<float>());
+        EXPECT_FALSE(handle.grid<double>());
+        EXPECT_FALSE(handle.grid<int64_t>());
+        EXPECT_FALSE(handle.grid<int32_t>());
+        EXPECT_FALSE(handle.grid<nanovdb::Vec3f>());
+        EXPECT_FALSE(handle.grid<nanovdb::Vec3d>());
+        EXPECT_FALSE(handle.grid<nanovdb::ValueMask>());
+        auto* grid = handle.grid<bool>();
+        EXPECT_TRUE(grid);
+        EXPECT_EQ(2u, grid->activeVoxelCount());
+        const nanovdb::Coord ijk(-256);
+        EXPECT_EQ(false, grid->tree().getValue(ijk));
+        EXPECT_EQ(true, grid->tree().getValue(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_EQ(false, grid->tree().getValue(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_EQ(false, grid->tree().getValue(ijk + nanovdb::Coord(1, 0, 0)));
+        EXPECT_FALSE(grid->tree().isActive(ijk));
+        EXPECT_TRUE(grid->tree().isActive(nanovdb::Coord( 10, 450, 90)));
+        EXPECT_TRUE(grid->tree().isActive(nanovdb::Coord(-10,-450,-90)));
+        EXPECT_FALSE(grid->tree().isActive(ijk + nanovdb::Coord(1, 0, 0)));
+        EXPECT_EQ(false, grid->tree().root().valueMin());
+        EXPECT_EQ(false, grid->tree().root().valueMax());
+        EXPECT_EQ(nanovdb::Coord(-10,-450,-90), grid->indexBBox().min());
+        EXPECT_EQ(nanovdb::Coord( 10, 450, 90), grid->indexBBox().max());
+        EXPECT_NE(nanovdb::Coord(std::numeric_limits<int>::max()), grid->indexBBox().min());
+        EXPECT_NE(nanovdb::Coord(std::numeric_limits<int>::min()), grid->indexBBox().max());
+        EXPECT_EQ(handle.gridMetaData()->indexBBox(), grid->indexBBox());
+        EXPECT_EQ(2u, grid->tree().nodeCount(0));
+        EXPECT_EQ(2u, grid->tree().nodeCount(1));
+        EXPECT_EQ(2u, grid->tree().nodeCount(2));
+        EXPECT_EQ(1u, grid->tree().nodeCount(3)); // always a root node
+        EXPECT_FALSE(grid->isLevelSet());
+        EXPECT_FALSE(grid->isFogVolume());
+        EXPECT_TRUE(grid->isUnknown());
+        EXPECT_FALSE(grid->isStaggered());
+        EXPECT_FALSE(grid->isMask());
     }
     { // read int64 grid and test values
         //mTimer.start("Reading multiple grids from file");
         auto handles = nanovdb::io::readGrids("data/multi.nvdb");
         //mTimer.stop();
-        EXPECT_EQ(15u, handles.size());
-        auto& handle = handles[3];
+        EXPECT_EQ(17u, handles.size());
+        auto& handle = handles[5];
         EXPECT_TRUE(handle);
         EXPECT_EQ(std::string("Int64 grid"), handle.gridMetaData()->gridName());
         auto* grid = handle.grid<int64_t>();
@@ -1190,8 +1361,8 @@ TEST_F(TestOpenVDB, MultiFile)
     }
     { // read vec3f grid and test values
         auto handles = nanovdb::io::readGrids("data/multi.nvdb");
-        EXPECT_EQ(15u, handles.size());
-        auto& handle = handles[2];
+        EXPECT_EQ(17u, handles.size());
+        auto& handle = handles[4];
         EXPECT_TRUE(handle);
         EXPECT_EQ(std::string("Float vector grid"), handle.gridMetaData()->gridName());
         auto* grid = handle.grid<nanovdb::Vec3f>();
@@ -1211,7 +1382,7 @@ TEST_F(TestOpenVDB, MultiFile)
     }
     { // read double grid and test values
         auto handles = nanovdb::io::readGrids("data/multi.nvdb");
-        EXPECT_EQ(15u, handles.size());
+        EXPECT_EQ(17u, handles.size());
         auto& handle = handles.back();
         EXPECT_TRUE(handle);
         EXPECT_EQ(std::string("Double grid"), handle.gridMetaData()->gridName());
@@ -1232,11 +1403,41 @@ TEST_F(TestOpenVDB, MultiFile)
     }
 } // MultiFile
 
+TEST_F(TestOpenVDB, LongGridName)
+{
+    for (int n = -10; n <= 10; ++n) {
+        openvdb::FloatGrid srcGrid(0.0f);
+        const int limit = nanovdb::GridData::MaxNameSize - 1, length = limit + n;
+        char buffer[length + 1];
+        srand (time(NULL));
+        for (int i = 0; i < length; ++i) {
+            buffer[i] = 'a' + (rand() % 26);// a-z
+        }
+        buffer[length] = '\0';
+        const std::string gridName(buffer);
+        //std::cout << "Long random grid name: " << gridName << std::endl;
+        EXPECT_EQ(gridName.length(), size_t(length));
+        srcGrid.setName(gridName);
+        EXPECT_EQ(gridName, srcGrid.getName());
+        srcGrid.tree().setValue(openvdb::Coord(-256), 10.0f);
+        EXPECT_EQ(1u, srcGrid.activeVoxelCount());
+
+        auto handle = nanovdb::openToNanoVDB(srcGrid);
+        auto* dstGrid = handle.grid<float>();
+        EXPECT_TRUE(dstGrid);
+        EXPECT_EQ(1u, dstGrid->activeVoxelCount());
+        EXPECT_EQ(length > limit, dstGrid->hasLongGridName());
+        EXPECT_EQ(gridName, std::string(dstGrid->gridName()));
+        EXPECT_EQ( 0.0, dstGrid->tree().getValue(nanovdb::Coord(-255)));
+        EXPECT_EQ(10.0, dstGrid->tree().getValue(nanovdb::Coord(-256)));
+    }
+}// LongGridName
+
 TEST_F(TestOpenVDB, LevelSetFiles)
 {
     const auto fileNames = this->availableLevelSetFiles();
     if (fileNames.empty()) {
-        std::cout << "\tSet the enviroment variable \"VDB_DATA_PATH\" to a directory\n"
+        std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
                   << "\tcontaining OpenVDB level set files. They can be downloaded\n" 
                   << "\there: https://www.openvdb.org/download/" << std::endl;
         return;
@@ -1319,7 +1520,7 @@ TEST_F(TestOpenVDB, FogFiles)
 {
     const auto fileNames = this->availableFogFiles();
     if (fileNames.empty()) {
-        std::cout << "\tSet the enviroment variable \"VDB_DATA_PATH\" to a directory\n"
+        std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
                   << "\tcontaining OpenVDB fog volume files. They can be downloaded\n" 
                   << "\there: https://www.openvdb.org/download/" << std::endl;
         return;
@@ -1397,7 +1598,7 @@ TEST_F(TestOpenVDB, PointFiles)
 {
     const auto fileNames = this->availablePointFiles();
     if (fileNames.empty()) {
-        std::cout << "\tSet the enviroment variable \"VDB_DATA_PATH\" to a directory\n"
+        std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
                   << "\tcontaining OpenVDB files with points. They can be downloaded\n"
                   << "\there: https://www.openvdb.org/download/" << std::endl;
         return;

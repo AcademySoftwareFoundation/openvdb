@@ -1,0 +1,11 @@
+string test = "test";
+string test2 = test;
+string@string_test1 = test2; // test
+
+test2 = "new string size";
+string@string_test2 = test;  // test
+string@string_test3 = test2; // new string size
+
+test = "";
+string@string_test4 = test; // empty string
+

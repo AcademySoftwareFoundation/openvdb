@@ -16,6 +16,7 @@ Use this module by invoking find_package with the form::
     [COMPONENTS <libs>...] # OpenVDB libraries by their canonical name
                            # e.g. "openvdb" for "libopenvdb",
                            # "pyopenvdb" for the python plugin
+                           # "openvdb_ax" for the OpenVDB AX extension
                            # "openvdb_houdini" for the houdini plugin
     )
 
@@ -30,6 +31,8 @@ IMPORTED Targets
   The openvdb python library target.
 ``OpenVDB::openvdb_houdini``
   The openvdb houdini library target.
+``OpenVDB::openvdb_ax``
+  The openvdb_ax library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -126,6 +129,7 @@ set(_OPENVDB_COMPONENT_LIST
   openvdb
   openvdb_je
   pyopenvdb
+  openvdb_ax
   openvdb_houdini
 )
 
@@ -226,7 +230,9 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
     ${OPENVDB_${COMPONENT}_ROOT}
     ${OPENVDB_${COMPONENT}_INCLUDEDIR}
   )
-  list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  if(_VDB_COMPONENT_SEARCH_DIRS)
+    list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  endif()
 
   # Look for a standard header files.
   if(${COMPONENT} STREQUAL "openvdb")
@@ -245,6 +251,17 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/python
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb
+        ${CMAKE_INSTALL_INCLUDEDIR}
+        include
+    )
+  elseif(${COMPONENT} STREQUAL "openvdb_ax")
+    # Look for a standard OpenVDB header file.
+    find_path(OpenVDB_${COMPONENT}_INCLUDE_DIR compiler/Compiler.h
+      ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
+      PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
+      PATH_SUFFIXES
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/openvdb_ax
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax
         ${CMAKE_INSTALL_INCLUDEDIR}
         include
     )
@@ -477,6 +494,26 @@ if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
   endif()
 endif()
 
+# Add deps for openvdb_ax
+
+if(openvdb_ax IN_LIST OpenVDB_FIND_COMPONENTS)
+  find_package(LLVM REQUIRED)
+  find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
+
+  if(found_LLVM)
+    set(LLVM_LIBS "LLVM")
+  else()
+    llvm_map_components_to_libnames(_llvm_libs
+      native core executionengine support mcjit passes objcarcopts)
+    set(LLVM_LIBS "${_llvm_libs}")
+  endif()
+
+  if(NOT OpenVDB_FIND_QUIET)
+    message(STATUS "Found LLVM: ${LLVM_DIR} (found version \"${LLVM_PACKAGE_VERSION}\")")
+  endif()
+  find_package(Boost REQUIRED COMPONENTS random)
+endif()
+
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
@@ -548,7 +585,6 @@ else()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
-  unset(_HAS_DEP)
 endif()
 
 if(OpenVDB_USES_BLOSC)
@@ -715,6 +751,36 @@ if(OpenVDB_openvdb_houdini_LIBRARY)
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Houdini"
       INTERFACE_COMPILE_FEATURES cxx_std_14
    )
+  endif()
+endif()
+
+# OpenVDB::openvdb_ax
+
+if(OpenVDB_openvdb_ax_LIBRARY)
+  set(OPENVDB_openvdb_ax_LIB_TYPE UNKNOWN)
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_OPENVDB_openvdb_ax_EXT
+      ${OpenVDB_openvdb_ax_LIBRARY} EXT)
+    if(_OPENVDB_openvdb_ax_EXT STREQUAL ".a")
+      set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+    elseif(_OPENVDB_openvdb_ax_EXT STREQUAL ".so" OR
+           _OPENVDB_openvdb_ax_EXT STREQUAL ".dylib")
+      set(OPENVDB_openvdb_ax_LIB_TYPE SHARED)
+    endif()
+  endif()
+
+
+  if(NOT TARGET OpenVDB::openvdb_ax)
+    add_library(OpenVDB::openvdb_ax UNKNOWN IMPORTED)
+    set_target_properties(OpenVDB::openvdb_ax PROPERTIES
+      IMPORTED_LOCATION "${OpenVDB_openvdb_ax_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
+      INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::random;${LLVM_LIBS}"
+      INTERFACE_COMPILE_FEATURES cxx_std_14
+    )
   endif()
 endif()
 

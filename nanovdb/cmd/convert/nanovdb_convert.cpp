@@ -38,12 +38,9 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
     exit(exitStatus);
 }
 
-void version [[noreturn]] (const std::string& progName, int exitStatus = EXIT_SUCCESS)
+void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    std::cout << "\n " << progName << " was build against NanoVDB version " 
-              << NANOVDB_MAJOR_VERSION_NUMBER << "."
-              << NANOVDB_MINOR_VERSION_NUMBER << "."
-              << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
+    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
     exit(exitStatus);
 }
 

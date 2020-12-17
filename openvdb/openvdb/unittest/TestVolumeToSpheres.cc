@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h> // for createLevelSetSphere
@@ -14,30 +14,15 @@
 #include <vector>
 
 
-class TestVolumeToSpheres: public CppUnit::TestCase
+class TestVolumeToSpheres: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestVolumeToSpheres);
-    CPPUNIT_TEST(testFromLevelSet);
-    CPPUNIT_TEST(testFromFog);
-    CPPUNIT_TEST(testMinimumSphereCount);
-    CPPUNIT_TEST(testClosestSurfacePoint);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testFromLevelSet();
-    void testFromFog();
-    void testMinimumSphereCount();
-    void testClosestSurfacePoint();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeToSpheres);
 
 
 ////////////////////////////////////////
 
 
-void
-TestVolumeToSpheres::testFromLevelSet()
+TEST_F(TestVolumeToSpheres, testFromLevelSet)
 {
     const float
         radius = 20.0f,
@@ -62,37 +47,36 @@ TestVolumeToSpheres::testFromLevelSet()
         openvdb::tools::fillWithSpheres(*grid, spheres, sphereCount, overlapping,
             minRadius, maxRadius, isovalue, instanceCount);
 
-        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
+        EXPECT_EQ(1, int(spheres.size()));
 
         //for (size_t i=0; i< spheres.size(); ++i) {
         //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
         //}
 
         const auto tolerance = 2.0 * voxelSize;
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
+        EXPECT_NEAR(center[0], spheres[0][0], tolerance);
+        EXPECT_NEAR(center[1], spheres[0][1], tolerance);
+        EXPECT_NEAR(center[2], spheres[0][2], tolerance);
+        EXPECT_NEAR(radius,    spheres[0][3], tolerance);
     }
     {
         // Verify that an isovalue outside the narrow band still produces a valid sphere.
         std::vector<openvdb::Vec4s> spheres;
         openvdb::tools::fillWithSpheres(*grid, spheres, sphereCount,
             overlapping, minRadius, maxRadius, 1.5f * halfWidth, instanceCount);
-        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
+        EXPECT_EQ(1, int(spheres.size()));
     }
     {
         // Verify that an isovalue inside the narrow band produces no spheres.
         std::vector<openvdb::Vec4s> spheres;
         openvdb::tools::fillWithSpheres(*grid, spheres, sphereCount,
             overlapping, minRadius, maxRadius, -1.5f * halfWidth, instanceCount);
-        CPPUNIT_ASSERT_EQUAL(0, int(spheres.size()));
+        EXPECT_EQ(0, int(spheres.size()));
     }
 }
 
 
-void
-TestVolumeToSpheres::testFromFog()
+TEST_F(TestVolumeToSpheres, testFromFog)
 {
     const float
         radius = 20.0f,
@@ -121,26 +105,25 @@ TestVolumeToSpheres::testFromFog()
         //    std::cout << "\nSphere #" << i << ": " << spheres[i] << std::endl;
         //}
 
-        CPPUNIT_ASSERT_EQUAL(1, int(spheres.size()));
+        EXPECT_EQ(1, int(spheres.size()));
 
         const auto tolerance = 2.0 * voxelSize;
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[0], spheres[0][0], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[1], spheres[0][1], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(center[2], spheres[0][2], tolerance);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(radius,    spheres[0][3], tolerance);
+        EXPECT_NEAR(center[0], spheres[0][0], tolerance);
+        EXPECT_NEAR(center[1], spheres[0][1], tolerance);
+        EXPECT_NEAR(center[2], spheres[0][2], tolerance);
+        EXPECT_NEAR(radius,    spheres[0][3], tolerance);
     }
     {
         // Verify that an isovalue outside the narrow band still produces valid spheres.
         std::vector<openvdb::Vec4s> spheres;
         openvdb::tools::fillWithSpheres(*grid, spheres, sphereCount, overlapping,
             minRadius, maxRadius, 10.0f, instanceCount);
-        CPPUNIT_ASSERT(!spheres.empty());
+        EXPECT_TRUE(!spheres.empty());
     }
 }
 
 
-void
-TestVolumeToSpheres::testMinimumSphereCount()
+TEST_F(TestVolumeToSpheres, testMinimumSphereCount)
 {
     using namespace openvdb;
     {
@@ -156,9 +139,9 @@ TestVolumeToSpheres::testMinimumSphereCount()
 
             // Given the relatively large minimum radius, the actual sphere count
             // should be no larger than the requested mimimum count.
-            CPPUNIT_ASSERT_EQUAL(minSphereCount, int(spheres.size()));
-            //CPPUNIT_ASSERT(int(spheres.size()) >= minSphereCount);
-            CPPUNIT_ASSERT(int(spheres.size()) <= maxSphereCount);
+            EXPECT_EQ(minSphereCount, int(spheres.size()));
+            //EXPECT_TRUE(int(spheres.size()) >= minSphereCount);
+            EXPECT_TRUE(int(spheres.size()) <= maxSphereCount);
         }
     }
     {
@@ -177,13 +160,12 @@ TestVolumeToSpheres::testMinimumSphereCount()
         std::vector<Vec4s> spheres;
         tools::fillWithSpheres(grid, spheres, sphereCount, /*overlapping=*/true, minRadius);
 
-        CPPUNIT_ASSERT(int(spheres.size()) >= sphereCount[0]);
+        EXPECT_TRUE(int(spheres.size()) >= sphereCount[0]);
     }
 }
 
 
-void
-TestVolumeToSpheres::testClosestSurfacePoint()
+TEST_F(TestVolumeToSpheres, testClosestSurfacePoint)
 {
     using namespace openvdb;
 
@@ -193,7 +175,7 @@ TestVolumeToSpheres::testClosestSurfacePoint()
     for (const float radius: { 8.0f, 50.0f }) {
         // Construct a spherical level set.
         const auto sphere = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize);
-        CPPUNIT_ASSERT(sphere);
+        EXPECT_TRUE(sphere);
 
         // Construct the corners of a cube that exactly encloses the sphere.
         const std::vector<Vec3R> corners{
@@ -210,22 +192,22 @@ TestVolumeToSpheres::testClosestSurfacePoint()
         const auto distToSurface = Vec3d{radius}.length() - radius;
 
         auto csp = tools::ClosestSurfacePoint<FloatGrid>::create(*sphere);
-        CPPUNIT_ASSERT(csp);
+        EXPECT_TRUE(csp);
 
         // Move each corner point to the closest surface point.
         auto points = corners;
         std::vector<float> distances;
         bool ok = csp->searchAndReplace(points, distances);
-        CPPUNIT_ASSERT(ok);
-        CPPUNIT_ASSERT_EQUAL(8, int(points.size()));
-        CPPUNIT_ASSERT_EQUAL(8, int(distances.size()));
+        EXPECT_TRUE(ok);
+        EXPECT_EQ(8, int(points.size()));
+        EXPECT_EQ(8, int(distances.size()));
 
         for (auto d: distances) {
-            CPPUNIT_ASSERT((std::abs(d - distToSurface) / distToSurface) < 0.01); // rel err < 1%
+            EXPECT_TRUE((std::abs(d - distToSurface) / distToSurface) < 0.01); // rel err < 1%
         }
         for (int i = 0; i < 8; ++i) {
             const auto intersection = corners[i] + distToSurface * (center - corners[i]).unit();
-            CPPUNIT_ASSERT(points[i].eq(intersection, /*tolerance=*/0.1));
+            EXPECT_TRUE(points[i].eq(intersection, /*tolerance=*/0.1));
         }
 
         // Place a point inside the sphere.
@@ -233,11 +215,11 @@ TestVolumeToSpheres::testClosestSurfacePoint()
         distances.clear();
         points.emplace_back(1, 0, 0);
         ok = csp->searchAndReplace(points, distances);
-        CPPUNIT_ASSERT(ok);
-        CPPUNIT_ASSERT_EQUAL(1, int(points.size()));
-        CPPUNIT_ASSERT_EQUAL(1, int(distances.size()));
-        CPPUNIT_ASSERT((std::abs(radius - 1 - distances[0]) / (radius - 1)) < 0.01);
-        CPPUNIT_ASSERT(points[0].eq(Vec3R{radius, 0, 0}, /*tolerance=*/0.5));
+        EXPECT_TRUE(ok);
+        EXPECT_EQ(1, int(points.size()));
+        EXPECT_EQ(1, int(distances.size()));
+        EXPECT_TRUE((std::abs(radius - 1 - distances[0]) / (radius - 1)) < 0.01);
+        EXPECT_TRUE(points[0].eq(Vec3R{radius, 0, 0}, /*tolerance=*/0.5));
             ///< @todo off by half a voxel in y and z
     }
 }

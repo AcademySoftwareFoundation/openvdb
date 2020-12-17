@@ -4,7 +4,7 @@
 #include <algorithm>
 #include <iostream>
 #include <nanovdb/util/IO.h>
-#include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/CudaDeviceBuffer.h>
 
 #if defined(NANOVDB_USE_CUDA)

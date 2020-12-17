@@ -1,0 +1,27 @@
+
+int@itest1 = floormod(7,5);
+int@itest2 = 7%5;
+int@itest3 = floormod(-7,5);
+int@itest4 = -7%5;
+int@itest5 = floormod(7,-5);
+int@itest6 = 7%-5;
+int@itest7 = floormod(-7,-5);
+int@itest8 = -7%-5;
+
+float@ftest1 = floormod(7.2f,5.7f);
+float@ftest2 = 7.2f%5.7f;
+float@ftest3 = floormod(-7.2f,5.7f);
+float@ftest4 = -7.2f%5.7f;
+float@ftest5 = floormod(7.2f,-5.7f);
+float@ftest6 = 7.2f%-5.7f;
+float@ftest7 = floormod(-7.2f,-5.7f);
+float@ftest8 = -7.2f%-5.7f;
+
+double@dtest1 = floormod(7.2,5.7);
+double@dtest2 = 7.2%5.7;
+double@dtest3 = floormod(-7.2,5.7);
+double@dtest4 = -7.2%5.7;
+double@dtest5 = floormod(7.2,-5.7);
+double@dtest6 = 7.2%-5.7;
+double@dtest7 = floormod(-7.2,-5.7);
+double@dtest8 = -7.2%-5.7;

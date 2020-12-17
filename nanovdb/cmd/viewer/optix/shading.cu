@@ -48,7 +48,7 @@ extern "C" __global__ void __miss__levelset_radiance()
                 groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
 
                 if (sceneParams.useLighting && sceneParams.useShadows) {
-                    const float3 wLightDir = make_float3(0.0f, 1.0f, 0.0f);
+                    const float3 wLightDir = make_float3(sceneParams.sunDirection[0], sceneParams.sunDirection[1], sceneParams.sunDirection[2]);
                     float        attenuation = 0.0f;
 
                     optixTrace(
@@ -150,7 +150,7 @@ extern "C" __global__ void __closesthit__nanovdb_levelset_radiance()
     ijk[2] -= 1;
     auto wNormal = make_float3(grid->indexToWorldDirF(iNormal).normalize());
 
-    const float3 wLightDir = {0.0f, 1.0f, 0.0f};
+    const float3 wLightDir = {sceneParams.sunDirection[0], sceneParams.sunDirection[1], sceneParams.sunDirection[2]};
     float        intensity = 1.0f;
     float        occlusion = 0.0f;
     float        voxelUniformSize = float(grid->voxelSize()[0]);
@@ -237,7 +237,7 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_radiance()
 
     const auto* densityGrid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
 
-    const Vec3T wLightDir = Vec3T(0, 1, 0);
+    const Vec3T wLightDir = sceneParams.sunDirection;
     const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
     const auto& densityTree = densityGrid->tree();
@@ -246,8 +246,8 @@ extern "C" __global__ void __closesthit__nanovdb_fogvolume_radiance()
 
     HeterogenousMedium medium;
     medium.densityScale = params.volumeDensityScale;
-    medium.densityMin = valueToScalar(densityGrid->tree().root().valueMin()) * medium.densityScale;
-    medium.densityMax = valueToScalar(densityGrid->tree().root().valueMax()) * medium.densityScale;
+    medium.densityMin = render::valueToScalar(densityGrid->tree().root().valueMin()) * medium.densityScale;
+    medium.densityMax = render::valueToScalar(densityGrid->tree().root().valueMax()) * medium.densityScale;
     medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
     medium.hgMeanCosine = params.phase;
     medium.temperatureScale = params.volumeTemperatureScale;
@@ -368,45 +368,49 @@ extern "C" __global__ void __miss__fogvolume_radiance()
 
     float wT = 1e16f;
 
+    auto radiance = 0.f;
+
     if (sceneParams.useBackground) {
-        // intersect with ground plane and draw checker if camera is above...
+        if (sceneParams.useGround) {
+            // intersect with ground plane and draw checker if camera is above...
 
-        float wGroundT = (sceneParams.groundHeight - wRayEye.y) / wRayDir.y;
+            float wGroundT = (sceneParams.groundHeight - wRayEye.y) / wRayDir.y;
 
-        if (wRayDir.y != 0 && wGroundT > 0.f) {
-            float3 wGroundPos = wRayEye + wGroundT * wRayDir;
+            if (wRayDir.y != 0 && wGroundT > 0.f) {
+                float3 wGroundPos = wRayEye + wGroundT * wRayDir;
 
-            groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
+                groundIntensity = render::evalGroundMaterial(wGroundT, sceneParams.groundFalloff, reinterpret_cast<const Vec3T&>(wGroundPos), wRayDir.y, groundMix);
 
-            if (sceneParams.useLighting && sceneParams.useShadows > 0) {
-                const float3 wLightDir = {0.0f, 1.0f, 0.0f};
+                if (sceneParams.useLighting && sceneParams.useShadows > 0) {
+                    const float3 wLightDir = {sceneParams.sunDirection[0], sceneParams.sunDirection[1], sceneParams.sunDirection[2]};
 
-                // HACK: temporrary hack to ensure the ray is not within the volume.
-                wGroundPos -= 1.0f * wLightDir;
+                    // HACK: temporrary hack to ensure the ray is not within the volume.
+                    wGroundPos -= 1.0f * wLightDir;
 
-                float attenuation = 0.0f;
-                optixTrace(
-                    constantParams.handle,
-                    wGroundPos,
-                    wLightDir,
-                    0.01f,
-                    1e16f,
-                    0.0f,
-                    OptixVisibilityMask(1),
-                    OPTIX_RAY_FLAG_NONE,
-                    RAY_TYPE_OCCLUSION,
-                    RAY_TYPE_COUNT,
-                    RAY_TYPE_OCCLUSION,
-                    reinterpret_cast<uint32_t&>(attenuation));
+                    float attenuation = 0.0f;
+                    optixTrace(
+                        constantParams.handle,
+                        wGroundPos,
+                        wLightDir,
+                        0.01f,
+                        1e16f,
+                        0.0f,
+                        OptixVisibilityMask(1),
+                        OPTIX_RAY_FLAG_NONE,
+                        RAY_TYPE_OCCLUSION,
+                        RAY_TYPE_COUNT,
+                        RAY_TYPE_OCCLUSION,
+                        reinterpret_cast<uint32_t&>(attenuation));
 
-                groundIntensity *= attenuation;
+                    groundIntensity *= attenuation;
+                }
             }
         }
+
+        float skyIntensity = render::evalSkyMaterial(nanovdb::Vec3f(wRayDir.x, wRayDir.y, wRayDir.z));
+
+        radiance = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
     }
-
-    float skyIntensity = render::evalSkyMaterial(nanovdb::Vec3f(wRayDir.x, wRayDir.y, wRayDir.z));
-
-    auto radiance = (1.f - groundMix) * skyIntensity + groundMix * groundIntensity;
 
     optixSetPayload_0(float_as_int(radiance));
     optixSetPayload_1(float_as_int(radiance));

@@ -46,7 +46,7 @@ struct RenderLevelSetRgba32fFn
             color[2] = envRadiance;
 
         } else {
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
 
             const auto& tree = grid->tree();

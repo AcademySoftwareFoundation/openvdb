@@ -1,0 +1,7 @@
+
+int32@test1 = --int32@test2;
+int32@test3 = int32@test4--;
+int32@test5 = (int32@test6--, int32@test7--, --int32@test6);
+int32@test8 = (--int32@test6, --int32@test7, int32@test6--);
+--int32@test9 = int32@test9;
+

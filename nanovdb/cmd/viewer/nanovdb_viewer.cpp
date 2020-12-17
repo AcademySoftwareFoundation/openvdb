@@ -34,6 +34,31 @@ static std::string makeStringCsv(const char* const* strs, int n)
     return str;
 }
 
+
+template<>
+struct ToString<nanovdb::Vec3f>
+{
+    inline std::string operator()(const nanovdb::Vec3f& v) const
+    {
+        std::ostringstream ss;
+        ss << '(' << v[0] << ',' << v[1] << ',' << v[1] << ')';
+        return ss.str();
+    }
+};
+
+template<>
+struct FromString<nanovdb::Vec3f>
+{
+    inline nanovdb::Vec3f operator()(const std::string& s) const
+    {
+        std::istringstream ss(s);
+        char skip;
+        float x,y,z;
+        ss >> skip >> x >> skip >> y >> skip >> z >> skip;
+        return nanovdb::Vec3f(x,y,z);
+    }
+};
+
 struct ParamInfo
 {
     std::string type;
@@ -47,11 +72,16 @@ static const std::map<std::string, ParamInfo> kRenderParamMap{
     {"end", {"integer", "end frame"}},
     {"background", {"boolean", "use background"}},
     {"lighting", {"boolean", "use lighting"}},
+    {"sun-direction", {"vec3f", "sun direction"}},
     {"shadows", {"boolean", "use shadows"}},
     {"ground", {"boolean", "use ground-plane"}},
     {"ground-reflections", {"boolean", "use ground-plane reflections"}},
     {"tonemapping", {"boolean", "use tonemapping"}},
     {"tonemapping-whitepoint", {"scalar", "tonemapping whitepoint"}},
+    {"camera-target", {"vec3f", "camera target position, e.g. \"(0,10,0)\""}},
+    {"camera-rotation", {"vec3f", "camera rotation in degrees. e.g. \"(22.5,90,0)\""}},
+    {"camera-distance", {"scalar", "distance from camera target position"}},
+    {"camera-fov", {"scalar", "camera field-of-view in degrees"}},
     {"camera-samples", {"integer", "camera samples per ray"}},
     {"camera-turntable", {"boolean", "use camera turntable"}},
     {"camera-turntable-rate", {"scalar", "camera turntable revolutions per frame-sequence"}},
@@ -106,12 +136,9 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
     exit(exitStatus);
 }
 
-void version [[noreturn]] (const std::string& progName, int exitStatus = EXIT_SUCCESS)
+void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    std::cout << "\n " << progName << " was build against NanoVDB version "
-              << NANOVDB_MAJOR_VERSION_NUMBER << "."
-              << NANOVDB_MINOR_VERSION_NUMBER << "."
-              << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
+    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
     exit(exitStatus);
 }
 
@@ -215,6 +242,7 @@ int main(int argc, char* argv[])
     rendererParams.mMaterialBlackbodyTemperature = renderStringParams.get<float>("material-blackbody-temperature", rendererParams.mMaterialBlackbodyTemperature);
     rendererParams.mMaterialVolumeDensity = renderStringParams.get<float>("material-volume-density", rendererParams.mMaterialVolumeDensity);
 
+    rendererParams.mSceneParameters.sunDirection = renderStringParams.get<nanovdb::Vec3f>("sun-direction", rendererParams.mSceneParameters.sunDirection);
     rendererParams.mSceneParameters.samplesPerPixel = renderStringParams.get<int>("camera-samples", rendererParams.mSceneParameters.samplesPerPixel);
     rendererParams.mSceneParameters.useBackground = renderStringParams.get<bool>("background", rendererParams.mSceneParameters.useBackground);
     rendererParams.mSceneParameters.useLighting = renderStringParams.get<bool>("lighting", rendererParams.mSceneParameters.useLighting);
@@ -226,6 +254,10 @@ int main(int argc, char* argv[])
     rendererParams.mSceneParameters.camera.lensType() = renderStringParams.getEnum<Camera::LensType>("camera-lens", kCameraLensTypeStrings, (int)Camera::LensType::kNumTypes, rendererParams.mSceneParameters.camera.lensType());
     rendererParams.mUseTurntable = renderStringParams.get<bool>("camera-turntable", rendererParams.mUseTurntable);
     rendererParams.mTurntableRate = renderStringParams.get<float>("camera-turntable-rate", rendererParams.mTurntableRate);
+    rendererParams.mCameraFov = renderStringParams.get<float>("camera-fov", rendererParams.mCameraFov);
+    rendererParams.mCameraDistance = renderStringParams.get<float>("camera-distance", rendererParams.mCameraDistance);
+    rendererParams.mCameraTarget = renderStringParams.get<nanovdb::Vec3f>("camera-target", rendererParams.mCameraTarget);
+    rendererParams.mCameraRotation = renderStringParams.get<nanovdb::Vec3f>("camera-rotation", rendererParams.mCameraRotation);
     rendererParams.mMaxProgressiveSamples = renderStringParams.get<int>("iterations", rendererParams.mMaxProgressiveSamples);
 
     // if range still invalid, then make a default frame range...
