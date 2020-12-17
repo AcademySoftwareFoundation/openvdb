@@ -16,6 +16,7 @@ Use this module by invoking find_package with the form::
     [COMPONENTS <libs>...] # OpenVDB libraries by their canonical name
                            # e.g. "openvdb" for "libopenvdb",
                            # "pyopenvdb" for the python plugin
+                           # "openvdb_ax" for the OpenVDB AX extension
                            # "openvdb_houdini" for the houdini plugin
     )
 
@@ -30,6 +31,8 @@ IMPORTED Targets
   The openvdb python library target.
 ``OpenVDB::openvdb_houdini``
   The openvdb houdini library target.
+``OpenVDB::openvdb_ax``
+  The openvdb_ax library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -52,6 +55,8 @@ This will define the following variables:
   True if the system has the named OpenVDB component.
 ``OpenVDB_USES_BLOSC``
   True if the OpenVDB Library has been built with blosc support
+``OpenVDB_USES_ZLIB``
+  True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
 ``OpenVDB_USES_EXR``
@@ -99,7 +104,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.3)
+cmake_minimum_required(VERSION 3.12)
 include(GNUInstallDirs)
 
 # Monitoring <PackageName>_ROOT variables
@@ -124,6 +129,7 @@ set(_OPENVDB_COMPONENT_LIST
   openvdb
   openvdb_je
   pyopenvdb
+  openvdb_ax
   openvdb_houdini
 )
 
@@ -224,7 +230,9 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
     ${OPENVDB_${COMPONENT}_ROOT}
     ${OPENVDB_${COMPONENT}_INCLUDEDIR}
   )
-  list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  if(_VDB_COMPONENT_SEARCH_DIRS)
+    list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  endif()
 
   # Look for a standard header files.
   if(${COMPONENT} STREQUAL "openvdb")
@@ -243,6 +251,17 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/python
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb
+        ${CMAKE_INSTALL_INCLUDEDIR}
+        include
+    )
+  elseif(${COMPONENT} STREQUAL "openvdb_ax")
+    # Look for a standard OpenVDB header file.
+    find_path(OpenVDB_${COMPONENT}_INCLUDE_DIR compiler/Compiler.h
+      ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
+      PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
+      PATH_SUFFIXES
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/openvdb_ax
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax
         ${CMAKE_INSTALL_INCLUDEDIR}
         include
     )
@@ -475,10 +494,31 @@ if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
   endif()
 endif()
 
+# Add deps for openvdb_ax
+
+if(openvdb_ax IN_LIST OpenVDB_FIND_COMPONENTS)
+  find_package(LLVM REQUIRED)
+  find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
+
+  if(found_LLVM)
+    set(LLVM_LIBS "LLVM")
+  else()
+    llvm_map_components_to_libnames(_llvm_libs
+      native core executionengine support mcjit passes objcarcopts)
+    set(LLVM_LIBS "${_llvm_libs}")
+  endif()
+
+  if(NOT OpenVDB_FIND_QUIET)
+    message(STATUS "Found LLVM: ${LLVM_DIR} (found version \"${LLVM_PACKAGE_VERSION}\")")
+  endif()
+  find_package(Boost REQUIRED COMPONENTS random)
+endif()
+
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
+set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
 set(OpenVDB_USES_EXR ${USE_EXR})
 set(OpenVDB_DEFINITIONS)
@@ -488,7 +528,11 @@ if(WIN32)
   list(APPEND OpenVDB_DEFINITIONS NOMINMAX)
 endif()
 
-if(NOT OPENVDB_USE_STATIC_LIBS)
+if(OPENVDB_USE_STATIC_LIBS)
+  if(WIN32)
+    list(APPEND OpenVDB_DEFINITIONS OPENVDB_STATICLIB)
+  endif()
+else()
   if(WIN32)
     list(APPEND OpenVDB_DEFINITIONS OPENVDB_DLL)
   endif()
@@ -524,6 +568,11 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
       set(OpenVDB_USES_BLOSC ON)
     endif()
 
+    string(FIND ${PREREQUISITE} "zlib" _HAS_DEP)
+    if(NOT ${_HAS_DEP} EQUAL -1)
+      set(OpenVDB_USES_ZLIB ON)
+    endif()
+
     string(FIND ${PREREQUISITE} "log4cplus" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_LOG4CPLUS ON)
@@ -536,11 +585,14 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
-  unset(_HAS_DEP)
 endif()
 
 if(OpenVDB_USES_BLOSC)
   find_package(Blosc REQUIRED)
+endif()
+
+if(OpenVDB_USES_ZLIB)
+  find_package(ZLIB REQUIRED)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
@@ -612,8 +664,9 @@ if(NOT OPENVDB_USE_STATIC_LIBS)
   if(OpenVDB_USES_BLOSC)
     list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES Blosc::blosc)
   endif()
-
-  list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  if(OpenVDB_USES_ZLIB)
+    list(APPEND _OPENVDB_HIDDEN_DEPENDENCIES ZLIB::ZLIB)
+  endif()
 endif()
 
 if(openvdb_je IN_LIST OpenVDB_FIND_COMPONENTS)
@@ -698,6 +751,36 @@ if(OpenVDB_openvdb_houdini_LIBRARY)
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Houdini"
       INTERFACE_COMPILE_FEATURES cxx_std_14
    )
+  endif()
+endif()
+
+# OpenVDB::openvdb_ax
+
+if(OpenVDB_openvdb_ax_LIBRARY)
+  set(OPENVDB_openvdb_ax_LIB_TYPE UNKNOWN)
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_OPENVDB_openvdb_ax_EXT
+      ${OpenVDB_openvdb_ax_LIBRARY} EXT)
+    if(_OPENVDB_openvdb_ax_EXT STREQUAL ".a")
+      set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+    elseif(_OPENVDB_openvdb_ax_EXT STREQUAL ".so" OR
+           _OPENVDB_openvdb_ax_EXT STREQUAL ".dylib")
+      set(OPENVDB_openvdb_ax_LIB_TYPE SHARED)
+    endif()
+  endif()
+
+
+  if(NOT TARGET OpenVDB::openvdb_ax)
+    add_library(OpenVDB::openvdb_ax UNKNOWN IMPORTED)
+    set_target_properties(OpenVDB::openvdb_ax PROPERTIES
+      IMPORTED_LOCATION "${OpenVDB_openvdb_ax_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
+      INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::random;${LLVM_LIBS}"
+      INTERFACE_COMPILE_FEATURES cxx_std_14
+    )
   endif()
 endif()
 

@@ -1,7 +1,57 @@
 OpenVDB Version History
 =======================
 
-Version 7.1.1 - In Development
+
+Version 8.0.0 - In development
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 6 for
+      Houdini 18.0 and 7 for Houdini 18.5.
+
+    ABI changes:
+    - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
+      accessed from the GridBase.
+    - Private method RootNode::getChildCount() has been removed as of ABI=8.
+
+    Build:
+    - As of this release, VFX Reference Platform 2018 is no longer supported.
+      CMake now issues deprecation warnings for 2019 VFX Reference Platform
+      version dependencies.
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
+
+    New features:
+    - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
+      if respectively active voxels or tiles in a tree intersect a given
+      CoordBBox.
+    - Added tools::activeTiles that returns a vector containing all the active
+      tiles in a tree that intersects a given CoordBBox.
+
+
+Version 7.2.0 - December 9, 2020
+
+    New features:
+    - Added tree::DynamicNodeManager that lazily caches the nodes at each
+      level of the tree to allow for efficient threading of topology-changing
+      top-down workflows.
+    - Added tools::CsgUnionOp, tools::CsgIntersectionOp and
+      tools::CsgDifferenceOp that use a parallel breadth-first algorithm to
+      accelerate CSG union, intersection and difference operations.
+    - Added tools::TreeToMerge which provides methods to steal or deep-copy
+      from a tree based on the tag dispatch class used in its construction.
+    - Pre-release of OpenVDB AX, an open source C++ library that provides a
+      powerful and easy way of interacting with OpenVDB volume and point data.
+
+    Improvements:
+    - util::CpuTimer now uses C++11 chrono instead of TBB.
+    - Threaded the construction of LeafManager and NodeManager linear arrays.
+    - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
+      the new parallel breadth-first algorithms for much faster performance.
+    - Extended tree::NodeManager to allow for use with a const tree.
+    - Added math::Abs, math::cwiseAdd, math::cwiseLessThan and
+      math::cwiseGreaterThan methods for Matrix types. Matrix grids can now be
+      instantiated.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
@@ -10,6 +60,42 @@ Version 7.1.1 - In Development
       packed geometry were also being converted.
     - Fixed a bug where a Houdini SOP's verb would not be correctly associated
       with the corresponding node if the node's internal name was changed.
+    - Fixed bug where OpenVDB Convert SOP could revert the name attribute.
+
+    Bug fixes:
+    - Fixed a bug which could cause recursive compile time instantiations of
+      TypeList objects, manifesting in longer compile times.
+    - Deprecated util::PagedArray::push_back due to a race condition. Instead
+      use util::PagedArray::ValueBuffer::push_back which is faster and thread-safe.
+    - Fixed various cases of undefined behavior in some LevelSetUtil methods
+      [Reported by fkemmler]
+
+    API changes:
+    - Deprecated tree::LeafManager::getNodes. This method is no longer used when
+      constructing a NodeManager from a LeafManager.
+    - Deprecated Tree::visitActiveBBox, Tree::visit and Tree::visit2 methods in
+      favor of using a tree::DynamicNodeManager.
+    - Removed tools::CsgVisitorBase, tools::CsgVisitorUnion,
+      tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
+      tools now use the parallel breath-first algorithms.
+    - Moved openvdb::TypeList from Types.h into its own header TypeList.h
+
+    Build:
+    - Removed the Makefiles.
+    - Re-organised the repository layout such that each independent library
+      is able to be configured against an existing installation of OpenVDB
+      without ambiguous include paths.
+    - Upgraded CMake minimum version support to 3.12.
+    - Removed OPENVDB_STATIC_SPECIALIZATION macro which is no longer required.
+    - Fixed various compiler warnings for GCC 9.1.
+    - Moved to CMake doxygen commands and removed the doxygen-config files for
+      doxygen documentation.
+    - Added USE_ZLIB compiler flag that enables zlib compression and defaults
+      to on.
+    - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
+      Windows which use the multithread/DLL-specific version of the CRT.
+      [Reported by Tobias Rittig]
+    - Core library unit tests use GoogleTest instead of CppUnit.
 
 Version 7.1.0 - August 13, 2020
 

@@ -1,0 +1,23 @@
+// Note the internal noise function takes doubles so we're deliberately testing with
+// floats here to ensure implicit conversion works, both for scalars and vectors.
+
+@float1_input_test = noise(1.1f);
+@float2_input_test = noise(1.1f, -2.2f);             // should be different to @float1_input_test
+@float3_input_test = noise(1.1f, -2.2f, 3.3f);       // should be different to @float2_input_test
+
+vec3f test = {1.1f, -2.2f, 3.3f};
+@vector_input_test = noise(test);                    // should match @float3_input_test
+
+vec3f test2 = {1.1f + 256.f, -2.2f + 256.f, 3.3f + 256.f};
+@another_vector_input_test = noise(test2);           // should be different to @vector_input_test
+
+float float_assign_test = noise(1.1f, -2.2f, 3.3f);  // ensure noise can be assigned to a local variable...
+@float_assign_test = float_assign_test;              // ... and then assigned to an attribute
+
+vec3f vector_assign_test = noise(1.1f, -2.2f, 3.3f);// ensure noise can be assigned to a vec3f local variable...
+v@vector_assign_test = vector_assign_test;            // ... and then assigned to a vec3f attribute
+
+@cast_test_1 = noise(1, 2.0f, 3.0);                  // ensure different arguments can be casted
+@cast_test_2 = noise(1.0, 2, 3.0f);                  // @cast_test_1 should equal @cast_test_2
+
+// All values should be in the range [0..1]

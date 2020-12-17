@@ -1,0 +1,49 @@
+// do loop
+{
+    vec3f v = 0.0f;
+    int32 i = 0;
+    do {
+        v[i] = i+1;
+        i++;
+    }
+    while(i < 3);
+
+    vec3f@loop_test12 = v;
+}
+
+// do loop false condition
+{
+    vec3f v = 0.0f;
+    int32 i = 0;
+    do {
+        v[i] = i + 1;
+    }
+    while(false)
+
+    vec3f@loop_test17 = v;
+}
+
+// do loop multi expression false condition
+{
+    vec3f v = 0.0f;
+    int32 i = 0;
+    do {
+        v[i] = i + 1;
+    }
+    while(true, true, true, false)
+
+    vec3f@loop_test29 = v;
+}
+
+// do while loop declaration condition
+{
+    int32 k = 1;
+    float j = 1.1f;
+    do {
+        k++;
+        j--;
+    }
+    while(int32 i = floor(j))
+
+    int32@loop_test32 = k;
+}

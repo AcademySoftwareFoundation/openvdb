@@ -1,0 +1,3 @@
+int@a0 = getcoordx();
+int@a1 = getcoordy();
+int@a2 = getcoordz();

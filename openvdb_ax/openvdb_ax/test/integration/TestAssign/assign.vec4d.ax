@@ -1,0 +1,17 @@
+
+vec4d@test1 = {1.1,  2.3, 4.3, 5.4};
+vec4d local1 = {1.1,  2.3, 4.3, 5.4};
+vec4d@test2 = local1;
+vec4d@test3 =
+    vec4d@test4 =
+        vec4d@test2;
+vec4d local3,
+      local2 = {5.1, 6.3, 7.3, 8.4};
+vec4d@test5 =
+    local3 =
+        local2;
+vec4d@test6 = {5.1, 6.3, 7.3, 8.4},
+     vec4d@test7 = {1.1,  2.3, 4.3, 5.4};
+vec4d@test8 = {5.1, 6.3, 7.3, 8.4};
+vec4d@test8 = {1.1,  2.3, 4.3, 5.4};
+

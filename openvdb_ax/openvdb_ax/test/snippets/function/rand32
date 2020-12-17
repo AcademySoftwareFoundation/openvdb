@@ -1,0 +1,6 @@
+
+double seed = 2.0;
+double@test0 = rand32(seed);
+double@test1 = rand32(seed); // should be the same as test0
+double@test2 = rand32(seed + 1.0); // should be different to test0 and test1
+double@test3 = rand32(); // should advance the generator from seed+1

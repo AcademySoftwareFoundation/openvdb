@@ -1,0 +1,12 @@
+// uninitialized string should be set to ""
+string test1;
+test1 += "foo";
+string test2 = "foo";
+test2 += "bar";
+
+s@test1 = test1;
+s@test2 = test2;
+
+for (int i = 0; i < 10; i++) {
+    s@test3 += "a";
+}

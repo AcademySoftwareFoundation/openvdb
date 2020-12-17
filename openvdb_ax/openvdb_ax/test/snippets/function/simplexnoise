@@ -1,0 +1,6 @@
+double@noise1 = simplexnoise(1.0, 2.0, 3.0);
+double@noise2 = simplexnoise(1.0, 2.0);
+double@noise3 = simplexnoise(1.0);
+
+vec3d x = {4.0, 14.0, 114.0};
+double@noise4 = simplexnoise(x);
