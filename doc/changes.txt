@@ -20,6 +20,16 @@ Build:
   CMake now issues deprecation warnings for 2019 VFX Reference Platform
   version dependencies.
 
+@par
+New features:
+- Added @vdblink::tools::anyActiveVoxels tools::anyActiveVoxels@endlink
+  and @vdblink::tools::anyActiveTiles tools::anyActiveTiles@endlink that check
+  if respectively active voxels or tiles in a tree intersect a given
+  CoordBBox.
+- Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
+  a vector containing all the active tiles in a tree that intersects a given
+  CoordBBox.
+
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.2.0</B> - <I>December 9, 2020</I>
