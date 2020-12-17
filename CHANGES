@@ -12,6 +12,7 @@ Version 8.0.0 - In development
     ABI changes:
     - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
       accessed from the GridBase.
+    - Private method RootNode::getChildCount() has been removed as of ABI=8.
 
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.

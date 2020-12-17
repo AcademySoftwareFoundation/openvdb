@@ -19,6 +19,9 @@ preserve ABI compatibility it might be necessary to define the macro
 ABI changes:
 - @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
   of ABI=8 so that it can be accessed from the GridBase.
+- Private method
+  @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
+  removed as of ABI=8.
 
 @par
 Build:
