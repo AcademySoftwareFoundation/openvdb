@@ -9,18 +9,6 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
-#ifndef DWA_BOOST_VERSION
-#include <boost/version.hpp>
-#define DWA_BOOST_VERSION (10 * BOOST_VERSION)
-#endif
-#if defined PY_OPENVDB_USE_NUMPY && DWA_BOOST_VERSION < 1065000
-  #define PY_ARRAY_UNIQUE_SYMBOL PY_OPENVDB_ARRAY_API
-  #include <numpyconfig.h>
-  #ifdef NPY_1_7_API_VERSION
-    #define NPY_NO_DEPRECATED_API NPY_1_7_API_VERSION
-  #endif
-  #include <arrayobject.h> // for import_array()
-#endif
 #include "openvdb/openvdb.h"
 #include "pyopenvdb.h"
 #include "pyGrid.h"
