@@ -49,7 +49,7 @@ int forEach(RangeT taskRange, const Func &taskFunc)
         }
         std::vector<std::thread> threadPool;
         for (auto &r : rangePool) threadPool.emplace_back(taskFunc, r);// launch threads
-        for (auto &t : threadPool) t.join();// syncronize threads
+        for (auto &t : threadPool) t.join();// synchronize threads
         return 3;// std multi-threading
     } else {
         taskFunc(taskRange);

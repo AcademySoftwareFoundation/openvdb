@@ -22,8 +22,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_invoke.h>
 #include <tbb/parallel_sort.h>
-#include <tbb/atomic.h>
 
+#include <atomic>
 #include <type_traits>
 
 #ifndef NANOVDB_OPENTONANOVDB_H_HAS_BEEN_INCLUDED
@@ -57,48 +57,61 @@ struct TypeConverter
 };
 
 template<>
-struct TypeConverter<openvdb::math::Coord>
+struct TypeConverter<openvdb::Coord>
 {
     using Type = nanovdb::Coord;
+    static_assert(sizeof(Type) == sizeof(openvdb::Coord), "Mismatching sizeof");
 };
 
 template<>
 struct TypeConverter<openvdb::math::CoordBBox>
 {
     using Type = nanovdb::CoordBBox;
+    static_assert(sizeof(Type) == sizeof(openvdb::CoordBBox), "Mismatching sizeof");
 };
 
 template<typename T>
 struct TypeConverter<openvdb::math::BBox<T>>
 {
     using Type = nanovdb::BBox<T>;
+    static_assert(sizeof(Type) == sizeof(openvdb::math::BBox<T>), "Mismatching sizeof");
 };
 
 template<typename T>
 struct TypeConverter<openvdb::math::Vec3<T>>
 {
     using Type = nanovdb::Vec3<T>;
+    static_assert(sizeof(Type) == sizeof(openvdb::math::Vec3<T>), "Mismatching sizeof");
 };
 
 template<typename T>
 struct TypeConverter<openvdb::math::Vec4<T>>
 {
     using Type = nanovdb::Vec4<T>;
+    static_assert(sizeof(Type) == sizeof(openvdb::math::Vec4<T>), "Mismatching sizeof");
+};
+
+template<>
+struct TypeConverter<openvdb::ValueMask>
+{
+    using Type = nanovdb::ValueMask;
+    static_assert(sizeof(Type) == sizeof(openvdb::ValueMask), "Mismatching sizeof");
 };
 
 namespace { // unnamed namespace
 
 /// @brief This class will openToNanoVDB an OpenVDB grid into a NanoVDB grid managed by a GridHandle.
 template<typename SrcTreeT, typename BufferT = HostBuffer>
-//typename StatsT = Extrema<typename SrcTreeT::ValueType, openvdb::VecTraits<typename SrcTreeT::ValueType>::IsVec ? 1 : 0> >
 class OpenToNanoVDB
 {
     struct BlindMetaData; // forward decleration
-    using ValueT = typename SrcTreeT::ValueType;
+    using SrcBuildT = typename SrcTreeT::BuildType;
+    using BuildT = typename TypeConverter<typename SrcTreeT::BuildType>::Type;// openvdb to nanovdb type conversion 
+    using ValueT = typename TypeConverter<typename SrcTreeT::ValueType>::Type;// openvdb to nanovdb type conversion
     ValueT                  mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
-    uint8_t*                mData;
+    uint8_t*                mData; // raw pointer to memory buffer of the NanoVDB grid
     uint64_t                mBytes[8]; // Byte offsets to from mData to: tree, blindmetadata, root, node2, node1, leafs, blinddata, (total size)
-    std::set<BlindMetaData> mBlindMetaData; // sorted accoring to index
+    std::set<BlindMetaData> mBlindMetaData; // sorted according to index
 
 public:
     /// @brief Construction from an existing const OpenVDB Grid.
@@ -107,7 +120,7 @@ public:
     {
     }
 
-    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpneVDB grid
+    /// @brief Return a shared pointer to a NanoVDB grid constructed from the specified OpenVDB grid
     GridHandle<BufferT> operator()(const openvdb::Grid<SrcTreeT>& grid,
                                    StatsMode                      sMode = StatsMode::Default,
                                    ChecksumMode                   mode = ChecksumMode::Default,
@@ -126,20 +139,44 @@ private:
     using SrcNode1 = typename SrcNode2::ChildNodeType; // lower OpenVDB internal node
     using SrcNode0 = typename SrcNode1::ChildNodeType; // OpenVDB leaf node
 
-    using DstNode0 = nanovdb::LeafNode<ValueT, CoordT, openvdb::util::NodeMask, SrcNode0::LOG2DIM>; // leaf
-    using DstNode1 = nanovdb::InternalNode<DstNode0, SrcNode1::LOG2DIM>; // lower
-    using DstNode2 = nanovdb::InternalNode<DstNode1, SrcNode2::LOG2DIM>; // upper
+    static_assert(SrcNode0::LOG2DIM == 3, "Expected 8^3 leaf nodes");
+    static_assert(SrcNode1::LOG2DIM == 4, "Expected 16^3 lower internal nodes");
+    static_assert(SrcNode2::LOG2DIM == 5, "Expected 32^3 upper internal nodes");
+
+    using DstNode0 = nanovdb::LeafNode<BuildT>;//, CoordT, openvdb::util::NodeMask, SrcNode0::LOG2DIM>; // leaf
+    using DstNode1 = nanovdb::InternalNode<DstNode0>;//, SrcNode1::LOG2DIM>; // lower
+    using DstNode2 = nanovdb::InternalNode<DstNode1>;//, SrcNode2::LOG2DIM>; // upper
     using DstRootT = nanovdb::RootNode<DstNode2>;
     using DstTreeT = nanovdb::Tree<DstRootT>;
     using DstGridT = nanovdb::Grid<DstTreeT>;
 
-    /// @brief Private method to concurrently process the leaf nodes
-    void processLeafs(std::vector<const SrcNode0*>& array, int32_t* x0);
+    /// @brief Private methods to pre-process the bind metadata
+    template<typename SrcLeafT>
+    typename std::enable_if<!(std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value ||
+                              std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
+    preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>&);
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value>::type
+    preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array);
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value>::type
+    preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array);
 
-    /// @brief Private method to concurrently process the internal nodes
+    /// @brief Private methods for concurrent processing the leaf nodes
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::BuildType, bool>::value>::type
+    processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0);
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::BuildType, openvdb::ValueMask>::value>::type
+    processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0);
+    template<typename SrcLeafT>
+    typename std::enable_if<!std::is_same<typename SrcLeafT::BuildType, openvdb::ValueMask>::value && !std::is_same<typename SrcLeafT::BuildType, bool>::value>::type
+    processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0);
+
+    /// @brief Private method for concurrent processing the internal nodes
     template<typename SrcNode, typename DstNode>
     void processInternals(std::vector<const SrcNode*>& array, int32_t* x0, const int32_t* childX);
-
+    
     /// @brief Private method to process the root node
     void processRoot(const SrcRootT& srcRoot, std::vector<const SrcNode2*>& array, const int32_t* childX);
 
@@ -149,34 +186,25 @@ private:
     /// @brief Private method to process the grid
     void processGrid(const SrcGridT& srcGrid);
 
+    /// @brief Private methods to process the blind metadata
+    template<typename SrcLeafT>
+    typename std::enable_if<!(std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value ||
+                              std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
+    processMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>&);
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value>::type
+    processMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array);
+    template<typename SrcLeafT>
+    typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value>::type
+    processMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array);
+
     template<typename LeafT>
     uint64_t pointCount(std::vector<const LeafT*>&);
-
-    template<typename LeafT>
-    typename std::enable_if<!(std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value ||
-                              std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
-    preProcessPoints(std::vector<const LeafT*>&) {}
-
-    template<typename LeafT>
-    typename std::enable_if<!(std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value ||
-                              std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
-    postProcessPoints(std::vector<const LeafT*>&) {}
-
-    template<typename LeafT>
-    typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value>::type
-    preProcessPoints(std::vector<const LeafT*>& array);
-
-    template<typename LeafT>
-    typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
-    preProcessPoints(std::vector<const LeafT*>& array);
-
-    template<typename LeafT>
-    typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value>::type
-    postProcessPoints(std::vector<const LeafT*>& array);
-
-    template<typename LeafT>
-    typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
-    postProcessPoints(std::vector<const LeafT*>& array);
+    
+    //template<typename AttT>
+    //void copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx, const openvdb::Name &codec);
+    template<typename AttT, typename CodecT = openvdb::points::UnknownCodec>
+    void copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx);
 
     /// @brief Private methods to access points to data
     template<typename DstNodeT>
@@ -190,21 +218,13 @@ private:
     nanovdb::GridBlindMetaData*  blindMetaData() const { return reinterpret_cast<nanovdb::GridBlindMetaData*>(mData + mBytes[1]); }
     uint8_t*                     blindData() const { return reinterpret_cast<uint8_t*>(mData + mBytes[6]); }
 
-    /// @brief Private method used to cache the x compoment of a Coord into x and
+    /// @brief Private method used to cache the x component of a Coord into x and
     //         encode uint32_t id into the x component despite it being of type const int32_t.
     static void cache(int32_t& x, const CoordT& ijk, uint32_t id)
     {
         x = ijk[0];
         reinterpret_cast<uint32_t&>(const_cast<CoordT&>(ijk)[0]) = id;
     }
-
-    template<typename T, typename FlagT>
-    typename std::enable_if<!std::is_floating_point<T>::value>::type
-    setFlag(const T&, const T&, FlagT& flag) const { flag &= ~FlagT(1); } // unset first bit
-
-    template<typename T, typename FlagT>
-    typename std::enable_if<std::is_floating_point<T>::value>::type
-    setFlag(const T& min, const T& max, FlagT& flag) const;
 
     /// @brief Private method to sorts the nodes in the specified array using the provided key function
     template<typename NodeT, typename KeyT>
@@ -213,10 +233,10 @@ private:
 }; // OpenToNanoVDB class
 
 template<typename SrcTreeT, typename BufferT>
-template<typename LeafT>
-uint64_t OpenToNanoVDB<SrcTreeT, BufferT>::pointCount(std::vector<const LeafT*>& array)
+template<typename SrcLeafT>
+uint64_t OpenToNanoVDB<SrcTreeT, BufferT>::pointCount(std::vector<const SrcLeafT*>& array)
 {
-    tbb::atomic<uint64_t> pointCount = 0;
+    std::atomic<uint64_t> pointCount{0};
     tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
                       [&](const tbb::blocked_range<uint64_t>& r) {
                           uint64_t sum = 0;
@@ -245,26 +265,43 @@ struct OpenToNanoVDB<SrcTreeT, BufferT>::BlindMetaData
 }; // OpenToNanoVDB::BlindMetaData
 
 template<typename SrcTreeT, typename BufferT>
-template<typename LeafT>
-inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::preProcessPoints(std::vector<const LeafT*>& array)
+template<typename SrcLeafT>
+inline typename std::enable_if<!(std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value ||
+                                 std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>&) 
 {
-    const uint64_t count = this->pointCount(array);
-    mBlindMetaData.clear();
-    if (count == 0)
-        return;
-    mBlindMetaData.emplace("index", "uint32", 0, count, sizeof(uint32_t));
+    const size_t length = srcGrid.getName().length();
+    if (length >= nanovdb::GridData::MaxNameSize) {
+        mBlindMetaData.emplace("grid name", "uint8_t", 0, 1, length + 1);// Null-terminated byte strings
+    }
 }
 
 template<typename SrcTreeT, typename BufferT>
-template<typename LeafT>
-inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::preProcessPoints(std::vector<const LeafT*>& array)
+template<typename SrcLeafT>
+inline typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array)
 {
     const uint64_t count = this->pointCount(array);
     mBlindMetaData.clear();
-    if (count == 0)
+    if (count != 0) {
+        mBlindMetaData.emplace("index", "uint32", 0, count, sizeof(uint32_t));
+    }
+    const size_t length = srcGrid.getName().length();
+    if (length >= nanovdb::GridData::MaxNameSize) {
+        mBlindMetaData.emplace("grid name", "uint8_t", 1, 1, length + 1);// Null-terminated byte strings
+    }
+}
+
+template<typename SrcTreeT, typename BufferT>
+template<typename SrcLeafT>
+inline typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::preProcessMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array)
+{
+    const uint64_t count = this->pointCount(array);
+    mBlindMetaData.clear();
+    if (count == 0) {
         return;
+    }
     const auto& attributeSet = array.front()->attributeSet();
     const auto& descriptor = attributeSet.descriptor();
     const auto& nameMap = descriptor.map();
@@ -273,16 +310,44 @@ OpenToNanoVDB<SrcTreeT, BufferT>::preProcessPoints(std::vector<const LeafT*>& ar
         auto&        attArray = array.front()->constAttributeArray(index);
         mBlindMetaData.emplace(it->first, descriptor.valueType(index), index, count, attArray.valueTypeSize());
     }
+    const size_t length = srcGrid.getName().length();
+    if (length >= nanovdb::GridData::MaxNameSize) {
+        mBlindMetaData.emplace("grid name", "uint8_t", nameMap.size(), 1, length + 1);// Null-terminated byte strings
+    }
 }
 
 template<typename SrcTreeT, typename BufferT>
-template<typename LeafT>
-inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointIndex32>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& array)
+template<typename SrcLeafT>
+inline typename std::enable_if<!(std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value ||
+                                 std::is_same<typename SrcLeafT::ValueType, openvdb::PointDataIndex32>::value)>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::processMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>&) 
+{
+    if (mBlindMetaData.empty()) {
+        return;
+    }
+    assert(mBlindMetaData.size() == 1);// only the grid name is expected
+    size_t byteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
+    auto it = mBlindMetaData.cbegin();
+    assert(it->name == "grid name" && it->typeName == "uint8_t" && it->index == 0);
+    assert(srcGrid.getName().length() >= nanovdb::GridData::MaxNameSize);
+    auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(0));
+    meta.mByteOffset = byteOffset; // offset from Grid to blind data
+    meta.mElementCount = it->count;
+    meta.mFlags = 0;
+    meta.mSemantic = GridBlindDataSemantic::Unknown;
+    meta.mDataClass = GridBlindDataClass::GridName;
+    meta.mDataType = GridType::Unknown;
+    strcpy(reinterpret_cast<char*>(mData + meta.mByteOffset), srcGrid.getName().c_str());
+}
+
+template<typename SrcTreeT, typename BufferT>
+template<typename SrcLeafT>
+inline typename std::enable_if<std::is_same<typename SrcLeafT::ValueType, openvdb::PointIndex32>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::processMetadata(const SrcGridT& srcGrid, std::vector<const SrcLeafT*>& array)
 {
     if (mBlindMetaData.empty())
         return;
-    assert(mBlindMetaData.size() == 1);
+    assert(mBlindMetaData.size() == 1 || mBlindMetaData.size() == 2);
 
     const uint32_t leafCount = static_cast<uint32_t>(array.size());
     auto*          data = this->template nodeData<DstNode0>();
@@ -295,22 +360,24 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
     }
 
     // write point offsets as blind meta data
-    auto b = *mBlindMetaData.cbegin();
-    assert(b.count == data[leafCount - 1].mMinimum + data[leafCount - 1].mMaximum);
-    assert(b.name == "index" && b.typeName == "uint32");
+    size_t byteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
+    auto it = mBlindMetaData.cbegin();
+    assert(it->count == data[leafCount - 1].mMinimum + data[leafCount - 1].mMaximum);
+    assert(it->name == "index" && it->typeName == "uint32" && it->index == 0);
     auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(0));
-    meta.mByteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
-    meta.mElementCount = b.count;
+    meta.mByteOffset = byteOffset;
+    byteOffset += it->size;
+    meta.mElementCount = it->count;
     meta.mFlags = 0;
     meta.mSemantic = GridBlindDataSemantic::Unknown;
     meta.mDataClass = GridBlindDataClass::IndexArray;
     meta.mDataType = GridType::UInt32;
-    if (b.name.length() + 1 > nanovdb::GridBlindMetaData::MaxNameSize) {
+    if (it->name.length() >= nanovdb::GridBlindMetaData::MaxNameSize) {
         std::stringstream ss;
-        ss << "Point attribute name \"" << b.name << "\" is more then " << nanovdb::GridBlindMetaData::MaxNameSize << " characters";
+        ss << "Point attribute name \"" << it->name << "\" is more than " << (nanovdb::GridBlindMetaData::MaxNameSize-1) << " characters";
         OPENVDB_THROW(openvdb::ValueError, ss.str());
     }
-    memcpy(meta.mName, b.name.c_str(), b.name.size() + 1);
+    memcpy(meta.mName, it->name.c_str(), it->name.size() + 1);
 
     uint32_t* points = reinterpret_cast<uint32_t*>(this->blindData());
     tbb::parallel_for(tbb::blocked_range<uint32_t>(0, array.size(), 16),
@@ -321,15 +388,68 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
                                   *p++ = idx;
                           }
                       });
+    ++it;
+    if (it != mBlindMetaData.cend()) {
+        assert(it->name == "grid name" && it->typeName == "uint8_t" && it->index == 1);
+        assert(srcGrid.getName().length() >= nanovdb::GridData::MaxNameSize);
+        auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(1));
+        meta.mByteOffset = byteOffset; // offset from Grid to blind data
+        meta.mElementCount = it->count;
+        meta.mFlags = 0;
+        meta.mSemantic = GridBlindDataSemantic::Unknown;
+        meta.mDataClass = GridBlindDataClass::GridName;
+        meta.mDataType = GridType::Unknown;
+        strcpy(reinterpret_cast<char*>(mData + meta.mByteOffset), srcGrid.getName().c_str());
+    }   
 }
 
 template<typename SrcTreeT, typename BufferT>
+template<typename AttT, typename CodecT>
+inline void
+OpenToNanoVDB<SrcTreeT, BufferT>::copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx)
+{
+    static_assert(std::is_same<typename SrcNode0::ValueType, openvdb::PointDataIndex32>::value, "Expected value to openvdb::PointData");
+    using RangeT  = tbb::blocked_range<uint64_t>;
+    using HandleT = openvdb::points::AttributeHandle<AttT, CodecT>;
+    AttT* attPtr  = reinterpret_cast<AttT*>(mData + this->gridData()->blindMetaData(static_cast<uint32_t>(attIdx)).mByteOffset);
+    auto* dstLeaf = this->template nodeData<DstNode0>(); 
+    tbb::parallel_for(RangeT(0, array.size(), 16), [&](const RangeT& r) {
+        for (auto i = r.begin(); i != r.end(); ++i) {
+            auto* srcLeaf = array[i];
+            HandleT handle(srcLeaf->constAttributeArray(attIdx));
+            AttT* p = attPtr + dstLeaf[i].mMinimum;
+            for (auto iter = srcLeaf->beginIndexOn(); iter; ++iter) {
+                *p++ = handle.get(*iter);
+            }
+        }
+    });
+}
+
+/*
+template<typename SrcTreeT, typename BufferT>
+template<typename AttT>
+inline void
+OpenToNanoVDB<SrcTreeT, BufferT>::copyPointAttribute(std::vector<const SrcNode0*>& array, size_t attIdx, const openvdb::Name &codec)
+{
+    if (codec == openvdb::points::FixedPointCodec<false>::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::FixedPointCodec<false>>(array, attIdx);
+    } else if (codec == openvdb::points::FixedPointCodec<true>::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::FixedPointCodec<true>>(array, attIdx);
+    } else if (codec == openvdb::points::NullCodec::name()) {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::NullCodec>(array, attIdx);
+    } else {
+        this->template copyPointAttribute<openvdb::Vec3f, openvdb::points::UnknownCodec>(array, attIdx);
+    }
+}
+*/
+template<typename SrcTreeT, typename BufferT>
 template<typename LeafT>
 inline typename std::enable_if<std::is_same<typename LeafT::ValueType, openvdb::PointDataIndex32>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& array)
+OpenToNanoVDB<SrcTreeT, BufferT>::processMetadata(const SrcGridT& srcGrid, std::vector<const LeafT*>& array)
 {
-    if (mBlindMetaData.empty())
+    if (mBlindMetaData.empty()) {
         return;
+    }
     const uint32_t leafCount = array.size();
     auto*          data = this->template nodeData<DstNode0>();
 
@@ -343,40 +463,34 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
     // write point coordinates as blind meta data
     size_t byteOffset = uintptr_t(this->blindData()) - uintptr_t(this->gridData()); // offset from Grid to blind data;
     for (auto& b : mBlindMetaData) {
-        assert(b.count == data[leafCount - 1].mMinimum + data[leafCount - 1].mMaximum);
         auto& meta = const_cast<nanovdb::GridBlindMetaData&>(this->gridData()->blindMetaData(static_cast<uint32_t>(b.index)));
         meta.mByteOffset = byteOffset; // offset from Grid to blind data
         byteOffset += b.size;
         meta.mElementCount = b.count;
         meta.mFlags = 0;
-        meta.mDataClass = GridBlindDataClass::AttributeArray;
-        if (b.name.length() + 1 > nanovdb::GridBlindMetaData::MaxNameSize) {
-            std::stringstream ss;
-            ss << "Point attribute name \"" << b.name << "\" is more then " << nanovdb::GridBlindMetaData::MaxNameSize << " characters";
-            OPENVDB_THROW(openvdb::ValueError, ss.str());
-        }
-        memcpy(meta.mName, b.name.c_str(), b.name.size() + 1);
-        if (b.typeName == "vec3s") {
-            meta.mDataType = GridType::Vec3f;
-            using T = openvdb::Vec3f;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            if (b.name == "P") {
-                meta.mSemantic = GridBlindDataSemantic::PointPosition;
-                tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                                  [&](const tbb::blocked_range<uint64_t>& r) {
-                                      for (auto i = r.begin(); i != r.end(); ++i) {
-                                          auto*                               leaf = array[i];
-                                          openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                          T*                                  p = ptr + data[i].mMinimum;
-                                          for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                                              const auto ijk = iter.getCoord();
-                                              assert(leaf->isValueOn(ijk));
-                                              *p++ = ijk.asVec3s() + posHandle.get(*iter);
-                                          }
-                                      }
-                                  });
-            } else {
-                if (b.name == "V") {
+        if (b.name == "grid name") {
+            meta.mSemantic = GridBlindDataSemantic::Unknown;
+            meta.mDataClass = GridBlindDataClass::GridName;
+            meta.mDataType = GridType::Unknown;
+            assert(srcGrid.getName().length() >= nanovdb::GridData::MaxNameSize);
+            strcpy(reinterpret_cast<char*>(mData + meta.mByteOffset), srcGrid.getName().c_str());
+        } else {
+            assert(b.count == data[leafCount - 1].mMinimum + data[leafCount - 1].mMaximum);
+            meta.mDataClass = GridBlindDataClass::AttributeArray;
+            if (b.name.length()>= nanovdb::GridBlindMetaData::MaxNameSize) {
+                std::stringstream ss;
+                ss << "Point attribute name \"" << b.name << "\" is more than " << (nanovdb::GridBlindMetaData::MaxNameSize-1) << " characters";
+                OPENVDB_THROW(openvdb::ValueError, ss.str());
+            }
+        
+            //const openvdb::Name codec = array.empty() ? "" : array[0]->constAttributeArray(b.index).codecType();
+            memcpy(meta.mName, b.name.c_str(), b.name.size() + 1);
+            if (b.typeName == "vec3s") {
+                meta.mDataType = GridType::Vec3f;
+                this->template copyPointAttribute<openvdb::Vec3f>(array, b.index);
+                if (b.name == "P") {
+                    meta.mSemantic = GridBlindDataSemantic::PointPosition;  
+                } else if (b.name == "V") {
                     meta.mSemantic = GridBlindDataSemantic::PointVelocity;
                 } else if (b.name == "Cd") {
                     meta.mSemantic = GridBlindDataSemantic::PointColor;
@@ -385,89 +499,33 @@ OpenToNanoVDB<SrcTreeT, BufferT>::postProcessPoints(std::vector<const LeafT*>& a
                 } else {
                     meta.mSemantic = GridBlindDataSemantic::Unknown;
                 }
-                tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                                  [&](const tbb::blocked_range<uint64_t>& r) {
-                                      for (auto i = r.begin(); i != r.end(); ++i) {
-                                          auto*                               leaf = array[i];
-                                          openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                          T*                                  p = ptr + data[i].mMinimum;
-                                          for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                              *p++ = posHandle.get(*iter);
-                                      }
-                                  });
-            }
-        } else if (b.typeName == "int32") {
-            meta.mDataType = GridType::Int32;
-            if (b.name == "id") {
-                meta.mSemantic = GridBlindDataSemantic::PointId;
-            } else {
+            } else if (b.typeName == "int32") {
+                meta.mDataType = GridType::Int32;
+                this->template copyPointAttribute<int32_t>(array, b.index);
+                if (b.name == "id") {
+                    meta.mSemantic = GridBlindDataSemantic::PointId;
+                } else {
+                    meta.mSemantic = GridBlindDataSemantic::Unknown;
+                }
+            } else if (b.typeName == "int64") {
+                meta.mDataType = GridType::Int64;
+                this->template copyPointAttribute<int64_t>(array, b.index);
+                if (b.name == "id") {
+                    meta.mSemantic = GridBlindDataSemantic::PointId;
+                } else {
+                    meta.mSemantic = GridBlindDataSemantic::Unknown;
+                }
+            } else if (b.typeName == "float") {
+                meta.mDataType = GridType::Float;
                 meta.mSemantic = GridBlindDataSemantic::Unknown;
-            }
-            using T = int32_t;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
-        } else if (b.typeName == "int64") {
-            meta.mDataType = GridType::Int64;
-            if (b.name == "id") {
-                meta.mSemantic = GridBlindDataSemantic::PointId;
+                this->template copyPointAttribute<float>(array, b.index);
             } else {
-                meta.mSemantic = GridBlindDataSemantic::Unknown;
+                std::stringstream ss;
+                ss << "Unsupported point attribute type: \"" << b.typeName << "\"";
+                OPENVDB_THROW(openvdb::ValueError, ss.str());
             }
-            using T = int64_t;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
-        } else if (b.typeName == "float") {
-            meta.mDataType = GridType::Float;
-            meta.mSemantic = GridBlindDataSemantic::Unknown;
-
-            using T = float;
-            T* ptr = reinterpret_cast<T*>(mData + meta.mByteOffset);
-            tbb::parallel_for(tbb::blocked_range<uint64_t>(0, array.size(), 16),
-                              [&](const tbb::blocked_range<uint64_t>& r) {
-                                  for (auto i = r.begin(); i != r.end(); ++i) {
-                                      auto*                               leaf = array[i];
-                                      openvdb::points::AttributeHandle<T> posHandle(leaf->constAttributeArray(b.index));
-                                      T*                                  p = ptr + data[i].mMinimum;
-                                      for (auto iter = leaf->beginIndexOn(); iter; ++iter)
-                                          *p++ = posHandle.get(*iter);
-                                  }
-                              });
-        } else {
-            std::stringstream ss;
-            ss << "Unsupported point attribute type: \"" << b.typeName << "\"";
-            OPENVDB_THROW(openvdb::ValueError, ss.str());
         }
     } // loop over bind data
-}
-
-template<typename SrcTreeT, typename BufferT>
-template<typename T, typename FlagT>
-inline typename std::enable_if<std::is_floating_point<T>::value>::type
-OpenToNanoVDB<SrcTreeT, BufferT>::setFlag(const T& min, const T& max, FlagT& flag) const
-{
-    if (mDelta > 0 && (min > mDelta || max < -mDelta)) {
-        flag |= FlagT(1); // set first bit
-    } else {
-        flag &= ~FlagT(1); // unset first bit
-    }
 }
 
 template<typename SrcTreeT, typename BufferT>
@@ -515,8 +573,8 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
 #endif
     assert(std::is_sorted(array2.begin(), array2.end(), [&key](const SrcNode2* a, const SrcNode2* b) { return key(a->origin()) < key(b->origin()); }));
 
-    startTimer("Pre-processing points");
-    this->preProcessPoints(array0);
+    startTimer("Pre-processing metadata");
+    this->preProcessMetadata(srcGrid, array0);
     stopTimer();
 
     mBytes[0] = DstGridT::memUsage(); // grid + blind meta data
@@ -599,17 +657,17 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     this->processGrid(srcGrid);
     stopTimer();
 
-    startTimer("Post-processing points");
-    this->postProcessPoints(array0);
+    startTimer("Process metadata");
+    this->processMetadata(srcGrid, array0);
     stopTimer();
 
-    using NanoValueT = typename TypeConverter<ValueT>::Type;
-    auto* nanoGrid = reinterpret_cast<NanoGrid<NanoValueT>*>(mData);
-
     // Since point grids already mde use of min/max we should not re-compute them
-    if (std::is_same<ValueT, openvdb::PointIndex32>::value ||
-        std::is_same<ValueT, openvdb::PointDataIndex32>::value)
+    if (std::is_same<SrcBuildT, openvdb::PointIndex32>::value ||
+        std::is_same<SrcBuildT, openvdb::PointDataIndex32>::value) {
         sMode = StatsMode::BBox;
+    }
+
+    auto* nanoGrid = reinterpret_cast<DstGridT*>(mData);
 
     startTimer("GridStats");
     gridStats(*nanoGrid, sMode);
@@ -620,24 +678,28 @@ OpenToNanoVDB<SrcTreeT, BufferT>::operator()(const openvdb::Grid<SrcTreeT>& srcG
     stopTimer();
 
     mData = nullptr;
-    return handle; // envokes move constructor
+    return handle; // invokes move constructor
 } // operator()
 
 template<typename SrcTreeT, typename BufferT>
-void OpenToNanoVDB<SrcTreeT, BufferT>::
-    processLeafs(std::vector<const SrcNode0*>& array, int32_t* x0)
+template<typename SrcLeafT>
+inline typename std::enable_if<!std::is_same<typename SrcLeafT::BuildType, openvdb::ValueMask>::value && 
+                               !std::is_same<typename SrcLeafT::BuildType, bool>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0)
 {
+    static_assert(sizeof(ValueT) == sizeof(typename SrcLeafT::ValueType), "Mismatching sizeof");
     DstNode0* firstLeaf = this->template node<DstNode0>(); // address of first leaf node
     auto      op = [&](const tbb::blocked_range<uint32_t>& r) {
         int32_t* x = x0 + r.begin();
         auto*    dstLeaf = firstLeaf + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
-            const SrcNode0* srcLeaf = array[i];
-            auto*           data = dstLeaf->data();
+            const SrcLeafT* srcLeaf = array[i];
+            auto*              data = dstLeaf->data();
             data->mValueMask = srcLeaf->valueMask(); // copy value mask
             data->mBBoxMin = srcLeaf->origin(); // copy origin of node
-            const ValueT* src = srcLeaf->buffer().data();
-            for (ValueT *dst = data->mValues, *end = dst + SrcNode0::size(); dst != end; dst += 4, src += 4) {
+            data->mFlags = 0u;
+            auto *src = reinterpret_cast<const ValueT*>(srcLeaf->buffer().data());
+            for (ValueT *dst = data->mValues, *end = dst + SrcLeafT::size(); dst != end; dst += 4, src += 4) {
                 dst[0] = src[0]; // copy *all* voxel values in sets of four, i.e. loop-unrolling
                 dst[1] = src[1];
                 dst[2] = src[2];
@@ -647,8 +709,53 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
         }
     };
     tbb::parallel_for(tbb::blocked_range<uint32_t>(0, static_cast<uint32_t>(array.size()), 8), op);
-} // processLeafs
+} // processLeafs<T>
 
+template<typename SrcTreeT, typename BufferT>
+template<typename SrcLeafT>
+inline typename std::enable_if<std::is_same<typename SrcLeafT::BuildType, bool>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0)
+{
+    DstNode0* firstLeaf = this->template node<DstNode0>(); // address of first leaf node
+    auto      op = [&](const tbb::blocked_range<uint32_t>& r) {
+        int32_t* x = x0 + r.begin();
+        auto*    dstLeaf = firstLeaf + r.begin();
+        for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
+            const SrcLeafT* srcLeaf = array[i];
+            auto*              data = dstLeaf->data();
+            data->mValueMask = srcLeaf->valueMask(); // copy value mask
+            data->mValues = *reinterpret_cast<const nanovdb::Mask<3>*>(srcLeaf->buffer().data()); // copy values
+            data->mBBoxMin = srcLeaf->origin(); // copy origin of node
+            data->mFlags = 0u;
+            cache(*x++, srcLeaf->origin(), i);
+        }
+    };
+    tbb::parallel_for(tbb::blocked_range<uint32_t>(0, static_cast<uint32_t>(array.size()), 8), op);
+} // processLeafs<bool>
+
+// Partial template specialization on ValueMask
+template<typename SrcTreeT, typename BufferT>
+template<typename SrcLeafT>
+inline typename std::enable_if<std::is_same<typename SrcLeafT::BuildType, openvdb::ValueMask>::value>::type
+OpenToNanoVDB<SrcTreeT, BufferT>::processLeafs(std::vector<const SrcLeafT*>& array, int32_t* x0)
+{
+    DstNode0* firstLeaf = this->template node<DstNode0>(); // address of first leaf node
+    auto      op = [&](const tbb::blocked_range<uint32_t>& r) {
+        int32_t* x = x0 + r.begin();
+        auto*    dstLeaf = firstLeaf + r.begin();
+        for (auto i = r.begin(); i != r.end(); ++i, ++dstLeaf) {
+            const SrcLeafT* srcLeaf = array[i];
+            auto*              data = dstLeaf->data();
+            data->mValueMask = srcLeaf->valueMask(); // copy value mask
+            data->mBBoxMin = srcLeaf->origin(); // copy origin of node
+            data->mFlags = 0u;
+            cache(*x++, srcLeaf->origin(), i);
+        }
+    };
+    tbb::parallel_for(tbb::blocked_range<uint32_t>(0, static_cast<uint32_t>(array.size()), 8), op);
+} // processLeafs<ValueMask>
+
+// Partial template specialization on bool value type
 template<typename SrcTreeT, typename BufferT>
 template<typename SrcNode, typename DstNode>
 void OpenToNanoVDB<SrcTreeT, BufferT>::
@@ -666,8 +773,8 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
             data->mOffset = size - i;
             data->mValueMask = srcNode->getValueMask();
             data->mChildMask = srcNode->getChildMask();
-            for (auto iter = srcNode->cbeginValueAll(); iter; ++iter) {
-                data->mTable[iter.pos()].value = *iter;
+            for (auto tileIter = srcNode->cbeginValueAll(); tileIter; ++tileIter) {
+                data->mTable[tileIter.pos()].value = *tileIter;
             }
             for (auto childIter = srcNode->cbeginChildOn(); childIter; ++childIter) {
                 const auto childID = static_cast<uint32_t>(childIter->origin()[0]);
@@ -740,21 +847,20 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
     auto& data = *this->gridData();
     data.mMagic = NANOVDB_MAGIC_NUMBER;
     data.mChecksum = 0u;
-    data.mMajor = NANOVDB_MAJOR_VERSION_NUMBER;
-    data.mFlags = 0u;
+    data.mVersion = Version();
+    data.mFlags = 0u;// disables all flags!
     data.mGridSize = this->gridSize();
     data.mWorldBBox = BBox<Vec3R>();
     data.mBlindMetadataOffset = mBlindMetaData.size() ? mBytes[1] : 0;
     data.mBlindMetadataCount = static_cast<uint32_t>(mBlindMetaData.size());
-    { /// @todo allow long loger grid names by encoding it as blind meta data!
-        const std::string name = srcGrid.getName();
-        if (name.length() + 1 > nanovdb::GridData::MaxNameSize) {
-            std::stringstream ss;
-            ss << "Grid name \"" << name << "\" is more then " << nanovdb::GridData::MaxNameSize << " characters";
-            OPENVDB_THROW(openvdb::ValueError, ss.str());
-        }
-        memcpy(data.mGridName, name.c_str(), name.size() + 1);
+
+    const std::string gridName = srcGrid.getName();
+    if (gridName.length() >= nanovdb::GridData::MaxNameSize) {
+        data.setLongGridNameOn();
+    } else {
+        strcpy(data.mGridName, gridName.c_str());
     }
+    
     switch (srcGrid.getGridClass()) { // set grid class
     case openvdb::GRID_LEVEL_SET:
         if (!is_floating_point<ValueT>::value)
@@ -770,26 +876,32 @@ void OpenToNanoVDB<SrcTreeT, BufferT>::
     default:
         data.mGridClass = GridClass::Unknown;
     }
-    if (std::is_same<ValueT, float>::value) { // resolved at compiletime
+    
+    if (std::is_same<SrcBuildT, float>::value) { // resolved at compiletime
         data.mGridType = GridType::Float;
-    } else if (std::is_same<ValueT, double>::value) {
+    } else if (std::is_same<SrcBuildT, double>::value) {
         data.mGridType = GridType::Double;
-    } else if (std::is_same<ValueT, int16_t>::value) {
+    } else if (std::is_same<SrcBuildT, int16_t>::value) {
         data.mGridType = GridType::Int16;
-    } else if (std::is_same<ValueT, int32_t>::value) {
+    } else if (std::is_same<SrcBuildT, int32_t>::value) {
         data.mGridType = GridType::Int32;
-    } else if (std::is_same<ValueT, int64_t>::value) {
+    } else if (std::is_same<SrcBuildT, int64_t>::value) {
         data.mGridType = GridType::Int64;
-    } else if (std::is_same<ValueT, openvdb::Vec3f>::value) {
+    } else if (std::is_same<SrcBuildT, openvdb::Vec3f>::value) {
         data.mGridType = GridType::Vec3f;
-    } else if (std::is_same<ValueT, openvdb::Index32>::value) {
+    } else if (std::is_same<SrcBuildT, openvdb::Index32>::value) {
         data.mGridType = GridType::UInt32;
-    } else if (std::is_same<ValueT, openvdb::PointIndex32>::value) {
+    } else if (std::is_same<SrcBuildT, openvdb::PointIndex32>::value) {
         data.mGridType = GridType::UInt32;
         data.mGridClass = GridClass::PointIndex;
-    } else if (std::is_same<ValueT, openvdb::PointDataIndex32>::value) {
+    } else if (std::is_same<SrcBuildT, openvdb::PointDataIndex32>::value) {
         data.mGridType = GridType::UInt32;
         data.mGridClass = GridClass::PointData;
+     } else if (std::is_same<SrcBuildT, openvdb::ValueMask>::value) {
+        data.mGridType = GridType::Mask;
+        data.mGridClass = GridClass::Topology;
+     } else if (std::is_same<SrcBuildT, bool>::value) {
+        data.mGridType = GridType::Boolean;
     } else {
         OPENVDB_THROW(openvdb::ValueError, "Unsupported value type");
     }
@@ -873,6 +985,10 @@ openToNanoVDB(const openvdb::GridBase::Ptr& base,
         return nanovdb::openToNanoVDB<BufferT, openvdb::Vec3dTree>(*grid, sMode, cMode, mortonSort, verbose);
     } else if (auto grid = openvdb::GridBase::grid<openvdb::points::PointDataGrid>(base)) {
         return nanovdb::openToNanoVDB<BufferT, openvdb::points::PointDataTree>(*grid, sMode, cMode, mortonSort, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::MaskGrid>(base)) {
+        return nanovdb::openToNanoVDB<BufferT, openvdb::MaskTree>(*grid, sMode, cMode, mortonSort, verbose);
+    } else if (auto grid = openvdb::GridBase::grid<openvdb::BoolGrid>(base)) {
+        return nanovdb::openToNanoVDB<BufferT, openvdb::BoolTree>(*grid, sMode, cMode, mortonSort, verbose);
     } else {
         OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized OpenVDB grid type");
     }

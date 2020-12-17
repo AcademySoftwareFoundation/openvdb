@@ -10,6 +10,9 @@
 #ifndef NANOVDB_HDDA_H_HAS_BEEN_INCLUDED
 #define NANOVDB_HDDA_H_HAS_BEEN_INCLUDED
 
+// Comment out to disable this explicit round-off check
+#define ENFORCE_FORWARD_STEPPING
+
 #include <nanovdb/NanoVDB.h> // only dependency
 
 namespace nanovdb {
@@ -143,15 +146,15 @@ private:
     template<int axis>
     __hostdev__ bool step()
     {
-#if 0
-        mT0 = mNext[axis];
-        mNext[axis] += mDim * mDelta[axis];
-#else
+#ifdef ENFORCE_FORWARD_STEPPING
         //if (mNext[axis] <= mT0) mNext[axis] += mT0 - mNext[axis] + fmaxf(mNext[axis]*1.0e-6f, 1.0e-6f);
-        if (mNext[axis] <= mT0) mNext[axis] += mT0 - mNext[axis] + (mNext[axis] + 1.0f)*1.0e-6f;
+        //if (mNext[axis] <= mT0) mNext[axis] += mT0 - mNext[axis] + (mNext[axis] + 1.0f)*1.0e-6f;
+        if (mNext[axis] <= mT0) {
+            mNext[axis] += mT0 - 0.999999f * mNext[axis] + 1.0e-6f;
+        }
+#endif
         mT0 = mNext[axis];
         mNext[axis] += mDim * mDelta[axis];
-#endif
         mVoxel[axis] += mDim * mStep[axis];
         return mT0 <= mT1;
     }
@@ -172,7 +175,7 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
     static const float Delta = 1.0001f;
     ijk = RoundDown<Coord>(ray.start()); // first hit of bbox
     HDDA<RayT, Coord> hdda(ray, acc.getDim(ijk, ray));
-    const auto       v0 = acc.getValue(ijk);
+    const auto        v0 = acc.getValue(ijk);
     while (hdda.step()) {
         ijk = RoundDown<Coord>(ray(hdda.time() + Delta));
         hdda.update(ray, acc.getDim(ijk, ray));
@@ -257,6 +260,11 @@ public:
             return step<2>();
         }
 #else
+#ifdef ENFORCE_FORWARD_STEPPING
+        if (mNext[axis] <= mT0) {
+            mNext[axis] += mT0 - 0.999999f * mNext[axis] + 1.0e-6f;
+        }
+#endif
         mT0 = mNext[axis];
         mNext[axis] += mDelta[axis];
         mVoxel[axis] += mStep[axis];
@@ -289,20 +297,30 @@ public:
         return Min(mT1, Min(mNext[0], Min(mNext[1], mNext[2])));
     }
 
+    __hostdev__ int nextAxis() const
+    {
+        return nanovdb::MinIndex(mNext);
+    }
+
 private:
     // helper to implement the general form
     template<int axis>
     __hostdev__ bool step()
     {
+#ifdef ENFORCE_FORWARD_STEPPING
+        if (mNext[axis] <= mT0) {
+            mNext[axis] += mT0 - 0.999999f * mNext[axis] + 1.0e-6f;
+        }
+#endif
         mT0 = mNext[axis];
         mNext[axis] += mDelta[axis];
         mVoxel[axis] += mStep[axis];
         return mT0 <= mT1;
     }
 
-    RealT   mT0, mT1; // min and max allowed times
-    CoordT  mVoxel, mStep; // current voxel location and step to next voxel location
-    Vec3T   mDelta, mNext; // delta time and next time
+    RealT  mT0, mT1; // min and max allowed times
+    CoordT mVoxel, mStep; // current voxel location and step to next voxel location
+    Vec3T  mDelta, mNext; // delta time and next time
 }; // class DDA
 
 /////////////////////////////////////////// ZeroCrossingNode ////////////////////////////////////////////
@@ -310,14 +328,13 @@ private:
 template<typename RayT, typename NodeT>
 inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0, nanovdb::Coord& ijk, float& v, float& t)
 {
-    BBox<Coord> bbox(node.origin(), node.origin() + Coord(node.dim()-1));
+    BBox<Coord> bbox(node.origin(), node.origin() + Coord(node.dim() - 1));
 
     if (!ray.clip(node.bbox())) {
         return false;
     }
 
-    float t0 = ray.t0();
-    //float t1 = ray.t1();
+    const float t0 = ray.t0();
 
     static const float Delta = 1.0001f;
     ijk = Coord::Floor(ray(ray.t0() + Delta));
@@ -333,7 +350,7 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
             return false;
 
         v = node.getValue(ijk);
-        if (v*v0 < 0) {
+        if (v * v0 < 0) {
             t = dda.time();
             return true;
         }
@@ -342,6 +359,8 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
 }
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
+
+/// @brief A Tree Marcher for Generic Grids
 
 template<typename NodeT, typename RayT, typename AccT, typename CoordT = Coord>
 class TreeMarcher
@@ -357,17 +376,27 @@ public:
     {
     }
 
-    /// @brief Initialize the TreeMarcher with a ray.
-    inline __hostdev__ bool init(const RayT& ray)
+    /// @brief Initialize the TreeMarcher with an index-space ray.
+    inline __hostdev__ bool init(const RayT& indexRay)
     {
-        mRay = ray;
+        mRay = indexRay;
         if (!mRay.clip(mAcc.root().bbox()))
             return false; // clip ray to bbox
-        const CoordT ijk = RoundDown<Coord>(mRay.start());
-        const int    dim = mAcc.getDim(ijk, mRay);
-        mHdda.init(mRay, mRay.t0(), mRay.t1(), nanovdb::Max(dim, (int)NodeT::dim()));
+
+        // tweak the intersection span into the bbox.
+        // CAVEAT: this will potentially clip some tiny corner intersections.
+        static const float Eps = 0.000001f;
+        const float        t0 = mRay.t0() + Eps;
+        const float        t1 = mRay.t1() - Eps;
+        if (t0 > t1)
+            return false;
+
+        const CoordT ijk = RoundDown<Coord>(mRay(t0));
+        const uint32_t    dim = mAcc.getDim(ijk, mRay);
+        mHdda.init(mRay, t0, t1, nanovdb::Max(dim, NodeT::dim()));
 
         mT0 = (dim <= ChildT::dim()) ? mHdda.time() : -1; // potentially begin a span.
+        mTmax = t1;
         return true;
     }
 
@@ -376,23 +405,30 @@ public:
     /// @return true when a node of type NodeT is intersected, false otherwise.
     inline __hostdev__ bool step(const NodeT** node, float& t0, float& t1)
     {
-        // CAVEAT: if this is too large then it will miss corners of nodes!
-        static const float Delta = 1.000001f;
+        // CAVEAT: if Delta is too large then it will clip corners of nodes in a visible way.
+        // but it has to be quite large when very far from the grid (due to fp32 rounding)
+        static const float Delta = 0.01f;
         bool               hddaIsValid;
 
         do {
             t0 = mT0;
 
-            // get next node intersection.
+            auto currentNode = mAcc.template getNode<NodeT>();
+
+            // get next node intersection...
             hddaIsValid = mHdda.step();
-            const CoordT ijk = RoundDown<Coord>(mRay(mHdda.time() + Delta));
-            auto         currentNode = mAcc.template getNode<NodeT>();
-            const auto    dim = mAcc.getDim(ijk, mRay);
-            mHdda.update(mRay, (int)nanovdb::Max(dim, NodeT::dim()));
-            mT0 = (dim <= ChildT::dim()) ? mHdda.time() : -1; // potentially begin a span.
+            const CoordT nextIjk = RoundDown<Coord>(mRay(mHdda.time() + Delta));
+            const auto   nextDim = mAcc.getDim(nextIjk, mRay);
+            mHdda.update(mRay, (int)Max(nextDim, NodeT::dim()));
+            mT0 = (nextDim <= ChildT::dim()) ? mHdda.time() : -1; // potentially begin a span.
 
             if (t0 >= 0) { // we are in a span.
-                t1 = mHdda.time();
+                t1 = Min(mTmax, mHdda.time());
+
+                // TODO: clean this up!
+                if (t0 >= t1 || currentNode == nullptr)
+                    continue;
+
                 *node = currentNode;
                 return true;
             }
@@ -402,11 +438,43 @@ public:
         return false;
     }
 
+    inline __hostdev__ const RayT& ray() const { return mRay; }
+
+    inline __hostdev__ RayT& ray() { return mRay; }
+
+private:
     AccT&             mAcc;
     RayT              mRay;
     HDDA<RayT, Coord> mHdda;
     float             mT0;
-};
+    float             mTmax;
+};// TreeMarcher
+
+/////////////////////////////////////////// PointTreeMarcher ////////////////////////////////////////////
+
+/// @brief A Tree Marcher for Point Grids
+///
+/// @note This class will handle correctly offseting the ray by 0.5 to ensure that
+/// the underlying HDDA will intersect with the grid-cells. See details below.
+
+template<typename AccT, typename RayT, typename CoordT = Coord>
+class PointTreeMarcher : public TreeMarcher<LeafNode<typename AccT::ValueType>, RayT, AccT, CoordT>
+{
+    using BaseT = TreeMarcher<LeafNode<typename AccT::ValueType>, RayT, AccT, CoordT>;
+public:
+    __hostdev__ PointTreeMarcher(AccT& acc) : BaseT(acc) {}
+
+    /// @brief Initiates this instance with a ray in index space.
+    ///
+    /// @details An offset by 0.5 is applied to the ray to account for the fact that points in vdb
+    ///          grids are bucketed into so-called grid cell, which are centered round grid voxels,
+    ///          whereas the DDA is based on so-called grid nodes, which are coincident with grid
+    ///          voxels. So, rather than offsettting the points by 0.5 to bring them into a grid
+    ///          node representation this method offsets the eye of the ray by 0.5, which effectively
+    ///          ensures that the DDA operates on grid cells as oppose to grid nodes. This subtle
+    ///          but important offset by 0.5 is explined in more details in our online documentation.
+    __hostdev__ bool init(RayT ray) { return BaseT::init(ray.offsetEye(0.5)); }
+};// PointTreeMarcher
 
 } // namespace nanovdb
 

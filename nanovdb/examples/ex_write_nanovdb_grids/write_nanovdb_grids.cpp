@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/IO.h>
 
 /// @brief Creates multiple NanoVDB grids, accesses a value in one, and saves all grids to file.

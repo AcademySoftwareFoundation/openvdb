@@ -155,6 +155,7 @@ void createContext(RenderState& state)
     OptixDeviceContextOptions options = {};
     options.logCallbackFunction = &context_log_cb;
     options.logCallbackLevel = 4;
+    //options.validationMode = OPTIX_DEVICE_CONTEXT_VALIDATION_MODE_ALL;
     OPTIX_CHECK(optixDeviceContextCreate(cuCtx, &options, &context));
 
     state.context = context;
@@ -403,10 +404,9 @@ const char* getPtxString(const char* filename, const char** log = NULL)
 
 void createModules(RenderState& state)
 {
-    OptixModuleCompileOptions module_compile_options;
+    OptixModuleCompileOptions module_compile_options = {};
     module_compile_options.maxRegisterCount = 100;
     module_compile_options.optLevel = OPTIX_COMPILE_OPTIMIZATION_DEFAULT;
-    //module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_NONE;
     module_compile_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
 
     char   log[2048];
@@ -599,7 +599,7 @@ void createPipeline(MaterialClass renderMethod, RenderState& state)
     std::vector<OptixProgramGroup> program_groups;
 
     state.pipeline_compile_options = {};
-    state.pipeline_compile_options.usesMotionBlur = false;
+    state.pipeline_compile_options.usesMotionBlur = 0;
     state.pipeline_compile_options.traversableGraphFlags = OPTIX_TRAVERSABLE_GRAPH_FLAG_ALLOW_SINGLE_GAS;
     state.pipeline_compile_options.numPayloadValues = 3;
     state.pipeline_compile_options.numAttributeValues = 6;
@@ -613,10 +613,10 @@ void createPipeline(MaterialClass renderMethod, RenderState& state)
     createMissProgram(renderMethod, state, program_groups);
 
     // Link program groups to pipeline
-    OptixPipelineLinkOptions pipeline_link_options = {
-        g_sMaxTrace, // maxTraceDepth
-        OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO, // debugLevel
-    };
+    OptixPipelineLinkOptions pipeline_link_options = {};
+    pipeline_link_options.maxTraceDepth = g_sMaxTrace;
+    pipeline_link_options.debugLevel = OPTIX_COMPILE_DEBUG_LEVEL_LINEINFO;
+
     char   log[2048];
     size_t sizeof_log = sizeof(log);
     OPTIX_CHECK_LOG(optixPipelineCreate(state.context,
@@ -932,7 +932,7 @@ void* RenderLauncherOptix::mapCUDA(int access, const std::shared_ptr<Resource>& 
     return imgBuffer->cudaMap(FrameBufferBase::AccessType(access));
 }
 
-bool RenderLauncherOptix::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherOptix::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     if (grids[0].gridHandle == nullptr)
         return false;

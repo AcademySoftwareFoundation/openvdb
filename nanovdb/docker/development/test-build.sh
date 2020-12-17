@@ -8,13 +8,14 @@
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 COMPILER_NAME=$1; shift
 CUDA_VER=$1; shift
+GIT_BRANCH=$1; shift
 
 if [[ -z "${COMPILER_NAME}" ]]; then
     COMPILER_NAME="clang++"
-else if [[ -z "${CUDA_VER}" ]]; then
+fi
+
+if [[ -z "${CUDA_VER}" ]]; then
     CUDA_VER="10.2"
-else
-    GIT_BRANCH=$1; shift
 fi
 
 echo "Building with compiler: ${COMPILER_NAME}"

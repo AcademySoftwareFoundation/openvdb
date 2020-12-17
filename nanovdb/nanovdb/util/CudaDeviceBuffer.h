@@ -38,8 +38,8 @@ namespace nanovdb {
 /// @brief Simple memory buffer using un-managed pinned host memory when compiled with NVCC.
 ///        Obviously this class is making explicit used of CUDA so replace it with your own memory
 ///        allocator if you are not using CUDA.
-/// @note  While CUDA's pinned host memory allows for asyncronous memory copy between host and device
-///        it is signififcantly slower then cached (un-pinned) memory on the host.
+/// @note  While CUDA's pinned host memory allows for asynchronous memory copy between host and device
+///        it is significantly slower then cached (un-pinned) memory on the host.
 class CudaDeviceBuffer
 {
     uint64_t mSize; // total number of bytes for the NanoVDB grid.

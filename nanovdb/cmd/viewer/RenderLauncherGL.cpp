@@ -61,7 +61,7 @@ bool RenderLauncherGL::ensureGridResource(const std::shared_ptr<Resource>& resou
         return false;
     }
 
-    if (gridByteSize > maxStorageBlockSize || maxStorageBlocks < 4) {
+    if (gridByteSize > (size_t)maxStorageBlockSize || maxStorageBlocks < 4) {
         std::stringstream msg;
         msg << "grid is too large. Requested size: " << gridByteSize << ", ";
         msg << "GL_MAX_SHADER_STORAGE_BLOCK_SIZE: " << maxStorageBlockSize << ", ";
@@ -98,7 +98,7 @@ bool RenderLauncherGL::ensureGridResource(const std::shared_ptr<Resource>& resou
     auto gridData = grid;
 
     uintptr_t gridBaseAddr = uintptr_t(grid);
-    uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
+    //uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
     uint32_t  offsets[] = {
         uint32_t(uintptr_t(node0Level) - gridBaseAddr),
         uint32_t(uintptr_t(node1Level) - gridBaseAddr),
@@ -139,7 +139,7 @@ static std::string fileToString(std::string filename)
     return str;
 }
 
-bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& resource, std::string valueType, MaterialClass method)
+bool RenderLauncherGL::ensureProgramResource(const std::shared_ptr<Resource>& resource, std::string /*valueType*/, MaterialClass method)
 {
     if (resource->mUniformBufferId)
         glDeleteBuffers(1, &resource->mUniformBufferId);
@@ -273,7 +273,7 @@ std::shared_ptr<RenderLauncherGL::Resource> RenderLauncherGL::ensureResource(con
     return resource;
 }
 
-bool RenderLauncherGL::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherGL::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     if (grids[0].gridHandle == nullptr)
         return false;

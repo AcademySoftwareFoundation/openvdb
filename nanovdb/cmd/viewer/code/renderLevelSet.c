@@ -90,7 +90,7 @@ CNANOVDB_KERNEL void renderLevelSet(
         float randVar1 = randomf(pixelSeed + 0);
         float randVar2 = randomf(pixelSeed + 1);
 
-        vec3 wRayDir = getRayDirFromPixelCoord(ix, iy, kArgs.width, kArgs.height, kArgs.numAccumulations, kArgs.samplesPerPixel, pixelSeed, cameraU, cameraV, cameraW, kArgs.cameraFovY, kArgs.cameraAspect);
+        vec3 wRayDir = getRayDirFromPixelCoord(ix, iy, kArgs.width, kArgs.height, kArgs.numAccumulations, pixelSeed, cameraU, cameraV, cameraW, kArgs.cameraFovY, kArgs.cameraAspect);
 
         vec3        wRayEye = cameraP;
         nanovdb_Ray wRay;

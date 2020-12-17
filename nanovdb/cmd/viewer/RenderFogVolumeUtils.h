@@ -23,31 +23,6 @@
 namespace render {
 namespace fogvolume {
 
-template<typename ValueT>
-inline __hostdev__ ValueT valueToScalar(const ValueT& v)
-{
-    return v;
-}
-
-inline __hostdev__ float valueToScalar(const nanovdb::Vec3f& v)
-{
-    return luminance<float>(v);
-}
-
-inline __hostdev__ double valueToScalar(const nanovdb::Vec3d& v)
-{
-    return luminance<double>(v);
-}
-
-template<typename ValueT>
-inline __hostdev__ nanovdb::Vec3f colorFromTemperature(const ValueT& v, float scale)
-{
-    float r = v;
-    float g = r * r;
-    float b = g * g;
-    return scale * nanovdb::Vec3f(r * r * r, g * g * g, b * b * b);
-}
-
 struct HeterogenousMedium
 {
     int                       maxPathDepth;
@@ -281,7 +256,7 @@ inline __hostdev__ nanovdb::Vec3f sampleHG(const nanovdb::Vec3f& dir, float g, f
 }
 
 template<typename Vec3T, typename SamplerT>
-inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& dir, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed, const Vec3T& lightDir)
+inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& /*dir*/, const SamplerT& sampler, const HeterogenousMedium& medium, uint32_t& seed, const Vec3T& lightDir)
 {
     const Vec3T lightRadiance = Vec3T(1) * 1.f;
     auto        shadowRay = nanovdb::Ray<float>(pos, lightDir);
@@ -291,7 +266,7 @@ inline __hostdev__ Vec3T estimateLight(const Vec3T& pos, const Vec3T& dir, const
 }
 
 template<typename Vec3T, typename SamplerT>
-inline __hostdev__ Vec3T estimateBlackbodyEmission(const Vec3T& pos, const SamplerT& temperatureSampler, const HeterogenousMedium& medium, uint32_t& seed)
+inline __hostdev__ Vec3T estimateBlackbodyEmission(const Vec3T& pos, const SamplerT& temperatureSampler, const HeterogenousMedium& medium, uint32_t& /*seed*/)
 {
     const auto value = temperatureSampler(pos);
     return colorFromTemperature(value, medium.temperatureScale);
@@ -422,7 +397,7 @@ struct RenderVolumeRgba32fFn
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
@@ -437,7 +412,7 @@ struct RenderVolumeRgba32fFn
             color[2] = envRadiance;
 
         } else {
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             const auto& densityTree = densityGrid->tree();
@@ -517,7 +492,7 @@ struct RenderBlackBodyVolumeRgba32fFn
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const nanovdb::NanoGrid<ValueT>* temperatureGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const nanovdb::NanoGrid<ValueT>* temperatureGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
@@ -539,7 +514,7 @@ struct RenderBlackBodyVolumeRgba32fFn
             const auto  densitySampler = nanovdb::createSampler<InterpolationOrder, decltype(densityAcc), false>(densityAcc);
             const auto  temperatureSampler = nanovdb::createSampler<InterpolationOrder, decltype(temperatureAcc), false>(temperatureAcc);
 
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             HeterogenousMedium medium;
@@ -615,7 +590,7 @@ struct FogVolumeFastRenderFn
     using RayT = nanovdb::Ray<RealT>;
 
     template<typename ValueT>
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
@@ -648,7 +623,7 @@ struct FogVolumeFastRenderFn
             const auto densityAcc = densityTree.getAccessor();
             const auto densitySampler = nanovdb::createSampler<0, decltype(densityAcc), false>(densityAcc);
 
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             float radiance = 0;

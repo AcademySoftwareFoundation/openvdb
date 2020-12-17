@@ -30,7 +30,7 @@ struct RenderLevelSetRgba32fFn
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR proxy, const nanovdb::NanoGrid<ValueT>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         auto outPixel = &imgBuffer[4 * (ix + width * iy)];
 
@@ -46,19 +46,21 @@ struct RenderLevelSetRgba32fFn
             color[2] = envRadiance;
 
         } else {
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = grid->worldToIndexDirF(wLightDir).normalize();
 
             const auto& tree = grid->tree();
             const auto  acc = tree.getAccessor();
-            const auto  sampler = nanovdb::createSampler<0, decltype(acc), false>(acc);
+
+            // TODO: Use a sampler in ZeroCrossing for accurate surface bisection.
+            //const auto sampler = nanovdb::createSampler<0, decltype(acc), false>(acc);
 
             for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
                 uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ hash(ix, iy);
 
                 RayT wRay = getRayFromPixelCoord(ix, iy, width, height, numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
 
-                RayT  iRay = wRay.worldToIndexF(*grid);
+                RayT iRay = wRay.worldToIndexF(*grid);
 
                 CoordT ijk;
                 ValueT v0 = 0.0f;

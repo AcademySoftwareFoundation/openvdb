@@ -49,7 +49,7 @@ function(_ADD_EXAMPLE)
 
   target_include_directories(
     ${EXAMPLE_NAME} PUBLIC ex_util ${TBB_INCLUDE_DIRECTORY}
-                           ${CUDA_INCLUDE_DIRECTORY})
+                           ${CUDA_INCLUDE_DIRECTORY} ${NANOVDB_OGT_INCLUDE_DIRECTORY})
 
   target_link_libraries(
     ${EXAMPLE_NAME}
@@ -63,9 +63,9 @@ function(_ADD_EXAMPLE)
 
   target_compile_definitions(
     ${EXAMPLE_NAME}
-    PRIVATE "-D${NANOVDB_USE_OPENVDB_FLAG}" "-D${NANOVDB_USE_CUDA_FLAG}"
-            "-D${NANOVDB_USE_TBB_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
-            "-D${NANOVDB_USE_ZLIB_FLAG}")
+    PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}" "${NANOVDB_USE_CUDA_FLAG}" "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
+            "${NANOVDB_USE_TBB_FLAG}" "${NANOVDB_USE_BLOSC_FLAG}"
+            "${NANOVDB_USE_ZLIB_FLAG}")
 
   install(TARGETS ${EXAMPLE_NAME} DESTINATION examples)
 
@@ -120,7 +120,7 @@ function(_ADD_EXAMPLE_OPENVDB)
 
   target_include_directories(
     ${EXAMPLE_NAME} PUBLIC ex_util ${OpenVDB_INCLUDE_DIRS}
-                           ${TBB_INCLUDE_DIRECTORY} ${CUDA_INCLUDE_DIRECTORY})
+                           ${TBB_INCLUDE_DIRECTORY} ${CUDA_INCLUDE_DIRECTORY} ${NANOVDB_OGT_INCLUDE_DIRECTORY})
 
   target_link_libraries(
     ${EXAMPLE_NAME}
@@ -133,9 +133,9 @@ function(_ADD_EXAMPLE_OPENVDB)
 
   target_compile_definitions(
     ${EXAMPLE_NAME}
-    PRIVATE "-D${NANOVDB_USE_OPENVDB_FLAG}" "-D${NANOVDB_USE_CUDA_FLAG}"
-            "-D${NANOVDB_USE_TBB_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
-            "-D${NANOVDB_USE_ZLIB_FLAG}")
+    PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}" "${NANOVDB_USE_CUDA_FLAG}" "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
+            "${NANOVDB_USE_TBB_FLAG}" "${NANOVDB_USE_BLOSC_FLAG}"
+            "${NANOVDB_USE_ZLIB_FLAG}")
 
   install(TARGETS ${EXAMPLE_NAME} DESTINATION examples)
 
@@ -160,7 +160,9 @@ _add_example(NAME "ex_bump_pool_buffer")
 _add_example(NAME "ex_collide_level_set")
 _add_example(NAME "ex_raytrace_fog_volume")
 _add_example(NAME "ex_raytrace_level_set")
-
+if(NANOVDB_USE_MAGICAVOXEL)
+_add_example(NAME "ex_vox_to_nanovdb")
+endif()
 # add_subdirectory(ex_sph_benchmark)
 
 # ---------------------------------------------------------------

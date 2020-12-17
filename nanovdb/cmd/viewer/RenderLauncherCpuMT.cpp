@@ -27,7 +27,7 @@
 #endif
 #include <iostream>
 
-struct Launcher
+struct PlatformLauncherCpuMT
 {
     template<typename ValueT>
     const nanovdb::NanoGrid<ValueT>* grid(const void* gridPtr) const
@@ -92,7 +92,7 @@ struct Launcher
     }
 };
 
-bool RenderLauncherCpuMT::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherCpuMT::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
@@ -102,7 +102,7 @@ bool RenderLauncherCpuMT::render(MaterialClass method, int width, int height, Fr
         return false;
     }
 
-    Launcher methodLauncher;
+    PlatformLauncherCpuMT methodLauncher;
     launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
 
     imgBuffer->unmap();

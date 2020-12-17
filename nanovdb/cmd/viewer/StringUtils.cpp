@@ -45,10 +45,14 @@ std::string urlGetPath(const std::string& url)
         path = url.substr(i + 3);
     }
     i = path.find("?");
-    if (i == std::string::npos) {
-        return path;
+    if (i != std::string::npos) {
+        path = path.substr(0, i);
     }
-    return path.substr(0, i);
+    i = path.find("#");
+    if (i != std::string::npos) {
+        path = path.substr(0, i);
+    }
+    return path;
 }
 
 std::string urlGetPathExtension(const std::string& url)

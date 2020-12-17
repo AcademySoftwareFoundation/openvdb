@@ -62,7 +62,7 @@ inline __hostdev__ void invTonemapReinhard(Vec3T1& out, Vec3T2& in, const float 
 }
 
 template<typename ValueT, typename Vec3T>
-inline __hostdev__ ValueT luminance(Vec3T v)
+inline __hostdev__ ValueT luminance(const Vec3T& v)
 {
     return ValueT(v[0] * ValueT(0.2126) + v[1] * ValueT(0.7152) + v[2] * ValueT(0.0722));
 }
@@ -81,6 +81,47 @@ inline __hostdev__ void tonemapACES(Vec3T& out, const Vec3T& in)
     out[0] = nanovdb::Max(nanovdb::Min(r, 1.0f), 0.0f);
     out[1] = nanovdb::Max(nanovdb::Min(g, 1.0f), 0.0f);
     out[2] = nanovdb::Max(nanovdb::Min(b, 1.0f), 0.0f);
+}
+
+template<typename ValueT>
+inline __hostdev__ ValueT valueToScalar(const ValueT& v)
+{
+    return v;
+}
+
+inline __hostdev__ float valueToScalar(const nanovdb::Vec3f& v)
+{
+    return luminance<float>(v);
+}
+
+inline __hostdev__ double valueToScalar(const nanovdb::Vec3d& v)
+{
+    return luminance<double>(v);
+}
+
+template<typename T>
+inline __hostdev__ nanovdb::Vec4f valueToColor(const T& v)
+{
+    return nanovdb::Vec4f(valueToScalar(v));
+}
+
+inline __hostdev__ nanovdb::Vec4f valueToColor(const uint32_t v)
+{
+    return nanovdb::Vec4f(v);
+}
+
+inline __hostdev__ nanovdb::Vec4f valueToColor(const nanovdb::PackedRGBA8 v)
+{
+    return nanovdb::Vec4f(v[0], v[1], v[2], v[3]) / 255.f;
+}
+
+template<typename ValueT>
+inline __hostdev__ nanovdb::Vec3f colorFromTemperature(const ValueT& v, float scale)
+{
+    float r = v;
+    float g = r * r;
+    float b = g * g;
+    return scale * nanovdb::Vec3f(r * r * r, g * g * g, b * b * b);
 }
 
 // LCG values from Numerical Recipes
@@ -169,15 +210,30 @@ inline __hostdev__ nanovdb::Ray<float> getRayFromPixelCoord(int ix, int iy, int 
     return sceneParams.camera.getRay(u / width, v / height);
 }
 
-inline __hostdev__ float evalGroundMaterial(float groundT, float falloffDistance, const nanovdb::Vec3f& pos, float rayDirY, float& outMix)
+inline __hostdev__ float smoothstep(float t, float edge0, float edge1)
 {
-    static constexpr float checkerScale = 1.0f / 1024.0f;
+    t = nanovdb::Clamp((t - edge0) / (edge1 - edge0), 0.f, 1.f);
+    return t * t * (3.0f - 2.0f * t);
+}
+
+inline __hostdev__ float evalGroundMaterial(float wGroundT, float wFalloffDistance, const nanovdb::Vec3f& pos, float rayDirY, float& outMix)
+{
+    const float s = nanovdb::Min(wGroundT / wFalloffDistance, 1.f);
+
+    outMix = nanovdb::Max(0.f, (1.0f - s) * -rayDirY);
+
+    static constexpr float checkerScale = 1.0f / float(1 << (3 + 4));
     auto                   iu = floorf(pos[0] * checkerScale);
     auto                   iv = floorf(pos[2] * checkerScale);
-    float                  outIntensity = fabsf(fmodf(iu + iv, 2.f));
-    outIntensity = 0.25f + outIntensity * 0.5f;
-    outMix = fmaxf(0.f, (1.0f - groundT / falloffDistance) * -(rayDirY));
-    return outIntensity;
+    float                  floorIntensity = 0.25f + fabsf(fmodf(iu + iv, 2.f)) * 0.5f;
+
+    float       t = nanovdb::Max(fmodf(nanovdb::Abs(pos[0]), 1.0f), fmodf(nanovdb::Abs(pos[2]), 1.0f));
+    const float lineWidth = s;
+    float       grid = smoothstep(t, 0.97f - lineWidth, 1.0f - lineWidth);
+    // fade the grid out before the checkboard floor. (This avoids quite a lot of aliasing)
+    grid *= nanovdb::Max(0.f, (1.0f - nanovdb::Min((wGroundT / 100.f), 1.0f)) * -rayDirY);
+
+    return floorIntensity + grid;
 }
 
 inline __hostdev__ float evalSkyMaterial(const nanovdb::Vec3f& dir)
@@ -255,7 +311,7 @@ inline __hostdev__ void compositeFn(float* outPixel, float* color, int numAccumu
 
 struct RenderEnvRgba32fFn
 {
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const SceneRenderParameters sceneParams, const MaterialParameters materialParams) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const SceneRenderParameters sceneParams, const MaterialParameters /*materialParams*/) const
     {
         auto wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
         auto envRadiance = traceEnvironment(wRay, sceneParams);
@@ -272,7 +328,7 @@ struct RenderEnvRgba32fFn
 
 struct CameraDiagnosticRenderer
 {
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const SceneRenderParameters sceneParams, const MaterialParameters materialParams) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int /*numAccumulations*/, const SceneRenderParameters sceneParams, const MaterialParameters /*materialParams*/) const
     {
         auto outPixel = &imgBuffer[4 * (ix + width * iy)];
         auto wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);

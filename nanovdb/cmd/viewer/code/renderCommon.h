@@ -94,14 +94,31 @@ CNANOVDB_INLINE float evalSkyMaterial(const vec3 dir)
     return 0.75f + 0.25f * dir.y;
 }
 
-CNANOVDB_INLINE float evalGroundMaterial(float groundT, float falloffDistance, const vec3 pos, float rayDirY, CNANOVDB_REF(float) outMix)
+CNANOVDB_INLINE float mysmoothstep(float t, float edge0, float edge1)
 {
-    const float checkerScale = 1.0f / 1024.0f;
+    t = (t - edge0) / (edge1 - edge0);
+    t = fmax(0.f, fmin(1.f, t));
+    return t * t * (3.0f - 2.0f * t);
+}
+
+CNANOVDB_INLINE float evalGroundMaterial(float wGroundT, float wFalloffDistance, const vec3 pos, float rayDirY, CNANOVDB_REF(float) outMix)
+{
+    const float s = fmin(wGroundT / wFalloffDistance, 1.f);
+    CNANOVDB_DEREF(outMix) = fmax(0.f, (1.0f - s) * -rayDirY);
+
+    const float checkerScale = 1.0f / CNANOVDB_MAKE(float)(1 << (3 + 4));
     float       iu = floor(pos.x * checkerScale);
     float       iv = floor(pos.z * checkerScale);
-    float       outIntensity = 0.25f + fabs(fmod(iu + iv, 2.f)) * 0.5f;
-    CNANOVDB_DEREF(outMix) = fmax(0.f, (1.0f - groundT / falloffDistance) * -rayDirY);
-    return outIntensity;
+    float       floorIntensity = 0.25f + fabs(fmod(iu + iv, 2.f)) * 0.5f;
+
+    // TODO:
+    float       t = fmax(fmod(fabs(pos.x), 1.0f), fmod(fabs(pos.z), 1.0f));
+    const float lineWidth = s;
+    float       grid = mysmoothstep(t, 0.97f - lineWidth, 1.0f - lineWidth);
+    // fade the grid out before the checkboard floor. (This avoids quite a lot of aliasing)
+    grid *= fmax(0.f, (1.0f - (wGroundT / 100.f))) * -rayDirY;
+
+    return floorIntensity + grid;
 }
 
 // algorithm taken from: http://amietia.com/lambertnotangent.html
@@ -114,7 +131,7 @@ CNANOVDB_INLINE Vec3T lambertNoTangent(Vec3T normal, float u, float v)
     return vec3_normalize(vec3_add(normal, spherePoint));
 }
 
-CNANOVDB_INLINE Vec3T getRayDirFromPixelCoord(uint32_t ix, uint32_t iy, int width, int height, int numAccumulations, int samplesPerPixel, uint32_t pixelSeed, const Vec3T cameraU, const Vec3T cameraV, const Vec3T cameraW, float fovY, float aspect)
+CNANOVDB_INLINE Vec3T getRayDirFromPixelCoord(uint32_t ix, uint32_t iy, int width, int height, int numAccumulations, uint32_t pixelSeed, const Vec3T cameraU, const Vec3T cameraV, const Vec3T cameraW, float fovY, float aspect)
 {
     float u = CNANOVDB_MAKE(float)(ix) + 0.5f;
     float v = CNANOVDB_MAKE(float)(iy) + 0.5f;

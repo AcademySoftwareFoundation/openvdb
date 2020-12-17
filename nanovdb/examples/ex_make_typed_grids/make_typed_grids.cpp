@@ -51,7 +51,7 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
             }
         }
 
-        gridHandles.push_back(builder.template getHandle<>(1.0, nanovdb::Vec3d(0), typeNameStr, nanovdb::GridClass::Unknown));
+        gridHandles.push_back(builder.template getHandle<>(1.0, nanovdb::Vec3d(0), typeNameStr));
     }
     catch (const std::exception& e) {
         std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;

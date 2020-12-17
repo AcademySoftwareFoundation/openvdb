@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-	\file RenderFunctions.h
+	\file RenderGridUtils.h
 
 	\author Wil Braithwaite
 
@@ -30,10 +30,8 @@ struct RenderGridRgba32fFn
     using RayT = nanovdb::Ray<RealT>;
 
     template<typename ValueType>
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::NanoGrid<ValueType>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::NanoGrid<ValueType>* grid, const SceneRenderParameters sceneParams, const MaterialParameters /*materialParams*/) const
     {
-        int pixelSeed = numAccumulations + hash(ix, iy);
-
         auto outPixel = &imgBuffer[4 * (ix + width * iy)];
 
         float color[4] = {0, 0, 0, 0};
@@ -47,57 +45,53 @@ struct RenderGridRgba32fFn
             color[1] = envRadiance;
             color[2] = envRadiance;
         } else {
-            
-            float groundIntensity = 0.0f;
-            float groundMix = 0.0f;
+            for (int sampleIndex = 0; sampleIndex < sceneParams.samplesPerPixel; ++sampleIndex) {
+                uint32_t pixelSeed = hash((sampleIndex + (numAccumulations + 1) * sceneParams.samplesPerPixel)) ^ hash(ix, iy);
 
-            RayT wRay = getRayFromPixelCoord(ix, iy, width, height, sceneParams);
+                RayT wRay = getRayFromPixelCoord(ix, iy, width, height, numAccumulations, sceneParams.samplesPerPixel, pixelSeed, sceneParams);
+                RayT iRay = wRay.worldToIndexF(*grid);
 
-            RayT  iRay = wRay.worldToIndexF(*grid);
-            Vec3T iRayDir = iRay.dir();
-            Vec3T wRayDir = wRay.dir();
-            Vec3T wRayEye = wRay.eye();
+                {
+                    const auto& tree = grid->tree();
+                    using TreeT = nanovdb::NanoTree<ValueType>;
+                    auto acc = tree.getAccessor();
+                    using AccT = decltype(acc);
+                    nanovdb::TreeMarcher<typename TreeT::LeafNodeType, nanovdb::Ray<float>, AccT> marcher(acc);
+                    if (marcher.init(iRay)) {
+                        const typename TreeT::LeafNodeType* node = nullptr;
+                        float                               t0 = 0, t1 = 0;
+                        bool                                hitNode = marcher.step(&node, t0, t1);
 
-            {
-                const auto& tree = grid->tree();
-                using TreeT = nanovdb::NanoTree<ValueType>;
-                auto acc = tree.getAccessor();
-                using AccT = decltype(acc);
-                nanovdb::TreeMarcher<typename TreeT::LeafNodeType, nanovdb::Ray<float>, AccT> marcher(acc);
-                if (marcher.init(iRay)) {
-                    float                        nodeSpanAccum = 0;
-                    float                        nodeCount = 0;
-                    const typename TreeT::LeafNodeType* node;
-                    float                        t0 = 0, t1 = 0;
-                    while (marcher.step(&node, t0, t1)) {
-                        nodeSpanAccum += (t1 - t0);
-                        nodeCount += 1.0f;
-                    }
+                        if (!hitNode) {
+                            auto envRadiance = traceEnvironment(wRay, sceneParams);
+                            color[0] += envRadiance * 0.5f;
+                            color[1] += envRadiance;
+                            color[2] += envRadiance;
+                        } else {
+                            // color by a hashed value based on the node...
+                            auto rgba = hash(reinterpret_cast<uintptr_t>(node));
+                            color[0] += ((rgba >> 16) & 255) / 255.f;
+                            color[1] += ((rgba >> 8) & 255) / 255.f;
+                            color[2] += ((rgba >> 0) & 255) / 255.f;
+                        }
 
-                    if (nodeCount == 0) {
-                        // hit no nodes!
-                        color[0] = 0;
-                        color[1] = 1;
-                        color[2] = 0;
                     } else {
-                        color[0] = nodeCount / 16.f;
-                        color[1] = 0;
-                        color[2] = 0;
-                    }
-                } else {
-                    auto envRadiance = traceEnvironment(wRay, sceneParams);
+                        auto envRadiance = traceEnvironment(wRay, sceneParams);
 
-                    color[0] = envRadiance;
-                    color[1] = envRadiance;
-                    color[2] = envRadiance;
+                        color[0] += envRadiance;
+                        color[1] += envRadiance;
+                        color[2] += envRadiance;
+                    }
                 }
             }
+
+            for (int k = 0; k < 3; ++k)
+                color[k] = color[k] / sceneParams.samplesPerPixel;
         }
 
-        for (int k = 0; k < 3; ++k)
-            outPixel[k] = color[k];
-        outPixel[3] = 1.0;
+        compositeFn(outPixel, color, numAccumulations, sceneParams);
     }
 };
+
 }
 } // namespace render::grid

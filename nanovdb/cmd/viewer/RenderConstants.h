@@ -39,6 +39,7 @@ struct MaterialParameters
     int                       maxPathDepth;
     float                     volumeAlbedo;
     int                       interpolationOrder;
+    int                       voxelGeometry;
     RendererAttributeParams   attributeSemanticMap[(int)nanovdb::GridBlindDataSemantic::End];
 };
 
@@ -54,6 +55,7 @@ inline MaterialParameters makeMaterialParameters()
     params.maxPathDepth = 4;
     params.volumeAlbedo = 0.5f;
     params.interpolationOrder = 0;
+    params.voxelGeometry = 0;
     return params;
 }
 
@@ -86,8 +88,9 @@ public:
         , mW((eye - lookat).normalize())
         , mU(up.cross(mW))
         , mV(up)
-        , mFovY(vfov)
         , mAspect(aspect)
+        , mIpd(1.0f)
+        , mFovY(vfov)
     {
     }
 
@@ -172,23 +175,25 @@ private:
 
 struct SceneRenderParameters
 {
-    float  groundHeight;
-    float  groundFalloff;
-    int    useTonemapping;
-    float  tonemapWhitePoint;
-    int    useBackground;
-    int    useGround;
-    int    useShadows;
-    int    useLighting;
-    int    useGroundReflections;
-    int    samplesPerPixel;
-    Camera camera;
+    float          groundHeight;
+    float          groundFalloff;
+    int            useTonemapping;
+    float          tonemapWhitePoint;
+    int            useBackground;
+    int            useGround;
+    int            useShadows;
+    int            useLighting;
+    int            useGroundReflections;
+    int            samplesPerPixel;
+    nanovdb::Vec3f sunDirection;
+    Camera         camera;
 };
 
 inline SceneRenderParameters makeSceneRenderParameters()
 {
     SceneRenderParameters params;
     params.groundHeight = 0;
+    params.sunDirection = nanovdb::Vec3f(0,1,0);
     params.groundFalloff = 0;
     params.useTonemapping = false;
     params.tonemapWhitePoint = 1.5f;

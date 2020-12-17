@@ -19,7 +19,7 @@
 #include "FrameBuffer.h"
 #include "RenderLauncherImpl.h"
 
-const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes] = {"Auto", "LevelSetFast", "FogVolumePathTracer", "Grid", "PointsFast", "BlackBodyVolumePathTracer", "FogVolumeFast", "CameraDiagnostic"};
+const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes] = {"Auto", "LevelSetFast", "FogVolumePathTracer", "Grid", "PointsFast", "BlackBodyVolumePathTracer", "FogVolumeFast", "Voxels", "CameraDiagnostic"};
 const char* kCameraLensTypeStrings[(int)Camera::LensType::kNumTypes] = {"PinHole", "Spherical", "ODS"};
 
 RenderLauncher::RenderLauncher()
@@ -50,7 +50,7 @@ RenderLauncher::RenderLauncher()
 std::string RenderLauncher::getNameForPlatformIndex(int i) const
 {
     auto names = getPlatformNames();
-    if (i < 0 || i >= names.size())
+    if (i < 0 || i >= (int)names.size())
         return "";
     return names[i];
 }
@@ -59,9 +59,9 @@ int RenderLauncher::getPlatformIndexFromName(std::string name) const
 {
     int  found = -1;
     auto names = getPlatformNames();
-    for (int i = 0; i < names.size(); ++i) {
+    for (size_t i = 0; i < names.size(); ++i) {
         if (names[i] == name) {
-            found = i;
+            found = (int)i;
             break;
         }
     }
@@ -82,7 +82,7 @@ std::string RenderLauncher::name() const
     return mImpls[mIndex]->name();
 }
 
-struct Launcher
+struct PlatformLauncherCpu
 {
     template<typename ValueT>
     const nanovdb::NanoGrid<ValueT>* grid(const void* gridPtr)
@@ -106,7 +106,7 @@ struct Launcher
     }
 };
 
-bool RenderLauncherCpu::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int numGrids, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
+bool RenderLauncherCpu::render(MaterialClass method, int width, int height, FrameBufferBase* imgBuffer, int numAccumulations, int /*numGrids*/, const GridRenderParameters* grids, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams, RenderStatistics* stats)
 {
     using ClockT = std::chrono::high_resolution_clock;
     auto t0 = ClockT::now();
@@ -117,7 +117,7 @@ bool RenderLauncherCpu::render(MaterialClass method, int width, int height, Fram
         return false;
     }
 
-    Launcher methodLauncher;
+    PlatformLauncherCpu methodLauncher;
     launchRender(methodLauncher, method, width, height, imgPtr, numAccumulations, grids, sceneParams, materialParams);
 
     imgBuffer->unmap();
