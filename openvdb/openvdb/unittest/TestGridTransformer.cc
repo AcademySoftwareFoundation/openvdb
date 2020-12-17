@@ -299,8 +299,11 @@ TestGridTransformer::testDecomposition()
                                     outM.setTranslation(outT);
                                     CPPUNIT_ASSERT(outM.eq(m));
                                 }
-                                tools::GridTransformer transformer(m);
-                                CPPUNIT_ASSERT(transformer.getTransform().eq(m));
+                                {
+                                    tools::GridTransformer transformer(m);
+                                    const bool transform_unchanged = transformer.getTransform().eq(m);
+                                    CPPUNIT_ASSERT(transform_unchanged);
+                                }
                             }
                         }
                     }
