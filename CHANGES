@@ -9,10 +9,16 @@ Version 8.0.0 - In development
       macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 6 for
       Houdini 18.0 and 7 for Houdini 18.5.
 
+    ABI changes:
+    - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
+      accessed from the GridBase.
+
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
       version dependencies.
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
