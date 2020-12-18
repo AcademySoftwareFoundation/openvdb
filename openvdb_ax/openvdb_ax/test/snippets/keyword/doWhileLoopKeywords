@@ -1,0 +1,44 @@
+// do loop with break
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    do {
+        if (i == 1) break;
+        v[i] = i+1;
+        i++;
+    }
+    while(i < 3)
+
+    vec3f@loop_test13 = v;
+}
+
+// do loop with continue
+{
+    vec3f v = 0.0f;
+    int i = 0;
+
+    do {
+        i++;
+        if (i == 1) continue;
+        v[i] = i;
+    }
+    while(i < 2)
+
+    vec3f@loop_test14 = v;
+}
+
+// do loop with return
+{
+    vec3f v = 0.0f;
+    int i = 0;
+    vec3f@return_test7 = 100;
+
+    do {
+        if (i == 1) return;
+        v[i] = i+1;
+        i++;
+    }
+    while(i < 3)
+
+    vec3f@return_test7 = v;
+}

@@ -1,50 +1,20 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Metadata.h>
 #include <openvdb/Types.h>
 #include <iostream>
 #include <sstream>
 
-// CPPUNIT_TEST_SUITE() invokes CPPUNIT_TESTNAMER_DECL() to generate a suite name
-// from the FixtureType.  But if FixtureType is a templated type, the generated name
-// can become long and messy.  This macro overrides the normal naming logic,
-// instead invoking FixtureType::testSuiteName(), which should be a static member
-// function that returns a std::string containing the suite name for the specific
-// template instantiation.
-#undef CPPUNIT_TESTNAMER_DECL
-#define CPPUNIT_TESTNAMER_DECL( variableName, FixtureType ) \
-    CPPUNIT_NS::TestNamer variableName( FixtureType::testSuiteName() )
-
-template<typename T>
-class TestMetadataIO: public CppUnit::TestCase
+class TestMetadataIO: public ::testing::Test
 {
 public:
-    static std::string testSuiteName()
-    {
-        std::string name = openvdb::typeNameAsString<T>();
-        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
-        return "TestMetadataIO" + name;
-    }
-
-    CPPUNIT_TEST_SUITE(TestMetadataIO);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST(testMultiple);
-    CPPUNIT_TEST_SUITE_END();
-
+    template <typename T>
     void test();
+    template <typename T>
     void testMultiple();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<int>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<int64_t>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<float>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<double>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<std::string>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec3R>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec2i>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestMetadataIO<openvdb::Vec4d>);
 
 
 namespace {
@@ -71,9 +41,9 @@ template<typename T> struct Value<openvdb::math::Vec4<T>> {
 }
 
 
-template<typename T>
+template <typename T>
 void
-TestMetadataIO<T>::test()
+TestMetadataIO::test()
 {
     using namespace openvdb;
 
@@ -91,15 +61,14 @@ TestMetadataIO<T>::test()
 
     OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
 
-    CPPUNIT_ASSERT_EQUAL(val, tm.value());
+    EXPECT_EQ(val, tm.value());
 
     OPENVDB_NO_FP_EQUALITY_WARNING_END
 }
 
-
-template<typename T>
+template <typename T>
 void
-TestMetadataIO<T>::testMultiple()
+TestMetadataIO::testMultiple()
 {
     using namespace openvdb;
 
@@ -120,8 +89,32 @@ TestMetadataIO<T>::testMultiple()
 
     OPENVDB_NO_FP_EQUALITY_WARNING_BEGIN
 
-    CPPUNIT_ASSERT_EQUAL(val1, tm1.value());
-    CPPUNIT_ASSERT_EQUAL(val2, tm2.value());
+    EXPECT_EQ(val1, tm1.value());
+    EXPECT_EQ(val2, tm2.value());
 
     OPENVDB_NO_FP_EQUALITY_WARNING_END
 }
+
+TEST_F(TestMetadataIO, testInt) { test<int>(); }
+TEST_F(TestMetadataIO, testMultipleInt) { testMultiple<int>(); }
+
+TEST_F(TestMetadataIO, testInt64) { test<int64_t>(); }
+TEST_F(TestMetadataIO, testMultipleInt64) { testMultiple<int64_t>(); }
+
+TEST_F(TestMetadataIO, testFloat) { test<float>(); }
+TEST_F(TestMetadataIO, testMultipleFloat) { testMultiple<float>(); }
+
+TEST_F(TestMetadataIO, testDouble) { test<double>(); }
+TEST_F(TestMetadataIO, testMultipleDouble) { testMultiple<double>(); }
+
+TEST_F(TestMetadataIO, testString) { test<std::string>(); }
+TEST_F(TestMetadataIO, testMultipleString) { testMultiple<std::string>(); }
+
+TEST_F(TestMetadataIO, testVec3R) { test<openvdb::Vec3R>(); }
+TEST_F(TestMetadataIO, testMultipleVec3R) { testMultiple<openvdb::Vec3R>(); }
+
+TEST_F(TestMetadataIO, testVec2i) { test<openvdb::Vec2i>(); }
+TEST_F(TestMetadataIO, testMultipleVec2i) { testMultiple<openvdb::Vec2i>(); }
+
+TEST_F(TestMetadataIO, testVec4d) { test<openvdb::Vec4d>(); }
+TEST_F(TestMetadataIO, testMultipleVec4d) { testMultiple<openvdb::Vec4d>(); }

@@ -1,0 +1,15 @@
+
+vec3i@test1 += {1, 2, 3};
+vec3i@test2 -= {1, 2, 3};
+vec3i@test3 *= {1, 2, 3};
+vec3i@test4 /= {1, 2, 3};
+vec3i@test5 %= {1, 2, 3};
+
+vec3i local1 = {1, 2, 3},
+    local2 = {4, 5, 6};
+
+local1 += local2;
+vec3i@test6 = local1;
+vec3i@test7 += vec3i@test8;
+vec3i@test9 += local2;
+

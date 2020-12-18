@@ -5,33 +5,18 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 
-class TestLeafManager: public CppUnit::TestFixture
+class TestLeafManager: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestLeafManager);
-    CPPUNIT_TEST(testBasics);
-    CPPUNIT_TEST(testActiveLeafVoxelCount);
-    CPPUNIT_TEST(testForeach);
-    CPPUNIT_TEST(testReduce);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testBasics();
-    void testActiveLeafVoxelCount();
-    void testForeach();
-    void testReduce();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 };
 
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestLeafManager);
-
-void
-TestLeafManager::testBasics()
+TEST_F(TestLeafManager, testBasics)
 {
     using openvdb::CoordBBox;
     using openvdb::Coord;
@@ -55,78 +40,78 @@ TestLeafManager::testBasics()
     //grid->print(std::cout, 3);
     {// test with no aux buffers
         openvdb::tree::LeafManager<FloatTree> r(tree);
-        CPPUNIT_ASSERT_EQUAL(leafCount, r.leafCount());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
-        CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+        EXPECT_EQ(leafCount, r.leafCount());
+        EXPECT_EQ(size_t(0), r.auxBufferCount());
+        EXPECT_EQ(size_t(0), r.auxBuffersPerLeaf());
         size_t n = 0;
         for (FloatTree::LeafCIter iter=tree.cbeginLeaf(); iter; ++iter, ++n) {
-            CPPUNIT_ASSERT(r.leaf(n) == *iter);
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == iter->buffer());
+            EXPECT_TRUE(r.leaf(n) == *iter);
+            EXPECT_TRUE(r.getBuffer(n,0) == iter->buffer());
         }
-        CPPUNIT_ASSERT_EQUAL(r.leafCount(), n);
-        CPPUNIT_ASSERT(!r.swapBuffer(0,0));
+        EXPECT_EQ(r.leafCount(), n);
+        EXPECT_TRUE(!r.swapBuffer(0,0));
 
         r.rebuildAuxBuffers(2);
 
-        CPPUNIT_ASSERT_EQUAL(leafCount, r.leafCount());
-        CPPUNIT_ASSERT_EQUAL(size_t(2), r.auxBuffersPerLeaf());
-        CPPUNIT_ASSERT_EQUAL(size_t(2*leafCount),r.auxBufferCount());
+        EXPECT_EQ(leafCount, r.leafCount());
+        EXPECT_EQ(size_t(2), r.auxBuffersPerLeaf());
+        EXPECT_EQ(size_t(2*leafCount),r.auxBufferCount());
 
          for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,2));
         }
     }
     {// test with 2 aux buffers
         openvdb::tree::LeafManager<FloatTree> r(tree, 2);
-        CPPUNIT_ASSERT_EQUAL(leafCount, r.leafCount());
-        CPPUNIT_ASSERT_EQUAL(size_t(2), r.auxBuffersPerLeaf());
-        CPPUNIT_ASSERT_EQUAL(size_t(2*leafCount),r.auxBufferCount());
+        EXPECT_EQ(leafCount, r.leafCount());
+        EXPECT_EQ(size_t(2), r.auxBuffersPerLeaf());
+        EXPECT_EQ(size_t(2*leafCount),r.auxBufferCount());
         size_t n = 0;
         for (FloatTree::LeafCIter iter=tree.cbeginLeaf(); iter; ++iter, ++n) {
-            CPPUNIT_ASSERT(r.leaf(n) == *iter);
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == iter->buffer());
+            EXPECT_TRUE(r.leaf(n) == *iter);
+            EXPECT_TRUE(r.getBuffer(n,0) == iter->buffer());
 
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,2));
         }
-        CPPUNIT_ASSERT_EQUAL(r.leafCount(), n);
+        EXPECT_EQ(r.leafCount(), n);
         for (n=0; n<leafCount; ++n) r.leaf(n).buffer().setValue(4,2.4f);
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,2));
         }
         r.syncAllBuffers();
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,2));
         }
         for (n=0; n<leafCount; ++n) r.getBuffer(n,1).setValue(4,5.4f);
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) != r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) != r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,2));
         }
-        CPPUNIT_ASSERT(r.swapLeafBuffer(1));
+        EXPECT_TRUE(r.swapLeafBuffer(1));
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,2));
         }
         r.syncAuxBuffer(1);
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) != r.getBuffer(n,2));
-            CPPUNIT_ASSERT(r.getBuffer(n,0) != r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) != r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) != r.getBuffer(n,2));
         }
         r.syncAuxBuffer(2);
         for (n=0; n<leafCount; ++n) {
-            CPPUNIT_ASSERT(r.getBuffer(n,0) == r.getBuffer(n,1));
-            CPPUNIT_ASSERT(r.getBuffer(n,1) == r.getBuffer(n,2));
+            EXPECT_TRUE(r.getBuffer(n,0) == r.getBuffer(n,1));
+            EXPECT_TRUE(r.getBuffer(n,1) == r.getBuffer(n,2));
         }
     }
     {// test with const tree (buffers are not swappable)
@@ -135,34 +120,33 @@ TestLeafManager::testBasics()
         for (size_t numAuxBuffers = 0; numAuxBuffers <= 2; ++numAuxBuffers += 2) {
             r.rebuildAuxBuffers(numAuxBuffers);
 
-            CPPUNIT_ASSERT_EQUAL(leafCount, r.leafCount());
-            CPPUNIT_ASSERT_EQUAL(int(numAuxBuffers * leafCount), int(r.auxBufferCount()));
-            CPPUNIT_ASSERT_EQUAL(numAuxBuffers, r.auxBuffersPerLeaf());
+            EXPECT_EQ(leafCount, r.leafCount());
+            EXPECT_EQ(int(numAuxBuffers * leafCount), int(r.auxBufferCount()));
+            EXPECT_EQ(numAuxBuffers, r.auxBuffersPerLeaf());
 
             size_t n = 0;
             for (FloatTree::LeafCIter iter = tree.cbeginLeaf(); iter; ++iter, ++n) {
-                CPPUNIT_ASSERT(r.leaf(n) == *iter);
+                EXPECT_TRUE(r.leaf(n) == *iter);
                 // Verify that each aux buffer was initialized with a copy of the leaf buffer.
                 for (size_t bufIdx = 0; bufIdx < numAuxBuffers; ++bufIdx) {
-                    CPPUNIT_ASSERT(r.getBuffer(n, bufIdx) == iter->buffer());
+                    EXPECT_TRUE(r.getBuffer(n, bufIdx) == iter->buffer());
                 }
             }
-            CPPUNIT_ASSERT_EQUAL(r.leafCount(), n);
+            EXPECT_EQ(r.leafCount(), n);
 
             for (size_t i = 0; i < numAuxBuffers; ++i) {
                 for (size_t j = 0; j < numAuxBuffers; ++j) {
                     // Verify that swapping buffers with themselves and swapping
                     // leaf buffers with aux buffers have no effect.
                     const bool canSwap = (i != j && i != 0 && j != 0);
-                    CPPUNIT_ASSERT_EQUAL(canSwap, r.swapBuffer(i, j));
+                    EXPECT_EQ(canSwap, r.swapBuffer(i, j));
                 }
             }
         }
     }
 }
 
-void
-TestLeafManager::testActiveLeafVoxelCount()
+TEST_F(TestLeafManager, testActiveLeafVoxelCount)
 {
     using namespace openvdb;
 
@@ -193,9 +177,9 @@ TestLeafManager::testActiveLeafVoxelCount()
         //t.stop();
         //std::cerr << "Old1 = " << treeActiveVoxels << " old2 = " << treeActiveLeafVoxels
         //    << " New = " << mgrActiveLeafVoxels << std::endl;
-        CPPUNIT_ASSERT(size < treeActiveVoxels);
-        CPPUNIT_ASSERT_EQUAL(size, treeActiveLeafVoxels);
-        CPPUNIT_ASSERT_EQUAL(size, mgrActiveLeafVoxels);
+        EXPECT_TRUE(size < treeActiveVoxels);
+        EXPECT_EQ(size, treeActiveLeafVoxels);
+        EXPECT_EQ(size, mgrActiveLeafVoxels);
     }
 }
 
@@ -233,8 +217,7 @@ struct ReduceOp
 
 }//unnamed namespace
 
-void
-TestLeafManager::testForeach()
+TEST_F(TestLeafManager, testForeach)
 {
     using namespace openvdb;
 
@@ -248,34 +231,33 @@ TestLeafManager::testForeach()
     tree.voxelizeActiveTiles();
 
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+        EXPECT_EQ( -1.0f, tree.getValue(*iter));
     }
     for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+        EXPECT_EQ(  1.0f, tree.getValue(*iter));
     }
 
     tree::LeafManager<FloatTree> r(tree);
-    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+    EXPECT_EQ(size_t(2), r.leafCount());
+    EXPECT_EQ(size_t(0), r.auxBufferCount());
+    EXPECT_EQ(size_t(0), r.auxBuffersPerLeaf());
 
     ForeachOp op(0.0f);
     r.foreach(op);
 
-    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+    EXPECT_EQ(size_t(2), r.leafCount());
+    EXPECT_EQ(size_t(0), r.auxBufferCount());
+    EXPECT_EQ(size_t(0), r.auxBuffersPerLeaf());
 
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+        EXPECT_EQ( -1.0f, tree.getValue(*iter));
     }
     for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL(  2.0f, tree.getValue(*iter));
+        EXPECT_EQ(  2.0f, tree.getValue(*iter));
     }
 }
 
-void
-TestLeafManager::testReduce()
+TEST_F(TestLeafManager, testReduce)
 {
     using namespace openvdb;
 
@@ -289,36 +271,36 @@ TestLeafManager::testReduce()
     tree.voxelizeActiveTiles();
 
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+        EXPECT_EQ( -1.0f, tree.getValue(*iter));
     }
     for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
-        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+        EXPECT_EQ(  1.0f, tree.getValue(*iter));
     }
 
     tree::LeafManager<FloatTree> r(tree);
-    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+    EXPECT_EQ(size_t(2), r.leafCount());
+    EXPECT_EQ(size_t(0), r.auxBufferCount());
+    EXPECT_EQ(size_t(0), r.auxBuffersPerLeaf());
 
     ReduceOp op(0.0f);
     r.reduce(op);
-    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), op.mN);
+    EXPECT_EQ(FloatTree::LeafNodeType::numValues(), op.mN);
 
-    CPPUNIT_ASSERT_EQUAL(size_t(2), r.leafCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBufferCount());
-    CPPUNIT_ASSERT_EQUAL(size_t(0), r.auxBuffersPerLeaf());
+    EXPECT_EQ(size_t(2), r.leafCount());
+    EXPECT_EQ(size_t(0), r.auxBufferCount());
+    EXPECT_EQ(size_t(0), r.auxBuffersPerLeaf());
 
     Index n = 0;
     for (CoordBBox::Iterator<true> iter(bbox1); iter; ++iter) {
         ++n;
-        CPPUNIT_ASSERT_EQUAL( -1.0f, tree.getValue(*iter));
+        EXPECT_EQ( -1.0f, tree.getValue(*iter));
     }
-    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), n);
+    EXPECT_EQ(FloatTree::LeafNodeType::numValues(), n);
 
     n = 0;
     for (CoordBBox::Iterator<true> iter(bbox2); iter; ++iter) {
         ++n;
-        CPPUNIT_ASSERT_EQUAL(  1.0f, tree.getValue(*iter));
+        EXPECT_EQ(  1.0f, tree.getValue(*iter));
     }
-    CPPUNIT_ASSERT_EQUAL(FloatTree::LeafNodeType::numValues(), n);
+    EXPECT_EQ(FloatTree::LeafNodeType::numValues(), n);
 }

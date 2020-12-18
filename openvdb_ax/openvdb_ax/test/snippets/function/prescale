@@ -1,0 +1,72 @@
+
+// mat vec float
+mat4f identf1 = {
+    1.0f, 2.0f, 3.0f, 4.0f,
+    5.0f, 6.0f, 7.0f, 8.0f,
+    9.0f, 10.0f,11.0f,12.0f,
+    13.0f,14.0f,15.0f,16.0f
+};
+
+vec3f vecf = {10.0f, 11.0f, 12.0f};
+prescale(identf1, vecf);
+mat4f@mat1 = identf1;
+
+// mat vec double
+mat4d identd1 = {
+    1.0, 2.0, 3.0, 4.0,
+    5.0, 6.0, 7.0, 8.0,
+    9.0, 10.0,11.0,12.0,
+    13.0,14.0,15.0,16.0
+};
+
+vec3d vecd1 = {10.0, 11.0, 12.0};
+prescale(identd1, vecd1);
+mat4d@mat2 = identd1;
+
+// mat float vec double
+mat4f identf2 = {
+    1.0f, 2.0f, 3.0f, 4.0f,
+    5.0f, 6.0f, 7.0f, 8.0f,
+    9.0f, 10.0f,11.0f,12.0f,
+    13.0f,14.0f,15.0f,16.0f
+};
+
+vec3d vecd2 = {-1.0, -2.0, -3.0};
+prescale(identf2, vecd2);
+mat4f@mat3 = identf2;
+
+
+// mat double vec float
+mat4d identd2 = {
+    1.0, 2.0, 3.0, 4.0,
+    5.0, 6.0, 7.0, 8.0,
+    9.0, 10.0,11.0,12.0,
+    13.0,14.0,15.0,16.0
+};
+
+vec3d vecf2 = {-1.0, -2.0, -3.0};
+prescale(identd2, vecf2);
+mat4d@mat4 = identd2;
+
+// mat float vec int
+mat4f identf3 = {
+    100.0f, 100.0f, 100.0f, 100.0f,
+    200.0f, 200.0f, 200.0f, 200.0f,
+    300.0f, 300.0f, 300.0f, 300.0f,
+    400.0f, 400.0f, 400.0f, 400.0f
+};
+
+vec3i veci = {0, 1, 2};
+prescale(identf3, veci);
+mat4f@mat5 = identf3;
+
+// mat double vec int
+mat4d identd3 = {
+    100.0f, 100.0f, 100.0f, 100.0f,
+    200.0f, 200.0f, 200.0f, 200.0f,
+    300.0f, 300.0f, 300.0f, 300.0f,
+    400.0f, 400.0f, 400.0f, 400.0f
+};
+
+prescale(identd3, veci);
+mat4d@mat6 = identd3;

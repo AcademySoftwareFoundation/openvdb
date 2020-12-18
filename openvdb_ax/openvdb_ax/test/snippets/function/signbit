@@ -1,0 +1,5 @@
+bool@test1 = signbit(-0.0);
+bool@test2 = signbit(+0.0);
+bool@test3 = signbit(-0.0f);
+bool@test4 = signbit(+0.0f);
+bool@test5 = signbit(0);
