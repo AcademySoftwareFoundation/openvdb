@@ -1896,8 +1896,7 @@ inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op)
 {
     this->clearAllAccessors();
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
+    mRoot.template visit2(other.root(), op);
 }
 
 
@@ -1906,8 +1905,7 @@ template<typename OtherTreeType, typename VisitorOp>
 inline void
 Tree<RootNodeType>::visit2(OtherTreeType& other, VisitorOp& op) const
 {
-    using OtherRootNodeType = typename OtherTreeType::RootNodeType;
-    mRoot.template visit2<OtherRootNodeType, VisitorOp>(other.root(), op);
+    mRoot.template visit2(other.root(), op);
 }
 
 

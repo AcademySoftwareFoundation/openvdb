@@ -884,8 +884,7 @@ protected:
     template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
     static inline void doVisit(NodeT&, VisitorOp&);
 
-    template<typename NodeT, typename OtherNodeT, typename VisitorOp,
-             typename ChildAllIterT, typename OtherChildAllIterT>
+    template<typename NodeT, typename OtherNodeT, typename VisitorOp>
     static inline void doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp&);
 
     template<typename NodeT, typename VisitorOp,
@@ -1869,8 +1868,7 @@ template<typename OtherLeafNodeType, typename VisitorOp>
 inline void
 LeafNode<T, Log2Dim>::visit2Node(OtherLeafNodeType& other, VisitorOp& op)
 {
-    doVisit2Node<LeafNode, OtherLeafNodeType, VisitorOp, ChildAllIter,
-        typename OtherLeafNodeType::ChildAllIter>(*this, other, op);
+    doVisit2Node<LeafNode, OtherLeafNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -1879,8 +1877,7 @@ template<typename OtherLeafNodeType, typename VisitorOp>
 inline void
 LeafNode<T, Log2Dim>::visit2Node(OtherLeafNodeType& other, VisitorOp& op) const
 {
-    doVisit2Node<const LeafNode, OtherLeafNodeType, VisitorOp, ChildAllCIter,
-        typename OtherLeafNodeType::ChildAllCIter>(*this, other, op);
+    doVisit2Node<const LeafNode, OtherLeafNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -1888,9 +1885,7 @@ template<typename T, Index Log2Dim>
 template<
     typename NodeT,
     typename OtherNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
+    typename VisitorOp>
 inline void
 LeafNode<T, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
 {
@@ -1900,8 +1895,8 @@ LeafNode<T, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op
     static_assert(OtherNodeT::LEVEL == NodeT::LEVEL,
         "can't visit nodes at different tree levels simultaneously");
 
-    ChildAllIterT iter = self.beginChildAll();
-    OtherChildAllIterT otherIter = other.beginChildAll();
+    auto iter = self.beginChildAll();
+    auto otherIter = other.beginChildAll();
 
     for ( ; iter && otherIter; ++iter, ++otherIter) {
         op(iter, otherIter);

@@ -787,8 +787,7 @@ protected:
     template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
     static inline void doVisit(NodeT&, VisitorOp&);
 
-    template<typename NodeT, typename OtherNodeT, typename VisitorOp,
-        typename ChildAllIterT, typename OtherChildAllIterT>
+    template<typename NodeT, typename OtherNodeT, typename VisitorOp>
     static inline void doVisit2Node(NodeT&, OtherNodeT&, VisitorOp&);
 
     template<typename NodeT, typename VisitorOp,
@@ -2916,8 +2915,7 @@ template<typename OtherNodeType, typename VisitorOp>
 inline void
 InternalNode<ChildT, Log2Dim>::visit2Node(OtherNodeType& other, VisitorOp& op)
 {
-    doVisit2Node<InternalNode, OtherNodeType, VisitorOp, ChildAllIter,
-        typename OtherNodeType::ChildAllIter>(*this, other, op);
+    doVisit2Node<InternalNode, OtherNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -2926,8 +2924,7 @@ template<typename OtherNodeType, typename VisitorOp>
 inline void
 InternalNode<ChildT, Log2Dim>::visit2Node(OtherNodeType& other, VisitorOp& op) const
 {
-    doVisit2Node<const InternalNode, OtherNodeType, VisitorOp, ChildAllCIter,
-        typename OtherNodeType::ChildAllCIter>(*this, other, op);
+    doVisit2Node<const InternalNode, OtherNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -2935,9 +2932,7 @@ template<typename ChildT, Index Log2Dim>
 template<
     typename NodeT,
     typename OtherNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
+    typename VisitorOp>
 inline void
 InternalNode<ChildT, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
 {
@@ -2950,8 +2945,11 @@ InternalNode<ChildT, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, Visi
     typename NodeT::ValueType val;
     typename OtherNodeT::ValueType otherVal;
 
-    ChildAllIterT iter = self.beginChildAll();
-    OtherChildAllIterT otherIter = other.beginChildAll();
+    auto iter = self.beginChildAll();
+    using ChildAllIterT = decltype(iter);
+    auto otherIter = other.beginChildAll();
+    using OtherChildAllIterT = decltype(otherIter);
+
 
     for ( ; iter && otherIter; ++iter, ++otherIter)
     {

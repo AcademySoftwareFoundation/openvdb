@@ -900,7 +900,7 @@ private:
     //@{
     /// @internal Used by doVisit2().
     void resetTable(MapType& table) { mTable.swap(table); table.clear(); }
-    void resetTable(const MapType&) const {}
+    void resetTable(MapType& table) const {table.clear(); }
     //@}
 
 #if OPENVDB_ABI_VERSION_NUMBER < 8
@@ -956,8 +956,7 @@ private:
     template<typename RootNodeT, typename VisitorOp, typename ChildAllIterT>
     static inline void doVisit(RootNodeT&, VisitorOp&);
 
-    template<typename RootNodeT, typename OtherRootNodeT, typename VisitorOp,
-        typename ChildAllIterT, typename OtherChildAllIterT>
+    template<typename RootNodeT, typename OtherRootNodeT, typename VisitorOp>
     static inline void doVisit2(RootNodeT&, OtherRootNodeT&, VisitorOp&);
 
 
@@ -3403,8 +3402,7 @@ template<typename OtherRootNodeType, typename VisitorOp>
 inline void
 RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op)
 {
-    doVisit2<RootNode, OtherRootNodeType, VisitorOp, ChildAllIter,
-        typename OtherRootNodeType::ChildAllIter>(*this, other, op);
+    doVisit2<RootNode, OtherRootNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -3413,8 +3411,7 @@ template<typename OtherRootNodeType, typename VisitorOp>
 inline void
 RootNode<ChildT>::visit2(OtherRootNodeType& other, VisitorOp& op) const
 {
-    doVisit2<const RootNode, OtherRootNodeType, VisitorOp, ChildAllCIter,
-        typename OtherRootNodeType::ChildAllCIter>(*this, other, op);
+    doVisit2<const RootNode, OtherRootNodeType, VisitorOp>(*this, other, op);
 }
 
 
@@ -3422,9 +3419,7 @@ template<typename ChildT>
 template<
     typename RootNodeT,
     typename OtherRootNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
+    typename VisitorOp>
 inline void
 RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op)
 {
@@ -3436,9 +3431,9 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
     // The two nodes are required to have corresponding table entries,
     // but since that might require background tiles to be added to one or both,
     // and the nodes might be const, we operate on shallow copies of the nodes instead.
-    RootNodeT copyOfSelf(self.mBackground);
+    typename std::remove_const<RootNodeT>::type copyOfSelf(self.mBackground);
     copyOfSelf.mTable = self.mTable;
-    OtherRootNodeT copyOfOther(other.mBackground);
+    typename std::remove_const<OtherRootNodeT>::type copyOfOther(other.mBackground);
     copyOfOther.mTable = other.mTable;
 
     // Add background tiles to both nodes as needed.
@@ -3450,8 +3445,13 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
         copyOfOther.findOrAddCoord(*i);
     }
 
-    ChildAllIterT iter = copyOfSelf.beginChildAll();
-    OtherChildAllIterT otherIter = copyOfOther.beginChildAll();
+    RootNodeT& constQualifiedCopyOfSelf = copyOfSelf;
+    OtherRootNodeT& constQualifiedCopyOfOther = copyOfOther;
+    // Depending on const-ness, iterators will also be const or non-const
+    auto iter = constQualifiedCopyOfSelf.beginChildAll();
+    using ChildAllIterT = decltype(iter);
+    auto otherIter = constQualifiedCopyOfOther.beginChildAll();
+    using OtherChildAllIterT  = decltype(otherIter);
 
     for ( ; iter && otherIter; ++iter, ++otherIter)
     {
@@ -3477,6 +3477,8 @@ RootNode<ChildT>::doVisit2(RootNodeT& self, OtherRootNodeT& other, VisitorOp& op
 
     // If either input node is non-const, replace its table with
     // the (possibly modified) copy.
+    // In any case, this clears copy's mTable so when copy is destroyed
+    // the child nodes are not deleted.
     self.resetTable(copyOfSelf.mTable);
     other.resetTable(copyOfOther.mTable);
 }
