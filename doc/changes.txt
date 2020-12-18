@@ -50,6 +50,7 @@ Improvements:
 @par
 Houdini:
 - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
