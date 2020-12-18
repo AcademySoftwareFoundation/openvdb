@@ -196,7 +196,8 @@ SOP_OpenVDB_Write::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
     }
 #else
 #ifdef OPENVDB_USE_ZLIB
-    if (nullptr != obsoleteParms->getParmPtr("compression")) {
+    if (nullptr != obsoleteParms->getParmPtr("compression")
+	&& !obsoleteParms->getParmPtr("compression")->isFactoryDefault()) {
         UT_String compression;
         obsoleteParms->evalString(compression, "compression", 0, /*time=*/0.0);
         setInt("compress_zip", 0, 0.0, (compression == "zip" ? 1 : 0));
