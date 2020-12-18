@@ -293,9 +293,20 @@ private:
 ////////////////////////////////////////
 
 
+/// @note Macro to use a final specifier from ABI=8 onwards.
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+#define OPENVDB_MAP_CLASS_SPECIFIER final
+#define OPENVDB_MAP_FUNC_SPECIFIER final
+#else
+#define OPENVDB_MAP_CLASS_SPECIFIER
+#define OPENVDB_MAP_FUNC_SPECIFIER override
+#endif
+
+
 /// @brief A general linear transform using homogeneous coordinates to perform
 /// rotation, scaling, shear and translation
-class OPENVDB_API AffineMap: public MapBase
+/// @note This class is marked final with ABI=8
+class OPENVDB_API AffineMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
 {
 public:
     using Ptr = SharedPtr<AffineMap>;
@@ -653,6 +664,8 @@ private:
 
 /// @brief A specialized Affine transform that scales along the principal axis
 /// the scaling need not be uniform in the three-directions
+/// @note This class is not marked final because UniformScaleMap inherits from it,
+/// so some of the member methods are marked final instead.
 class OPENVDB_API ScaleMap: public MapBase
 {
 public:
@@ -711,10 +724,10 @@ public:
     static Name mapType() { return Name("ScaleMap"); }
 
     /// Return @c true (a ScaleMap is always linear).
-    bool isLinear() const override { return true; }
+    bool isLinear() const OPENVDB_MAP_FUNC_SPECIFIER { return true; }
 
     /// Return @c true if the values have the same magitude (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const override
+    bool hasUniformScale() const OPENVDB_MAP_FUNC_SPECIFIER
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -724,7 +737,7 @@ public:
     }
 
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const override
+    Vec3d applyMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         return Vec3d(
             in.x() * mScaleValues.x(),
@@ -732,7 +745,7 @@ public:
             in.z() * mScaleValues.z());
     }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const override
+    Vec3d applyInverseMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -740,32 +753,38 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyJacobian(in);
+    }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const override { return applyMap(in); }
+    Vec3d applyJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyMap(in); }
 
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override {
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
         return applyInverseJacobian(in);
     }
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const override { return applyInverseMap(in); }
+    Vec3d applyInverseJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyInverseMap(in);
+    }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
     /// @details This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const override { return applyMap(in); }
+    Vec3d applyJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyMap(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in.
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const override { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyIJT(in);
+    }
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const override { return applyInverseMap(in); }
+    Vec3d applyIJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyInverseMap(in); }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const override
+    Mat3d applyIJC(const Mat3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         Mat3d tmp;
         for (int i = 0; i < 3; i++) {
@@ -776,13 +795,13 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const override {
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
         return applyIJC(in);
     }
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d&) const override { return determinant(); }
+    double determinant(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const override {
+    double determinant() const OPENVDB_MAP_FUNC_SPECIFIER {
         return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
     }
 
@@ -800,8 +819,8 @@ public:
     /// @brief Return the lengths of the images of the segments
     /// (0,0,0) &minus; 1,0,0), (0,0,0) &minus; (0,1,0) and (0,0,0) &minus; (0,0,1).
     /// @details This is equivalent to the absolute values of the scale values
-    Vec3d voxelSize() const override { return mVoxelSize; }
-    Vec3d voxelSize(const Vec3d&) const override { return voxelSize(); }
+    Vec3d voxelSize() const OPENVDB_MAP_FUNC_SPECIFIER { return mVoxelSize; }
+    Vec3d voxelSize(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return voxelSize(); }
     //@}
 
     /// read serialization
@@ -897,7 +916,8 @@ private:
 
 /// @brief A specialized Affine transform that scales along the principal axis
 /// the scaling is uniform in the three-directions
-class OPENVDB_API UniformScaleMap: public ScaleMap
+/// @note This class is marked final with ABI=8
+class OPENVDB_API UniformScaleMap OPENVDB_MAP_CLASS_SPECIFIER: public ScaleMap
 {
 public:
     using Ptr = SharedPtr<UniformScaleMap>;
@@ -969,7 +989,8 @@ ScaleMap::postScale(const Vec3d& v) const
 
 
 /// @brief A specialized linear transform that performs a translation
-class OPENVDB_API TranslationMap: public MapBase
+/// @note This class is marked final with ABI=8
+class OPENVDB_API TranslationMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
 {
 public:
     using Ptr = SharedPtr<TranslationMap>;
@@ -1152,6 +1173,8 @@ private:
 /// @brief A specialized Affine transform that scales along the principal axis
 /// the scaling need not be uniform in the three-directions, and then
 /// translates the result.
+/// @note This class is not marked final because UniformScaleMap inherits from it,
+/// so some of the member methods are marked final instead.
 class OPENVDB_API ScaleTranslateMap: public MapBase
 {
 public:
@@ -1233,11 +1256,11 @@ public:
     static Name mapType() { return Name("ScaleTranslateMap"); }
 
     /// Return @c true (a ScaleTranslateMap is always linear).
-    bool isLinear() const override { return true; }
+    bool isLinear() const OPENVDB_MAP_FUNC_SPECIFIER { return true; }
 
     /// @brief Return @c true if the scale values have the same magnitude
     /// (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const override
+    bool hasUniformScale() const OPENVDB_MAP_FUNC_SPECIFIER
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -1247,7 +1270,7 @@ public:
     }
 
     /// Return the image of @c under the map
-    Vec3d applyMap(const Vec3d& in) const override
+    Vec3d applyMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         return Vec3d(
             in.x() * mScaleValues.x() + mTranslation.x(),
@@ -1255,7 +1278,7 @@ public:
             in.z() * mScaleValues.z() + mTranslation.z());
     }
     /// Return the pre-image of @c under the map
-    Vec3d applyInverseMap(const Vec3d& in) const override
+    Vec3d applyInverseMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         return Vec3d(
             (in.x() - mTranslation.x() ) * mScaleValuesInverse.x(),
@@ -1264,28 +1287,36 @@ public:
     }
 
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const override { return applyJacobian(in); }
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyJacobian(in);
+    }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const override { return in * mScaleValues; }
+    Vec3d applyJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return in * mScaleValues; }
 
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const override { return applyInverseJacobian(in); }
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyInverseJacobian(in);
+    }
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const override { return in * mScaleValuesInverse; }
+    Vec3d applyInverseJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return in * mScaleValuesInverse;
+    }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
     /// @details This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const override { return applyJT(in); }
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const override { return applyJacobian(in); }
+    Vec3d applyJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJacobian(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const override { return applyIJT(in);}
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+        return applyIJT(in);
+    }
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const override
+    Vec3d applyIJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -1293,7 +1324,7 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const override
+    Mat3d applyIJC(const Mat3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
     {
         Mat3d tmp;
         for (int i=0; i<3; i++){
@@ -1304,20 +1335,20 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const override {
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const OPENVDB_MAP_FUNC_SPECIFIER {
         return applyIJC(in);
     }
 
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d&) const override { return determinant(); }
+    double determinant(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const override {
+    double determinant() const OPENVDB_MAP_FUNC_SPECIFIER {
         return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
     }
     /// Return the absolute values of the scale values
-    Vec3d voxelSize() const override { return mVoxelSize;}
+    Vec3d voxelSize() const OPENVDB_MAP_FUNC_SPECIFIER { return mVoxelSize;}
     /// Return the absolute values of the scale values, ignores argument
-    Vec3d voxelSize(const Vec3d&) const override { return voxelSize();}
+    Vec3d voxelSize(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return voxelSize();}
 
     /// Returns the scale values
     const Vec3d& getScale() const { return mScaleValues; }
@@ -1460,7 +1491,8 @@ ScaleMap::preTranslate(const Vec3d& t) const
 
 /// @brief A specialized Affine transform that uniformaly scales along the principal axis
 /// and then translates the result.
-class OPENVDB_API UniformScaleTranslateMap: public ScaleTranslateMap
+/// @note This class is marked final with ABI=8
+class OPENVDB_API UniformScaleTranslateMap OPENVDB_MAP_CLASS_SPECIFIER: public ScaleTranslateMap
 {
 public:
     using Ptr = SharedPtr<UniformScaleTranslateMap>;
@@ -1602,7 +1634,8 @@ ScaleTranslateMap::postScale(const Vec3d& v) const
 
 /// @brief A specialized linear transform that performs a unitary maping
 /// i.e. rotation  and or reflection.
-class OPENVDB_API UnitaryMap: public MapBase
+/// @note This class is marked final with ABI=8
+class OPENVDB_API UnitaryMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
 {
 public:
     using Ptr = SharedPtr<UnitaryMap>;
@@ -1873,7 +1906,8 @@ private:
 /// Then this frustum is transformed by an internal second map: most often a uniform scale,
 /// but other effects can be achieved by accumulating translation, shear and rotation: these
 /// are all applied to the second map
-class OPENVDB_API NonlinearFrustumMap: public MapBase
+/// @note This class is marked final with ABI=8
+class OPENVDB_API NonlinearFrustumMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
 {
 public:
     using Ptr = SharedPtr<NonlinearFrustumMap>;

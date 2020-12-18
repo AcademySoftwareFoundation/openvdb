@@ -22,6 +22,8 @@ ABI changes:
 - Private method
   @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
   removed as of ABI=8.
+- Mark map classes and functions as final for ABI=8 where beneficial to allow
+  devirtualization optimization.
 
 @par
 Build:
