@@ -314,7 +314,7 @@ TEST_F(TestTreeVisitor, testVisit2Trees)
 
     // Traverse non-const and const
     tree.visit2(cTree2, visitor);
-    
+
     EXPECT_EQ(tree.leafCount(), visitor.aLeafCount());
     EXPECT_EQ(tree2.leafCount(), visitor.bLeafCount());
     EXPECT_EQ(tree.nonLeafCount(), visitor.aNonLeafCount());
