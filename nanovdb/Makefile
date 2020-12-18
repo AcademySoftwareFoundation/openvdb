@@ -120,7 +120,7 @@ ifeq (yes,$(USE_OPENVDB))
 	LIBS += -lopenvdb -lHalf
 	EXA  += debug/openvdb_to_nanovdb debug/openvdb_to_nanovdb_accessor
 ifneq ("$(wildcard $(USE_CUDA))", "")
-    EXA += cuda/openvdb_to_nanovdb_cuda
+    EXA += cuda/openvdb_to_nanovdb_cuda + cuda/modify_nanovdb_thrust
 endif
 endif
 
@@ -257,6 +257,9 @@ openvdb_to_nanovdb: debug/openvdb_to_nanovdb
 openvdb_to_nanovdb_cuda: cuda/openvdb_to_nanovdb_cuda
 	cuda/openvdb_to_nanovdb_cuda
 
+modify_nanovdb_thrust: cuda/modify_nanovdb_thrust
+	cuda/modify_nanovdb_thrust
+
 openvdb_to_nanovdb_accessor: debug/openvdb_to_nanovdb_accessor
 	debug/openvdb_to_nanovdb_accessor
 
@@ -355,6 +358,10 @@ cuda/openvdb_to_nanovdb_cuda.o: examples/ex_openvdb_to_nanovdb_cuda/openvdb_to_n
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
 cuda/openvdb_to_nanovdb_cuda_kernel.o: examples/ex_openvdb_to_nanovdb_cuda/openvdb_to_nanovdb_cuda.cu $(DEP)
+	@mkdir -p cuda data
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+cuda/modify_nanovdb_thrust.o: examples/ex_modify_nanovdb_thrust/modify_nanovdb_thrust.cu $(DEP)
 	@mkdir -p cuda data
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
@@ -531,6 +538,9 @@ debug/openvdb_to_nanovdb: debug/openvdb_to_nanovdb.o
 	$(BUILD_DEBUG) $(LIBRARY) -o $@ $^ $(LIBS)
 
 cuda/openvdb_to_nanovdb_cuda: cuda/openvdb_to_nanovdb_cuda.o cuda/openvdb_to_nanovdb_cuda_kernel.o
+	$(BUILD_CUDA) $(LIBRARY) -o $@ $^ $(LIBS)
+
+cuda/modify_nanovdb_thrust: cuda/modify_nanovdb_thrust.o
 	$(BUILD_CUDA) $(LIBRARY) -o $@ $^ $(LIBS)
 
 debug/openvdb_to_nanovdb_accessor: debug/openvdb_to_nanovdb_accessor.o
