@@ -300,6 +300,28 @@ TEST_F(TestTreeVisitor, testVisit2Trees)
 
     visitor.reset();
 
+    // Traverse const references to both trees
+    const TreeT& cTree = tree;
+    const Tree2T& cTree2 = tree2;
+    cTree.visit2(cTree2, visitor);
+
+    EXPECT_EQ(tree.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.bNonLeafCount());
+
+    visitor.reset();
+
+    // Traverse non-const and const
+    tree.visit2(cTree2, visitor);
+    
+    EXPECT_EQ(tree.leafCount(), visitor.aLeafCount());
+    EXPECT_EQ(tree2.leafCount(), visitor.bLeafCount());
+    EXPECT_EQ(tree.nonLeafCount(), visitor.aNonLeafCount());
+    EXPECT_EQ(tree2.nonLeafCount(), visitor.bNonLeafCount());
+
+    visitor.reset();
+
     // Change the topology of the first tree.
     tree.setValue(openvdb::Coord(-200, -200, -200), openvdb::zeroVal<ValueT>());
 
