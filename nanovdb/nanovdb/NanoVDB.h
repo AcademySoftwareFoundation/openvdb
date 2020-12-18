@@ -3277,6 +3277,7 @@ public:
     /// @brief Sets the value at the specified location but leaves its state unchanged.
     ///
     /// @note This is safe since it does not change the topology of the tree (unlike setValue methods on the other nodes)
+    __hostdev__ void setValueOnly(uint32_t offset, const ValueType& v) { DataType::setValueOnly(offset, v); }
     __hostdev__ void setValueOnly(const CoordT& ijk, const ValueType& v) { DataType::setValueOnly(CoordToOffset(ijk), v); }
 
     /// @brief Return @c true if the voxel value at the given coordinate is active.
