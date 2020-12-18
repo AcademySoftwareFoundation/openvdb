@@ -28,12 +28,9 @@ void usage [[noreturn]] (const std::string& progName, int exitStatus = EXIT_FAIL
     exit(exitStatus);
 }
 
-void version [[noreturn]] (const std::string& progName, int exitStatus = EXIT_SUCCESS)
+void version [[noreturn]] (const char* progName, int exitStatus = EXIT_SUCCESS)
 {
-    std::cout << "\n " << progName << " was build against NanoVDB version " 
-              << NANOVDB_MAJOR_VERSION_NUMBER << "."
-              << NANOVDB_MINOR_VERSION_NUMBER << "."
-              << NANOVDB_PATCH_VERSION_NUMBER << std::endl;
+    printf("\n%s was build against NanoVDB version %s\n", progName, nanovdb::Version().c_str());
     exit(exitStatus);
 }
 
@@ -97,8 +94,12 @@ int main(int argc, char* argv[])
 
             for (auto& m : list) {
                 auto handle = nanovdb::io::readGrid(file, m.gridName);
+                auto gridType = handle.gridType();
                 bool test = false;
-                if (auto* grid = handle.grid<float>()) {
+                if (gridType == nanovdb::GridType::End) {
+                    std::cerr << "GridHandle was empty\n" << std::endl;
+                    usage(argv[0]);
+                } else if (auto* grid = handle.grid<float>()) {
                     test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<nanovdb::Vec3f>()) {
                     test = isValid(*grid, detailed, verbose);
@@ -116,9 +117,14 @@ int main(int argc, char* argv[])
                     test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<nanovdb::Vec3d>()) {
                     test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::ValueMask>()) {
+                    test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::PackedRGBA8>()) {
+                    test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<bool>()) {
+                    test = isValid(*grid, detailed, verbose);
                 } else {
-                    std::cerr << "Unsupported grid type\n"
-                              << std::endl;
+                    std::cerr << "Unsupported GridType: \"" << nanovdb::toStr(gridType) << "\"\n" << std::endl;
                     usage(argv[0]);
                 }
                 if (verbose) {

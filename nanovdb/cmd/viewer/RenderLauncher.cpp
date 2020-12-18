@@ -19,7 +19,7 @@
 #include "FrameBuffer.h"
 #include "RenderLauncherImpl.h"
 
-const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes] = {"Auto", "LevelSetFast", "FogVolumePathTracer", "Grid", "PointsFast", "BlackBodyVolumePathTracer", "FogVolumeFast", "CameraDiagnostic"};
+const char* kMaterialClassTypeStrings[(int)MaterialClass::kNumTypes] = {"Auto", "LevelSetFast", "FogVolumePathTracer", "Grid", "PointsFast", "BlackBodyVolumePathTracer", "FogVolumeFast", "Voxels", "CameraDiagnostic"};
 const char* kCameraLensTypeStrings[(int)Camera::LensType::kNumTypes] = {"PinHole", "Spherical", "ODS"};
 
 RenderLauncher::RenderLauncher()

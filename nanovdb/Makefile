@@ -41,7 +41,8 @@ ifeq ("$(shell uname -s)","Darwin")
 endif
 
 #CC = clang -Wall -Wunused-parameter -march=native
-CC = g++ -Wall -Wunused-parameter -Wno-invalid-offsetof -march=native
+CC = g++ -Wfatal-errors -Wall -Wunused-parameter -Wno-invalid-offsetof -march=native
+#CC = g++ -Wall -Wunused-parameter -Wno-invalid-offsetof -march=native
 
 ifeq (yes,$(USE_INTRINSICS))
     CXXFLAGS += -DNANOVDB_USE_INTRINSICS
@@ -152,7 +153,7 @@ ifeq (yes,$(USE_CUDA))
 
 	CUDA_PATH ?= /usr/local/cuda
 	NVCC = $(CUDA_PATH)/bin/nvcc
-	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -DNDEBUG -O3 -use_fast_math
+	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -DNDEBUG -O3 -use_fast_math --extended-lambda
 #	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -O1 -g -use_fast_math
 
 ifneq ("$(wildcard $(CUDA_PATH))", "")
@@ -377,6 +378,10 @@ debug/write_nanovdb_grids.o: examples/ex_write_nanovdb_grids/write_nanovdb_grids
 	@mkdir -p debug data
 	$(BUILD_DEBUG) $(INCLUDES) -o $@ -c $<
 
+debug/vox_to_nanovdb.o: examples/ex_vox_to_nanovdb/vox_to_nanovdb.cpp $(DEP)
+	@mkdir -p debug data
+	$(BUILD_DEBUG) $(INCLUDES) -o $@ -c $<
+
 # Command-line tools
 
 release/nanovdb_print.o: cmd/print/nanovdb_print.cpp $(DEP)
@@ -419,7 +424,7 @@ release/FrameBufferHost.o: cmd/viewer/FrameBufferHost.cpp cmd/viewer/FrameBuffer
 	@mkdir -p release
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
-release/RenderLauncher.o: cmd/viewer/RenderLauncher.cpp cmd/viewer/RenderUtils.h cmd/viewer/RenderPointsUtils.h cmd/viewer/RenderGridUtils.h cmd/viewer/RenderLevelSetUtils.h cmd/viewer/RenderFogVolumeUtils.h $(DEP)
+release/RenderLauncher.o: cmd/viewer/RenderLauncher.cpp cmd/viewer/RenderUtils.h cmd/viewer/RenderPointsUtils.h cmd/viewer/RenderGridUtils.h cmd/viewer/RenderLevelSetUtils.h cmd/viewer/RenderFogVolumeUtils.h cmd/viewer/RenderVoxelUtils.h $(DEP)
 	@mkdir -p release
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
@@ -440,6 +445,10 @@ release/RenderLauncherCUDA.o: cmd/viewer/RenderLauncherCUDA.cu cmd/viewer/Render
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
 release/RenderLauncherGL.o: cmd/viewer/RenderLauncherGL.cpp $(DEP)
+	@mkdir -p release
+	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+
+release/primitives.o: cmd/viewer/primitives.cpp $(DEP)
 	@mkdir -p release
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
@@ -465,7 +474,7 @@ release/GridAssetUrl.o: cmd/viewer/GridAssetUrl.cpp cmd/viewer/GridAssetUrl.h $(
 
 release/GridManager.o: cmd/viewer/GridManager.cpp cmd/viewer/GridManager.h $(DEP)
 	@mkdir -p release
-	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
+	$(BUILD_CUDA) $(INCLUDES) -Iexamples/ex_vox_to_nanovdb -o $@ -c $<
 
 release/StringUtils.o: cmd/viewer/StringUtils.cpp cmd/viewer/StringUtils.h $(DEP)
 	@mkdir -p release
@@ -512,6 +521,9 @@ debug/make_typed_grids: debug/make_typed_grids.o
 	$(BUILD_DEBUG) $(LIBRARY) -o $@ $^ $(LIBS)
 
 debug/map_pool_buffer: debug/map_pool_buffer.o
+	$(BUILD_DEBUG) $(LIBRARY) -o $@ $^ $(LIBS)
+
+debug/vox_to_nanovdb: debug/vox_to_nanovdb.o
 	$(BUILD_DEBUG) $(LIBRARY) -o $@ $^ $(LIBS)
 
 ifeq (yes,$(USE_OPENVDB))
@@ -569,6 +581,7 @@ release/nanovdb_viewer: release/nanovdb_viewer.o \
 						release/GridAssetUrl.o \
 						release/GridManager.o \
 						release/StringUtils.o \
+						release/primitives.o \
 						$(VIEWER_SRC_FILES)
 	$(BUILD_CUDA) $(LIBRARY) -o $@ $^ $(VIEWER_LIBS) $(LIBS)
 

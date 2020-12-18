@@ -62,7 +62,7 @@ inline __hostdev__ void invTonemapReinhard(Vec3T1& out, Vec3T2& in, const float 
 }
 
 template<typename ValueT, typename Vec3T>
-inline __hostdev__ ValueT luminance(Vec3T v)
+inline __hostdev__ ValueT luminance(const Vec3T& v)
 {
     return ValueT(v[0] * ValueT(0.2126) + v[1] * ValueT(0.7152) + v[2] * ValueT(0.0722));
 }
@@ -81,6 +81,47 @@ inline __hostdev__ void tonemapACES(Vec3T& out, const Vec3T& in)
     out[0] = nanovdb::Max(nanovdb::Min(r, 1.0f), 0.0f);
     out[1] = nanovdb::Max(nanovdb::Min(g, 1.0f), 0.0f);
     out[2] = nanovdb::Max(nanovdb::Min(b, 1.0f), 0.0f);
+}
+
+template<typename ValueT>
+inline __hostdev__ ValueT valueToScalar(const ValueT& v)
+{
+    return v;
+}
+
+inline __hostdev__ float valueToScalar(const nanovdb::Vec3f& v)
+{
+    return luminance<float>(v);
+}
+
+inline __hostdev__ double valueToScalar(const nanovdb::Vec3d& v)
+{
+    return luminance<double>(v);
+}
+
+template<typename T>
+inline __hostdev__ nanovdb::Vec4f valueToColor(const T& v)
+{
+    return nanovdb::Vec4f(valueToScalar(v));
+}
+
+inline __hostdev__ nanovdb::Vec4f valueToColor(const uint32_t v)
+{
+    return nanovdb::Vec4f(v);
+}
+
+inline __hostdev__ nanovdb::Vec4f valueToColor(const nanovdb::PackedRGBA8 v)
+{
+    return nanovdb::Vec4f(v[0], v[1], v[2], v[3]) / 255.f;
+}
+
+template<typename ValueT>
+inline __hostdev__ nanovdb::Vec3f colorFromTemperature(const ValueT& v, float scale)
+{
+    float r = v;
+    float g = r * r;
+    float b = g * g;
+    return scale * nanovdb::Vec3f(r * r * r, g * g * g, b * b * b);
 }
 
 // LCG values from Numerical Recipes

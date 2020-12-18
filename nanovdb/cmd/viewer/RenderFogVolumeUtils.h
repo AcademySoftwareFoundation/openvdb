@@ -23,31 +23,6 @@
 namespace render {
 namespace fogvolume {
 
-template<typename ValueT>
-inline __hostdev__ ValueT valueToScalar(const ValueT& v)
-{
-    return v;
-}
-
-inline __hostdev__ float valueToScalar(const nanovdb::Vec3f& v)
-{
-    return luminance<float>(v);
-}
-
-inline __hostdev__ double valueToScalar(const nanovdb::Vec3d& v)
-{
-    return luminance<double>(v);
-}
-
-template<typename ValueT>
-inline __hostdev__ nanovdb::Vec3f colorFromTemperature(const ValueT& v, float scale)
-{
-    float r = v;
-    float g = r * r;
-    float b = g * g;
-    return scale * nanovdb::Vec3f(r * r * r, g * g * g, b * b * b);
-}
-
 struct HeterogenousMedium
 {
     int                       maxPathDepth;
@@ -437,7 +412,7 @@ struct RenderVolumeRgba32fFn
             color[2] = envRadiance;
 
         } else {
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             const auto& densityTree = densityGrid->tree();
@@ -539,7 +514,7 @@ struct RenderBlackBodyVolumeRgba32fFn
             const auto  densitySampler = nanovdb::createSampler<InterpolationOrder, decltype(densityAcc), false>(densityAcc);
             const auto  temperatureSampler = nanovdb::createSampler<InterpolationOrder, decltype(temperatureAcc), false>(temperatureAcc);
 
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             HeterogenousMedium medium;
@@ -648,7 +623,7 @@ struct FogVolumeFastRenderFn
             const auto densityAcc = densityTree.getAccessor();
             const auto densitySampler = nanovdb::createSampler<0, decltype(densityAcc), false>(densityAcc);
 
-            const Vec3T wLightDir = Vec3T(0, 1, 0);
+            const Vec3T wLightDir = sceneParams.sunDirection;
             const Vec3T iLightDir = densityGrid->worldToIndexDirF(wLightDir).normalize();
 
             float radiance = 0;

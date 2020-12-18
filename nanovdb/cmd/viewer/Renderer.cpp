@@ -444,7 +444,7 @@ int RendererBase::addGridAssetsAndNodes(const std::string& nodePrefix, std::vect
 
 std::vector<std::string> RendererBase::getGridNamesFromFile(const GridAssetUrl& url)
 {
-    return mGridManager.getGridsNamesFromLocalFile(url.fullname(), url.asSequence(getSceneFrame()).path());
+    return mGridManager.getGridsNamesFromLocalFile(url.fullname(), url.getSequencePath(getSceneFrame()));
 }
 
 void RendererBase::addGridAsset(const GridAssetUrl& url)
@@ -532,7 +532,7 @@ bool RendererBase::render(int frame)
     }
     auto wBboxSize = wBbox.max() - wBbox.min();
     auto sceneParameters = mParams.mSceneParameters;
-    sceneParameters.groundHeight =(float)wBbox.min()[1];
+    sceneParameters.groundHeight = (float)wBbox.min()[1];
     sceneParameters.groundFalloff = (50.f * float(wBboxSize.length())) / tanf((3.142f / 180.f) * mCurrentCameraState->mFovY * 0.5f);
     sceneParameters.camera = Camera(mParams.mSceneParameters.camera.lensType(), mCurrentCameraState->eye(), mCurrentCameraState->target(), mCurrentCameraState->V(), mCurrentCameraState->mFovY, float(w) / h);
     sceneParameters.camera.ipd() = mParams.mSceneParameters.camera.ipd();
@@ -550,6 +550,8 @@ bool RendererBase::render(int frame)
             materialClass = MaterialClass::kPointsFast;
         else if (attachment->mGridClassOverride == nanovdb::GridClass::PointIndex)
             materialClass = MaterialClass::kPointsFast;
+        else if (attachment->mGridClassOverride == nanovdb::GridClass::VoxelVolume)
+            materialClass = MaterialClass::kVoxels;
         else
             materialClass = MaterialClass::kGrid;
     }
@@ -667,9 +669,23 @@ void RendererBase::resetCamera(bool isFramingSceneNodeBounds)
         mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(0, 0, 0);
         mCurrentCameraState->mCameraLookAt[1] = 0;
     } else {
-        mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
-        mCurrentCameraState->mCameraDistance = halfWidth / tanf(mCurrentCameraState->mFovY * 0.5f * (3.142f / 180.f));
-        mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(float(M_PI) / 8.f, float(M_PI) / 4.f, 0.f);
+        if (mParams.mCameraTarget[0] != std::numeric_limits<float>::max())
+            mCurrentCameraState->mCameraLookAt = mParams.mCameraTarget;
+        else
+            mCurrentCameraState->mCameraLookAt = nanovdb::Vec3f(bbox.min() + bboxSize * 0.5);
+
+        if (mParams.mCameraFov != std::numeric_limits<float>::max())
+            mCurrentCameraState->mFovY = std::max(1.0f, mParams.mCameraFov);
+
+        if (mParams.mCameraDistance != std::numeric_limits<float>::max())
+            mCurrentCameraState->mCameraDistance = mParams.mCameraDistance;
+        else
+            mCurrentCameraState->mCameraDistance = halfWidth / tanf(mCurrentCameraState->mFovY * 0.5f * (3.142f / 180.f));
+
+        if (mParams.mCameraRotation[0] != std::numeric_limits<float>::max())
+            mCurrentCameraState->mCameraRotation = mParams.mCameraRotation * (3.142f / 180.f);
+        else
+            mCurrentCameraState->mCameraRotation = nanovdb::Vec3f(float(M_PI) / 8.f, float(M_PI) / 4.f, 0.f);
     }
 
     mCurrentCameraState->mIsViewChanged = true;

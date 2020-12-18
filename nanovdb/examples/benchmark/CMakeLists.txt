@@ -1,20 +1,8 @@
 # Copyright Contributors to the OpenVDB Project SPDX-License-Identifier: MPL-2.0
 
 # -----------------------------------------------------------------------
-if(NOT (OpenVDB_FOUND))
-  message(WARNING " - OpenVDB required to build benchmark. Skipping.")
-  return()
-endif()
-
-# -----------------------------------------------------------------------
 if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
-endif()
-
-# -----------------------------------------------------------------------
-if(NOT (NANOVDB_OPENVDB))
-  message(WARNING " - OpenVDB required to build benchmark. Skipping.")
-  return()
 endif()
 
 # -----------------------------------------------------------------------

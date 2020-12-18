@@ -62,6 +62,12 @@ enum class Codec : uint16_t { NONE = 0,
                               BLOSC = 2,
                               END = 3 };
 
+inline __hostdev__ const char* toStr(Codec codec)
+{
+    static const char * LUT[] = { "NONE", "ZIP", "BLOSC" , "END" };
+    return LUT[static_cast<int>(codec)];
+}
+
 /// @brief Internal functions for compressed read/write of a NanoVDB GridHandle into a stream
 ///
 /// @warning These functions should never be called directly by client code
@@ -99,19 +105,18 @@ inline uint64_t reverseEndianness(uint64_t val)
 /// @note A file or stream is composed of one or more segments that each contain
 //        one or more grids.
 // Magic number of NanoVDB files   (uint64_t) |
-// Major number of the file format (uint16_t) |
-// Minor number of the file format (uint16_t) | one header for each segment
+// Version numbers of this file    (uint32_t) | one header for each segment
 // Compression mode                (uint16_t) |
 // Number of grids in this segment (uint16_t) |
 struct Header
 {
     uint64_t magic; // 8 bytes
-    uint16_t major, minor, gridCount; // 3 * 2 = 6 bytes
+    Version  version;// 4 bytes version numbers 
+    uint16_t gridCount; // 2 bytes
     Codec    codec; // 2 bytes
     Header(Codec c = Codec::NONE)
         : magic(NANOVDB_MAGIC_NUMBER) // Magic number: "NanoVDB" in hex
-        , major(NANOVDB_MAJOR_VERSION_NUMBER) // incremented for incompatible changes to the file format.
-        , minor(NANOVDB_MINOR_VERSION_NUMBER) // incremented for backwards-compatible changes to the file format.
+        , version()// major, minor and patch version numbers
         , gridCount(0)
         , codec(c)
     {
@@ -140,8 +145,8 @@ struct MetaData
     uint32_t    nameSize; // 4B.
     uint32_t    nodeCount[4]; //4 x 4 = 16B
     Codec       codec; // 2B
-    uint16_t    major; // 2B
-}; // MetaData ( 160B )
+    Version     version;// 4B
+}; // MetaData ( for backwards compatibility only the first 160B are used in I/O )
 
 struct GridMetaData : public MetaData
 {
@@ -151,14 +156,14 @@ struct GridMetaData : public MetaData
     GridMetaData() {}
     template<typename ValueT>
     GridMetaData(uint64_t size, Codec c, const NanoGrid<ValueT>& grid);
-    uint64_t memUsage() const { return sizeof(MetaData) + nameSize; }
+    // for backwards compatibility we only write and read 160 bytes
+    uint64_t memUsage() const { return 160 + nameSize; }
 }; // GridMetaData
 
 struct Segment
 {
     // Check assumptions made during read and write of Header and MetaData
-    static_assert(sizeof(Header) == 16u, "Unexpected sizeof(Header)");
-    static_assert(sizeof(MetaData) == 160u, "Unexpected sizeof(MetaData)");
+    static_assert(sizeof(Header)   ==  16u, "Unexpected sizeof(Header)");
     Header                    header;
     std::vector<GridMetaData> meta;
     Segment(Codec c = Codec::NONE)
@@ -362,7 +367,7 @@ inline GridMetaData::GridMetaData(uint64_t size, Codec c, const NanoGrid<ValueT>
                0, // nameSize
                {0, 0, 0, 0}, // nodeCount[4]
                c, // codec
-               NANOVDB_MAJOR_VERSION_NUMBER} // major
+               Version()}// version
     , gridName(grid.gridName())
 {
     nameKey = stringHash(gridName);
@@ -375,7 +380,7 @@ inline GridMetaData::GridMetaData(uint64_t size, Codec c, const NanoGrid<ValueT>
 
 inline void GridMetaData::write(std::ostream& os) const
 {
-    os.write(reinterpret_cast<const char*>(this), sizeof(MetaData));
+    os.write(reinterpret_cast<const char*>(this), 160); // for backwards compatibility
     os.write(gridName.c_str(), nameSize);
     if (!os) {
         throw std::runtime_error("Failed writing GridMetaData");
@@ -384,7 +389,7 @@ inline void GridMetaData::write(std::ostream& os) const
 
 inline void GridMetaData::read(std::istream& is)
 {
-    is.read(reinterpret_cast<char*>(this), sizeof(MetaData));
+    is.read(reinterpret_cast<char*>(this), 160); // for backwards compatibility
     std::unique_ptr<char[]> tmp(new char[nameSize]);
     is.read(reinterpret_cast<char*>(tmp.get()), nameSize);
     gridName.assign(tmp.get());
@@ -423,8 +428,14 @@ inline void Segment::add(const GridHandle<BufferT>& h)
         meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<Vec3d>()) {
         meta.emplace_back(h.size(), header.codec, *grid);
+    } else if (auto* grid = h.template grid<ValueMask>()) {
+        meta.emplace_back(h.size(), header.codec, *grid);
+    } else if (auto* grid = h.template grid<bool>()) {
+        meta.emplace_back(h.size(), header.codec, *grid);
+    } else if (auto* grid = h.template grid<PackedRGBA8>()) {
+        meta.emplace_back(h.size(), header.codec, *grid);
     } else {
-        throw std::runtime_error("Cannot write empty or unknown grids to file");
+        throw std::runtime_error("Cannot write grid of unknown type to file");
     }
     header.gridCount += 1;
 }
@@ -452,20 +463,31 @@ inline bool Segment::read(std::istream& is)
         if (header.magic == reverseEndianness(NANOVDB_MAGIC_NUMBER))
             throw std::runtime_error("This nvdb file has reversed endianness");
         throw std::runtime_error("Magic number error: This is not a valid nvdb file");
-    } else if (header.major != NANOVDB_MAJOR_VERSION_NUMBER) {
+    } else if ( header.version >= Version(29,0,0) && header.version.getMajor() != NANOVDB_MAJOR_VERSION_NUMBER) {
         std::stringstream ss;
-        if (header.major < NANOVDB_MAJOR_VERSION_NUMBER) {
-            ss << "The file is written in an older version of NanoVDB: " << header.major << "." << header.minor << ".X!\n\t"
+        if (header.version.getMajor() < NANOVDB_MAJOR_VERSION_NUMBER) {
+            ss << "The file is written in an older version of NanoVDB: " << std::string(header.version.c_str()) << "!\n\t"
                << "Recommendation: Re-generate this NanoVDB file with the never version " << NANOVDB_MAJOR_VERSION_NUMBER << ".X of NanoVDB";
         } else {
             ss << "This tool was compiled against an older version of NanoVDB: " << NANOVDB_MAJOR_VERSION_NUMBER << ".X!\n\t"
-               << "Recommendation: Re-compile this tool against version " << header.major << ".X of NanoVDB";
+               << "Recommendation: Re-compile this tool against version " << header.version.getMajor() << ".X of NanoVDB";
         }
         throw std::runtime_error("An unrecoverable error in nanovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
+    } else if (header.version < Version(29,0,0)) {// old format: uint16_t major, minor
+        struct T {union {Version v; struct {uint16_t major, minor;};}; T(Version a) : v(a) {}} t(header.version);// old format 
+        static_assert( sizeof(uint32_t) == sizeof(T), "Expected sizeof(T) == sizeof(uint32_t)" );
+        if (t.major != 28u ) {
+            std::stringstream ss;
+            ss << "The file is written in an older version of NanoVDB: " << t.major << "." << t.minor << ".X!\n\t"
+               << "Recommendation: Re-generate this NanoVDB file with the never version " << NANOVDB_MAJOR_VERSION_NUMBER << ".X of NanoVDB";
+            throw std::runtime_error("An unrecoverable error in nanovdb::Segment::read:\n\tIncompatible file format: " + ss.str());
+        }
+        header.version = Version(t.major, t.minor, 0);
     }
     meta.resize(header.gridCount);
     for (auto& m : meta) {
         m.read(is);
+        m.version = header.version;
     }
     return true;
 }
@@ -703,44 +725,6 @@ inline uint64_t stringHash(const char* cstr)
         hash += *str + overflow;
     }
     return hash;
-}
-
-inline std::string getStringForGridType(nanovdb::GridType t)
-{
-    switch (t) {
-    case GridType::Float: return "float"; break;
-    case GridType::Double: return "double"; break;
-    case GridType::Int16: return "int16"; break;
-    case GridType::Int32: return "int32"; break;
-    case GridType::UInt32: return "uint32"; break;
-    case GridType::Int64: return "int64"; break;
-    case GridType::Vec3f: return "Vec3f"; break;
-    case GridType::Vec3d: return "Vec3d"; break;
-    case GridType::Mask: return "Mask"; break;
-    default: return "?";
-    }
-}
-
-inline std::string getStringForGridClass(nanovdb::GridClass t)
-{
-    switch (t) {
-    case GridClass::LevelSet: return "SDF"; break;
-    case GridClass::FogVolume: return "FOG"; break;
-    case GridClass::Staggered: return "MAC"; break;
-    case GridClass::PointIndex: return "PNTIDX"; break;
-    case GridClass::PointData: return "PNTDAT"; break;
-    default: return "?";
-    }
-}
-
-inline std::string getStringForCodec(nanovdb::io::Codec c)
-{
-    switch (c) {
-    case Codec::NONE: return "None"; break;
-    case Codec::ZIP: return "Zip"; break;
-    case Codec::BLOSC: return "Blosc"; break;
-    default: return "?";
-    }
 }
 
 }

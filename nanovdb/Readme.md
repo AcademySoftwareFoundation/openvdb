@@ -3,10 +3,9 @@ A lightweight GPU friendly version of VDB initially targeting rendering applicat
 
 * [Build instructions for make and cmake](docs/HowToBuild.md)
 * [Frequently asked questions](docs/FAQ.md)
-* [Examples](docs/HelloWorld.md)
-* [Change logs](docs/Changes.md)
+* [Grid cells vs grid nodes](docs/GridCells_vs_GridNodes/Main.pdf)
 * [Source tree](docs/SourceTree.md)
-* [To-Do list](docs/ToDo.md)
+* [Examples](docs/HelloWorld.md)
 
 ### Copyright Contributors to the OpenVDB Project
 ### SPDX-License-Identifier: MPL-2.0

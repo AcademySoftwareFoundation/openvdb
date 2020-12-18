@@ -297,6 +297,11 @@ public:
         return Min(mT1, Min(mNext[0], Min(mNext[1], mNext[2])));
     }
 
+    __hostdev__ int nextAxis() const
+    {
+        return nanovdb::MinIndex(mNext);
+    }
+
 private:
     // helper to implement the general form
     template<int axis>
@@ -419,6 +424,11 @@ public:
 
             if (t0 >= 0) { // we are in a span.
                 t1 = Min(mTmax, mHdda.time());
+
+                // TODO: clean this up!
+                if (t0 >= t1 || currentNode == nullptr)
+                    continue;
+
                 *node = currentNode;
                 return true;
             }

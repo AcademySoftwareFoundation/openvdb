@@ -16,6 +16,7 @@
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
+#include <nanovdb/util/Primitives.h>
 #include <nanovdb/util/SampleFromVoxels.h>
 #include "Image.h"
 #include "Camera.h"
@@ -34,8 +35,6 @@
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/Transform.h>
-#else
-#include <nanovdb/util/GridBuilder.h>
 #endif
 
 #if defined(NANOVDB_USE_TBB)
@@ -66,11 +65,11 @@ operator<<(std::ostream& os, const nanovdb::Vec3<T>& v)
     return os;
 }
 
-// define the enviroment variable VDB_DATA_PATH to use models from the web
+// define the environment variable VDB_DATA_PATH to use models from the web
 // e.g. setenv VDB_DATA_PATH /home/kmu/dev/data/vdb
 // or   export VDB_DATA_PATH=/Users/ken/dev/data/vdb
 
-// define the enviroment variable VDB_SCRATCH_PATH to specify the directory where image are saved
+// define the environment variable VDB_SCRATCH_PATH to specify the directory where image are saved
 
 // The fixture for testing class.
 class Benchmark : public ::testing::Test
@@ -106,9 +105,12 @@ protected:
         openvdb::FloatGrid::Ptr grid;
         const std::string       path = this->getEnvVar("VDB_DATA_PATH");
         if (path.empty()) { // create a narrow-band level set sphere
-            const float          radius = 500.0f;
+            std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
+                      << "\tcontaining OpenVDB level sets files. They can be downloaded\n"
+                      << "\there: https://www.openvdb.org/download/" << std::endl;
+            const float          radius = 50.0f;
             const openvdb::Vec3f center(0.0f, 0.0f, 0.0f);
-            const float          voxelSize = 1.0f, width = 3.0f;
+            const float          voxelSize = 0.1f, width = 3.0f;
             if (verbose > 0) {
                 std::stringstream ss;
                 ss << "Generating level set sphere with a radius of " << radius << " voxels";
@@ -116,9 +118,11 @@ protected:
             }
 #if 1 // choose between a sphere or one of five platonic solids
             grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>(radius, center, voxelSize, width);
+            grid->setName("ls_sphere");
 #else
             const int faces[5] = {4, 6, 8, 12, 20};
             grid = openvdb::tools::createLevelSetPlatonic<openvdb::FloatGrid>(faces[4], radius, center, voxelSize, width);
+            grid->setName("ls_platonic");
 #endif
         } else {
             openvdb::initialize();
@@ -163,9 +167,9 @@ TEST_F(Benchmark, Ray)
         //std::cerr << "ray(1.5) = " << ray(1.5) << std::endl;
         //std::cerr << "ray(2.0) = " << ray(2.0) << std::endl;
         EXPECT_EQ(0.5, ray.t0());
-        EXPECT_EQ(1.5, ray.t1());
+        EXPECT_EQ(2.0, ray.t1());
         EXPECT_EQ(ray(0.5)[1], 2); //lower y component of intersection
-        EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
+        EXPECT_EQ(ray(2.0)[1], 5); //higher y component of intersection
 
         ray.reset(eye, dir, t0, t1);
         // intersects the lower edge anlong the z-axis of the box
@@ -438,7 +442,7 @@ TEST_F(Benchmark, NanoVDB_CPU)
     auto handles = nanovdb::io::readGrids("data/test.nvdb");
 #else
     std::vector<nanovdb::GridHandle<>> handles;
-    handles.push_back(nanovdb::createLevelSetTorus<float>(100.0f, 50.0f));
+    handles.push_back(nanovdb::createLevelSetTorus<float>(50.0f, 20.0f, nanovdb::Vec3d(0.0), 0.1f));
 #endif
     mTimer.stop();
     auto* grid = handles[0].grid<float>();

@@ -15,7 +15,7 @@
 #include <emscripten/emscripten.h>
 #endif
 
-#include <cinttypes>
+#include <cinttypes> // for PRIu64
 #include <iomanip>
 #include <iostream>
 #include <sstream>
@@ -122,7 +122,14 @@ static void windowDropCB(GLFWwindow* w, int count, const char** paths)
 static bool openFileDialog(std::string& outPathStr)
 {
     nfdchar_t*  outPath = NULL;
-    nfdresult_t result = NFD_OpenDialog("vdb,nvdb", NULL, &outPath);
+    std::string extensions = "nvdb";
+#if defined(NANOVDB_USE_VOX)
+    extensions += ",vox";
+#endif
+#if defined(NANOVDB_USE_OPENVDB)
+    extensions += ",vdb";
+#endif
+    nfdresult_t result = NFD_OpenDialog(extensions.c_str(), NULL, &outPath);
     if (result == NFD_OKAY) {
         outPathStr = outPath;
         free(outPath);
@@ -148,6 +155,26 @@ static bool openFolderDialog(std::string& outPathStr, const std::string& pathStr
     }
     return true;
 }
+
+static bool openSaveDialog(std::string& outPathStr)
+{
+    nfdchar_t*  outPath = NULL;
+    std::string extensions = "nvdb";
+#if defined(NANOVDB_USE_OPENVDB)
+    extensions += ",vdb";
+#endif
+    nfdresult_t result = NFD_SaveDialog(extensions.c_str(), NULL, &outPath);
+    if (result == NFD_OKAY) {
+        outPathStr = outPath;
+        free(outPath);
+    } else if (result == NFD_CANCEL) {
+        return false;
+    } else {
+        throw std::runtime_error(std::string(NFD_GetError()));
+    }
+    return true;
+}
+
 #endif
 
 Viewer::Viewer(const RendererParams& params)
@@ -547,6 +574,13 @@ bool Viewer::updateCamera()
     }
 
     isChanged |= mCurrentCameraState->update();
+
+    if (glfwGetKey((GLFWwindow*)mWindow, GLFW_KEY_D) == GLFW_PRESS) {
+        // move the light source to the camera direction.
+        mParams.mSceneParameters.sunDirection = -mCurrentCameraState->W().normalize();
+        isChanged = true;
+    }
+
     return isChanged;
 }
 
@@ -554,7 +588,10 @@ void Viewer::onDrop(int numPaths, const char** paths)
 {
     std::vector<GridAssetUrl> urls;
     for (int i = 0; i < numPaths; i++) {
-        urls.push_back(paths[i]);
+        GridAssetUrl assetUrl;
+        assetUrl.scheme() = "file";
+        assetUrl.path() = std::string(paths[i]);
+        urls.push_back(assetUrl);
     }
 
     int sceneNodeIndex = addGridAssetsAndNodes("default", urls);
@@ -576,7 +613,7 @@ void Viewer::onKey(int key, int action)
             saveFrameBuffer(getSceneFrame(), getScreenShotFilename(mScreenShotIteration), "png");
         } else if (key == 'H') {
             mIsDrawingHelpDialog = !mIsDrawingHelpDialog;
-#if !defined(NANOVDB_USE_IMGUI)            
+#if !defined(NANOVDB_USE_IMGUI)
             printHelp(std::cout);
 #endif
         } else if (key == 'F') {
@@ -831,7 +868,7 @@ void Viewer::drawRenderOptionsDialog()
     if (!mIsDrawingRenderOptions)
         return;
 
-    ImGui::Begin("Render Options", &mIsDrawingRenderOptions, ImGuiWindowFlags_None);
+    ImGui::Begin("Render Options", &mIsDrawingRenderOptions, ImGuiWindowFlags_NoSavedSettings);
 
     ImGuiTabBarFlags tab_bar_flags = ImGuiTabBarFlags_None;
     if (ImGui::BeginTabBar("Render-options", tab_bar_flags)) {
@@ -1167,7 +1204,7 @@ bool Viewer::drawPointRenderOptionsWidget(SceneNode::Ptr node, int attachmentInd
         for (int i = 0; i < n; ++i) {
             auto meta = grid->blindMetaData(i);
             attributeMeta.push_back(meta);
-            attributeNames.push_back(meta.mName + std::string(" (") + nanovdb::io::getStringForGridType(meta.mDataType) + std::string(")"));
+            attributeNames.push_back(meta.mName + std::string(" (") + nanovdb::toStr(meta.mDataType) + std::string(")"));
         }
 
         static auto vector_getter = [](void* vec, int idx, const char** out_text) {
@@ -1251,6 +1288,28 @@ bool Viewer::drawMaterialParameters(SceneNode::Ptr node, MaterialClass mat)
         ImGui::NextColumn();
         ImGui::SetNextItemWidth(-1);
         isChanged |= drawMaterialGridAttachment(node, 0);
+        ImGui::NextColumn();
+
+    } else if (mat == MaterialClass::kVoxels) {
+        ImGui::BulletText("Voxels");
+        ImGui::SameLine();
+        HelpMarker("The grid URL.\n(<scheme>://<path>#<gridName><sequence>)\nwhere optional <sequence> is [<start>-<end>]\ne.g. file://explosion.%d.vdb#density[0-100]");
+
+        ImGui::NextColumn();
+        ImGui::SetNextItemWidth(-1);
+        isChanged |= drawMaterialGridAttachment(node, 0);
+        ImGui::NextColumn();
+
+        ImGui::BulletText("Density");
+        ImGui::NextColumn();
+        ImGui::SetNextItemWidth(-1);
+        isChanged |= ImGui::DragFloat("##density-value", &params.volumeDensityScale, 0.01f);
+        ImGui::NextColumn();
+
+        ImGui::BulletText("Voxel Geometry");
+        ImGui::NextColumn();
+        ImGui::SetNextItemWidth(-1);
+        isChanged |= ImGui::Combo("##voxelGeometry", (int*)&params.voxelGeometry, "Cube\0Sphere\0\0");
         ImGui::NextColumn();
 
     } else if (mat == MaterialClass::kLevelSetFast) {
@@ -1471,6 +1530,8 @@ void Viewer::drawSceneGraphNodes()
                     materialClass = MaterialClass::kPointsFast;
                 else if (attachment->mGridClassOverride == nanovdb::GridClass::PointIndex)
                     materialClass = MaterialClass::kPointsFast;
+                else if (attachment->mGridClassOverride == nanovdb::GridClass::VoxelVolume)
+                    materialClass = MaterialClass::kVoxels;
                 else
                     materialClass = MaterialClass::kGrid;
             }
@@ -1559,7 +1620,7 @@ void Viewer::drawGridInfo(const std::string& url, const std::string& gridName)
         ImGui::Text("(%.2f,%.2f,%.2f)", bboxMax[0], bboxMax[1], bboxMax[2]);
         ImGui::Text("Class(Type):");
         ImGui::SameLine(150);
-        ImGui::Text("%s(%s)", nanovdb::io::getStringForGridClass(meta->gridClass()).c_str(), nanovdb::io::getStringForGridType(meta->gridType()).c_str());
+        ImGui::Text("%s(%s)", nanovdb::toStr(meta->gridClass()), nanovdb::toStr(meta->gridType()));
         if (meta->gridClass() == nanovdb::GridClass::PointData || meta->gridClass() == nanovdb::GridClass::PointIndex) {
             ImGui::Text("Point count:");
             ImGui::SameLine(150);
@@ -1569,6 +1630,9 @@ void Viewer::drawGridInfo(const std::string& url, const std::string& gridName)
             ImGui::SameLine(150);
             ImGui::Text("%" PRIu64, meta->activeVoxelCount());
         }
+        ImGui::Text("Size:");
+        ImGui::SameLine(150);
+        ImGui::Text("%" PRIu64 " MB", meta->gridSize());
     } else {
         ImGui::TextUnformatted("Loading...");
     }
@@ -1772,6 +1836,24 @@ void Viewer::drawMenuBar()
                 openLoadURL = true;
             }
 
+            ImGui::Separator();
+
+#if defined(NANOVDB_USE_NFD)
+            if (ImGui::MenuItem("Save to file...", nullptr)) {
+                std::string filePath;
+                if (openSaveDialog(filePath)) {
+                    try {
+                        std::cout << filePath << "\n";
+                    }
+                    catch (const std::exception& e) {
+                        std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
+                    }
+                }
+            }
+#else
+            ImGui::MenuItem("Save to file...", "(Please build with NFD support)", false, false);
+#endif
+            ImGui::Separator();
             if (ImGui::MenuItem("Quit", "Q")) {
                 glfwSetWindowShouldClose((GLFWwindow*)mWindow, 1);
             }
@@ -1806,13 +1888,16 @@ void Viewer::drawMenuBar()
                 urls["ls_sphere"] = "internal://#ls_sphere_100";
                 urls["ls_torus"] = "internal://#ls_torus_100";
                 urls["ls_box"] = "internal://#ls_box_100";
+                urls["ls_octahedron"] = "internal://#ls_octahedron_100";
                 urls["ls_bbox"] = "internal://#ls_bbox_100";
                 urls["fog_sphere"] = "internal://#fog_sphere_100";
                 urls["fog_torus"] = "internal://#fog_torus_100";
                 urls["fog_box"] = "internal://#fog_box_100";
+                urls["fog_octahedron"] = "internal://#fog_octahedron_100";
                 urls["points_sphere"] = "internal://#points_sphere_100";
                 urls["points_torus"] = "internal://#points_torus_100";
                 urls["points_box"] = "internal://#points_box_100";
+                urls["fog_mandelbulb"] = "internal://#fog_mandelbulb_100";
 
                 for (auto& it : urls) {
                     if (ImGui::MenuItem(it.first.c_str())) {

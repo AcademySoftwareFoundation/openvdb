@@ -17,7 +17,7 @@
 #include <algorithm>// for std::generate
 #include <array>
 #include <cstdint>
-#include <cstddef>// offsetoff macro
+#include <cstddef>// offsetof macro
 #include <numeric>
 #include <type_traits>
 
@@ -135,7 +135,7 @@ inline std::uint_fast32_t crc32_slow(const NanoGrid<ValueT> &grid)
     // Validate the assumed memory layout
     static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
     static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mMajor) == 16, "Unexpected offset to major version number");
+    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
     return crc32(reinterpret_cast<const uint8_t*>(&grid) + 16, grid.totalMemUsage() - 16);
 }
 
@@ -145,7 +145,7 @@ inline std::uint_fast32_t crc32_slow(const GridHandleBase &handle)
     // Validate the assumed memory layout
     static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
     static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mMajor) == 16, "Unexpected offset to major version number");
+    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to major version number");
     CRC32 crc;
     crc(handle.data() + 16, handle.size() - 16);
     return crc.checksum();
@@ -198,7 +198,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
     // Validate the assumed memory layout
     static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
     static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mMajor) == 16, "Unexpected offset to major version number");
+    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
     static const size_t offset = 16;
 
     mChecksum = EMPTY;
@@ -295,7 +295,7 @@ std::uint_fast32_t crc32(const NanoGrid<ValueT> &grid)
     // Validate the assumed memory layout
     static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
     static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mMajor) == 16, "Unexpected offset to major version number");
+    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
     static const size_t offset = 16;
 
     CRC32 totalCRC;

@@ -24,11 +24,15 @@
 #include "StringUtils.h"
 
 #include <nanovdb/util/IO.h> // for NanoVDB file import
-#include <nanovdb/util/GridBuilder.h>
+#include <nanovdb/util/Primitives.h>
 #if defined(NANOVDB_USE_OPENVDB)
 #include <openvdb/io/Stream.h>
 #include <nanovdb/util/OpenToNanoVDB.h>
 #endif
+#if defined(NANOVDB_USE_MAGICAVOXEL)
+#include <VoxToNanoVDB.h>
+#endif
+#include "primitives.h"
 
 // create a nanovdb grid from a typeName.
 // Returns a valid GridHandle on success.
@@ -36,19 +40,42 @@ static nanovdb::GridHandle<> createInternalGrid(std::string typeName, std::strin
 {
     if (typeName == "empty") {
         nanovdb::GridBuilder<float> builder(0);
-        return builder.getHandle<>();
+        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName, nanovdb::GridClass::Unknown);
     } else if (typeName == "ls_sphere_100") {
         return nanovdb::createLevelSetSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_torus_100") {
         return nanovdb::createLevelSetTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_box_100") {
         return nanovdb::createLevelSetBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+    } else if (typeName == "ls_octahedron_100") {
+        return nanovdb::createLevelSetOctahedron(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_sphere_100") {
         return nanovdb::createFogVolumeSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_torus_100") {
         return nanovdb::createFogVolumeTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_box_100") {
         return nanovdb::createFogVolumeBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+    } else if (typeName == "fog_mandelbulb_100") {
+
+        nanovdb::GridBuilder<float> builder(0);
+        auto                        acc = builder.getAccessor();
+
+        const int radius = 100;
+        for (int z = -radius; z <= radius; ++z) {
+            for (int y = -radius; y <= radius; ++y) {
+                for (int x = -radius; x <= radius; ++x) {
+                    const auto ijk = nanovdb::Coord(x, y, z);
+                    const auto xyz = nanovdb::Vec3f(ijk) / (radius);
+                    const auto v = viewer::primitives::mandelbulb(xyz * 0.95f);
+                    if (v[3] <= 0) {
+                        acc.setValue(ijk, 1.0f);
+                    }
+                }
+            }
+        }
+        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName, nanovdb::GridClass::FogVolume);      
+    } else if (typeName == "fog_octahedron_100") {
+        return nanovdb::createFogVolumeOctahedron(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "points_sphere_100") {
         return nanovdb::createPointSphere(1, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "points_torus_100") {
@@ -301,7 +328,9 @@ std::vector<std::string> GridManager::getGridsNamesFromLocalFile(const std::stri
     std::vector<std::string> result;
     std::string              extension = urlGetPathExtension(localFilename);
     try {
-        if (extension == "vdb") {
+        if (extension == "vox") {
+            result.push_back("");
+        } else if (extension == "vdb") {
 #if defined(NANOVDB_USE_OPENVDB)
             openvdb::io::File file(localFilename);
             file.open(true);
@@ -339,7 +368,8 @@ bool GridManager::addGridsMetaFromLocalFile(const std::string& url, const std::s
     }
 
     try {
-        if (extension == "vdb") {
+        if (extension == "vox") {
+        } else if (extension == "vdb") {
 #if defined(NANOVDB_USE_OPENVDB)
             openvdb::io::File file(localFilename);
             file.open(true);
@@ -441,7 +471,14 @@ bool GridManager::addGridsFromLocalFile(const std::string& url, const std::strin
     try {
         std::string extension = urlGetPathExtension(localFilename);
 
-        if (extension == "vdb") {
+        if (extension == "vox") {
+#if defined(NANOVDB_USE_VOX)
+            auto gridHdl = convertVoxToNanoVDB<>(localFilename, gridName);
+            gridAsset = ensureGridAsset(asset, "", AssetGridStatus::kLoaded, std::move(gridHdl));
+#else
+            throw std::runtime_error("VOX files are not supported in this build. Please recompile with MagicaVoxel support.");
+#endif
+        } else if (extension == "vdb") {
 #if defined(NANOVDB_USE_OPENVDB)
             openvdb::io::File file(localFilename);
             file.open(true);
@@ -462,7 +499,7 @@ bool GridManager::addGridsFromLocalFile(const std::string& url, const std::strin
                 }
             }
 #else
-            throw std::runtime_error("OpenVDB is not supported in this build. Please recompile with OpenVDB support.");
+            throw std::runtime_error("VDB files are not supported in this build. Please recompile with OpenVDB support.");
 #endif
         } else {
             // load all the grids in the file...

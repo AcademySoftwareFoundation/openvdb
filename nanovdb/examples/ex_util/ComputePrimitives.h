@@ -1,6 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+/// @file ComputePrimitives.h
+///
+/// @author Wil Braithwaite
+///
+/// @brief A collection of parallel compute primitives
+
 #pragma once
 
 #if defined(NANOVDB_USE_CUDA)
@@ -86,6 +92,7 @@ public:
         call(start, end, cxx14::make_index_sequence<sizeof...(Args)>());
     }
 
+#if defined(NANOVDB_USE_TBB)
     void operator()(const tbb::blocked_range<int>& r) const
     {
         int start = r.begin();
@@ -94,6 +101,7 @@ public:
             end = mCount;
         call(start, end, cxx14::make_index_sequence<sizeof...(Args)>());
     }
+#endif
 
 private:
     int                 mCount;
@@ -128,11 +136,13 @@ inline void computeSync(bool useCuda, const char* file, int line)
 
 inline void computeFill(bool useCuda, void* data, uint8_t value, size_t size)
 {
+    if (useCuda) {
 #if defined(__CUDACC__)
-    cudaMemset(data, value, size);
-#else
-    std::memset(data, value, size);
+        cudaMemset(data, value, size);
 #endif
+    } else {
+        std::memset(data, value, size);
+    }
 }
 
 template<typename FunctorT, typename... Args>
@@ -154,7 +164,7 @@ inline void computeForEach(bool useCuda, int numItems, int blockSize, const char
         tbb::parallel_for(range, ApplyFunc<FunctorT, Args...>(numItems, blockSize, op, args...));
 #else
         for (int i = 0; i < numItems; ++i)
-            op(i, i + 1, std::forward<Args>(args)...);
+            op(i, i + 1, args...);
 #endif
     }
 }

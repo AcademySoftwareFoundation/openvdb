@@ -25,6 +25,7 @@
 #include "RenderFogVolumeUtils.h"
 #include "RenderLevelSetUtils.h"
 #include "RenderGridUtils.h"
+#include "RenderVoxelUtils.h"
 #include "RenderPointsUtils.h"
 
 class FrameBufferBase;
@@ -70,6 +71,9 @@ struct LauncherForType<MaterialClass::kGrid>
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) {
             auto grid = launcher.template grid<uint32_t>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::PackedRGBA8)) {
+            auto grid = launcher.template grid<nanovdb::PackedRGBA8>(gridParams.gridHandle);
+            launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Int64)) {
             auto grid = launcher.template grid<int64_t>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
@@ -79,6 +83,46 @@ struct LauncherForType<MaterialClass::kGrid>
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Vec3d)) {
             auto grid = launcher.template grid<nanovdb::Vec3d>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else {
+            launcher.render(width, height, render::RenderEnvRgba32fFn(), imgPtr, numAccumulations, sceneParams, materialParams);
+        }
+    }
+};
+
+template<>
+struct LauncherForType<MaterialClass::kVoxels>
+{
+    template<typename LauncherT>
+    void operator()(LauncherT launcher, int width, int height, float* imgPtr, int numAccumulations, const GridRenderParameters& gridParams, const SceneRenderParameters& sceneParams, const MaterialParameters& materialParams) const
+    {
+        auto gridBounds = gridParams.bounds;
+
+        if (gridBounds.empty()) {
+            launcher.render(width, height, render::RenderEnvRgba32fFn(), imgPtr, numAccumulations, sceneParams, materialParams);
+            return;
+        }
+
+        if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Float)) {
+            auto grid = launcher.template grid<float>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Double)) {
+            auto grid = launcher.template grid<double>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) {
+            auto grid = launcher.template grid<uint32_t>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::PackedRGBA8)) {
+            auto grid = launcher.template grid<nanovdb::PackedRGBA8>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Int64)) {
+            auto grid = launcher.template grid<int64_t>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Vec3f)) {
+            auto grid = launcher.template grid<nanovdb::Vec3f>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Vec3d)) {
+            auto grid = launcher.template grid<nanovdb::Vec3d>(gridParams.gridHandle);
+            launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else {
             launcher.render(width, height, render::RenderEnvRgba32fFn(), imgPtr, numAccumulations, sceneParams, materialParams);
         }
@@ -262,6 +306,8 @@ void launchRender(LauncherT& methodLauncher, MaterialClass method, int width, in
 {
     if (method == MaterialClass::kGrid) {
         LauncherForType<MaterialClass::kGrid>()(methodLauncher, width, height, imgPtr, numAccumulations, grids[0], sceneParams, materialParams);
+    } else if (method == MaterialClass::kVoxels) {
+        LauncherForType<MaterialClass::kVoxels>()(methodLauncher, width, height, imgPtr, numAccumulations, grids[0], sceneParams, materialParams);
     } else if (method == MaterialClass::kFogVolumePathTracer) {
         LauncherForType<MaterialClass::kFogVolumePathTracer>()(methodLauncher, width, height, imgPtr, numAccumulations, grids[0], sceneParams, materialParams);
     } else if (method == MaterialClass::kLevelSetFast) {
