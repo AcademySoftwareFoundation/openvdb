@@ -26,6 +26,13 @@ ABI changes:
   devirtualization optimization.
 
 @par
+Bug fixes:
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+
+@par
 Build:
 - As of this release, VFX Reference Platform 2018 is no longer supported.
   CMake now issues deprecation warnings for 2019 VFX Reference Platform

@@ -15,6 +15,11 @@ Version 8.0.0 - In development
     - Mark map classes and functions as final for ABI=8 where beneficial to
       allow devirtualization optimization.
 
+    Bug fixes:
+    - Fix GridTransformer construction to use correct rotate-scale-translate
+      order when recomposing matrix components.
+      [Contributed by Tom Cnops].
+
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
