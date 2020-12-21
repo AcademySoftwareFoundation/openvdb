@@ -104,9 +104,7 @@ public:
 
 // Template specialization for values of POD types (int, float, pointer, etc.)
 template<typename ValueT, typename ChildT>
-class NodeUnion<ValueT, ChildT, typename std::enable_if<
-    !CopyTraits<ValueT>::IsCopyable && std::is_pod<ValueT>::value
->::type>
+class NodeUnion<ValueT, ChildT, typename std::enable_if<std::is_pod<ValueT>::value>::type>
 {
 private:
     union { ChildT* mChild; ValueT mValue; };
