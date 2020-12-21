@@ -30,30 +30,15 @@ public:
     using ValueType = T;
     enum SIZE_ { size = SIZE };
 
+    /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Mat() = default;
+
     // Number of cols, rows, elements
     static unsigned numRows() { return SIZE; }
     static unsigned numColumns() { return SIZE; }
     static unsigned numElements() { return SIZE*SIZE; }
-
-    /// Default ctor.  Does nothing.  Required because declaring a copy (or
-    /// other) constructor means the default constructor gets left out.
-    Mat() { }
-
-    /// Copy constructor.  Used when the class signature matches exactly.
-    Mat(Mat const &src) {
-        for (unsigned i(0); i < numElements(); ++i) {
-            mm[i] = src.mm[i];
-        }
-    }
-
-    Mat& operator=(Mat const& src) {
-        if (&src != this) {
-            for (unsigned i = 0; i < numElements(); ++i) {
-                mm[i] = src.mm[i];
-            }
-        }
-        return *this;
-    }
 
     /// @return string representation of matrix
     /// Since output is multiline, optional indentation argument prefixes
