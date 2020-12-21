@@ -22,6 +22,10 @@ Version 8.0.0 - In development
       version dependencies.
     - Added a missing header include to resolve an undefined size_t build error
       on GCC10.
+    - Improved the python module's linkage with the CMake 3.15 Python::Module
+      target. Explicitly linking with the Development target could result in
+      crashes, particularly on macOS.
+      [Reported by Alexander Hagen]
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
