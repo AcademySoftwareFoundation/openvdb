@@ -13,6 +13,7 @@
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+#include <cstring> // for std::memcpy()
 #include <type_traits>
 
 namespace openvdb {
