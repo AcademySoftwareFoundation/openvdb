@@ -135,6 +135,9 @@ int validatePointsGrid(void* gridPtr)
     VDB_ASSERT(iter);
     VDB_ASSERT(iter->memUsage() > openvdb::Index64(0));
 
+    auto handle = openvdb::points::AttributeHandle<openvdb::Vec3f>::create(iter->constAttributeArray("P"));
+    VDB_ASSERT(handle->get(0) == openvdb::Vec3f(0));
+
     return 0;
 }
 
