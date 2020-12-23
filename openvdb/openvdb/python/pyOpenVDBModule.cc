@@ -519,9 +519,8 @@ template<typename T> void translateException(const T&) {}
 
 /// Define an overloaded function that translate all OpenVDB exceptions into
 /// their Python equivalents.
-/// @todo IllegalValueException and LookupError are redundant and should someday be removed.
+/// @todo LookupError is redundant and should someday be removed.
 PYOPENVDB_CATCH(openvdb::ArithmeticError,       PyExc_ArithmeticError)
-PYOPENVDB_CATCH(openvdb::IllegalValueException, PyExc_ValueError)
 PYOPENVDB_CATCH(openvdb::IndexError,            PyExc_IndexError)
 PYOPENVDB_CATCH(openvdb::IoError,               PyExc_IOError)
 PYOPENVDB_CATCH(openvdb::KeyError,              PyExc_KeyError)
@@ -851,7 +850,6 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
     py::register_exception_translator<_classname>(&_openvdbmodule::translateException<_classname>)
 
     PYOPENVDB_TRANSLATE_EXCEPTION(ArithmeticError);
-    PYOPENVDB_TRANSLATE_EXCEPTION(IllegalValueException);
     PYOPENVDB_TRANSLATE_EXCEPTION(IndexError);
     PYOPENVDB_TRANSLATE_EXCEPTION(IoError);
     PYOPENVDB_TRANSLATE_EXCEPTION(KeyError);
