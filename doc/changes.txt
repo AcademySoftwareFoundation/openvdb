@@ -19,6 +19,11 @@ preserve ABI compatibility it might be necessary to define the macro
 ABI changes:
 - @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
   of ABI=8 so that it can be accessed from the GridBase.
+- Private method
+  @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
+  removed as of ABI=8.
+- Mark map classes and functions as final for ABI=8 where beneficial to allow
+  devirtualization optimization.
 
 @par
 API changes:
@@ -43,6 +48,10 @@ New features:
 - Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
   a vector containing all the active tiles in a tree that intersects a given
   CoordBBox.
+
+@par
+Improvements:
+- Made LeafManager class non-virtual.
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
