@@ -1,7 +1,6 @@
 OpenVDB Version History
 =======================
 
-
 Version 8.0.0 - In development
 
       This version introduces ABI changes relative to older major releases,
@@ -25,6 +24,10 @@ Version 8.0.0 - In development
       version dependencies.
     - Added a missing header include to resolve an undefined size_t build error
       on GCC10.
+    - Improved the python module's linkage with the CMake 3.15 Python::Module
+      target. Explicitly linking with the Development target could result in
+      crashes, particularly on macOS.
+      [Reported by Alexander Hagen]
     - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
       attribute.
 
@@ -37,6 +40,10 @@ Version 8.0.0 - In development
 
     Improvements:
     - Made LeafManager class non-virtual.
+
+    Houdini:
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+      VDB Write likewise should not reset the compression values.
 
 Version 7.2.0 - December 9, 2020
 
