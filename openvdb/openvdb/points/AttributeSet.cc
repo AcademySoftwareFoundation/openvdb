@@ -340,31 +340,6 @@ AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& repla
 }
 
 
-// deprecated
-AttributeArray::Ptr
-AttributeSet::appendAttribute(  const Name& name,
-                                const NamePair& type,
-                                const Index strideOrTotalSize,
-                                const bool constantStride,
-                                Metadata::Ptr defaultValue)
-{
-    return this->appendAttribute(name, type, strideOrTotalSize,
-        constantStride, defaultValue.get());
-}
-
-
-// deprecated
-AttributeArray::Ptr
-AttributeSet::appendAttribute(  const Descriptor& expected, DescriptorPtr& replacement,
-                                const size_t pos, const Index strideOrTotalSize,
-                                const bool constantStride,
-                                const AttributeArray::ScopedRegistryLock* lock)
-{
-    return this->appendAttribute(expected, replacement, pos, strideOrTotalSize,
-        constantStride, nullptr, lock);
-}
-
-
 AttributeArray::Ptr
 AttributeSet::removeAttribute(const Name& name)
 {
@@ -1229,13 +1204,6 @@ AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
     }
 
     return offset;
-}
-
-// deprecated
-size_t
-AttributeSet::Descriptor::nextUnusedGroupOffset() const
-{
-    return this->unusedGroupOffset();
 }
 
 bool

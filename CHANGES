@@ -15,6 +15,9 @@ Version 8.0.0 - In development
     - Mark map classes and functions as final for ABI=8 where beneficial to
       allow devirtualization optimization.
 
+    API changes:
+    - Removed a number of deprecated point, volume and AX methods.
+
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.
       CMake now issues deprecation warnings for 2019 VFX Reference Platform
@@ -26,6 +29,8 @@ Version 8.0.0 - In development
       target. Explicitly linking with the Development target could result in
       crashes, particularly on macOS.
       [Reported by Alexander Hagen]
+    - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
+      attribute.
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check

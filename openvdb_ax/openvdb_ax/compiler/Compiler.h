@@ -176,47 +176,6 @@ public:
 
     ///////////////////////////////////////////////////////////////////////////
 
-    /// @brief deprecated methods
-    template <typename ExecutableT>
-    OPENVDB_DEPRECATED
-    typename ExecutableT::Ptr
-    compile(const ast::Tree& syntaxTree,
-            const CustomData::Ptr data,
-            std::vector<std::string>* warnings) {
-        openvdb::ax::Logger logger(
-            // throw immediately on first error
-            [] (const std::string& error) {
-            OPENVDB_THROW(AXSyntaxError, error);
-            },
-            // collect warnings in vector
-            [&warnings] (const std::string& warn) {
-                if (warnings) warnings->emplace_back(warn);
-            }
-        );
-        return compile<ExecutableT>(syntaxTree, logger, data);
-    }
-
-    template <typename ExecutableT>
-    OPENVDB_DEPRECATED
-    typename ExecutableT::Ptr
-    compile(const std::string& code,
-            const CustomData::Ptr data,
-            std::vector<std::string>* warnings) {
-        openvdb::ax::Logger logger(
-            // throw immediately on first error
-            [] (const std::string& error) {
-            OPENVDB_THROW(AXSyntaxError, error);
-            },
-            // collect warnings in vector
-            [&warnings] (const std::string& warn) {
-                if (warnings) warnings->emplace_back(warn);
-            }
-        );
-        return compile<ExecutableT>(code, logger, data);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
-
 private:
 
     std::shared_ptr<llvm::LLVMContext> mContext;
