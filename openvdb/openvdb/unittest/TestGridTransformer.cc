@@ -277,6 +277,9 @@ TEST_F(TestGridTransformer, testDecomposition)
                                     outM.setTranslation(outT);
                                     EXPECT_TRUE(outM.eq(m));
                                 }
+                                tools::GridTransformer transformer(m);
+                                const bool transformUnchanged = transformer.getTransform().eq(m);
+                                EXPECT_TRUE(transformUnchanged);
                             }
                         }
                     }
