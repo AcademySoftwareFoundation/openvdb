@@ -27,7 +27,8 @@ ABI changes:
 Build:
 - As of this release, VFX Reference Platform 2018 is no longer supported.
   CMake now issues deprecation warnings for 2019 VFX Reference Platform
-  version dependencies.
+  version dependencies, with the exception that OpenEXR/IlmBase 2.2 is still
+  supported.
 - Added a missing header include to resolve an undefined size_t build error
   on GCC10.
 
