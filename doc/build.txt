@@ -229,9 +229,8 @@ it's a good idea to read the above section on
 
 DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
-Houdini  | 17.0              | 5           |
-Houdini  | 17.5              | 5           |
 Houdini  | 18.0              | 6           |
+Houdini  | 18.5              | 7           |
 Maya     | 2017              | Any         |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
@@ -578,11 +577,6 @@ OpenVDB uses [imported targets](https://cmake.org/cmake/help/latest/command/add_
 for all its dependencies. For imported Boost compatibility, the following
 versions of CMake are required:
 
-  - Boost 1.63 requires CMake 3.7 or newer.
-  - Boost 1.64 requires CMake 3.8 or newer.
-  - Boost 1.65 and 1.65.1 require CMake 3.9.3 or newer.
-  - Boost 1.66 requires CMake 3.11 or newer.
-  - Boost 1.67 requires CMake 3.12 or newer.
   - Boost 1.68, 1.69 require CMake 3.13 or newer.
   - Boost 1.70 requires CMake 3.14 or newer.
 
