@@ -540,21 +540,6 @@ levelSetGenus(const GridT& grid)
     return doLevelSetGenus(grid);
 }
 
-////////////////////////////////////////////////////////////////////////////////////////
-
-/// @deprecated Use the @a LevelSetMeasure class instead.
-template<class GridT>
-OPENVDB_DEPRECATED
-inline void
-levelSetMeasure(const GridT& grid, Real& area, Real& volume, Real& avgCurvature,
-                bool useWorldUnits = true)
-{
-    LevelSetMeasure<GridT> m(grid);
-    area = m.area(useWorldUnits);
-    volume = m.volume(useWorldUnits);
-    avgCurvature = m.avgMeanCurvature(useWorldUnits);
-}
-
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

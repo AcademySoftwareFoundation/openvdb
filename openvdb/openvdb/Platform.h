@@ -29,19 +29,6 @@
 #define OPENVDB_PREPROC_CONCAT(x, y) OPENVDB_PREPROC_CONCAT_(x, y)
 /// @}
 
-
-/// Use OPENVDB_DEPRECATED to mark functions as deprecated.
-/// It should be placed right before the signature of the function,
-/// e.g., "OPENVDB_DEPRECATED void functionName();".
-#ifdef OPENVDB_DEPRECATED
-#undef OPENVDB_DEPRECATED
-#endif
-#ifdef _MSC_VER
-    #define OPENVDB_DEPRECATED  __declspec(deprecated)
-#else
-    #define OPENVDB_DEPRECATED  __attribute__ ((deprecated))
-#endif
-
 /// Macro for determining if GCC version is >= than X.Y
 #if defined(__GNUC__)
     #define OPENVDB_CHECK_GCC(MAJOR, MINOR) \
@@ -112,7 +99,7 @@
 /// @note Use this sparingly.  Remove references to deprecated code if at all possible.
 /// @details Example:
 /// @code
-/// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
+/// [[deprecated]] void myDeprecatedFunction() {}
 ///
 /// {
 ///     OPENVDB_NO_DEPRECATION_WARNING_BEGIN

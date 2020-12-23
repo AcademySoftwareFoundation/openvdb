@@ -14,6 +14,27 @@ preserve ABI compatibility it might be necessary to define the macro
 <I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
 </BLOCKQUOTE>
 
+@par
+<BLOCKQUOTE>
+Official release of OpenVDB AX, a new C++ library that implements
+a domain specific JIT (just-in-time) compiled expression language,
+providing users with a new way of interacting with OpenVDB data. AX is
+tailored towards writing highly parallelizable and customizable OpenVDB
+volume and point kernel operations. See the
+<A HREF="https://www.openvdb.org/documentation/doxygen/openvdbax.html">documentation</A>
+for more.
+</BLOCKQUOTE>
+
+@par
+New features:
+- Added @vdblink::tools::anyActiveVoxels tools::anyActiveVoxels@endlink
+  and @vdblink::tools::anyActiveTiles tools::anyActiveTiles@endlink that check
+  if respectively active voxels or tiles in a tree intersect a given
+  CoordBBox.
+- Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
+  a vector containing all the active tiles in a tree that intersects a given
+  CoordBBox.
+
 @anchor v8_0_0_ABI_changes
 @par
 ABI changes:
@@ -26,6 +47,10 @@ ABI changes:
   devirtualization optimization.
 
 @par
+API changes:
+- Removed a number of deprecated point, volume and AX methods.
+
+@par
 Bug fixes:
 - Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
   construction to use correct rotate-scale-translate order when recomposing
@@ -36,28 +61,35 @@ Bug fixes:
 Build:
 - As of this release, VFX Reference Platform 2018 is no longer supported.
   CMake now issues deprecation warnings for 2019 VFX Reference Platform
-  version dependencies.
+  version dependencies, with the exception that OpenEXR/IlmBase 2.2 is still
+  supported.
 - Added a missing header include to resolve an undefined size_t build error
   on GCC10.
-
-@par
-New features:
-- Added @vdblink::tools::anyActiveVoxels tools::anyActiveVoxels@endlink
-  and @vdblink::tools::anyActiveTiles tools::anyActiveTiles@endlink that check
-  if respectively active voxels or tiles in a tree intersect a given
-  CoordBBox.
-- Added @vdblink::tools::activeTiles tools::activeTiles@endlink that returns
-  a vector containing all the active tiles in a tree that intersects a given
-  CoordBBox.
+- Improved the python module's linkage with the CMake 3.15 Python::Module
+  target. Explicitly linking with the Development target could result in
+  crashes, particularly on macOS.
+  [Reported&nbsp;by&nbsp;Alexander&nbsp;Hagen]
+- Removed OPENVDB_DEPRECATED macro in favor of C++14 <TT>[[deprecated]]</TT>
+  attribute.
 
 @par
 Improvements:
 - Made LeafManager class non-virtual.
 
 @par
+Bug fixes:
+- OpenVDB AX: Fixed a potential code generation crash in binary, ternary
+  or comma operators when errors occurred in first operand.
+
+@par
 Houdini:
 - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
   VDB Write SOP should likewise not reset the compression values.
+
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
@@ -1080,8 +1112,8 @@ API changes:
 - Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
   including @b io::File::readGridPartial, @b points::initialize,
   @b points::uninitialize and @b util::PagedArray::pop_back.
-- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
-  in favor of @vdblink::ValueError ValueError@endlink.
+- Deprecated IllegalValueException in favor of
+  @vdblink::ValueError ValueError@endlink.
 - Changed the naming scheme for the
   @link OPENVDB_VERSION_NAME library namespace@endlink
   from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
