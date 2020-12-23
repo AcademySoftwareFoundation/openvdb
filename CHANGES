@@ -41,6 +41,10 @@ Version 8.0.0 - In development
     - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
       VDB Write likewise should not reset the compression values.
 
+    Bug fixes:
+    - Fixed a determinism bug in NodeManager when using non-thread-safe
+      functor members.
+
 Version 7.2.0 - December 9, 2020
 
     New features:

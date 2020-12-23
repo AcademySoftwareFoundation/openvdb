@@ -57,6 +57,11 @@ Houdini:
 - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
   VDB Write SOP should likewise not reset the compression values.
 
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
+
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.2.0</B> - <I>December 9, 2020</I>
