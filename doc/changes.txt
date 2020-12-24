@@ -2,6 +2,21 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v7_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.1</B> - <I>December 23, 2020</I>
+
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
+
+@par
+Build:
+- Added a missing header include to resolve an undefined size_t build error
+  on GCC10.
+
+
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 7.2.0</B> - <I>December 9, 2020</I>

@@ -1,6 +1,16 @@
 OpenVDB Version History
 =======================
 
+Version 7.2.1 - December 23, 2020
+
+    Bug fixes:
+    - Fixed a determinism bug in NodeManager when using non-thread-safe
+      functor members.
+
+    Build:
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
+
 Version 7.2.0 - December 9, 2020
 
     New features:
