@@ -27,7 +27,13 @@ public:
     using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Vec2() = default;
+#else
     Vec2() {}
+#endif
 
     /// @brief Construct a vector all of whose components have the given value.
     explicit Vec2(T val) { this->mm[0] = this->mm[1] = val; }
@@ -354,7 +360,6 @@ public:
     static Vec2<T> ones() { return Vec2<T>(1, 1); }
 };
 
-
 /// Multiply each element of the given vector by @a scalar and return the result.
 template <typename S, typename T>
 inline Vec2<typename promote<S, T>::type> operator*(S scalar, const Vec2<T> &v)
@@ -530,6 +535,13 @@ using Vec2i = Vec2<int32_t>;
 using Vec2ui = Vec2<uint32_t>;
 using Vec2s = Vec2<float>;
 using Vec2d = Vec2<double>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+OPENVDB_IS_POD(Vec2i)
+OPENVDB_IS_POD(Vec2ui)
+OPENVDB_IS_POD(Vec2s)
+OPENVDB_IS_POD(Vec2d)
+#endif
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

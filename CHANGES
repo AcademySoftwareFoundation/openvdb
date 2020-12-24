@@ -28,6 +28,15 @@ Version 8.0.0 - In development
     - Private method RootNode::getChildCount() has been removed as of ABI=8.
     - Mark map classes and functions as final for ABI=8 where beneficial to
       allow devirtualization optimization.
+    - As of ABI 8, Vector, Matrix and Quaternion types now satisfy the Trivial
+      Type requirement. Their empty constructors and copy constructors have
+      been removed (and are left to the compiler to define).
+    - As of ABI 8, removed an unnecessary specialization of NodeUnion and
+      CopyTraits from NodeUnion.h. Replaced std::is_pod usage with
+      std::is_trivially_copyable which allows more types to benefit from the
+      union storage.
+    - As of ABI 8, PointDataGrids use the union NodeUnion specialization,
+      reducing the memory footprint of their topology by 50%.
 
     API changes:
     - Removed a number of deprecated point, volume and AX methods.
