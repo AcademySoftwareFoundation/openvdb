@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 8.0.0 - In development
+Version 8.0.0 - December 23, 2020
 
       This version introduces ABI changes relative to older major releases,
       so to preserve ABI compatibility it might be necessary to define the
@@ -22,6 +22,18 @@ Version 8.0.0 - In development
     - Added tools::activeTiles that returns a vector containing all the active
       tiles in a tree that intersects a given CoordBBox.
 
+    Improvements:
+    - Made LeafManager class non-virtual.
+
+    Bug fixes:
+    - Fixed a determinism bug in NodeManager when using non-thread-safe
+      functor members.
+    - Fix GridTransformer construction to use correct rotate-scale-translate
+      order when recomposing matrix components.
+      [Contributed by Tom Cnops].
+    - OpenVDB AX: Fixed a potential code generation crash in binary, ternary
+      or comma operators when errors occurred in first operand.
+
     ABI changes:
     - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
       accessed from the GridBase.
@@ -41,10 +53,9 @@ Version 8.0.0 - In development
     API changes:
     - Removed a number of deprecated point, volume and AX methods.
 
-    Bug fixes:
-    - Fix GridTransformer construction to use correct rotate-scale-translate
-      order when recomposing matrix components.
-      [Contributed by Tom Cnops].
+    Houdini:
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+      VDB Write likewise should not reset the compression values.
 
     Build:
     - As of this release, VFX Reference Platform 2018 is no longer supported.
@@ -60,20 +71,15 @@ Version 8.0.0 - In development
     - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
       attribute.
 
-    Improvements:
-    - Made LeafManager class non-virtual.
-
-    Bug fixes:
-    - OpenVDB AX: Fixed a potential code generation crash in binary, ternary
-      or comma operators when errors occurred in first operand.
-
-    Houdini:
-    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
-      VDB Write likewise should not reset the compression values.
+Version 7.2.1 - December 23, 2020
 
     Bug fixes:
     - Fixed a determinism bug in NodeManager when using non-thread-safe
       functor members.
+
+    Build:
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
 
 Version 7.2.0 - December 9, 2020
 
