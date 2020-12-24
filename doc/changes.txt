@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.0.0</B> - <I>In development</I>
+<B>Version 8.0.0</B> - <I>December 23, 2020</I>
 
 @par
 <BLOCKQUOTE>
@@ -35,6 +35,21 @@ New features:
   a vector containing all the active tiles in a tree that intersects a given
   CoordBBox.
 
+@par
+Improvements:
+- Made LeafManager class non-virtual.
+
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+- OpenVDB AX: Fixed a potential code generation crash in binary, ternary
+  or comma operators when errors occurred in first operand.
+
 @anchor v8_0_0_ABI_changes
 @par
 ABI changes:
@@ -60,11 +75,9 @@ API changes:
 - Removed a number of deprecated point, volume and AX methods.
 
 @par
-Bug fixes:
-- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
-  construction to use correct rotate-scale-translate order when recomposing
-  matrix components.
-  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+Houdini:
+- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
 
 @par
 Build:
@@ -81,24 +94,21 @@ Build:
 - Removed OPENVDB_DEPRECATED macro in favor of C++14 <TT>[[deprecated]]</TT>
   attribute.
 
-@par
-Improvements:
-- Made LeafManager class non-virtual.
 
+@htmlonly <a name="v7_2_1_changes"></a>@endhtmlonly
 @par
-Bug fixes:
-- OpenVDB AX: Fixed a potential code generation crash in binary, ternary
-  or comma operators when errors occurred in first operand.
-
-@par
-Houdini:
-- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
-  VDB Write SOP should likewise not reset the compression values.
+<B>Version 7.2.1</B> - <I>December 23, 2020</I>
 
 @par
 Bug fixes:
 - Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
   when using non-thread-safe functor members.
+
+@par
+Build:
+- Added a missing header include to resolve an undefined size_t build error
+  on GCC10.
+
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
