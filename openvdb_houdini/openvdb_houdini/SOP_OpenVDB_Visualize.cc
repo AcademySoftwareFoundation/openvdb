@@ -26,6 +26,7 @@
 #include <GU/GU_PolyReduce.h>
 #include <GU/GU_Surfacer.h>
 #include <PRM/PRM_Parm.h>
+#include <PY/PY_CompiledCode.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
 #include <UT/UT_UniquePtr.h>
@@ -349,16 +350,19 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", ""));
 #endif
 
-    // Register this operator.
-    hvdb::OpenVDBOpFactory("VDB Visualize Tree",
-        SOP_OpenVDB_Visualize::factory, parms, *table)
+    std::string internalName;
+
+    {
+        // Register this operator.
+        hvdb::OpenVDBOpFactory factory("VDB Visualize Tree",
+            SOP_OpenVDB_Visualize::factory, parms, *table);
 #ifndef SESI_OPENVDB
-        .setInternalName("DW_OpenVDBVisualize")
+            factory.setInternalName("DW_OpenVDBVisualize");
 #endif
-        .setObsoleteParms(obsoleteParms)
-        .addInput("Input with VDBs to visualize")
-        .setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; })
-        .setDocumentation("\
+            factory.setObsoleteParms(obsoleteParms);
+            factory.addInput("Input with VDBs to visualize");
+            factory.setVerb(SOP_NodeVerb::COOK_GENERATOR, []() { return new SOP_OpenVDB_Visualize::Cache; });
+            factory.setDocumentation("\
 #icon: COMMON/openvdb\n\
 #tags: vdb\n\
 \n\
@@ -380,6 +384,46 @@ of VDB volumes as well as to examine their extents and the values of individual 
 \n\
 See [openvdb.org|http://www.openvdb.org/download/] for source code\n\
 and usage examples.\n");
+
+        internalName = factory.name();
+    }
+
+    // Add a new VDB Visualize As Points tool that places a VDB Visualize Tree SOP
+    // with various parameters changed to visualize voxels as points with values.
+    // This is done through HOM so that it shows up as a tab menu option.
+
+    std::ostringstream ostr;
+    ostr << R"(
+script = '''
+import soptoolutils;
+node = soptoolutils.genericTool(kwargs, ')" << internalName << R"(');
+node.parm("addcolor").set(False);
+node.parm("drawleafnodes").set(False);
+node.parm("drawtiles").set(False);
+node.parm("drawvoxels").set(True);
+node.parm("addvalue").set(True);
+node.parm("usegridname").set(True);
+'''
+
+if not hou.shelves.tool('vdbvisualizeaspoints'):
+ tool = hou.shelves.newTool(name='vdbvisualizeaspoints')
+ tool.setLabel('VDB Visualize As Points')
+ tool.setIcon('SOP_OpenVDB')
+ # add to 'SOP' tab menu
+ tool.setToolMenuCategories(hou.paneTabType.NetworkEditor, [hou.nodeTypeCategories()['Sop']])
+ # add to 'VDB' tab submenu
+ tool.setToolLocations(['VDB'])
+ tool.setScript(script)
+    )";
+
+    PY_CompiledCode compiledCode(ostr.str().c_str(), PY_CompiledCode::STATEMENTS);
+
+    if (compiledCode.hasSyntaxErrors()) {
+        std::cerr << "ERROR: VDB Visualize As Points: " <<
+            compiledCode.syntaxErrors() << std::endl;
+    }
+
+    compiledCode.evaluate(PY_Result::NONE);
 }
 
 
