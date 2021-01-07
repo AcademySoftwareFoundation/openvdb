@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/IndexIterator.h>
 #include <openvdb/points/IndexFilter.h>
 #include <openvdb/points/PointAttribute.h>
@@ -16,32 +16,14 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestIndexFilter: public CppUnit::TestCase
+class TestIndexFilter: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 
-    CPPUNIT_TEST_SUITE(TestIndexFilter);
-    CPPUNIT_TEST(testActiveFilter);
-    CPPUNIT_TEST(testMultiGroupFilter);
-    CPPUNIT_TEST(testRandomLeafFilter);
-    CPPUNIT_TEST(testAttributeHashFilter);
-    CPPUNIT_TEST(testLevelSetFilter);
-    CPPUNIT_TEST(testBBoxFilter);
-    CPPUNIT_TEST(testBinaryFilter);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testActiveFilter();
-    void testMultiGroupFilter();
-    void testRandomLeafFilter();
-    void testAttributeHashFilter();
-    void testLevelSetFilter();
-    void testBBoxFilter();
-    void testBinaryFilter();
+    void testRandomLeafFilterImpl();
 }; // class TestIndexFilter
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestIndexFilter);
 
 
 ////////////////////////////////////////
@@ -160,8 +142,7 @@ multiGroupMatches(  const LeafT& leaf, const Index32 size,
 }
 
 
-void
-TestIndexFilter::testActiveFilter()
+TEST_F(TestIndexFilter, testActiveFilter)
 {
     // create a point grid, three points are stored in two leafs
 
@@ -175,41 +156,41 @@ TestIndexFilter::testActiveFilter()
 
     // check there are two leafs
 
-    CPPUNIT_ASSERT_EQUAL(Index32(2), points->tree().leafCount());
+    EXPECT_EQ(Index32(2), points->tree().leafCount());
 
     ActiveFilter activeFilter;
     InactiveFilter inActiveFilter;
 
-    CPPUNIT_ASSERT_EQUAL(index::PARTIAL, activeFilter.state());
-    CPPUNIT_ASSERT_EQUAL(index::PARTIAL, inActiveFilter.state());
+    EXPECT_EQ(index::PARTIAL, activeFilter.state());
+    EXPECT_EQ(index::PARTIAL, inActiveFilter.state());
 
     { // test default active / inactive values
         auto leafIter = points->tree().cbeginLeaf();
 
-        CPPUNIT_ASSERT_EQUAL(index::PARTIAL, activeFilter.state(*leafIter));
-        CPPUNIT_ASSERT_EQUAL(index::PARTIAL, inActiveFilter.state(*leafIter));
+        EXPECT_EQ(index::PARTIAL, activeFilter.state(*leafIter));
+        EXPECT_EQ(index::PARTIAL, inActiveFilter.state(*leafIter));
 
         auto indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 
     auto firstLeaf = points->tree().beginLeaf();
@@ -219,30 +200,30 @@ TestIndexFilter::testActiveFilter()
 
         auto leafIter = points->tree().cbeginLeaf();
 
-        CPPUNIT_ASSERT_EQUAL(index::NONE, activeFilter.state(*leafIter));
-        CPPUNIT_ASSERT_EQUAL(index::ALL, inActiveFilter.state(*leafIter));
+        EXPECT_EQ(index::NONE, activeFilter.state(*leafIter));
+        EXPECT_EQ(index::ALL, inActiveFilter.state(*leafIter));
 
         auto indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(!activeFilter.valid(indexIter));
+        EXPECT_TRUE(inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(!activeFilter.valid(indexIter));
+        EXPECT_TRUE(inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 
     { // set all voxels to be active in the first leaf
@@ -250,35 +231,34 @@ TestIndexFilter::testActiveFilter()
 
         auto leafIter = points->tree().cbeginLeaf();
 
-        CPPUNIT_ASSERT_EQUAL(index::ALL, activeFilter.state(*leafIter));
-        CPPUNIT_ASSERT_EQUAL(index::NONE, inActiveFilter.state(*leafIter));
+        EXPECT_EQ(index::ALL, activeFilter.state(*leafIter));
+        EXPECT_EQ(index::NONE, inActiveFilter.state(*leafIter));
 
         auto indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         activeFilter.reset(*leafIter);
         inActiveFilter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(activeFilter.valid(indexIter));
-        CPPUNIT_ASSERT(!inActiveFilter.valid(indexIter));
+        EXPECT_TRUE(activeFilter.valid(indexIter));
+        EXPECT_TRUE(!inActiveFilter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 }
 
-void
-TestIndexFilter::testMultiGroupFilter()
+TEST_F(TestIndexFilter, testMultiGroupFilter)
 {
     using LeafNode          = PointDataTree::LeafNodeType;
     using AttributeVec3f    = TypedAttributeArray<Vec3f>;
@@ -302,14 +282,14 @@ TestIndexFilter::testMultiGroupFilter()
         std::vector<Name> includeGroups;
         std::vector<Name> excludeGroups;
         MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
-        CPPUNIT_ASSERT(!filter.initialized());
+        EXPECT_TRUE(!filter.initialized());
         MultiGroupFilter filter2 = filter;
-        CPPUNIT_ASSERT(!filter2.initialized());
+        EXPECT_TRUE(!filter2.initialized());
 
         filter.reset(*leaf);
-        CPPUNIT_ASSERT(filter.initialized());
+        EXPECT_TRUE(filter.initialized());
         MultiGroupFilter filter3 = filter;
-        CPPUNIT_ASSERT(filter3.initialized());
+        EXPECT_TRUE(filter3.initialized());
     }
 
     // group population
@@ -338,10 +318,10 @@ TestIndexFilter::testMultiGroupFilter()
         std::vector<Name> include;
         std::vector<Name> exclude;
         MultiGroupFilter filter(include, exclude, leaf->attributeSet());
-        CPPUNIT_ASSERT_EQUAL(filter.state(), index::ALL);
+        EXPECT_EQ(filter.state(), index::ALL);
         include.push_back("all");
         MultiGroupFilter filter2(include, exclude, leaf->attributeSet());
-        CPPUNIT_ASSERT_EQUAL(filter2.state(), index::PARTIAL);
+        EXPECT_EQ(filter2.state(), index::PARTIAL);
     }
 
     // test multi group iteration
@@ -350,134 +330,134 @@ TestIndexFilter::testMultiGroupFilter()
         std::vector<Name> include;
         std::vector<Name> exclude;
         std::vector<int> indices{0, 1, 2, 3, 4};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include
         std::vector<Name> include{"all"};
         std::vector<Name> exclude;
         std::vector<int> indices{0, 1, 2, 3, 4};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all exclude
         std::vector<Name> include;
         std::vector<Name> exclude{"all"};
         std::vector<int> indices;
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include and exclude
         std::vector<Name> include{"all"};
         std::vector<Name> exclude{"all"};
         std::vector<int> indices;
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // even include
         std::vector<Name> include{"even"};
         std::vector<Name> exclude;
         std::vector<int> indices{0, 2, 4};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd include
         std::vector<Name> include{"odd"};
         std::vector<Name> exclude;
         std::vector<int> indices{1, 3};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd include and exclude
         std::vector<Name> include{"odd"};
         std::vector<Name> exclude{"odd"};
         std::vector<int> indices;
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd and first include
         std::vector<Name> include{"odd", "first"};
         std::vector<Name> exclude;
         std::vector<int> indices{0, 1, 3};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // even include, first exclude
         std::vector<Name> include{"even"};
         std::vector<Name> exclude{"first"};
         std::vector<int> indices{2, 4};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // all include, first and odd exclude
         std::vector<Name> include{"all"};
         std::vector<Name> exclude{"first", "odd"};
         std::vector<int> indices{2, 4};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 
     { // odd and first include, even exclude
         std::vector<Name> include{"odd", "first"};
         std::vector<Name> exclude{"even"};
         std::vector<int> indices{1, 3};
-        CPPUNIT_ASSERT(multiGroupMatches(*leaf, size, include, exclude, indices));
+        EXPECT_TRUE(multiGroupMatches(*leaf, size, include, exclude, indices));
     }
 }
 
 
 void
-TestIndexFilter::testRandomLeafFilter()
+TestIndexFilter::testRandomLeafFilterImpl()
 {
     { // generateRandomSubset
         std::vector<int> values = index_filter_internal::generateRandomSubset<std::mt19937, int>(
             /*seed*/unsigned(0), 1, 20);
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
+        EXPECT_EQ(values.size(), size_t(1));
 
         // different seed
 
         std::vector<int> values2 = index_filter_internal::generateRandomSubset<std::mt19937, int>(
             /*seed*/unsigned(1), 1, 20);
 
-        CPPUNIT_ASSERT_EQUAL(values2.size(), size_t(1));
-        CPPUNIT_ASSERT(values[0] != values2[0]);
+        EXPECT_EQ(values2.size(), size_t(1));
+        EXPECT_TRUE(values[0] != values2[0]);
 
         // different integer type
 
         std::vector<long> values3 = index_filter_internal::generateRandomSubset<std::mt19937, long>(
             /*seed*/unsigned(0), 1, 20);
 
-        CPPUNIT_ASSERT_EQUAL(values3.size(), size_t(1));
-        CPPUNIT_ASSERT(values[0] == values3[0]);
+        EXPECT_EQ(values3.size(), size_t(1));
+        EXPECT_TRUE(values[0] == values3[0]);
 
         // different random number generator
 
         values = index_filter_internal::generateRandomSubset<std::mt19937_64, int>(
             /*seed*/unsigned(1), 1, 20);
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1));
-        CPPUNIT_ASSERT(values[0] != values2[0]);
+        EXPECT_EQ(values.size(), size_t(1));
+        EXPECT_TRUE(values[0] != values2[0]);
 
         // no values
 
         values = index_filter_internal::generateRandomSubset<std::mt19937, int>(
             /*seed*/unsigned(0), 0, 20);
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(0));
+        EXPECT_EQ(values.size(), size_t(0));
 
         // all values
 
         values = index_filter_internal::generateRandomSubset<std::mt19937, int>(
             /*seed*/unsigned(0), 1000, 1000);
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(1000));
+        EXPECT_EQ(values.size(), size_t(1000));
 
         // ensure all numbers are represented
 
         std::sort(values.begin(), values.end());
 
         for (int i = 0; i < 1000; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[i], i);
+            EXPECT_EQ(values[i], i);
         }
     }
 
@@ -488,21 +468,21 @@ TestIndexFilter::testRandomLeafFilter()
 
         RandFilter filter(tree, 0);
 
-        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
+        EXPECT_TRUE(filter.state() == index::PARTIAL);
 
         filter.mLeafMap[Coord(0, 0, 0)] = std::make_pair(0, 10);
         filter.mLeafMap[Coord(0, 0, 8)] = std::make_pair(1, 1);
         filter.mLeafMap[Coord(0, 8, 0)] = std::make_pair(2, 50);
 
         { // construction, copy construction
-            CPPUNIT_ASSERT(filter.initialized());
+            EXPECT_TRUE(filter.initialized());
             RandFilter filter2 = filter;
-            CPPUNIT_ASSERT(filter2.initialized());
+            EXPECT_TRUE(filter2.initialized());
 
             filter.reset(OriginLeaf(Coord(0, 0, 0), 10));
-            CPPUNIT_ASSERT(filter.initialized());
+            EXPECT_TRUE(filter.initialized());
             RandFilter filter3 = filter;
-            CPPUNIT_ASSERT(filter3.initialized());
+            EXPECT_TRUE(filter3.initialized());
         }
 
         { // all 10 values
@@ -513,10 +493,10 @@ TestIndexFilter::testRandomLeafFilter()
                 if (filter.valid(iter))     values.push_back(*iter);
             }
 
-            CPPUNIT_ASSERT_EQUAL(values.size(), size_t(10));
+            EXPECT_EQ(values.size(), size_t(10));
 
             for (int i = 0; i < 10; i++) {
-                CPPUNIT_ASSERT_EQUAL(values[i], i);
+                EXPECT_EQ(values[i], i);
             }
         }
 
@@ -528,17 +508,18 @@ TestIndexFilter::testRandomLeafFilter()
                 if (filter.valid(iter))     values.push_back(*iter);
             }
 
-            CPPUNIT_ASSERT_EQUAL(values.size(), size_t(50));
+            EXPECT_EQ(values.size(), size_t(50));
 
             // ensure no duplicates
 
             std::sort(values.begin(), values.end());
             auto it = std::adjacent_find(values.begin(), values.end());
 
-            CPPUNIT_ASSERT(it == values.end());
+            EXPECT_TRUE(it == values.end());
         }
     }
 }
+TEST_F(TestIndexFilter, testRandomLeafFilter) { testRandomLeafFilterImpl(); }
 
 
 inline void
@@ -557,8 +538,7 @@ setId(PointDataTree& tree, const size_t index, const std::vector<int>& ids)
 }
 
 
-void
-TestIndexFilter::testAttributeHashFilter()
+TEST_F(TestIndexFilter, testAttributeHashFilter)
 {
     std::vector<Vec3s> positions{{1, 1, 1}, {2, 2, 2}, {11, 11, 11}, {12, 12, 12}};
 
@@ -570,7 +550,7 @@ TestIndexFilter::testAttributeHashFilter()
 
     // four points, two leafs
 
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index32(2));
 
     appendAttribute<int>(tree, "id");
 
@@ -584,15 +564,15 @@ TestIndexFilter::testAttributeHashFilter()
 
     { // construction, copy construction
         HashFilter filter(index, 0.0f);
-        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
-        CPPUNIT_ASSERT(!filter.initialized());
+        EXPECT_TRUE(filter.state() == index::PARTIAL);
+        EXPECT_TRUE(!filter.initialized());
         HashFilter filter2 = filter;
-        CPPUNIT_ASSERT(!filter2.initialized());
+        EXPECT_TRUE(!filter2.initialized());
 
         filter.reset(*tree.cbeginLeaf());
-        CPPUNIT_ASSERT(filter.initialized());
+        EXPECT_TRUE(filter.initialized());
         HashFilter filter3 = filter;
-        CPPUNIT_ASSERT(filter3.initialized());
+        EXPECT_TRUE(filter3.initialized());
     }
 
     { // zero percent
@@ -603,20 +583,20 @@ TestIndexFilter::testAttributeHashFilter()
         auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 
     { // one hundred percent
@@ -627,20 +607,20 @@ TestIndexFilter::testAttributeHashFilter()
         auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 
     { // fifty percent
@@ -651,20 +631,20 @@ TestIndexFilter::testAttributeHashFilter()
         auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 
     { // fifty percent, new seed
@@ -675,26 +655,25 @@ TestIndexFilter::testAttributeHashFilter()
         auto indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(indexIter));
+        EXPECT_TRUE(!filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
         ++leafIter;
 
         indexIter = leafIter->beginIndexAll();
         filter.reset(*leafIter);
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(filter.valid(indexIter));
+        EXPECT_TRUE(filter.valid(indexIter));
         ++indexIter;
-        CPPUNIT_ASSERT(!indexIter);
+        EXPECT_TRUE(!indexIter);
     }
 }
 
 
-void
-TestIndexFilter::testLevelSetFilter()
+TEST_F(TestIndexFilter, testLevelSetFilter)
 {
     // create a point grid
 
@@ -728,15 +707,15 @@ TestIndexFilter::testLevelSetFilter()
 
     { // construction, copy construction
         LSFilter filter(*sphere, points->transform(), -4.0f, 4.0f);
-        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
-        CPPUNIT_ASSERT(!filter.initialized());
+        EXPECT_TRUE(filter.state() == index::PARTIAL);
+        EXPECT_TRUE(!filter.initialized());
         LSFilter filter2 = filter;
-        CPPUNIT_ASSERT(!filter2.initialized());
+        EXPECT_TRUE(!filter2.initialized());
 
         filter.reset(* points->tree().cbeginLeaf());
-        CPPUNIT_ASSERT(filter.initialized());
+        EXPECT_TRUE(filter.initialized());
         LSFilter filter3 = filter;
-        CPPUNIT_ASSERT(filter3.initialized());
+        EXPECT_TRUE(filter3.initialized());
     }
 
     { // capture both points near origin
@@ -745,20 +724,20 @@ TestIndexFilter::testLevelSetFilter()
         auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(iter);
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 
     { // capture just the inner-most point
@@ -767,20 +746,20 @@ TestIndexFilter::testLevelSetFilter()
         auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(iter);
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 
     { // capture everything but the second point (min > max)
@@ -789,20 +768,20 @@ TestIndexFilter::testLevelSetFilter()
         auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(iter);
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 
     {
@@ -831,32 +810,31 @@ TestIndexFilter::testLevelSetFilter()
         auto iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(!filter.valid(iter));
+        EXPECT_TRUE(!filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
 
         ++leafIter;
         iter = leafIter->beginIndexOn();
         filter.reset(*leafIter);
 
-        CPPUNIT_ASSERT(iter);
-        CPPUNIT_ASSERT(filter.valid(iter));
+        EXPECT_TRUE(iter);
+        EXPECT_TRUE(filter.valid(iter));
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 }
 
 
-void
-TestIndexFilter::testBBoxFilter()
+TEST_F(TestIndexFilter, testBBoxFilter)
 {
     std::vector<Vec3s> positions{{1, 1, 1}, {1, 2, 1}, {10.1f, 10, 1}};
 
@@ -867,7 +845,7 @@ TestIndexFilter::testBBoxFilter()
     PointDataTree& tree = grid->tree();
 
     // check one leaf per point
-    CPPUNIT_ASSERT_EQUAL(tree.leafCount(), Index32(2));
+    EXPECT_EQ(tree.leafCount(), Index32(2));
 
     // build some bounding box filters to test
 
@@ -877,14 +855,14 @@ TestIndexFilter::testBBoxFilter()
     BBoxFilter filter4(*transform, BBoxd({-10, 0, 0}, {11, 1.2, 1.2}));
 
     { // construction, copy construction
-        CPPUNIT_ASSERT(!filter1.initialized());
+        EXPECT_TRUE(!filter1.initialized());
         BBoxFilter filter5 = filter1;
-        CPPUNIT_ASSERT(!filter5.initialized());
+        EXPECT_TRUE(!filter5.initialized());
 
         filter1.reset(*tree.cbeginLeaf());
-        CPPUNIT_ASSERT(filter1.initialized());
+        EXPECT_TRUE(filter1.initialized());
         BBoxFilter filter6 = filter1;
-        CPPUNIT_ASSERT(filter6.initialized());
+        EXPECT_TRUE(filter6.initialized());
     }
 
     // leaf 1
@@ -897,29 +875,29 @@ TestIndexFilter::testBBoxFilter()
         // point 1
 
         filter1.reset(*leafIter);
-        CPPUNIT_ASSERT(filter1.valid(iter));
+        EXPECT_TRUE(filter1.valid(iter));
         filter2.reset(*leafIter);
-        CPPUNIT_ASSERT(filter2.valid(iter));
+        EXPECT_TRUE(filter2.valid(iter));
         filter3.reset(*leafIter);
-        CPPUNIT_ASSERT(filter3.valid(iter));
+        EXPECT_TRUE(filter3.valid(iter));
         filter4.reset(*leafIter);
-        CPPUNIT_ASSERT(filter4.valid(iter));
+        EXPECT_TRUE(filter4.valid(iter));
 
         ++iter;
 
         // point 2
 
         filter1.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter1.valid(iter));
+        EXPECT_TRUE(!filter1.valid(iter));
         filter2.reset(*leafIter);
-        CPPUNIT_ASSERT(filter2.valid(iter));
+        EXPECT_TRUE(filter2.valid(iter));
         filter3.reset(*leafIter);
-        CPPUNIT_ASSERT(filter3.valid(iter));
+        EXPECT_TRUE(filter3.valid(iter));
         filter4.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter4.valid(iter));
+        EXPECT_TRUE(!filter4.valid(iter));
 
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 
     ++leafIter;
@@ -932,16 +910,16 @@ TestIndexFilter::testBBoxFilter()
         // point 3
 
         filter1.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter1.valid(iter));
+        EXPECT_TRUE(!filter1.valid(iter));
         filter2.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter2.valid(iter));
+        EXPECT_TRUE(!filter2.valid(iter));
         filter3.reset(*leafIter);
-        CPPUNIT_ASSERT(filter3.valid(iter));
+        EXPECT_TRUE(filter3.valid(iter));
         filter4.reset(*leafIter);
-        CPPUNIT_ASSERT(!filter4.valid(iter));
+        EXPECT_TRUE(!filter4.valid(iter));
 
         ++iter;
-        CPPUNIT_ASSERT(!iter);
+        EXPECT_TRUE(!iter);
     }
 }
 
@@ -959,8 +937,7 @@ private:
 };
 
 
-void
-TestIndexFilter::testBinaryFilter()
+TEST_F(TestIndexFilter, testBinaryFilter)
 {
     const int intMax = std::numeric_limits<int>::max();
 
@@ -970,15 +947,15 @@ TestIndexFilter::testBinaryFilter()
         NeedsInitializeFilter needs1;
         NeedsInitializeFilter needs2;
         InitializeBinaryFilter filter(needs1, needs2);
-        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
-        CPPUNIT_ASSERT(!filter.initialized());
+        EXPECT_TRUE(filter.state() == index::PARTIAL);
+        EXPECT_TRUE(!filter.initialized());
         InitializeBinaryFilter filter2 = filter;
-        CPPUNIT_ASSERT(!filter2.initialized());
+        EXPECT_TRUE(!filter2.initialized());
 
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
-        CPPUNIT_ASSERT(filter.initialized());
+        EXPECT_TRUE(filter.initialized());
         InitializeBinaryFilter filter3 = filter;
-        CPPUNIT_ASSERT(filter3.initialized());
+        EXPECT_TRUE(filter3.initialized());
     }
 
     using LessThanFilter    = ThresholdFilter<true>;
@@ -986,9 +963,9 @@ TestIndexFilter::testBinaryFilter()
 
     { // less than
         LessThanFilter zeroFilter(0); // all invalid
-        CPPUNIT_ASSERT(zeroFilter.state() == index::NONE);
+        EXPECT_TRUE(zeroFilter.state() == index::NONE);
         LessThanFilter maxFilter(intMax); // all valid
-        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
+        EXPECT_TRUE(maxFilter.state() == index::ALL);
 
         LessThanFilter filter(5);
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
@@ -998,18 +975,18 @@ TestIndexFilter::testBinaryFilter()
             if (filter.valid(iter))     values.push_back(*iter);
         }
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(5));
+        EXPECT_EQ(values.size(), size_t(5));
 
         for (int i = 0; i < 5; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[i], i);
+            EXPECT_EQ(values[i], i);
         }
     }
 
     { // greater than
         GreaterThanFilter zeroFilter(0); // all valid
-        CPPUNIT_ASSERT(zeroFilter.state() == index::ALL);
+        EXPECT_TRUE(zeroFilter.state() == index::ALL);
         GreaterThanFilter maxFilter(intMax); // all invalid
-        CPPUNIT_ASSERT(maxFilter.state() == index::NONE);
+        EXPECT_TRUE(maxFilter.state() == index::NONE);
 
         GreaterThanFilter filter(94);
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
@@ -1019,11 +996,11 @@ TestIndexFilter::testBinaryFilter()
             if (filter.valid(iter))     values.push_back(*iter);
         }
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(5));
+        EXPECT_EQ(values.size(), size_t(5));
 
         int offset = 0;
         for (int i = 95; i < 100; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[offset++], i);
+            EXPECT_EQ(values[offset++], i);
         }
     }
 
@@ -1031,12 +1008,12 @@ TestIndexFilter::testBinaryFilter()
         using RangeFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/true>;
 
         RangeFilter zeroFilter(LessThanFilter(0), GreaterThanFilter(10)); // all invalid
-        CPPUNIT_ASSERT(zeroFilter.state() == index::NONE);
+        EXPECT_TRUE(zeroFilter.state() == index::NONE);
         RangeFilter maxFilter(LessThanFilter(intMax), GreaterThanFilter(0)); // all valid
-        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
+        EXPECT_TRUE(maxFilter.state() == index::ALL);
 
         RangeFilter filter(LessThanFilter(55), GreaterThanFilter(45));
-        CPPUNIT_ASSERT(filter.state() == index::PARTIAL);
+        EXPECT_TRUE(filter.state() == index::PARTIAL);
 
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
 
@@ -1046,11 +1023,11 @@ TestIndexFilter::testBinaryFilter()
             if (filter.valid(iter))     values.push_back(*iter);
         }
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(9));
+        EXPECT_EQ(values.size(), size_t(9));
 
         int offset = 0;
         for (int i = 46; i < 55; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[offset++], i);
+            EXPECT_EQ(values[offset++], i);
         }
     }
 
@@ -1058,9 +1035,9 @@ TestIndexFilter::testBinaryFilter()
         using HeadTailFilter = BinaryFilter<LessThanFilter, GreaterThanFilter, /*And=*/false>;
 
         HeadTailFilter zeroFilter(LessThanFilter(0), GreaterThanFilter(10)); // some valid
-        CPPUNIT_ASSERT(zeroFilter.state() == index::PARTIAL);
+        EXPECT_TRUE(zeroFilter.state() == index::PARTIAL);
         HeadTailFilter maxFilter(LessThanFilter(intMax), GreaterThanFilter(0)); // all valid
-        CPPUNIT_ASSERT(maxFilter.state() == index::ALL);
+        EXPECT_TRUE(maxFilter.state() == index::ALL);
 
         HeadTailFilter filter(LessThanFilter(5), GreaterThanFilter(95));
         filter.reset(OriginLeaf(Coord(0, 0, 0)));
@@ -1071,14 +1048,14 @@ TestIndexFilter::testBinaryFilter()
             if (filter.valid(iter))     values.push_back(*iter);
         }
 
-        CPPUNIT_ASSERT_EQUAL(values.size(), size_t(9));
+        EXPECT_EQ(values.size(), size_t(9));
 
         int offset = 0;
         for (int i = 0; i < 5; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[offset++], i);
+            EXPECT_EQ(values[offset++], i);
         }
         for (int i = 96; i < 100; i++) {
-            CPPUNIT_ASSERT_EQUAL(values[offset++], i);
+            EXPECT_EQ(values[offset++], i);
         }
     }
 }

@@ -2,8 +2,9 @@
 
 set -ex
 
-RELEASE="$2"
-EXTRAS="$3"
+RELEASE="$1"; shift
+EXTRAS="$1"; shift
+CMAKE_EXTRA="$@"
 
 # print versions
 bash --version
@@ -23,13 +24,14 @@ if [ -d "hou" ]; then
         -DCMAKE_CXX_FLAGS_DebugNoInfo="" \
         -DCMAKE_BUILD_TYPE=${RELEASE} \
         -DOPENVDB_CXX_STRICT=ON \
-        -DOPENVDB_USE_DEPRECATED_ABI_5=ON \
+        -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
         -DOPENVDB_BUILD_HOUDINI_PLUGIN=ON \
         -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON \
         -DOPENVDB_BUILD_BINARIES=${EXTRAS} \
         -DOPENVDB_BUILD_PYTHON_MODULE=${EXTRAS} \
         -DOPENVDB_BUILD_UNITTESTS=${EXTRAS} \
         -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp \
+        ${CMAKE_EXTRA} \
          ..
 
     # Can only build using one thread with GCC due to memory constraints

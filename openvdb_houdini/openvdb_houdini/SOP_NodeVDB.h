@@ -142,7 +142,7 @@ protected:
     /// calling this method, as there will be no data on the input stream if isSourceStealable()
     /// returns @c true.
     /// @deprecated     verbification renders this redundant
-    OPENVDB_DEPRECATED
+    [[deprecated]]
     OP_ERROR duplicateSourceStealable(const unsigned index,
         OP_Context& context, GU_Detail **pgdp, GU_DetailHandle& gdh, bool clean = true);
 
@@ -164,7 +164,7 @@ protected:
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
     /// @deprecated     verbification renders this redundant
-    OPENVDB_DEPRECATED
+    [[deprecated]]
     OP_ERROR duplicateSourceStealable(const unsigned index, OP_Context& context);
 
     /// @}
@@ -180,7 +180,7 @@ private:
     /// @param index    the index of the input from which to perform this operation
     /// @param context  the current SOP context is used for cook time for network traversal
     /// @deprecated     verbification renders this redundant
-    OPENVDB_DEPRECATED
+    [[deprecated]]
     bool isSourceStealable(const unsigned index, OP_Context& context) const;
 }; // class SOP_NodeVDB
 

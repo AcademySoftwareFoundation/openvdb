@@ -241,7 +241,9 @@ SOP_OpenVDB_To_Spheres::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
     resolveRenamedParm(*obsoleteParms, "minradius", "radiusmin");
 
     // If world units are enabled, use the old world-space radius bounds if they exist.
-    if (worldUnits && obsoleteParms->getParmPtr("minradiusworld")) {
+    if (worldUnits
+        && obsoleteParms->getParmPtr("minradiusworld")
+        && !obsoleteParms->getParmPtr("minradiusworld")->isFactoryDefault()) {
         setFloat("radiusmin", 0, time, obsoleteParms->evalFloat("minradiusworld", 0, time));
     }
     {

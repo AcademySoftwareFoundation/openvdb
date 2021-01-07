@@ -329,7 +329,7 @@ private:
                 OpT::template eval(mNodeOp, it);
             }
         }
-        const NodeOp& mNodeOp;
+        const NodeOp mNodeOp;
     };// NodeList::NodeTransformer
 
     // Private struct of NodeList that performs parallel_reduce

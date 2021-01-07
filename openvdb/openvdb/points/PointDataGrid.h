@@ -346,12 +346,6 @@ public:
                                         const Metadata* metadata = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
-    OPENVDB_DEPRECATED
-    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
-                                        const size_t pos, const Index strideOrTotalSize,
-                                        const bool constantStride,
-                                        const AttributeArray::ScopedRegistryLock* lock);
-
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
     /// @param expected Existing descriptor is expected to match this parameter.
@@ -809,18 +803,6 @@ PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Desc
 {
     return mAttributeSet->appendAttribute(
         expected, replacement, pos, strideOrTotalSize, constantStride, metadata, lock);
-}
-
-// deprecated
-template<typename T, Index Log2Dim>
-inline AttributeArray::Ptr
-PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
-                                                const size_t pos, const Index strideOrTotalSize,
-                                                const bool constantStride,
-                                                const AttributeArray::ScopedRegistryLock* lock)
-{
-    return this->appendAttribute(expected, replacement, pos,
-        strideOrTotalSize, constantStride, nullptr, lock);
 }
 
 template<typename T, Index Log2Dim>

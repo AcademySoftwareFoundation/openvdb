@@ -4,19 +4,9 @@
 /// @file TestQuadraticInterp.cc
 
 #include <sstream>
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Interpolation.h>
-
-// CPPUNIT_TEST_SUITE() invokes CPPUNIT_TESTNAMER_DECL() to generate a suite name
-// from the FixtureType.  But if FixtureType is a templated type, the generated name
-// can become long and messy.  This macro overrides the normal naming logic,
-// instead invoking FixtureType::testSuiteName(), which should be a static member
-// function that returns a std::string containing the suite name for the specific
-// template instantiation.
-#undef CPPUNIT_TESTNAMER_DECL
-#define CPPUNIT_TESTNAMER_DECL( variableName, FixtureType ) \
-    CPPUNIT_NS::TestNamer variableName( FixtureType::testSuiteName() )
 
 
 namespace {
@@ -29,34 +19,20 @@ const double TOLERANCE = 1.0e-5;
 
 
 template<typename GridType>
-class TestQuadraticInterp: public CppUnit::TestCase
+class TestQuadraticInterp
 {
 public:
     typedef typename GridType::ValueType ValueT;
     typedef typename GridType::Ptr GridPtr;
     struct TestVal { float x, y, z; ValueT expected; };
 
-    static std::string testSuiteName()
-    {
-        std::string name = openvdb::typeNameAsString<ValueT>();
-        if (!name.empty()) name[0] = static_cast<char>(::toupper(name[0]));
-        return "TestQuadraticInterp" + name;
-    }
+    static void test();
+    static void testConstantValues();
+    static void testFillValues();
+    static void testNegativeIndices();
 
-    CPPUNIT_TEST_SUITE(TestQuadraticInterp);
-    CPPUNIT_TEST(test);
-    CPPUNIT_TEST(testConstantValues);
-    CPPUNIT_TEST(testFillValues);
-    CPPUNIT_TEST(testNegativeIndices);
-    CPPUNIT_TEST_SUITE_END();
-
-    void test();
-    void testConstantValues();
-    void testFillValues();
-    void testNegativeIndices();
-
-private:
-    void executeTest(const GridPtr&, const TestVal*, size_t numVals) const;
+protected:
+    static void executeTest(const GridPtr&, const TestVal*, size_t numVals);
 
     /// Initialize an arbitrary ValueType from a scalar.
     static inline ValueT constValue(double d) { return ValueT(d); }
@@ -66,9 +42,10 @@ private:
         { return fabs(v1 - v2) <= TOLERANCE; }
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::FloatGrid>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::DoubleGrid>);
-CPPUNIT_TEST_SUITE_REGISTRATION(TestQuadraticInterp<openvdb::Vec3SGrid>);
+
+class TestQuadraticInterpTest: public ::testing::Test
+{
+};
 
 
 ////////////////////////////////////////
@@ -97,7 +74,7 @@ TestQuadraticInterp<openvdb::Vec3SGrid>::relEq(
 template<typename GridType>
 void
 TestQuadraticInterp<GridType>::executeTest(const GridPtr& grid,
-    const TestVal* testVals, size_t numVals) const
+    const TestVal* testVals, size_t numVals)
 {
     openvdb::tools::GridSampler<GridType, openvdb::tools::QuadraticSampler> interpolator(*grid);
     //openvdb::tools::QuadraticInterp<GridType> interpolator(*tree);
@@ -110,7 +87,7 @@ TestQuadraticInterp<GridType>::executeTest(const GridPtr& grid,
             ostr << std::setprecision(10)
                 << "sampleVoxel(" << val.x << ", " << val.y << ", " << val.z
                 << "): expected " << val.expected << ", got " << actual;
-            CPPUNIT_FAIL(ostr.str());
+            FAIL() << ostr.str();
         }
     }
 }
@@ -180,6 +157,9 @@ TestQuadraticInterp<GridType>::test()
 
     executeTest(grid, testVals, numVals);
 }
+TEST_F(TestQuadraticInterpTest, testFloat) { TestQuadraticInterp<openvdb::FloatGrid>::test(); }
+TEST_F(TestQuadraticInterpTest, testDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::test(); }
+TEST_F(TestQuadraticInterpTest, testVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::test(); }
 
 
 template<typename GridType>
@@ -238,6 +218,9 @@ TestQuadraticInterp<GridType>::testConstantValues()
 
     executeTest(grid, testVals, numVals);
 }
+TEST_F(TestQuadraticInterpTest, testConstantValuesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testConstantValues(); }
+TEST_F(TestQuadraticInterpTest, testConstantValuesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testConstantValues(); }
+TEST_F(TestQuadraticInterpTest, testConstantValuesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testConstantValues(); }
 
 
 template<typename GridType>
@@ -262,6 +245,9 @@ TestQuadraticInterp<GridType>::testFillValues()
 
     executeTest(grid, testVals, numVals);
 }
+TEST_F(TestQuadraticInterpTest, testFillValuesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testFillValues(); }
+TEST_F(TestQuadraticInterpTest, testFillValuesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testFillValues(); }
+TEST_F(TestQuadraticInterpTest, testFillValuesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testFillValues(); }
 
 
 template<typename GridType>
@@ -328,3 +314,6 @@ TestQuadraticInterp<GridType>::testNegativeIndices()
 
     executeTest(grid, testVals, numVals);
 }
+TEST_F(TestQuadraticInterpTest, testNegativeIndicesFloat) { TestQuadraticInterp<openvdb::FloatGrid>::testNegativeIndices(); }
+TEST_F(TestQuadraticInterpTest, testNegativeIndicesDouble) { TestQuadraticInterp<openvdb::DoubleGrid>::testNegativeIndices(); }
+TEST_F(TestQuadraticInterpTest, testNegativeIndicesVec3S) { TestQuadraticInterp<openvdb::Vec3SGrid>::testNegativeIndices(); }

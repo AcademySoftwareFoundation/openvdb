@@ -2041,8 +2041,8 @@ Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
         minVal = maxVal = *iter;
         for (++iter; iter; ++iter) {
             const ValueType& val = *iter;
-            if (val < minVal) minVal = val;
-            if (val > maxVal) maxVal = val;
+            if (math::cwiseLessThan(val, minVal)) minVal = val;
+            if (math::cwiseGreaterThan(val, maxVal)) maxVal = val;
         }
     }
 }

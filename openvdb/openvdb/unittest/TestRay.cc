@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
@@ -12,46 +12,32 @@
 #include <openvdb/tools/LevelSetSphere.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/0.0);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
 
 #define ASSERT_DOUBLES_APPROX_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1.e-6);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/1.e-6);
 
-class TestRay : public CppUnit::TestCase
+class TestRay : public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestRay);
-    CPPUNIT_TEST(testInfinity);
-    CPPUNIT_TEST(testRay);
-    CPPUNIT_TEST(testTimeSpan);
-    CPPUNIT_TEST(testDDA);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testInfinity();
-    void testRay();
-    void testTimeSpan();
-    void testDDA();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestRay);
 
 //  the Ray class makes use of infinity=1/0 so we test for it
-void
-TestRay::testInfinity()
+TEST_F(TestRay, testInfinity)
 {
     // This code generates compiler warnings which is why it's not
     // enabled by default.
     /*
     const double one=1, zero = 0, infinity = one / zero;
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( infinity , infinity,0);//not a NAN
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( infinity , infinity+1,0);//not a NAN
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( infinity , infinity*10,0);//not a NAN
-    CPPUNIT_ASSERT( zero <   infinity);
-    CPPUNIT_ASSERT( zero >  -infinity);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( zero ,  one/infinity,0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( zero , -one/infinity,0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL( infinity  ,  one/zero,0);
-    CPPUNIT_ASSERT_DOUBLES_EQUAL(-infinity  , -one/zero,0);
+    EXPECT_NEAR( infinity , infinity,0);//not a NAN
+    EXPECT_NEAR( infinity , infinity+1,0);//not a NAN
+    EXPECT_NEAR( infinity , infinity*10,0);//not a NAN
+    EXPECT_TRUE( zero <   infinity);
+    EXPECT_TRUE( zero >  -infinity);
+    EXPECT_NEAR( zero ,  one/infinity,0);
+    EXPECT_NEAR( zero , -one/infinity,0);
+    EXPECT_NEAR( infinity  ,  one/zero,0);
+    EXPECT_NEAR(-infinity  , -one/zero,0);
 
     std::cerr << "inf:        "   << infinity << "\n";
     std::cerr << "1 / inf:    "   << one / infinity << "\n";
@@ -65,7 +51,7 @@ TestRay::testInfinity()
     */
 }
 
-void TestRay::testRay()
+TEST_F(TestRay, testRay)
 {
     using namespace openvdb;
     typedef double             RealT;
@@ -75,8 +61,8 @@ void TestRay::testRay()
 
     {//default constructor
         RayT ray;
-        CPPUNIT_ASSERT(ray.eye() == Vec3T(0,0,0));
-        CPPUNIT_ASSERT(ray.dir() == Vec3T(1,0,0));
+        EXPECT_TRUE(ray.eye() == Vec3T(0,0,0));
+        EXPECT_TRUE(ray.dir() == Vec3T(1,0,0));
         ASSERT_DOUBLES_APPROX_EQUAL( math::Delta<RealT>::value(), ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( std::numeric_limits<RealT>::max(), ray.t1());
     }
@@ -87,8 +73,8 @@ void TestRay::testRay()
         RealT t0=0.1, t1=12589.0;
 
         RayT ray(eye, dir, t0, t1);
-        CPPUNIT_ASSERT(ray.eye()==eye);
-        CPPUNIT_ASSERT(ray.dir()==dir);
+        EXPECT_TRUE(ray.eye()==eye);
+        EXPECT_TRUE(ray.dir()==dir);
         ASSERT_DOUBLES_APPROX_EQUAL( t0, ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( t1, ray.t1());
     }
@@ -105,11 +91,11 @@ void TestRay::testRay()
         RealT t0=0.1, t1=12589.0;
 
         RayT ray0(eye, dir, t0, t1);
-        CPPUNIT_ASSERT( ray0.test(t0));
-        CPPUNIT_ASSERT( ray0.test(t1));
-        CPPUNIT_ASSERT( ray0.test(0.5*(t0+t1)));
-        CPPUNIT_ASSERT(!ray0.test(t0-1));
-        CPPUNIT_ASSERT(!ray0.test(t1+1));
+        EXPECT_TRUE( ray0.test(t0));
+        EXPECT_TRUE( ray0.test(t1));
+        EXPECT_TRUE( ray0.test(0.5*(t0+t1)));
+        EXPECT_TRUE(!ray0.test(t0-1));
+        EXPECT_TRUE(!ray0.test(t1+1));
         //std::cerr << "Ray0: " << ray0 << std::endl;
         RayT ray1 = ray0.applyMap( *(xform->baseMap()) );
         //std::cerr << "Ray1: " << ray1 << std::endl;
@@ -146,11 +132,11 @@ void TestRay::testRay()
         RealT t0=0.1, t1=12589.0;
         RayT ray0(eye, dir, t0, t1);
         //std::cerr << "\nWorld Ray0: " << ray0 << std::endl;
-        CPPUNIT_ASSERT( ray0.test(t0));
-        CPPUNIT_ASSERT( ray0.test(t1));
-        CPPUNIT_ASSERT( ray0.test(0.5*(t0+t1)));
-        CPPUNIT_ASSERT(!ray0.test(t0-1));
-        CPPUNIT_ASSERT(!ray0.test(t1+1));
+        EXPECT_TRUE( ray0.test(t0));
+        EXPECT_TRUE( ray0.test(t1));
+        EXPECT_TRUE( ray0.test(0.5*(t0+t1)));
+        EXPECT_TRUE(!ray0.test(t0-1));
+        EXPECT_TRUE(!ray0.test(t1+1));
         Vec3T xyz0[3] = {ray0.start(), ray0.mid(), ray0.end()};
 
         // Transform the ray to index space
@@ -199,21 +185,21 @@ void TestRay::testRay()
 
 
         // intersects the two faces of the box perpendicular to the y-axis!
-        CPPUNIT_ASSERT(ray.intersects(CoordBBox(Coord(0, 2, 2), Coord(2, 4, 6)), t0, t1));
+        EXPECT_TRUE(ray.intersects(CoordBBox(Coord(0, 2, 2), Coord(2, 4, 6)), t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, t0);
         ASSERT_DOUBLES_APPROX_EQUAL( 1.5, t1);
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[1], 2);//lower y component of intersection
         ASSERT_DOUBLES_APPROX_EQUAL( ray(1.5)[1], 4);//higher y component of intersection
 
         // intersects the lower edge anlong the z-axis of the box
-        CPPUNIT_ASSERT(ray.intersects(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0)), t0, t1));
+        EXPECT_TRUE(ray.intersects(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0)), t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, t0);
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, t1);
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[0], 1.5);//lower y component of intersection
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[1], 2.0);//higher y component of intersection
 
         // no intersections
-        CPPUNIT_ASSERT(!ray.intersects(CoordBBox(Coord(4, 2, 2), Coord(6, 4, 6))));
+        EXPECT_TRUE(!ray.intersects(CoordBBox(Coord(4, 2, 2), Coord(6, 4, 6))));
     }
 
     {// test sphere intersection
@@ -225,8 +211,8 @@ void TestRay::testRay()
         // intersects twice - second intersection exits sphere in lower y-z-plane
         Vec3T center(2.0,3.0,4.0);
         RealT radius = 1.0f;
-        CPPUNIT_ASSERT(ray.intersects(center, radius, t0, t1));
-        CPPUNIT_ASSERT(t0 < t1);
+        EXPECT_TRUE(ray.intersects(center, radius, t0, t1));
+        EXPECT_TRUE(t0 < t1);
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t1);
         ASSERT_DOUBLES_APPROX_EQUAL(ray(t1)[1], center[1]);
         ASSERT_DOUBLES_APPROX_EQUAL(ray(t1)[2], center[2]);
@@ -236,7 +222,7 @@ void TestRay::testRay()
         // no intersection
         center = Vec3T(3.0,3.0,4.0);
         radius = 1.0f;
-        CPPUNIT_ASSERT(!ray.intersects(center, radius, t0, t1));
+        EXPECT_TRUE(!ray.intersects(center, radius, t0, t1));
     }
 
     {// test bbox clip
@@ -246,7 +232,7 @@ void TestRay::testRay()
         RayT ray(eye, dir, t0, t1);
 
         // intersects the two faces of the box perpendicular to the y-axis!
-        CPPUNIT_ASSERT(ray.clip(CoordBBox(Coord(0, 2, 2), Coord(2, 4, 6))));
+        EXPECT_TRUE(ray.clip(CoordBBox(Coord(0, 2, 2), Coord(2, 4, 6))));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( 1.5, ray.t1());
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[1], 2);//lower y component of intersection
@@ -254,7 +240,7 @@ void TestRay::testRay()
 
         ray.reset(eye, dir, t0, t1);
         // intersects the lower edge anlong the z-axis of the box
-        CPPUNIT_ASSERT(ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))));
+        EXPECT_TRUE(ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( 0.5, ray.t1());
         ASSERT_DOUBLES_APPROX_EQUAL( ray(0.5)[0], 1.5);//lower y component of intersection
@@ -262,7 +248,7 @@ void TestRay::testRay()
 
         ray.reset(eye, dir, t0, t1);
         // no intersections
-        CPPUNIT_ASSERT(!ray.clip(CoordBBox(Coord(4, 2, 2), Coord(6, 4, 6))));
+        EXPECT_TRUE(!ray.clip(CoordBBox(Coord(4, 2, 2), Coord(6, 4, 6))));
         ASSERT_DOUBLES_APPROX_EQUAL( t0, ray.t0());
         ASSERT_DOUBLES_APPROX_EQUAL( t1, ray.t1());
     }
@@ -275,13 +261,13 @@ void TestRay::testRay()
         RayT ray(eye, dir, t0, t1);
 
         Real t = 0.0;
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 4.0, t));
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T(-1.0, 0.0, 0.0),-4.0, t));
-        CPPUNIT_ASSERT( ray.intersects(Vec3T( 1.0, 0.0, 0.0),-4.0, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 4.0, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T(-1.0, 0.0, 0.0),-4.0, t));
+        EXPECT_TRUE( ray.intersects(Vec3T( 1.0, 0.0, 0.0),-4.0, t));
         ASSERT_DOUBLES_APPROX_EQUAL(4.5, t);
-        CPPUNIT_ASSERT( ray.intersects(Vec3T(-1.0, 0.0, 0.0), 4.0, t));
+        EXPECT_TRUE( ray.intersects(Vec3T(-1.0, 0.0, 0.0), 4.0, t));
         ASSERT_DOUBLES_APPROX_EQUAL(4.5, t);
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0),-0.4, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T( 1.0, 0.0, 0.0),-0.4, t));
     }
 
     {// test plane intersection
@@ -292,18 +278,18 @@ void TestRay::testRay()
         RayT ray(eye, dir, t0, t1);
 
         Real t = 0.0;
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T( 0.0,-1.0, 0.0), 4.0, t));
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T( 0.0, 1.0, 0.0),-4.0, t));
-        CPPUNIT_ASSERT( ray.intersects(Vec3T( 0.0, 1.0, 0.0), 4.0, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T( 0.0,-1.0, 0.0), 4.0, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T( 0.0, 1.0, 0.0),-4.0, t));
+        EXPECT_TRUE( ray.intersects(Vec3T( 0.0, 1.0, 0.0), 4.0, t));
         ASSERT_DOUBLES_APPROX_EQUAL(3.5, t);
-        CPPUNIT_ASSERT( ray.intersects(Vec3T( 0.0,-1.0, 0.0),-4.0, t));
+        EXPECT_TRUE( ray.intersects(Vec3T( 0.0,-1.0, 0.0),-4.0, t));
         ASSERT_DOUBLES_APPROX_EQUAL(3.5, t);
-        CPPUNIT_ASSERT(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 0.4, t));
+        EXPECT_TRUE(!ray.intersects(Vec3T( 1.0, 0.0, 0.0), 0.4, t));
     }
 
 }
 
-void TestRay::testTimeSpan()
+TEST_F(TestRay, testTimeSpan)
 {
     using namespace openvdb;
     typedef double             RealT;
@@ -312,16 +298,16 @@ void TestRay::testTimeSpan()
     ASSERT_DOUBLES_EXACTLY_EQUAL(2.0, t.t0);
     ASSERT_DOUBLES_EXACTLY_EQUAL(5.0, t.t1);
     ASSERT_DOUBLES_APPROX_EQUAL(3.5, t.mid());
-    CPPUNIT_ASSERT(t.valid());
+    EXPECT_TRUE(t.valid());
     t.set(-1, -1);
-    CPPUNIT_ASSERT(!t.valid());
+    EXPECT_TRUE(!t.valid());
     t.scale(5);
     ASSERT_DOUBLES_EXACTLY_EQUAL(-5.0, t.t0);
     ASSERT_DOUBLES_EXACTLY_EQUAL(-5.0, t.t1);
     ASSERT_DOUBLES_APPROX_EQUAL(-5.0, t.mid());
 }
 
-void TestRay::testDDA()
+TEST_F(TestRay, testDDA)
 {
     using namespace openvdb;
     typedef math::Ray<double>  RayType;
@@ -406,8 +392,8 @@ void TestRay::testDDA()
                 //dda.print();
                 for (int i=1; i<=10; ++i) {
                     //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
-                    //CPPUNIT_ASSERT(dda.voxel()==Coord(i*d[0], i*d[1], i*d[2]));
-                    CPPUNIT_ASSERT(dda.step());
+                    //EXPECT_TRUE(dda.voxel()==Coord(i*d[0], i*d[1], i*d[2]));
+                    EXPECT_TRUE(dda.step());
                     ASSERT_DOUBLES_APPROX_EQUAL(i,dda.time());
                 }
             }
@@ -426,8 +412,8 @@ void TestRay::testDDA()
                 //std::cerr << "\nray: "<<ray<<std::endl;
                 for (int i=1; i<=10; ++i) {
                     //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
-                    //CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
-                    CPPUNIT_ASSERT(dda.step());
+                    //EXPECT_TRUE(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
+                    EXPECT_TRUE(dda.step());
                     ASSERT_DOUBLES_APPROX_EQUAL(8*i,dda.time());
                 }
             }
@@ -445,15 +431,17 @@ void TestRay::testDDA()
                 RayType ray(eye, dir);
                 DDAType dda(ray);
                 //ASSERT_DOUBLES_APPROX_EQUAL(0.0, dda.time());
-                //CPPUNIT_ASSERT(dda.voxel()==Coord(0,0,0));
+                //EXPECT_TRUE(dda.voxel()==Coord(0,0,0));
                 double next=0;
                 //std::cerr << "\nray: "<<ray<<std::endl;
                 for (int i=1; i<=10; ++i) {
                     //std::cerr << "i="<<i<<" voxel="<<dda.voxel()<<" time="<<dda.time()<<std::endl;
-                    //CPPUNIT_ASSERT(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
-                    CPPUNIT_ASSERT(dda.step());
+                    //EXPECT_TRUE(dda.voxel()==Coord(8*i*d[0],8*i*d[1],8*i*d[2]));
+                    EXPECT_TRUE(dda.step());
                     ASSERT_DOUBLES_APPROX_EQUAL(4*i, dda.time());
-                    if (i>1) ASSERT_DOUBLES_APPROX_EQUAL(dda.time(), next);
+                    if (i>1) {
+                        ASSERT_DOUBLES_APPROX_EQUAL(dda.time(), next);
+                    }
                     next = dda.next();
                 }
             }
