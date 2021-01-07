@@ -1,6 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
-
+///
 /// @file SOP_OpenVDB_AX.cc
 ///
 /// @authors  Nick Avramoussis, Richard Jones, Francisco Gochez, Matt Warner
@@ -12,9 +12,11 @@
 #define __STDC_LIMIT_MACROS
 #endif
 
+#include "ax/HoudiniAXUtils.h"
+
 #include <openvdb_ax/ast/AST.h>
-#include <openvdb_ax/ast/Literals.h>
 #include <openvdb_ax/compiler/Compiler.h>
+#include <openvdb_ax/compiler/Logger.h>
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/compiler/PointExecutable.h>
 #include <openvdb_ax/compiler/VolumeExecutable.h>
@@ -23,6 +25,7 @@
 #include <houdini_utils/geometry.h>
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
+#include <openvdb_houdini/PointUtils.h>
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
@@ -44,7 +47,8 @@
 
 #include <tbb/mutex.h>
 
-#include "ax/HoudiniAXUtils.h"
+#include <sstream>
+#include <string>
 
 namespace hvdb = openvdb_houdini;
 namespace hax =  openvdb_ax_houdini;
@@ -52,102 +56,10 @@ namespace hutil = houdini_utils;
 
 using namespace openvdb;
 
-
-////////////////////////////////////////
-
-/// @brief OpPolicy for OpenVDB operator types from DNEG
-class DnegVDBOpPolicy: public hutil::OpPolicy
-{
-public:
-    std::string getValidName(const std::string& english)
-    {
-        UT_String s(english);
-        // Remove non-alphanumeric characters from the name.
-        s.forceValidVariableName();
-        std::string name = s.toStdString();
-        // Remove spaces and underscores.
-        name.erase(std::remove(name.begin(), name.end(), ' '), name.end());
-        name.erase(std::remove(name.begin(), name.end(), '_'), name.end());
-        return name;
-    }
-
-    std::string getLowercaseName(const std::string& english)
-    {
-        UT_String s(english);
-        s.toLower();
-        return s.toStdString();
-    }
-
-    std::string getName(const houdini_utils::OpFactory&, const std::string& english) override
-    {
-        return "DN_Open" + this->getValidName(english);
-    }
-
-    std::string getLabelName(const houdini_utils::OpFactory& factory) override
-    {
-        return factory.english();
-    }
-
-    std::string getFirstName(const houdini_utils::OpFactory& factory) override
-    {
-        return this->getLowercaseName(this->getValidName(this->getLabelName(factory)));
-    }
-
-    std::string getIconName(const houdini_utils::OpFactory& factory) override
-    {
-        return factory.flavorString() + "_OpenVDB";
-    }
-
-    std::string getTabSubMenuPath(const houdini_utils::OpFactory&) override
-    {
-        return "VDB/ASWF";
-    }
-};
-
-
-/// @brief  Methods for adding a "groupTypeSimple" folder PRM_SWITCHER to the
-///         OpenVDB AX SOP
-/// @todo   Expose option to set the switcher type in ParmFactory
-void appendParameters(hutil::ParmList& templates1, const hutil::ParmList& templates2)
-{
-    for(size_t i = 0; i < templates2.size(); ++i) {
-        templates1.add(templates2.get()[i]);
-    }
-}
-
-void addSimpleFolder(hutil::ParmList* templates,
-    const std::string& name,
-    const std::string& token,
-    const hutil::ParmList& parms)
-{
-    std::string* folderNameStr(new std::string(name));
-    std::string* folderTokenStr(new std::string(token));
-
-    PRM_Name* folderToken(new PRM_Name(folderTokenStr->c_str()));
-    PRM_Default* folderDefaults(new PRM_Default(static_cast<float>(parms.size()), folderNameStr->c_str()));
-    templates->add(PRM_Template(PRM_SWITCHER, 1, folderToken, folderDefaults,
-                             0, 0, 0, &PRM_SpareData::groupTypeSimple));
-    appendParameters(*templates, parms);
-}
-
-void addSimpleFolder(hutil::ParmList* templates,
-    const std::string& name,
-    const hutil::ParmList& parms)
-{
-    std::string token(name);
-    // Remove spaces and make lower case
-    token.erase(std::remove(token.begin(), token.end(), ' '), token.end());
-    std::transform(token.begin(), token.end(), token.begin(), ::tolower);
-    addSimpleFolder(templates, name, token, parms);
-}
-
-
-////////////////////////////////////////
-
-
 struct CompilerCache
 {
     ax::Compiler::Ptr mCompiler = nullptr;
+    ax::Logger::Ptr mLogger = nullptr;
     ax::ast::Tree::Ptr mSyntaxTree = nullptr;
     ax::CustomData::Ptr mCustomData = nullptr;
     ax::PointExecutable::Ptr mPointExecutable = nullptr;
@@ -239,10 +151,10 @@ public:
 
         hax::ChannelExpressionSet mChExpressionSet;
         hax::ChannelExpressionSet mDollarExpressionSet;
-        std::vector<std::string> mWarnings;
     };
 
 protected:
+    void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
     void syncNodeVersion(const char*, const char*, bool*) override;
 }; // class SOP_OpenVDB_AX
@@ -259,37 +171,10 @@ newSopOperator(OP_OperatorTable* table)
 
     hutil::ParmList parms;
 
-    hutil::ParmList execution;
-
-    execution.add(hutil::ParmFactory(PRM_STRING, "vdbgroup", "Group")
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbgroup", "Group")
         .setHelpText("Specify a subset of the input VDB grids to be processed.")
         .setChoiceList(&hutil::PrimGroupMenu));
 
-    execution.add(hutil::ParmFactory(PRM_STRING, "pointsgroup", "VDB Points Group")
-        .setHelpText("Specify a point group name to perform the execution on. If no name is "
-                     "given, the AX snippet is applied to all points."));
-
-    {
-        const char* items[] = {
-            "active",    "Active",
-            "inactive",  "Inactive",
-            "all",       "All",
-            nullptr
-        };
-
-        execution.add(hutil::ParmFactory(PRM_ORD, "activity", "Voxel Activity")
-            .setDefault("active")
-            .setHelpText("Whether to run this snippet over Active, Inactive or All voxels.")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
-    }
-
-    execution.add(hutil::ParmFactory(PRM_TOGGLE, "createmissing", "Create Missing Attributes/Grids")
-        .setDefault(PRMoneDefaults)
-        .setHelpText("Create missing point attributes or VDB volumes accessed by @."));
-
-    addSimpleFolder(&parms, "Execution", execution);
-
-    hutil::ParmList code;
     {
         const char* items[] = {
             "points",   "Points",
@@ -297,35 +182,61 @@ newSopOperator(OP_OperatorTable* table)
             nullptr
         };
 
-        code.add(hutil::ParmFactory(PRM_ORD, "targettype", "Target Type")
+        parms.add(hutil::ParmFactory(PRM_ORD, "runover", "Run Over")
             .setDefault("points")
             .setHelpText("Whether to run this snippet over OpenVDB Points or OpenVDB Volumes.")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
-    code.add(hutil::ParmFactory(PRM_STRING, "snippet", "AX Expression")
+    {
+        const char* items[] = {
+            "active",    "Active Voxels",
+            "inactive",  "Inactive Voxels",
+            "all",       "All Voxels",
+            nullptr
+        };
+
+        parms.add(hutil::ParmFactory(PRM_ORD, "activity", "")
+            .setDefault("active")
+            .setHelpText("Whether to run this snippet over Active, Inactive or All voxels.")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
+        .setHelpText("Specify a point group name to perform the execution on. If no name is "
+                     "given, the AX snippet is applied to all points.")
+        .setChoiceList(&hvdb::VDBPointsGroupMenuInput1));
+
+    parms.beginSwitcher("tabMenu1");
+    parms.addFolder("Code");
+
+    static PRM_SpareData theEditor(PRM_SpareArgs()
+            << PRM_SpareToken(PRM_SpareData::getEditorToken(), "1")
+            << PRM_SpareToken(PRM_SpareData::getEditorLanguageToken(), "ax")
+            << PRM_SpareToken(PRM_SpareData::getEditorLinesRangeToken(), "8-40")
+    );
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "snippet", "AX Expression")
         .setHelpText("A snippet of AX code that will manipulate the attributes on the VDB Points or "
                      "the VDB voxel values.")
-        .setSpareData(&PRM_SpareData::stringEditor));
-
-    addSimpleFolder(&parms, "Code", code);
+        .setSpareData(&theEditor));
 
     // language/script modifiers
 
-    hutil::ParmList scriptModifiers;
+    parms.addFolder("Options");
 
-    scriptModifiers.add(hutil::ParmFactory(PRM_TOGGLE, "allowvex", "Allow VEX")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "allowvex", "Allow VEX")
         .setDefault(PRMoneDefaults)
         .setHelpText("Whether to enable support for various VEX functionality. When disabled, only AX "
                      "syntax is supported."));
 
-    scriptModifiers.add(hutil::ParmFactory(PRM_TOGGLE, "hscriptvars", "Allow HScript Variables")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "hscriptvars", "Allow HScript Variables")
         .setDefault(PRMoneDefaults)
         .setHelpText("Whether to enable support for various $ variables available in the current node's "
                      "context. As $ is used for custom parameters in AX, a warning will be generated "
                      "if a Houdini parameter also exists of the same name as the given $ variable."));
 
-    scriptModifiers.add(hutil::ParmFactory(PRM_STRING, "cwdpath", "Evaluation Node Path")
+    parms.add(hutil::ParmFactory(PRM_STRING, "cwdpath", "Evaluation Node Path")
         .setTypeExtended(PRM_TYPE_DYNAMIC_PATH)
         .setDefault(".")
         .setHelpText("Functions like ch() and $ syntax usually evaluate with respect to this node. "
@@ -334,33 +245,61 @@ newSopOperator(OP_OperatorTable* table)
             "Note that HScript variables (if enabled) always refer to the AX node and ignore "
             "the evaluation path."));
 
-    addSimpleFolder(&parms, "Script Modifiers", scriptModifiers);
+    parms.endSwitcher();
 
-    // volume modifiers
-
-    hutil::ParmList volumeModifiers;
-
-    volumeModifiers.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "createattributes", "Create New Attributes/Grids")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Whether to prune VDBs after execution"));
+        .setHelpText("Create point attributes or VDB volumes accessed by @ that do not exist on input."));
 
-    addSimpleFolder(&parms, "Volume Modifiers", volumeModifiers);
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "")
+        .setDefault(PRMoneDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
+        .setTooltip("Collapse regions of constant value in output grids. "
+            "Voxel values are considered equal if they differ "
+            "by less than the specified threshold.")
+        .setDocumentation(nullptr));
 
-    // point modifiers
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "tolerance", "Prune Tolerance")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setTooltip(
+            "When pruning is enabled, voxel values are considered equal"
+            " if they differ by less than the specified tolerance.")
+        .setDocumentation(
+            "If enabled, reduce the memory footprint of output grids that have"
+            " (sufficiently large) regions of voxels with the same value,"
+            " where values are considered equal if they differ by less than"
+            " the specified threshold.\n\n"
+            "NOTE:\n"
+            "    Pruning affects only the memory usage of a grid.\n"
+            "    It does not remove voxels, apart from inactive voxels\n"
+            "    whose value is equal to the background."));
 
-    hutil::ParmList pointModifiers;
-
-    pointModifiers.add(hutil::ParmFactory(PRM_TOGGLE, "compact", "Compact Attributes")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "compact", "Compact Attributes")
         .setDefault(PRMzeroDefaults)
         .setHelpText("Whether to try to compact VDB Point Attributes after execution."));
 
-    addSimpleFolder(&parms, "Point Modifiers", pointModifiers);
+    // Obsolete parameters
+    hutil::ParmList obsoleteParms;
+    {
+        const char* items[] = {
+            "points",   "Points",
+            "volumes",  "Volumes",
+            nullptr
+        };
+
+        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "targettype", "Target Type")
+            .setDefault("points")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "pointsgroup", "VDB Points Group"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "createmissing", "Create Missing")
+        .setDefault(PRMoneDefaults));
 
     //////////
     // Register this operator.
 
-    hutil::OpFactory factory(DnegVDBOpPolicy(), "VDB AX",
-        SOP_OpenVDB_AX::factory, parms, *table);
+    hvdb::OpenVDBOpFactory factory("VDB AX", SOP_OpenVDB_AX::factory, parms, *table);
 
     factory.addInput("VDBs to manipulate");
     factory.addAliasVerbatim("DW_OpenVDBAX");
@@ -746,14 +685,15 @@ For an up-to-date list of available functions, see AX documentation or call `vdb
 
     // Add backward compatible support if building against VDB 6.2
     // copy the implementation in vdb in regards to the vdb and houdini
-    // version string, but also append the ax version
+    // version string, but also append the ax version (which as of merger
+    // into VDB is the same as the VDB version)
 
 #if (OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER > 6 || \
     (OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER >= 6 && OPENVDB_LIBRARY_MINOR_VERSION_NUMBER >= 2))
     std::stringstream ss;
     ss << "vdb" << OPENVDB_LIBRARY_VERSION_STRING << " ";
     ss << "houdini" << SYS_Version::full() << " ";
-    ss << "vdb_ax" << OPENVDB_AX_LIBRARY_VERSION_STRING;
+    ss << "vdb_ax" << OPENVDB_LIBRARY_VERSION_STRING;
     factory.addSpareData({{"operatorversion", ss.str()}});
 #endif
 
@@ -782,24 +722,70 @@ SOP_OpenVDB_AX::Cache::Cache()
     , mCompilerCache()
     , mChExpressionSet()
     , mDollarExpressionSet()
-    , mWarnings()
 {
     mCompilerCache.mCompiler = ax::Compiler::create();
     mCompilerCache.mCustomData.reset(new ax::CustomData);
 
+    auto locFromStr = [&] (const std::string& str) -> UT_SourceLocation {
+        // find error location at end of message
+        size_t locColon = str.rfind(":");
+        size_t locLine = str.rfind(" ", locColon);
+        int line = std::atoi(str.substr(locLine + 1, locColon - locLine - 1).c_str());
+        int col = std::atoi(str.substr(locColon + 1, str.size()).c_str());
+        // currently only does one character, as we don't know the offending code's length
+        return UT_SourceLocation(nullptr, line, col, col+1);
+    };
+
+    mCompilerCache.mLogger.reset(new ax::Logger(
+        [this, &locFromStr](const std::string& str) {
+            UT_SourceLocation loc = locFromStr(str);
+            this->cookparms()->sopAddError(SOP_MESSAGE, str.c_str(), &loc);
+        },
+        [this,  &locFromStr](const std::string& str) {
+            UT_SourceLocation loc = locFromStr(str);
+            this->cookparms()->sopAddWarning(SOP_MESSAGE, str.c_str(), &loc);
+        })
+    );
+    mCompilerCache.mLogger->setErrorPrefix("");
+    mCompilerCache.mLogger->setWarningPrefix("");
+
     // initialize the function registry with VEX support as default
     initializeFunctionRegistry(*mCompilerCache.mCompiler, /*allow vex*/true);
+}
+
+void
+SOP_OpenVDB_AX::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
+{
+    if (!obsoleteParms) return;
+
+    resolveRenamedParm(*obsoleteParms, "targettype", "runover");
+    resolveRenamedParm(*obsoleteParms, "pointsgroup", "vdbpointsgroup");
+    resolveRenamedParm(*obsoleteParms, "createmissing", "createattributes");
+
+    // Delegate to the base class.
+    hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
 
 bool
 SOP_OpenVDB_AX::updateParmsFlags()
 {
     bool changed = false;
-    const bool points = evalInt("targettype", 0, 0) == 0;
-    changed |= enableParm("pointsgroup", points);
+    const bool points = evalInt("runover", 0, 0) == 0;
+    changed |= enableParm("vdbpointsgroup", points);
+    changed |= setVisibleState("vdbpointsgroup", points);
+
     changed |= enableParm("prune", !points);
+    const bool prune = static_cast<bool>(evalInt("prune", 0, 0));
+    changed |= enableParm("tolerance", prune && !points );
+    changed |= setVisibleState("prune", !points);
+    changed |= setVisibleState("tolerance", !points);
+
     changed |= enableParm("activity", !points);
+    changed |= setVisibleState("activity", !points);
+
     changed |= enableParm("compact", points);
+    changed |= setVisibleState("compact", points);
+
     return changed;
 }
 
@@ -817,11 +803,11 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
         "0.1.0", {
             // We can't just return 0 as the expected behaviour here is for points to always
             // create attribute and for volumes to error. This preserves that behaviour.
-            // { "createmissing", [](const SOP_OpenVDB_AX&) -> std::string { return "0"} }
-            { "createmissing",
+            // { "createattributes", [](const SOP_OpenVDB_AX&) -> std::string { return "0"} }
+            { "createattributes",
                 [](const SOP_OpenVDB_AX& node) -> std::string {
-                    const int targetInt = static_cast<int>(node.evalInt("targettype", 0, 0));
-                    if (targetInt == 0) return "1"; // points, keep default (on)
+                    const int targetType = static_cast<int>(node.evalInt("runover", 0, 0));
+                    if (targetType == 0) return "1"; // points, keep default (on)
                     else return "0"; // volumes, turn off
                 }
             }
@@ -898,10 +884,14 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
 
 
 struct PruneOp {
+    PruneOp(const fpreal tol)
+        : mTol(tol) {}
+
     template<typename GridT>
     void operator()(GridT& grid) const {
-        tools::prune(grid.tree());
+        tools::prune(grid.tree(), typename GridT::TreeType::ValueType(mTol));
     }
+    const fpreal mTol;
 };
 
 OP_ERROR
@@ -945,7 +935,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
         else      this->evalString(snippet, "snippet", 0, time);
         if (snippet.length() == 0) return error();
 
-        const int targetInt = static_cast<int>(evalInt("targettype", 0, time));
+        const int targetType = static_cast<int>(evalInt("runover", 0, time));
 
         // get the node which is set as the current evaluation path. If we can't find the
         // node, all channel links are zero valued. This matches VEX behaviour.
@@ -960,7 +950,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
         }
 
         ParameterCache parmCache;
-        parmCache.mTargetType = static_cast<hax::TargetType>(targetInt);
+        parmCache.mTargetType = static_cast<hax::TargetType>(targetType);
         parmCache.mVEXSupport = evalInt("allowvex", 0, time);
         parmCache.mHScriptSupport = evalInt("hscriptvars", 0, time);
 
@@ -980,7 +970,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
             mHash = 0;
 
-            mWarnings.clear();
+            mCompilerCache.mLogger->clear();
             mChExpressionSet.clear();
             mDollarExpressionSet.clear();
 
@@ -992,7 +982,24 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
             // build the AST from the provided snippet
 
-            mCompilerCache.mSyntaxTree = ax::ast::parse(snippet.nonNullBuffer());
+            openvdb::ax::ast::Tree::ConstPtr tree = ax::ast::parse(snippet.nonNullBuffer(), *mCompilerCache.mLogger);
+            // current only catches single syntax error but could be updated to catch multiple
+            // further still can be updated to encounter syntax errors AND output a valid tree
+            // @todo: update to catch multiple errors and output tree when possible
+
+            if (!tree) {
+                const size_t numSyntaxErrors = mCompilerCache.mLogger->errors();
+                std::stringstream os;
+               const bool multi = numSyntaxErrors > 1;
+                if (multi) os << numSyntaxErrors << " ";
+                os <<"AX syntax error";
+                if (multi) os <<"s";
+                os <<"!"<<"\n";
+                addError(SOP_MESSAGE, os.str().c_str());
+                return error();
+            }
+            // store a copy of the AST to modify, the logger will store the original for error printing
+            mCompilerCache.mSyntaxTree.reset(tree->copy());
 
             // find all externally accessed data - do this before conversion from VEX
             // so identify HScript tokens which have been explicitly requested with $
@@ -1034,23 +1041,47 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
             evaluateExternalExpressions(time, mDollarExpressionSet, parmCache.mHScriptSupport, evaluationNode);
 
             if (parmCache.mTargetType == hax::TargetType::POINTS) {
-
                 mCompilerCache.mRequiresDeletion =
                     openvdb::ax::ast::callsFunction(*mCompilerCache.mSyntaxTree, "deletepoint");
 
                 mCompilerCache.mPointExecutable =
                     mCompilerCache.mCompiler->compile<ax::PointExecutable>
-                        (*mCompilerCache.mSyntaxTree, mCompilerCache.mCustomData, &mWarnings);
+                        (*mCompilerCache.mSyntaxTree, *mCompilerCache.mLogger, mCompilerCache.mCustomData);
             }
             else if (parmCache.mTargetType == hax::TargetType::VOLUMES) {
                 mCompilerCache.mVolumeExecutable =
                     mCompilerCache.mCompiler->compile<ax::VolumeExecutable>
-                        (*mCompilerCache.mSyntaxTree, mCompilerCache.mCustomData, &mWarnings);
+                        (*mCompilerCache.mSyntaxTree, *mCompilerCache.mLogger, mCompilerCache.mCustomData);
             }
 
             // update the parameter cache
 
             mParameterCache = parmCache;
+
+            // add compilation warnings/errors
+
+            if (mCompilerCache.mLogger->hasWarning()) {
+                const size_t numWarnings = mCompilerCache.mLogger->warnings();
+                std::stringstream os;
+                 const bool multi = numWarnings > 1;
+                if (multi) os << numWarnings << " ";
+                os <<"AX syntax warning";
+                if (multi) os <<"s";
+                os <<"! "<<"\n";
+                addWarning(SOP_MESSAGE, os.str().c_str());
+            }
+
+            if (mCompilerCache.mLogger->hasError()) {
+                const size_t numErrors = mCompilerCache.mLogger->errors();
+                std::stringstream os;
+                const bool multi = numErrors > 1;
+                if (multi) os << numErrors << " ";
+                os <<"AX syntax error";
+                if (multi) os <<"s";
+                os <<"!"<<"\n";
+                addError(SOP_MESSAGE, os.str().c_str());
+                return error();
+            }
 
             // set the hash only if compilation was successful - Houdini sops tend to cook
             // multiple times, especially on fail. If we assign the hash prior to this it will
@@ -1065,16 +1096,12 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
         snippet.clear();
 
-        for (const std::string& warning : mWarnings) {
-            addWarning(SOP_MESSAGE, warning.c_str());
-        }
-
-        const bool createMissing = static_cast<bool>(evalInt("createmissing", 0, time));
+        const bool createMissing = static_cast<bool>(evalInt("createattributes", 0, time));
 
         if (mParameterCache.mTargetType == hax::TargetType::POINTS) {
 
             UT_String pointsStr;
-            evalString(pointsStr, "pointsgroup", 0, time);
+            evalString(pointsStr, "vdbpointsgroup", 0, time);
             const std::string pointsGroup = pointsStr.toStdString();
 
             for (; vdbIt; ++vdbIt) {
@@ -1154,7 +1181,8 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
             mCompilerCache.mVolumeExecutable->execute(grids);
 
             if (evalInt("prune", 0, time)) {
-                PruneOp op;
+                const fpreal tol = evalFloat("tolerance", 0, time);
+                PruneOp op(tol);
                 for (auto& vdbPrim : guPrims) {
                     GEOvdbProcessTypedGridTopology(*vdbPrim, op, /*make_unique*/false);
                 }
@@ -1221,8 +1249,7 @@ SOP_OpenVDB_AX::Cache::evalInsertHScriptVariable(const std::string& name,
         if (valueStr.length() > 0) {
             const std::string str = valueStr.toStdString();
             try {
-                const fpreal32 valueFloat =
-                    static_cast<fpreal32>(openvdb::ax::LiteralLimits<float>::convert(str));
+                const fpreal32 valueFloat = static_cast<fpreal32>(std::stod(str));
                 valueFloatPtr.reset(new fpreal32(valueFloat));
                 expectedType = openvdb::typeNameAsString<float>();
             }
