@@ -57,8 +57,6 @@ if(USE_EXR)
         "is deprecated and will be removed.")
     endif()
   endif()
-else()
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
@@ -132,7 +130,6 @@ endif()
 set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
 
 if(WIN32)
@@ -205,6 +202,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
+  math/half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -254,6 +252,8 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
+  math/half.h
+  math/halfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -416,7 +416,6 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
   if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
     list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
   endif()
