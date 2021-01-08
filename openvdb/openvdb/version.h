@@ -50,7 +50,7 @@
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 8
 #define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 1
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.
