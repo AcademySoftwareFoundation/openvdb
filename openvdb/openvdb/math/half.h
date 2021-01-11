@@ -2,9 +2,9 @@
 //
 // Copyright (c) 2002, Industrial Light & Magic, a division of Lucas
 // Digital Ltd. LLC
-// 
+//
 // All rights reserved.
-// 
+//
 // Redistribution and use in source and binary forms, with or without
 // modification, are permitted provided that the following conditions are
 // met:
@@ -16,8 +16,8 @@
 // distribution.
 // *       Neither the name of Industrial Light & Magic nor the names of
 // its contributors may be used to endorse or promote products derived
-// from this software without specific prior written permission. 
-// 
+// from this software without specific prior written permission.
+//
 // THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 // "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 // LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -38,47 +38,47 @@
 
 //---------------------------------------------------------------------------
 //
-//	half -- a 16-bit floating point number class:
+//      half -- a 16-bit floating point number class:
 //
-//	Type half can represent positive and negative numbers whose
-//	magnitude is between roughly 6.1e-5 and 6.5e+4 with a relative
-//	error of 9.8e-4; numbers smaller than 6.1e-5 can be represented
-//	with an absolute error of 6.0e-8.  All integers from -2048 to
-//	+2048 can be represented exactly.
+//      Type half can represent positive and negative numbers whose
+//      magnitude is between roughly 6.1e-5 and 6.5e+4 with a relative
+//      error of 9.8e-4; numbers smaller than 6.1e-5 can be represented
+//      with an absolute error of 6.0e-8.  All integers from -2048 to
+//      +2048 can be represented exactly.
 //
-//	Type half behaves (almost) like the built-in C++ floating point
-//	types.  In arithmetic expressions, half, float and double can be
-//	mixed freely.  Here are a few examples:
+//      Type half behaves (almost) like the built-in C++ floating point
+//      types.  In arithmetic expressions, half, float and double can be
+//      mixed freely.  Here are a few examples:
 //
-//	    half a (3.5);
-//	    float b (a + sqrt (a));
-//	    a += b;
-//	    b += a;
-//	    b = a + 7;
+//          half a (3.5);
+//          float b (a + sqrt (a));
+//          a += b;
+//          b += a;
+//          b = a + 7;
 //
-//	Conversions from half to float are lossless; all half numbers
-//	are exactly representable as floats.
+//      Conversions from half to float are lossless; all half numbers
+//      are exactly representable as floats.
 //
-//	Conversions from float to half may not preserve a float's value
-//	exactly.  If a float is not representable as a half, then the
-//	float value is rounded to the nearest representable half.  If a
-//	float value is exactly in the middle between the two closest
-//	representable half values, then the float value is rounded to
-//	the closest half whose least significant bit is zero.
+//      Conversions from float to half may not preserve a float's value
+//      exactly.  If a float is not representable as a half, then the
+//      float value is rounded to the nearest representable half.  If a
+//      float value is exactly in the middle between the two closest
+//      representable half values, then the float value is rounded to
+//      the closest half whose least significant bit is zero.
 //
-//	Overflows during float-to-half conversions cause arithmetic
-//	exceptions.  An overflow occurs when the float value to be
-//	converted is too large to be represented as a half, or if the
-//	float value is an infinity or a NAN.
+//      Overflows during float-to-half conversions cause arithmetic
+//      exceptions.  An overflow occurs when the float value to be
+//      converted is too large to be represented as a half, or if the
+//      float value is an infinity or a NAN.
 //
-//	The implementation of type half makes the following assumptions
-//	about the implementation of the built-in C++ types:
+//      The implementation of type half makes the following assumptions
+//      about the implementation of the built-in C++ types:
 //
-//	    float is an IEEE 754 single-precision number
-//	    sizeof (float) == 4
-//	    sizeof (unsigned int) == sizeof (float)
-//	    alignof (unsigned int) == alignof (float)
-//	    sizeof (unsigned short) == 2
+//          float is an IEEE 754 single-precision number
+//          sizeof (float) == 4
+//          sizeof (unsigned int) == sizeof (float)
+//          alignof (unsigned int) == alignof (float)
+//          sizeof (unsigned short) == 2
 //
 //---------------------------------------------------------------------------
 
@@ -102,7 +102,7 @@ class OPENVDB_API half
     // Constructors
     //-------------
 
-    half () = default;			// no initialization
+    half () = default;                  // no initialization
     half (float f);
     // rule of 5
     ~half () = default;
@@ -113,35 +113,35 @@ class OPENVDB_API half
     // Conversion to float
     //--------------------
 
-    operator		float () const;
+    operator            float () const;
 
 
     //------------
     // Unary minus
     //------------
 
-    half		operator - () const;
+    half                operator - () const;
 
 
     //-----------
     // Assignment
     //-----------
 
-    half &		operator = (const half  &h) = default;
-    half &		operator = (half  &&h) noexcept = default;
-    half &		operator = (float f);
+    half &              operator = (const half  &h) = default;
+    half &              operator = (half  &&h) noexcept = default;
+    half &              operator = (float f);
 
-    half &		operator += (half  h);
-    half &		operator += (float f);
+    half &              operator += (half  h);
+    half &              operator += (float f);
 
-    half &		operator -= (half  h);
-    half &		operator -= (float f);
+    half &              operator -= (half  h);
+    half &              operator -= (float f);
 
-    half &		operator *= (half  h);
-    half &		operator *= (float f);
+    half &              operator *= (half  h);
+    half &              operator *= (float f);
 
-    half &		operator /= (half  h);
-    half &		operator /= (float f);
+    half &              operator /= (half  h);
+    half &              operator /= (float f);
 
 
     //---------------------------------------------------------
@@ -150,73 +150,73 @@ class OPENVDB_API half
     // bits will be zero.
     //---------------------------------------------------------
 
-    half		round (unsigned int n) const;
+    half                round (unsigned int n) const;
 
 
     //--------------------------------------------------------------------
     // Classification:
     //
-    //	h.isFinite()		returns true if h is a normalized number,
-    //				a denormalized number or zero
+    //  h.isFinite()            returns true if h is a normalized number,
+    //                          a denormalized number or zero
     //
-    //	h.isNormalized()	returns true if h is a normalized number
+    //  h.isNormalized()        returns true if h is a normalized number
     //
-    //	h.isDenormalized()	returns true if h is a denormalized number
+    //  h.isDenormalized()      returns true if h is a denormalized number
     //
-    //	h.isZero()		returns true if h is zero
+    //  h.isZero()              returns true if h is zero
     //
-    //	h.isNan()		returns true if h is a NAN
+    //  h.isNan()               returns true if h is a NAN
     //
-    //	h.isInfinity()		returns true if h is a positive
-    //				or a negative infinity
+    //  h.isInfinity()          returns true if h is a positive
+    //                          or a negative infinity
     //
-    //	h.isNegative()		returns true if the sign bit of h
-    //				is set (negative)
+    //  h.isNegative()          returns true if the sign bit of h
+    //                          is set (negative)
     //--------------------------------------------------------------------
 
-    bool		isFinite () const;
-    bool		isNormalized () const;
-    bool		isDenormalized () const;
-    bool		isZero () const;
-    bool		isNan () const;
-    bool		isInfinity () const;
-    bool		isNegative () const;
+    bool                isFinite () const;
+    bool                isNormalized () const;
+    bool                isDenormalized () const;
+    bool                isZero () const;
+    bool                isNan () const;
+    bool                isInfinity () const;
+    bool                isNegative () const;
 
 
     //--------------------------------------------
     // Special values
     //
-    //	posInf()	returns +infinity
+    //  posInf()        returns +infinity
     //
-    //	negInf()	returns -infinity
+    //  negInf()        returns -infinity
     //
-    //	qNan()		returns a NAN with the bit
-    //			pattern 0111111111111111
+    //  qNan()          returns a NAN with the bit
+    //                  pattern 0111111111111111
     //
-    //	sNan()		returns a NAN with the bit
-    //			pattern 0111110111111111
+    //  sNan()          returns a NAN with the bit
+    //                  pattern 0111110111111111
     //--------------------------------------------
 
-    static half		posInf ();
-    static half		negInf ();
-    static half		qNan ();
-    static half		sNan ();
+    static half         posInf ();
+    static half         negInf ();
+    static half         qNan ();
+    static half         sNan ();
 
 
     //--------------------------------------
     // Access to the internal representation
     //--------------------------------------
 
-    unsigned short	bits () const;
-    void		setBits (unsigned short bits);
+    unsigned short      bits () const;
+    void                setBits (unsigned short bits);
 
 
   public:
 
     union uif
     {
-	unsigned int	i;
-	float		f;
+        unsigned int    i;
+        float           f;
     };
 
   private:
@@ -260,59 +260,59 @@ OPENVDB_API void        printBits   (char  c[35], float f);
 
 #if (defined _WIN32 || defined _WIN64) && defined _MSC_VER
 
-  #define VDB_HALF_MIN	5.96046448e-08f	// Smallest positive half
+  #define VDB_HALF_MIN  5.96046448e-08f // Smallest positive half
 
-  #define VDB_HALF_NRM_MIN	6.10351562e-05f	// Smallest positive normalized half
+  #define VDB_HALF_NRM_MIN      6.10351562e-05f // Smallest positive normalized half
 
-  #define VDB_HALF_MAX	65504.0f	// Largest positive half
+  #define VDB_HALF_MAX  65504.0f        // Largest positive half
 
-  #define VDB_HALF_EPSILON	0.00097656f	// Smallest positive e for which
-					// half (1.0 + e) != half (1.0)
+  #define VDB_HALF_EPSILON      0.00097656f     // Smallest positive e for which
+                                        // half (1.0 + e) != half (1.0)
 #else
 
-  #define VDB_HALF_MIN	5.96046448e-08	// Smallest positive half
+  #define VDB_HALF_MIN  5.96046448e-08  // Smallest positive half
 
-  #define VDB_HALF_NRM_MIN	6.10351562e-05	// Smallest positive normalized half
+  #define VDB_HALF_NRM_MIN      6.10351562e-05  // Smallest positive normalized half
 
-  #define VDB_HALF_MAX	65504.0		// Largest positive half
+  #define VDB_HALF_MAX  65504.0         // Largest positive half
 
-  #define VDB_HALF_EPSILON	0.00097656	// Smallest positive e for which
-					// half (1.0 + e) != half (1.0)
+  #define VDB_HALF_EPSILON      0.00097656      // Smallest positive e for which
+                                        // half (1.0 + e) != half (1.0)
 #endif
 
 
-#define VDB_HALF_MANT_DIG	11		// Number of digits in mantissa
-					// (significand + hidden leading 1)
+#define VDB_HALF_MANT_DIG       11              // Number of digits in mantissa
+                                        // (significand + hidden leading 1)
 
-// 
+//
 // floor( (VDB_HALF_MANT_DIG - 1) * log10(2) ) => 3.01... -> 3
-#define VDB_HALF_DIG	3		// Number of base 10 digits that
-					// can be represented without change
+#define VDB_HALF_DIG    3               // Number of base 10 digits that
+                                        // can be represented without change
 
 // ceil(VDB_HALF_MANT_DIG * log10(2) + 1) => 4.31... -> 5
-#define VDB_HALF_DECIMAL_DIG	5	// Number of base-10 digits that are
-					// necessary to uniquely represent all
-					// distinct values
+#define VDB_HALF_DECIMAL_DIG    5       // Number of base-10 digits that are
+                                        // necessary to uniquely represent all
+                                        // distinct values
 
-#define VDB_HALF_RADIX	2		// Base of the exponent
+#define VDB_HALF_RADIX  2               // Base of the exponent
 
-#define VDB_HALF_MIN_EXP	-13		// Minimum negative integer such that
-					// HALF_RADIX raised to the power of
-					// one less than that integer is a
-					// normalized half
+#define VDB_HALF_MIN_EXP        -13             // Minimum negative integer such that
+                                        // HALF_RADIX raised to the power of
+                                        // one less than that integer is a
+                                        // normalized half
 
-#define VDB_HALF_MAX_EXP	16		// Maximum positive integer such that
-					// HALF_RADIX raised to the power of
-					// one less than that integer is a
-					// normalized half
+#define VDB_HALF_MAX_EXP        16              // Maximum positive integer such that
+                                        // HALF_RADIX raised to the power of
+                                        // one less than that integer is a
+                                        // normalized half
 
-#define VDB_HALF_MIN_10_EXP	-4		// Minimum positive integer such
-					// that 10 raised to that power is
-					// a normalized half
+#define VDB_HALF_MIN_10_EXP     -4              // Minimum positive integer such
+                                        // that 10 raised to that power is
+                                        // a normalized half
 
-#define VDB_HALF_MAX_10_EXP	4		// Maximum positive integer such
-					// that 10 raised to that power is
-					// a normalized half
+#define VDB_HALF_MAX_10_EXP     4               // Maximum positive integer such
+                                        // that 10 raised to that power is
+                                        // a normalized half
 
 
 //---------------------------------------------------------------------------
@@ -321,108 +321,108 @@ OPENVDB_API void        printBits   (char  c[35], float f);
 //
 // Representation of a float:
 //
-//	We assume that a float, f, is an IEEE 754 single-precision
-//	floating point number, whose bits are arranged as follows:
+//      We assume that a float, f, is an IEEE 754 single-precision
+//      floating point number, whose bits are arranged as follows:
 //
-//	    31 (msb)
-//	    | 
-//	    | 30     23
-//	    | |      | 
-//	    | |      | 22                    0 (lsb)
-//	    | |      | |                     |
-//	    X XXXXXXXX XXXXXXXXXXXXXXXXXXXXXXX
+//          31 (msb)
+//          |
+//          | 30     23
+//          | |      |
+//          | |      | 22                    0 (lsb)
+//          | |      | |                     |
+//          X XXXXXXXX XXXXXXXXXXXXXXXXXXXXXXX
 //
-//	    s e        m
+//          s e        m
 //
-//	S is the sign-bit, e is the exponent and m is the significand.
+//      S is the sign-bit, e is the exponent and m is the significand.
 //
-//	If e is between 1 and 254, f is a normalized number:
+//      If e is between 1 and 254, f is a normalized number:
 //
-//	            s    e-127
-//	    f = (-1)  * 2      * 1.m
+//                  s    e-127
+//          f = (-1)  * 2      * 1.m
 //
-//	If e is 0, and m is not zero, f is a denormalized number:
+//      If e is 0, and m is not zero, f is a denormalized number:
 //
-//	            s    -126
-//	    f = (-1)  * 2      * 0.m
+//                  s    -126
+//          f = (-1)  * 2      * 0.m
 //
-//	If e and m are both zero, f is zero:
+//      If e and m are both zero, f is zero:
 //
-//	    f = 0.0
+//          f = 0.0
 //
-//	If e is 255, f is an "infinity" or "not a number" (NAN),
-//	depending on whether m is zero or not.
+//      If e is 255, f is an "infinity" or "not a number" (NAN),
+//      depending on whether m is zero or not.
 //
-//	Examples:
+//      Examples:
 //
-//	    0 00000000 00000000000000000000000 = 0.0
-//	    0 01111110 00000000000000000000000 = 0.5
-//	    0 01111111 00000000000000000000000 = 1.0
-//	    0 10000000 00000000000000000000000 = 2.0
-//	    0 10000000 10000000000000000000000 = 3.0
-//	    1 10000101 11110000010000000000000 = -124.0625
-//	    0 11111111 00000000000000000000000 = +infinity
-//	    1 11111111 00000000000000000000000 = -infinity
-//	    0 11111111 10000000000000000000000 = NAN
-//	    1 11111111 11111111111111111111111 = NAN
+//          0 00000000 00000000000000000000000 = 0.0
+//          0 01111110 00000000000000000000000 = 0.5
+//          0 01111111 00000000000000000000000 = 1.0
+//          0 10000000 00000000000000000000000 = 2.0
+//          0 10000000 10000000000000000000000 = 3.0
+//          1 10000101 11110000010000000000000 = -124.0625
+//          0 11111111 00000000000000000000000 = +infinity
+//          1 11111111 00000000000000000000000 = -infinity
+//          0 11111111 10000000000000000000000 = NAN
+//          1 11111111 11111111111111111111111 = NAN
 //
 // Representation of a half:
 //
-//	Here is the bit-layout for a half number, h:
+//      Here is the bit-layout for a half number, h:
 //
-//	    15 (msb)
-//	    | 
-//	    | 14  10
-//	    | |   |
-//	    | |   | 9        0 (lsb)
-//	    | |   | |        |
-//	    X XXXXX XXXXXXXXXX
+//          15 (msb)
+//          |
+//          | 14  10
+//          | |   |
+//          | |   | 9        0 (lsb)
+//          | |   | |        |
+//          X XXXXX XXXXXXXXXX
 //
-//	    s e     m
+//          s e     m
 //
-//	S is the sign-bit, e is the exponent and m is the significand.
+//      S is the sign-bit, e is the exponent and m is the significand.
 //
-//	If e is between 1 and 30, h is a normalized number:
+//      If e is between 1 and 30, h is a normalized number:
 //
-//	            s    e-15
-//	    h = (-1)  * 2     * 1.m
+//                  s    e-15
+//          h = (-1)  * 2     * 1.m
 //
-//	If e is 0, and m is not zero, h is a denormalized number:
+//      If e is 0, and m is not zero, h is a denormalized number:
 //
-//	            S    -14
-//	    h = (-1)  * 2     * 0.m
+//                  S    -14
+//          h = (-1)  * 2     * 0.m
 //
-//	If e and m are both zero, h is zero:
+//      If e and m are both zero, h is zero:
 //
-//	    h = 0.0
+//          h = 0.0
 //
-//	If e is 31, h is an "infinity" or "not a number" (NAN),
-//	depending on whether m is zero or not.
+//      If e is 31, h is an "infinity" or "not a number" (NAN),
+//      depending on whether m is zero or not.
 //
-//	Examples:
+//      Examples:
 //
-//	    0 00000 0000000000 = 0.0
-//	    0 01110 0000000000 = 0.5
-//	    0 01111 0000000000 = 1.0
-//	    0 10000 0000000000 = 2.0
-//	    0 10000 1000000000 = 3.0
-//	    1 10101 1111000001 = -124.0625
-//	    0 11111 0000000000 = +infinity
-//	    1 11111 0000000000 = -infinity
-//	    0 11111 1000000000 = NAN
-//	    1 11111 1111111111 = NAN
+//          0 00000 0000000000 = 0.0
+//          0 01110 0000000000 = 0.5
+//          0 01111 0000000000 = 1.0
+//          0 10000 0000000000 = 2.0
+//          0 10000 1000000000 = 3.0
+//          1 10101 1111000001 = -124.0625
+//          0 11111 0000000000 = +infinity
+//          1 11111 0000000000 = -infinity
+//          0 11111 1000000000 = NAN
+//          1 11111 1111111111 = NAN
 //
 // Conversion:
 //
-//	Converting from a float to a half requires some non-trivial bit
-//	manipulations.  In some cases, this makes conversion relatively
-//	slow, but the most common case is accelerated via table lookups.
+//      Converting from a float to a half requires some non-trivial bit
+//      manipulations.  In some cases, this makes conversion relatively
+//      slow, but the most common case is accelerated via table lookups.
 //
-//	Converting back from a half to a float is easier because we don't
-//	have to do any rounding.  In addition, there are only 65536
-//	different half numbers; we can convert each of those numbers once
-//	and store the results in a table.  Later, all conversions can be
-//	done using only simple table lookups.
+//      Converting back from a half to a float is easier because we don't
+//      have to do any rounding.  In addition, there are only 65536
+//      different half numbers; we can convert each of those numbers once
+//      and store the results in a table.  Later, all conversions can be
+//      done using only simple table lookups.
 //
 //---------------------------------------------------------------------------
 
@@ -440,53 +440,53 @@ half::half (float f)
 
     if (f == 0)
     {
-	//
-	// Common special case - zero.
-	// Preserve the zero's sign bit.
-	//
+        //
+        // Common special case - zero.
+        // Preserve the zero's sign bit.
+        //
 
-	_h = (x.i >> 16);
+        _h = (x.i >> 16);
     }
     else
     {
-	//
-	// We extract the combined sign and exponent, e, from our
-	// floating-point number, f.  Then we convert e to the sign
-	// and exponent of the half number via a table lookup.
-	//
-	// For the most common case, where a normalized half is produced,
-	// the table lookup returns a non-zero value; in this case, all
-	// we have to do is round f's significand to 10 bits and combine
-	// the result with e.
-	//
-	// For all other cases (overflow, zeroes, denormalized numbers
-	// resulting from underflow, infinities and NANs), the table
-	// lookup returns zero, and we call a longer, non-inline function
-	// to do the float-to-half conversion.
-	//
+        //
+        // We extract the combined sign and exponent, e, from our
+        // floating-point number, f.  Then we convert e to the sign
+        // and exponent of the half number via a table lookup.
+        //
+        // For the most common case, where a normalized half is produced,
+        // the table lookup returns a non-zero value; in this case, all
+        // we have to do is round f's significand to 10 bits and combine
+        // the result with e.
+        //
+        // For all other cases (overflow, zeroes, denormalized numbers
+        // resulting from underflow, infinities and NANs), the table
+        // lookup returns zero, and we call a longer, non-inline function
+        // to do the float-to-half conversion.
+        //
 
-	int e = (x.i >> 23) & 0x000001ff;
+        int e = (x.i >> 23) & 0x000001ff;
 
-	e = _eLut[e];
+        e = _eLut[e];
 
-	if (e)
-	{
-	    //
-	    // Simple case - round the significand, m, to 10
-	    // bits and combine it with the sign and exponent.
-	    //
+        if (e)
+        {
+            //
+            // Simple case - round the significand, m, to 10
+            // bits and combine it with the sign and exponent.
+            //
 
-	    int m = x.i & 0x007fffff;
-	    _h = e + ((m + 0x00000fff + ((m >> 13) & 1)) >> 13);
-	}
-	else
-	{
-	    //
-	    // Difficult case - call a function.
-	    //
+            int m = x.i & 0x007fffff;
+            _h = e + ((m + 0x00000fff + ((m >> 13) & 1)) >> 13);
+        }
+        else
+        {
+            //
+            // Difficult case - call a function.
+            //
 
-	    _h = convert (x.i);
-	}
+            _h = convert (x.i);
+        }
     }
 }
 
@@ -514,7 +514,7 @@ half::round (unsigned int n) const
     //
 
     if (n >= 10)
-	return *this;
+        return *this;
 
     //
     // Disassemble h into the sign, s,
@@ -541,13 +541,13 @@ half::round (unsigned int n) const
 
     if (e >= 0x7c00)
     {
-	//
-	// Overflow occurred -- truncate instead of rounding.
-	//
+        //
+        // Overflow occurred -- truncate instead of rounding.
+        //
 
-	e = _h;
-	e >>= 10 - n;
-	e <<= 10 - n;
+        e = _h;
+        e >>= 10 - n;
+        e <<= 10 - n;
     }
 
     //
@@ -565,7 +565,7 @@ half::round (unsigned int n) const
 // Other inline functions
 //-----------------------
 
-inline half	
+inline half
 half::operator - () const
 {
     half h;
@@ -646,7 +646,7 @@ half::operator /= (float f)
 }
 
 
-inline bool	
+inline bool
 half::isFinite () const
 {
     unsigned short e = (_h >> 10) & 0x001f;
@@ -696,7 +696,7 @@ half::isInfinity () const
 }
 
 
-inline bool	
+inline bool
 half::isNegative () const
 {
     return (_h & 0x8000) != 0;
