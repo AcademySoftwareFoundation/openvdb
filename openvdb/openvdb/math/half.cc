@@ -115,7 +115,7 @@ half::convert (int i)
             // We convert f to a half zero with the same sign as f.
             //
 
-            return s;
+            return (short) s;
         }
 
         //
@@ -151,7 +151,7 @@ half::convert (int i)
         // Assemble the half from s, e (zero) and m.
         //
 
-        return s | m;
+        return (short) (s | m);
     }
     else if (e == 0xff - (127 - 15))
     {
@@ -162,7 +162,7 @@ half::convert (int i)
             // infinity with the same sign as f.
             //
 
-            return s | 0x7c00;
+            return (short) (s | 0x7c00);
         }
         else
         {
@@ -176,7 +176,7 @@ half::convert (int i)
             //
 
             m >>= 13;
-            return s | 0x7c00 | m | (m == 0);
+            return (short)(s | 0x7c00 | m | (m == 0));
         }
     }
     else
@@ -206,14 +206,14 @@ half::convert (int i)
         if (e > 30)
         {
             overflow ();        // Cause a hardware floating point overflow;
-            return s | 0x7c00;  // if this returns, the half becomes an
+            return (short)(s | 0x7c00);  // if this returns, the half becomes an
         }                       // infinity with the same sign as f.
 
         //
         // Assemble the half from s, e and m.
         //
 
-        return s | (e << 10) | (m >> 13);
+        return (short)(s | (e << 10) | (m >> 13));
     }
 }
 

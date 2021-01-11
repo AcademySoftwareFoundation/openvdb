@@ -445,7 +445,7 @@ half::half (float f)
         // Preserve the zero's sign bit.
         //
 
-        _h = (x.i >> 16);
+        _h = (unsigned short)(x.i >> 16);
     }
     else
     {
@@ -477,7 +477,7 @@ half::half (float f)
             //
 
             int m = x.i & 0x007fffff;
-            _h = e + ((m + 0x00000fff + ((m >> 13) & 1)) >> 13);
+            _h = (unsigned short)(e + ((m + 0x00000fff + ((m >> 13) & 1)) >> 13));
         }
         else
         {
@@ -555,7 +555,7 @@ half::round (unsigned int n) const
     //
 
     half h;
-    h._h = s | e;
+    h._h = (unsigned short)(s | e);
 
     return h;
 }
