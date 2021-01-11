@@ -531,9 +531,9 @@ half::round (unsigned int n) const
     // up causes the significand to overflow.
     //
 
-    e >>= (unsigned short)(9 - n);
-    e  += (unsigned short)(e & 1);
-    e <<= (unsigned short)(9 - n);
+    e = (unsigned short)(e >> (9 - n));
+    e = (unsigned short)(e + (e & 1));
+    e = (unsigned short)(e << (9 - n));
 
     //
     // Check for exponent overflow.
@@ -546,8 +546,8 @@ half::round (unsigned int n) const
         //
 
         e = _h;
-        e >>= 10 - n;
-        e <<= 10 - n;
+        e = (unsigned short)(e >> (10 - n));
+        e = (unsigned short)(e << (10 - n));
     }
 
     //
