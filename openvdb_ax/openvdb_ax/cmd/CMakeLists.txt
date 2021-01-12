@@ -10,6 +10,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBAXBinaries LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 #########################################################################
 
 message(STATUS "----------------------------------------------------")
@@ -39,7 +41,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Tbb_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_AX)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
