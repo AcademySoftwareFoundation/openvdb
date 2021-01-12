@@ -179,13 +179,6 @@ public:
                                         const bool constantStride = true,
                                         const Metadata* defaultValue = nullptr);
 
-    OPENVDB_DEPRECATED
-    AttributeArray::Ptr appendAttribute(const Name& name,
-                                        const NamePair& type,
-                                        const Index strideOrTotalSize,
-                                        const bool constantStride,
-                                        Metadata::Ptr defaultValue);
-
     /// Append attribute @a attribute (descriptor-sharing)
     /// Requires current descriptor to match @a expected
     /// On append, current descriptor is replaced with @a replacement
@@ -195,12 +188,6 @@ public:
                                         const bool constantStride = true,
                                         const Metadata* defaultValue = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
-
-    OPENVDB_DEPRECATED
-    AttributeArray::Ptr appendAttribute(const Descriptor& expected, DescriptorPtr& replacement,
-                                        const size_t pos, const Index strideOrTotalSize,
-                                        const bool constantStride,
-                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// @brief Remove and return an attribute array by name
     /// @param name the name of the attribute array to release
@@ -475,9 +462,6 @@ public:
     /// @param hint if provided, request a specific offset as a hint
     /// @return index of an offset or size_t max if no available group offsets
     size_t unusedGroupOffset(size_t hint = std::numeric_limits<size_t>::max()) const;
-
-    OPENVDB_DEPRECATED
-    size_t nextUnusedGroupOffset() const;
 
     /// @brief Determine if a move is required to efficiently compact the data and store the
     /// source name, offset and the target offset in the input parameters

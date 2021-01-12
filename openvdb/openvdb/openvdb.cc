@@ -25,6 +25,11 @@
         #error ABI = 5 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_5 suppresses this error
     #endif
 #endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_6
+    #if OPENVDB_ABI_VERSION_NUMBER == 6
+        #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error
+    #endif
+#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

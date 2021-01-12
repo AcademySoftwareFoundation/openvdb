@@ -27,7 +27,13 @@ public:
     using ValueType = T;
 
     /// Trivial constructor, the vector is NOT initialized
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Vec3() = default;
+#else
     Vec3() {}
+#endif
 
     /// @brief Construct a vector all of whose components have the given value.
     explicit Vec3(T val) { this->mm[0] = this->mm[1] = this->mm[2] = val; }
@@ -660,6 +666,13 @@ using Vec3i = Vec3<int32_t>;
 using Vec3ui = Vec3<uint32_t>;
 using Vec3s = Vec3<float>;
 using Vec3d = Vec3<double>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+OPENVDB_IS_POD(Vec3i)
+OPENVDB_IS_POD(Vec3ui)
+OPENVDB_IS_POD(Vec3s)
+OPENVDB_IS_POD(Vec3d)
+#endif
 
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME

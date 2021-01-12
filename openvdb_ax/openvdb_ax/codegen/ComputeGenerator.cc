@@ -102,7 +102,7 @@ ComputeGenerator::ComputeGenerator(llvm::Module& module,
                                    Logger& logger)
     : mModule(module)
     , mContext(module.getContext())
-    , mBuilder(llvm::IRBuilder<>(module.getContext()))
+    , mBuilder(module.getContext())
     , mValues()
     , mBreakContinueStack()
     , mScopeIndex(1)
@@ -141,19 +141,6 @@ bool ComputeGenerator::generate(const ast::Tree& tree)
     return this->traverse(&tree) && !mLog.hasError();
 }
 
-bool ComputeGenerator::visit(const ast::CommaOperator* comma)
-{
-    // only keep the last value
-    assert(mValues.size() >= comma->size());
-    if (comma->size() == 1) return true;
-    llvm::Value* cache = mValues.top();
-    for (size_t i = 0; i < comma->size(); ++i) {
-        mValues.pop();
-    }
-    mValues.push(cache);
-    return true;
-}
-
 bool ComputeGenerator::visit(const ast::Block* block)
 {
     mScopeIndex++;
@@ -162,9 +149,11 @@ bool ComputeGenerator::visit(const ast::Block* block)
     const size_t children = block->children();
 
     for (size_t i = 0; i < children; ++i) {
-        if (!this->traverse(block->child(i))) {
+        if (!this->traverse(block->child(i)) && mLog.atErrorLimit()) {
             return false;
         }
+        // reset the value stack for each statement
+        mValues = std::stack<llvm::Value*>();
     }
 
     mSymbolTables.erase(mScopeIndex);
@@ -172,87 +161,118 @@ bool ComputeGenerator::visit(const ast::Block* block)
     return true;
 }
 
+bool ComputeGenerator::visit(const ast::CommaOperator* comma)
+{
+    // traverse the contents of the comma expression
+    const size_t children = comma->children();
+    llvm::Value* value = nullptr;
+    bool hasErrored = false;
+    for (size_t i = 0; i < children; ++i) {
+        if (this->traverse(comma->child(i))) {
+            value = mValues.top(); mValues.pop();
+        }
+        else {
+            if (mLog.atErrorLimit()) return false;
+            hasErrored = true;
+        }
+    }
+    // only keep the last value
+    if (!value || hasErrored) return false;
+    mValues.push(value);
+    return true;
+}
+
 bool ComputeGenerator::visit(const ast::ConditionalStatement* cond)
 {
     llvm::BasicBlock* postIfBlock = llvm::BasicBlock::Create(mContext, "block", mFunction);
-
-    // generate conditional
-    if (!this->traverse(cond->condition())) return false;
-    llvm::Value* condition = mValues.top();
-
-    if (condition->getType()->isPointerTy()) {
-        condition = mBuilder.CreateLoad(condition);
-    }
-    llvm::Type* conditionType = condition->getType();
-    // check the type of the condition branch is bool-convertable
-    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
-        condition = boolComparison(condition, mBuilder);
-    } else {
-        if (!mLog.error("cannot convert non-scalar type to bool in condition", cond)) return false;
-    }
-
-    mValues.pop();
-    const bool hasElse = cond->hasFalse();
     llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(mContext, "then", mFunction);
+    const bool hasElse = cond->hasFalse();
     llvm::BasicBlock* elseBlock = hasElse ? llvm::BasicBlock::Create(mContext, "else", mFunction) : postIfBlock;
 
-    mBuilder.CreateCondBr(condition, thenBlock, elseBlock);
+    // generate conditional
+    if (this->traverse(cond->condition())) {
+        llvm::Value* condition = mValues.top(); mValues.pop();
+
+        if (condition->getType()->isPointerTy()) {
+            condition = mBuilder.CreateLoad(condition);
+        }
+        llvm::Type* conditionType = condition->getType();
+        // check the type of the condition branch is bool-convertable
+        if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+            condition = boolComparison(condition, mBuilder);
+            mBuilder.CreateCondBr(condition, thenBlock, elseBlock);
+        } else {
+            if (!mLog.error("cannot convert non-scalar type to bool in condition", cond->condition())) return false;
+        }
+    } else if (mLog.atErrorLimit()) return false;
 
     // generate if-then branch
     mBuilder.SetInsertPoint(thenBlock);
-    if (!this->traverse(cond->trueBranch())) return false;
+    if (!this->traverse(cond->trueBranch()) && mLog.atErrorLimit()) return false;
     mBuilder.CreateBr(postIfBlock);
 
     if (hasElse) {
         // generate else-then branch
         mBuilder.SetInsertPoint(elseBlock);
-        if (!this->traverse(cond->falseBranch())) return false;
+        if (!this->traverse(cond->falseBranch()) && mLog.atErrorLimit()) return false;
         mBuilder.CreateBr(postIfBlock);
     }
 
     // reset to continue block
     mBuilder.SetInsertPoint(postIfBlock);
+
+    // reset the value stack
+    mValues = std::stack<llvm::Value*>();
+
     return true;
 }
 
 bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
 {
-    // generate conditional
-    if (!this->traverse(tern->condition())) return false;
-
-    // get the condition
-    llvm::Value* trueValue = mValues.top(); mValues.pop();
-    assert(trueValue);
-
-    llvm::Type* trueType = trueValue->getType();
-    bool truePtr = trueType->isPointerTy();
-
-    llvm::Type* conditionType = truePtr ? trueType->getPointerElementType() : trueType;
-    llvm::Value* boolCondition = nullptr;
-    // check the type of the condition branch is bool-convertable
-    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
-        boolCondition = truePtr ?
-            boolComparison(mBuilder.CreateLoad(trueValue), mBuilder) : boolComparison(trueValue, mBuilder);
-    }
-    else {
-        if (!mLog.error("cannot convert non-scalar type to bool in condition", tern)) return false;
-    }
-
     llvm::BasicBlock* trueBlock = llvm::BasicBlock::Create(mContext, "ternary_true", mFunction);
     llvm::BasicBlock* falseBlock = llvm::BasicBlock::Create(mContext, "ternary_false", mFunction);
     llvm::BasicBlock* returnBlock = llvm::BasicBlock::Create(mContext, "ternary_return", mFunction);
 
-    mBuilder.CreateCondBr(boolCondition, trueBlock, falseBlock);
+    llvm::Value* trueValue = nullptr;
+    llvm::Type* trueType = nullptr;
+    bool truePtr = false;
+    // generate conditional
+    bool conditionSuccess = this->traverse(tern->condition());
+    if (conditionSuccess) {
+        // get the condition
+        trueValue = mValues.top(); mValues.pop();
+        assert(trueValue);
+
+        trueType = trueValue->getType();
+        truePtr = trueType->isPointerTy();
+
+        llvm::Type* conditionType = truePtr ? trueType->getPointerElementType() : trueType;
+        llvm::Value* boolCondition = nullptr;
+        // check the type of the condition branch is bool-convertable
+        if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+            boolCondition = truePtr ?
+                boolComparison(mBuilder.CreateLoad(trueValue), mBuilder) : boolComparison(trueValue, mBuilder);
+            mBuilder.CreateCondBr(boolCondition, trueBlock, falseBlock);
+        }
+        else {
+            if (!mLog.error("cannot convert non-scalar type to bool in condition", tern->condition())) return false;
+            conditionSuccess = false;
+        }
+    }
+    else if (mLog.atErrorLimit()) return false;
 
     // generate true branch, if it exists otherwise take condition as true value
 
     mBuilder.SetInsertPoint(trueBlock);
+    bool trueSuccess = conditionSuccess;
     if (tern->hasTrue()) {
-        if (!this->traverse(tern->trueBranch())) return false;
-        trueValue = mValues.top(); // get true value from true expression
-        mValues.pop();
-        // update true type details
-        trueType = trueValue->getType();
+        trueSuccess = this->traverse(tern->trueBranch());
+        if (trueSuccess) {
+            trueValue = mValues.top(); mValues.pop();// get true value from true expression
+            // update true type details
+            trueType = trueValue->getType();
+        }
+        else if (mLog.atErrorLimit()) return false;
     }
 
     llvm::BranchInst* trueBranch = mBuilder.CreateBr(returnBlock);
@@ -260,12 +280,15 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     // generate false branch
 
     mBuilder.SetInsertPoint(falseBlock);
-    if (!this->traverse(tern->falseBranch())) return false;
+    bool falseSuccess = this->traverse(tern->falseBranch());
+    // even if the condition isnt successful but the others are, we continue to code gen to find type errors in branches
+    if (!(trueSuccess && falseSuccess)) return false;
+
     llvm::BranchInst* falseBranch = mBuilder.CreateBr(returnBlock);
 
-    llvm::Value* falseValue = mValues.top();
+    llvm::Value* falseValue = mValues.top(); mValues.pop();
     llvm::Type* falseType = falseValue->getType();
-
+    assert(trueType);
     // if both variables of same type do no casting or loading
     if (trueType != falseType) {
         // get the (contained) types of the expressions
@@ -361,7 +384,9 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                 }
             }
             else {
-                if (!mLog.error("unsupported implicit cast in ternary operation.", tern)) return false;
+                mLog.error("unsupported implicit cast in ternary operation",
+                           tern->hasTrue() ? tern->trueBranch() : tern->falseBranch());
+                return false;
             }
         }
     }
@@ -369,26 +394,21 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         // void type ternary acts like if-else statement
         // push void value to stop use of return from this expression
         mBuilder.SetInsertPoint(returnBlock);
-        mValues.pop();
         mValues.push(falseValue);
-        return true;
+        return conditionSuccess && trueSuccess && falseSuccess;
     }
 
     // reset to continue block
     mBuilder.SetInsertPoint(returnBlock);
-    // if any errors have occurred these may not be the same type
-    if (falseValue->getType() == trueValue->getType()) {
-        llvm::PHINode* ternary = mBuilder.CreatePHI(trueValue->getType(), 2, "ternary");
+    llvm::PHINode* ternary = mBuilder.CreatePHI(trueValue->getType(), 2, "ternary");
 
-        // if nesting branches the blocks for true and false branches may have been updated
-        // so get these again rather than reusing trueBlock/falseBlock
-        ternary->addIncoming(trueValue, trueBranch->getParent());
-        ternary->addIncoming(falseValue, falseBranch->getParent());
+    // if nesting branches the blocks for true and false branches may have been updated
+    // so get these again rather than reusing trueBlock/falseBlock
+    ternary->addIncoming(trueValue, trueBranch->getParent());
+    ternary->addIncoming(falseValue, falseBranch->getParent());
 
-        mValues.pop();
-        mValues.push(ternary);
-    }
-    return true;
+    mValues.push(ternary);
+    return conditionSuccess && trueSuccess && falseSuccess;
 }
 
 bool ComputeGenerator::visit(const ast::Loop* loop)
@@ -412,7 +432,9 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
 
         // generate initial statement
         if (loop->hasInit()) {
-            if (!this->traverse(loop->initial())) return false;
+            if (!this->traverse(loop->initial()) && mLog.atErrorLimit()) return false;
+            // reset the value stack
+            mValues = std::stack<llvm::Value*>();
         }
         mBuilder.CreateBr(conditionBlock);
 
@@ -422,7 +444,7 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
             postBodyBlock = iterBlock;
 
             mBuilder.SetInsertPoint(iterBlock);
-            if (!this->traverse(loop->iteration())) return false;
+            if (!this->traverse(loop->iteration()) && mLog.atErrorLimit()) return false;
             mBuilder.CreateBr(conditionBlock);
         }
     }
@@ -440,25 +462,29 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
 
     // generate loop body
     mBuilder.SetInsertPoint(bodyBlock);
-    if (!this->traverse(loop->body())) return false;
+    if (!this->traverse(loop->body()) && mLog.atErrorLimit()) return false;
     mBuilder.CreateBr(postBodyBlock);
 
     // generate condition
     mBuilder.SetInsertPoint(conditionBlock);
-    if (!this->traverse(loop->condition())) return false;
-    llvm::Value* condition = mValues.top(); mValues.pop();
-    if (condition->getType()->isPointerTy()) {
-        condition = mBuilder.CreateLoad(condition);
+    if (this->traverse(loop->condition())) {
+        llvm::Value* condition = mValues.top(); mValues.pop();
+        if (condition->getType()->isPointerTy()) {
+            condition = mBuilder.CreateLoad(condition);
+        }
+        llvm::Type* conditionType = condition->getType();
+        // check the type of the condition branch is bool-convertable
+        if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
+            condition = boolComparison(condition, mBuilder);
+            mBuilder.CreateCondBr(condition, bodyBlock, postLoopBlock);
+        }
+        else {
+            if (!mLog.error("cannot convert non-scalar type to bool in condition", loop->condition())) return false;
+        }
+        // reset the value stack
+        mValues = std::stack<llvm::Value*>();
     }
-    llvm::Type* conditionType = condition->getType();
-    // check the type of the condition branch is bool-convertable
-    if (conditionType->isFloatingPointTy() || conditionType->isIntegerTy()) {
-        condition = boolComparison(condition, mBuilder);
-    }
-    else {
-        if (!mLog.error("cannot convert non-scalar type to bool in condition", loop)) return false;
-    }
-    mBuilder.CreateCondBr(condition, bodyBlock, postLoopBlock);
+    else if (mLog.atErrorLimit()) return false;
 
     // reset to post loop block
     mBuilder.SetInsertPoint(postLoopBlock);
@@ -469,6 +495,9 @@ bool ComputeGenerator::visit(const ast::Loop* loop)
     // remove the symbol table created in this scope
     mSymbolTables.erase(mScopeIndex);
     mScopeIndex--;
+
+    // reset the value stack
+    mValues = std::stack<llvm::Value*>();
 
     return true;
 }
@@ -524,72 +553,86 @@ bool ComputeGenerator::visit(const ast::Keyword* node)
 
 bool ComputeGenerator::visit(const ast::BinaryOperator* node)
 {
-    if (!this->traverse(node->lhs())) return false;
-
     openvdb::ax::ast::tokens::OperatorToken opToken = node->operation();
     // if AND or OR, need to handle short-circuiting
     if (opToken == openvdb::ax::ast::tokens::OperatorToken::AND
         || opToken == openvdb::ax::ast::tokens::OperatorToken::OR) {
-
-        llvm::Value* lhs = mValues.top(); mValues.pop();
-        llvm::Type* lhsType = lhs->getType();
-        if (lhsType->isPointerTy()) {
-            lhs = mBuilder.CreateLoad(lhs);
-            lhsType = lhsType->getPointerElementType();
-        }
-
-        if (lhsType->isFloatingPointTy() || lhsType->isIntegerTy()) {
-            lhs = boolComparison(lhs, mBuilder);
-        }
-        else {
-            if (!mLog.error("cannot convert non-scalar lhs type to bool", node)) return false;
-        }
-
+        llvm::BranchInst* lhsBranch = nullptr;
         llvm::BasicBlock* rhsBlock = llvm::BasicBlock::Create(mContext, "binary_rhs", mFunction);
         llvm::BasicBlock* returnBlock = llvm::BasicBlock::Create(mContext, "binary_return", mFunction);
-        llvm::BranchInst* lhsBranch = nullptr;
+        llvm::Value* lhs = nullptr;
+        bool lhsSuccess = this->traverse(node->lhs());
+        if (lhsSuccess) {
+            lhs = mValues.top(); mValues.pop();
+            llvm::Type* lhsType = lhs->getType();
+            if (lhsType->isPointerTy()) {
+                lhs = mBuilder.CreateLoad(lhs);
+                lhsType = lhsType->getPointerElementType();
+            }
 
-        if (opToken == openvdb::ax::ast::tokens::OperatorToken::AND) {
-            lhsBranch = mBuilder.CreateCondBr(lhs, rhsBlock, returnBlock);
+            if (lhsType->isFloatingPointTy() || lhsType->isIntegerTy()) {
+                lhs = boolComparison(lhs, mBuilder);
+
+                if (opToken == openvdb::ax::ast::tokens::OperatorToken::AND) {
+                    lhsBranch = mBuilder.CreateCondBr(lhs, rhsBlock, returnBlock);
+                }
+                else {
+                    lhsBranch = mBuilder.CreateCondBr(lhs, returnBlock, rhsBlock);
+                }
+            }
+            else {
+                mLog.error("cannot convert non-scalar lhs to bool", node->lhs());
+                lhsSuccess = false;
+            }
         }
-        else {
-            lhsBranch = mBuilder.CreateCondBr(lhs, returnBlock, rhsBlock);
-        }
+
+        if (mLog.atErrorLimit()) return false;
 
         mBuilder.SetInsertPoint(rhsBlock);
-        if (!this->traverse(node->rhs())) return false;
+        bool rhsSuccess = this->traverse(node->rhs());
+        if (rhsSuccess) {
+            llvm::Value* rhs = mValues.top(); mValues.pop();
+            llvm::Type* rhsType = rhs->getType();
+            if (rhsType->isPointerTy()) {
+                rhs = mBuilder.CreateLoad(rhs);
+                rhsType = rhsType->getPointerElementType();
+            }
 
-        llvm::Value* rhs = mValues.top(); mValues.pop();
-        llvm::Type* rhsType = rhs->getType();
-        if (rhsType->isPointerTy()) {
-            rhs = mBuilder.CreateLoad(rhs);
-            rhsType = rhsType->getPointerElementType();
+            if (rhsType->isFloatingPointTy() || rhsType->isIntegerTy()) {
+                rhs = boolComparison(rhs, mBuilder);
+                llvm::BranchInst* rhsBranch = mBuilder.CreateBr(returnBlock);
+
+                mBuilder.SetInsertPoint(returnBlock);
+                if (lhsBranch) {// i.e. lhs was successful
+                    assert(rhs && lhs);
+                    llvm::PHINode* result = mBuilder.CreatePHI(LLVMType<bool>::get(mContext), 2, "binary_op");
+                    result->addIncoming(lhs, lhsBranch->getParent());
+                    result->addIncoming(rhs, rhsBranch->getParent());
+                    mValues.push(result);
+                }
+            }
+            else {
+                mLog.error("cannot convert non-scalar rhs to bool", node->rhs());
+                rhsSuccess = false;
+            }
         }
-
-        if (rhsType->isFloatingPointTy() || rhsType->isIntegerTy()) {
-            rhs = boolComparison(rhs, mBuilder);
-        }
-        else {
-            if (!mLog.error("cannot convert non-scalar rhs type to bool", node)) return false;
-        }
-
-        llvm::BranchInst* rhsBranch = mBuilder.CreateBr(returnBlock);
-
-        mBuilder.SetInsertPoint(returnBlock);
-        llvm::PHINode* result = mBuilder.CreatePHI(LLVMType<bool>::get(mContext), 2, "binary_op");
-        result->addIncoming(lhs, lhsBranch->getParent());
-        result->addIncoming(rhs, rhsBranch->getParent());
-        mValues.push(result);
+        return lhsSuccess && rhsSuccess;
     }
     else {
-        if (!this->traverse(node->rhs())) return false;
-        llvm::Value* rhs = mValues.top(); mValues.pop();
-        llvm::Value* lhs = mValues.top();
+        llvm::Value* lhs = nullptr;
+        if (this->traverse(node->lhs())) {
+            lhs = mValues.top(); mValues.pop();
+        }
+        else if (mLog.atErrorLimit()) return false;
+        llvm::Value* rhs = nullptr;
+        if (this->traverse(node->rhs())) {
+            rhs = mValues.top(); mValues.pop();
+        }
+        else if (mLog.atErrorLimit()) return false;
         llvm::Value* result = nullptr;
-        if (!this->binaryExpression(result, lhs, rhs, node->operation(), node)) return false;
+        if (!(lhs && rhs) || !this->binaryExpression(result, lhs, rhs, node->operation(), node)) return false;
 
         if (result) {
-            mValues.pop();
             mValues.push(result);
         }
     }
@@ -607,11 +650,11 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
     if (token != ast::tokens::MINUS &&
         token != ast::tokens::BITNOT &&
         token != ast::tokens::NOT) {
-        if (!mLog.error("unrecognised unary operator \"" +
-                ast::tokens::operatorNameFromToken(token) + "\"", node)) return false;
-        return true;
+        mLog.error("unrecognised unary operator \"" +
+                ast::tokens::operatorNameFromToken(token) + "\"", node);
+        return false;
     }
-
+    // unary operator uses default traversal so value should be on the stack
     llvm::Value* value = mValues.top();
     llvm::Type* type = value->getType();
     if (type->isPointerTy()) {
@@ -641,8 +684,9 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
         if (token == ast::tokens::MINUS)         result = mBuilder.CreateFNeg(value);
         else if (token == ast::tokens::NOT)      result = mBuilder.CreateFCmpOEQ(value, llvm::ConstantFP::get(type, 0));
         else if (token == ast::tokens::BITNOT) {
-            if (!mLog.error("unable to perform operation \""
-                    + ast::tokens::operatorNameFromToken(token) + "\" on floating points values", node)) return false;
+            mLog.error("unable to perform operation \""
+                    + ast::tokens::operatorNameFromToken(token) + "\" on floating point values", node);
+            return false;
         }
     }
     else if (type->isArrayTy()) {
@@ -677,29 +721,31 @@ bool ComputeGenerator::visit(const ast::UnaryOperator* node)
             }
             else {
                 //@todo support NOT?
-                if (!mLog.error("unable to perform operation \""
-                        + ast::tokens::operatorNameFromToken(token) + "\" on arrays/vectors", node)) return false;
+                mLog.error("unable to perform operation \""
+                        + ast::tokens::operatorNameFromToken(token) + "\" on arrays/vectors", node);
+                return false;
             }
         }
         else {
-            if (!mLog.error("unrecognised array element type", node)) return false;
+            mLog.error("unrecognised array element type", node);
+            return false;
         }
 
         result = arrayPack(elements, mBuilder);
     }
     else {
-        if (!mLog.error("value is not a scalar or vector", node)) return false;
+        mLog.error("value is not a scalar or vector", node);
+        return false;
     }
-
-    if (result)  {
-        mValues.pop();
-        mValues.push(result);
-    }
+    assert(result);
+    mValues.pop();
+    mValues.push(result);
     return true;
 }
 
 bool ComputeGenerator::visit(const ast::AssignExpression* assign)
 {
+    // default traversal, should have rhs and lhs on stack
     // leave LHS on stack
     llvm::Value* rhs = mValues.top(); mValues.pop();
     llvm::Value* lhs = mValues.top();
@@ -708,10 +754,9 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
     if (assign->isCompound()) {
         llvm::Value* rhsValue = nullptr;
         if (!this->binaryExpression(rhsValue, lhs, rhs, assign->operation(), assign)) return false;
-        if (rhsValue) {
-            rhs = rhsValue;
-            rhsType = rhs->getType();
-        }
+        assert(rhsValue);
+        rhs = rhsValue;
+        rhsType = rhs->getType();
     }
     // rhs must be loaded for assignExpression() if it's a scalar
     if (rhsType->isPointerTy()) {
@@ -730,16 +775,16 @@ bool ComputeGenerator::visit(const ast::Crement* node)
 {
     llvm::Value* value = mValues.top();
     if (!value->getType()->isPointerTy()) {
-        if (!mLog.error("unable to assign to an rvalue", node)) return false;
-        return true;
+        mLog.error("unable to assign to an rvalue", node);
+        return false;
     }
     llvm::Value* rvalue = mBuilder.CreateLoad(value);
     llvm::Type* type = rvalue->getType();
 
     if (type->isIntegerTy(1) || (!type->isIntegerTy() && !type->isFloatingPointTy())) {
-        if (!mLog.error("variable is an unsupported type for "
-                "crement. Must be a non-boolean scalar.", node)) return false;
-        return true;
+        mLog.error("variable is an unsupported type for "
+                "crement. Must be a non-boolean scalar", node);
+        return false;
     }
     else {
         llvm::Value* crement = nullptr;
@@ -766,7 +811,8 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
 {
     const FunctionGroup* const function = this->getFunction(node->name());
     if (!function) {
-        if (!mLog.error("unable to locate function \"" + node->name() + "\".", node)) return false;
+        mLog.error("unable to locate function \"" + node->name() + "\"", node);
+        return false;
     }
     else {
         const size_t args = node->children();
@@ -822,7 +868,6 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
                 printSignature(os, inputTypes,
                     LLVMType<void>::get(mContext),
                     node->name().c_str(), {}, true);
-                os << ".";
             }
 
             os << " \ncandidates are: ";
@@ -830,7 +875,8 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
                 os << std::endl;
                 sig->print(mContext, os, node->name().c_str());
             }
-            if (!mLog.error(os.str(), node)) return false;
+            mLog.error(os.str(), node);
+            return false;
         }
         else {
             llvm::Value* result = nullptr;
@@ -852,21 +898,22 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
 
 bool ComputeGenerator::visit(const ast::Cast* node)
 {
-    llvm::Value* value = mValues.top();
+    llvm::Value* value = mValues.top(); mValues.pop();
+
     llvm::Type* type =
         value->getType()->isPointerTy() ?
         value->getType()->getPointerElementType() :
         value->getType();
 
     if (!type->isIntegerTy() && !type->isFloatingPointTy()) {
-        if (!mLog.error("unable to cast non scalar values", node)) return false;
+        mLog.error("unable to cast non scalar values", node);
+        return false;
     }
     else {
         // If the value to cast is already the correct type, return
         llvm::Type* targetType = llvmTypeFromToken(node->type(), mContext);
         if (type == targetType) return true;
 
-        mValues.pop();
 
         if (value->getType()->isPointerTy()) {
             value = mBuilder.CreateLoad(value);
@@ -908,40 +955,43 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
 
     const std::string& name = node->local()->name();
     if (!current->insert(name, value)) {
-        if (!mLog.error("local variable \"" + name +
-                "\" has already been declared!", node)) return false;
+        mLog.error("local variable \"" + name +
+                "\" has already been declared", node);
+        return false;
     }
 
     if (mSymbolTables.find(name, mScopeIndex - 1)) {
         if (!mLog.warning("declaration of variable \"" + name
-                + "\" shadows a previous declaration.", node)) return false;
+                + "\" shadows a previous declaration", node)) return false;
     }
 
 
     // do this to ensure all AST nodes are visited
-    if (!this->traverse(node->local())) return false;
-    value = mValues.top(); mValues.pop();
+    // shouldnt ever fail
+    if (this->traverse(node->local())) {
+        value = mValues.top(); mValues.pop();
+    }
+    else if (mLog.atErrorLimit()) return false;
 
     if (node->hasInit()) {
-        if (!this->traverse(node->init())) return false;
+        if (this->traverse(node->init())) {
+            llvm::Value* init = mValues.top(); mValues.pop();
+            llvm::Type* initType = init->getType();
 
-        llvm::Value* init = mValues.top(); mValues.pop();
-        llvm::Type* initType = init->getType();
-
-        if (initType->isPointerTy()) {
-            initType = initType->getPointerElementType();
-            if (initType->isIntegerTy() || initType->isFloatingPointTy()) {
-                init = mBuilder.CreateLoad(init);
+            if (initType->isPointerTy()) {
+                initType = initType->getPointerElementType();
+                if (initType->isIntegerTy() || initType->isFloatingPointTy()) {
+                    init = mBuilder.CreateLoad(init);
+                }
             }
+            if (!this->assignExpression(value, init, node)) return false;
+
+            // note that loop conditions allow uses of initialized declarations
+            // and so require the value
+            if (value) mValues.push(value);
         }
-
-        if (!this->assignExpression(value, init, node)) return false;
-
-        // note that loop conditions allow uses of initialized declarations
-        // and so require the value
-        if (value) mValues.push(value);
+        else if (mLog.atErrorLimit()) return false;
     }
-
     return true;
 }
 
@@ -968,10 +1018,8 @@ bool ComputeGenerator::visit(const ast::Local* node)
         mValues.push(value);
     }
     else {
-        if (!mLog.error("variable \"" + node->name() + "\" hasn't been declared!", node)) return false;
-        // if not a fatal error, add a dummy to use in subsequent codegen
-        llvm::Value* dummy = insertStaticAlloca(mBuilder, LLVMType<float>::get(mContext));
-        mValues.push(dummy);
+        mLog.error("variable \"" + node->name() + "\" hasn't been declared", node);
+        return false;
     }
     return true;
 }
@@ -996,8 +1044,8 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     llvm::Type* type = value->getType();
     if (!type->isPointerTy() ||
         !type->getPointerElementType()->isArrayTy()) {
-        if (!mLog.error("variable is not a valid type for component access.", node)) return false;
-        return true;
+        mLog.error("variable is not a valid type for component access", node);
+        return false;
     }
 
     // type now guaranteed to be an array type
@@ -1005,9 +1053,9 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
     const size_t size = type->getArrayNumElements();
     if (component1 && size <= 4) {
         {
-            if (!mLog.error("attribute or Local variable is not a compatible matrix type "
-                "for [,] indexing.", node)) return false;
-            return true;
+            mLog.error("attribute or local variable is not a compatible matrix type "
+                "for [,] indexing", node);
+            return false;
         }
     }
 
@@ -1029,9 +1077,9 @@ bool ComputeGenerator::visit(const ast::ArrayUnpack* node)
         }
         stream.flush();
         {
-            if (!mLog.error("unable to index into array with a non integer value. Types are ["
-                    + os.str() + "]", node)) return false;
-            return true;
+            mLog.error("unable to index into array with a non integer value. Types are ["
+                    + os.str() + "]", node);
+            return false;
         }
     }
 
@@ -1214,8 +1262,8 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
     llvm::Type* rtype = rhs->getType();
 
     if (!ltype->isPointerTy()) {
-        if (!mLog.error("unable to assign to an rvalue", node)) return false;
-        return true;
+        mLog.error("unable to assign to an rvalue", node);
+        return false;
     }
 
     ltype = ltype->getPointerElementType();
@@ -1242,16 +1290,16 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
 
     if (lsize != rsize) {
         if (lsize > 1 && rsize > 1) {
-            if (!mLog.error("unable to assign vector/array "
-                "attributes with mismatching sizes", node)) return false;
-            return true;
+            mLog.error("unable to assign vector/array "
+                "attributes with mismatching sizes", node);
+            return false;
         }
         else if (lsize == 1) {
             assert(rsize > 1);
-            if (!mLog.error("cannot assign a scalar value "
+            mLog.error("cannot assign a scalar value "
                 "from a vector or matrix. Consider using the [] operator to "
-                "get a particular element.", node)) return false;
-            return true;
+                "get a particular element", node);
+            return false;
         }
     }
 
@@ -1346,7 +1394,8 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
         mBuilder.CreateStore(size, lsize);
     }
     else {
-        if (!mLog.error("unsupported implicit cast in assignment.", node)) return false;
+        mLog.error("unsupported implicit cast in assignment", node);
+        return false;
     }
     return true;
 }
@@ -1419,9 +1468,9 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 result = this->getFunction("transform")->execute({lhs, rhs}, mBuilder);
             }
             else {
-                if (!mLog.error("unsupported * operator on "
-                    "vector/matrix sizes", node)) return false;
-                return true;
+                mLog.error("unsupported * operator on "
+                    "vector/matrix sizes", node);
+                return false;
             }
         }
         else if (op == ast::tokens::MORETHAN ||
@@ -1432,10 +1481,10 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                  op == ast::tokens::MODULO || // no % support for mats
                  opType == ast::tokens::LOGICAL ||
                  opType == ast::tokens::BITWISE) {
-            if (!mLog.error("call to unsupported operator \""
+            mLog.error("call to unsupported operator \""
                 + ast::tokens::operatorNameFromToken(op) +
-                "\" with a vector/matrix argument", node)) return false;
-            return true;
+                "\" with a vector/matrix argument", node);
+            return false;
         }
     }
 
@@ -1443,9 +1492,9 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
         // Handle matrix/vector ops of mismatching sizes
         if (lsize > 1 || rsize > 1) {
             if (lsize != rsize && (lsize > 1 && rsize > 1)) {
-                if (!mLog.error("unsupported binary operator on vector/matrix "
-                    "arguments of mismatching sizes.", node)) return false;
-                return true;
+                mLog.error("unsupported binary operator on vector/matrix "
+                    "arguments of mismatching sizes", node);
+                return false;
             }
             if (op == ast::tokens::MORETHAN ||
                 op == ast::tokens::LESSTHAN ||
@@ -1453,20 +1502,20 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 op == ast::tokens::LESSTHANOREQUAL ||
                 opType == ast::tokens::LOGICAL ||
                 opType == ast::tokens::BITWISE) {
-                if (!mLog.error("call to unsupported operator \""
+                mLog.error("call to unsupported operator \""
                     + ast::tokens::operatorNameFromToken(op) +
-                    "\" with a vector/matrix argument", node)) return false;
-                return true;
+                    "\" with a vector/matrix argument", node);
+                return false;
             }
         }
 
         // Handle invalid floating point ops
         if (rtype->isFloatingPointTy() || ltype->isFloatingPointTy()) {
             if (opType == ast::tokens::BITWISE) {
-                if (!mLog.error("call to unsupported operator \""
+                mLog.error("call to unsupported operator \""
                     + ast::tokens::operatorNameFromToken(op) +
-                    "\" with a floating point argument", node)) return false;
-                return true;
+                    "\" with a floating point argument", node);
+                return false;
             }
         }
     }
@@ -1589,9 +1638,9 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
     if (string)
     {
         if (op != ast::tokens::PLUS) {
-            if (!mLog.error("unsupported string operation \""
-                + ast::tokens::operatorNameFromToken(op) + "\"", node)) return false;
-            return true;
+            mLog.error("unsupported string operation \""
+                + ast::tokens::operatorNameFromToken(op) + "\"", node);
+            return false;
         }
 
         auto& B = mBuilder;
@@ -1664,7 +1713,8 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
     }
 
     if (!result) {
-        if (!mLog.error("unsupported implicit cast in binary op.", node)) return false;
+        mLog.error("unsupported implicit cast in binary op", node);
+        return false;
     }
 
     return true;

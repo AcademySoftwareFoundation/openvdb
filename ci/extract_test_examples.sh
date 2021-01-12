@@ -6,10 +6,10 @@ VDB_AX=$ROOT/build/openvdb_ax/openvdb_ax/cmd/vdb_ax
 
 DOCS=()
 DOCS+=($ROOT/doc/ax/ax.txt)
+DOCS+=($ROOT/doc/ax/axcplusplus.txt)
 DOCS+=($ROOT/doc/ax/axexamples.txt)
 # DOCS+=($ROOT/doc/ax/axfunctionlist.txt) do not test this file
 DOCS+=($ROOT/doc/ax/doc.txt)
-DOCS+=($ROOT/doc/ax/openvdbaxapi.txt)
 
 for DOC in "${DOCS[@]}"; do
     echo "Checking doxygen code in '$DOC...'"
