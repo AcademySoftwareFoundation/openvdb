@@ -10,10 +10,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBBinaries LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 include(GNUInstallDirs)
 
 ###### OpenVDB Binary Component Options
