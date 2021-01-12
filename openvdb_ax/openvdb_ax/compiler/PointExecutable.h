@@ -83,29 +83,6 @@ public:
 
     ////////////////////////////////////////////////////////
 
-    // @brief deprecated methods
-    OPENVDB_DEPRECATED void
-    execute(points::PointDataGrid& grid,
-        const std::string* const group,
-        const bool create) const
-    {
-        PointExecutable copy(*this);
-        if (group) copy.setGroupExecution(*group);
-        copy.setCreateMissing(create);
-        copy.execute(grid);
-    }
-
-    OPENVDB_DEPRECATED void
-    execute(points::PointDataGrid& grid,
-        const std::string* const group) const
-    {
-        PointExecutable copy(*this);
-        if (group) copy.setGroupExecution(*group);
-        copy.execute(grid);
-    }
-
-    ////////////////////////////////////////////////////////
-
     // foward declaration of settings for this executable
     struct Settings;
 

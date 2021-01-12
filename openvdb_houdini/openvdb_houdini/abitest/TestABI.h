@@ -3,6 +3,9 @@
 
 const char* getABI();
 const char* getNamespace();
-void* createGrid();
-void cleanupGrid(void*);
-int validateGrid(void*);
+void* createFloatGrid();
+void* createPointsGrid();
+void cleanupFloatGrid(void*);
+void cleanupPointsGrid(void*);
+int validateFloatGrid(void*);
+int validatePointsGrid(void*);

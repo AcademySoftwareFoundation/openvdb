@@ -4,7 +4,7 @@
 /// @file unittest/TestPoissonSolver.cc
 /// @authors D.J. Hill, Peter Cucka
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/ConjGradient.h> // for JacobiPreconditioner
@@ -16,34 +16,15 @@
 #include <cmath>
 
 
-class TestPoissonSolver: public CppUnit::TestCase
+class TestPoissonSolver: public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestPoissonSolver);
-    CPPUNIT_TEST(testIndexTree);
-    CPPUNIT_TEST(testTreeToVectorToTree);
-    CPPUNIT_TEST(testLaplacian);
-    CPPUNIT_TEST(testSolve);
-    CPPUNIT_TEST(testSolveWithBoundaryConditions);
-    CPPUNIT_TEST(testSolveWithSegmentedDomain);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testIndexTree();
-    void testTreeToVectorToTree();
-    void testLaplacian();
-    void testSolve();
-    void testSolveWithBoundaryConditions();
-    void testSolveWithSegmentedDomain();
 };
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPoissonSolver);
 
 
 ////////////////////////////////////////
 
 
-void
-TestPoissonSolver::testIndexTree()
+TEST_F(TestPoissonSolver, testIndexTree)
 {
     using namespace openvdb;
     using tools::poisson::VIndex;
@@ -59,7 +40,7 @@ TestPoissonSolver::testIndexTree()
     for (size_t n = 0, N = leafManager.leafCount(); n < N; ++n) {
         const LeafNodeType& leaf = leafManager.leaf(n);
         for (LeafNodeType::ValueOnCIter it = leaf.cbeginValueOn(); it; ++it, testOffset++) {
-            CPPUNIT_ASSERT_EQUAL(testOffset, *it);
+            EXPECT_EQ(testOffset, *it);
         }
     }
 
@@ -71,12 +52,11 @@ TestPoissonSolver::testIndexTree()
     //              << tree.activeTileCount()<<std::endl;
     //}
 
-    CPPUNIT_ASSERT_EQUAL(VIndex(tree.activeVoxelCount()), testOffset);
+    EXPECT_EQ(VIndex(tree.activeVoxelCount()), testOffset);
 }
 
 
-void
-TestPoissonSolver::testTreeToVectorToTree()
+TEST_F(TestPoissonSolver, testTreeToVectorToTree)
 {
     using namespace openvdb;
     using tools::poisson::VIndex;
@@ -92,12 +72,12 @@ TestPoissonSolver::testTreeToVectorToTree()
 
     // Generate an index tree.
     VIdxTree::Ptr indexTree = tools::poisson::createIndexTree(inputTree);
-    CPPUNIT_ASSERT(bool(indexTree));
+    EXPECT_TRUE(bool(indexTree));
 
     // Copy the values of the active voxels of the tree into a vector.
     math::pcg::VectorS::Ptr vec =
         tools::poisson::createVectorFromTree<float>(inputTree, *indexTree);
-    CPPUNIT_ASSERT_EQUAL(math::pcg::SizeType(numVoxels), vec->size());
+    EXPECT_EQ(math::pcg::SizeType(numVoxels), vec->size());
 
     {
         // Convert the vector back to a tree.
@@ -112,14 +92,13 @@ TestPoissonSolver::testTreeToVectorToTree()
             //    std::cout << " value error " << *it << " "
             //        << inputTree.getValue(ijk) << std::endl;
             //}
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(inputAcc.getValue(ijk), *it, /*tolerance=*/1.0e-6);
+            EXPECT_NEAR(inputAcc.getValue(ijk), *it, /*tolerance=*/1.0e-6);
         }
     }
 }
 
 
-void
-TestPoissonSolver::testLaplacian()
+TEST_F(TestPoissonSolver, testLaplacian)
 {
     using namespace openvdb;
     using tools::poisson::VIndex;
@@ -146,12 +125,12 @@ TestPoissonSolver::testLaplacian()
 
         // Generate an index tree.
         VIdxTree::Ptr indexTree = tools::poisson::createIndexTree(inputTree);
-        CPPUNIT_ASSERT(bool(indexTree));
+        EXPECT_TRUE(bool(indexTree));
 
         // Copy the values of the active voxels of the tree into a vector.
         math::pcg::VectorS::Ptr source =
             tools::poisson::createVectorFromTree<float>(inputTree, *indexTree);
-        CPPUNIT_ASSERT_EQUAL(math::pcg::SizeType(numVoxels), source->size());
+        EXPECT_EQ(math::pcg::SizeType(numVoxels), source->size());
 
         // Create a mask of the interior voxels of the source tree.
         BoolTree interiorMask(/*background=*/false);
@@ -162,7 +141,7 @@ TestPoissonSolver::testLaplacian()
         tools::poisson::LaplacianMatrix::Ptr laplacian =
             tools::poisson::createISLaplacian(*indexTree, interiorMask, /*staggered=*/true);
         laplacian->scale(1.0 / (delta * delta)); // account for voxel spacing
-        CPPUNIT_ASSERT_EQUAL(math::pcg::SizeType(numVoxels), laplacian->size());
+        EXPECT_EQ(math::pcg::SizeType(numVoxels), laplacian->size());
 
         math::pcg::VectorS result(source->size());
         laplacian->vectorMultiply(*source, result);
@@ -174,14 +153,13 @@ TestPoissonSolver::testLaplacian()
             float((3.0 * src[1] - 6.0 * src[0]) / (delta * delta * src[0]));
         for (math::pcg::SizeType n = 0; n < result.size(); ++n) {
             result[n] /= src[n];
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(expected, result[n], /*tolerance=*/1.0e-4);
+            EXPECT_NEAR(expected, result[n], /*tolerance=*/1.0e-4);
         }
     }
 }
 
 
-void
-TestPoissonSolver::testSolve()
+TEST_F(TestPoissonSolver, testSolve)
 {
     using namespace openvdb;
 
@@ -195,8 +173,8 @@ TestPoissonSolver::testSolve()
 
     FloatTree::Ptr outTree = tools::poisson::solve(sphere->tree(), result);
 
-    CPPUNIT_ASSERT(result.success);
-    CPPUNIT_ASSERT(result.iterations < 60);
+    EXPECT_TRUE(result.success);
+    EXPECT_TRUE(result.iterations < 60);
 }
 
 
@@ -257,12 +235,12 @@ doTestSolveWithBoundaryConditions()
     typename TreeType::Ptr solution = tools::poisson::solveWithBoundaryConditions(
         source, BoundaryOp(), state, interrupter, /*staggered=*/true);
 
-    CPPUNIT_ASSERT(state.success);
-    CPPUNIT_ASSERT(state.iterations < 60);
+    EXPECT_TRUE(state.success);
+    EXPECT_TRUE(state.iterations < 60);
 
     // Verify that P = -y throughout the solution space.
     for (typename TreeType::ValueOnCIter it = solution->cbeginValueOn(); it; ++it) {
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(
+        EXPECT_NEAR(
             double(-it.getCoord().y()), double(*it), /*tolerance=*/10.0 * epsilon);
     }
 }
@@ -270,8 +248,7 @@ doTestSolveWithBoundaryConditions()
 } // unnamed namespace
 
 
-void
-TestPoissonSolver::testSolveWithBoundaryConditions()
+TEST_F(TestPoissonSolver, testSolveWithBoundaryConditions)
 {
     doTestSolveWithBoundaryConditions<openvdb::FloatTree>();
     doTestSolveWithBoundaryConditions<openvdb::DoubleTree>();
@@ -353,8 +330,7 @@ private:
 } // unnamed namespace
 
 
-void
-TestPoissonSolver::testSolveWithSegmentedDomain()
+TEST_F(TestPoissonSolver, testSolveWithSegmentedDomain)
 {
     // In fluid simulations, incompressibility is enforced by the pressure, which is
     // computed as a solution of a Poisson equation.  Often, procedural animation
@@ -456,7 +432,7 @@ TestPoissonSolver::testSolveWithSegmentedDomain()
     // Identify the well-posed part of the problem.
     BoolTree wellPosedDomain(source, /*inactive=*/false, /*active=*/true, TopologyCopy());
     wellPosedDomain.topologyDifference(*interiorMask);
-    CPPUNIT_ASSERT_EQUAL(expectedWellPosedVolume, wellPosedDomain.activeVoxelCount());
+    EXPECT_EQ(expectedWellPosedVolume, wellPosedDomain.activeVoxelCount());
 
     // Solve the well-posed Poisson equation.
 
@@ -476,9 +452,9 @@ TestPoissonSolver::testSolveWithSegmentedDomain()
         tools::poisson::solveWithBoundaryConditionsAndPreconditioner<PreconditionerType>(
             source, wellPosedDomain, boundaryOp, state, interrupter, /*staggered=*/true);
 
-    CPPUNIT_ASSERT_EQUAL(expectedWellPosedVolume, wellPosedSolutionP->activeVoxelCount());
-    CPPUNIT_ASSERT(state.success);
-    CPPUNIT_ASSERT(state.iterations < 68);
+    EXPECT_EQ(expectedWellPosedVolume, wellPosedSolutionP->activeVoxelCount());
+    EXPECT_TRUE(state.success);
+    EXPECT_TRUE(state.iterations < 68);
 
     // Verify that the solution is linear with depth.
     for (FloatTree::ValueOnCIter it = wellPosedSolutionP->cbeginValueOn(); it; ++it) {
@@ -488,7 +464,7 @@ TestPoissonSolver::testSolveWithSegmentedDomain()
         } else {
             depth = 1 + liquidInClosedDomain1.max().z() - it.getCoord().z();
         }
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(depth), double(*it), /*tolerance=*/10.0 * epsilon);
+        EXPECT_NEAR(double(depth), double(*it), /*tolerance=*/10.0 * epsilon);
     }
 
 #if 0

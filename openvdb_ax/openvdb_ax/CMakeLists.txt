@@ -54,10 +54,10 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
     set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
   endif()
 
-  FLEX_TARGET(openvdb_ax_lexer openvdb_ax/grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+  FLEX_TARGET(openvdb_ax_lexer grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
     COMPILE_FLAGS ${FLEX_COMPILE_FLAGS}
   )
-  BISON_TARGET(openvdb_ax_parser openvdb_ax/grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
+  BISON_TARGET(openvdb_ax_parser grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
     DEFINES_FILE ${OPENVDB_AX_GRAMMAR_DIR}/axparser.h
     COMPILE_FLAGS ${BISON_COMPILE_FLAGS}
   )
@@ -99,24 +99,24 @@ message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE
 #########################################################################
 
 set(OPENVDB_AX_LIBRARY_SOURCE_FILES
-  openvdb_ax/ast/Parse.cc
-  openvdb_ax/ast/PrintTree.cc
-  openvdb_ax/ast/Scanners.cc
-  openvdb_ax/ax.cc
-  openvdb_ax/codegen/ComputeGenerator.cc
-  openvdb_ax/codegen/FunctionRegistry.cc
-  openvdb_ax/codegen/FunctionTypes.cc
-  openvdb_ax/codegen/PointComputeGenerator.cc
-  openvdb_ax/codegen/PointFunctions.cc
-  openvdb_ax/codegen/StandardFunctions.cc
-  openvdb_ax/codegen/Types.cc
-  openvdb_ax/codegen/VolumeComputeGenerator.cc
-  openvdb_ax/codegen/VolumeFunctions.cc
-  openvdb_ax/compiler/Compiler.cc
-  openvdb_ax/compiler/Logger.cc
-  openvdb_ax/compiler/PointExecutable.cc
-  openvdb_ax/compiler/VolumeExecutable.cc
-  openvdb_ax/math/OpenSimplexNoise.cc
+  ast/Parse.cc
+  ast/PrintTree.cc
+  ast/Scanners.cc
+  ax.cc
+  codegen/ComputeGenerator.cc
+  codegen/FunctionRegistry.cc
+  codegen/FunctionTypes.cc
+  codegen/PointComputeGenerator.cc
+  codegen/PointFunctions.cc
+  codegen/StandardFunctions.cc
+  codegen/Types.cc
+  codegen/VolumeComputeGenerator.cc
+  codegen/VolumeFunctions.cc
+  compiler/Compiler.cc
+  compiler/Logger.cc
+  compiler/PointExecutable.cc
+  compiler/VolumeExecutable.cc
+  math/OpenSimplexNoise.cc
 )
 
 if(OPENVDB_BUILD_AX_GRAMMAR)
@@ -125,42 +125,42 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
     ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
 else()
   list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
-    openvdb_ax/grammar/generated/axlexer.cc
-    openvdb_ax/grammar/generated/axparser.cc)
+    grammar/generated/axlexer.cc
+    grammar/generated/axparser.cc)
 endif()
 
 set(OPENVDB_AX_AST_INCLUDE_FILES
-  openvdb_ax/ast/AST.h
-  openvdb_ax/ast/Parse.h
-  openvdb_ax/ast/PrintTree.h
-  openvdb_ax/ast/Scanners.h
-  openvdb_ax/ast/Tokens.h
-  openvdb_ax/ast/Visitor.h
+  ast/AST.h
+  ast/Parse.h
+  ast/PrintTree.h
+  ast/Scanners.h
+  ast/Tokens.h
+  ast/Visitor.h
 )
 
 set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
-  openvdb_ax/codegen/ComputeGenerator.h
-  openvdb_ax/codegen/ConstantFolding.h
-  openvdb_ax/codegen/FunctionRegistry.h
-  openvdb_ax/codegen/Functions.h
-  openvdb_ax/codegen/FunctionTypes.h
-  openvdb_ax/codegen/PointComputeGenerator.h
-  openvdb_ax/codegen/PointLeafLocalData.h
-  openvdb_ax/codegen/SymbolTable.h
-  openvdb_ax/codegen/Types.h
-  openvdb_ax/codegen/Utils.h
-  openvdb_ax/codegen/VolumeComputeGenerator.h
-  openvdb_ax/math/OpenSimplexNoise.h
+  codegen/ComputeGenerator.h
+  codegen/ConstantFolding.h
+  codegen/FunctionRegistry.h
+  codegen/Functions.h
+  codegen/FunctionTypes.h
+  codegen/PointComputeGenerator.h
+  codegen/PointLeafLocalData.h
+  codegen/SymbolTable.h
+  codegen/Types.h
+  codegen/Utils.h
+  codegen/VolumeComputeGenerator.h
+  math/OpenSimplexNoise.h
 )
 
 set(OPENVDB_AX_COMPILER_INCLUDE_FILES
-  openvdb_ax/compiler/AttributeRegistry.h
-  openvdb_ax/compiler/Compiler.h
-  openvdb_ax/compiler/CompilerOptions.h
-  openvdb_ax/compiler/CustomData.h
-  openvdb_ax/compiler/Logger.h
-  openvdb_ax/compiler/PointExecutable.h
-  openvdb_ax/compiler/VolumeExecutable.h
+  compiler/AttributeRegistry.h
+  compiler/Compiler.h
+  compiler/CompilerOptions.h
+  compiler/CustomData.h
+  compiler/Logger.h
+  compiler/PointExecutable.h
+  compiler/VolumeExecutable.h
 )
 
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
@@ -202,11 +202,7 @@ set(OPENVDB_AX_CORE_DEPENDENT_LIBS
 
 if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PUBLIC ${LLVM_DEFINITIONS})
-  if(OPENVDB_HAS_MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
-  endif()
-
-  target_include_directories(openvdb_ax_static PUBLIC . )
+  target_include_directories(openvdb_ax_static PUBLIC ../)
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -234,11 +230,7 @@ endif()
 
 if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PUBLIC ${LLVM_DEFINITIONS})
-  if(OPENVDB_HAS_MATRIX_SUPPORT)
-    target_compile_definitions(openvdb_ax_shared PUBLIC -DOPENVDB_HAS_MATRIX_SUPPORT)
-  endif()
-
-  target_include_directories(openvdb_ax_shared PUBLIC . )
+  target_include_directories(openvdb_ax_shared PUBLIC ../)
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -285,7 +277,7 @@ if(OPENVDB_AX_SHARED)
   endif()
 endif()
 
-install(FILES openvdb_ax/ax.h openvdb_ax/Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
+install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
 install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
 install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
 install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)

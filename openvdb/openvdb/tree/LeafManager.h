@@ -230,8 +230,6 @@ public:
     {
     }
 
-    virtual ~LeafManager() { }
-
     /// @brief (Re)initialize by resizing (if necessary) and repopulating the leaf array
     /// and by deleting existing auxiliary buffers and allocating new ones.
     /// @details Call this method if the tree's topology, and therefore the number

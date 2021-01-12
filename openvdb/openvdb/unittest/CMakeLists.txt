@@ -34,11 +34,12 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
+find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
 set(OPENVDB_TEST_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  CppUnit::cppunit
+  GTest::GTest
+  GTest::Main
 )
 
 if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
@@ -189,7 +190,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}
-    ${CppUnit_LIBRARY_DIRS}
+    ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
     list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)

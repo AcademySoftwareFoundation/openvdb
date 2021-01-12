@@ -906,7 +906,9 @@ private:
     void resetTable(const MapType&) const {}
     //@}
 
+#if OPENVDB_ABI_VERSION_NUMBER < 8
     Index getChildCount() const;
+#endif
     Index getTileCount() const;
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
@@ -1477,15 +1479,13 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER < 8
 template<typename ChildT>
 inline Index
 RootNode<ChildT>::getChildCount() const {
-    Index sum = 0;
-    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
-        if (isChild(i)) ++sum;
-    }
-    return sum;
+    return this->childCount();
 }
+#endif
 
 
 template<typename ChildT>
@@ -1554,7 +1554,11 @@ template<typename ChildT>
 inline Index32
 RootNode<ChildT>::childCount() const
 {
-    return this->getChildCount();
+    Index sum = 0;
+    for (MapCIter i = mTable.begin(), e = mTable.end(); i != e; ++i) {
+        if (isChild(i)) ++sum;
+    }
+    return sum;
 }
 
 
@@ -2268,7 +2272,7 @@ RootNode<ChildT>::writeTopology(std::ostream& os, bool toHalf) const
     }
     io::setGridBackgroundValuePtr(os, &mBackground);
 
-    const Index numTiles = this->getTileCount(), numChildren = this->getChildCount();
+    const Index numTiles = this->getTileCount(), numChildren = this->childCount();
     os.write(reinterpret_cast<const char*>(&numTiles), sizeof(Index));
     os.write(reinterpret_cast<const char*>(&numChildren), sizeof(Index));
 

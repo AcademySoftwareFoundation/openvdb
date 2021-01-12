@@ -70,22 +70,6 @@ fillWithSpheres(
     InterrupterT* interrupter = nullptr);
 
 
-/// @deprecated Use the @a sphereCount overload instead.
-template<typename GridT, typename InterrupterT = util::NullInterrupter>
-OPENVDB_DEPRECATED
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
-    bool overlapping = false,
-    float minRadius = 1.0,
-    float maxRadius = std::numeric_limits<float>::max(),
-    float isovalue = 0.0,
-    int instanceCount = 10000,
-    InterrupterT* interrupter = nullptr);
-
-
 ////////////////////////////////////////
 
 
@@ -640,24 +624,6 @@ UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
 
 
 ////////////////////////////////////////
-
-
-template<typename GridT, typename InterrupterT>
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
-    bool overlapping,
-    float minRadius,
-    float maxRadius,
-    float isovalue,
-    int instanceCount,
-    InterrupterT* interrupter)
-{
-    fillWithSpheres(grid, spheres, Vec2i(1, maxSphereCount), overlapping,
-        minRadius, maxRadius, isovalue, instanceCount, interrupter);
-}
 
 
 template<typename GridT, typename InterrupterT>

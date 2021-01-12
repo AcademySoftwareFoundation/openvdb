@@ -1,7 +1,87 @@
 OpenVDB Version History
 =======================
 
-Version 7.2.0 - In Development
+Version 8.0.0 - December 23, 2020
+
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 6 for
+      Houdini 18.0 and 7 for Houdini 18.5.
+
+      Official release of OpenVDB AX, a new C++ library that implements a
+      domain specific JIT (just-in-time) compiled expression language,
+      providing users with a new way of interacting with OpenVDB data. AX is
+      tailored towards writing highly parallelizable and customizable OpenVDB
+      volume and point kernel operations. See the documentation for more:
+      https://www.openvdb.org/documentation/doxygen/openvdbax.html
+
+    New features:
+    - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
+      if respectively active voxels or tiles in a tree intersect a given
+      CoordBBox.
+    - Added tools::activeTiles that returns a vector containing all the active
+      tiles in a tree that intersects a given CoordBBox.
+
+    Improvements:
+    - Made LeafManager class non-virtual.
+
+    Bug fixes:
+    - Fixed a determinism bug in NodeManager when using non-thread-safe
+      functor members.
+    - Fix GridTransformer construction to use correct rotate-scale-translate
+      order when recomposing matrix components.
+      [Contributed by Tom Cnops].
+    - OpenVDB AX: Fixed a potential code generation crash in binary, ternary
+      or comma operators when errors occurred in first operand.
+
+    ABI changes:
+    - Grid::isTreeUnique() is now virtual as of ABI=8 so that it can be
+      accessed from the GridBase.
+    - Private method RootNode::getChildCount() has been removed as of ABI=8.
+    - Mark map classes and functions as final for ABI=8 where beneficial to
+      allow devirtualization optimization.
+    - As of ABI 8, Vector, Matrix and Quaternion types now satisfy the Trivial
+      Type requirement. Their empty constructors and copy constructors have
+      been removed (and are left to the compiler to define).
+    - As of ABI 8, removed an unnecessary specialization of NodeUnion and
+      CopyTraits from NodeUnion.h. Replaced std::is_pod usage with
+      std::is_trivially_copyable which allows more types to benefit from the
+      union storage.
+    - As of ABI 8, PointDataGrids use the union NodeUnion specialization,
+      reducing the memory footprint of their topology by 50%.
+
+    API changes:
+    - Removed a number of deprecated point, volume and AX methods.
+
+    Houdini:
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+      VDB Write likewise should not reset the compression values.
+
+    Build:
+    - As of this release, VFX Reference Platform 2018 is no longer supported.
+      CMake now issues deprecation warnings for 2019 VFX Reference Platform
+      version dependencies, with the exception that OpenEXR/IlmBase 2.2 is
+      still supported.
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
+    - Improved the python module's linkage with the CMake 3.15 Python::Module
+      target. Explicitly linking with the Development target could result in
+      crashes, particularly on macOS.
+      [Reported by Alexander Hagen]
+    - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
+      attribute.
+
+Version 7.2.1 - December 23, 2020
+
+    Bug fixes:
+    - Fixed a determinism bug in NodeManager when using non-thread-safe
+      functor members.
+
+    Build:
+    - Added a missing header include to resolve an undefined size_t build error
+      on GCC10.
+
+Version 7.2.0 - December 9, 2020
 
     New features:
     - Added tree::DynamicNodeManager that lazily caches the nodes at each
@@ -12,6 +92,8 @@ Version 7.2.0 - In Development
       accelerate CSG union, intersection and difference operations.
     - Added tools::TreeToMerge which provides methods to steal or deep-copy
       from a tree based on the tag dispatch class used in its construction.
+    - Pre-release of OpenVDB AX, an open source C++ library that provides a
+      powerful and easy way of interacting with OpenVDB volume and point data.
 
     Improvements:
     - util::CpuTimer now uses C++11 chrono instead of TBB.
@@ -19,9 +101,9 @@ Version 7.2.0 - In Development
     - tools::csgUnion, tools::csgIntersection and tools::csgDifference now use
       the new parallel breadth-first algorithms for much faster performance.
     - Extended tree::NodeManager to allow for use with a const tree.
-    - Vector, Matrix and Quaternion types now satisfy the Trivial Type requirement.
-      Their empty constructors and copy constructors have been removed (and are left
-      to the compiler to define).
+    - Added math::Abs, math::cwiseAdd, math::cwiseLessThan and
+      math::cwiseGreaterThan methods for Matrix types. Matrix grids can now be
+      instantiated.
 
     Houdini:
     - Fixed a bug in the OpenVDB Points Convert SOP where the auto voxel
@@ -49,8 +131,6 @@ Version 7.2.0 - In Development
       tools::CsgVisitorIntersection and tools::CsgVisitorDifference. The CSG
       tools now use the parallel breath-first algorithms.
     - Moved openvdb::TypeList from Types.h into its own header TypeList.h
-    - Removed an unnecessary specialization of NodeUnion and CopyTraits from
-      NodeUnion.h. Replaced std::is_pod usage with std::is_trivially_copyable.
 
     Build:
     - Removed the Makefiles.
@@ -67,6 +147,7 @@ Version 7.2.0 - In Development
     - Added the OPENVDB_STATICLIB define to all static builds to fix builds on
       Windows which use the multithread/DLL-specific version of the CRT.
       [Reported by Tobias Rittig]
+    - Core library unit tests use GoogleTest instead of CppUnit.
 
 Version 7.1.0 - August 13, 2020
 
