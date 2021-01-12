@@ -26,7 +26,7 @@ else()
   set(OPENVDBAX_LIB openvdb_ax)
 endif()
 
-find_package(CppUnit REQUIRED)
+find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
 
 set(TEST_SOURCE_FILES
   ast/TestScanners.cc
