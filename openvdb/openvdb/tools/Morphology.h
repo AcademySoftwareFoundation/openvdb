@@ -1206,7 +1206,7 @@ inline void erodeActiveLeafValues(TreeOrLeafManagerT& treeOrLeafM,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
-OPENVDB_DEPRECATED
+[[deprecated]]
 inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE)
@@ -1229,7 +1229,7 @@ inline void dilateVoxels(TreeType& tree,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
-OPENVDB_DEPRECATED
+[[deprecated]]
 inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE)
@@ -1247,7 +1247,7 @@ inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
 /// of any voxels, only their active states.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType>
-OPENVDB_DEPRECATED
+[[deprecated]]
 inline void erodeVoxels(TreeType& tree,
                         int iterations=1,
                         NearestNeighbors nn = NN_FACE)
@@ -1257,7 +1257,7 @@ inline void erodeVoxels(TreeType& tree,
 }
 
 template<typename TreeType>
-OPENVDB_DEPRECATED
+[[deprecated]]
 inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
                         int iterations = 1,
                         NearestNeighbors nn = NN_FACE)
