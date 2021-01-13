@@ -380,7 +380,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
                     EXPECT_EQ(Index64(1), tree.activeVoxelCount());
                     CheckInactiveNeighbours(tree, xyz);
                     EXPECT_TRUE(tree.isValueOn(xyz));
-                    if (!IsMask) EXPECT_EQ(ValueType(1.0), tree.getValue(xyz));
+                    if (!IsMask) { EXPECT_EQ(ValueType(1.0), tree.getValue(xyz)); }
                 }
             }
         }
