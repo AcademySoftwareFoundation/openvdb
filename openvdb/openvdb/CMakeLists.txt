@@ -416,8 +416,10 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+  if(USE_EXR)
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
   endif()
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
 endif()
