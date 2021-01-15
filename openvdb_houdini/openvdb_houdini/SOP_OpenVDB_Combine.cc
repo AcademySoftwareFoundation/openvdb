@@ -1158,6 +1158,22 @@ struct SOP_OpenVDB_Combine::CombineOp
         }
     }
 
+    template <typename GridT>
+    void doUnion(GridT &result, GridT &temp)
+    {
+        openvdb::tools::csgUnion(result, temp);
+    }
+    template <typename GridT>
+    void doIntersection(GridT &result, GridT &temp)
+    {
+        openvdb::tools::csgIntersection(result, temp);
+    }
+    template <typename GridT>
+    void doDifference(GridT &result, GridT &temp)
+    {
+        openvdb::tools::csgDifference(result, temp);
+    }
+
     // Combine two grids of the same type.
     template<typename GridT>
     void combineSameType()
@@ -1265,19 +1281,19 @@ struct SOP_OpenVDB_Combine::CombineOp
             case OP_UNION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                openvdb::tools::csgUnion(*resultGrid, *tempGrid);
+                doUnion(*resultGrid, *tempGrid);
                 break;
 
             case OP_INTERSECTION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                openvdb::tools::csgIntersection(*resultGrid, *tempGrid);
+                doIntersection(*resultGrid, *tempGrid);
                 break;
 
             case OP_DIFFERENCE:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                openvdb::tools::csgDifference(*resultGrid, *tempGrid);
+                doDifference(*resultGrid, *tempGrid);
                 break;
 
             case OP_REPLACE:
@@ -1427,6 +1443,19 @@ struct SOP_OpenVDB_Combine::CombineOp
         }
     }
 }; // struct CombineOp
+
+template <>
+void SOP_OpenVDB_Combine::CombineOp::doUnion(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+{
+}
+template <>
+void SOP_OpenVDB_Combine::CombineOp::doIntersection(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+{
+}
+template <>
+void SOP_OpenVDB_Combine::CombineOp::doDifference(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+{
+}
 
 
 template<typename AGridT>
