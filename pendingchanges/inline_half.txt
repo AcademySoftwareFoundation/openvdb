@@ -1,0 +1,6 @@
+    Build:
+    - Dependency on OpenEXR's Half implementation has been removed from the
+      core library by naturalizing the implementation into openvdb::math.
+      This is fully bitwise compatible, but may require switching Half
+      references to math::Half.
+
