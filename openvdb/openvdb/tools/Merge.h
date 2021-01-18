@@ -501,6 +501,9 @@ struct UnallocatedBuffer<BufferT, bool>
 template <typename TreeT, bool Union>
 bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) const
 {
+    const bool Intersect = !Union;
+
+    // No trees to union/intersect with:
     if (this->empty())     return false;
 
     // store the background value
@@ -530,11 +533,21 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
     };
 
     std::unordered_map<Coord, /*flags*/uint8_t> tiles;
+    std::unordered_map<Coord, /*tilecount*/int> tilecount;
 
     if (root.getTableSize() > 0) {
         for (auto valueIter = root.cbeginValueAll(); valueIter; ++valueIter) {
             const Coord& key = valueIter.getCoord();
             tiles.insert({key, getTileFlag(valueIter)});
+            if (Intersect)
+                tilecount[key]++;
+        }
+    }
+    else
+    {
+        if (Intersect) {
+            // Intersecting with an empty grid is always empty.
+            return false;
         }
     }
 
@@ -542,13 +555,21 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
 
     for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
         const auto* mergeRoot = mergeTree.rootPtr();
+
+        // Empty trees can be ignored, we won't increment the tile counts
+        // and this will handle the intersection case.
         if (!mergeRoot)     continue;
         for (auto valueIter = mergeRoot->cbeginValueAll(); valueIter; ++valueIter) {
             const Coord& key = valueIter.getCoord();
+            if (Intersect)
+                tilecount[key]++;
             auto it = tiles.find(key);
             if (it == tiles.end()) {
-                // if no tile with this key, insert it
-                tiles.insert({key, getTileFlag(valueIter)});
+                // If no tile with this key, insert it
+                // Only need to do this in the union case as it will be
+                // skipped for interection.
+                if (Union)
+                    tiles.insert({key, getTileFlag(valueIter)});
             } else {
                 // replace an outside tile with an inside tile
                 const uint8_t flag = it->second;
@@ -570,6 +591,27 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             const Coord& key = it.first;
             const bool state = flag & ACTIVE_TILE;
             root.addTile(key, insideBackground, state);
+        }
+    }
+
+    // Remove all tiles with insufficent tile count. If they are missing
+    // in any grid, they are not present in an interesection.
+    if (Intersect) {
+        for (auto it : tilecount) {
+            const Coord& key = it.first;
+            const int count = it.second;
+
+            // We need to be in the main root, along with all the
+            // trees to merge
+            if (count != 1 + mTreesToMerge.size()) {
+                // We can skip adding a blank tile if we are only
+                // in the trees to merge - if we can't find the tile
+                // in the tiles array we also skip in the intersect case.
+                if (tiles.find(key) != tiles.end()) {
+                    root.addTile(key, insideBackground, false);
+                    tiles.insert({key, INSIDE_STATE});
+                }
+            }
         }
     }
 
@@ -603,6 +645,9 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             auto it = tiles.find(key);
             if (it != tiles.end() && it->second == INSIDE_STATE)     continue;
 
+            // Missing tiles are outside, so if we are intersection we skip
+            if (Intersect)  continue;
+
             auto childPtr = mergeTree.template stealOrDeepCopyNode<typename RootT::ChildNodeType>(key);
             if (childPtr)   root.addChild(childPtr.release());
 
@@ -622,6 +667,11 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             }
         }
     }
+
+    // Erase any top-level background tiles which might have been added
+    // to match other grids.
+    if (Intersect)
+        root.eraseBackgroundTiles();
 
     return continueRecurse;
 }
