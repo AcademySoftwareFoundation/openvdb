@@ -533,7 +533,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
     };
 
     std::unordered_map<Coord, /*flags*/uint8_t> tiles;
-    std::unordered_map<Coord, /*tilecount*/int> tilecount;
+    std::unordered_map<Coord, /*tilecount*/size_t> tilecount;
 
     if (root.getTableSize() > 0) {
         for (auto valueIter = root.cbeginValueAll(); valueIter; ++valueIter) {
@@ -599,7 +599,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
     if (Intersect) {
         for (auto it : tilecount) {
             const Coord& key = it.first;
-            const int count = it.second;
+            const size_t count = it.second;
 
             // We need to be in the main root, along with all the
             // trees to merge
