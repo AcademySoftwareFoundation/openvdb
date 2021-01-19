@@ -10,12 +10,15 @@
 
   There are two main stages for the OpenVDB Houdini build; the OpenVDB
   Houdini base shared library and all subsequent dependent nodes (SOPs,
-  SHOPs, procedurals etc.) Both are installed to the same prefix:
+  SHOPs, procedurals etc.) The default install looks as follows:
 
-    <prefix>/include  - Shared openvdb_houdini headers
-    <prefix>/lib      - Location of libopenvdb_houdini
-    <prefix>/dso      - Location of all other .so and required files
-                        such as icons and scripts
+    <prefix>/bin           - Windows runtime components
+    <prefix>/include       - Shared openvdb_houdini headers
+    <prefix>/config/Icons  - OpenVDB Icon files
+    <prefix>/{lib|lib64}   - Location of libopenvdb_houdini
+    <prefix>/python2.7libs - python.rc for Houdini startup
+    <prefix>/scripts/sop   - Relevant SOP scripts
+    <prefix>/dso           - Location of DSOs
 
   By default, the prefix is set to the value returned by the Houdini
   CMake configuration. This is the default installation path for all
@@ -47,6 +50,8 @@ houdini_get_default_install_dir():
   Mac: $ENV{HOME}/Library/Preferences/houdini/X.X
   Windows: $ENV{HOMEDRIVE}$ENV{HOMEPATH}\Documents\houdiniX.X
 If OFF, CMAKE_INSTALL_PREFIX is used.]=] ON)
+option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
+the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 
 set(_OPENVDB_HOUDINI_OPHIDE_POLICY_OPTIONS none aswf native)
 if(NOT OPENVDB_HOUDINI_OPHIDE_POLICY)
@@ -64,13 +69,6 @@ else()
     message(WARNING "Unrecognized value for OPENVDB_HOUDINI_OPHIDE_POLICY, using none instead.")
     set(OPENVDB_HOUDINI_OPHIDE_POLICY none CACHE STRING FORCE)
   endif()
-endif()
-
-if(OPENVDB_HOUDINI_ENABLE_SESI_TAG)
-  # SESI tag information on the OpenVDB DSOs. This is legacy functionality for
-  # older Houdini versions (< 18) and will be removed.
-  message(DEPRECATION "The OPENVDB_HOUDINI_ENABLE_SESI_TAG option is deprecated "
-    "and will be removed.")
 endif()
 
 #########################################################################
@@ -95,15 +93,27 @@ endif()
 set(OPENVDB_HOUDINI_INSTALL_PREFIX ${HOUDINI_INSTALL_LOCATION}
   CACHE PATH "Base install path for OpenVDB Houdini shared libraries, dsos and headers."
 )
-set(OPENVDB_HOUDINI_CONFIGDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/config")
-set(OPENVDB_HOUDINI_DSODIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso")
-set(OPENVDB_HOUDINI_BINDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}")
-set(OPENVDB_HOUDINI_INCLUDEDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}")
-set(OPENVDB_HOUDINI_LIBDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-set(OPENVDB_HOUDINI_PYTHONRC_DIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/python2.7libs")
-set(OPENVDB_HOUDINI_SCRIPTSDIR "${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts")
-
 message(STATUS "Houdini base install path: ${OPENVDB_HOUDINI_INSTALL_PREFIX}")
+
+# Install paths for bin/lib/include components
+set(OPENVDB_HOUDINI_BIN_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_BINDIR}
+  CACHE PATH "Install path for the OpenVDB Houdini shared library")
+set(OPENVDB_HOUDINI_LIB_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}
+  CACHE PATH "Install path for the OpenVDB Houdini shared library")
+set(OPENVDB_HOUDINI_INCLUDE_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/${CMAKE_INSTALL_INCLUDEDIR}
+  CACHE PATH "Install path for the OpenVDB Houdini headers")
+
+# Install paths for dsos and scripts
+set(OPENVDB_HOUDINI_DSO_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso
+  CACHE PATH "Install path for the OpenVDB Houdini dsos")
+set(OPENVDB_HOUDINI_MANTRA_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso/mantra
+  CACHE PATH "Install path for the OpenVDB Houdini mantra nodes")
+set(OPENVDB_HOUDINI_SOP_SCRIPT_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
+  CACHE PATH "Install path for the OpenVDB Houdini node scripts")
+set(OPENVDB_HOUDINI_ICON_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
+  CACHE PATH "Install path for the OpenVDB Houdini node icons")
+set(OPENVDB_HOUDINI_PYTHON_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/python2.7libs
+  CACHE PATH "Install path for the OpenVDB Houdini startup script")
 
 #########################################################################
 
@@ -297,19 +307,6 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
     TAGINFO ""
   )
 
-  # If the sesi tag needs removing, manually configure the compile
-  # options for each DSO and replace the UT_DSO_TAGINFO define
-
-  if(Houdini_VERSION VERSION_LESS 18)
-    if(NOT OPENVDB_HOUDINI_ENABLE_SESI_TAG)
-      get_target_property(DSO_DEFINITIONS ${DSO_NAME} COMPILE_DEFINITIONS)
-      string(REGEX REPLACE "UT_DSO_TAGINFO=\".+\"" "" DSO_DEFINITIONS "${DSO_DEFINITIONS}")
-      set_target_properties(${DSO_NAME}
-        PROPERTIES COMPILE_DEFINITIONS "${DSO_DEFINITIONS}"
-      )
-    endif()
-  endif()
-
   # Configure rpaths
   # Encode the path to libopenvdb.so into plugins, and because some
   # plugins might depend on Houdini libraries that are not linked into
@@ -323,7 +320,7 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
       list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
     endif()
 
-    list(APPEND RPATHS ${OPENVDB_HOUDINI_LIBDIR})
+    list(APPEND RPATHS ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX})
 
     list(REMOVE_DUPLICATES RPATHS)
     set_target_properties(${DSO_NAME}
@@ -357,42 +354,42 @@ endif()
 install(DIRECTORY
   ${OPENVDB_HOUDINI_UTILS_DIR}
   ${OPENVDB_HOUDINI_LOCAL_DIR}
-  DESTINATION ${OPENVDB_HOUDINI_INCLUDEDIR}
+  DESTINATION ${OPENVDB_HOUDINI_INCLUDE_INSTALL_PREFIX}
 )
 
 install(TARGETS openvdb_houdini
-  RUNTIME DESTINATION ${OPENVDB_HOUDINI_BINDIR}
-  LIBRARY DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
-  ARCHIVE DESTINATION ${OPENVDB_HOUDINI_LIBDIR}
+  RUNTIME DESTINATION ${OPENVDB_HOUDINI_BIN_INSTALL_PREFIX}
+  LIBRARY DESTINATION ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX}
+  ARCHIVE DESTINATION ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX}
 )
 
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   if(DSO_NAME MATCHES "VRAY_*")
     install(TARGETS
       ${DSO_NAME}
-      DESTINATION ${OPENVDB_HOUDINI_DSODIR}/mantra
+      DESTINATION ${OPENVDB_HOUDINI_MANTRA_INSTALL_PREFIX}
     )
   else()
     install(TARGETS
       ${DSO_NAME}
-      DESTINATION ${OPENVDB_HOUDINI_DSODIR}
+      DESTINATION ${OPENVDB_HOUDINI_DSO_INSTALL_PREFIX}
     )
   endif()
 endforeach()
 
 install(FILES
   SOP_OpenVDB.svg
-  DESTINATION ${OPENVDB_HOUDINI_CONFIGDIR}/Icons
+  DESTINATION ${OPENVDB_HOUDINI_ICON_INSTALL_PREFIX}
 )
 
 install(FILES
   DW_OpenVDBRasterizePoints.cmd
-  DESTINATION ${OPENVDB_HOUDINI_SCRIPTSDIR}/sop
+  DESTINATION ${OPENVDB_HOUDINI_SOP_SCRIPT_INSTALL_PREFIX}
 )
 
 if(OPENVDB_INSTALL_HOUDINI_PYTHONRC)
   install(FILES
     pythonrc.py
-    DESTINATION ${OPENVDB_HOUDINI_PYTHONRC_DIR}
+    DESTINATION ${OPENVDB_HOUDINI_PYTHON_INSTALL_PREFIX}
   )
 endif()
