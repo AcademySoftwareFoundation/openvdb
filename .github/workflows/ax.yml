@@ -7,17 +7,21 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
-      - 'openvdb/doc/**'
+      - 'doc/**'
       - 'openvdb_maya/**'
-      - '**/*.md'
+      - 'openvdb_houdini/**'
+      - '**.md'
+      - '**.txt'
   pull_request:
     branches:
       - '**'
     paths-ignore:
       - 'CHANGES'
-      - 'openvdb/doc/**'
+      - 'doc/**'
       - 'openvdb_maya/**'
-      - '**/*.md'
+      - 'openvdb_houdini/**'
+      - '**.md'
+      - '**.txt'
   schedule:
     # run this workflow every midnight Tuesday
     - cron:  '0 0 * * 2'
