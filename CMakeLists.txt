@@ -236,7 +236,8 @@ endif()
 # VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
 # Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
+# python linkage on macOS (Python::Module target in 3.15)
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
