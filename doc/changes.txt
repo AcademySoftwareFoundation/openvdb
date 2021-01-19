@@ -6,6 +6,9 @@
 @par
 <B>Version 8.0.1</B> - <I>In Development</I>
 
+@par
+Build:
+- Fixed various incorrect RPATH directory paths in CMake
 
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par

@@ -3,6 +3,8 @@ OpenVDB Version History
 
 Version 8.0.1 - In Development
 
+    Build:
+    - Fixed various incorrect RPATH directory paths in CMake
 
 Version 8.0.0 - December 23, 2020
 
