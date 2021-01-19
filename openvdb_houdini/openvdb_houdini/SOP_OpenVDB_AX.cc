@@ -12,7 +12,7 @@
 #define __STDC_LIMIT_MACROS
 #endif
 
-#include "ax/HoudiniAXUtils.h"
+#include "AXUtils.h"
 
 #include <openvdb_ax/ast/AST.h>
 #include <openvdb_ax/compiler/Compiler.h>

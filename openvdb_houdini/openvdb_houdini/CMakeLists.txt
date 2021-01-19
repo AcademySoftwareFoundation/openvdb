@@ -34,6 +34,9 @@
   This allows you to use CMAKE_INSTALL_PREFIX for the core library
   location and a custom location for the Houdini plugin.
 
+  Note: Individual DSO components can be turned off with their own CMake
+  variable "OPENVDB_BUILD_{NAME}" i.e. OPENVDB_BUILD_SOP_OpenVDB_Scatter=OFF
+
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.12)
@@ -282,6 +285,26 @@ set(OPENVDB_DSO_NAMES
   VRAY_OpenVDB_Points
 )
 
+if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
+  # Check to see if the AX SOP has been manually disabled
+  if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+    set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+  endif()
+
+  if(OPENVDB_BUILD_SOP_OpenVDB_AX)
+    # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
+    # if OPENVDB_BUILD_CORE is ON, all deps must also be on
+    # openvdb and openvdb_houdini must be either both enabled or disabled.
+    # openvdb and openvdb_ax must be either both enabled or disabled.
+    if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
+      message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
+        "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
+        "also be rebuilt.")
+    endif()
+    list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
+  endif()
+endif()
+
 add_custom_target(openvdb_houdini_dsos
   COMMENT "Group target which corresponds to all Houdini Nodes and DSOs "
   "which aren't part of the shared library i.e. all targets in OPENVDB_DSO_NAMES."
@@ -292,9 +315,17 @@ add_custom_target(openvdb_houdini_dsos
 message(STATUS "Configuring Houdini DSOs...")
 
 foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
+  # Allow individual DSOs to be disabled through their own CMake variable
+  # "OPENVDB_BUILD_{NAME}" i.e. OPENVDB_BUILD_SOP_OpenVDB_Scatter=OFF
+
+  if(DEFINED OPENVDB_BUILD_${DSO_NAME})
+    if(NOT OPENVDB_BUILD_${DSO_NAME})
+      continue()
+    endif()
+  endif()
 
   add_library(${DSO_NAME} SHARED ${DSO_NAME}.cc)
-  target_link_libraries(${DSO_NAME} openvdb_houdini)
+  target_link_libraries(${DSO_NAME} PUBLIC openvdb_houdini)
 
   # Call houdini_configure_target to setup the sesi tag information. We set
   # INSTDIR to the project build directory and configure the actuall install
@@ -319,9 +350,7 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
     else()
       list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
     endif()
-
     list(APPEND RPATHS ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX})
-
     list(REMOVE_DUPLICATES RPATHS)
     set_target_properties(${DSO_NAME}
       PROPERTIES INSTALL_RPATH "${RPATHS}"
@@ -329,8 +358,17 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
   endif()
 
   add_dependencies(openvdb_houdini_dsos ${DSO_NAME})
-
 endforeach()
+
+if(OPENVDB_BUILD_SOP_OpenVDB_AX)
+  # Link the AX SOP against openvdb_ax
+  if(NOT OPENVDB_BUILD_AX)
+    find_package(OpenVDB REQUIRED openvdb_ax)
+    target_link_libraries(SOP_OpenVDB_AX PUBLIC OpenVDB::openvdb_ax)
+  else()
+    target_link_libraries(SOP_OpenVDB_AX PUBLIC openvdb_ax)
+  endif()
+endif()
 
 # This is only required for the OpenVDB Write SOP which enables a compression menu
 # option if blosc and zlib are supported.
@@ -346,6 +384,8 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
     target_compile_definitions(SOP_OpenVDB_Write PRIVATE "-DOPENVDB_USE_ZLIB")
   endif()
 endif()
+
+#
 
 ##########
 # Installs
