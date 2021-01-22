@@ -838,6 +838,8 @@ TEST_F(TestMerge, testCsgIntersection)
     { // merge two different outside root tiles from one grid into an empty grid
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
+        root.addTile(Coord(0, 0, 0), -grid->background(), false);
+        root.addTile(Coord(8192, 0, 0), -grid->background(), false);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
         root2.addTile(Coord(0, 0, 0), grid->background(), false);
@@ -865,11 +867,15 @@ TEST_F(TestMerge, testCsgIntersection)
     { // merge two different outside root tiles from two grids into an empty grid
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
+        root.addTile(Coord(0, 0, 0), /*background=*/-100.0f, false);
+        root.addTile(Coord(8192, 0, 0), /*background=*/-100.0f, false);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
+        root2.addTile(Coord(0, 0, 0), /*background=*/123.0f, false);
+        root2.addTile(Coord(8192, 0, 0), /*background=*/-100.0f, false);
         FloatGrid::Ptr grid3 = createLevelSet<FloatGrid>();
         auto& root3 = grid3->tree().root();
-        root2.addTile(Coord(0, 0, 0), /*background=*/123.0f, false);
+        root3.addTile(Coord(0, 0, 0), /*background=*/-100.0f, false);
         root3.addTile(Coord(8192, 0, 0), /*background=*/0.1f, true);
 
         std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
@@ -894,11 +900,12 @@ TEST_F(TestMerge, testCsgIntersection)
     { // merge the same outside root tiles from two grids into an empty grid
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
+        root.addTile(Coord(0, 0, 0), -grid->background(), false);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
+        root2.addTile(Coord(0, 0, 0), grid->background(), true);
         FloatGrid::Ptr grid3 = createLevelSet<FloatGrid>();
         auto& root3 = grid3->tree().root();
-        root2.addTile(Coord(0, 0, 0), grid->background(), true);
         root3.addTile(Coord(0, 0, 0), grid->background(), false);
 
         std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
@@ -913,6 +920,7 @@ TEST_F(TestMerge, testCsgIntersection)
         EXPECT_EQ(Index(0), getInactiveTileCount(root));
 
         root.clear();
+        root.addTile(Coord(0, 0, 0), -grid->background(), false);
         // reverse tree order
         std::vector<FloatTree*> trees2{&grid3->tree(), &grid2->tree()};
         tools::CsgIntersectionOp<FloatTree> mergeOp2(trees2, Steal());
@@ -968,14 +976,12 @@ TEST_F(TestMerge, testCsgIntersection)
     { // merge two grids with an outside and an inside tile, outside takes precedence
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
+        root.addTile(Coord(0, 0, 0), -grid->background(), true);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
-        root2.addTile(Coord(0, 0, 0), -grid->background(), true);
-        FloatGrid::Ptr grid3 = createLevelSet<FloatGrid>();
-        auto& root3 = grid3->tree().root();
-        root3.addTile(Coord(0, 0, 0), /*outside*/0.1f, false);
+        root2.addTile(Coord(0, 0, 0), /*outside*/0.1f, false);
 
-        std::vector<FloatTree*> trees{&grid2->tree(), &grid3->tree()};
+        std::vector<FloatTree*> trees{&grid2->tree(), &grid2->tree()};
         tools::CsgIntersectionOp<FloatTree> mergeOp(trees, Steal());
         tree::DynamicNodeManager<FloatTree, 3> nodeManager(grid->tree());
         nodeManager.foreachTopDown(mergeOp);
@@ -994,6 +1000,8 @@ TEST_F(TestMerge, testCsgIntersection)
 
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
+        root.addTile(Coord(0, 0, 0), -grid->background(), true);
+        root.addTile(Coord(8192, 0, 0), -grid->background(), true);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
         root2.addChild(new RootChildType(Coord(0, 0, 0), 1.0f, false));
@@ -1040,8 +1048,10 @@ TEST_F(TestMerge, testCsgIntersection)
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
         auto& root = grid->tree().root();
         root.addChild(new RootChildType(Coord(0, 0, 0), 123.0f, false));
+        root.addTile(Coord(8192, 0, 0), -123.0f, true);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
         auto& root2 = grid2->tree().root();
+        root2.addTile(Coord(0, 0, 0), -123.0f, true);
         root2.addChild(new RootChildType(Coord(8192, 0, 0), 1.9f, false));
 
         EXPECT_EQ(Index(1), getChildCount(root));
@@ -1159,8 +1169,8 @@ TEST_F(TestMerge, testCsgIntersection)
 
     { // merge a leaf node into an empty grid
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
+        grid->tree().root().addTile(Coord(0, 0, 0), -1.0f, false);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
-
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
         EXPECT_EQ(Index32(0), grid->tree().leafCount());
@@ -1234,8 +1244,8 @@ TEST_F(TestMerge, testCsgIntersection)
 
     { // merge a leaf node into an empty grid from a const grid
         FloatGrid::Ptr grid = createLevelSet<FloatGrid>();
+        grid->tree().root().addTile(Coord(0, 0, 0), -1.0f, false);
         FloatGrid::Ptr grid2 = createLevelSet<FloatGrid>();
-
         grid2->tree().touchLeaf(Coord(0, 0, 0));
 
         EXPECT_EQ(Index32(0), grid->tree().leafCount());
