@@ -1,4 +1,0 @@
-Houdini:
-    - VDB Combine SOP no longer attempts to invoke SDF CSG operations on
-      bool grids because unary negation is undefined on bools in the
-      template expansion.
