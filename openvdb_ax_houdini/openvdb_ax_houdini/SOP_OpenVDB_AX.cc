@@ -64,6 +64,7 @@ struct CompilerCache
     ax::CustomData::Ptr mCustomData = nullptr;
     ax::PointExecutable::Ptr mPointExecutable = nullptr;
     ax::VolumeExecutable::Ptr mVolumeExecutable = nullptr;
+    ax::AttributeRegistry::Ptr mAttributeRegistry = nullptr;
 
     // point variables
 
@@ -112,6 +113,22 @@ void initializeFunctionRegistry(ax::Compiler& compiler, const bool allowVex)
     compiler.setFunctionRegistry(std::move(functionRegistry));
 }
 
+void checkAttributesAgainstList(const std::string& list,
+                                const std::vector<UT_String>& newAttributes)
+{
+    if (newAttributes.empty()) return;
+
+    UT_String msg;
+    // attributes are in reverse order as they appear in snippet
+    for (auto iter = newAttributes.rbegin(); iter != newAttributes.rend(); ++iter) {
+        if (!iter->multiMatch(list.c_str())) msg += " " + iter->toStdString();
+    }
+
+    if (msg.length() != 0) {
+        msg.prepend("Missing attributes:");
+        throw std::runtime_error(msg.c_str());
+    }
+}
 ////////////////////////////////////////
 
 
@@ -188,6 +205,7 @@ newSopOperator(OP_OperatorTable* table)
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
 
+#ifdef DNEG_OPENVDB_AX
     {
         const char* items[] = {
             "active",    "Active Voxels",
@@ -201,6 +219,7 @@ newSopOperator(OP_OperatorTable* table)
             .setHelpText("Whether to run this snippet over Active, Inactive or All voxels.")
             .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
     }
+#endif
 
     parms.add(hutil::ParmFactory(PRM_STRING, "vdbpointsgroup", "VDB Points Group")
         .setHelpText("Specify a point group name to perform the execution on. If no name is "
@@ -220,6 +239,11 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("A snippet of AX code that will manipulate the attributes on the VDB Points or "
                      "the VDB voxel values.")
         .setSpareData(&theEditor));
+
+    parms.add(hutil::ParmFactory(PRM_STRING, "attributestocreate", "Attributes To Create")
+        .setHelpText("Specify the attributes allowed to be created if they are not present on the input. "
+                     "Use * to allow all attributes, or specify them by name in a space separated list. ")
+        .setDefault("*"));
 
     // language/script modifiers
 
@@ -245,13 +269,18 @@ newSopOperator(OP_OperatorTable* table)
             "Note that HScript variables (if enabled) always refer to the AX node and ignore "
             "the evaluation path."));
 
-    parms.endSwitcher();
-
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "createattributes", "Create New Attributes/Grids")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "densify", "Densify Active Tiles")
         .setDefault(PRMoneDefaults)
-        .setHelpText("Create point attributes or VDB volumes accessed by @ that do not exist on input."));
+        .setTooltip(
+            "Whether to densify active tiles into voxels before execution, otherwise tiles will be skipped."
+            " Only applies to volumes that are written to.")
+        .setDocumentation(
+            "Whether to densify active tiles into voxels before execution, otherwise tiles will be skipped."
+            " Only applies to volumes that are written to.\n\n"
+            "WARNING:\n"
+            "    Densifying a sparse VDB can significantly increase its memory footprint."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
         .setDefault(PRMoneDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN)
         .setTooltip("Collapse regions of constant value in output grids. "
@@ -264,12 +293,14 @@ newSopOperator(OP_OperatorTable* table)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
         .setTooltip(
             "When pruning is enabled, voxel values are considered equal"
-            " if they differ by less than the specified tolerance.")
+            " if they differ by less than the specified tolerance."
+            " Only applies to volumes that are written to.")
         .setDocumentation(
             "If enabled, reduce the memory footprint of output grids that have"
             " (sufficiently large) regions of voxels with the same value,"
             " where values are considered equal if they differ by less than"
-            " the specified threshold.\n\n"
+            " the specified threshold."
+            " Only applies to volumes that are written to.\n\n"
             "NOTE:\n"
             "    Pruning affects only the memory usage of a grid.\n"
             "    It does not remove voxels, apart from inactive voxels\n"
@@ -277,7 +308,13 @@ newSopOperator(OP_OperatorTable* table)
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "compact", "Compact Attributes")
         .setDefault(PRMzeroDefaults)
-        .setHelpText("Whether to try to compact VDB Point Attributes after execution."));
+        .setHelpText("Whether to try to compact VDB Point Attributes after execution.")
+        .setDocumentation(
+            "Whether to try to compact VDB Point Attributes after execution\n\n"
+            "NOTE:\n"
+            "    Compacting uniform values affects only the memory usage of the attributes.\n"));
+
+    parms.endSwitcher();
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -295,7 +332,6 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "pointsgroup", "VDB Points Group"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "createmissing", "Create Missing")
         .setDefault(PRMoneDefaults));
-
     //////////
     // Register this operator.
 
@@ -760,7 +796,6 @@ SOP_OpenVDB_AX::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 
     resolveRenamedParm(*obsoleteParms, "targettype", "runover");
     resolveRenamedParm(*obsoleteParms, "pointsgroup", "vdbpointsgroup");
-    resolveRenamedParm(*obsoleteParms, "createmissing", "createattributes");
 
     // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
@@ -779,9 +814,13 @@ SOP_OpenVDB_AX::updateParmsFlags()
     changed |= enableParm("tolerance", prune && !points );
     changed |= setVisibleState("prune", !points);
     changed |= setVisibleState("tolerance", !points);
+    changed |= enableParm("densify", !points);
+    changed |= setVisibleState("densify", !points);
 
+#ifdef DNEG_OPENVDB_AX
     changed |= enableParm("activity", !points);
     changed |= setVisibleState("activity", !points);
+#endif
 
     changed |= enableParm("compact", points);
     changed |= setVisibleState("compact", points);
@@ -803,12 +842,31 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
         "0.1.0", {
             // We can't just return 0 as the expected behaviour here is for points to always
             // create attribute and for volumes to error. This preserves that behaviour.
-            // { "createattributes", [](const SOP_OpenVDB_AX&) -> std::string { return "0"} }
-            { "createattributes",
+            { "attributestocreate",
                 [](const SOP_OpenVDB_AX& node) -> std::string {
                     const int targetType = static_cast<int>(node.evalInt("runover", 0, 0));
-                    if (targetType == 0) return "1"; // points, keep default (on)
-                    else return "0"; // volumes, turn off
+                    if (targetType == 0) return "*"; // points, keep default (on)
+                    else return ""; // volumes, turn off
+                }
+            }
+        }},
+        {
+        "0.3.0", {
+            { "attributestocreate",
+                [](const SOP_OpenVDB_AX& node) -> std::string {
+                    const bool createMissing = static_cast<bool>(node.evalInt("createmissing", 0, 0));
+                    if (createMissing == 1) return "*";
+                    else return "";
+                }
+            }
+        }},
+        {
+        "1.0.0", {
+            { "attributestocreate",
+                [](const SOP_OpenVDB_AX& node) -> std::string {
+                    const bool createMissing = static_cast<bool>(node.evalInt("createattributes", 0, 0));
+                    if (createMissing == 1) return "*";
+                    else return "";
                 }
             }
         }
@@ -881,7 +939,16 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
 
 
 ////////////////////////////////////////
+namespace {
+struct DensifyOp {
+    DensifyOp() {}
 
+    template<typename GridT>
+    void operator()(GridT& grid) const
+    {
+        grid.tree().voxelizeActiveTiles(/*threaded=*/true);
+    }
+};
 
 struct PruneOp {
     PruneOp(const fpreal tol)
@@ -893,6 +960,7 @@ struct PruneOp {
     }
     const fpreal mTol;
 };
+}
 
 OP_ERROR
 SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
@@ -1083,6 +1151,9 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 return error();
             }
 
+            // if successful, also create the attribute registry to check against
+            mCompilerCache.mAttributeRegistry = openvdb::ax::AttributeRegistry::create(*mCompilerCache.mSyntaxTree);
+
             // set the hash only if compilation was successful - Houdini sops tend to cook
             // multiple times, especially on fail. If we assign the hash prior to this it will
             // be incorrectly cached
@@ -1096,7 +1167,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
         snippet.clear();
 
-        const bool createMissing = static_cast<bool>(evalInt("createattributes", 0, time));
+        const std::string attribList = evalStdString("attributestocreate", time);
 
         if (mParameterCache.mTargetType == hax::TargetType::POINTS) {
 
@@ -1121,8 +1192,21 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                     throw std::runtime_error("No point executable has been built");
                 }
 
+                // check the attributes that are not being created already exist
+
+                std::vector<UT_String> missingAttributes;
+                const auto& desc = points->tree().cbeginLeaf()->attributeSet().descriptor();
+
+                for (const auto& attribute : mCompilerCache.mAttributeRegistry->data()) {
+                    const auto& name = attribute.name();
+                    if (desc.find(name) == openvdb::points::AttributeSet::INVALID_POS) {
+                        missingAttributes.emplace_back(name);
+                    }
+                }
+                checkAttributesAgainstList(attribList, missingAttributes);
+
                 mCompilerCache.mPointExecutable->setGroupExecution(pointsGroup);
-                mCompilerCache.mPointExecutable->setCreateMissing(createMissing);
+                mCompilerCache.mPointExecutable->setCreateMissing(true);
                 mCompilerCache.mPointExecutable->execute(*points);
 
                 if (mCompilerCache.mRequiresDeletion) {
@@ -1176,41 +1260,63 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 iterType = static_cast<ax::VolumeExecutable::IterType>(evalInt("activity", 0, time));
 
             const size_t size = grids.size();
+
+            // check the attributes that are not being created already exist
+            std::vector<UT_String> missingAttributes;
+            const auto& attribRegistry = mCompilerCache.mAttributeRegistry;
+            for (const auto& attribute : attribRegistry->data()) {
+                const auto& name = attribute.name();
+                if (names.find(name) == names.cend()) missingAttributes.emplace_back(name);
+            }
+            checkAttributesAgainstList(attribList, missingAttributes);
+
+            auto applyOpToWriteGrids = [&](const auto& op) {
+                for (auto& vdbPrim : guPrims) {
+                    if (attribRegistry->isWritable(vdbPrim->getGridName(),
+                            openvdb::ax::ast::tokens::UNKNOWN)) {
+                        if (boss.wasInterrupted()) {
+                            throw std::runtime_error("processing was interrupted");
+                        }
+                        hvdb::GEOvdbApply<hvdb::VolumeGridTypes>(*vdbPrim, op);
+                    }
+                }
+            };
+
+            if (evalInt("densify", 0, time)) {
+                const DensifyOp op;
+                applyOpToWriteGrids(op);
+            }
+
             mCompilerCache.mVolumeExecutable->setValueIterator(iterType);
-            mCompilerCache.mVolumeExecutable->setCreateMissing(createMissing);
+            mCompilerCache.mVolumeExecutable->setCreateMissing(true);
             mCompilerCache.mVolumeExecutable->execute(grids);
 
             if (evalInt("prune", 0, time)) {
                 const fpreal tol = evalFloat("tolerance", 0, time);
-                PruneOp op(tol);
-                for (auto& vdbPrim : guPrims) {
-                    GEOvdbProcessTypedGridTopology(*vdbPrim, op, /*make_unique*/false);
+                const PruneOp op(tol);
+                applyOpToWriteGrids(op);
+            }
+
+            std::vector<openvdb::GridBase::Ptr> invalid;
+            for (size_t pos = size; pos < grids.size(); ++pos) {
+                auto& grid = grids[pos];
+                // Call apply with a noop as createVdbPrimitive requires a grid ptr.
+                // apply will return false if the grid is not one of the supported types
+                if (!grid->apply<hvdb::AllGridTypes>([](auto&){})) {
+                    invalid.emplace_back(grid);
+                }
+                else {
+                    hvdb::createVdbPrimitive(*gdp, grid);
                 }
             }
 
-            if (createMissing) {
-
-                std::vector<openvdb::GridBase::Ptr> invalid;
-                for (size_t pos = size; pos < grids.size(); ++pos) {
-                    auto& grid = grids[pos];
-                    // Call apply with a noop as createVdbPrimitive requires a grid ptr.
-                    // apply will return false if the grid is not one of the supported types
-                    if (!grid->apply<hvdb::AllGridTypes>([](auto&){})) {
-                        invalid.emplace_back(grid);
-                    }
-                    else {
-                        hvdb::createVdbPrimitive(*gdp, grid);
-                    }
+            if (!invalid.empty()) {
+                std::ostringstream os;
+                os << "Unable to create the following grid types as these are not supported by Houdini:\n";
+                for (auto& grid : invalid) {
+                    os << "Grid Name: " << grid->getName() << ", Type: " << grid->valueType() << '\n';
                 }
-
-                if (!invalid.empty()) {
-                    std::ostringstream os;
-                    os << "Unable to create the following grid types as these are not supported by Houdini:\n";
-                    for (auto& grid : invalid) {
-                        os << "Grid Name: " << grid->getName() << ", Type: " << grid->valueType() << '\n';
-                    }
-                    addWarning(SOP_MESSAGE, os.str().c_str());
-                }
+                addWarning(SOP_MESSAGE, os.str().c_str());
             }
         }
 
