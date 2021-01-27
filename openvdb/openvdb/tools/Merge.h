@@ -525,6 +525,9 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
         return true;
     };
 
+    // delete any background tiles
+    root.eraseBackgroundTiles();
+
     // for intersection, delete any root node keys that are not present in all trees
     if (Intersect) {
         // find all tile coordinates to delete
@@ -538,25 +541,10 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             const Coord& key = childIter.getCoord();
             if (!keyExistsInAllTrees(key))   toDelete.push_back(key);
         }
-        // mark any background tiles as active to prevent them from being deleted
-        std::vector<Coord> toPreserve;
-        for (auto valueIter = root.beginValueAll(); valueIter; ++valueIter) {
-            const Coord& key = valueIter.getCoord();
-            // background tiles are always inactive
-            if (valueIter.isValueOff() &&
-                math::isApproxEqual(*valueIter, root.background())) {
-                toPreserve.push_back(key);
-                valueIter.setValueOn();
-            }
-        }
         // only mechanism to delete elements in root node is to delete background tiles,
         // so insert background tiles (which will replace any child nodes) and then delete
         for (Coord& key : toDelete)     root.addTile(key, *mBackground, false);
         root.eraseBackgroundTiles();
-        // now re-insert the background tiles
-        for (Coord& key : toPreserve) {
-            root.addTile(key, *mBackground, false);
-        }
     }
 
     // find all tile values in this root and track inside/outside and active state
@@ -663,6 +651,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             if (it != tiles.end() && it->second == INSIDE_STATE)     continue;
 
             auto childPtr = mergeTree.template stealOrDeepCopyNode<typename RootT::ChildNodeType>(key);
+            childPtr->resetBackground(mergeRoot->background(), root.background());
             if (childPtr)   root.addChild(childPtr.release());
 
             children.insert(key);
@@ -684,6 +673,9 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             }
         }
     }
+
+    // finish by removing any background tiles
+    root.eraseBackgroundTiles();
 
     return continueRecurse;
 }
@@ -754,7 +746,10 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(NodeT& node, size_t) con
                 mergeTree.template addTile<NonConstNodeT>(ijk, outsideBackground, false);
             } else if (invalidTile.isOn(pos)) {
                 auto childPtr = mergeTree.template stealOrDeepCopyNode<typename NodeT::ChildNodeType>(ijk);
-                if (childPtr)   node.addChild(childPtr.release());
+                if (childPtr) {
+                    childPtr->resetBackground(mergeTree.rootPtr()->background(), this->background());
+                    node.addChild(childPtr.release());
+                }
                 invalidTile.setOff(pos);
             } else {
                 // if both source and target are child nodes, merge recursion needs to continue
@@ -843,6 +838,9 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
         return flag;
     };
 
+    // delete any background tiles
+    root.eraseBackgroundTiles();
+
     std::unordered_map<Coord, /*flags*/uint8_t> flags;
 
     if (root.getTableSize() > 0) {
@@ -896,6 +894,9 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
             }
         }
     }
+
+    // finish by removing any background tiles
+    root.eraseBackgroundTiles();
 
     return continueRecurse;
 }
