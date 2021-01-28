@@ -269,13 +269,13 @@ newSopOperator(OP_OperatorTable* table)
             "Note that HScript variables (if enabled) always refer to the AX node and ignore "
             "the evaluation path."));
 
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "densify", "Densify Active Tiles")
-        .setDefault(PRMoneDefaults)
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "ignoretiles", "Ignore Active Tiles")
+        .setDefault(PRMzeroDefaults)
         .setTooltip(
-            "Whether to densify active tiles into voxels before execution, otherwise tiles will be skipped."
+            "Whether to ignore active tiles in the input volumes, otherwise active tiles will be densified before execution."
             " Only applies to volumes that are written to.")
         .setDocumentation(
-            "Whether to densify active tiles into voxels before execution, otherwise tiles will be skipped."
+            "Whether to ignore active tiles in the input volumes, otherwise active tiles will be densified before execution."
             " Only applies to volumes that are written to.\n\n"
             "WARNING:\n"
             "    Densifying a sparse VDB can significantly increase its memory footprint."));
@@ -814,8 +814,8 @@ SOP_OpenVDB_AX::updateParmsFlags()
     changed |= enableParm("tolerance", prune && !points );
     changed |= setVisibleState("prune", !points);
     changed |= setVisibleState("tolerance", !points);
-    changed |= enableParm("densify", !points);
-    changed |= setVisibleState("densify", !points);
+    changed |= enableParm("ignoretiles", !points);
+    changed |= setVisibleState("ignoretiles", !points);
 
 #ifdef DNEG_OPENVDB_AX
     changed |= enableParm("activity", !points);
@@ -1282,7 +1282,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 }
             };
 
-            if (evalInt("densify", 0, time)) {
+            if (!evalInt("ignoretiles", 0, time)) {
                 const DensifyOp op;
                 applyOpToWriteGrids(op);
             }
