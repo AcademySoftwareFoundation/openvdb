@@ -53,6 +53,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+namespace internal {
 
 // Handled via OPENVDB_API, but disabled here to minimize change
 // with reference implementation
@@ -16770,6 +16771,7 @@ const unsigned short    half::_eLut[1 << 9] =
         0,     0,     0,     0,     0,     0,     0,     0,
 };
 
+} // namespace internal
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

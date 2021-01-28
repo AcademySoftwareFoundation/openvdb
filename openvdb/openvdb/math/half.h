@@ -93,6 +93,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+namespace internal {
 
 class OPENVDB_API half
 {
@@ -752,6 +753,7 @@ half::setBits (unsigned short bits)
     _h = bits;
 }
 
+} // namespace internal
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

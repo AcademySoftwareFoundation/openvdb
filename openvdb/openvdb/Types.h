@@ -7,7 +7,27 @@
 #include "version.h"
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
+
+#ifdef OPENVDB_USE_EXR_HALF
+// WARNING: You must make sure to link your openexr half properly,
+// this is an unsupported configuration
+#include <OpenEXR/half.h>
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace math {
+using half = half;
+}}}
+#else
 #include <openvdb/math/half.h>
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace math {
+using half = internal::half;
+}}}
+#endif
+
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/math/Quat.h>
