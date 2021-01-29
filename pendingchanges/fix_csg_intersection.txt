@@ -1,0 +1,3 @@
+Bug fixes:
+    - Fixed a bug in the new CSG intersection merge algorithm where data
+      outside of the intersection region was not being removed.
