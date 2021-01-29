@@ -28,6 +28,8 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../openvdb/openvdb)
+
 # This binary is composed of two object files:
 # - TestABI uses headers from this version of OpenVDB
 # - main uses headers from the version of OpenVDB shipped with Houdini
