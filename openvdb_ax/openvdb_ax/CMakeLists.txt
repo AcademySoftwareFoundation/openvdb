@@ -31,6 +31,8 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../openvdb/openvdb)
+
 if(NOT OPENVDB_BUILD_CORE)
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
