@@ -31,8 +31,6 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/..)
-
 # Collect lib dependencies shared by all binaries
 
 if(NOT OPENVDB_BUILD_CORE)

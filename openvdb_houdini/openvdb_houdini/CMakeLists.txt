@@ -81,8 +81,6 @@ message(STATUS "----------------------------------------------------")
 
 #########################################################################
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../openvdb/openvdb)
-
 # Configure prefix
 
 if(NOT OPENVDB_HOUDINI_INSTALL_PREFIX)

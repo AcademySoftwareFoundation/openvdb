@@ -18,8 +18,6 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR}/../../../openvdb/openvdb)
-
 if(NOT OPENVDB_BUILD_AX)
   set(OPENVDBAX_LIB OpenVDB::openvdb_ax)
 else()

@@ -381,8 +381,6 @@ set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/Util.h
 )
 
-include_directories(${CMAKE_CURRENT_BINARY_DIR})
-
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
 # builds. There are limitations with earlier versions of CMake when used with
 # imported targets.
@@ -445,7 +443,7 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   target_include_directories(openvdb_static
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
@@ -471,7 +469,7 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   target_include_directories(openvdb_shared
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
