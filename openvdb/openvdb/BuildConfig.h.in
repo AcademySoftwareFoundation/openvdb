@@ -1,0 +1,12 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+///
+/// @file BuildConfig.h
+
+#ifndef OPENVDB_BUILDCONFIG_HAS_BEEN_INCLUDED
+#define OPENVDB_BUILDCONFIG_HAS_BEEN_INCLUDED
+
+#cmakedefine OPENVDB_BUILDCONFIG_USE_EXR
+
+#endif // OPENVDB_BUILDCONFIG_HAS_BEEN_INCLUDED
+

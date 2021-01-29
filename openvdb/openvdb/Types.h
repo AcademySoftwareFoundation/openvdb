@@ -4,13 +4,12 @@
 #ifndef OPENVDB_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
+#include "BuildConfig.h"
 #include "version.h"
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
 
-#ifdef OPENVDB_USE_EXR_HALF
-// WARNING: You must make sure to link your openexr half properly,
-// this is an unsupported configuration
+#ifdef OPENVDB_BUILDCONFIG_USE_EXR
 #include <OpenEXR/half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

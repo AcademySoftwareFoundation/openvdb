@@ -192,6 +192,13 @@ endif()
 
 ##### Core library configuration
 
+option(OPENVDB_BUILDCONFIG_USE_EXR "Enable Half in Configuration File" OFF)
+if(USE_EXR)
+  set(OPENVDB_BUILDCONFIG_USE_EXR, 1)
+endif()
+
+configure_file(BuildConfig.h.in BuildConfig.h)
+
 set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
@@ -374,6 +381,8 @@ set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/Util.h
 )
 
+include_directories(${CMAKE_CURRENT_BINARY_DIR})
+
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
 # builds. There are limitations with earlier versions of CMake when used with
 # imported targets.
@@ -520,6 +529,7 @@ if(OPENVDB_CORE_SHARED)
 endif()
 
 install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/points)
