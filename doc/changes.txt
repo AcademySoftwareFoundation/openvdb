@@ -10,6 +10,12 @@
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
 
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+
+
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 8.0.0</B> - <I>December 23, 2020</I>
