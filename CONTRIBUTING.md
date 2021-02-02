@@ -37,13 +37,13 @@ can be merged.
 
 * If you are an individual writing the code on your own time and
   you're SURE you are the sole owner of any intellectual property you
-  contribute, you can [sign the CLA as an individual contributor](https://github.com/communitybridge/easycla/blob/master/docs/sign-a-cla-as-an-individual-contributor-to-github.md).
+  contribute, you can [sign the CLA as an individual contributor](https://docs.linuxfoundation.org/lfx/easycla/contributors/individual-contributor).
 
 * If you are writing the code as part of your job, or if there is any
   possibility that your employers might think they own any
   intellectual property you create, then you should use the [Corporate
   Contributor Licence
-  Agreement](https://github.com/communitybridge/easycla/blob/master/docs/contribute-to-a-github-company-project.md).
+  Agreement](https://docs.linuxfoundation.org/lfx/easycla/contributors/corporate-contributor).
 
 The OpenVDB CLAs are the standard forms used by Linux Foundation
 projects and [recommended by the ASWF TAC](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contributor-license-agreement-cla). You can review the text of the CLAs in the [TSC directory](tsc/).
@@ -55,7 +55,7 @@ must include a “`Signed-off-by`” line (generated, for example, with
 “`git commit --signoff`”), indicating that the committer wrote the
 code and has the right to release it under the
 [Mozilla Public License, version 2.0](LICENSE.md)
-license. See https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off for more information on this requirement.
+license. See the [TAC documentation on contribution sign off](https://github.com/AcademySoftwareFoundation/tac/blob/master/process/contributing.md#contribution-sign-off) for more information on this requirement.
 
 ## Committer
 
@@ -95,7 +95,7 @@ All meetings of the TSC are open to participation by any member of the OpenVDB c
 * Ken Museth, Chair / Weta
 * Peter Cucka, DreamWorks
 * Jeff Lait, SideFX
-* Nick Avramoussis, Double Negative
+* Nick Avramoussis, DNEG
 * Dan Bailey, ILM
 
 # Release Process
