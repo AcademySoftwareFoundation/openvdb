@@ -332,6 +332,8 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "pointsgroup", "VDB Points Group"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "createmissing", "Create Missing")
         .setDefault(PRMoneDefaults));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "createattributes", "Create New Attributes")
+        .setDefault(PRMoneDefaults));
     //////////
     // Register this operator.
 
@@ -868,9 +870,25 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
                     if (createMissing == 1) return "*";
                     else return "";
                 }
-            }
-        }
-    }};
+            },
+        }},
+        {
+        "8.0.0", {
+            // ax, ax sop and vdb versions re-synced at this version
+            { "attributestocreate",
+                [](const SOP_OpenVDB_AX& node) -> std::string {
+                    const bool createMissing = static_cast<bool>(node.evalInt("createattributes", 0, 0));
+                    if (createMissing == 1) return "*";
+                    else return "";
+                }
+            },
+            { "ignoretiles",
+                [](const SOP_OpenVDB_AX& node) -> std::string {
+                    return "1";
+                }
+            },
+        }}
+    };
 
     auto axVersion = [](const UT_String& version) -> std::string {
         if (!version.startsWith("vdb")) return "";
