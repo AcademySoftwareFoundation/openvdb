@@ -24,7 +24,7 @@ cmake ../ \
 # remove existing doxygen
 rm $website_dox_location/* && rm $website_dox_location/search/*
 # move new doxygen
-cp -r $install_location_on_path/doc/html/* $website_dox_location/
+cp -r $install_location_on_path/share/doc/OpenVDB/html/* $website_dox_location/
 # commit doxygen changes
 git commit -s -m "<TICKET-NUMBER> Doxygen updates"
 # generate python documentaion - make sure this pick up your newly installed module

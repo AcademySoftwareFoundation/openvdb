@@ -10,6 +10,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBDocs LANGUAGES NONE)
 
+include(GNUInstallDirs)
+
 # If OPENVDB_DOXYGEN_HOUDINI is set, the Houdini documentation is also
 # built. You can provide this module a value for Houdini_VERSION which will
 # take into account any conditional compiled blocks. Whilst this doesn't
@@ -193,5 +195,5 @@ doxygen_add_docs(doc ${DOXY_FILES}
   COMMENT "Generating API documentation with Doxygen")
 
 # Suppress "Installing..." messages for all but one of the hundreds of generated files.
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/html/index.html DESTINATION doc/html)
-install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html DESTINATION doc MESSAGE_NEVER)
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/html/index.html DESTINATION ${CMAKE_INSTALL_DOCDIR}/html)
+install(DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/html DESTINATION ${CMAKE_INSTALL_DOCDIR} MESSAGE_NEVER)
