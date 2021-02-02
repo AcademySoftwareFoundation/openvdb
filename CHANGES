@@ -5,6 +5,8 @@ Version 8.0.1 - In Development
 
     Build:
     - Fixed various incorrect RPATH directory paths in CMake
+    - Documentation installed by the doc target is now installed to the
+      share/doc/OpenVDB prefix
 
 Version 8.0.0 - December 23, 2020
 

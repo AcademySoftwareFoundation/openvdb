@@ -9,6 +9,8 @@
 @par
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
+- Documentation installed by the doc target is now installed to the
+  share/doc/OpenVDB prefix
 
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
