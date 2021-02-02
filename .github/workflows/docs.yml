@@ -16,6 +16,7 @@ on:
       - 'CHANGES'
       - 'openvdb_maya/**'
       - '**/*.md'
+  workflow_dispatch:
 
 jobs:
   doxygen:
@@ -39,3 +40,10 @@ jobs:
         export LD_LIBRARY_PATH=/usr/local/lib64
         export PYTHONPATH=/usr/local/lib64/python2.7
         epydoc --html -o /usr/local/share/doc/OpenVDB/html/python pyopenvdb
+    - name: deploy
+      # only deploy documentation to gh-pages on a manual workflow dispatch
+      if: ${{ github.event_name == 'workflow_dispatch' }}
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: /usr/local/share/doc/OpenVDB/html
