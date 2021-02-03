@@ -65,11 +65,11 @@ jobs:
       matrix:
         config:
           # build against VFX Ref 2018 even though it's unsupported, just to make sure that we test Boost 1.61
-          - { cxx: clang++, image: '2018', hou: '18_0', build: 'Release', extras: 'ON' }
-          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF' }
-          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF' }
+          - { cxx: clang++, image: '2018', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
+          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
+          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
@@ -87,7 +87,7 @@ jobs:
     - name: houdini
       run: ./ci/install_houdini.sh
     - name: build
-      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }}
+      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
     - name: test
       run: ./ci/test.sh
 
