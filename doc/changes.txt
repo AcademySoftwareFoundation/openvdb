@@ -2,6 +2,27 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v7_2_2_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.2</B> - <I>February 4, 2020</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data outside of
+  the intersection region was not being removed.
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
+
+
 @htmlonly <a name="v7_2_1_changes"></a>@endhtmlonly
 @par
 <B>Version 7.2.1</B> - <I>December 23, 2020</I>
