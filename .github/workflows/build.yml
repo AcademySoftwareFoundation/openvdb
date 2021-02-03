@@ -127,7 +127,7 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
-  testabi8gcc10:
+  testabi7gcc10:
     runs-on: ubuntu-20.04
     env:
       CXX: g++-10
@@ -140,11 +140,11 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 7 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
-  testabi8clang10:
+  testabi7clang10:
     runs-on: ubuntu-20.04
     env:
       CXX: clang++-10
@@ -157,7 +157,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 7 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
