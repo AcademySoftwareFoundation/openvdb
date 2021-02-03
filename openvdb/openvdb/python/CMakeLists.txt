@@ -10,10 +10,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBPython LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
@@ -271,7 +267,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Python_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
