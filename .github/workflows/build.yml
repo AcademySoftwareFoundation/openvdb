@@ -64,8 +64,6 @@ jobs:
     strategy:
       matrix:
         config:
-          # disable dependency version checks for H18.0 as it ships with OpenEXR 2.2,
-          # not OpenEXR 2.3 as stated in the VFX Reference Platform 2019
           - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON' }
           - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON' }
           - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF' }
