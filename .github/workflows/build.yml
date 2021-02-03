@@ -64,6 +64,8 @@ jobs:
     strategy:
       matrix:
         config:
+          # build against VFX Ref 2018 even though it's unsupported, just to make sure that we test Boost 1.61
+          - { cxx: clang++, image: '2018', hou: '18_0', build: 'Release', extras: 'ON' }
           - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON' }
           - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON' }
           - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF' }
