@@ -5,6 +5,7 @@ Version 8.0.1 - In Development
 
     Build:
     - Fixed various incorrect RPATH directory paths in CMake
+    - Dropped the minimum boost requirement back to 1.61.
 
     Houdini:
     - VDB Combine SOP no longer attempts to invoke SDF CSG operations on

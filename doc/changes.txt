@@ -9,6 +9,7 @@
 @par
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
+- Dropped the minimum boost requirement back to 1.61.
 
 @par
 Houdini:

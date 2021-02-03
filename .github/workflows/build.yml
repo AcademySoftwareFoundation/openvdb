@@ -64,12 +64,10 @@ jobs:
     strategy:
       matrix:
         config:
-          # disable dependency version checks for H18.0 as it ships with OpenEXR 2.2,
-          # not OpenEXR 2.3 as stated in the VFX Reference Platform 2019
-          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
-          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF' }
+          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
@@ -87,7 +85,7 @@ jobs:
     - name: houdini
       run: ./ci/install_houdini.sh
     - name: build
-      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
+      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }}
     - name: test
       run: ./ci/test.sh
 
@@ -134,7 +132,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
@@ -151,7 +149,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
