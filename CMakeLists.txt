@@ -762,7 +762,7 @@ if(OPENVDB_BUILD_HOUDINI_PLUGIN)
 endif()
 
 if(OPENVDB_BUILD_AX_HOUDINI_PLUGIN)
-  add_subdirectory(openvdb_ax_houdini)
+  add_subdirectory(openvdb_ax_houdini/openvdb_ax_houdini)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_ABITESTS)
