@@ -1,6 +1,22 @@
 OpenVDB Version History
 =======================
 
+Version 7.2.2 - February 4, 2020
+
+    Bug fixes:
+    - Fixed a bug in the new CSG intersection merge algorithm where data
+      outside of the intersection region was not being removed.
+    - Fix GridTransformer construction to use correct rotate-scale-translate
+      order when recomposing matrix components.
+      [Contributed by Tom Cnops].
+
+    Houdini:
+    - VDB Combine SOP no longer attempts to invoke SDF CSG operations on
+      bool grids because unary negation is undefined on bools in the
+      template expansion.
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+      VDB Write likewise should not reset the compression values.
+
 Version 7.2.1 - December 23, 2020
 
     Bug fixes:
