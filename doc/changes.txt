@@ -70,9 +70,7 @@ Bug fixes:
 ABI changes:
 - @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
   of ABI=8 so that it can be accessed from the GridBase.
-- Private method
-  @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
-  removed as of ABI=8.
+- Private method RootNode::getChildCount() has been removed as of ABI=8.
 - Mark map classes and functions as final for ABI=8 where beneficial to allow
   devirtualization optimization.
 - As of ABI 8, Vector, Matrix and Quaternion types now satisfy the Trivial

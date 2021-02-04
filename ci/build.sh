@@ -71,7 +71,7 @@ export CMAKE_BUILD_PARALLEL_LEVEL=2
 
 # DebugNoInfo is a custom CMAKE_BUILD_TYPE - no optimizations, no symbols, asserts enabled
 
-mkdir build
+mkdir -p build
 cd build
 
 # Note: all sub binary options are always on and can be toggles with
