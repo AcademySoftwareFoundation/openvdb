@@ -7,6 +7,10 @@
 <B>Version 8.0.1</B> - <I>In Development</I>
 
 @par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data
+  outside of the intersection region was not being removed.
+
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
 - Dropped the minimum boost requirement back to 1.61.
