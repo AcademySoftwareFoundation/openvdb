@@ -1321,8 +1321,8 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
     /// @note   Extending an integer field is based on the nearest-neighbor interpolation
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& /* w */, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
-        Vec3R d(d1, d2, d3);
-        math::Vec3<SdfT> v(v1, v2, v3);
+        math::Vec3<SdfT> d(d1.v, d2.v, d3.v);
+        math::Vec3<ExtT> v(v1, v2, v3);
         return v[static_cast<int>(math::MinIndex(d))];
     }// int implementation
 
