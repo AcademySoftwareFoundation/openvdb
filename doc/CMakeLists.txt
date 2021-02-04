@@ -51,7 +51,7 @@ set(DOXY_FILES
   doc/python.txt)
 
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
-set(DOXYGEN_PROJECT_NUMBER "7.2.1")
+set(DOXYGEN_PROJECT_NUMBER "7.2.2")
 set(DOXYGEN_PROJECT_BRIEF "")
 set(DOXYGEN_FILE_PATTERNS "*.h") # headers only
 set(DOXYGEN_IMAGE_PATH "doc/img")
