@@ -1323,7 +1323,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
     ExtT threeNghbr(const NN& d1, const NN& d2, const NN& d3, const SdfT& /* w */, const ExtT& v1, const ExtT& v2, const ExtT& v3) const {
         Vec3R d(d1, d2, d3);
         Vec3R v(v1, v2, v3);
-        return v[math::MinIndex(d)];
+        return v[static_cast<int>(math::MinIndex(d))];
     }// int implementation
 
     /// @note   Extending a non-integer field is based on a weighted interpolation
