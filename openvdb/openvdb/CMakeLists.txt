@@ -147,10 +147,7 @@ endif()
 
 if(USE_EXR)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
+    IlmBase::Half
   )
 endif()
 
@@ -192,7 +189,7 @@ endif()
 
 ##### Core library configuration
 
-option(OPENVDB_BUILDCONFIG_USE_EXR "Enable Half in Configuration File" OFF)
+option(OPENVDB_BUILDCONFIG_USE_EXR "Enable OpenEXR Half in Configuration File" OFF)
 if(USE_EXR)
   set(OPENVDB_BUILDCONFIG_USE_EXR, 1)
 endif()
@@ -429,9 +426,6 @@ if(WIN32)
     endif()
   endif()
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
-endif()
-if(USE_EXR)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
