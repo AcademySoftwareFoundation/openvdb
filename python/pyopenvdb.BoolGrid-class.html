@@ -1,0 +1,1939 @@
+<?xml version="1.0" encoding="ascii"?>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN"
+          "DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
+<head>
+  <title>pyopenvdb.BoolGrid</title>
+  <link rel="stylesheet" href="epydoc.css" type="text/css" />
+  <script type="text/javascript" src="epydoc.js"></script>
+</head>
+
+<body bgcolor="white" text="black" link="blue" vlink="#204080"
+      alink="#204080">
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="pyopenvdb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+      <th class="navbar" width="100%"></th>
+  </tr>
+</table>
+<table width="100%" cellpadding="0" cellspacing="0">
+  <tr valign="top">
+    <td width="100%">
+      <span class="breadcrumbs">
+        <a href="pyopenvdb-module.html">Module&nbsp;pyopenvdb</a> ::
+        Class&nbsp;BoolGrid
+      </span>
+    </td>
+    <td>
+      <table cellpadding="0" cellspacing="0">
+        <!-- hide/show private -->
+        <tr><td align="right"><span class="options">[<a href="javascript:void(0);" class="privatelink"
+    onclick="toggle_private();">hide&nbsp;private</a>]</span></td></tr>
+        <tr><td align="right"><span class="options"
+            >[<a href="frames.html" target="_top">frames</a
+            >]&nbsp;|&nbsp;<a href="pyopenvdb.BoolGrid-class.html"
+            target="_top">no&nbsp;frames</a>]</span></td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+<!-- ==================== CLASS DESCRIPTION ==================== -->
+<h1 class="epydoc">Class BoolGrid</h1><p class="nomargin-top"></p>
+<pre class="base-tree">
+ object --+    
+          |    
+??.instance --+
+              |
+             <strong class="uidshort">BoolGrid</strong>
+</pre>
+
+<hr />
+<p>OpenVDB grid with voxels of type bool</p>
+
+<!-- ==================== NESTED CLASSES ==================== -->
+<a name="section-NestedClasses"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Nested Classes</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-NestedClasses"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.Accessor-class.html" class="summary-name">Accessor</a><br />
+      Read/write access by (i, j, k) index coordinates to the voxels of a
+        BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ConstAccessor-class.html" class="summary-name">ConstAccessor</a><br />
+      Read-only access by (i, j, k) index coordinates to the voxels of a 
+        BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.Value-class.html" class="summary-name">Value</a><br />
+      Proxy for a tile or voxel value in a BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueAllCIter-class.html" class="summary-name">ValueAllCIter</a><br />
+      Read-only iterator over all tile and voxel values of a BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueAllIter-class.html" class="summary-name">ValueAllIter</a><br />
+      Read/write iterator over all tile and voxel values of a BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueOffCIter-class.html" class="summary-name">ValueOffCIter</a><br />
+      Read-only iterator over the inactive values (tile and voxel) of a 
+        BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueOffIter-class.html" class="summary-name">ValueOffIter</a><br />
+      Read/write iterator over the inactive values (tile and voxel) of a 
+        BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueOnCIter-class.html" class="summary-name">ValueOnCIter</a><br />
+      Read-only iterator over the active values (tile and voxel) of a 
+        BoolGrid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid.ValueOnIter-class.html" class="summary-name">ValueOnIter</a><br />
+      Read/write iterator over the active values (tile and voxel) of a 
+        BoolGrid
+    </td>
+  </tr>
+</table>
+<!-- ==================== INSTANCE METHODS ==================== -->
+<a name="section-InstanceMethods"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Instance Methods</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-InstanceMethods"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">bool</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__contains__"></a><span class="summary-sig-name">__contains__</span>(<span class="summary-sig-arg">name</span>)</span><br />
+      Return True if this grid contains metadata with the given name.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__delitem__"></a><span class="summary-sig-name">__delitem__</span>(<span class="summary-sig-arg">name</span>)</span><br />
+      Remove the metadata with the given name.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">value</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__getitem__"></a><span class="summary-sig-name">__getitem__</span>(<span class="summary-sig-arg">name</span>)</span><br />
+      Return the metadata value associated with the given name.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__getstate__"></a><span class="summary-sig-name">__getstate__</span>(<span class="summary-sig-arg">...</span>)</span></td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#__init__" class="summary-sig-name">__init__</a>(<span class="summary-sig-arg">...</span>)</span><br />
+      Initialize with a background value of False.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__iter__"></a><span class="summary-sig-name">__iter__</span>()</span><br />
+      Return an iterator over this grid's metadata keys.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__nonzero__"></a><span class="summary-sig-name">__nonzero__</span>(<span class="summary-sig-arg">...</span>)</span></td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#__reduce__" class="summary-sig-name">__reduce__</a>(<span class="summary-sig-arg">...</span>)</span><br />
+      helper for pickle</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__setitem__"></a><span class="summary-sig-name">__setitem__</span>(<span class="summary-sig-arg">name</span>,
+        <span class="summary-sig-arg">value</span>)</span><br />
+      Add metadata to this grid, replacing any existing item having the 
+      same name as the new item.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="__setstate__"></a><span class="summary-sig-name">__setstate__</span>(<span class="summary-sig-arg">...</span>)</span></td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">int</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="activeLeafVoxelCount"></a><span class="summary-sig-name">activeLeafVoxelCount</span>()</span><br />
+      Return the number of active voxels that are stored in the leaf nodes 
+      of this grid's tree.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">int</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="activeVoxelCount"></a><span class="summary-sig-name">activeVoxelCount</span>()</span><br />
+      Return the number of active voxels in this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#addStatsMetadata" class="summary-sig-name">addStatsMetadata</a>()</span><br />
+      Add metadata to this grid comprising the current values of statistics
+      like the active voxel count and bounding box.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="citerAllValues"></a><span class="summary-sig-name">citerAllValues</span>()</span><br />
+      Return a read-only iterator over all of this grid's tile and voxel 
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="citerOffValues"></a><span class="summary-sig-name">citerOffValues</span>()</span><br />
+      Return a read-only iterator over this grid's inactive tile and voxel 
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="citerOnValues"></a><span class="summary-sig-name">citerOnValues</span>()</span><br />
+      Return a read-only iterator over this grid's active tile and voxel 
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="clear"></a><span class="summary-sig-name">clear</span>()</span><br />
+      Remove all tiles from this grid and all nodes other than the root 
+      node.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#combine" class="summary-sig-name">combine</a>(<span class="summary-sig-arg">grid</span>,
+        <span class="summary-sig-arg">function</span>)</span><br />
+      Compute function(self, other) over all corresponding pairs of values 
+      (tile or voxel) of this grid and the other grid and store the result 
+      in this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">points, triangles, quads</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#convertToPolygons" class="summary-sig-name">convertToPolygons</a>(<span class="summary-sig-arg">isovalue</span>=<span class="summary-sig-default">0</span>,
+        <span class="summary-sig-arg">adaptivity</span>=<span class="summary-sig-default">0</span>)</span><br />
+      Adaptively mesh a scalar grid that has a continuous isosurface at the
+      given isovalue.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">points, quads</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#convertToQuads" class="summary-sig-name">convertToQuads</a>(<span class="summary-sig-arg">isovalue</span>=<span class="summary-sig-default">0</span>)</span><br />
+      Uniformly mesh a scalar grid that has a continuous isosurface at the 
+      given isovalue.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">BoolGrid</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="copy"></a><span class="summary-sig-name">copy</span>()</span><br />
+      Return a shallow copy of this grid, i.e., a grid that shares its 
+      voxel data with this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#copyFromArray" class="summary-sig-name">copyFromArray</a>(<span class="summary-sig-arg">array</span>,
+        <span class="summary-sig-arg">ijk</span>=<span class="summary-sig-default">(0</span>,
+        <span class="summary-sig-arg">0</span>,
+        <span class="summary-sig-arg">0)</span>,
+        <span class="summary-sig-arg">tolerance</span>=<span class="summary-sig-default">0</span>)</span><br />
+      Populate this grid, starting at voxel (i, j, k), with values from a 
+      three-dimensional array.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="copyToArray"></a><span class="summary-sig-name">copyToArray</span>(<span class="summary-sig-arg">array</span>,
+        <span class="summary-sig-arg">ijk</span>=<span class="summary-sig-default">(0</span>,
+        <span class="summary-sig-arg">0</span>,
+        <span class="summary-sig-arg">0)</span>)</span><br />
+      Populate a three-dimensional array with values from this grid, 
+      starting at voxel (i, j, k).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">BoolGrid</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="deepCopy"></a><span class="summary-sig-name">deepCopy</span>()</span><br />
+      Return a deep copy of this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">bool</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="empty"></a><span class="summary-sig-name">empty</span>()</span><br />
+      Return True if this grid contains only background voxels.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">xyzMin, xyzMax</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="evalActiveVoxelBoundingBox"></a><span class="summary-sig-name">evalActiveVoxelBoundingBox</span>()</span><br />
+      Return the coordinates of opposite corners of the axis-aligned 
+      bounding box of all active voxels.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">x, y, z</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="evalActiveVoxelDim"></a><span class="summary-sig-name">evalActiveVoxelDim</span>()</span><br />
+      Return the dimensions of the axis-aligned bounding box of all active 
+      voxels.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">xyzMin, xyzMax</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="evalLeafBoundingBox"></a><span class="summary-sig-name">evalLeafBoundingBox</span>()</span><br />
+      Return the coordinates of opposite corners of the axis-aligned 
+      bounding box of all leaf nodes.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">x, y, z</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="evalLeafDim"></a><span class="summary-sig-name">evalLeafDim</span>()</span><br />
+      Return the dimensions of the axis-aligned bounding box of all leaf 
+      nodes.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">min, max</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="evalMinMax"></a><span class="summary-sig-name">evalMinMax</span>()</span><br />
+      Return the minimum and maximum active values in this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="fill"></a><span class="summary-sig-name">fill</span>(<span class="summary-sig-arg">min</span>,
+        <span class="summary-sig-arg">max</span>,
+        <span class="summary-sig-arg">value</span>,
+        <span class="summary-sig-arg">active</span>=<span class="summary-sig-default">True</span>)</span><br />
+      Set all voxels within a given axis-aligned box to a constant value 
+      (either active or inactive).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">BoolGridAccessor</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="getAccessor"></a><span class="summary-sig-name">getAccessor</span>()</span><br />
+      Return an accessor that provides random read and write access to this
+      grid's voxels.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">BoolGridAccessor</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="getConstAccessor"></a><span class="summary-sig-name">getConstAccessor</span>()</span><br />
+      Return an accessor that provides random read-only access to this 
+      grid's voxels.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">min, max</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#getIndexRange" class="summary-sig-name">getIndexRange</a>()</span><br />
+      Return the minimum and maximum coordinates that are represented in 
+      this grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">dict</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="getStatsMetadata"></a><span class="summary-sig-name">getStatsMetadata</span>()</span><br />
+      Return a (possibly empty) dict containing just the metadata that was 
+      added to this grid with addStatsMetadata().</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">str</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="info"></a><span class="summary-sig-name">info</span>(<span class="summary-sig-arg">verbosity</span>=<span class="summary-sig-default">1</span>)</span><br />
+      Return a string containing information about this grid with a 
+      specified level of verbosity.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="iterAllValues"></a><span class="summary-sig-name">iterAllValues</span>()</span><br />
+      Return a read/write iterator over all of this grid's tile and voxel 
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="iterOffValues"></a><span class="summary-sig-name">iterOffValues</span>()</span><br />
+      Return a read/write iterator over this grid's inactive tile and voxel
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="iterOnValues"></a><span class="summary-sig-name">iterOnValues</span>()</span><br />
+      Return a read/write iterator over this grid's active tile and voxel 
+      values.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">iterator</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="iterkeys"></a><span class="summary-sig-name">iterkeys</span>()</span><br />
+      Return an iterator over this grid's metadata keys.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">int</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="leafCount"></a><span class="summary-sig-name">leafCount</span>()</span><br />
+      Return the number of leaf nodes in this grid's tree.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#mapAll" class="summary-sig-name">mapAll</a>(<span class="summary-sig-arg">function</span>)</span><br />
+      Iterate over all values (tile and voxel) of this grid and replace 
+      each value with function(value).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#mapOff" class="summary-sig-name">mapOff</a>(<span class="summary-sig-arg">function</span>)</span><br />
+      Iterate over all the inactive (&quot;off&quot;) values (tile and 
+      voxel) of this grid and replace each value with function(value).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#mapOn" class="summary-sig-name">mapOn</a>(<span class="summary-sig-arg">function</span>)</span><br />
+      Iterate over all the active (&quot;on&quot;) values (tile and voxel) 
+      of this grid and replace each value with function(value).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">int</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="memUsage"></a><span class="summary-sig-name">memUsage</span>()</span><br />
+      Return the memory usage of this grid in bytes.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#merge" class="summary-sig-name">merge</a>(<span class="summary-sig-arg">BoolGrid</span>)</span><br />
+      Move child nodes from the other grid into this grid wherever those 
+      nodes correspond to constant-value tiles in this grid, and replace 
+      leaf-level inactive voxels in this grid with corresponding voxels in 
+      the other grid that are active.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="nodeLog2Dims"></a><span class="summary-sig-name">nodeLog2Dims</span>(<span class="summary-sig-arg">...</span>)</span><br />
+      list of Log2Dims of the nodes of this grid's tree in order from root 
+      to leaf</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">int</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="nonLeafCount"></a><span class="summary-sig-name">nonLeafCount</span>()</span><br />
+      Return the number of non-leaf nodes in this grid's tree.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="prune"></a><span class="summary-sig-name">prune</span>(<span class="summary-sig-arg">tolerance</span>=<span class="summary-sig-default">0</span>)</span><br />
+      Remove nodes whose values all have the same active state and are 
+      equal to within a given tolerance.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="pruneInactive"></a><span class="summary-sig-name">pruneInactive</span>(<span class="summary-sig-arg">value</span>=<span class="summary-sig-default">None</span>)</span><br />
+      Remove nodes whose values are all inactive and replace them with 
+      either background tiles or tiles of the given value (if the value is 
+      not None).</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">bool</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="sharesWith"></a><span class="summary-sig-name">sharesWith</span>(<span class="summary-sig-arg">BoolGrid</span>)</span><br />
+      Return True if this grid shares its voxel data with the given grid.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="signedFloodFill"></a><span class="summary-sig-name">signedFloodFill</span>()</span><br />
+      Propagate the sign from a narrow-band level set into inactive voxels 
+      and tiles.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a name="updateMetadata"></a><span class="summary-sig-name">updateMetadata</span>(<span class="summary-sig-arg">dict</span>)</span><br />
+      Add metadata to this grid, replacing any existing items having the 
+      same names as the new items.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" class="summary">
+    <p class="indent-wrapped-lines"><b>Inherited from <code><i>unreachable</i>.instance</code></b>:
+      <code>__new__</code>
+      </p>
+    <p class="indent-wrapped-lines"><b>Inherited from <code>object</code></b>:
+      <code>__delattr__</code>,
+      <code>__format__</code>,
+      <code>__getattribute__</code>,
+      <code>__hash__</code>,
+      <code>__reduce_ex__</code>,
+      <code>__repr__</code>,
+      <code>__setattr__</code>,
+      <code>__sizeof__</code>,
+      <code>__str__</code>,
+      <code>__subclasshook__</code>
+      </p>
+    </td>
+  </tr>
+</table>
+<!-- ==================== STATIC METHODS ==================== -->
+<a name="section-StaticMethods"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Static Methods</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-StaticMethods"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">BoolGrid</span>
+    </td><td class="summary">
+      <table width="100%" cellpadding="0" cellspacing="0" border="0">
+        <tr>
+          <td><span class="summary-sig"><a href="pyopenvdb.BoolGrid-class.html#createLevelSetFromPolygons" class="summary-sig-name">createLevelSetFromPolygons</a>(<span class="summary-sig-arg">points</span>,
+        <span class="summary-sig-arg">triangles</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">quads</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">transform</span>=<span class="summary-sig-default">None</span>,
+        <span class="summary-sig-arg">halfWidth</span>=<span class="summary-sig-default">3.000000</span>)</span><br />
+      Convert a triangle and/or quad mesh to a narrow-band level set 
+      volume.</td>
+          <td align="right" valign="top">
+            
+            
+          </td>
+        </tr>
+      </table>
+      
+    </td>
+  </tr>
+</table>
+<!-- ==================== CLASS VARIABLES ==================== -->
+<a name="section-ClassVariables"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Class Variables</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-ClassVariables"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__getstate_manages_dict__"></a><span class="summary-name">__getstate_manages_dict__</span> = <code title="True">True</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__instance_size__"></a><span class="summary-name">__instance_size__</span> = <code title="32">32</code>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a name="__safe_for_unpickling__"></a><span class="summary-name">__safe_for_unpickling__</span> = <code title="True">True</code>
+    </td>
+  </tr>
+</table>
+<!-- ==================== PROPERTIES ==================== -->
+<a name="section-Properties"></a>
+<table class="summary" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Properties</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-Properties"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#background" class="summary-name">background</a><br />
+      value of this grid's background voxels
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#creator" class="summary-name">creator</a><br />
+      description of this grid's creator
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#gridClass" class="summary-name">gridClass</a><br />
+      the class of volumetric data (level set, fog volume, etc.) stored in 
+      this grid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#metadata" class="summary-name">metadata</a><br />
+      dict of this grid's metadata
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#name" class="summary-name">name</a><br />
+      this grid's name
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#oneValue" class="summary-name">oneValue</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#saveFloatAsHalf" class="summary-name">saveFloatAsHalf</a><br />
+      if True, write floating-point voxel values as 16-bit half floats
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#transform" class="summary-name">transform</a><br />
+      transform associated with this grid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#treeDepth" class="summary-name">treeDepth</a><br />
+      depth of this grid's tree from root node to leaf node
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#valueTypeName" class="summary-name">valueTypeName</a>
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#vectorType" class="summary-name">vectorType</a><br />
+      how transforms are applied to values stored in this grid
+    </td>
+  </tr>
+<tr>
+    <td width="15%" align="right" valign="top" class="summary">
+      <span class="summary-type">&nbsp;</span>
+    </td><td class="summary">
+        <a href="pyopenvdb.BoolGrid-class.html#zeroValue" class="summary-name">zeroValue</a>
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" class="summary">
+    <p class="indent-wrapped-lines"><b>Inherited from <code>object</code></b>:
+      <code>__class__</code>
+      </p>
+    </td>
+  </tr>
+</table>
+<!-- ==================== METHOD DETAILS ==================== -->
+<a name="section-MethodDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Method Details</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-MethodDetails"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+</table>
+<a name="__init__"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">__init__</span>(<span class="sig-arg">...</span>)</span>
+    <br /><em class="fname">(Constructor)</em>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Initialize with a background value of False.</p>
+  <p>Initialize with the given background value.</p>
+  <dl class="fields">
+    <dt>Overrides:
+        object.__init__
+    </dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="__reduce__"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">__reduce__</span>(<span class="sig-arg">...</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>helper for pickle</p>
+  <dl class="fields">
+    <dt>Overrides:
+        object.__reduce__
+        <dd><em class="note">(inherited documentation)</em></dd>
+    </dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="addStatsMetadata"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">addStatsMetadata</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Add metadata to this grid comprising the current values of statistics 
+  like the active voxel count and bounding box. (This metadata is not 
+  automatically kept up-to-date with changes to this grid.)</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="combine"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">combine</span>(<span class="sig-arg">grid</span>,
+        <span class="sig-arg">function</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Compute function(self, other) over all corresponding pairs of values 
+  (tile or voxel) of this grid and the other grid and store the result in 
+  this grid.</p>
+  <p>Note: this operation always empties the other grid.</p>
+  <p>Example: grid.combine(otherGrid, lambda a, b: min(a, b))</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="convertToPolygons"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">convertToPolygons</span>(<span class="sig-arg">isovalue</span>=<span class="sig-default">0</span>,
+        <span class="sig-arg">adaptivity</span>=<span class="sig-default">0</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Adaptively mesh a scalar grid that has a continuous isosurface at the 
+  given isovalue.  Return a NumPy array of world-space points and NumPy 
+  arrays of 3- and 4-tuples of point indices, which specify the vertices of
+  the triangles and quadrilaterals that form the mesh.  Adaptivity can vary
+  from 0 to 1, where 0 produces a high-polygon-count mesh that closely 
+  approximates the isosurface, and 1 produces a lower-polygon-count mesh 
+  with some loss of surface detail.</p>
+  <dl class="fields">
+    <dt>Returns: points, triangles, quads</dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="convertToQuads"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">convertToQuads</span>(<span class="sig-arg">isovalue</span>=<span class="sig-default">0</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Uniformly mesh a scalar grid that has a continuous isosurface at the 
+  given isovalue.  Return a NumPy array of world-space points and a NumPy 
+  array of 4-tuples of point indices, which specify the vertices of the 
+  quadrilaterals that form the mesh.</p>
+  <dl class="fields">
+    <dt>Returns: points, quads</dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="copyFromArray"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">copyFromArray</span>(<span class="sig-arg">array</span>,
+        <span class="sig-arg">ijk</span>=<span class="sig-default">(0</span>,
+        <span class="sig-arg">0</span>,
+        <span class="sig-arg">0)</span>,
+        <span class="sig-arg">tolerance</span>=<span class="sig-default">0</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Populate this grid, starting at voxel (i, j, k), with values from a 
+  three-dimensional array.  Mark voxels as inactive if and only if their 
+  values are equal to this grid's background value within the given 
+  tolerance.</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="createLevelSetFromPolygons"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">createLevelSetFromPolygons</span>(<span class="sig-arg">points</span>,
+        <span class="sig-arg">triangles</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">quads</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">transform</span>=<span class="sig-default">None</span>,
+        <span class="sig-arg">halfWidth</span>=<span class="sig-default">3.000000</span>)</span>
+    <br /><em class="fname">Static Method</em>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Convert a triangle and/or quad mesh to a narrow-band level set volume.
+  The mesh must form a closed surface, but the surface need not be manifold
+  and may have self intersections and degenerate faces. The mesh is 
+  described by a NumPy array of world-space points and NumPy arrays of 3- 
+  and 4-tuples of point indices that specify the vertices of the triangles 
+  and quadrilaterals that form the mesh. Either the triangle or the quad 
+  array may be empty or None. The resulting volume will have the given 
+  transform (or the identity transform if no transform is given) and a 
+  narrow band width of 2 x halfWidth voxels.</p>
+  <dl class="fields">
+    <dt>Returns: BoolGrid</dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="getIndexRange"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">getIndexRange</span>()</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Return the minimum and maximum coordinates that are represented in 
+  this grid.  These might include background voxels.</p>
+  <dl class="fields">
+    <dt>Returns: min, max</dt>
+  </dl>
+</td></tr></table>
+</div>
+<a name="mapAll"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">mapAll</span>(<span class="sig-arg">function</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Iterate over all values (tile and voxel) of this grid and replace each
+  value with function(value).</p>
+  <p>Example: grid.mapAll(lambda x: x * 2 if x &lt; 0.5 else x)</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="mapOff"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">mapOff</span>(<span class="sig-arg">function</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Iterate over all the inactive (&quot;off&quot;) values (tile and 
+  voxel) of this grid and replace each value with function(value).</p>
+  <p>Example: grid.mapOff(lambda x: x * 2 if x &lt; 0.5 else x)</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="mapOn"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">mapOn</span>(<span class="sig-arg">function</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Iterate over all the active (&quot;on&quot;) values (tile and voxel) 
+  of this grid and replace each value with function(value).</p>
+  <p>Example: grid.mapOn(lambda x: x * 2 if x &lt; 0.5 else x)</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<a name="merge"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <table width="100%" cellpadding="0" cellspacing="0" border="0">
+  <tr valign="top"><td>
+  <h3 class="epydoc"><span class="sig"><span class="sig-name">merge</span>(<span class="sig-arg">BoolGrid</span>)</span>
+  </h3>
+  </td><td align="right" valign="top"
+    >&nbsp;
+    </td>
+  </tr></table>
+  
+  <p>Move child nodes from the other grid into this grid wherever those 
+  nodes correspond to constant-value tiles in this grid, and replace 
+  leaf-level inactive voxels in this grid with corresponding voxels in the 
+  other grid that are active.</p>
+  <p>Note: this operation always empties the other grid.</p>
+  <dl class="fields">
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== PROPERTY DETAILS ==================== -->
+<a name="section-PropertyDetails"></a>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr bgcolor="#70b0f0" class="table-header">
+  <td colspan="2" class="table-header">
+    <table border="0" cellpadding="0" cellspacing="0" width="100%">
+      <tr valign="top">
+        <td align="left"><span class="table-header">Property Details</span></td>
+        <td align="right" valign="top"
+         ><span class="options">[<a href="#section-PropertyDetails"
+         class="privatelink" onclick="toggle_private();"
+         >hide private</a>]</span></td>
+      </tr>
+    </table>
+  </td>
+</tr>
+</table>
+<a name="background"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">background</h3>
+  <p>value of this grid's background voxels</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="creator"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">creator</h3>
+  <p>description of this grid's creator</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="gridClass"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">gridClass</h3>
+  <p>the class of volumetric data (level set, fog volume, etc.) stored in 
+  this grid</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="metadata"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">metadata</h3>
+  <p>dict of this grid's metadata</p>
+  <p>Setting this attribute replaces all of this grid's metadata, but 
+  mutating it in place has no effect on the grid, since the value of this 
+  attribute is a only a copy of the metadata. Use either indexing or 
+  updateMetadata() to mutate metadata in place.</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="name"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">name</h3>
+  <p>this grid's name</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="oneValue"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">oneValue</h3>
+  
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="saveFloatAsHalf"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">saveFloatAsHalf</h3>
+  <p>if True, write floating-point voxel values as 16-bit half floats</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="transform"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">transform</h3>
+  <p>transform associated with this grid</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="treeDepth"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">treeDepth</h3>
+  <p>depth of this grid's tree from root node to leaf node</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="valueTypeName"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">valueTypeName</h3>
+  
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="vectorType"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">vectorType</h3>
+  <p>how transforms are applied to values stored in this grid</p>
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+    <dt>Set Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<a name="zeroValue"></a>
+<div>
+<table class="details" border="1" cellpadding="3"
+       cellspacing="0" width="100%" bgcolor="white">
+<tr><td>
+  <h3 class="epydoc">zeroValue</h3>
+  
+  <dl class="fields">
+    <dt>Get Method:</dt>
+    <dd class="value"><span class="summary-sig"><i>unreachable</i>(<span class="summary-sig-arg">...</span>)</span>
+    </dd>
+  </dl>
+</td></tr></table>
+</div>
+<br />
+<!-- ==================== NAVIGATION BAR ==================== -->
+<table class="navbar" border="0" width="100%" cellpadding="0"
+       bgcolor="#a0c0ff" cellspacing="0">
+  <tr valign="middle">
+  <!-- Home link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="pyopenvdb-module.html">Home</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Tree link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="module-tree.html">Trees</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Index link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="identifier-index.html">Indices</a>&nbsp;&nbsp;&nbsp;</th>
+
+  <!-- Help link -->
+      <th>&nbsp;&nbsp;&nbsp;<a
+        href="help.html">Help</a>&nbsp;&nbsp;&nbsp;</th>
+
+      <th class="navbar" width="100%"></th>
+  </tr>
+</table>
+<table border="0" cellpadding="0" cellspacing="0" width="100%%">
+  <tr>
+    <td align="left" class="footer">
+    Generated by Epydoc 3.0.1 on Fri Feb  5 04:55:30 2021
+    </td>
+    <td align="right" class="footer">
+      <a target="mainFrame" href="http://epydoc.sourceforge.net"
+        >http://epydoc.sourceforge.net</a>
+    </td>
+  </tr>
+</table>
+
+<script type="text/javascript">
+  <!--
+  // Private objects are initially displayed (because if
+  // javascript is turned off then we want them to be
+  // visible); but by default, we want to hide them.  So hide
+  // them unless we have a cookie that says to show them.
+  checkCookie();
+  // -->
+</script>
+</body>
+</html>
