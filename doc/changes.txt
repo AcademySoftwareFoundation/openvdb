@@ -52,7 +52,7 @@ a domain specific JIT (just-in-time) compiled expression language,
 providing users with a new way of interacting with OpenVDB data. AX is
 tailored towards writing highly parallelizable and customizable OpenVDB
 volume and point kernel operations. See the
-<A HREF="https://www.openvdb.org/documentation/doxygen/openvdbax.html">documentation</A>
+<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
 for more.
 </BLOCKQUOTE>
 
