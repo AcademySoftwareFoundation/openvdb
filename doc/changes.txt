@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v7_2_2_changes"></a>@endhtmlonly
 @par
-<B>Version 7.2.2</B> - <I>February 4, 2020</I>
+<B>Version 7.2.2</B> - <I>February 4, 2021</I>
 
 @par
 Bug fixes:
