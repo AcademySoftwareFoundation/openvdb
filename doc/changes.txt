@@ -4,16 +4,19 @@
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par
-<B>Version 8.0.1</B> - <I>In Development</I>
+<B>Version 8.0.1</B> - <I>February 5, 2021</I>
 
 @par
 Bug fixes:
 - Fixed a bug in the new CSG intersection merge algorithm where data
   outside of the intersection region was not being removed.
 
+@par
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
 - Dropped the minimum boost requirement back to 1.61.
+- Documentation installed by the doc target is now installed to the
+  share/doc/OpenVDB prefix
 
 @par
 Houdini:

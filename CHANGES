@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 8.0.1 - In Development
+Version 8.0.1 - February 5, 2021
 
     Bug fixes:
     - Fixed a bug in the new CSG intersection merge algorithm where data
@@ -10,6 +10,8 @@ Version 8.0.1 - In Development
     Build:
     - Fixed various incorrect RPATH directory paths in CMake
     - Dropped the minimum boost requirement back to 1.61.
+    - Documentation installed by the doc target is now installed to the
+      share/doc/OpenVDB prefix
 
     Houdini:
     - VDB Combine SOP no longer attempts to invoke SDF CSG operations on
