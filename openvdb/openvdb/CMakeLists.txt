@@ -45,21 +45,13 @@ message(STATUS "----------------------------------------------------")
 
 # Collect and configure lib dependencies
 
-if(USE_EXR)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
-    if(${OpenEXR_VERSION} VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
-      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+if(USE_IMATH_HALF)
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
         "is deprecated and will be removed.")
     endif()
-  endif()
-endif()
-
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-      "is deprecated and will be removed.")
   endif()
 endif()
 
@@ -119,15 +111,20 @@ if(UNIX)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
-# users chosen namespaced headers are correctly prioritized. Otherwise other
-# include paths from shared installs (including houdini) may pull in the wrong
-# headers
+# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# namespaced headers are correctly prioritized. Otherwise other include paths
+# from shared installs (including houdini) may pull in the wrong headers
 
 set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
 )
+
+if(USE_IMATH_HALF)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    IlmBase::Half
+  )
+endif()
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -140,12 +137,6 @@ if(WIN32)
         Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
       )
   endif()
-endif()
-
-if(USE_EXR)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    IlmBase::Half
-  )
 endif()
 
 if(USE_LOG4CPLUS)
@@ -186,12 +177,15 @@ endif()
 
 ##### Core library configuration
 
-option(OPENVDB_BUILDCONFIG_USE_EXR "Enable OpenEXR Half in Configuration File" OFF)
-if(USE_EXR)
-  set(OPENVDB_BUILDCONFIG_USE_EXR, 1)
+# Configure the BuildConfig header
+
+if(USE_IMATH_HALF)
+  set(OPENVDB_BUILDCONFIG_USE_IMATH_HALF 1)
 endif()
 
 configure_file(BuildConfig.h.in BuildConfig.h)
+
+##########################################################################
 
 set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
@@ -417,8 +411,8 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  if(USE_EXR)
-    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+  if(USE_IMATH_HALF)
+    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()
@@ -485,7 +479,6 @@ if(OPENVDB_CORE_SHARED)
     list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
       ${IlmBase_LIBRARY_DIRS}
-      ${OpenEXR_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}
       ${Tbb_LIBRARY_DIRS}
