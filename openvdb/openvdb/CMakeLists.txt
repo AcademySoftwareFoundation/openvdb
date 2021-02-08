@@ -197,7 +197,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
-  math/half.cc
+  math/Half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -247,8 +247,8 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
-  math/half.h
-  math/halfLimits.h
+  math/Half.h
+  math/HalfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h

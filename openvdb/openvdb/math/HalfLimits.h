@@ -38,8 +38,8 @@
 //     Rod Bogart <rgb@ilm.com>
 
 
-#ifndef INCLUDED_HALF_LIMITS_H
-#define INCLUDED_HALF_LIMITS_H
+#ifndef OPENVDB_MATH_HALF_LIMITS_HAS_BEEN_INCLUDED
+#define OPENVDB_MATH_HALF_LIMITS_HAS_BEEN_INCLUDED
 
 
 //------------------------------------------------------------------------
@@ -49,7 +49,7 @@
 //------------------------------------------------------------------------
 
 #include <limits>
-#include "half.h"
+#include "Half.h"
 
 namespace std {
 
@@ -108,4 +108,4 @@ class numeric_limits <openvdb::OPENVDB_VERSION_NAME::math::half>
 
 } // namespace std
 
-#endif
+#endif // OPENVDB_MATH_HALF_LIMITS_HAS_BEEN_INCLUDED

@@ -18,7 +18,7 @@ namespace math {
 using half = half;
 }}}
 #else
-#include <openvdb/math/half.h>
+#include <openvdb/math/Half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
