@@ -418,7 +418,7 @@ TEST_F(TestAttributeArray, testAttributeArray)
         }
         {
             // half is not registered by default, but for complete-ness
-            TypedAttributeArray<half> typedAttr(size);
+            TypedAttributeArray<math::half> typedAttr(size);
             AttributeArray& attr(typedAttr);
             EXPECT_EQ(Name("half"), attr.valueType());
             EXPECT_EQ(Name("null"), attr.codecType());
@@ -700,8 +700,8 @@ TEST_F(TestAttributeArray, testAttributeArray)
         }
 
         { // Equality using an unregistered attribute type
-            TypedAttributeArray<half> attr1(50);
-            TypedAttributeArray<half> attr2(50);
+            TypedAttributeArray<math::half> attr1(50);
+            TypedAttributeArray<math::half> attr2(50);
 
             EXPECT_TRUE(attr1 == attr2);
         }
@@ -945,7 +945,7 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
 
     { // copy values between attribute arrays with different value types, but the same storage type
         // target half array
-        TypedAttributeArray<half> targetTypedAttr1(size);
+        TypedAttributeArray<math::half> targetTypedAttr1(size);
         AttributeArray& targetAttr1(targetTypedAttr1);
         for (Index i = 0; i < size; i++) {
             targetTypedAttr1.set(i,

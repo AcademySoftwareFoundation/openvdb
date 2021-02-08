@@ -74,7 +74,7 @@ template<> struct GAHandleTraits<int8_t>      { using RW = GA_RWHandleI; using R
 template<> struct GAHandleTraits<int16_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int32_t>     { using RW = GA_RWHandleI; using RO = GA_ROHandleI; };
 template<> struct GAHandleTraits<int64_t>     { using RW = GA_RWHandleID; using RO = GA_ROHandleID; };
-template<> struct GAHandleTraits<half>        { using RW = GA_RWHandleH; using RO = GA_ROHandleH; };
+template<> struct GAHandleTraits<math::half>        { using RW = GA_RWHandleH; using RO = GA_ROHandleH; };
 template<> struct GAHandleTraits<float>       { using RW = GA_RWHandleF; using RO = GA_ROHandleF; };
 template<> struct GAHandleTraits<double>      { using RW = GA_RWHandleD; using RO = GA_ROHandleD; };
 template<> struct GAHandleTraits<std::string> { using RW = GA_RWHandleS; using RO = GA_ROHandleS; };

@@ -444,7 +444,6 @@ endif()
 
 # Add standard dependencies
 
-find_package(IlmBase REQUIRED COMPONENTS Half)
 find_package(TBB REQUIRED COMPONENTS tbb)
 find_package(ZLIB REQUIRED)
 
@@ -608,7 +607,6 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
   if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
     list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
   endif()
@@ -623,7 +621,6 @@ endif()
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
 
 if(OpenVDB_ABI)

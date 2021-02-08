@@ -54,8 +54,6 @@ if(USE_EXR)
         "is deprecated and will be removed.")
     endif()
   endif()
-else()
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
 endif()
 
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
@@ -129,7 +127,6 @@ endif()
 set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
 
 if(WIN32)
@@ -147,10 +144,7 @@ endif()
 
 if(USE_EXR)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
+    IlmBase::Half
   )
 endif()
 
@@ -192,6 +186,13 @@ endif()
 
 ##### Core library configuration
 
+option(OPENVDB_BUILDCONFIG_USE_EXR "Enable OpenEXR Half in Configuration File" OFF)
+if(USE_EXR)
+  set(OPENVDB_BUILDCONFIG_USE_EXR, 1)
+endif()
+
+configure_file(BuildConfig.h.in BuildConfig.h)
+
 set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
@@ -202,6 +203,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
+  math/half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -251,6 +253,8 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
+  math/half.h
+  math/halfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -413,14 +417,12 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+  if(USE_EXR)
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
   endif()
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
-endif()
-if(USE_EXR)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
@@ -432,7 +434,7 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   target_include_directories(openvdb_static
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
@@ -458,7 +460,7 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   target_include_directories(openvdb_shared
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
@@ -516,6 +518,7 @@ if(OPENVDB_CORE_SHARED)
 endif()
 
 install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/points)
