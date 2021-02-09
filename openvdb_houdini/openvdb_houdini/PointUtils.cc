@@ -494,7 +494,7 @@ convertAttributeFromHoudini(PointDataTree& tree, const tools::PointIndexTree& in
     using HoudiniStringAttribute = HoudiniReadAttribute<Name>;
 
     if (!attribute) {
-        std::stringstream ss; ss << "Invalid attribute - " << attribute->getName();
+        std::stringstream ss; ss << "Invalid attribute - " << name;
         throw std::runtime_error(ss.str());
     }
 
