@@ -332,14 +332,14 @@ Package        | Description                                                    
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++14 Compiler | Matching Houdini compiler and version                             | All                              |
 Boost          | Components: system, iostreams, python, thread                     | All                              |
-IlmBase        | Used half precision floating points and EXR serialization support | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
 CppUnit        | A unit testing framework module for C++                           | Unit Tests (AX)                  |
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
-OpenEXR        | EXR serialization support                                         | Optional (Core) / OpenVDB Render |
+OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
+IlmBase        | Used half precision floating points and EXR serialization support | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
@@ -347,9 +347,9 @@ LLVM           | Target-independent code generation                             
 
 * See [blosc support](@ref buildBloscSupport)
 
-At a minimum, boost, a matching C++14 compiler, IlmBase, ZLIB, blosc and CMake
-will be required. See the full [dependency list](@ref dependencies) for help
-with downloading and installing the above software.
+At a minimum, boost, a matching C++14 compiler, ZLIB, blosc and CMake will be
+required. See the full [dependency list](@ref dependencies) for help with
+downloading and installing the above software.
 
 With the necessary dependencies installed, create and enter a directory for
 cmake to write to. It's generally useful to create this in the location you've

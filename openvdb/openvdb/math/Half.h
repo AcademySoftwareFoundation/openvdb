@@ -758,4 +758,4 @@ half::setBits (unsigned short bits)
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif
+#endif // OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED

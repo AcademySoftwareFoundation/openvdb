@@ -59,8 +59,8 @@ This will define the following variables:
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
-``OpenVDB_USES_EXR``
-  True if the OpenVDB Library has been built with openexr support
+``OpenVDB_USES_IMATH_HALF``
+  True if the OpenVDB Library has been built with Imath half support
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -515,7 +515,7 @@ endif()
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
-set(OpenVDB_USES_EXR ${USE_EXR})
+set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -573,9 +573,9 @@ else()
       set(OpenVDB_USES_LOG4CPLUS ON)
     endif()
 
-    string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
+    string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_EXR ON)
+      set(OpenVDB_USES_IMATH_HALF ON)
     endif()
   endforeach()
 
@@ -594,47 +594,38 @@ if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
 endif()
 
-if(OpenVDB_USES_EXR)
-  find_package(IlmBase REQUIRED)
-  find_package(OpenEXR REQUIRED)
+if(OpenVDB_USES_IMATH_HALF)
+  find_package(IlmBase REQUIRED COMPONENTS Half)
+  if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+    #       used in PlatformConfig.h to configure EXR exports. Once this file
+    #       is completely removed, this define can be too
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
 endif()
 
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(WIN32)
-  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
-  #       used in PlatformConfig.h to configure EXR exports. Once this file
-  #       is completely removed, this define can be too
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-  endif()
-endif()
-
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
-# users chosen namespaced headers are correctly prioritized. Otherwise other
-# include paths from shared installs (including houdini) may pull in the wrong
-# headers
+# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# namespaced headers are correctly prioritized. Otherwise other include paths
+# from shared installs (including houdini) may pull in the wrong headers
 
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
 )
 
-if(OpenVDB_ABI)
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
+if(OpenVDB_USES_IMATH_HALF)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
 endif()
 
-if(OpenVDB_USES_EXR)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
-  )
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_TOOLS_RAYTRACER_USE_EXR)
+if(OpenVDB_ABI)
+  list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
