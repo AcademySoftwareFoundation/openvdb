@@ -2,6 +2,11 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v8_0_2_changes"></a>@endhtmlonly
+@par
+<B>Version 8.0.2</B> - <I>In development</I>
+
+
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par
 <B>Version 8.0.1</B> - <I>February 5, 2021</I>
@@ -47,7 +52,7 @@ a domain specific JIT (just-in-time) compiled expression language,
 providing users with a new way of interacting with OpenVDB data. AX is
 tailored towards writing highly parallelizable and customizable OpenVDB
 volume and point kernel operations. See the
-<A HREF="https://www.openvdb.org/documentation/doxygen/openvdbax.html">documentation</A>
+<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
 for more.
 </BLOCKQUOTE>
 

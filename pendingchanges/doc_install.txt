@@ -1,3 +1,0 @@
-
-Build:
-    Documentation installed by the doc target is now installed to the share/doc/OpenVDB prefix
