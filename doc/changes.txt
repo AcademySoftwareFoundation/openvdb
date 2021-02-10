@@ -6,6 +6,37 @@
 @par
 <B>Version 8.0.2</B> - <I>In development</I>
 
+@par
+New features:
+- Added @vdblink::tools::erodeActiveValues() tools::erodeActiveValues@endlink,
+  @vdblink::tools::erodeActiveLeafValues() tools::erodeActiveLeafValues@endlink and
+  @vdblink::tools::dilateActiveLeafValues() tools::dilateActiveLeafValues@endlink,
+  to match the existing
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink. New
+  erosion tools support all tile policies and edge/vertex neighbour patterns.
+
+@par
+Improvements:
+- Significant performance improvements to large dilations with
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink and
+  @vdblink::tools::dilateActiveLeafValues() tools::dilateActiveLeafValues@endlink.
+  Performance gains will improve relative to increases in the inputs size
+  and dilation scheme.
+- Added an optional argument to
+  @vdblink::Tree::topologyUnion() Tree::topologyUnion@endlink which preserves
+  active tiles on the destination tree should they overlap leaf nodes from the
+  source tree.
+
+@par
+API changes:
+- Restructured the internals of Morphology.h and moved
+  @vdblink::tools::activate() tools::activate@endlink and
+  @vdblink::tools::deactivate() tools::deactivate@endlink to a new header,
+  Activation.h.
+- Deprecated @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink
+  and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
+  new morphology methods.
+
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par

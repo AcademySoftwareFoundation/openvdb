@@ -3,6 +3,26 @@ OpenVDB Version History
 
 Version 8.0.2 - In development
 
+    New features:
+    - Added tools::erodeActiveValues(), tools::erodeActiveLeafValues() and
+      tools::dilateActiveLeafValues() to match the existing
+      tools::dilateActiveValues(). New erosion tools support all tile policies
+      and edge/vertex neighbour patterns.
+
+    Improvements:
+    - Significant performance improvements to large dilations with
+      tools::dilateActiveValues() and tools::dilateActiveLeafValues().
+      Performance gains will improve relative to increases in the inputs size
+      and dilation scheme.
+    - Added an optional argument to Tree::topologyUnion() which preserves
+      active tiles on the destination tree should they overlap leaf nodes
+      from the source tree.
+
+    API changes:
+    - Restructured the internals of Morphology.h and moved tools::activate()
+      and tools::deactivate() to a new header, Activation.h.
+    - Deprecated tools::dilateVoxels() and tools::erodeVoxels() in favour of
+      new morphology methods.
 
 Version 8.0.1 - February 5, 2021
 
