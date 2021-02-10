@@ -18,12 +18,12 @@
   and required dependencies are expected. See the dependency documentation
   for more information:
 
-    https://www.openvdb.org/documentation/doxygen/dependencies.html
+    https://academysoftwarefoundation.github.io/openvdb/dependencies.html
 
   And the documentation on building OpenVDB for more in depth installation
   instructions:
 
-    https://www.openvdb.org/documentation/doxygen/build.html
+    https://academysoftwarefoundation.github.io/openvdb/build.html
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
@@ -213,9 +213,9 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_ICC_VERSION 17)
   set(MINIMUM_MSVC_VERSION 19.10)
 
-  set(MINIMUM_BOOST_VERSION 1.66)
-  set(MINIMUM_ILMBASE_VERSION 2.2)
-  set(MINIMUM_OPENEXR_VERSION 2.2)
+  set(MINIMUM_BOOST_VERSION 1.61)  # @warning should be 1.66, but H18 ships with 1.61
+  set(MINIMUM_ILMBASE_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
+  set(MINIMUM_OPENEXR_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2018.0)
   set(MINIMUM_LLVM_VERSION 6.0.0)
@@ -236,7 +236,8 @@ endif()
 # VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
 # Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
+# python linkage on macOS (Python::Module target in 3.15)
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned

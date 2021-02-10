@@ -2,6 +2,37 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v8_0_2_changes"></a>@endhtmlonly
+@par
+<B>Version 8.0.2</B> - <I>In development</I>
+
+
+@htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 8.0.1</B> - <I>February 5, 2021</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data
+  outside of the intersection region was not being removed.
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data
+  outside of the intersection region was not being removed.
+
+Build:
+- Fixed various incorrect RPATH directory paths in CMake
+- Dropped the minimum boost requirement back to 1.61.
+- Documentation installed by the doc target is now installed to the
+  share/doc/OpenVDB prefix
+
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+
+
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
 <B>Version 8.0.0</B> - <I>December 23, 2020</I>
@@ -21,7 +52,7 @@ a domain specific JIT (just-in-time) compiled expression language,
 providing users with a new way of interacting with OpenVDB data. AX is
 tailored towards writing highly parallelizable and customizable OpenVDB
 volume and point kernel operations. See the
-<A HREF="https://www.openvdb.org/documentation/doxygen/openvdbax.html">documentation</A>
+<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
 for more.
 </BLOCKQUOTE>
 
@@ -55,9 +86,7 @@ Bug fixes:
 ABI changes:
 - @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
   of ABI=8 so that it can be accessed from the GridBase.
-- Private method
-  @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
-  removed as of ABI=8.
+- Private method RootNode::getChildCount() has been removed as of ABI=8.
 - Mark map classes and functions as final for ABI=8 where beneficial to allow
   devirtualization optimization.
 - As of ABI 8, Vector, Matrix and Quaternion types now satisfy the Trivial
@@ -93,6 +122,27 @@ Build:
   [Reported&nbsp;by&nbsp;Alexander&nbsp;Hagen]
 - Removed OPENVDB_DEPRECATED macro in favor of C++14 <TT>[[deprecated]]</TT>
   attribute.
+
+
+@htmlonly <a name="v7_2_2_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.2</B> - <I>February 4, 2021</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data outside of
+  the intersection region was not being removed.
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
 
 
 @htmlonly <a name="v7_2_1_changes"></a>@endhtmlonly

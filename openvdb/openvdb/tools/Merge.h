@@ -501,10 +501,51 @@ struct UnallocatedBuffer<BufferT, bool>
 template <typename TreeT, bool Union>
 bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) const
 {
+    const bool Intersect = !Union;
+
     if (this->empty())     return false;
 
     // store the background value
     if (!mBackground)   mBackground = &root.background();
+
+    // does the key exist in the root node?
+    auto keyExistsInRoot = [&](const Coord& key) -> bool
+    {
+        return root.getValueDepth(key) > -1;
+    };
+
+    // does the key exist in all merge tree root nodes?
+    auto keyExistsInAllTrees = [&](const Coord& key) -> bool
+    {
+        for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+            const auto* mergeRoot = mergeTree.rootPtr();
+            if (!mergeRoot)                             return false;
+            if (mergeRoot->getValueDepth(key) == -1)    return false;
+        }
+        return true;
+    };
+
+    // delete any background tiles
+    root.eraseBackgroundTiles();
+
+    // for intersection, delete any root node keys that are not present in all trees
+    if (Intersect) {
+        // find all tile coordinates to delete
+        std::vector<Coord> toDelete;
+        for (auto valueIter = root.cbeginValueAll(); valueIter; ++valueIter) {
+            const Coord& key = valueIter.getCoord();
+            if (!keyExistsInAllTrees(key))   toDelete.push_back(key);
+        }
+        // find all child coordinates to delete
+        for (auto childIter = root.cbeginChildOn(); childIter; ++childIter) {
+            const Coord& key = childIter.getCoord();
+            if (!keyExistsInAllTrees(key))   toDelete.push_back(key);
+        }
+        // only mechanism to delete elements in root node is to delete background tiles,
+        // so insert background tiles (which will replace any child nodes) and then delete
+        for (Coord& key : toDelete)     root.addTile(key, *mBackground, false);
+        root.eraseBackgroundTiles();
+    }
 
     // find all tile values in this root and track inside/outside and active state
     // note that level sets should never contain active tiles, but we handle them anyway
@@ -569,7 +610,10 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
         if (flag & INSIDE_STATE) {
             const Coord& key = it.first;
             const bool state = flag & ACTIVE_TILE;
-            root.addTile(key, insideBackground, state);
+            // for intersection, only add the tile if the key already exists in the tree
+            if (Union || keyExistsInRoot(key)) {
+                root.addTile(key, insideBackground, state);
+            }
         }
     }
 
@@ -593,6 +637,9 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
         for (auto childIter = mergeRoot->cbeginChildOn(); childIter; ++childIter) {
             const Coord& key = childIter.getCoord();
 
+            // for intersection, only add child nodes if the key already exists in the tree
+            if (Intersect && !keyExistsInRoot(key))        continue;
+
             // if child already exists, merge recursion will need to continue to resolve conflict
             if (children.count(key)) {
                 continueRecurse = true;
@@ -604,6 +651,7 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             if (it != tiles.end() && it->second == INSIDE_STATE)     continue;
 
             auto childPtr = mergeTree.template stealOrDeepCopyNode<typename RootT::ChildNodeType>(key);
+            childPtr->resetBackground(mergeRoot->background(), root.background());
             if (childPtr)   root.addChild(childPtr.release());
 
             children.insert(key);
@@ -618,10 +666,16 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(RootT& root, size_t) con
             const Coord& key = it.first;
             if (!children.count(key)) {
                 const bool state = flag & ACTIVE_TILE;
-                root.addTile(key, outsideBackground, state);
+                // for intersection, only add the tile if the key already exists in the tree
+                if (Union || keyExistsInRoot(key)) {
+                    root.addTile(key, outsideBackground, state);
+                }
             }
         }
     }
+
+    // finish by removing any background tiles
+    root.eraseBackgroundTiles();
 
     return continueRecurse;
 }
@@ -692,7 +746,10 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(NodeT& node, size_t) con
                 mergeTree.template addTile<NonConstNodeT>(ijk, outsideBackground, false);
             } else if (invalidTile.isOn(pos)) {
                 auto childPtr = mergeTree.template stealOrDeepCopyNode<typename NodeT::ChildNodeType>(ijk);
-                if (childPtr)   node.addChild(childPtr.release());
+                if (childPtr) {
+                    childPtr->resetBackground(mergeTree.rootPtr()->background(), this->background());
+                    node.addChild(childPtr.release());
+                }
                 invalidTile.setOff(pos);
             } else {
                 // if both source and target are child nodes, merge recursion needs to continue
@@ -781,6 +838,9 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
         return flag;
     };
 
+    // delete any background tiles
+    root.eraseBackgroundTiles();
+
     std::unordered_map<Coord, /*flags*/uint8_t> flags;
 
     if (root.getTableSize() > 0) {
@@ -834,6 +894,9 @@ bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
             }
         }
     }
+
+    // finish by removing any background tiles
+    root.eraseBackgroundTiles();
 
     return continueRecurse;
 }
