@@ -10,7 +10,7 @@
 
 [Website](https://www.openvdb.org) |
 [Discussion Forum](https://www.openvdb.org/forum) |
-[Documentation](https://www.openvdb.org/documentation/)
+[Documentation](https://academysoftwarefoundation.github.io/openvdb)
 
 OpenVDB is an open source C++ library comprising a novel hierarchical data structure and a large suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It was developed by DreamWorks Animation for use in volumetric applications typically encountered in feature film production.
 
@@ -32,7 +32,7 @@ OpenVDB welcomes contributions to the OpenVDB project. Please refer to the [cont
 
 ### Developer Quick Start
 
-The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX and various executables, may require additional dependencies. See the [build documentation](https://www.openvdb.org/documentation/doxygen/build.html) for help with installations.
+The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX and various executables, may require additional dependencies. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
 
 #### Linux
 ##### Installing Dependencies (Boost, TBB, Blosc)

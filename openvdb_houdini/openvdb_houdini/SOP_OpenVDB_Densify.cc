@@ -61,8 +61,8 @@ newSopOperator(OP_OperatorTable* table)
 @overview\n\
 \n\
 This node replaces active\n\
-[tiles|http://www.openvdb.org/documentation/doxygen/overview.html#secSparsity]\n\
-in VDB [trees|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
+[tiles|https://academysoftwarefoundation.github.io/openvdb/overview.html#secSparsity]\n\
+in VDB [trees|https://academysoftwarefoundation.github.io/openvdb/overview.html#secTree]\n\
 with dense, leaf-level voxels.\n\
 This is useful for subsequent processing with nodes like [Node:sop/volumevop]\n\
 that operate only on leaf voxels.\n\
