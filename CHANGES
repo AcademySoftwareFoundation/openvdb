@@ -1,6 +1,9 @@
 OpenVDB Version History
 =======================
 
+Version 8.0.2 - In development
+
+
 Version 8.0.1 - February 5, 2021
 
     Bug fixes:
@@ -34,7 +37,7 @@ Version 8.0.0 - December 23, 2020
       providing users with a new way of interacting with OpenVDB data. AX is
       tailored towards writing highly parallelizable and customizable OpenVDB
       volume and point kernel operations. See the documentation for more:
-      https://www.openvdb.org/documentation/doxygen/openvdbax.html
+      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
