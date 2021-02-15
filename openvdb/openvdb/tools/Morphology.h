@@ -253,14 +253,20 @@ public:
         if (masks.size() < mManager.leafCount()) {
             masks.resize(mManager.leafCount());
         }
-        // @note this is marginally faster than using leafRange or foreach
-        const auto range = mManager.getRange(this->getThreaded() ?
-            1 : std::numeric_limits<size_t>::max());
-        tbb::parallel_for(range,
-            [&](const tbb::blocked_range<size_t>& r){
-            for (size_t idx = r.begin(); idx < r.end(); ++idx)
+
+        if (this->getThreaded()) {
+            // @note this is marginally faster than using leafRange or foreach
+            tbb::parallel_for(mManager.getRange(),
+                [&](const tbb::blocked_range<size_t>& r){
+                for (size_t idx = r.begin(); idx < r.end(); ++idx)
+                    masks[idx] = mManager.leaf(idx).getValueMask();
+            });
+        }
+        else {
+            for (size_t idx = 0; idx < mManager.leafCount(); ++idx) {
                 masks[idx] = mManager.leaf(idx).getValueMask();
-        });
+            }
+        }
     }
 
 public:
@@ -494,10 +500,6 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
     if (leafCount == 0) return;
     auto& tree = mManager.tree();
 
-    const size_t grainSize = this->getThreaded() ?
-        1 : std::numeric_limits<size_t>::max();
-    const auto range = mManager.getRange(grainSize);
-
     // If the nearest neighbour mode is not FACE, fall back to an
     // inverse dilation scheme which executes over a mask topology
     if (nn != NN_FACE) {
@@ -526,37 +528,59 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         // compute the wavefront. If the leaf previously existed, compute the
         // xor activity result which is guaranteed to be equal to but slightly
         // faster than a subtraction
-        tbb::parallel_for(manager.getRange(grainSize),
-            [&](const tbb::blocked_range<size_t>& r){
-            for (size_t idx = r.begin(); idx < r.end(); ++idx) {
-                auto& leaf = manager.leaf(idx);
-                auto& nodemask = leaf.getValueMask();
-                if (const auto* original = tree.probeConstLeaf(leaf.origin())) {
-                    nodemask ^= original->getValueMask();
-                }
-                else {
-                    // should never have a dense leaf if it didn't exist in the
-                    // original tree (it was previous possible when dilateVoxels()
-                    // called topologyUnion without the preservation of active
-                    // tiles)
-                    assert(!nodemask.isOn());
-                }
+        auto computeWavefront = [&](const size_t idx) {
+            auto& leaf = manager.leaf(idx);
+            auto& nodemask = leaf.getValueMask();
+            if (const auto* original = tree.probeConstLeaf(leaf.origin())) {
+                nodemask ^= original->getValueMask();
             }
-        });
+            else {
+                // should never have a dense leaf if it didn't exist in the
+                // original tree (it was previous possible when dilateVoxels()
+                // called topologyUnion without the preservation of active
+                // tiles)
+                assert(!nodemask.isOn());
+            }
+        };
+
+        if (this->getThreaded()) {
+            tbb::parallel_for(manager.getRange(),
+                [&](const tbb::blocked_range<size_t>& r){
+                for (size_t idx = r.begin(); idx < r.end(); ++idx) {
+                    computeWavefront(idx);
+                }
+            });
+        }
+        else {
+            for (size_t idx = 0; idx < manager.leafCount(); ++idx) {
+                computeWavefront(idx);
+            }
+        }
 
         // perform the inverse dilation
         m.dilateVoxels(iter, nn, /*prune=*/false);
 
         // subtract the inverse dilation from the original node masks
-        tbb::parallel_for(range,
-            [&](const tbb::blocked_range<size_t>& r){
-            for (size_t idx = r.begin(); idx < r.end(); ++idx) {
-                auto& leaf = mManager.leaf(idx);
-                const auto* maskleaf = mask.probeConstLeaf(leaf.origin());
-                assert(maskleaf);
-                leaf.getValueMask() -= maskleaf->getValueMask();
+        auto subtractTopology = [&](const size_t idx) {
+            auto& leaf = mManager.leaf(idx);
+            const auto* maskleaf = mask.probeConstLeaf(leaf.origin());
+            assert(maskleaf);
+            leaf.getValueMask() -= maskleaf->getValueMask();
+        };
+
+        if (this->getThreaded()) {
+            tbb::parallel_for(mManager.getRange(),
+                [&](const tbb::blocked_range<size_t>& r){
+                for (size_t idx = r.begin(); idx < r.end(); ++idx) {
+                    subtractTopology(idx);
+                }
+            });
+        }
+        else {
+            for (size_t idx = 0; idx < leafCount; ++idx) {
+                subtractTopology(idx);
             }
-        });
+        }
     }
     else {
         // NN_FACE erosion scheme
@@ -565,28 +589,50 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
         std::vector<MaskType> nodeMasks;
         this->copyMasks(nodeMasks);
 
-        for (size_t i = 0; i < iter; ++i) {
-            // For each leaf, in parallel, gather neighboring off values
-            // and update the cached value mask
-            tbb::parallel_for(range,
-                [&](const tbb::blocked_range<size_t>& r) {
-                AccessorType accessor(tree);
-                NodeMaskOp cache(accessor, nn);
-                for (size_t idx = r.begin(); idx < r.end(); ++idx) {
+        if (this->getThreaded()) {
+            const auto range = mManager.getRange();
+            for (size_t i = 0; i < iter; ++i) {
+                // For each leaf, in parallel, gather neighboring off values
+                // and update the cached value mask
+                tbb::parallel_for(range,
+                    [&](const tbb::blocked_range<size_t>& r) {
+                    AccessorType accessor(tree);
+                    NodeMaskOp cache(accessor, nn);
+                    for (size_t idx = r.begin(); idx < r.end(); ++idx) {
+                        const auto& leaf = mManager.leaf(idx);
+                        if (leaf.isEmpty()) continue;
+                        // original bit-mask of current leaf node
+                        MaskType& newMask = nodeMasks[idx];
+                        cache.erode(leaf, newMask);
+                    }
+                });
+
+                // update the masks after all nodes have been eroded
+                tbb::parallel_for(range,
+                    [&](const tbb::blocked_range<size_t>& r){
+                    for (size_t idx = r.begin(); idx < r.end(); ++idx)
+                        mManager.leaf(idx).setValueMask(nodeMasks[idx]);
+                });
+            }
+        }
+        else {
+            AccessorType accessor(tree);
+            NodeMaskOp cache(accessor, nn);
+            for (size_t i = 0; i < iter; ++i) {
+                // For each leaf, in parallel, gather neighboring off values
+                // and update the cached value mask
+                for (size_t idx = 0; idx < leafCount; ++idx) {
                     const auto& leaf = mManager.leaf(idx);
                     if (leaf.isEmpty()) continue;
                     // original bit-mask of current leaf node
                     MaskType& newMask = nodeMasks[idx];
                     cache.erode(leaf, newMask);
                 }
-            });
 
-            // update the masks after all nodes have been eroded
-            tbb::parallel_for(range,
-                [&](const tbb::blocked_range<size_t>& r){
-                for (size_t idx = r.begin(); idx < r.end(); ++idx)
+                for (size_t idx = 0; idx < leafCount; ++idx) {
                     mManager.leaf(idx).setValueMask(nodeMasks[idx]);
-            });
+                }
+            }
         }
     }
 
