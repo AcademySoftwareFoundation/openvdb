@@ -317,7 +317,7 @@ public:
         ///           single threaded context as it will update the node masks
         ///           of neighbouring leaf nodes as well as the provided leaf.
         /// @param  leaf  The leaf to dilate. The leaf's origin is used to
-        ///               calcualte the result of the dilation.
+        ///               calculate the result of the dilation.
         /// @param  mask  The node mask to use in place of the current leaf
         ///               node mask.
         inline void dilate(LeafType& leaf, const MaskType& mask)
@@ -337,13 +337,13 @@ public:
 
         /// @brief Erode a single leaf node by the current spatial scheme
         ///        stored on the instance of this NodeMaskOp.
-        /// @details  Unlike dialte, this method updates the provided mask
+        /// @details  Unlike dilate, this method updates the provided mask
         ///           and does not apply the result to the leaf node. The
         ///           leaf node is simply used to infer the position in the
         ///           tree to find it's neighbours. This allows erode to be
         ///           called from multiple threads
         /// @param  leaf  The leaf to erode. The leaf's origin is used to
-        ///               calcualte the result of the erosion.
+        ///               calculate the result of the erosion.
         /// @return The eroded mask
         inline MaskType erode(const LeafType& leaf)
         {
@@ -357,12 +357,12 @@ public:
         ///        stored on the instance of this NodeMaskOp. The provided
         ///        mask is used in place of the actual leaf's node mask and
         ///        stores the erosion result.
-        /// @details  Unlike dialte, this method updates the provided mask
+        /// @details  Unlike dilate, this method updates the provided mask
         ///           and does not apply the result to the leaf node. The
         ///           leaf node is simply used to infer the position in the
         ///           tree to find it's neighbours.
         /// @param  leaf  The leaf to erode. The leaf's origin is used to
-        ///               calcualte the result of the erosion.
+        ///               calculate the result of the erosion.
         /// @param  mask  The node mask to use in place of the current leaf
         ///               node mask.
         inline void erode(const LeafType& leaf, MaskType& mask)
