@@ -19,10 +19,10 @@
 #include "Activate.h" // backwards compatibility
 #include "Prune.h"
 #include "ValueTransformer.h"
-#include "../Types.h"
-#include "../Grid.h"
-#include "../tree/ValueAccessor.h"
-#include "../tree/LeafManager.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/tree/ValueAccessor.h"
+#include "openvdb/tree/LeafManager.h"
 
 #include <tbb/task_scheduler_init.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -215,7 +215,7 @@ public:
     inline void setThreaded(const bool threaded) { mThreaded = threaded; }
 
     /// @brief  Return a const reference to the leaf manager
-    inline const tree::LeafManager<TreeType>& manager() const { return mManager; }
+    inline const tree::LeafManager<TreeType>& leafManager() const { return mManager; }
 
     /// @brief Topologically erode all voxels by the provided nearest neighbour
     ///    scheme and optionally collapse constant leaf nodes
@@ -304,8 +304,8 @@ public:
         inline void dilate(LeafType& leaf)
         {
             // copy the mask
-            const MaskType cache = leaf.getValueMask();
-            this->dilate(leaf, cache);
+            const MaskType mask = leaf.getValueMask();
+            this->dilate(leaf, mask);
         }
 
         /// @brief Dilate a single leaf node by the current spatial scheme
@@ -348,9 +348,9 @@ public:
         inline MaskType erode(const LeafType& leaf)
         {
             // copy the mask
-            MaskType cache = leaf.getValueMask();
-            this->erode(leaf, cache);
-            return cache;
+            MaskType mask = leaf.getValueMask();
+            this->erode(leaf, mask);
+            return mask;
         }
 
         /// @brief Erode a single leaf node by the current spatial scheme
@@ -531,7 +531,7 @@ void Morphology<TreeType>::erodeVoxels(const size_t iter,
             for (size_t idx = r.begin(); idx < r.end(); ++idx) {
                 auto& leaf = manager.leaf(idx);
                 auto& nodemask = leaf.getValueMask();
-                if (auto original = tree.probeConstLeaf(leaf.origin())) {
+                if (const auto* original = tree.probeConstLeaf(leaf.origin())) {
                     nodemask ^= original->getValueMask();
                 }
                 else {
