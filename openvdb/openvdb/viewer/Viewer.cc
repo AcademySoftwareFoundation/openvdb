@@ -12,8 +12,8 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/version.h> // for OPENVDB_LIBRARY_MAJOR_VERSION, etc.
-#include <tbb/atomic.h>
 #include <tbb/mutex.h>
+#include <atomic>
 #include <cmath> // for fabs()
 #include <iomanip> // for std::setprecision()
 #include <iostream>
@@ -109,7 +109,7 @@ private:
     void doView();
     static void* doViewTask(void* arg);
 
-    tbb::atomic<bool> mRedisplay;
+    std::atomic<bool> mRedisplay;
     bool mClose, mHasThread;
     std::thread mThread;
     openvdb::GridCPtrVec mGrids;
@@ -328,7 +328,9 @@ ThreadManager::doView()
     // This function runs in its own thread.
     // The mClose and mRedisplay flags are set from the main thread.
     while (!mClose) {
-        if (mRedisplay.compare_and_swap(/*set to*/false, /*if*/true)) {
+        bool expected = true;
+        mRedisplay.compare_exchange_strong(expected, false);
+        if (expected) {
             if (sViewer) sViewer->view(mGrids);
         }
         sViewer->sleep(0.5/*sec*/);

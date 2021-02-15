@@ -10,13 +10,13 @@
 #include "Stream.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
-#include <tbb/atomic.h>
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/mutex.h>
 #include <tbb/task.h>
 #include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <tbb/tick_count.h>
 #include <algorithm> // for std::max()
+#include <atomic>
 #include <iostream>
 #include <map>
 
@@ -184,7 +184,7 @@ struct Queue::Impl
 
     Index32 mTimeout;
     Index32 mCapacity;
-    tbb::atomic<Int32> mNumTasks;
+    std::atomic<Int32> mNumTasks;
     Index32 mNextId;
     StatusMap mStatus;
     NotifierMap mNotifiers;

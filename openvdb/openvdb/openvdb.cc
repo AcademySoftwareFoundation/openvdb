@@ -8,8 +8,10 @@
 //#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
-#include <tbb/atomic.h>
 #include <tbb/mutex.h>
+
+#include <atomic>
+
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
@@ -37,15 +39,15 @@ typedef Mutex::scoped_lock Lock;
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
 Mutex sInitMutex;
-tbb::atomic<bool> sIsInitialized{false};
+std::atomic<bool> sIsInitialized{false};
 }
 
 void
 initialize()
 {
-    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return;
+    if (sIsInitialized.load(std::memory_order_acquire)) return;
     Lock lock(sInitMutex);
-    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return; // Double-checked lock
+    if (sIsInitialized.load(std::memory_order_acquire)) return; // Double-checked lock
 
     logging::initialize();
 
@@ -120,7 +122,7 @@ initialize()
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized.store<tbb::memory_semantics::release>(true);
+    sIsInitialized.store(true, std::memory_order_release);
 
 #ifdef __ICC
 __pragma(warning(default:1711))
@@ -138,7 +140,7 @@ uninitialize()
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized.store<tbb::memory_semantics::full_fence>(false); // What memory order? We can't have anything below reordered above this, right?
+    sIsInitialized.store(false, std::memory_order_seq_cst); // Do we need full memory order?
 
 #ifdef __ICC
 __pragma(warning(default:1711))

@@ -21,7 +21,7 @@
 #include <cassert>
 #include <iostream>
 #include <algorithm>// std::swap
-#include <tbb/atomic.h>
+#include <atomic>
 #include <tbb/spin_mutex.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
@@ -456,7 +456,7 @@ private:
         }
     }
     PageTableT mPageTable;//holds points to allocated pages
-    tbb::atomic<size_t> mSize;// current number of elements in array
+    std::atomic<size_t> mSize;// current number of elements in array
     size_t mCapacity;//capacity of array given the current page count
     tbb::spin_mutex mGrowthMutex;//Mutex-lock required to grow pages
 }; // Public class PagedArray

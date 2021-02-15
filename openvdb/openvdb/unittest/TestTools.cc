@@ -28,8 +28,8 @@
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include "gtest/gtest.h"
-#include <tbb/atomic.h>
 #include <algorithm> // for std::sort
+#include <atomic>
 #include <random>
 #include <sstream>
 
@@ -1614,7 +1614,7 @@ struct FloatToVec
         }
     }
 
-    tbb::atomic<int> numTiles;
+    std::atomic<int> numTiles;
 };
 
 }

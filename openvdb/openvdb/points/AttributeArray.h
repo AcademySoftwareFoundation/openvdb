@@ -21,7 +21,7 @@
 #include "StreamCompression.h"
 
 #include <tbb/spin_mutex.h>
-#include <tbb/atomic.h>
+#include <atomic>
 
 #include <memory>
 #include <mutex>
@@ -382,7 +382,7 @@ protected:
     mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
-    tbb::atomic<Index32> mOutOfCore; // interpreted as bool
+    std::atomic<Index32> mOutOfCore; // interpreted as bool
     /// used for out-of-core, paged reading
     union {
         compression::PageHandle::Ptr mPageHandle;

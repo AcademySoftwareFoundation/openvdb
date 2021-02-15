@@ -47,7 +47,6 @@
 #include <VOP/VOP_ExportedParmsManager.h>
 #include <VOP/VOP_LanguageContextTypeList.h>
 
-#include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -59,6 +58,7 @@
 #include <hboost/algorithm/string/split.hpp>
 
 #include <algorithm> // std::sort
+#include <atomic>
 #include <cmath> // trigonometric functions
 #include <memory>
 #include <set>
@@ -1954,7 +1954,7 @@ private:
     UT_WorkArgs mVexArgs;
     const size_t mMaxArraySize;
     fpreal mTime, mTimeInc, mFrame;
-    tbb::atomic<int> mIsTimeDependant;
+    std::atomic<int> mIsTimeDependant;
     GU_VexGeoInputs mVexInputs;
 };
 
