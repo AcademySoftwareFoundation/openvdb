@@ -32,7 +32,7 @@ API changes:
 - Restructured the internals of Morphology.h and moved
   @vdblink::tools::activate() tools::activate@endlink and
   @vdblink::tools::deactivate() tools::deactivate@endlink to a new header,
-  Activation.h.
+  Activate.h.
 - Deprecated @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink
   and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
   new morphology methods.

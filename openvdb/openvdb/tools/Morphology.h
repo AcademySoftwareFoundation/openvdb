@@ -16,7 +16,7 @@
 #ifndef OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MORPHOLOGY_HAS_BEEN_INCLUDED
 
-#include "Activation.h" // backwards compatibility
+#include "Activate.h" // backwards compatibility
 #include "Prune.h"
 #include "ValueTransformer.h"
 #include "../Types.h"

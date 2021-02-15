@@ -1,15 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 //
-/// @file   Activation.h
+/// @file   Activate.h
 ///
 /// @brief  Implementation of topological activation/deactivation
 ///
 /// @author Ken Museth
 ///
 
-#ifndef OPENVDB_TOOLS_ACTIVATION_HAS_BEEN_INCLUDED
-#define OPENVDB_TOOLS_ACTIVATION_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_TOOLS_ACTIVATE_HAS_BEEN_INCLUDED
+#define OPENVDB_TOOLS_ACTIVATE_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
@@ -150,4 +150,4 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_TOOLS_ACTIVATION_HAS_BEEN_INCLUDED
+#endif // OPENVDB_TOOLS_ACTIVATE_HAS_BEEN_INCLUDED

@@ -20,7 +20,7 @@ Version 8.0.2 - In development
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
-      and tools::deactivate() to a new header, Activation.h.
+      and tools::deactivate() to a new header, Activate.h.
     - Deprecated tools::dilateVoxels() and tools::erodeVoxels() in favour of
       new morphology methods.
 
