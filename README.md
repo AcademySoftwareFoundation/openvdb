@@ -32,17 +32,15 @@ OpenVDB welcomes contributions to the OpenVDB project. Please refer to the [cont
 
 ### Developer Quick Start
 
-See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
+The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX and various executables, may require additional dependencies. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
 
 #### Linux
-##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
+##### Installing Dependencies (Boost, TBB, Blosc)
 
 ```
 apt-get install -y libboost-iostreams-dev
 apt-get install -y libboost-system-dev
 apt-get install -y libtbb-dev
-apt-get install -y libilmbase-dev
-apt-get install -y libopenexr-dev
 ```
 ```
 git clone git@github.com:Blosc/c-blosc.git
@@ -67,12 +65,10 @@ make -j4
 make install
 ```
 #### macOS
-##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
+##### Installing Dependencies (Boost, TBB, Blosc)
 ```
 brew install boost
 brew install tbb
-brew install ilmbase
-brew install openexr
 ```
 ```
 git clone git@github.com:Blosc/c-blosc.git
@@ -96,7 +92,7 @@ make -j4
 make install
 ```
 #### Windows
-##### Installing Dependencies (Boost, TBB, OpenEXR, Blosc)
+##### Installing Dependencies (Boost, TBB, Blosc)
 
 Note that the following commands have only been tested for 64bit systems/libraries.
 It is recommended to set the `VCPKG_DEFAULT_TRIPLET` environment variable to
@@ -107,7 +103,6 @@ and [CMake](https://cmake.org/download/) to be installed.
 ```
 vcpkg install zlib:x64-windows
 vcpkg install blosc:x64-windows
-vcpkg install openexr:x64-windows
 vcpkg install tbb:x64-windows
 vcpkg install boost-iostreams:x64-windows
 vcpkg install boost-system:x64-windows

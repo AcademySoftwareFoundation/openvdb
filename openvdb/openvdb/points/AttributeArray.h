@@ -449,7 +449,7 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 namespace attribute_traits
 {
     template <typename T> struct TruncateTrait { };
-    template <> struct TruncateTrait<float> { using Type = half; };
+    template <> struct TruncateTrait<float> { using Type = math::half; };
     template <> struct TruncateTrait<int> { using Type = short; };
 
     template <typename T> struct TruncateTrait<math::Vec3<T>> {
@@ -1369,7 +1369,7 @@ TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
     using ElementT = typename VecTraits<ValueType>::ElementType;
 
     // half is not defined as float point as expected, so explicitly handle it
-    return std::is_floating_point<ElementT>::value || std::is_same<half, ElementT>::value;
+    return std::is_floating_point<ElementT>::value || std::is_same<math::half, ElementT>::value;
 }
 
 
@@ -1378,7 +1378,7 @@ bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsClass() const
 {
     // half is not defined as a non-class type as expected, so explicitly exclude it
-    return std::is_class<ValueType>::value && !std::is_same<half, ValueType>::value;
+    return std::is_class<ValueType>::value && !std::is_same<math::half, ValueType>::value;
 }
 
 

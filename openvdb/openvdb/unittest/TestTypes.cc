@@ -102,7 +102,7 @@ TEST_F(TestTypes, testVecTraits)
         // some less common types (Vec3U16, etc)
         EXPECT_TRUE(bool(std::is_same<VecTraits<Vec2R>::ElementType, double>::value));
         EXPECT_TRUE(bool(std::is_same<VecTraits<Vec3U16>::ElementType, uint16_t>::value));
-        EXPECT_TRUE(bool(std::is_same<VecTraits<Vec4H>::ElementType, half>::value));
+        EXPECT_TRUE(bool(std::is_same<VecTraits<Vec4H>::ElementType, math::half>::value));
 
         // some non-vector types
         EXPECT_TRUE(bool(std::is_same<VecTraits<int>::ElementType, int>::value));
