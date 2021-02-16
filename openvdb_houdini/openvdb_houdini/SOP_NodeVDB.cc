@@ -21,13 +21,12 @@
 #include <SYS/SYS_Version.h>
 #include <UT/UT_InfoTree.h>
 #include <UT/UT_SharedPtr.h>
-#include <tbb/mutex.h>
 #include <algorithm>
 #include <cctype> // std::tolower
 #include <iostream>
 #include <map>
 #include <memory>
-#include <mutex> // std::call_once
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 
@@ -100,8 +99,6 @@ namespace openvdb_houdini {
 
 namespace node_info_text {
 
-using Mutex = tbb::mutex;
-using Lock = Mutex::scoped_lock;
 // map of function callbacks to grid types
 using ApplyGridSpecificInfoTextMap = std::map<openvdb::Name, ApplyGridSpecificInfoText>;
 
@@ -110,18 +107,18 @@ struct LockedInfoTextRegistry
     LockedInfoTextRegistry() {}
     ~LockedInfoTextRegistry() {}
 
-    Mutex mMutex;
+    std::mutex mMutex;
     ApplyGridSpecificInfoTextMap mApplyGridSpecificInfoTextMap;
 };
 
 // Declare this at file scope to ensure thread-safe initialization
-static Mutex theInitInfoTextRegistryMutex;
+static std::mutex theInitInfoTextRegistryMutex;
 
 // Global function for accessing the regsitry
 static LockedInfoTextRegistry*
 getInfoTextRegistry()
 {
-    Lock lock(theInitInfoTextRegistryMutex);
+    std::lock_guard<std::mutex> lock(theInitInfoTextRegistryMutex);
 
     static LockedInfoTextRegistry *registry = nullptr;
 
@@ -147,7 +144,7 @@ void
 registerGridSpecificInfoText(const std::string& gridType, ApplyGridSpecificInfoText callback)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     if(registry->mApplyGridSpecificInfoTextMap.find(gridType) !=
        registry->mApplyGridSpecificInfoTextMap.end()) return;
@@ -162,7 +159,7 @@ ApplyGridSpecificInfoText
 getGridSpecificInfoText(const std::string& gridType)
 {
     LockedInfoTextRegistry *registry = getInfoTextRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     const ApplyGridSpecificInfoTextMap::const_iterator iter =
         registry->mApplyGridSpecificInfoTextMap.find(gridType);

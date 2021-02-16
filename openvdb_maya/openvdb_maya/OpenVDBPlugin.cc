@@ -23,8 +23,7 @@
 #include <maya/MPlug.h>
 #include <maya/MFnPluginData.h>
 
-#include <tbb/mutex.h>
-
+#include <mutex>
 #include <vector>
 #include <sstream>
 #include <string>

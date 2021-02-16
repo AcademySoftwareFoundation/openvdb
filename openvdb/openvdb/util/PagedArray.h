@@ -197,7 +197,7 @@ public:
     /// @warning Not thread-safe and mostly intended for debugging!
     size_t push_back_unsafe(const ValueType& value)
     {
-        const size_t index = mSize.fetch_and_increment();
+        const size_t index = mSize.fetch_add(1);
         if (index >= mCapacity) {
             mPageTable.push_back( new Page() );
             mCapacity += Page::Size;

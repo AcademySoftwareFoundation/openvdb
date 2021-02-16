@@ -8,9 +8,9 @@
 //#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
-#include <tbb/mutex.h>
 
 #include <atomic>
+#include <mutex>
 
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
@@ -33,12 +33,9 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
-
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
-Mutex sInitMutex;
+std::mutex sInitMutex;
 std::atomic<bool> sIsInitialized{false};
 }
 
@@ -46,7 +43,7 @@ void
 initialize()
 {
     if (sIsInitialized.load(std::memory_order_acquire)) return;
-    Lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     if (sIsInitialized.load(std::memory_order_acquire)) return; // Double-checked lock
 
     logging::initialize();
@@ -133,7 +130,7 @@ __pragma(warning(default:1711))
 void
 uninitialize()
 {
-    Lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.

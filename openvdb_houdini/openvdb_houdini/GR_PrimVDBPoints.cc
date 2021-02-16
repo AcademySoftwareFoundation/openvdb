@@ -31,10 +31,9 @@
 #include <UT/UT_DSOVersion.h>
 #include <UT/UT_UniquePtr.h>
 
-#include <tbb/mutex.h>
-
 #include <iostream>
 #include <limits>
+#include <mutex>
 #include <sstream>
 #include <string>
 #include <utility>
@@ -58,7 +57,7 @@ namespace {
 /// @note The render hook guard should not be required..
 
 // Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sRenderHookRegistryMutex;
+std::mutex sRenderHookRegistryMutex;
 bool renderHookRegistered = false;
 
 } // anonymous namespace
@@ -174,7 +173,7 @@ private:
 void
 newRenderHook(DM_RenderTable* table)
 {
-    tbb::mutex::scoped_lock lock(sRenderHookRegistryMutex);
+    std::lock_guard<std::mutex> lock(sRenderHookRegistryMutex);
 
     if (!renderHookRegistered) {
 

@@ -228,7 +228,8 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
             if (other.isOutOfCore()) this->deallocate();
         }
         if (other.isOutOfCore()) {
-            mOutOfCore.store(other.mOutOfCore);
+            mOutOfCore.store(other.mOutOfCore.load(std::memory_order_acquire),
+                             std::memory_order_release);
             mFileInfo = new FileInfo(*other.mFileInfo);
         } else if (other.mData != nullptr) {
             this->allocate();
@@ -275,7 +276,14 @@ inline void
 LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
 {
     std::swap(mData, other.mData);
-    std::swap(mOutOfCore, other.mOutOfCore);
+
+    // Two atomics can't be swapped because it would require hardware support:
+    // https://en.wikipedia.org/wiki/Double_compare-and-swap
+    // Note that there's a window in which other.mOutOfCore could be written
+    // between our load from it and our store to it.
+    auto tmp = other.mOutOfCore.load(std::memory_order_acquire);
+    tmp = mOutOfCore.exchange(std::move(tmp));
+    other.mOutOfCore.store(std::move(tmp), std::memory_order_release);
 }
 
 
