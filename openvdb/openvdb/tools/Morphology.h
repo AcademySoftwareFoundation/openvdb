@@ -80,7 +80,7 @@ enum TilePolicy { IGNORE_TILES, EXPAND_TILES, PRESERVE_TILES };
 /// @brief Topologically dilate all active values (i.e. both voxels
 ///   and tiles) in a tree using one of three nearest neighbor
 ///   connectivity patterns.
-/// @details If the input is not a MaskTree OR if tiles are being
+/// @details If the input is *not* a MaskTree OR if tiles are being
 ///   preserved, this algorithm will copy the input tree topology onto a
 ///   MaskTree, performs the dilation on the mask and copies the resulting
 ///   topology back. This algorithm guarantees topology preservation
@@ -139,46 +139,6 @@ inline void erodeActiveValues(TreeOrLeafManagerT& tree,
     const NearestNeighbors nn = NN_FACE,
     const TilePolicy mode = PRESERVE_TILES,
     const bool threaded = true);
-
-/// @brief Topologically dilate all leaf-level active voxels in a tree
-///   using one of three nearest neighbor connectivity patterns.
-/// @warning This method ignores active tiles
-/// @note The values of any voxels are unchanged. This method does not
-///   prune the resulting topology. It is recommended you call a variant
-///   of tools::prune afterwards to collapse dense nodes.
-///
-/// @param tree          tree to be dilated
-/// @param iterations    number of iterations to apply the dilation
-/// @param nn            connectivity pattern of the dilation: either
-///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
-///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
-///     nearest neighbors).
-/// @param threaded      Whether to multi-thread execution
-template<typename TreeOrLeafManagerT>
-inline void dilateActiveLeafValues(TreeOrLeafManagerT& tree,
-    const int iterations = 1,
-    const NearestNeighbors nn = NN_FACE,
-    const bool threaded = true);
-
-/// @brief Topologically erode all leaf-level active voxels in a tree
-///   using one of three nearest neighbor connectivity patterns.
-/// @warning This method ignores active tiles
-/// @note The values of any voxels are unchanged. This method does not
-///   prune the resulting topology. It is recommended you call a variant
-///   of tools::prune afterwards to collapse dense nodes.
-///
-/// @param tree          tree to be eroded
-/// @param iterations    number of iterations to apply the erosion
-/// @param nn            connectivity pattern of the erosion: either
-///     face-adjacent (6 nearest neighbors), face- and edge-adjacent
-///     (18 nearest neighbors) or face-, edge- and vertex-adjacent (26
-///     nearest neighbors).
-/// @param threaded      Whether to multi-thread execution
-template<typename TreeOrLeafManagerT>
-inline void erodeActiveLeafValues(TreeOrLeafManagerT& tree,
-        const int iterations = 1,
-        const NearestNeighbors nn = NN_FACE,
-        const bool threaded = true);
 
 
 ////////////////////////////////////////
@@ -1098,9 +1058,11 @@ inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
 
     if (iterations <= 0) return;
 
-    // If IGNORE_TILES, always call through to dilateActiveLeafValues
     if (mode == IGNORE_TILES) {
-        dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
+        morphology::Morphology<TreeT> morph(treeOrLeafM);
+        morph.setThreaded(threaded);
+        // This will also sync the leaf manager
+        morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
         return;
     }
 
@@ -1117,14 +1079,15 @@ inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
     if (isMask || mode == EXPAND_TILES) {
         tree.voxelizeActiveTiles();
         AdapterT::sync(treeOrLeafM);
+        morphology::Morphology<TreeT> morph(treeOrLeafM);
+        morph.setThreaded(threaded);
+
         if (mode == PRESERVE_TILES) {
-            morphology::Morphology<TreeT> morph(treeOrLeafM);
-            morph.setThreaded(threaded);
             morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/true);
         }
         else {
             assert(mode == EXPAND_TILES);
-            dilateActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
+            morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
         }
         return;
     }
@@ -1180,14 +1143,22 @@ inline void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
         MaskT topology;
         topology.topologyUnion(tree);
         topology.voxelizeActiveTiles();
-        erodeActiveLeafValues(topology, iterations, nn, threaded);
+
+        {
+            morphology::Morphology<MaskT> morph(topology);
+            morph.setThreaded(threaded);
+            morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
+        }
+
         // prune to ensure topologyIntersection does not expand tiles
         // which have not been changed
         tools::prune(topology, zeroVal<typename MaskT::ValueType>(), threaded);
         tree.topologyIntersection(topology);
         AdapterT::sync(treeOrLeafM);
+        return;
     }
-    else if (mode == EXPAND_TILES) {
+
+    if (mode == EXPAND_TILES) {
         // if expanding, voxelize everything first if there are active tiles
         // @note  check first to avoid any unnecessary rebuilds
         auto& tree = AdapterT::get(treeOrLeafM);
@@ -1195,41 +1166,10 @@ inline void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
             tree.voxelizeActiveTiles();
             AdapterT::sync(treeOrLeafM);
         }
-        erodeActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
     }
-    else {
-        // ignoring tiles. They won't be eroded
-        erodeActiveLeafValues(treeOrLeafM, iterations, nn, threaded);
-    }
-}
 
-
-template<typename TreeOrLeafManagerT>
-inline void dilateActiveLeafValues(TreeOrLeafManagerT& treeOrLeafM,
-                         const int iterations,
-                         const NearestNeighbors nn,
-                         const bool threaded)
-{
-    using TreeType = typename morph_internal::Adapter<TreeOrLeafManagerT>::TreeType;
-
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(treeOrLeafM);
-    morph.setThreaded(threaded);
-    // This will also sync the leaf manager
-    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
-}
-
-
-template<typename TreeOrLeafManagerT>
-inline void erodeActiveLeafValues(TreeOrLeafManagerT& treeOrLeafM,
-                         const int iterations,
-                         const NearestNeighbors nn,
-                         const bool threaded)
-{
-    using TreeType = typename morph_internal::Adapter<TreeOrLeafManagerT>::TreeType;
-
-    if (iterations <= 0) return;
-    morphology::Morphology<TreeType> morph(treeOrLeafM);
+    // ignoring tiles. They won't be eroded
+    morphology::Morphology<TreeT> morph(treeOrLeafM);
     morph.setThreaded(threaded);
     morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
 }
@@ -1257,7 +1197,11 @@ inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE)
 {
-    dilateActiveLeafValues(tree, iterations, nn, /*threaded*/false);
+    if (iterations <= 0) return;
+    morphology::Morphology<TreeType> morph(tree);
+    morph.setThreaded(false); // backwards compatible
+    // This will also sync the leaf manager
+    morph.dilateVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
 }
 
 /// @brief Topologically dilate all leaf-level active voxels in a tree
@@ -1298,7 +1242,12 @@ inline void erodeVoxels(TreeType& tree,
                         int iterations=1,
                         NearestNeighbors nn = NN_FACE)
 {
-    erodeActiveLeafValues(tree, iterations, nn, /*threaded*/true);
+    if (iterations > 0) {
+        morphology::Morphology<TreeType> morph(tree);
+        morph.setThreaded(true);
+        morph.erodeVoxels(static_cast<size_t>(iterations), nn, /*prune=*/false);
+    }
+
     tools::pruneLevelSet(tree); // matches old behaviour
 }
 

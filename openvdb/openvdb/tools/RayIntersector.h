@@ -308,7 +308,7 @@ public:
         }
 
         // Dilate active voxels to better account for the size of interpolation kernels
-        tools::dilateActiveLeafValues(*mTree, dilationCount);
+        tools::dilateActiveValues(*mTree, dilationCount, tools::NN_FACE, tools::IGNORE_TILES);
 
         mTree->root().evalActiveBoundingBox(mBBox, /*visit individual voxels*/false);
 

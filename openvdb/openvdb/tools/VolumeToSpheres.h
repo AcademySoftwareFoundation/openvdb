@@ -10,7 +10,7 @@
 
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Math.h>
-#include "Morphology.h" // for erodeActiveLeafValues()
+#include "Morphology.h" // for erodeActiveValues()
 #include "PointScatter.h"
 #include "LevelSetRebuild.h"
 #include "LevelSetUtil.h"
@@ -724,13 +724,13 @@ fillWithSpheres(
         // use the uneroded mask instead.  (But if the minimum sphere count is zero,
         // then eroding away the mask is acceptable.)
         if (!addNarrowBandPoints || (minSphereCount <= 0)) {
-            erodeActiveLeafValues(interiorMaskPtr->tree(), 1);
-            pruneInactive(interiorMaskPtr->tree());
+            tools::erodeActiveValues(interiorMaskPtr->tree(), /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::pruneInactive(interiorMaskPtr->tree());
         } else {
             auto& maskTree = interiorMaskPtr->tree();
             auto copyOfTree = StaticPtrCast<BoolTreeT>(maskTree.copy());
-            erodeActiveLeafValues(maskTree, 1);
-            pruneInactive(maskTree);
+            tools::erodeActiveValues(maskTree, /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::pruneInactive(maskTree);
             if (maskTree.empty()) { interiorMaskPtr->setTree(copyOfTree); }
         }
 

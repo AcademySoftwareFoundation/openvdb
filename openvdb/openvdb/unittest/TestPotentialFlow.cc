@@ -96,7 +96,7 @@ TEST_F(TestPotentialFlow, testNeumannVelocities)
         Vec3d windVelocityValue(0, 0, 10);
 
         Vec3dTree::Ptr windTree(new Vec3dTree(sphere->tree(), zeroVal<Vec3d>(), TopologyCopy()));
-        dilateActiveLeafValues(*windTree, 2, tools::NN_FACE_EDGE_VERTEX);
+        dilateActiveValues(*windTree, 2, tools::NN_FACE_EDGE_VERTEX, tools::IGNORE_TILES);
         windTree->voxelizeActiveTiles();
 
         for (auto leaf = windTree->beginLeaf(); leaf; ++leaf) {
@@ -331,7 +331,7 @@ TEST_F(TestPotentialFlow, testFlowAroundSphere)
         // (excluding neumann voxels and exterior voxels)
         // and ensure it evaluates to zero
 
-        tools::erodeActiveLeafValues(mask->tree(), 2, tools::NN_FACE);
+        tools::erodeActiveValues(mask->tree(), 2, tools::NN_FACE, tools::IGNORE_TILES);
 
         FloatGrid::Ptr divergence = tools::divergence(*flowVel, *mask);
 

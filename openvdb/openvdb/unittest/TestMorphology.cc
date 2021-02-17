@@ -14,7 +14,7 @@ template<typename TreeT, openvdb::tools::NearestNeighbors NN>
 class TestMorphologyInternal
 {
 public:
-    static void testMorphActiveLeafValues();
+    static void testMorphActiveLeafValues(); // only tests the IGNORE_TILES policy
     static void testMorphActiveValues();
 };
 
@@ -103,14 +103,14 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         EXPECT_TRUE(tree.isValueOn(xyz));
         EXPECT_EQ(Index64(1), tree.activeVoxelCount());
         // dilate
-        openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+        openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         CheckActiveNeighbours(tree, xyz, 0);
         EXPECT_EQ(Index64(1 + offsets), tree.activeVoxelCount());
         // erode
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         CheckInactiveNeighbours(tree, xyz);
         EXPECT_EQ(Index64(1), tree.activeVoxelCount());
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         EXPECT_EQ(Index64(0), tree.activeVoxelCount());
         EXPECT_EQ(Index32(1), tree.leafCount());
         // check values
@@ -135,7 +135,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         EXPECT_EQ(Index64(1), tree.activeTileCount());
 
         // dilate
-        openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+        openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         CheckActiveNeighbours(tree, xyz, 0);
         if (NN == openvdb::tools::NN_FACE)             expected += 5;  // 1 overlapping with tile
         if (NN == openvdb::tools::NN_FACE_EDGE)        expected += 15; // 3 overlapping
@@ -149,21 +149,21 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         EXPECT_EQ(leafs, tree.leafCount());
 
         // erode
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         // tile should be umodified
         expected = leafDim * leafDim * leafDim + 1;
         EXPECT_EQ(Index64(1), tree.activeTileCount());
         EXPECT_EQ(leafs, tree.leafCount());
         EXPECT_EQ(expected, tree.activeVoxelCount());
         //
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         EXPECT_EQ(Index64(1), tree.activeTileCount());
         EXPECT_EQ(leafs, tree.leafCount());
         expected = leafDim * leafDim * leafDim;
         EXPECT_EQ(expected, tree.activeVoxelCount());
         // erode again, only 1 active tile, should be no change
         TreeT copy(tree);
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         EXPECT_TRUE(copy.hasSameTopology(tree));
         // check values
         if (!IsMask) {
@@ -181,11 +181,11 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
             tree.setValue(xyz, ValueType(1.0));
             EXPECT_EQ(Index64(1), tree.activeVoxelCount());
             // dilate
-            openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+            openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
             CheckActiveNeighbours(tree, xyz, 0);
             EXPECT_EQ(Index64(1 + offsets), tree.activeVoxelCount());
             // erode
-            openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+            openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
             CheckInactiveNeighbours(tree, xyz);
             EXPECT_TRUE(tree.isValueOn(xyz));
             EXPECT_EQ(Index64(1), tree.activeVoxelCount());
@@ -206,7 +206,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
 
         Index64 expected = 3;
         EXPECT_EQ(expected, tree.activeVoxelCount());
-        openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+        openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         CheckActiveNeighbours(tree, xyz1, 0);
         CheckActiveNeighbours(tree, xyz2, 0);
         CheckActiveNeighbours(tree, xyz3, 0);
@@ -216,7 +216,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected += (26*3)-36; // dilation - overlapping
         EXPECT_EQ(expected, tree.activeVoxelCount());
 
-        openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+        openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
         expected = 3;
         EXPECT_EQ(expected, tree.activeVoxelCount());
         // check values
@@ -257,7 +257,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         // dilate
         i+= 3;
         for (; i < 33; i+=3) {
-            openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+            openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree.activeVoxelCount()));
             EXPECT_EQ(iterInfo[i].leafCount,        int(tree.leafCount()));
             EXPECT_EQ(iterInfo[i].nonLeafCount,     int(tree.nonLeafCount()));
@@ -265,7 +265,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         // erode
         i-= 6;
         for (; i >= 0; i-=3) {
-            openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+            openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
             // also prune inactive to clear up empty nodes
             openvdb::tools::pruneInactive(tree);
             EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree.activeVoxelCount()));
@@ -279,7 +279,7 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
             tree.clear();
             tree.setValue(Coord(leafDim >> 1), ValueType(1.0));
             // dilate
-            openvdb::tools::dilateActiveLeafValues(tree, j, NN);
+            openvdb::tools::dilateActiveValues(tree, j, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree.activeVoxelCount()));
             EXPECT_EQ(iterInfo[i].leafCount,        int(tree.leafCount()));
             EXPECT_EQ(iterInfo[i].nonLeafCount,     int(tree.nonLeafCount()));
@@ -290,8 +290,8 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         for (; i >= 0; i-=3, ++j) {
             tree.clear();
             tree.setValue(Coord(leafDim >> 1), ValueType(1.0));
-            openvdb::tools::dilateActiveLeafValues(tree, 10, NN);
-            openvdb::tools::erodeActiveLeafValues(tree, j, NN);
+            openvdb::tools::dilateActiveValues(tree, 10, NN, openvdb::tools::IGNORE_TILES);
+            openvdb::tools::erodeActiveValues(tree, j, NN, openvdb::tools::IGNORE_TILES);
             // also prune inactive to clear up empty nodes
             openvdb::tools::pruneInactive(tree);
             EXPECT_EQ(iterInfo[i].activeVoxelCount, int(tree.activeVoxelCount()));
@@ -310,17 +310,17 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         if (NN == openvdb::tools::NN_FACE)             expected = 25;
         if (NN == openvdb::tools::NN_FACE_EDGE)        expected = 93;
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected = 125;
-        openvdb::tools::dilateActiveLeafValues(tree, 2, NN);
+        openvdb::tools::dilateActiveValues(tree, 2, NN, openvdb::tools::IGNORE_TILES);
         CheckActiveNeighbours(tree, xyz, /*recurse-once*/1);
         EXPECT_EQ(expected, tree.activeVoxelCount());
 
         if (NN == openvdb::tools::NN_FACE)             expected = 231;
         if (NN == openvdb::tools::NN_FACE_EDGE)        expected = 1051;
         if (NN == openvdb::tools::NN_FACE_EDGE_VERTEX) expected = 1331;
-        openvdb::tools::dilateActiveLeafValues(tree, 3, NN);
+        openvdb::tools::dilateActiveValues(tree, 3, NN, openvdb::tools::IGNORE_TILES);
         CheckActiveNeighbours(tree, xyz, /*recurse-four-times*/4);
         EXPECT_EQ(expected, tree.activeVoxelCount());
-        openvdb::tools::erodeActiveLeafValues(tree, 5, NN);
+        openvdb::tools::erodeActiveValues(tree, 5, NN, openvdb::tools::IGNORE_TILES);
         EXPECT_EQ(Index64(1), tree.activeVoxelCount());
         CheckInactiveNeighbours(tree, xyz);
     }
@@ -333,12 +333,12 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         const Index64 count = grid->tree().activeVoxelCount();
         {
             TreeT copy(grid->tree());
-            openvdb::tools::dilateActiveLeafValues(copy, 1, NN);
+            openvdb::tools::dilateActiveValues(copy, 1, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_TRUE(copy.activeVoxelCount() > count);
         }
         {
             TreeT copy(grid->tree());
-            openvdb::tools::erodeActiveLeafValues(copy, 1, NN);
+            openvdb::tools::erodeActiveValues(copy, 1, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_TRUE(copy.activeVoxelCount() < count);
         }
     }
@@ -352,12 +352,12 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
         const Index64 count = grid->tree().activeVoxelCount();
         {
             TreeT copy(grid->tree());
-            openvdb::tools::dilateActiveLeafValues(copy, 1, NN);
+            openvdb::tools::dilateActiveValues(copy, 1, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_TRUE(copy.activeVoxelCount() > count);
         }
         {
             TreeT copy(grid->tree());
-            openvdb::tools::erodeActiveLeafValues(copy, 1, NN);
+            openvdb::tools::erodeActiveValues(copy, 1, NN, openvdb::tools::IGNORE_TILES);
             EXPECT_TRUE(copy.activeVoxelCount() < count);
         }
     }
@@ -372,11 +372,11 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveLeafValues()
                     EXPECT_TRUE(tree.isValueOn(xyz));
                     EXPECT_EQ(Index64(1), tree.activeVoxelCount());
                     // dilate
-                    openvdb::tools::dilateActiveLeafValues(tree, 1, NN);
+                    openvdb::tools::dilateActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
                     CheckActiveNeighbours(tree, xyz, 0);
                     EXPECT_EQ(Index64(1 + offsets), tree.activeVoxelCount());
                     //erode
-                    openvdb::tools::erodeActiveLeafValues(tree, 1, NN);
+                    openvdb::tools::erodeActiveValues(tree, 1, NN, openvdb::tools::IGNORE_TILES);
                     EXPECT_EQ(Index64(1), tree.activeVoxelCount());
                     CheckInactiveNeighbours(tree, xyz);
                     EXPECT_TRUE(tree.isValueOn(xyz));

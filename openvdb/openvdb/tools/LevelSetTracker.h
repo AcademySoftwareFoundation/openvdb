@@ -339,7 +339,7 @@ inline void
 LevelSetTracker<GridT, InterruptT>::
 erode(int iterations)
 {
-    tools::erodeActiveLeafValues(*mLeafs, iterations);
+    tools::erodeActiveValues(*mLeafs, iterations, tools::NN_FACE, tools::IGNORE_TILES);
     tools::pruneLevelSet(mLeafs->tree());
     mLeafs->rebuildLeafArray();
     const ValueType background = mGrid->background() - ValueType(iterations) * mDx;
