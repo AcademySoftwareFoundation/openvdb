@@ -658,3 +658,27 @@ TestMorphologyInternal<TreeT, NN>::testMorphActiveValues()
         EXPECT_EQ(Index64(1), tree.activeTileCount());
     }
 }
+
+TEST_F(TestMorphology, testPreserveMaskLeafNodes)
+{
+    // test that mask leaf pointers are preserved
+    openvdb::MaskTree mask;
+    static const openvdb::Int32 count = 160;
+
+    std::vector<openvdb::MaskTree::LeafNodeType*> nodes;
+    nodes.reserve(count);
+
+    for (openvdb::Int32 i = 0; i < count; ++i) {
+        nodes.emplace_back(mask.touchLeaf({i,i,i}));
+        nodes.back()->setValuesOn(); // activate all
+    }
+
+    openvdb::tools::morphology::Morphology<openvdb::MaskTree> morph(mask);
+    morph.setThreaded(true); // only a problem during mt
+    morph.dilateVoxels(/*iter*/3, openvdb::tools::NN_FACE,
+        /*prune*/false, /*preserve*/true);
+
+    for (openvdb::Int32 i = 0; i < count; ++i) {
+        EXPECT_EQ(mask.probeConstLeaf({i,i,i}), nodes[i]);
+    }
+}
