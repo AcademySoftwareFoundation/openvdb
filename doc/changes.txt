@@ -34,6 +34,11 @@ API changes:
   and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
   new morphology methods.
 
+@par
+Houdini:
+- Updated the VDB Activate SOP and others to use the multi-threaded
+  implementation for voxel dilation, providing a significant performance
+  increase.
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par

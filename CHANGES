@@ -22,6 +22,11 @@ Version 8.0.2 - In development
     - Deprecated tools::dilateVoxels() and tools::erodeVoxels() in favour of
       new morphology methods.
 
+    Houdini:
+    - Updated the VDB Activate SOP and others to use the multi-threaded
+      implementation for voxel dilation, providing a significant performance
+      increase.
+
 Version 8.0.1 - February 5, 2021
 
     Bug fixes:
