@@ -10,7 +10,6 @@ on:
       - 'doc/**'
       - 'openvdb_maya/**'
       - '**.md'
-      - '**.txt'
   pull_request:
     branches:
       - '**'
@@ -19,7 +18,6 @@ on:
       - 'doc/**'
       - 'openvdb_maya/**'
       - '**.md'
-      - '**.txt'
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'

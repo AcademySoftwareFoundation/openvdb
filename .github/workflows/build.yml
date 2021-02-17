@@ -12,7 +12,6 @@ on:
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
       - '**.md'
-      - '**.txt'
   pull_request:
     branches:
       - '**'
@@ -23,7 +22,6 @@ on:
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
       - '**.md'
-      - '**.txt'
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
