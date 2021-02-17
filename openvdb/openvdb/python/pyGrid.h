@@ -773,7 +773,7 @@ template<> struct NumPyToCpp<DtId::INT32>  { using type = Int32; };
 template<> struct NumPyToCpp<DtId::INT64>  { using type = Int64; };
 template<> struct NumPyToCpp<DtId::UINT32> { using type = Index32; };
 template<> struct NumPyToCpp<DtId::UINT64> { using type = Index64; };
-//template<> struct NumPyToCpp<DtId::HALF>   { using type = half; };
+//template<> struct NumPyToCpp<DtId::HALF>   { using type = math::half; };
 
 
 #if 0
@@ -786,7 +786,7 @@ template<> struct CppToNumPy<Int32>    { static const DtId typeId = DtId::INT32;
 template<> struct CppToNumPy<Int64>    { static const DtId typeId = DtId::INT64; };
 template<> struct CppToNumPy<Index32>  { static const DtId typeId = DtId::UINT32; };
 template<> struct CppToNumPy<Index64>  { static const DtId typeId = DtId::UINT64; };
-//template<> struct CppToNumPy<half>     { static const DtId typeId = DtId::HALF; };
+//template<> struct CppToNumPy<math::half>     { static const DtId typeId = DtId::HALF; };
 #endif
 
 
@@ -821,7 +821,7 @@ arrayTypeId(const py::numpy::ndarray& arrayObj)
     if (np::equivalent(dtype, np::dtype::get_builtin<Int64>())) return DtId::INT64;
     if (np::equivalent(dtype, np::dtype::get_builtin<Index32>())) return DtId::UINT32;
     if (np::equivalent(dtype, np::dtype::get_builtin<Index64>())) return DtId::UINT64;
-    //if (np::equivalent(dtype, np::dtype::get_builtin<half>())) return DtId::HALF;
+    //if (np::equivalent(dtype, np::dtype::get_builtin<math::half>())) return DtId::HALF;
 #endif
     throw openvdb::TypeError{};
 }
