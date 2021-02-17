@@ -1,5 +1,5 @@
 
-name: Houdini
+name: Houdini Cache
 
 on:
   schedule:
