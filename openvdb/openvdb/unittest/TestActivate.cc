@@ -5,6 +5,8 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Activate.h>
 
+// #define BENCHMARK
+
 
 class TestActivate: public ::testing::Test
 {
@@ -23,8 +25,13 @@ TEST_F(TestActivate, testActivate)
 
     Vec3STree tree(background);
 
+#ifndef BENCHMARK
     const CoordBBox bbox1(Coord(-200), Coord(-181));
     const CoordBBox bbox2(Coord(51), Coord(373));
+#else
+    const CoordBBox bbox1(Coord(-200*20), Coord(-181*20));
+    const CoordBBox bbox2(Coord(51*20), Coord(373*20));
+#endif
 
     // Set some non-background active voxels.
     tree.fill(bbox1, Vec3s(0.0), /*active=*/true);
