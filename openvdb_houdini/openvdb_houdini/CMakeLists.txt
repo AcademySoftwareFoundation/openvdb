@@ -42,9 +42,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBHoudini LANGUAGES CXX)
 
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 option(USE_DEFAULT_HOUDINI_INSTALL [=[
 Use the default install location returned by the Houdini CMake function,

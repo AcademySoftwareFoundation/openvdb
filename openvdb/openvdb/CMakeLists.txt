@@ -10,10 +10,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBCore LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
+include(GNUInstallDirs)
 
 ###### OpenVDB Core Options
 
@@ -48,23 +45,13 @@ message(STATUS "----------------------------------------------------")
 
 # Collect and configure lib dependencies
 
-if(USE_EXR)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED)
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_OPENEXR_VERSION)
-    if(${OpenEXR_VERSION} VERSION_LESS FUTURE_MINIMUM_OPENEXR_VERSION)
-      message(DEPRECATION "Support for OpenEXR versions < ${FUTURE_MINIMUM_OPENEXR_VERSION} "
+if(USE_IMATH_HALF)
+  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
         "is deprecated and will be removed.")
     endif()
-  endif()
-else()
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-endif()
-
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-  if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-    message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-      "is deprecated and will be removed.")
   endif()
 endif()
 
@@ -124,16 +111,20 @@ if(UNIX)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
-# users chosen namespaced headers are correctly prioritized. Otherwise other
-# include paths from shared installs (including houdini) may pull in the wrong
-# headers
+# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# namespaced headers are correctly prioritized. Otherwise other include paths
+# from shared installs (including houdini) may pull in the wrong headers
 
 set(OPENVDB_CORE_DEPENDENT_LIBS
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
+
+if(USE_IMATH_HALF)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    IlmBase::Half
+  )
+endif()
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -146,15 +137,6 @@ if(WIN32)
         Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
       )
   endif()
-endif()
-
-if(USE_EXR)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
-  )
 endif()
 
 if(USE_LOG4CPLUS)
@@ -195,6 +177,16 @@ endif()
 
 ##### Core library configuration
 
+# Configure the BuildConfig header
+
+if(USE_IMATH_HALF)
+  set(OPENVDB_BUILDCONFIG_USE_IMATH_HALF 1)
+endif()
+
+configure_file(BuildConfig.h.in BuildConfig.h)
+
+##########################################################################
+
 set(OPENVDB_LIBRARY_SOURCE_FILES
   Grid.cc
   io/Archive.cc
@@ -205,6 +197,7 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
+  math/Half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -254,6 +247,8 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
+  math/Half.h
+  math/HalfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -416,14 +411,12 @@ if(WIN32)
   # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+  if(USE_IMATH_HALF)
+    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
   endif()
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
-endif()
-if(USE_EXR)
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
@@ -435,7 +428,7 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   target_include_directories(openvdb_static
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
@@ -461,7 +454,7 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   target_include_directories(openvdb_shared
-    PUBLIC ../
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
     PRIVATE .
   )
 
@@ -486,7 +479,6 @@ if(OPENVDB_CORE_SHARED)
     list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
       ${IlmBase_LIBRARY_DIRS}
-      ${OpenEXR_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}
       ${Tbb_LIBRARY_DIRS}
@@ -519,6 +511,7 @@ if(OPENVDB_CORE_SHARED)
 endif()
 
 install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/points)

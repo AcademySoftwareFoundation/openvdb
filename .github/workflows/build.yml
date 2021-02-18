@@ -71,6 +71,21 @@ jobs:
     - name: test
       run: ./ci/test.sh
 
+  testabi8half:
+    runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
+    container:
+      image: aswf/ci-openvdb:2021
+    steps:
+    - uses: actions/checkout@v1
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      run: ./ci/build.sh Release 8 OFF None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON -DUSE_IMATH_HALF=ON
+    - name: test
+      run: ./ci/test.sh
+
   testabi8sse:
     runs-on: ubuntu-16.04
     env:
@@ -99,7 +114,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 
@@ -116,7 +131,7 @@ jobs:
     - name: install_gtest
       run: sudo apt-get -q install -y libgtest-dev
     - name: build
-      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DCMAKE_INSTALL_PREFIX=`pwd`
+      run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
       run: ./ci/test.sh
 

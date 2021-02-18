@@ -177,12 +177,12 @@ struct RealToHalf {
 };
 template<> struct RealToHalf<float> {
     enum { isReal = true };
-    using HalfT = half;
+    using HalfT = math::half;
     static HalfT convert(float val) { return HalfT(val); }
 };
 template<> struct RealToHalf<double> {
     enum { isReal = true };
-    using HalfT = half;
+    using HalfT = math::half;
     // A half can only be constructed from a float, so cast the value to a float first.
     static HalfT convert(double val) { return HalfT(float(val)); }
 };

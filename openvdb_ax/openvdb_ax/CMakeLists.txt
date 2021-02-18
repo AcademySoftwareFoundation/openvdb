@@ -10,6 +10,8 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBAXCore LANGUAGES CXX)
 
+include(GNUInstallDirs)
+
 option(OPENVDB_AX_SHARED "Build dynamically linked version of the ax library." ON)
 option(OPENVDB_AX_STATIC "Build statically linked version of the ax library." ON)
 option(USE_NEW_PASS_MANAGER [=[
@@ -257,7 +259,6 @@ if(OPENVDB_AX_SHARED)
     list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
       ${IlmBase_LIBRARY_DIRS}
-      ${OpenEXR_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}
       ${Tbb_LIBRARY_DIRS}
