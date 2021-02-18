@@ -291,6 +291,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
+  tools/Activate.h
   tools/ChangeBackground.h
   tools/Clip.h
   tools/Composite.h

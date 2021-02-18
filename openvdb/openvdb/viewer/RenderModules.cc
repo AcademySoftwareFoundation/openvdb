@@ -1133,7 +1133,9 @@ public:
                         (maxVoxelPoints / interiorMask->leafCount()));
                 }
 
-                openvdb::tools::erodeVoxels(*interiorMask, 2);
+                openvdb::tools::erodeActiveValues(*interiorMask, 2,
+                    openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
+                openvdb::tools::pruneInactive(*interiorMask);
 
                 openvdb::tree::LeafManager<BoolTreeT> maskleafs(*interiorMask);
                 std::vector<size_t> indexMap(maskleafs.leafCount());
