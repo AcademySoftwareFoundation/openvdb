@@ -82,39 +82,6 @@ private:
 } // unnamed namespace
 #endif
 
-TEST_F(TestTools, testActivate)
-{
-    using namespace openvdb;
-
-    const Vec3s background(0.0, -1.0, 1.0), foreground(42.0);
-
-    Vec3STree tree(background);
-
-    const CoordBBox bbox1(Coord(-200), Coord(-181)), bbox2(Coord(51), Coord(373));
-
-    // Set some non-background active voxels.
-    tree.fill(bbox1, Vec3s(0.0), /*active=*/true);
-
-    // Mark some background voxels as active.
-    tree.fill(bbox2, background, /*active=*/true);
-    EXPECT_EQ(bbox2.volume() + bbox1.volume(), tree.activeVoxelCount());
-
-    // Deactivate all voxels with the background value.
-    tools::deactivate(tree, background, /*tolerance=*/Vec3s(1.0e-6f));
-    // Verify that there are no longer any active voxels with the background value.
-    EXPECT_EQ(bbox1.volume(), tree.activeVoxelCount());
-
-    // Set some voxels to the foreground value but leave them inactive.
-    tree.fill(bbox2, foreground, /*active=*/false);
-    // Verify that there are no active voxels with the background value.
-    EXPECT_EQ(bbox1.volume(), tree.activeVoxelCount());
-
-    // Activate all voxels with the foreground value.
-    tools::activate(tree, foreground);
-    // Verify that the expected number of voxels are active.
-    EXPECT_EQ(bbox1.volume() + bbox2.volume(), tree.activeVoxelCount());
-}
-
 TEST_F(TestTools, testFilter)
 {
     openvdb::FloatGrid::Ptr referenceGrid = openvdb::FloatGrid::create(/*background=*/5.0);
