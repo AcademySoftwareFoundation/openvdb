@@ -14,8 +14,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
-#include <openvdb/tree/TreeIterator.h>
-#include "ValueTransformer.h" // for foreach()
+#include <openvdb/tree/NodeManager.h>
 
 
 namespace openvdb {
@@ -29,7 +28,8 @@ template<typename GridOrTree>
 inline void activate(
     GridOrTree&,
     const typename GridOrTree::ValueType& value,
-    const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>()
+    const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>(),
+    const bool threaded = true
 );
 
 
@@ -39,111 +39,177 @@ template<typename GridOrTree>
 inline void deactivate(
     GridOrTree&,
     const typename GridOrTree::ValueType& value,
-    const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>()
+    const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>(),
+    const bool threaded = true
 );
 
 
 ////////////////////////////////////////
 
 
-namespace activation {
+namespace activate_internal {
 
-template<typename TreeType>
-class ActivationOp
+template<typename TreeT, bool IgnoreTolerance = false>
+struct ActivateOp
 {
 public:
-    using ValueT = typename TreeType::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
 
-    ActivationOp(bool state, const ValueT& val, const ValueT& tol)
-        : mActivate(state)
-        , mValue(val)
-        , mTolerance(tol)
-    {}
+    explicit ActivateOp(const ValueT& value,
+                        const ValueT& tolerance = zeroVal<ValueT>())
+        : mValue(value)
+        , mTolerance(tolerance) { }
 
-    void operator()(const typename TreeType::ValueOnIter& it) const
-    {
-        if (math::isApproxEqual(*it, mValue, mTolerance)) {
-            it.setActiveState(/*on=*/false);
-        }
+    inline bool check(const ValueT& value) const {
+        // math::isApproxEqual is marginally more expensive,
+        // so opt to do direct comparison if tolerance is ignored
+        if (IgnoreTolerance)    return value == mValue;
+        return math::isApproxEqual(value, mValue, mTolerance);
     }
 
-    void operator()(const typename TreeType::ValueOffIter& it) const
+    bool operator()(RootT& root, size_t) const
     {
-        if (math::isApproxEqual(*it, mValue, mTolerance)) {
-            it.setActiveState(/*on=*/true);
+        for (auto it = root.beginValueOff(); it; ++it) {
+            if (check(*it))     it.setValueOn(/*on=*/true);
         }
+        return true;
     }
 
-    void operator()(const typename TreeType::LeafIter& lit) const
+    template<typename NodeT>
+    bool operator()(NodeT& node, size_t) const
     {
-        using LeafT = typename TreeType::LeafNodeType;
-        LeafT& leaf = *lit;
-        if (mActivate) {
-            for (typename LeafT::ValueOffIter it = leaf.beginValueOff(); it; ++it) {
-                if (math::isApproxEqual(*it, mValue, mTolerance)) {
-                    leaf.setValueOn(it.pos());
-                }
-            }
-        } else {
-            for (typename LeafT::ValueOnIter it = leaf.beginValueOn(); it; ++it) {
-                if (math::isApproxEqual(*it, mValue, mTolerance)) {
-                    leaf.setValueOff(it.pos());
-                }
+        // only iterate if there are inactive tiles
+        if (!node.isValueMaskOn()) {
+            for (auto it = node.beginValueOff(); it; ++it) {
+                if (check(*it))     it.setValueOn(/*on=*/true);
             }
         }
+        // return false if there are no child nodes below this node
+        return !node.isChildMaskOff();
+    }
+
+    bool operator()(LeafT& leaf, size_t) const
+    {
+        // early-exit if there are no inactive values
+        if (leaf.isValueMaskOn())  return true;
+        for (auto it = leaf.beginValueOff(); it; ++it) {
+            if (check(*it))     it.setValueOn(/*on=*/true);
+        }
+        return true;
     }
 
 private:
-    bool mActivate;
-    const ValueT mValue, mTolerance;
-}; // class ActivationOp
+    const ValueT mValue;
+    const ValueT mTolerance;
+};// ActivateOp
 
-} // namespace activation
+template<typename TreeT, bool IgnoreTolerance = false>
+struct DeactivateOp
+{
+public:
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
+
+    explicit DeactivateOp(const ValueT& value,
+                        const ValueT& tolerance = zeroVal<ValueT>())
+        : mValue(value)
+        , mTolerance(tolerance) { }
+
+    inline bool check(const ValueT& value) const {
+        if (IgnoreTolerance)    return value == mValue;
+        return math::isApproxEqual(value, mValue, mTolerance);
+    }
+
+    bool operator()(RootT& root, size_t) const
+    {
+        for (auto it = root.beginValueOn(); it; ++it) {
+            if (check(*it))     it.setValueOn(/*on=*/false);
+        }
+        return true;
+    }
+
+    template<typename NodeT>
+    bool operator()(NodeT& node, size_t) const
+    {
+        // only iterate if there are active tiles
+        if (!node.isValueMaskOff()) {
+            for (auto it = node.beginValueOn(); it; ++it) {
+                if (check(*it))     it.setValueOn(/*on=*/false);
+            }
+        }
+        // return false if there are no child nodes below this node
+        return !node.isChildMaskOff();
+    }
+
+    bool operator()(LeafT& leaf, size_t) const
+    {
+        // early-exit if there are no active values
+        if (leaf.isValueMaskOff())  return true;
+        for (auto it = leaf.beginValueOn(); it; ++it) {
+            if (check(*it))     it.setValueOn(/*on=*/false);
+        }
+        return true;
+    }
+
+private:
+    const ValueT mValue;
+    const ValueT mTolerance;
+};// DeactivateOp
+
+} // namespace activate_internal
+
+
+////////////////////////////////////////
 
 
 template<typename GridOrTree>
 inline void
 activate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
-    const typename GridOrTree::ValueType& tolerance)
+    const typename GridOrTree::ValueType& tolerance,
+    const bool threaded)
 {
     using Adapter = TreeAdapter<GridOrTree>;
     using TreeType = typename Adapter::TreeType;
+    using ValueType = typename TreeType::ValueType;
 
     TreeType& tree = Adapter::tree(gridOrTree);
 
-    activation::ActivationOp<TreeType> op(/*activate=*/true, value, tolerance);
+    tree::DynamicNodeManager<TreeType> nodeManager(tree);
 
-    // Process all leaf nodes in parallel.
-    foreach(tree.beginLeaf(), op);
-
-    // Process all other inactive values serially (because changing active states
-    // is not thread-safe unless no two threads modify the same node).
-    typename TreeType::ValueOffIter it = tree.beginValueOff();
-    it.setMaxDepth(tree.treeDepth() - 2);
-    foreach(it, op, /*threaded=*/false);
+    if (tolerance == zeroVal<ValueType>()) {
+        activate_internal::ActivateOp<TreeType, /*IgnoreTolerance=*/true> op(value);
+        nodeManager.foreachTopDown(op, threaded);
+    } else {
+        activate_internal::ActivateOp<TreeType> op(value, tolerance);
+        nodeManager.foreachTopDown(op, threaded);
+    }
 }
 
 
 template<typename GridOrTree>
 inline void
 deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
-    const typename GridOrTree::ValueType& tolerance)
+    const typename GridOrTree::ValueType& tolerance,
+    const bool threaded)
 {
     using Adapter = TreeAdapter<GridOrTree>;
     using TreeType = typename Adapter::TreeType;
+    using ValueType = typename TreeType::ValueType;
 
     TreeType& tree = Adapter::tree(gridOrTree);
 
-    activation::ActivationOp<TreeType> op(/*activate=*/false, value, tolerance);
+    tree::DynamicNodeManager<TreeType> nodeManager(tree);
 
-    // Process all leaf nodes in parallel.
-    foreach(tree.beginLeaf(), op);
-
-    // Process all other active values serially (because changing active states
-    // is not thread-safe unless no two threads modify the same node).
-    typename TreeType::ValueOnIter it = tree.beginValueOn();
-    it.setMaxDepth(tree.treeDepth() - 2);
-    foreach(it, op, /*threaded=*/false);
+    if (tolerance == zeroVal<ValueType>()) {
+        activate_internal::DeactivateOp<TreeType, /*IgnoreTolerance=*/true> op(value);
+        nodeManager.foreachTopDown(op, threaded);
+    } else {
+        activate_internal::DeactivateOp<TreeType> op(value, tolerance);
+        nodeManager.foreachTopDown(op, threaded);
+    }
 }
 
 } // namespace tools
