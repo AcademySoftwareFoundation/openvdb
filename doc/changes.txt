@@ -6,6 +6,10 @@
 @par
 <B>Version 8.0.2</B> - <I>In development</I>
 
+@par
+Houdini:
+- Introduced the VDB AX SOP which provides an interface for running
+  OpenVDB AX code in Houdini on VDB grids.
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par
@@ -31,8 +35,6 @@ Build:
 Houdini:
 - VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
   because unary negation is undefined on bools in the template expansion.
-- Introduced the VDB AX SOP which provides an interface for running
-  OpenVDB AX code in Houdini on VDB grids.
 
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
