@@ -63,7 +63,7 @@ public:
     void operator()(const typename TreeType::ValueOnIter& it) const
     {
         if (math::isApproxEqual(*it, mValue, mTolerance)) {
-            it.setValueOff();
+            it.setActiveState(/*on=*/false);
         }
     }
 
