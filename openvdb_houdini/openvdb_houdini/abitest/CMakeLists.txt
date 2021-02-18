@@ -15,10 +15,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBHoudiniABITest)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 #########################################################################
 
@@ -43,6 +39,13 @@ find_library(OPENVDB_SESI_LIB openvdb_sesi
   ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
   PATHS ${HOUDINI_LIB_DIR}
 )
+
+# Find sesi half library
+find_library(SESI_HALF Half
+  ${_FIND_HOUDINI_ADDITIONAL_OPTIONS}
+  PATHS ${HOUDINI_LIB_DIR}
+)
+
 
 if(NOT EXISTS ${OPENVDB_SESI_LIB})
   message(FATAL_ERROR "The Houdini ABI Test is unable to locate libopenvdb_sesi "
@@ -92,6 +95,7 @@ endif()
 target_link_libraries(openvdb_houdini_abi_test PUBLIC
   ${OPENVDB_LIB}
   ${OPENVDB_SESI_LIB}
+  ${SESI_HALF}
 )
 
 add_test(vdb_abi_test openvdb_houdini_abi_test)

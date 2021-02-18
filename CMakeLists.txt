@@ -18,12 +18,12 @@
   and required dependencies are expected. See the dependency documentation
   for more information:
 
-    https://www.openvdb.org/documentation/doxygen/dependencies.html
+    https://academysoftwarefoundation.github.io/openvdb/dependencies.html
 
   And the documentation on building OpenVDB for more in depth installation
   instructions:
 
-    https://www.openvdb.org/documentation/doxygen/build.html
+    https://academysoftwarefoundation.github.io/openvdb/build.html
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
@@ -95,10 +95,11 @@ option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
-option(USE_EXR [=[
-Use OpenEXR while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you
-know it to be required.]=] OFF)
+option(USE_IMATH_HALF [=[
+Use the definiton of half floating point types from the Imath library. If OFF, the embedded definition provided
+by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located openvdb build configuration
+to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
+required.]=] OFF)
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
@@ -162,6 +163,10 @@ set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
+if(USE_EXR)
+  message(FATAL_ERROR "The USE_EXR option has been removed. Use USE_IMATH_HALF to use the Half "
+    "implementation from IMath, or leave OFF to use the new embedded version of half floating point types.")
+endif()
 if(OPENVDB_BUILD_HOUDINI_SOPS)
   message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
@@ -177,6 +182,7 @@ mark_as_advanced(
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
+  USE_IMATH_HALF
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
@@ -211,9 +217,9 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_ICC_VERSION 17)
   set(MINIMUM_MSVC_VERSION 19.10)
 
-  set(MINIMUM_BOOST_VERSION 1.66)
-  set(MINIMUM_ILMBASE_VERSION 2.2)
-  set(MINIMUM_OPENEXR_VERSION 2.2)
+  set(MINIMUM_BOOST_VERSION 1.61)  # @warning should be 1.66, but H18 ships with 1.61
+  set(MINIMUM_ILMBASE_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
+  set(MINIMUM_OPENEXR_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2018.0)
   set(MINIMUM_LLVM_VERSION 6.0.0)
@@ -234,7 +240,8 @@ endif()
 # VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
 # Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
+# python linkage on macOS (Python::Module target in 3.15)
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned

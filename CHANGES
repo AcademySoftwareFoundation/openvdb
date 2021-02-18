@@ -1,6 +1,30 @@
 OpenVDB Version History
 =======================
 
+Version 8.0.2 - In development
+
+
+Version 8.0.1 - February 5, 2021
+
+    Bug fixes:
+    - Fixed a bug in the new CSG intersection merge algorithm where data
+      outside of the intersection region was not being removed.
+
+    Bug fixes:
+    - Fixed a bug in the new CSG intersection merge algorithm where data
+      outside of the intersection region was not being removed.
+
+    Build:
+    - Fixed various incorrect RPATH directory paths in CMake
+    - Dropped the minimum boost requirement back to 1.61.
+    - Documentation installed by the doc target is now installed to the
+      share/doc/OpenVDB prefix
+
+    Houdini:
+    - VDB Combine SOP no longer attempts to invoke SDF CSG operations on
+      bool grids because unary negation is undefined on bools in the
+      template expansion.
+
 Version 8.0.0 - December 23, 2020
 
       This version introduces ABI changes relative to older major releases,
@@ -13,7 +37,7 @@ Version 8.0.0 - December 23, 2020
       providing users with a new way of interacting with OpenVDB data. AX is
       tailored towards writing highly parallelizable and customizable OpenVDB
       volume and point kernel operations. See the documentation for more:
-      https://www.openvdb.org/documentation/doxygen/openvdbax.html
+      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
@@ -70,6 +94,22 @@ Version 8.0.0 - December 23, 2020
       [Reported by Alexander Hagen]
     - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
       attribute.
+
+Version 7.2.2 - February 4, 2021
+
+    Bug fixes:
+    - Fixed a bug in the new CSG intersection merge algorithm where data
+      outside of the intersection region was not being removed.
+    - Fix GridTransformer construction to use correct rotate-scale-translate
+      order when recomposing matrix components.
+      [Contributed by Tom Cnops].
+
+    Houdini:
+    - VDB Combine SOP no longer attempts to invoke SDF CSG operations on
+      bool grids because unary negation is undefined on bools in the
+      template expansion.
+    - VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+      VDB Write likewise should not reset the compression values.
 
 Version 7.2.1 - December 23, 2020
 
