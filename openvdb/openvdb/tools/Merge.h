@@ -15,6 +15,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/tools/NodeVisitor.h>
 
 #include <unordered_map>
 #include <unordered_set>
@@ -302,6 +303,76 @@ private:
 }; // struct CsgDifferenceOp
 
 
+/// @brief DynamicNodeManager operator to merge trees using a sum operation.
+/// @note This class modifies the topology of the tree so is designed to be used
+/// from DynamicNodeManager::foreachTopDown().
+template<typename TreeT>
+struct SumMergeOp
+{
+    using ValueT = typename TreeT::ValueType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    /// @brief Convenience constructor to sum a single non-const tree with another.
+    /// This constructor takes a Steal or DeepCopy tag dispatch class.
+    template <typename TagT>
+    SumMergeOp(TreeT& tree, TagT tag) { mTreesToMerge.emplace_back(tree, tag); }
+
+    /// @brief Convenience constructor to sum a single const tree with another.
+    /// This constructor requires a DeepCopy tag dispatch class.
+    SumMergeOp(const TreeT& tree, DeepCopy tag) { mTreesToMerge.emplace_back(tree, tag); }
+
+    /// @brief Constructor to sum a container of multiple const or non-const tree pointers.
+    /// A Steal tag requires a container of non-const trees, a DeepCopy tag will accept
+    /// either const or non-const trees.
+    template <typename TreesT, typename TagT>
+    SumMergeOp(TreesT& trees, TagT tag)
+    {
+        for (auto* tree : trees) {
+            if (tree) {
+                mTreesToMerge.emplace_back(*tree, tag);
+            }
+        }
+    }
+
+    /// @brief Constructor to accept a vector of TreeToMerge objects, primarily
+    /// used when mixing const/non-const trees.
+    /// @note Sum order is preserved.
+    explicit SumMergeOp(const std::vector<TreeToMerge<TreeT>>& trees)
+        : mTreesToMerge(trees) { }
+
+    /// @brief Constructor to accept a deque of TreeToMerge objects, primarily
+    /// used when mixing const/non-const trees.
+    /// @note Sum order is preserved.
+    explicit SumMergeOp(const std::deque<TreeToMerge<TreeT>>& trees)
+        : mTreesToMerge(trees.cbegin(), trees.cend()) { }
+
+    /// @brief Return true if no trees being merged
+    bool empty() const { return mTreesToMerge.empty(); }
+
+    /// @brief Return the number of trees being merged
+    size_t size() const { return mTreesToMerge.size(); }
+
+    // Processes the root node. Required by the NodeManager
+    bool operator()(RootT& root, size_t idx) const;
+
+    // Processes the internal nodes. Required by the NodeManager
+    template<typename NodeT>
+    bool operator()(NodeT& node, size_t idx) const;
+
+    // Processes the leaf nodes. Required by the NodeManager
+    bool operator()(LeafT& leaf, size_t idx) const;
+
+private:
+    // on processing the root node, the background value is stored, retrieve it
+    // and check that the root node has already been processed
+    const ValueT& background() const;
+
+    mutable std::vector<TreeToMerge<TreeT>> mTreesToMerge;
+    mutable const ValueT* mBackground = nullptr;
+}; // struct SumMergeOp
+
+
 ////////////////////////////////////////
 
 
@@ -471,9 +542,11 @@ struct UnallocatedBuffer
 {
     static void allocateAndFill(BufferT& buffer, const ValueT& background)
     {
-        if (!buffer.isOutOfCore() && buffer.empty()) {
-            buffer.allocate();
-            buffer.fill(background);
+        if (buffer.empty()) {
+            if (!buffer.isOutOfCore()) {
+                buffer.allocate();
+                buffer.fill(background);
+            }
         }
     }
 
@@ -490,6 +563,104 @@ struct UnallocatedBuffer<BufferT, bool>
     static void allocateAndFill(BufferT&, const bool&) { }
     static bool isPartiallyConstructed(const BufferT&) { return false; }
 }; // struct AllocateAndFillBuffer
+
+
+// a convenience class that combines nested parallelism with the depth-visit
+// node visitor which can result in increased performance with large sub-trees
+template <Index LEVEL>
+struct Dispatch
+{
+    template <typename NodeT, typename OpT>
+    static void run(NodeT& node, OpT& op)
+    {
+        using ChildT = typename NodeT::ChildNodeType;
+
+        // use nested parallelism if there is more than one child
+
+        Index32 childCount = node.childCount();
+        if (childCount > 0) {
+            op(node, size_t(0));
+
+            // build linear list of child pointers
+            std::vector<ChildT*> children;
+            children.reserve(childCount);
+            for (auto iter = node.beginChildOn(); iter; ++iter) {
+                children.push_back(&(*iter));
+            }
+
+            // parallelize across children
+            tbb::parallel_for(
+                tbb::blocked_range<Index32>(0, childCount),
+                [&](tbb::blocked_range<Index32>& range) {
+                    for (Index32 n = range.begin(); n < range.end(); n++) {
+                        DepthFirstNodeVisitor<ChildT>::visit(*children[n], op);
+                    }
+                }
+            );
+        } else {
+            DepthFirstNodeVisitor<NodeT>::visit(node, op);
+        }
+    }
+}; // struct Dispatch
+
+// when LEVEL = 0, do not attempt nested parallelism
+template <>
+struct Dispatch<0>
+{
+    template <typename NodeT, typename OpT>
+    static void run(NodeT& node, OpT& op)
+    {
+        DepthFirstNodeVisitor<NodeT>::visit(node, op);
+    }
+};
+
+
+// an DynamicNodeManager operator to add a value and modify active state
+// for every tile and voxel in a given subtree
+template <typename TreeT>
+struct ApplyTileToNodeOp
+{
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename TreeT::ValueType;
+
+    ApplyTileToNodeOp(const ValueT& value, const bool active):
+        mValue(value), mActive(active) { }
+
+    template <typename NodeT>
+    void operator()(NodeT& node, size_t) const
+    {
+        // TODO: Need to add an InternalNode::setValue(Index offset, ...) to
+        // avoid the cost of using a value iterator or coordToOffset() in the case
+        // where node.isChildMaskOff() is true
+
+        for (auto iter = node.beginValueAll(); iter; ++iter) {
+            iter.setValue(mValue + *iter);
+        }
+        if (mActive)     node.setValuesOn();
+    }
+
+    void operator()(LeafT& leaf, size_t) const
+    {
+        auto* data = leaf.buffer().data();
+
+        if (mValue != zeroVal<ValueT>()) {
+            for (Index i = 0; i < LeafT::SIZE; ++i) {
+                data[i] += mValue;
+            }
+        }
+        if (mActive)    leaf.setValuesOn();
+    }
+
+    template <typename NodeT>
+    void run(NodeT& node)
+    {
+        Dispatch<NodeT::LEVEL>::run(node, *this);
+    }
+
+private:
+    ValueT mValue;
+    bool mActive;
+}; // struct ApplyTileToNodeOp
 
 
 } // namespace merge_internal
@@ -1010,6 +1181,268 @@ CsgDifferenceOp<TreeT>::otherBackground() const
     assert(mOtherBackground);
     return *mOtherBackground;
 }
+
+
+////////////////////////////////////////
+
+
+template <typename TreeT>
+bool SumMergeOp<TreeT>::operator()(RootT& root, size_t) const
+{
+    using ValueT = typename RootT::ValueType;
+    using ChildT = typename RootT::ChildNodeType;
+    using NonConstChildT = typename std::remove_const<ChildT>::type;
+
+    if (this->empty())     return false;
+
+    // store the background value
+    if (!mBackground)   mBackground = &root.background();
+
+    // does the key exist in the root node?
+    auto keyExistsInRoot = [](const auto& rootToTest, const Coord& key) -> bool
+    {
+        return rootToTest.getValueDepth(key) > -1;
+    };
+
+    constexpr uint8_t TILE = 0x1;
+    constexpr uint8_t CHILD = 0x2;
+    constexpr uint8_t TARGET_CHILD = 0x4; // child already exists in the target tree
+
+    std::unordered_map<Coord, /*flags*/uint8_t> children;
+
+    // find all tiles and child nodes in our root
+
+    if (root.getTableSize() > 0) {
+        for (auto valueIter = root.cbeginValueAll(); valueIter; ++valueIter) {
+            const Coord& key = valueIter.getCoord();
+            children.insert({key, TILE});
+        }
+
+        for (auto childIter = root.cbeginChildOn(); childIter; ++childIter) {
+            const Coord& key = childIter.getCoord();
+            children.insert({key, CHILD | TARGET_CHILD});
+        }
+    }
+
+    // find all tiles and child nodes in other roots
+
+    for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+        const auto* mergeRoot = mergeTree.rootPtr();
+        if (!mergeRoot)     continue;
+
+        for (auto valueIter = mergeRoot->cbeginValueAll(); valueIter; ++valueIter) {
+            const Coord& key = valueIter.getCoord();
+            auto it = children.find(key);
+            if (it == children.end()) {
+                // if no element with this key, insert it
+                children.insert({key, TILE});
+            } else {
+                // mark as tile
+                it->second |= TILE;
+            }
+        }
+
+        for (auto childIter = mergeRoot->cbeginChildOn(); childIter; ++childIter) {
+            const Coord& key = childIter.getCoord();
+            auto it = children.find(key);
+            if (it == children.end()) {
+                // if no element with this key, insert it
+                children.insert({key, CHILD});
+            } else {
+                // mark as child
+                it->second |= CHILD;
+            }
+        }
+    }
+
+    // if any coords do not already exist in the root, insert an inactive background tile
+
+    for (const auto& it : children) {
+        if (!keyExistsInRoot(root, it.first)) {
+            root.addTile(it.first, root.background(), false);
+        }
+    }
+
+    // for each coord, merge each tile into the root until a child is found, then steal it
+
+    for (const auto& it : children) {
+
+        const Coord& key = it.first;
+
+        // do nothing if the target root already contains a child node,
+        // merge recursion will need to continue to resolve conflict
+        if (it.second & TARGET_CHILD)    continue;
+
+        ValueT value;
+        const bool active = root.probeValue(key, value);
+
+        for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+            const auto* mergeRoot = mergeTree.rootPtr();
+            if (!mergeRoot)                            continue;
+            if (!keyExistsInRoot(*mergeRoot, key))     continue;
+
+            // steal or deep-copy the first child node that is encountered,
+            // then cease processing of this root node coord as merge recursion
+            // will need to continue to resolve conflict
+
+            const auto* mergeNode = mergeRoot->template probeConstNode<ChildT>(key);
+            if (mergeNode) {
+                auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(key);
+                childPtr->resetBackground(mergeRoot->background(), root.background());
+                if (childPtr) {
+                    // apply tile value and active state to the sub-tree
+                    merge_internal::ApplyTileToNodeOp<TreeT> applyOp(value, active);
+                    applyOp.run(*childPtr);
+                    root.addChild(childPtr.release());
+                }
+                break;
+            }
+
+            ValueT mergeValue;
+            const bool mergeActive = mergeRoot->probeValue(key, mergeValue);
+
+            if (active || mergeActive) {
+                value += mergeValue;
+                root.addTile(key, value, true);
+            } else {
+                value += mergeValue;
+                root.addTile(key, value, false);
+            }
+
+            // reset tile value to zero to prevent it being merged twice
+            mergeTree.template addTile<NonConstChildT>(key, zeroVal<ValueT>(), false);
+        }
+    }
+
+    return true;
+}
+
+template<typename TreeT>
+template<typename NodeT>
+bool SumMergeOp<TreeT>::operator()(NodeT& node, size_t) const
+{
+    using ChildT = typename NodeT::ChildNodeType;
+    using NonConstNodeT = typename std::remove_const<NodeT>::type;
+
+    if (this->empty())     return false;
+
+    for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+        const auto* mergeRoot = mergeTree.rootPtr();
+        if (!mergeRoot)     continue;
+
+        const auto* mergeNode = mergeRoot->template probeConstNode<NonConstNodeT>(node.origin());
+        if (mergeNode) {
+            // merge node
+
+            for (auto iter = node.beginValueAll(); iter; ++iter) {
+                if (mergeNode->isChildMaskOn(iter.pos())) {
+                    // steal child node
+                    auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(iter.getCoord());
+                    childPtr->resetBackground(mergeRoot->background(), this->background());
+                    if (childPtr) {
+                        // apply tile value and active state to the sub-tree
+                        merge_internal::ApplyTileToNodeOp<TreeT> applyOp(*iter, iter.isValueOn());
+                        applyOp.run(*childPtr);
+                        node.addChild(childPtr.release());
+                    }
+                } else {
+                    ValueT mergeValue;
+                    const bool mergeActive = mergeNode->probeValue(iter.getCoord(), mergeValue);
+                    iter.setValue(*iter + mergeValue);
+                    if (mergeActive && !iter.isValueOn())   iter.setValueOn();
+                }
+            }
+
+        } else {
+            // merge tile or background value
+
+            ValueT mergeValue;
+            const bool mergeActive = mergeRoot->probeValue(node.origin(), mergeValue);
+            for (auto iter = node.beginValueAll(); iter; ++iter) {
+                iter.setValue(*iter + mergeValue);
+                if (mergeActive && !iter.isValueOn())   iter.setValueOn();
+            }
+        }
+    }
+
+    return true;
+}
+
+template <typename TreeT>
+bool SumMergeOp<TreeT>::operator()(LeafT& leaf, size_t) const
+{
+    using RootT = typename TreeT::RootNodeType;
+    using RootChildT = typename RootT::ChildNodeType;
+    using NonConstRootChildT = typename std::remove_const<RootChildT>::type;
+    using LeafT = typename TreeT::LeafNodeType;
+    using ValueT = typename LeafT::ValueType;
+    using BufferT = typename LeafT::Buffer;
+    using NonConstLeafT = typename std::remove_const<LeafT>::type;
+
+    if (this->empty())      return false;
+
+    const Coord& ijk = leaf.origin();
+
+    // if buffer is not out-of-core and empty, leaf node must have only been
+    // partially constructed, so allocate and fill with background value
+
+    merge_internal::UnallocatedBuffer<BufferT, ValueT>::allocateAndFill(
+        leaf.buffer(), this->background());
+
+    auto* data = leaf.buffer().data();
+
+    for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+        const RootT* mergeRoot = mergeTree.rootPtr();
+        if (!mergeRoot)     continue;
+
+        const RootChildT* mergeRootChild = mergeRoot->template probeConstNode<NonConstRootChildT>(ijk);
+        const LeafT* mergeLeaf = mergeRootChild ?
+            mergeRootChild->template probeConstNode<NonConstLeafT>(ijk) : nullptr;
+        if (mergeLeaf) {
+            // merge leaf
+
+            // if buffer is not out-of-core yet empty, leaf node must have only been
+            // partially constructed, so skip merge
+
+            if (merge_internal::UnallocatedBuffer<BufferT, ValueT>::isPartiallyConstructed(
+                mergeLeaf->buffer())) {
+                return false;
+            }
+
+            for (Index i = 0; i < LeafT::SIZE; ++i) {
+                data[i] += mergeLeaf->getValue(i);
+            }
+
+            leaf.getValueMask() |= mergeLeaf->getValueMask();
+        } else {
+            // merge root tile or background value
+
+            ValueT mergeValue;
+            bool mergeActive = mergeRootChild ?
+                mergeRootChild->probeValue(ijk, mergeValue) : mergeRoot->probeValue(ijk, mergeValue);
+
+            if (mergeValue != zeroVal<ValueT>()) {
+                for (Index i = 0; i < LeafT::SIZE; ++i) {
+                    data[i] += mergeValue;
+                }
+            }
+
+            if (mergeActive)    leaf.setValuesOn();
+        }
+    }
+
+    return false;
+}
+
+template <typename TreeT>
+const typename SumMergeOp<TreeT>::ValueT&
+SumMergeOp<TreeT>::background() const
+{
+    // this operator is only intended to be used with foreachTopDown()
+    assert(mBackground);
+    return *mBackground;
+}
+
 
 
 } // namespace tools
