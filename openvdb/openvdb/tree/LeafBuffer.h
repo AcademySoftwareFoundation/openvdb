@@ -40,7 +40,7 @@ template<typename T>
 struct LeafBufferFlags
 {
     /// The type of LeafBuffer::mOutOfCore
-    using type = std::atomic<Index32>;
+    using type = std::atomic<Index32>; // FIXME: Can we make this change from tbb::atomic to std::atomic, or do we need an ABI bump for that?
     static constexpr bool IsAtomic = true;
 };
 
