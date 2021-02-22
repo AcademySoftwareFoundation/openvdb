@@ -7,10 +7,10 @@
 #include "openvdb/openvdb.h"
 #include "openvdb/points/PointDataGrid.h"
 #include <boost/python.hpp>
-#include <map> // for std::pair
 #include <mutex>
-#include <string>
 #include <sstream>
+#include <string>
+#include <utility> // for std::pair
 
 
 namespace pyutil {
