@@ -285,7 +285,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
                typename SdfGridT::ValueType isoValue = 0,
                int nIter = 1);
 
-/// @brief Dilates an existing signed distance filed by a specified number of voxels
+/// @brief Dilates an existing signed distance field by a specified number of voxels
 ///
 /// @return A shared pointer to the dilated signed distance field.
 ///
