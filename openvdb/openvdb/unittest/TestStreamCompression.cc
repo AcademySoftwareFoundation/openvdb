@@ -284,11 +284,15 @@ TEST_F(TestStreamCompression, testBlosc)
         std::vector<int> values;
         values.reserve(uncompressedCount); // 128 bytes
 
-        for (int i = 0; i < uncompressedCount; i++)     values.push_back(i*10000);
+        // insert a sequence of 32 integer values that cannot be compressed using Blosc
 
-        std::random_device rng;
-        std::mt19937 urng(rng());
-        std::shuffle(values.begin(), values.end(), urng);
+        for (int i = 0; i < uncompressedCount; i++) {
+            if ((i%2) == 0) {
+                values.push_back(i * 12340);
+            } else {
+                values.push_back(i * 56780);
+            }
+        }
 
         std::unique_ptr<int[]> uncompressedBuffer(new int[values.size()]);
 
