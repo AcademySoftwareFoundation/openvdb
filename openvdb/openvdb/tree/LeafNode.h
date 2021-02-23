@@ -642,7 +642,7 @@ public:
     ///
     /// @note This operation modifies only active states, not values.
     template<typename OtherType>
-    void topologyUnion(const LeafNode<OtherType, Log2Dim>& other);
+    void topologyUnion(const LeafNode<OtherType, Log2Dim>& other, const bool preserveTiles = false);
 
     /// @brief Intersect this node's set of active values with the active values
     /// of the other node, whose @c ValueType may be different. So a
@@ -1678,7 +1678,7 @@ LeafNode<T, Log2Dim>::merge(const ValueType& tileValue, bool tileActive)
 template<typename T, Index Log2Dim>
 template<typename OtherType>
 inline void
-LeafNode<T, Log2Dim>::topologyUnion(const LeafNode<OtherType, Log2Dim>& other)
+LeafNode<T, Log2Dim>::topologyUnion(const LeafNode<OtherType, Log2Dim>& other, bool)
 {
     mValueMask |= other.valueMask();
 }

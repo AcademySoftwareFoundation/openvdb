@@ -23,7 +23,7 @@
 #include <openvdb/tools/Interpolation.h> // for tools::BoxSampler
 #include <openvdb/tools/LevelSetRebuild.h>
 #include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/Morphology.h> // for tools::dilateVoxels()
+#include <openvdb/tools/Morphology.h> // for tools::dilateActiveValues()
 #include <openvdb/tools/PointScatter.h>
 #include <openvdb/tree/LeafManager.h>
 #include <hboost/algorithm/string/join.hpp>
@@ -437,8 +437,8 @@ public:
                     // Dilate the isosurface mask to produce a suitably large CPT mask,
                     // to avoid unnecessary work in case the input is a dense SDF.
                     const int iterations = static_cast<int>(openvdb::LEVEL_SET_HALF_WIDTH);
-                    openvdb::tools::dilateVoxels(
-                        mMask->tree(), iterations, openvdb::tools::NN_FACE_EDGE);
+                    openvdb::tools::dilateActiveValues(
+                        mMask->tree(), iterations, openvdb::tools::NN_FACE_EDGE, openvdb::tools::IGNORE_TILES);
                 }
                 return openvdb::tools::cpt(*grid, *mMask, /*threaded=*/true, mBoss);
             }
