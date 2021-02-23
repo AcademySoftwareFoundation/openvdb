@@ -14,18 +14,13 @@
 #include <blosc.h>
 #endif
 
-#if OPENVDB_ABI_VERSION_NUMBER < 5
-    #error ABI <= 4 is no longer supported
+#if OPENVDB_ABI_VERSION_NUMBER < 6
+    #error ABI <= 5 is no longer supported
 #endif
 
 // If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an error
 // directive. This can be optionally suppressed by setting the CMake option
 // OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_DEPRECATED_ABI_5
-    #if OPENVDB_ABI_VERSION_NUMBER == 5
-        #error ABI = 5 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_5 suppresses this error
-    #endif
-#endif
 #ifndef OPENVDB_USE_DEPRECATED_ABI_6
     #if OPENVDB_ABI_VERSION_NUMBER == 6
         #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error

@@ -349,7 +349,6 @@ TEST_F(TestAttributeArray, testAttributeArray)
     }
 
     { // lots of type checking
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         Index size(50);
         {
             TypedAttributeArray<bool> typedAttr(size);
@@ -534,7 +533,6 @@ TEST_F(TestAttributeArray, testAttributeArray)
             EXPECT_TRUE(!attr.valueTypeIsQuaternion());
             EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
-#endif
     }
 
     {
@@ -906,18 +904,6 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
         targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER < 6
-    { // verify behaviour with slow virtual function (ABI<6)
-        AttributeArrayD typedAttr(size);
-        AttributeArray& attr(typedAttr);
-
-        for (const auto& pair : indexPairs) {
-            attr.set(pair.second, sourceAttr, pair.first);
-        }
-
-        EXPECT_TRUE(targetAttr == attr);
-    }
-#else
     using AttributeArrayF = TypedAttributeArray<float>;
 
     { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
@@ -1057,7 +1043,6 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
         EXPECT_TRUE(uniformAttr.isUniform());
         EXPECT_TRUE(uniformTypedAttr.get(0) == typedAttr.get(5));
     }
-#endif
 }
 
 
@@ -1342,12 +1327,7 @@ TEST_F(TestAttributeArray, testStrided)
         EXPECT_EQ(Index(3), handle.stride());
         EXPECT_EQ(Index(2), handle.size());
 
-// as of ABI=6, the base memory requirements of an AttributeArray have been lowered
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         size_t arrayMem = 40;
-#else
-        size_t arrayMem = 64;
-#endif
         EXPECT_EQ(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 
@@ -1497,11 +1477,9 @@ TestAttributeArray::testDelayedLoad()
             EXPECT_TRUE(attrBcopy.isOutOfCore());
             EXPECT_TRUE(attrBequal.isOutOfCore());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrB).isDataLoaded());
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
-#endif
 
             attrB.loadData();
             attrBcopy.loadData();
@@ -1511,11 +1489,9 @@ TestAttributeArray::testDelayedLoad()
             EXPECT_TRUE(!attrBcopy.isOutOfCore());
             EXPECT_TRUE(!attrBequal.isOutOfCore());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
             EXPECT_TRUE(static_cast<AttributeArray&>(attrB).isDataLoaded());
             EXPECT_TRUE(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
             EXPECT_TRUE(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
-#endif
 
             EXPECT_EQ(attrA.memUsage(), attrB.memUsage());
             EXPECT_EQ(attrA.memUsage(), attrBcopy.memUsage());
