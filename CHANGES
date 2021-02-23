@@ -26,6 +26,8 @@ Version 8.0.2 - In development
     - Updated the VDB Activate SOP and others to use the multi-threaded
       implementation for voxel dilation, providing a significant performance
       increase.
+    - Introduced the VDB AX SOP which provides an interface for running
+      OpenVDB AX code in Houdini on VDB grids.
 
 Version 8.0.1 - February 5, 2021
 

@@ -1,0 +1,63 @@
+
+name: Houdini
+
+on:
+  push:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'doc/**'
+      - 'openvdb_maya/**'
+      - '**.md'
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'doc/**'
+      - 'openvdb_maya/**'
+      - '**.md'
+  schedule:
+    # run this workflow every day at 7am UTC
+    - cron:  '0 7 * * *'
+
+jobs:
+  linux-vfx-houdini:
+    runs-on: ubuntu-16.04
+    name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
+    container:
+      image: aswf/ci-base:${{ matrix.config.image }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          # build against VFX Ref 2018 even though it's unsupported, just to make sure that we test Boost 1.61
+          - { cxx: clang++, image: '2018', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
+          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
+          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v1
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: fetch_houdini
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
+    - name: validate_houdini
+      if: github.repository_owner == 'AcademySoftwareFoundation'
+      run: test -f "hou/hou.tar.gz"
+    - name: houdini
+      run: ./ci/install_houdini.sh
+    - name: build
+      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
+    - name: test
+      run: ./ci/test.sh
