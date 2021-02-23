@@ -833,8 +833,11 @@ public:
     /// Specifically, active tiles and voxels in this tree are not changed, and
     /// tiles or voxels that were inactive in this tree but active in the other tree
     /// are marked as active in this tree but left with their original values.
+    ///
+    /// @note If preserveTiles is true, any active tile in this topology
+    /// will not be densified by overlapping child topology.
     template<typename OtherChildType>
-    void topologyUnion(const RootNode<OtherChildType>& other);
+    void topologyUnion(const RootNode<OtherChildType>& other, const bool preserveTiles = false);
 
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -3062,7 +3065,7 @@ RootNode<ChildT>::merge(RootNode& other)
 template<typename ChildT>
 template<typename OtherChildType>
 inline void
-RootNode<ChildT>::topologyUnion(const RootNode<OtherChildType>& other)
+RootNode<ChildT>::topologyUnion(const RootNode<OtherChildType>& other, const bool preserveTiles)
 {
     using OtherRootT = RootNode<OtherChildType>;
     using OtherCIterT = typename OtherRootT::MapCIter;
@@ -3076,12 +3079,14 @@ RootNode<ChildT>::topologyUnion(const RootNode<OtherChildType>& other)
                 mTable[i->first] = NodeStruct(
                     *(new ChildT(other.getChild(i), mBackground, TopologyCopy())));
             } else if (this->isChild(j)) { // union with child branch
-                this->getChild(j).topologyUnion(other.getChild(i));
+                this->getChild(j).topologyUnion(other.getChild(i), preserveTiles);
             } else {// this is a tile so replace it with a child branch with identical topology
-                ChildT* child = new ChildT(
-                    other.getChild(i), this->getTile(j).value, TopologyCopy());
-                if (this->isTileOn(j)) child->setValuesOn();//this is an active tile
-                this->setChild(j, *child);
+                if (!preserveTiles || this->isTileOff(j)) { // force child topology
+                    ChildT* child = new ChildT(
+                        other.getChild(i), this->getTile(j).value, TopologyCopy());
+                    if (this->isTileOn(j)) child->setValuesOn();//this is an active tile
+                    this->setChild(j, *child);
+                }
             }
         } else if (other.isTileOn(i)) { // other is an active tile
             if (j == mTable.end()) { // insert an active tile

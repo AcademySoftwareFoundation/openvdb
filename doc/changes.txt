@@ -7,7 +7,38 @@
 <B>Version 8.0.2</B> - <I>In development</I>
 
 @par
+New features:
+- Added @vdblink::tools::erodeActiveValues() tools::erodeActiveValues@endlink,
+  to match the existing
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink. New
+  erosion tools support all tile policies and edge/vertex neighbour patterns.
+
+@par
+Improvements:
+- Significant performance improvements to large dilations with
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink.
+  Performance gains will improve relative to increases in the inputs size
+  and dilation scheme.
+- Added an optional argument to
+  @vdblink::Tree::topologyUnion() Tree::topologyUnion@endlink which preserves
+  active tiles on the destination tree should they overlap leaf nodes from the
+  source tree.
+
+@par
+API changes:
+- Restructured the internals of Morphology.h and moved
+  @vdblink::tools::activate() tools::activate@endlink and
+  @vdblink::tools::deactivate() tools::deactivate@endlink to a new header,
+  Activate.h.
+- Deprecated @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink
+  and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
+  new morphology methods.
+
+@par
 Houdini:
+- Updated the VDB Activate SOP and others to use the multi-threaded
+  implementation for voxel dilation, providing a significant performance
+  increase.
 - Introduced the VDB AX SOP which provides an interface for running
   OpenVDB AX code in Houdini on VDB grids.
 
@@ -2057,7 +2088,7 @@ Houdini:
   for large numbers (tens to hundreds of millions) of particles.
 - Added edge-adjacent (6+12=18 neighbors) and vertex-adjacent (6+12+8=26
   neighbors) dilation algorithms to
-  @vdblink::tools::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
+  @vdblink::tools::morphology::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
   The default dilation pattern is still face-adjacent (6&nbsp;neighbors).
 - Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
   for fast construction of linear arrays of tree nodes for use in multithreaded

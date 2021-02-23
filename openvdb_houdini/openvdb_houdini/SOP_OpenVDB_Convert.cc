@@ -1150,7 +1150,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
 
         openvdb::tools::pruneInactive(*maskTree);
 
-        openvdb::tools::dilateVoxels(*maskTree, 2);
+        openvdb::tools::dilateActiveValues(*maskTree, 2, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
 
         mesher.setAdaptivityMask(maskTree);
     }
