@@ -12,7 +12,6 @@
 #include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
 #include <openvdb/tools/MeshToVolume.h> // for createLevelSetBox()
-#include <openvdb/tools/Morphology.h> // for tools::erodeVoxels()
 #include <openvdb/tools/PoissonSolver.h>
 #include <cmath>
 

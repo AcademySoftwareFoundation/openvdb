@@ -15,7 +15,7 @@
 #include "GridOperators.h"
 #include "GridTransformer.h"
 #include "Mask.h" // interiorMask
-#include "Morphology.h" // dilateVoxels, erodeVoxels
+#include "Morphology.h" // erodeActiveValues
 #include "PoissonSolver.h"
 
 
@@ -107,7 +107,8 @@ extractOuterVoxelMask(GridT& inGrid)
     typename MaskTreeT::Ptr interiorMask(new MaskTreeT(inGrid.tree(), false, TopologyCopy()));
     typename MaskTreeT::Ptr boundaryMask(new MaskTreeT(inGrid.tree(), false, TopologyCopy()));
 
-    erodeVoxels(*interiorMask, 1, NN_FACE);
+    tools::erodeActiveValues(*interiorMask, /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
+    tools::pruneInactive(*interiorMask);
     boundaryMask->topologyDifference(*interiorMask);
     return boundaryMask;
 }
