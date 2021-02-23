@@ -28,13 +28,16 @@ struct FastSweepingParms {
         mExtGroup(nullptr),
         mMode(""),
         mNeedExt(false),
+        mConvertOrRenormalize(false),
         mNSweeps(1),
         mIgnoreTiles(false),
         mPattern(""),
         mDilate(1),
         mFSPrimName(""),
         mExtPrimName(""),
-        mExtFieldProcessed(false)
+        mExtFieldProcessed(false),
+        mNewFSGrid(nullptr),
+        mNewExtGrid(nullptr)
     { }
 
     fpreal mTime;
@@ -44,11 +47,18 @@ struct FastSweepingParms {
     bool mNeedExt;
     int mNSweeps;
     bool mIgnoreTiles;
+    bool mConvertOrRenormalize;
     UT_String mPattern;
     int mDilate;
     std::string mFSPrimName;
     std::string mExtPrimName;
     bool mExtFieldProcessed;
+
+    // updated fast sweeping grid placeholder
+    hvdb::Grid::Ptr mNewFSGrid;
+
+    // updated extension grid placeholder
+    hvdb::Grid::Ptr mNewExtGrid;
 };
 
 
@@ -130,7 +140,7 @@ public:
 
         template<typename FSGridT, typename ExtGridT = FSGridT>
         bool process(
-            const FastSweepingParms& parms,
+            FastSweepingParms& parms,
             hvdb::GU_PrimVDB* lsPrim,
             typename FSGridT::ValueType fsIsoValue = typename FSGridT::ValueType(0),
             const hvdb::GU_PrimVDB* maskPrim = nullptr,
@@ -189,21 +199,25 @@ newSopOperator(OP_OperatorTable* table)
     // Modes
     parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Operation")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
-            "dilate",       "Dilate",
-            "mask",         "Mask",
+            "dilate",       "Expand SDF Narrowband",
+            "mask",         "Expand SDF Into Mask SDF",
             "convert",      "Convert Fog VDB To SDF", ///< @todo move to Convert SOP
             "renormalize",  "Renormalize SDF", // by solving the Eikonal equation
             "scalarext",    "Extend Field(s) Off Scalar VDB",
-            "scalarsdfext", "Extend Field(s) and Recompute SDF"
         })
         .setDefault("dilate")
+        .setTooltip("The mode Expand SDF Narrowband, Expand SDF Into Mask SDF,\n"
+            "Convert Fog VDB to SDF, and Renormalize SDF will modify the scalar grid(s)\n"
+            "specified by the Source Group parameter. The mode Extend Field(s) Off\n"
+            "Scalar VDB will modify the grid(s) specified by the Extension Group\n"
+            "parameter and possibly the scalar grid specified by the Source Group.")
         .setDocumentation(
             "The operation to perform\n\n"
-            "Dilate:\n"
-            "    Dilates an existing signed distance filed by a specified \n"
+            "Expand SDF Narrowband:\n"
+            "    Dilates the narrowband of an existing signed distance field by a specified \n"
             "    number of voxels.\n"
-            "Mask:\n"
-            "    Expand/extrapolate an existing signed distance fild into\n"
+            "Expand SDF Into Mask SDF:\n"
+            "    Expand/extrapolate an existing signed distance field into\n"
             "    a mask.\n"
             "Convert Scalar VDB To SDF:\n"
             "    Converts a scalar fog volume into a signed distance\n"
@@ -222,13 +236,7 @@ newSopOperator(OP_OperatorTable* table)
             "     specified functor, off an iso-surface from an input\n"
             "     Fog or SDF volume.\n"
             "     Note that this mode only uses the first fog/sdf grid\n"
-            "     specified by the Source Group parameter.\n"
-            "Extend Field(s) and Recompute SDF:\n"
-            "    Computes the signed distance field and the extension of a\n"
-            "    scalar field, defined by the specified functor, off an\n"
-            "    iso-surface from an input Fog or SDF volume.\n"
-            "    Note that this mode only uses the first fog/sdf grid\n"
-            "    specified by the Source Group parameter."));
+            "     specified by the Source Group parameter."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "sweeps", "Iterations")
          .setDefault(1)
@@ -272,6 +280,14 @@ newSopOperator(OP_OperatorTable* table)
              "but can produce the best results for large dilations.\n"
              "__Faces and Edges__ is intermediate in speed and quality.\n"));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "convertorrenormalize", "Convert Fog To SDF or Renormalize SDF")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Only works for when using Extend Field(s) of Scalar VDB.\n"
+            "If checked, it will either convert the Fog Grid to SDF or renormalize an SDF.")
+        .setDocumentation(
+            "Use this option if one wants to convert the Fog grid specified by the Source group\n"
+            "to be an SDF or to renormalize an SDF."));
+
     hvdb::OpenVDBOpFactory("VDB Extrapolate", SOP_OpenVDB_Extrapolate::factory, parms, *table)
         .addInput("Source VDB(s)")
         .addOptionalInput("Mask VDB")
@@ -306,12 +322,13 @@ SOP_OpenVDB_Extrapolate::updateParmsFlags()
     UT_String mode, tmpStr;
     bool changed = false;
     evalString(mode, "mode", 0, 0);
-    changed |= enableParm("extfields", mode == "scalarext" || mode == "scalarsdfext");
+    changed |= enableParm("extfields", mode == "scalarext");
     changed |= enableParm("mask", mode == "mask");
     changed |= enableParm("dilate", mode == "dilate");
     changed |= enableParm("pattern", mode == "dilate");
     changed |= enableParm("isovalue", !(mode == "mask" || mode == "dilate"));
     changed |= enableParm("ignoretiles", mode == "mask");
+    changed |= enableParm("convertorrenormalize", mode == "scalarext");
 
     return changed;
 }
@@ -365,13 +382,16 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
 
         // Go through the extension fields and extend each one according to the chosen mode
         for (; extPrim; ++extPrim) {
+            parms.mNewExtGrid = nullptr;
+            extPrim->makeGridUnique();
+
             openvdb::GridBase::Ptr extGridBase = extPrim->getGridPtr();
             UT_VDBType extType = UTvdbGetGridType(*extGridBase);
             parms.mExtPrimName = extPrim.getPrimitiveNameOrIndex().toStdString();
             if (parms.mExtPrimName == parms.mFSPrimName) {
                 std::string msg = "Skipping extending VDB primitive " + parms.mExtPrimName + " off the scalar " +
                     "grid " + parms.mFSPrimName + " because they are the same grid";
-                addWarning(SOP_MESSAGE, msg.c_str());
+                addMessage(SOP_MESSAGE, msg.c_str());
                 continue;
             }
             switch (extType) {
@@ -453,11 +473,10 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
                     break;
                 }
             } // switch
-        } // vdbprimiterator over extgroup
 
-        // update level set primitive
-        if (newLSGrid)
-        hvdb::replaceVdbPrimitive(*gdp, newLSGrid, *lsPrim, true);
+            // Update the Extension grid
+            if (parms.mNewExtGrid) extPrim->setGrid(*parms.mNewExtGrid);
+        } // vdbprimiterator over extgroup
     } else {
         process<FSGridT>(parms, lsPrim, fsIsoValue, maskPrim);
     }
@@ -471,7 +490,7 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
 template<typename FSGridT, typename ExtGridT>
 bool
 SOP_OpenVDB_Extrapolate::Cache::process(
-    const FastSweepingParms& parms,
+    FastSweepingParms& parms,
     hvdb::GU_PrimVDB* lsPrim,
     typename FSGridT::ValueType fsIsoValue,
     const hvdb::GU_PrimVDB* maskPrim,
@@ -480,6 +499,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
     hvdb::Grid::Ptr newLSGrid)
 {
     using namespace openvdb::tools;
+
 
     using SamplerT = openvdb::tools::GridSampler<ExtGridT, openvdb::tools::BoxSampler>;
     using ExtValueT = typename ExtGridT::ValueType;
@@ -498,47 +518,51 @@ SOP_OpenVDB_Extrapolate::Cache::process(
         using OpT = DirichletSamplerOp<ExtGridT>;
 
         if (parms.mMode == "scalarext") {
-            hvdb::Grid::Ptr outGrid;
-            if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
-                std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
-                addWarning(SOP_MESSAGE, msg.c_str());
-                outGrid = fogToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
-            }
-            else {
-                std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " level set grid.";
-                addWarning(SOP_MESSAGE, msg.c_str());
-                outGrid = sdfToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
-            }
+            if (!parms.mConvertOrRenormalize) {
+                hvdb::Grid::Ptr outGrid;
+                if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
+                    std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
+                    addMessage(SOP_MESSAGE, msg.c_str());
+                    outGrid = fogToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
+                }
+                else {
+                    std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " level set grid.";
+                    addMessage(SOP_MESSAGE, msg.c_str());
+                    outGrid = sdfToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
+                }
+                // Update the Extension grid
+                if (outGrid) {
+                    outGrid->setTransform(fsGrid->transform().copy());
+                    parms.mNewExtGrid = outGrid;
+                }
+            } else {
+                std::pair<hvdb::Grid::Ptr, hvdb::Grid::Ptr> outPair;
+                if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
+                    std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
+                    addMessage(SOP_MESSAGE, msg.c_str());
+                    outPair = fogToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
+                }
+                else {
+                    std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " level set grid.";
+                    addMessage(SOP_MESSAGE, msg.c_str());
+                    outPair = sdfToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
+                }
 
-            // Replace the primitive
-            outGrid->setTransform(fsGrid->transform().copy());
-            hvdb::replaceVdbPrimitive(*gdp, outGrid, *exPrim, true);
-        } else if (parms.mMode == "scalarsdfext") {
-            std::pair<hvdb::Grid::Ptr, hvdb::Grid::Ptr> outPair;
-            if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
-                std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
-                addWarning(SOP_MESSAGE, msg.c_str());
-                outPair = fogToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
+                // Update both the Fast Sweeping grid and the Extension grid
+                if (outPair.first && outPair.second) {
+                    outPair.first->setTransform(fsGrid->transform().copy());
+                    outPair.first->setGridClass(openvdb::GRID_LEVEL_SET);
+                    outPair.second->setTransform(fsGrid->transform().copy()); parms.mNewExtGrid = outPair.second;
+                    parms.mNewFSGrid = outPair.first;
+                }
             }
-            else {
-                std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " level set grid.";
-                addWarning(SOP_MESSAGE, msg.c_str());
-                outPair = sdfToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps);
-            }
-
-            // Replace the primitives
-            outPair.first->setTransform(fsGrid->transform().copy());
-            outPair.first->setGridClass(openvdb::GRID_LEVEL_SET);
-            outPair.second->setTransform(fsGrid->transform().copy());
-            hvdb::replaceVdbPrimitive(*gdp, outPair.second, *exPrim, true);
-            newLSGrid = outPair.first;
         }
     } else {
         hvdb::Grid::Ptr outGrid;
         if (parms.mMode == "dilate") {
             if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped in dilation because it is not a level set.";
-                addWarning(SOP_MESSAGE, msg.c_str());
+                addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
 
@@ -548,7 +572,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
         } else if (parms.mMode == "convert") {
             if (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was not converted to SDF because it is already a level set.";
-                addWarning(SOP_MESSAGE, msg.c_str());
+                addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
 
@@ -558,7 +582,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
             if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was not renormalized because it is not a level set."
                     " You may want to convert the FOG VDB into a level set before calling this mode.";
-                addWarning(SOP_MESSAGE, msg.c_str());
+                addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
 
@@ -567,7 +591,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
             if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped in Mask operation because it is not a level set."
                     " You may want to convert the FOG VDB into a level set before calling this mode.";
-                addWarning(SOP_MESSAGE, msg.c_str());
+                addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
 
@@ -576,10 +600,12 @@ SOP_OpenVDB_Extrapolate::Cache::process(
             hvdb::GEOvdbApply<hvdb::AllGridTypes>(*maskPrim, op);
             outGrid = op.mOutGrid;
         }
-        // Replace the original VDB primitive with a new primitive that contains
-        // the output grid and has the same attributes and group membership.
-        outGrid->setGridClass(openvdb::GRID_LEVEL_SET);
-        hvdb::replaceVdbPrimitive(*gdp, outGrid, *lsPrim, true);
+
+        // Update the fast sweeping grid
+        if (outGrid) {
+            outGrid->setGridClass(openvdb::GRID_LEVEL_SET);
+            parms.mNewFSGrid = outGrid;
+        }
     } // !parms.mNeedExt
 
     return true;
@@ -597,9 +623,10 @@ SOP_OpenVDB_Extrapolate::Cache::evalFastSweepingParms(OP_Context& context, FastS
 
     evalString(parms.mMode, "mode", 0, time);
 
-    parms.mNeedExt = (parms.mMode == "scalarext") || (parms.mMode == "scalarsdfext");
+    parms.mNeedExt = (parms.mMode == "scalarext");
     parms.mNSweeps = static_cast<int>(evalInt("sweeps", 0, time));
     parms.mIgnoreTiles = static_cast<bool>(evalInt("ignoretiles", 0, time));
+    parms.mConvertOrRenormalize = static_cast<bool>(evalInt("convertorrenormalize", 0, time));
 
     // For dilate
     evalString(parms.mPattern, "pattern", 0, time);
@@ -639,7 +666,7 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
                 if (maskIt) maskGrid = maskIt->getConstGridPtr();// only use the first grid
 
                 if (++maskIt) {
-                    addWarning(SOP_MESSAGE, "Multiple Mask grids were found.\n"
+                    addMessage(SOP_MESSAGE, "Multiple Mask grids were found.\n"
                        "Using the first one for reference.");
                 }
             } else {
@@ -654,6 +681,10 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
         // Go through the VDB primitives and process them
         // We only process grids of types UT_VDB_FLOAT and UT_VDB_DOUBLE in Fast Sweeping.
         for (hvdb::VdbPrimIterator it(gdp, parms.mFSGroup); it; ++it) {
+            // Reset the new fast sweeping grid placeholder
+            parms.mNewFSGrid = nullptr;
+            it->makeGridUnique();
+
             if (progress.wasInterrupted()) {
                 throw std::runtime_error("Processing was interrupted");
             }
@@ -678,11 +709,14 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
                 }
                 default:
                 {
-                    std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped because it is not a floating-point Grid.";
-                    addWarning(SOP_MESSAGE, msg.c_str());
+                    std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped to be treated as a source group because it is not a floating-point Grid.";
+                    addMessage(SOP_MESSAGE, msg.c_str());
                     break;
                 }
             }
+
+            // Update the fast sweeping grid
+            if (parms.mNewFSGrid) it->setGrid(*parms.mNewFSGrid);
 
             // If we need extension, we only process the first grid
             if (parms.mNeedExt && parms.mExtFieldProcessed) {
