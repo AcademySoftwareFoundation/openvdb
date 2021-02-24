@@ -113,6 +113,7 @@ set(UNITTEST_SOURCE_FILES
   TestNodeIterator.cc
   TestNodeManager.cc
   TestNodeMask.cc
+  TestNodeVisitor.cc
   TestParticleAtlas.cc
   TestParticlesToLevelSet.cc
   TestPointAdvect.cc
