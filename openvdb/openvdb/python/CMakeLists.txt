@@ -10,16 +10,11 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBPython LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 include(GNUInstallDirs)
 
 ###### OpenVDB Python Options
 
-option(USE_NUMPY [=[
-Build the python library with numpy support. Currently requires CMake 3.14.]=] OFF)
+option(USE_NUMPY "Build the python library with numpy support." OFF)
 option(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES [=[
 Expose (almost) all of the grid types in the python module. Otherwise, only FloatGrid, BoolGrid and
 Vec3SGrid will be exposed (see, e.g., exportIntGrid() in python/pyIntGrid.cc). Compiling the Python
@@ -43,9 +38,6 @@ if(NOT OPENVDB_BUILD_CORE)
 else()
   set(OPENVDB_LIB openvdb)
 endif()
-
-set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_INCLUDES)
 
 # Small function which mimics basic output (bar components) of
 # FindPackageHandleStandardArgs. This is required as we want to ensure
@@ -72,19 +64,25 @@ endfunction()
 
 # Configure Python and Numpy. Note that:
 #  - find_package(Python NumPy) requires CMake >= 3.14
+#  - find_package(Python Development) target Python::Module requires CMake >= 3.15
+#  - find_package(Python Development.Module) requires CMake >= 3.18
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
-# FindPython
-# Note that the Interpreter component is only required for the python test
+# FindPython.
+# @note  the Interpreter component is only required for the python test.
+# @note  the Python::Module target should be used over the Python::Python
+#   target but this was only added in CMake 3.15. See:
+#      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
+set(OPENVDB_PYTHON_DEPS)
+set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+
+if(OPENVDB_BUILD_PYTHON_UNITTESTS)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+endif()
+
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
-  # CMake < 3.14
-  if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-    find_package(Python QUIET COMPONENTS Interpreter Development)
-  else()
-    find_package(Python QUIET COMPONENTS Development)
-  endif()
+  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
   OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
-  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
 
   if(USE_NUMPY)
     # Note: This uses our custom backport in cmake/backports
@@ -92,15 +90,8 @@ if(${CMAKE_VERSION} VERSION_LESS 3.14)
     list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
   endif()
 else()
-  # CMake >= 3.14
-  if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-    find_package(Python QUIET COMPONENTS Interpreter Development)
-  else()
-    find_package(Python QUIET COMPONENTS Development)
-  endif()
-
+  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
   OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
-  list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
 
   if(USE_NUMPY)
     find_package(Python QUIET COMPONENTS NumPy)
@@ -176,10 +167,7 @@ endif()
 # If boost >= 1.65, find the required numpy boost component and link that in.
 # Use the same system as above, first trying without the suffix, then with.
 
-if(USE_NUMPY AND (
-  (${Boost_VERSION} VERSION_EQUAL 1.65) OR
-  (${Boost_VERSION} VERSION_GREATER 1.65)))
-
+if(USE_NUMPY)
   find_package(Boost ${MINIMUM_BOOST_VERSION}
     QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
   )
@@ -207,11 +195,6 @@ if(USE_NUMPY AND (
     )
   endif()
 endif()
-
-set(OPENVDB_PYTHON_DEPENDENT_LIBS
-  ${OPENVDB_LIB}
-  ${OPENVDB_PYTHON_DEPS}
-)
 
 ##########################################################################
 
@@ -249,8 +232,21 @@ elseif(WIN32)
   set_target_properties(pyopenvdb PROPERTIES SUFFIX ".pyd") # .pyd on windows
 endif()
 
-target_include_directories(pyopenvdb SYSTEM PUBLIC ${OPENVDB_PYTHON_INCLUDES})
-target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_PYTHON_DEPENDENT_LIBS})
+if(TARGET Python::Module)
+  list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
+else()
+  if(APPLE)
+    target_include_directories(pyopenvdb SYSTEM PUBLIC ${Python_INCLUDE_DIRS})
+    target_link_options(pyopenvdb PUBLIC -undefined dynamic_lookup)
+  else()
+    list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
+  endif()
+endif()
+
+target_link_libraries(pyopenvdb PUBLIC
+  ${OPENVDB_LIB}
+  ${OPENVDB_PYTHON_DEPS}
+)
 
 if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
   target_compile_definitions(pyopenvdb PRIVATE "-DPY_OPENVDB_WRAP_ALL_GRID_TYPES")
@@ -271,7 +267,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Python_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

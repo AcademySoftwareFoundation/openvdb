@@ -1,0 +1,15 @@
+mat3d testm3d = {
+     1.0,-100.0,-100.0,
+    -100.0, 2.0,-100.0,
+    -100.0,-100.0, 3.0
+};
+
+double@test1 = trace(testm3d);
+
+mat3f testm3f = {
+     1.0f,-100.0f,-100.0f,
+    -100.0f, 2.0f,-100.0f,
+    -100.0f,-100.0f, 3.0f
+};
+
+float@test2 = trace(testm3f);

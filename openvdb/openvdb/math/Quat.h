@@ -83,7 +83,34 @@ public:
     static const int size = 4;
 
     /// Trivial constructor, the quaternion is NOT initialized
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Quat() = default;
+#else
     Quat() {}
+
+    /// Copy constructor
+    Quat(const Quat &q)
+    {
+        mm[0] = q.mm[0];
+        mm[1] = q.mm[1];
+        mm[2] = q.mm[2];
+        mm[3] = q.mm[3];
+
+    }
+
+    /// Assignment operator
+    Quat& operator=(const Quat &q)
+    {
+        mm[0] = q.mm[0];
+        mm[1] = q.mm[1];
+        mm[2] = q.mm[2];
+        mm[3] = q.mm[3];
+
+        return *this;
+    }
+#endif
 
     /// Constructor with four arguments, e.g.   Quatf q(1,2,3,4);
     Quat(T x, T y, T z, T w)
@@ -185,16 +212,6 @@ public:
             mm[2] = q_z;
             mm[3] = factor * (rot(0,1) - rot(1,0));
         }
-    }
-
-    /// Copy constructor
-    Quat(const Quat &q)
-    {
-        mm[0] = q.mm[0];
-        mm[1] = q.mm[1];
-        mm[2] = q.mm[2];
-        mm[3] = q.mm[3];
-
     }
 
     /// Reference to the component, e.g.   q.x() = 4.5f;
@@ -304,17 +321,6 @@ public:
     /// Returns vector of x,y,z rotational components
     Vec3<T> eulerAngles(RotationOrder rotationOrder) const
     { return math::eulerAngles(Mat3<T>(*this), rotationOrder); }
-
-    /// Assignment operator
-    Quat& operator=(const Quat &q)
-    {
-        mm[0] = q.mm[0];
-        mm[1] = q.mm[1];
-        mm[2] = q.mm[2];
-        mm[3] = q.mm[3];
-
-        return *this;
-    }
 
     /// Equality operator, does exact floating point comparisons
     bool operator==(const Quat &q) const
@@ -618,6 +624,11 @@ Mat3<T> bezLerp(const Mat3<T0> &m1, const Mat3<T0> &m2,
 
 using Quats = Quat<float>;
 using Quatd = Quat<double>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+OPENVDB_IS_POD(Quats)
+OPENVDB_IS_POD(Quatd)
+#endif
 
 } // namespace math
 

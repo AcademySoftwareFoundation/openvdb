@@ -77,10 +77,6 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.12)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
 if(DISABLE_CMAKE_SEARCH_PATHS)

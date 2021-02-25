@@ -110,15 +110,6 @@ AttributeArray::create(const NamePair& type, Index length, Index stride,
 }
 
 
-// deprecated
-AttributeArray::Ptr
-AttributeArray::create(const NamePair& type, Index length, Index stride,
-    bool constantStride, const ScopedRegistryLock* lock)
-{
-    return AttributeArray::create(type, length, stride, constantStride, nullptr, lock);
-}
-
-
 bool
 AttributeArray::isRegistered(const NamePair& type, const ScopedRegistryLock* lock)
 {

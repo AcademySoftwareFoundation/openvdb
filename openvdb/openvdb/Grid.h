@@ -175,6 +175,11 @@ public:
     /// shared with other grids.  The pointer is guaranteed to be non-null.
     virtual TreeBase::ConstPtr constBaseTreePtr() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// @brief Return true if tree is not shared with another grid.
+    virtual bool isTreeUnique() const = 0;
+#endif
+
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
     /// @note Calling @vdblink::GridBase::setTree() setTree@endlink
@@ -898,8 +903,12 @@ public:
     TreeBase::ConstPtr constBaseTreePtr() const override { return mTree; }
     //@}
     /// @brief Return true if tree is not shared with another grid.
-    /// @todo Make this into a virtual function with ABI=8
+    /// @note This is a virtual function with ABI=8
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    bool isTreeUnique() const final;
+#else
     bool isTreeUnique() const;
+#endif
     //@{
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
@@ -1516,9 +1525,7 @@ template<typename TreeT>
 inline void
 Grid<TreeT>::pruneGrid(float tolerance)
 {
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-    const auto value = zeroVal<ValueType>() + tolerance;
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    const auto value = math::cwiseAdd(zeroVal<ValueType>(), tolerance);
     this->tree().prune(static_cast<ValueType>(value));
 }
 

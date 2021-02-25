@@ -100,8 +100,8 @@ struct GenerateBBoxOp {
 
                 if (pscaleType == typeNameAsString<float>()) {
                     expandBBox<float>(*leafIter, pscaleIndex);
-                } else if (pscaleType == typeNameAsString<half>()) {
-                    expandBBox<half>(*leafIter, pscaleIndex);
+                } else if (pscaleType == typeNameAsString<math::half>()) {
+                    expandBBox<math::half>(*leafIter, pscaleIndex);
                 } else {
                     throw TypeError("Unsupported pscale type - " + pscaleType);
                 }

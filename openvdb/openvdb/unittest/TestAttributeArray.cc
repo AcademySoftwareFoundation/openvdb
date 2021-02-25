@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
@@ -110,43 +110,16 @@ struct ScopedFile
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestAttributeArray: public CppUnit::TestCase
+class TestAttributeArray: public ::testing::Test
 {
 public:
-    void setUp() override { AttributeArray::clearRegistry(); }
-    void tearDown() override { AttributeArray::clearRegistry(); }
+    void SetUp() override { AttributeArray::clearRegistry(); }
+    void TearDown() override { AttributeArray::clearRegistry(); }
 
-    CPPUNIT_TEST_SUITE(TestAttributeArray);
-    CPPUNIT_TEST(testFixedPointConversion);
-    CPPUNIT_TEST(testRegistry);
-    CPPUNIT_TEST(testAttributeArray);
-    CPPUNIT_TEST(testAttributeArrayCopy);
-    CPPUNIT_TEST(testAccessorEval);
-    CPPUNIT_TEST(testAttributeHandle);
-    CPPUNIT_TEST(testStrided);
-    CPPUNIT_TEST(testDelayedLoad);
-    CPPUNIT_TEST(testDefaultValue);
-    CPPUNIT_TEST(testQuaternions);
-    CPPUNIT_TEST(testMatrices);
-    CPPUNIT_TEST(testProfile);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testFixedPointConversion();
     void testRegistry();
-    void testAttributeArray();
-    void testAttributeArrayCopy();
     void testAccessorEval();
-    void testAttributeHandle();
-    void testStrided();
     void testDelayedLoad();
-    void testDefaultValue();
-    void testQuaternions();
-    void testMatrices();
-    void testProfile();
 }; // class TestAttributeArray
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestAttributeArray);
 
 
 ////////////////////////////////////////
@@ -170,8 +143,7 @@ matchingNamePairs(const openvdb::NamePair& lhs,
 ////////////////////////////////////////
 
 
-void
-TestAttributeArray::testFixedPointConversion()
+TEST_F(TestAttributeArray, testFixedPointConversion)
 {
     openvdb::math::Transform::Ptr transform(openvdb::math::Transform::createLinearTransform(/*voxelSize=*/0.1));
 
@@ -193,7 +165,7 @@ TestAttributeArray::testFixedPointConversion()
 
         const float newValue = newWorldSpaceValue.x();
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(value, newValue, /*tolerance=*/1e-6);
+        EXPECT_NEAR(value, newValue, /*tolerance=*/1e-6);
     }
 
     {
@@ -216,9 +188,9 @@ TestAttributeArray::testFixedPointConversion()
         const openvdb::Vec3f newIndexSpaceValue(newIndexSpaceValueX, newIndexSpaceValueY, newIndexSpaceValueZ);
         const openvdb::Vec3f newWorldSpaceValue = transform->indexToWorld(newIndexSpaceValue);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.x(), newWorldSpaceValue.x(), /*tolerance=*/1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.y(), newWorldSpaceValue.y(), /*tolerance=*/1e-6);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(worldSpaceValue.z(), newWorldSpaceValue.z(), /*tolerance=*/1e-6);
+        EXPECT_NEAR(worldSpaceValue.x(), newWorldSpaceValue.x(), /*tolerance=*/1e-6);
+        EXPECT_NEAR(worldSpaceValue.y(), newWorldSpaceValue.y(), /*tolerance=*/1e-6);
+        EXPECT_NEAR(worldSpaceValue.z(), newWorldSpaceValue.z(), /*tolerance=*/1e-6);
 
     }
 }
@@ -241,12 +213,12 @@ TestAttributeArray::testRegistry()
     AttributeArray::clearRegistry();
 
     { // cannot create AttributeArray that is not registered
-        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
-        CPPUNIT_ASSERT_THROW(AttributeArray::create(AttributeF::attributeType(), Index(5)), LookupError);
+        EXPECT_TRUE(!AttributeArray::isRegistered(AttributeF::attributeType()));
+        EXPECT_THROW(AttributeArray::create(AttributeF::attributeType(), Index(5)), LookupError);
     }
 
     { // throw when attempting to register a float type with an integer factory
-        CPPUNIT_ASSERT_THROW(AttributeArray::registerType(
+        EXPECT_THROW(AttributeArray::registerType(
             AttributeF::attributeType(), factoryInt), KeyError);
     }
 
@@ -255,26 +227,27 @@ TestAttributeArray::testRegistry()
     AttributeF::registerType();
 
     { // can register an AttributeArray with the same value type but different codec
-        CPPUNIT_ASSERT_NO_THROW(AttributeFTrnc::registerType());
-        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeF::attributeType()));
-        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
+        EXPECT_NO_THROW(AttributeFTrnc::registerType());
+        EXPECT_TRUE(AttributeArray::isRegistered(AttributeF::attributeType()));
+        EXPECT_TRUE(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
     }
 
     { // un-registering
         AttributeArray::unregisterType(AttributeF::attributeType());
-        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
-        CPPUNIT_ASSERT(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
+        EXPECT_TRUE(!AttributeArray::isRegistered(AttributeF::attributeType()));
+        EXPECT_TRUE(AttributeArray::isRegistered(AttributeFTrnc::attributeType()));
     }
 
     { // clearing registry
         AttributeF::registerType();
         AttributeArray::clearRegistry();
-        CPPUNIT_ASSERT(!AttributeArray::isRegistered(AttributeF::attributeType()));
+        EXPECT_TRUE(!AttributeArray::isRegistered(AttributeF::attributeType()));
     }
 }
+TEST_F(TestAttributeArray, testRegistry) { testRegistry(); }
 
-void
-TestAttributeArray::testAttributeArray()
+
+TEST_F(TestAttributeArray, testAttributeArray)
 {
     using AttributeArrayF = TypedAttributeArray<float>;
     using AttributeArrayD = TypedAttributeArray<double>;
@@ -282,13 +255,13 @@ TestAttributeArray::testAttributeArray()
     {
         AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
+        EXPECT_EQ(Index(50), attr->size());
     }
 
     {
         AttributeArray::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
+        EXPECT_EQ(Index(50), attr->size());
 
         AttributeArrayD& typedAttr = static_cast<AttributeArrayD&>(*attr);
 
@@ -297,20 +270,20 @@ TestAttributeArray::testAttributeArray()
         double value = 0.0;
         typedAttr.get(0, value);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0));
+        EXPECT_NEAR(double(0.5), value, /*tolerance=*/double(0.0));
 
         // test unsafe methods for get() and set()
 
         typedAttr.setUnsafe(0, 1.5);
         typedAttr.getUnsafe(0, value);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.5), value, /*tolerance=*/double(0.0));
+        EXPECT_NEAR(double(1.5), value, /*tolerance=*/double(0.0));
 
         // out-of-range get() and set()
-        CPPUNIT_ASSERT_THROW(typedAttr.set(100, 0.5), openvdb::IndexError);
-        CPPUNIT_ASSERT_THROW(typedAttr.set(100, 1), openvdb::IndexError);
-        CPPUNIT_ASSERT_THROW(typedAttr.get(100, value), openvdb::IndexError);
-        CPPUNIT_ASSERT_THROW(typedAttr.get(100), openvdb::IndexError);
+        EXPECT_THROW(typedAttr.set(100, 0.5), openvdb::IndexError);
+        EXPECT_THROW(typedAttr.set(100, 1), openvdb::IndexError);
+        EXPECT_THROW(typedAttr.get(100, value), openvdb::IndexError);
+        EXPECT_THROW(typedAttr.get(100), openvdb::IndexError);
     }
 
     { // test copy constructor and copy assignment operator
@@ -323,39 +296,39 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArrayD attr3(attr1);
 
-        CPPUNIT_ASSERT_EQUAL(Index(10), attr3.size());
-        CPPUNIT_ASSERT_EQUAL(4.6, attr3.get(9));
+        EXPECT_EQ(Index(10), attr3.size());
+        EXPECT_EQ(4.6, attr3.get(9));
 
         // copy assignment operator
 
         attr2 = attr1;
 
-        CPPUNIT_ASSERT_EQUAL(Index(10), attr2.size());
-        CPPUNIT_ASSERT_EQUAL(4.6, attr2.get(9));
+        EXPECT_EQ(Index(10), attr2.size());
+        EXPECT_EQ(4.6, attr2.get(9));
     }
 
 #ifdef NDEBUG
     { // test setUnsafe and getUnsafe on uniform arrays
         AttributeArrayD::Ptr attr(new AttributeArrayD(50));
 
-        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
+        EXPECT_EQ(Index(50), attr->size());
         attr->collapse(5.0);
-        CPPUNIT_ASSERT(attr->isUniform());
+        EXPECT_TRUE(attr->isUniform());
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(10), 5.0, /*tolerance=*/double(0.0));
-        CPPUNIT_ASSERT(attr->isUniform());
+        EXPECT_NEAR(attr->getUnsafe(10), 5.0, /*tolerance=*/double(0.0));
+        EXPECT_TRUE(attr->isUniform());
 
         // this is expected behaviour because for performance reasons, array is not implicitly expanded
 
         attr->setUnsafe(10, 15.0);
-        CPPUNIT_ASSERT(attr->isUniform());
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
+        EXPECT_TRUE(attr->isUniform());
+        EXPECT_NEAR(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
 
         attr->expand();
-        CPPUNIT_ASSERT(!attr->isUniform());
+        EXPECT_TRUE(!attr->isUniform());
         attr->setUnsafe(10, 25.0);
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(attr->getUnsafe(10), 25.0, /*tolerance=*/double(0.0));
+        EXPECT_NEAR(attr->getUnsafe(5), 15.0, /*tolerance=*/double(0.0));
+        EXPECT_NEAR(attr->getUnsafe(10), 25.0, /*tolerance=*/double(0.0));
     }
 #endif
 
@@ -366,13 +339,13 @@ TestAttributeArray::testAttributeArray()
         AttributeArray::Ptr attrD(new AttributeArrayD(50));
         AttributeArray::Ptr attrF(new AttributeArrayF(50));
 
-        CPPUNIT_ASSERT(attrD->hasValueType<double>());
-        CPPUNIT_ASSERT(attrC->hasValueType<double>());
-        CPPUNIT_ASSERT(!attrF->hasValueType<double>());
+        EXPECT_TRUE(attrD->hasValueType<double>());
+        EXPECT_TRUE(attrC->hasValueType<double>());
+        EXPECT_TRUE(!attrF->hasValueType<double>());
 
-        CPPUNIT_ASSERT(!attrD->hasValueType<float>());
-        CPPUNIT_ASSERT(!attrC->hasValueType<float>());
-        CPPUNIT_ASSERT(attrF->hasValueType<float>());
+        EXPECT_TRUE(!attrD->hasValueType<float>());
+        EXPECT_TRUE(!attrC->hasValueType<float>());
+        EXPECT_TRUE(attrF->hasValueType<float>());
     }
 
     { // lots of type checking
@@ -381,185 +354,185 @@ TestAttributeArray::testAttributeArray()
         {
             TypedAttributeArray<bool> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("bool"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("bool"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(1), attr.valueTypeSize());
+            EXPECT_EQ(Index(1), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<int8_t> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("int8"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(1), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(1), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("int8"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(1), attr.valueTypeSize());
+            EXPECT_EQ(Index(1), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<int16_t> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("int16"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("int16"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(2), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<int32_t> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("int32"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("int32"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(4), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<int64_t> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("int64"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("int64"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(8), attr.valueTypeSize());
+            EXPECT_EQ(Index(8), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             // half is not registered by default, but for complete-ness
-            TypedAttributeArray<half> typedAttr(size);
+            TypedAttributeArray<math::half> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("half"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(2), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("half"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(2), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<float> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(4), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(4), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<double> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("double"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(8), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(8), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("double"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(8), attr.valueTypeSize());
+            EXPECT_EQ(Index(8), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<math::Vec3<int32_t>> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("vec3i"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(12), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(12), attr.storageTypeSize());
-            CPPUNIT_ASSERT(!attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("vec3i"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(12), attr.valueTypeSize());
+            EXPECT_EQ(Index(12), attr.storageTypeSize());
+            EXPECT_TRUE(!attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(attr.valueTypeIsClass());
+            EXPECT_TRUE(attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<math::Vec3<double>> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("vec3d"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(24), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(24), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("vec3d"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(24), attr.valueTypeSize());
+            EXPECT_EQ(Index(24), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(attr.valueTypeIsClass());
+            EXPECT_TRUE(attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<math::Mat3<float>> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("mat3s"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(36), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(36), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("mat3s"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(36), attr.valueTypeSize());
+            EXPECT_EQ(Index(36), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<math::Mat4<double>> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("mat4d"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(128), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(128), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("mat4d"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(128), attr.valueTypeSize());
+            EXPECT_EQ(Index(128), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<math::Quat<float>> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("quats"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("null"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(16), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(16), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("quats"), attr.valueType());
+            EXPECT_EQ(Name("null"), attr.codecType());
+            EXPECT_EQ(Index(16), attr.valueTypeSize());
+            EXPECT_EQ(Index(16), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
         {
             TypedAttributeArray<float, TruncateCodec> typedAttr(size);
             AttributeArray& attr(typedAttr);
-            CPPUNIT_ASSERT_EQUAL(Name("float"), attr.valueType());
-            CPPUNIT_ASSERT_EQUAL(Name("trnc"), attr.codecType());
-            CPPUNIT_ASSERT_EQUAL(Index(4), attr.valueTypeSize());
-            CPPUNIT_ASSERT_EQUAL(Index(2), attr.storageTypeSize());
-            CPPUNIT_ASSERT(attr.valueTypeIsFloatingPoint());
-            CPPUNIT_ASSERT(!attr.valueTypeIsClass());
-            CPPUNIT_ASSERT(!attr.valueTypeIsVector());
-            CPPUNIT_ASSERT(!attr.valueTypeIsQuaternion());
-            CPPUNIT_ASSERT(!attr.valueTypeIsMatrix());
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("trnc"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
 #endif
     }
@@ -574,7 +547,7 @@ TestAttributeArray::testAttributeArray()
         double value = 0.0;
         typedAttr.get(0, value);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), value, /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.5), value, /*tolerance=*/double(0.0001));
 
         // test unsafe methods for get() and set()
 
@@ -582,7 +555,7 @@ TestAttributeArray::testAttributeArray()
         typedAttr.setUnsafe(0, double(0.2));
         typedAttr.getUnsafe(0, value2);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.2), value2, /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.2), value2, /*tolerance=*/double(0.0001));
     }
 
     using AttributeArrayI = TypedAttributeArray<int32_t>;
@@ -591,14 +564,14 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArray::Ptr attr(new AttributeArrayI(50));
 
-        CPPUNIT_ASSERT_EQUAL(Index(50), attr->size());
+        EXPECT_EQ(Index(50), attr->size());
 
-        CPPUNIT_ASSERT_EQUAL((sizeof(AttributeArrayI) + sizeof(int)), attr->memUsage());
+        EXPECT_EQ((sizeof(AttributeArrayI) + sizeof(int)), attr->memUsage());
 
-        CPPUNIT_ASSERT(attr->isType<AttributeArrayI>());
-        CPPUNIT_ASSERT(!attr->isType<AttributeArrayD>());
+        EXPECT_TRUE(attr->isType<AttributeArrayI>());
+        EXPECT_TRUE(!attr->isType<AttributeArrayD>());
 
-        CPPUNIT_ASSERT(*attr == *attr);
+        EXPECT_TRUE(*attr == *attr);
     }
 
     { // Typed class API
@@ -609,128 +582,128 @@ TestAttributeArray::testAttributeArray()
 
         AttributeArrayI attr(count);
 
-        CPPUNIT_ASSERT_EQUAL(Index(count), attr.size());
+        EXPECT_EQ(Index(count), attr.size());
 
-        CPPUNIT_ASSERT_EQUAL(0, attr.get(0));
-        CPPUNIT_ASSERT_EQUAL(0, attr.get(10));
+        EXPECT_EQ(0, attr.get(0));
+        EXPECT_EQ(0, attr.get(10));
 
-        CPPUNIT_ASSERT(attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        EXPECT_TRUE(attr.isUniform());
+        EXPECT_EQ(uniformMemUsage, attr.memUsage());
 
         attr.set(0, 10);
-        CPPUNIT_ASSERT(!attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        EXPECT_TRUE(!attr.isUniform());
+        EXPECT_EQ(expandedMemUsage, attr.memUsage());
 
         AttributeArrayI attr2(count);
         attr2.set(0, 10);
 
-        CPPUNIT_ASSERT(attr == attr2);
+        EXPECT_TRUE(attr == attr2);
 
         attr.set(1, 5);
 
-        CPPUNIT_ASSERT(!attr.compact());
-        CPPUNIT_ASSERT(!attr.isUniform());
+        EXPECT_TRUE(!attr.compact());
+        EXPECT_TRUE(!attr.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(10, attr.get(0));
-        CPPUNIT_ASSERT_EQUAL(5, attr.get(1));
-        CPPUNIT_ASSERT_EQUAL(0, attr.get(2));
+        EXPECT_EQ(10, attr.get(0));
+        EXPECT_EQ(5, attr.get(1));
+        EXPECT_EQ(0, attr.get(2));
 
         attr.collapse(5);
-        CPPUNIT_ASSERT(attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        EXPECT_TRUE(attr.isUniform());
+        EXPECT_EQ(uniformMemUsage, attr.memUsage());
 
-        CPPUNIT_ASSERT_EQUAL(5, attr.get(0));
-        CPPUNIT_ASSERT_EQUAL(5, attr.get(20));
-        CPPUNIT_ASSERT_EQUAL(5, attr.getUnsafe(20));
+        EXPECT_EQ(5, attr.get(0));
+        EXPECT_EQ(5, attr.get(20));
+        EXPECT_EQ(5, attr.getUnsafe(20));
 
         attr.expand(/*fill=*/false);
-        CPPUNIT_ASSERT(!attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        EXPECT_TRUE(!attr.isUniform());
+        EXPECT_EQ(expandedMemUsage, attr.memUsage());
 
         attr.collapse(5);
 
-        CPPUNIT_ASSERT(attr.isUniform());
+        EXPECT_TRUE(attr.isUniform());
 
         attr.expand();
 
-        CPPUNIT_ASSERT(!attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        EXPECT_TRUE(!attr.isUniform());
+        EXPECT_EQ(expandedMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(5, attr.get(i));
+            EXPECT_EQ(5, attr.get(i));
         }
 
-        CPPUNIT_ASSERT(attr.compact());
-        CPPUNIT_ASSERT(attr.isUniform());
-        CPPUNIT_ASSERT(attr.compact());
+        EXPECT_TRUE(attr.compact());
+        EXPECT_TRUE(attr.isUniform());
+        EXPECT_TRUE(attr.compact());
 
         attr.expand();
 
         attr.fill(10);
-        CPPUNIT_ASSERT(!attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(expandedMemUsage, attr.memUsage());
+        EXPECT_TRUE(!attr.isUniform());
+        EXPECT_EQ(expandedMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(10, attr.get(i));
+            EXPECT_EQ(10, attr.get(i));
         }
 
         attr.collapse(7);
-        CPPUNIT_ASSERT(attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        EXPECT_TRUE(attr.isUniform());
+        EXPECT_EQ(uniformMemUsage, attr.memUsage());
 
-        CPPUNIT_ASSERT_EQUAL(7, attr.get(0));
-        CPPUNIT_ASSERT_EQUAL(7, attr.get(20));
+        EXPECT_EQ(7, attr.get(0));
+        EXPECT_EQ(7, attr.get(20));
 
         attr.fill(5);
-        CPPUNIT_ASSERT(attr.isUniform());
-        CPPUNIT_ASSERT_EQUAL(uniformMemUsage, attr.memUsage());
+        EXPECT_TRUE(attr.isUniform());
+        EXPECT_EQ(uniformMemUsage, attr.memUsage());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(5, attr.get(i));
+            EXPECT_EQ(5, attr.get(i));
         }
 
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(!attr.isHidden());
+        EXPECT_TRUE(!attr.isTransient());
+        EXPECT_TRUE(!attr.isHidden());
 
         attr.setTransient(true);
-        CPPUNIT_ASSERT(attr.isTransient());
-        CPPUNIT_ASSERT(!attr.isHidden());
+        EXPECT_TRUE(attr.isTransient());
+        EXPECT_TRUE(!attr.isHidden());
 
         attr.setHidden(true);
-        CPPUNIT_ASSERT(attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
+        EXPECT_TRUE(attr.isTransient());
+        EXPECT_TRUE(attr.isHidden());
 
         attr.setTransient(false);
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(attr.isHidden());
+        EXPECT_TRUE(!attr.isTransient());
+        EXPECT_TRUE(attr.isHidden());
 
         attr.setHidden(false);
-        CPPUNIT_ASSERT(!attr.isTransient());
-        CPPUNIT_ASSERT(!attr.isHidden());
+        EXPECT_TRUE(!attr.isTransient());
+        EXPECT_TRUE(!attr.isHidden());
 
         attr.setHidden(true);
 
         { // test copy construction
             AttributeArrayI attrB(attr);
-            CPPUNIT_ASSERT(matchingNamePairs(attr.type(), attrB.type()));
-            CPPUNIT_ASSERT_EQUAL(attr.size(), attrB.size());
-            CPPUNIT_ASSERT_EQUAL(attr.memUsage(), attrB.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attr.isUniform(), attrB.isUniform());
-            CPPUNIT_ASSERT_EQUAL(attr.isTransient(), attrB.isTransient());
-            CPPUNIT_ASSERT_EQUAL(attr.isHidden(), attrB.isHidden());
+            EXPECT_TRUE(matchingNamePairs(attr.type(), attrB.type()));
+            EXPECT_EQ(attr.size(), attrB.size());
+            EXPECT_EQ(attr.memUsage(), attrB.memUsage());
+            EXPECT_EQ(attr.isUniform(), attrB.isUniform());
+            EXPECT_EQ(attr.isTransient(), attrB.isTransient());
+            EXPECT_EQ(attr.isHidden(), attrB.isHidden());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attr.get(i), attrB.getUnsafe(i));
-                CPPUNIT_ASSERT_EQUAL(attr.getUnsafe(i), attrB.getUnsafe(i));
+                EXPECT_EQ(attr.get(i), attrB.get(i));
+                EXPECT_EQ(attr.get(i), attrB.getUnsafe(i));
+                EXPECT_EQ(attr.getUnsafe(i), attrB.getUnsafe(i));
             }
         }
 
         { // Equality using an unregistered attribute type
-            TypedAttributeArray<half> attr1(50);
-            TypedAttributeArray<half> attr2(50);
+            TypedAttributeArray<math::half> attr1(50);
+            TypedAttributeArray<math::half> attr2(50);
 
-            CPPUNIT_ASSERT(attr1 == attr2);
+            EXPECT_TRUE(attr1 == attr2);
         }
 
         // attribute array must not be uniform for compression
@@ -752,10 +725,10 @@ TestAttributeArray::testAttributeArray()
         fixedPoint.set(2, 0.4);
         fixedPoint.set(3, 0.6);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.5), fixedPoint.get(0), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(-0.4), fixedPoint.get(1), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.4), fixedPoint.get(2), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(-0.5), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(-0.4), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.4), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.5), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
     using UnitFixedPointCodec8 = FixedPointCodec<false, UnitRange>;
@@ -773,10 +746,10 @@ TestAttributeArray::testAttributeArray()
         fixedPoint.set(2, 0.6);
         fixedPoint.set(3, 1.1);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
     using UnitFixedPointCodec16 = FixedPointCodec<false, UnitRange>;
@@ -794,10 +767,10 @@ TestAttributeArray::testAttributeArray()
         fixedPoint.set(2, 0.6);
         fixedPoint.set(3, 1.1);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.0), fixedPoint.get(0), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.3), fixedPoint.get(1), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(0.6), fixedPoint.get(2), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(1.0), fixedPoint.get(3), /*tolerance=*/double(0.0001));
     }
 
     using AttributeArrayU = TypedAttributeArray<openvdb::Vec3f, UnitVecCodec>;
@@ -817,15 +790,15 @@ TestAttributeArray::testAttributeArray()
         unitVec.set(1, vec2);
         unitVec.set(2, vec3);
 
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.x()), unitVec.get(0).x(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.y()), unitVec.get(0).y(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec1.z()), unitVec.get(0).z(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.x()), unitVec.get(1).x(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.y()), unitVec.get(1).y(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec2.z()), unitVec.get(1).z(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.x()), unitVec.get(2).x(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.y()), unitVec.get(2).y(), /*tolerance=*/double(0.0001));
-        CPPUNIT_ASSERT_DOUBLES_EQUAL(double(vec3.z()), unitVec.get(2).z(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec1.x()), unitVec.get(0).x(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec1.y()), unitVec.get(0).y(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec1.z()), unitVec.get(0).z(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec2.x()), unitVec.get(1).x(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec2.y()), unitVec.get(1).y(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec2.z()), unitVec.get(1).z(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec3.x()), unitVec.get(2).x(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec3.y()), unitVec.get(2).y(), /*tolerance=*/double(0.0001));
+        EXPECT_NEAR(double(vec3.z()), unitVec.get(2).z(), /*tolerance=*/double(0.0001));
     }
 
     { // IO
@@ -848,7 +821,7 @@ TestAttributeArray::testAttributeArray()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrB.read(istr);
 
-        CPPUNIT_ASSERT(attrA == attrB);
+        EXPECT_TRUE(attrA == attrB);
 
         AttributeArrayI attrC(count, 3);
         attrC.setTransient(true);
@@ -856,12 +829,12 @@ TestAttributeArray::testAttributeArray()
         std::ostringstream ostrC(std::ios_base::binary);
         attrC.write(ostrC);
 
-        CPPUNIT_ASSERT(ostrC.str().empty());
+        EXPECT_TRUE(ostrC.str().empty());
 
         std::ostringstream ostrD(std::ios_base::binary);
         attrC.write(ostrD, /*transient=*/true);
 
-        CPPUNIT_ASSERT(!ostrD.str().empty());
+        EXPECT_TRUE(!ostrD.str().empty());
     }
 
     // Registry
@@ -873,12 +846,12 @@ TestAttributeArray::testAttributeArray()
 
     { // Casting
         AttributeArray::Ptr array = TypedAttributeArray<float>::create(0);
-        CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*array));
-        CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*array), TypeError);
+        EXPECT_NO_THROW(TypedAttributeArray<float>::cast(*array));
+        EXPECT_THROW(TypedAttributeArray<int>::cast(*array), TypeError);
 
         AttributeArray::ConstPtr constArray = array;
-        CPPUNIT_ASSERT_NO_THROW(TypedAttributeArray<float>::cast(*constArray));
-        CPPUNIT_ASSERT_THROW(TypedAttributeArray<int>::cast(*constArray), TypeError);
+        EXPECT_NO_THROW(TypedAttributeArray<float>::cast(*constArray));
+        EXPECT_THROW(TypedAttributeArray<int>::cast(*constArray), TypeError);
     }
 }
 
@@ -897,8 +870,7 @@ private:
     T::size_type index = 0;
 }; // struct VectorWrapper
 
-void
-TestAttributeArray::testAttributeArrayCopy()
+TEST_F(TestAttributeArray, testAttributeArrayCopy)
 {
     using AttributeArrayD = TypedAttributeArray<double>;
 
@@ -908,7 +880,7 @@ TestAttributeArray::testAttributeArrayCopy()
 
     AttributeArrayD sourceTypedAttr(size);
     AttributeArray& sourceAttr(sourceTypedAttr);
-    CPPUNIT_ASSERT_EQUAL(size, sourceAttr.size());
+    EXPECT_EQ(size, sourceAttr.size());
 
     sourceAttr.expand();
     for (Index i = 0; i < size; i++) {
@@ -943,7 +915,7 @@ TestAttributeArray::testAttributeArrayCopy()
             attr.set(pair.second, sourceAttr, pair.first);
         }
 
-        CPPUNIT_ASSERT(targetAttr == attr);
+        EXPECT_TRUE(targetAttr == attr);
     }
 #else
     using AttributeArrayF = TypedAttributeArray<float>;
@@ -954,26 +926,26 @@ TestAttributeArray::testAttributeArrayCopy()
 
         attr.copyValues(sourceAttr, wrapper);
 
-        CPPUNIT_ASSERT(targetAttr == attr);
+        EXPECT_TRUE(targetAttr == attr);
     }
 
     { // attempt to copy values between attribute arrays with different storage sizes
         AttributeArrayF typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+        EXPECT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
     }
 
     { // attempt to copy values between integer and float attribute arrays
         AttributeArrayF typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
+        EXPECT_THROW(attr.copyValues(sourceAttr, wrapper), TypeError);
     }
 
     { // copy values between attribute arrays with different value types, but the same storage type
         // target half array
-        TypedAttributeArray<half> targetTypedAttr1(size);
+        TypedAttributeArray<math::half> targetTypedAttr1(size);
         AttributeArray& targetAttr1(targetTypedAttr1);
         for (Index i = 0; i < size; i++) {
             targetTypedAttr1.set(i,
@@ -987,11 +959,11 @@ TestAttributeArray::testAttributeArrayCopy()
         targetAttr2.copyValues(targetAttr1, wrapper);
 
         // equality fails as attribute types are not the same
-        CPPUNIT_ASSERT(targetAttr2 != targetAttr);
-        CPPUNIT_ASSERT(targetAttr2.type() != targetAttr.type());
+        EXPECT_TRUE(targetAttr2 != targetAttr);
+        EXPECT_TRUE(targetAttr2.type() != targetAttr.type());
         // however testing value equality succeeds
         for (Index i = 0; i < size; i++) {
-            CPPUNIT_ASSERT(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
+            EXPECT_TRUE(targetTypedAttr2.get(i) == targetTypedAttr.get(i));
         }
     }
 
@@ -1005,15 +977,15 @@ TestAttributeArray::testAttributeArrayCopy()
 
         VectorWrapper rangeWrapper(rangeIndexPairs);
 
-        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+        EXPECT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
 
         rangeIndexPairs[10].first = 0;
 
-        CPPUNIT_ASSERT_NO_THROW(attr.copyValues(sourceAttr, rangeWrapper));
+        EXPECT_NO_THROW(attr.copyValues(sourceAttr, rangeWrapper));
 
         rangeIndexPairs[10].second = size+1;
 
-        CPPUNIT_ASSERT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
+        EXPECT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
     }
 
     { // source attribute array is uniform
@@ -1022,24 +994,24 @@ TestAttributeArray::testAttributeArrayCopy()
 
         uniformTypedAttr.collapse(5.3);
 
-        CPPUNIT_ASSERT(uniformAttr.isUniform());
+        EXPECT_TRUE(uniformAttr.isUniform());
 
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-        CPPUNIT_ASSERT(attr.isUniform());
+        EXPECT_TRUE(attr.isUniform());
 
         attr.copyValues(uniformAttr, wrapper);
 
-        CPPUNIT_ASSERT(attr.isUniform());
+        EXPECT_TRUE(attr.isUniform());
 
         attr.copyValues(uniformAttr, wrapper, /*preserveUniformity=*/false);
 
-        CPPUNIT_ASSERT(!attr.isUniform());
+        EXPECT_TRUE(!attr.isUniform());
 
         typedAttr.collapse(1.4);
 
-        CPPUNIT_ASSERT(attr.isUniform());
+        EXPECT_TRUE(attr.isUniform());
 
         // resize the vector to be smaller than the size of the array
 
@@ -1054,7 +1026,7 @@ TestAttributeArray::testAttributeArrayCopy()
 
         // verify that the array cannot be kept uniform
 
-        CPPUNIT_ASSERT(!attr.isUniform());
+        EXPECT_TRUE(!attr.isUniform());
     }
 
     { // target attribute array is uniform
@@ -1063,7 +1035,7 @@ TestAttributeArray::testAttributeArrayCopy()
 
         uniformTypedAttr.collapse(5.3);
 
-        CPPUNIT_ASSERT(uniformAttr.isUniform());
+        EXPECT_TRUE(uniformAttr.isUniform());
 
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
@@ -1071,7 +1043,7 @@ TestAttributeArray::testAttributeArrayCopy()
         typedAttr.set(5, 1.2);
         typedAttr.set(10, 3.1);
 
-        CPPUNIT_ASSERT(!attr.isUniform());
+        EXPECT_TRUE(!attr.isUniform());
 
         std::vector<std::pair<Index, Index>> uniformIndexPairs;
         uniformIndexPairs.push_back(std::make_pair(10, 0));
@@ -1080,10 +1052,10 @@ TestAttributeArray::testAttributeArrayCopy()
 
         // note that calling copyValues() will implicitly expand the uniform target
 
-        CPPUNIT_ASSERT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
+        EXPECT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
 
-        CPPUNIT_ASSERT(uniformAttr.isUniform());
-        CPPUNIT_ASSERT(uniformTypedAttr.get(0) == typedAttr.get(5));
+        EXPECT_TRUE(uniformAttr.isUniform());
+        EXPECT_TRUE(uniformTypedAttr.get(0) == typedAttr.get(5));
     }
 #endif
 }
@@ -1131,15 +1103,15 @@ TestAttributeArray::testAccessorEval()
         AttributeHandle<float, NullCodec> handle(array);
 
         const AttributeArray& constArray(array);
-        CPPUNIT_ASSERT_EQUAL(&constArray, &handle.array());
+        EXPECT_EQ(&constArray, &handle.array());
 
         handle.mGetter = TestAccessor::getterError;
 
         const float result1 = handle.get(4);
         const float result2 = handle.get(6);
 
-        CPPUNIT_ASSERT_EQUAL(15.0f, result1);
-        CPPUNIT_ASSERT_EQUAL(5.0f, result2);
+        EXPECT_EQ(15.0f, result1);
+        EXPECT_EQ(5.0f, result2);
     }
 
     { // test get and set (UnknownCodec)
@@ -1153,23 +1125,23 @@ TestAttributeArray::testAccessorEval()
 
         AttributeWriteHandle<float, UnknownCodec> writeHandle(array);
 
-        CPPUNIT_ASSERT_EQUAL(&array, &writeHandle.array());
+        EXPECT_EQ(&array, &writeHandle.array());
 
         writeHandle.mSetter = TestAccessor::setterError;
 
-        CPPUNIT_ASSERT_THROW(writeHandle.set(4, 15.0f), NotImplementedError);
+        EXPECT_THROW(writeHandle.set(4, 15.0f), NotImplementedError);
 
         AttributeHandle<float, UnknownCodec> handle(array);
 
         handle.mGetter = TestAccessor::getterError;
 
-        CPPUNIT_ASSERT_THROW(handle.get(4), NotImplementedError);
+        EXPECT_THROW(handle.get(4), NotImplementedError);
     }
 }
+TEST_F(TestAttributeArray, testAccessorEval) { testAccessorEval(); }
 
 
-void
-TestAttributeArray::testAttributeHandle()
+TEST_F(TestAttributeArray, testAttributeHandle)
 {
     using namespace openvdb::math;
 
@@ -1200,58 +1172,58 @@ TestAttributeArray::testAttributeHandle()
         AttributeArray* array = attrSet.get(2);
 
         AttributeHandleRWI nonExpandingHandle(*array, /*expand=*/false);
-        CPPUNIT_ASSERT(nonExpandingHandle.isUniform());
+        EXPECT_TRUE(nonExpandingHandle.isUniform());
 
         AttributeHandleRWI handle(*array);
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(array->size(), handle.size());
+        EXPECT_EQ(array->size(), handle.size());
 
-        CPPUNIT_ASSERT_EQUAL(0, handle.get(0));
-        CPPUNIT_ASSERT_EQUAL(0, handle.get(10));
+        EXPECT_EQ(0, handle.get(0));
+        EXPECT_EQ(0, handle.get(10));
 
         handle.set(0, 10);
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
 
         handle.collapse(5);
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(5, handle.get(0));
-        CPPUNIT_ASSERT_EQUAL(5, handle.get(20));
+        EXPECT_EQ(5, handle.get(0));
+        EXPECT_EQ(5, handle.get(20));
 
         handle.expand();
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(5, handle.get(i));
+            EXPECT_EQ(5, handle.get(i));
         }
 
-        CPPUNIT_ASSERT(handle.compact());
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.compact());
+        EXPECT_TRUE(handle.isUniform());
 
         handle.expand();
 
         handle.fill(10);
-        CPPUNIT_ASSERT(!handle.isUniform());
+        EXPECT_TRUE(!handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(10, handle.get(i));
+            EXPECT_EQ(10, handle.get(i));
         }
 
         handle.collapse(7);
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(7, handle.get(0));
-        CPPUNIT_ASSERT_EQUAL(7, handle.get(20));
+        EXPECT_EQ(7, handle.get(0));
+        EXPECT_EQ(7, handle.get(20));
 
         handle.fill(5);
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.isUniform());
 
         for (unsigned i = 0; i < unsigned(count); ++i) {
-            CPPUNIT_ASSERT_EQUAL(5, handle.get(i));
+            EXPECT_EQ(5, handle.get(i));
         }
 
-        CPPUNIT_ASSERT(handle.isUniform());
+        EXPECT_TRUE(handle.isUniform());
     }
 
     {
@@ -1261,7 +1233,7 @@ TestAttributeArray::testAttributeHandle()
 
         handle.set(5, Vec3f(10));
 
-        CPPUNIT_ASSERT_EQUAL(Vec3f(10), handle.get(5));
+        EXPECT_EQ(Vec3f(10), handle.get(5));
     }
 
     {
@@ -1271,12 +1243,12 @@ TestAttributeArray::testAttributeHandle()
 
         handle.set(6, float(11));
 
-        CPPUNIT_ASSERT_EQUAL(float(11), handle.get(6));
+        EXPECT_EQ(float(11), handle.get(6));
 
         {
             AttributeHandle<float> handleRO(*array);
 
-            CPPUNIT_ASSERT_EQUAL(float(11), handleRO.get(6));
+            EXPECT_EQ(float(11), handleRO.get(6));
         }
     }
 
@@ -1285,22 +1257,21 @@ TestAttributeArray::testAttributeHandle()
     {
         AttributeVec3f* array = static_cast<AttributeVec3f*>(attrSet.get(0));
 
-        CPPUNIT_ASSERT(array);
+        EXPECT_TRUE(array);
 
-        CPPUNIT_ASSERT_EQUAL(Vec3f(10), array->get(5));
+        EXPECT_EQ(Vec3f(10), array->get(5));
     }
 
     {
         AttributeFH* array = static_cast<AttributeFH*>(attrSet.get(1));
 
-        CPPUNIT_ASSERT(array);
+        EXPECT_TRUE(array);
 
-        CPPUNIT_ASSERT_EQUAL(float(11), array->get(6));
+        EXPECT_EQ(float(11), array->get(6));
     }
 }
 
-void
-TestAttributeArray::testStrided()
+TEST_F(TestAttributeArray, testStrided)
 {
     using AttributeArrayI       = TypedAttributeArray<int>;
     using StridedHandle         = AttributeHandle<int, /*CodecType=*/UnknownCodec>;
@@ -1308,68 +1279,68 @@ TestAttributeArray::testStrided()
 
     { // non-strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/1);
-        CPPUNIT_ASSERT(array->hasConstantStride());
-        CPPUNIT_ASSERT_EQUAL(Index(1), array->stride());
-        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
-        CPPUNIT_ASSERT_EQUAL(Index(2), array->dataSize());
+        EXPECT_TRUE(array->hasConstantStride());
+        EXPECT_EQ(Index(1), array->stride());
+        EXPECT_EQ(Index(2), array->size());
+        EXPECT_EQ(Index(2), array->dataSize());
     }
 
     { // strided array
         AttributeArrayI::Ptr array = AttributeArrayI::create(/*n=*/2, /*stride=*/3);
 
-        CPPUNIT_ASSERT(array->hasConstantStride());
+        EXPECT_TRUE(array->hasConstantStride());
 
-        CPPUNIT_ASSERT_EQUAL(Index(3), array->stride());
-        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
-        CPPUNIT_ASSERT_EQUAL(Index(6), array->dataSize());
-        CPPUNIT_ASSERT(array->isUniform());
+        EXPECT_EQ(Index(3), array->stride());
+        EXPECT_EQ(Index(2), array->size());
+        EXPECT_EQ(Index(6), array->dataSize());
+        EXPECT_TRUE(array->isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(0, array->get(0));
-        CPPUNIT_ASSERT_EQUAL(0, array->get(5));
-        CPPUNIT_ASSERT_THROW(array->get(6), IndexError); // out-of-range
+        EXPECT_EQ(0, array->get(0));
+        EXPECT_EQ(0, array->get(5));
+        EXPECT_THROW(array->get(6), IndexError); // out-of-range
 
-        CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
-        CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
+        EXPECT_NO_THROW(StridedHandle::create(*array));
+        EXPECT_NO_THROW(StridedWriteHandle::create(*array));
 
         array->collapse(10);
 
-        CPPUNIT_ASSERT_EQUAL(int(10), array->get(0));
-        CPPUNIT_ASSERT_EQUAL(int(10), array->get(5));
+        EXPECT_EQ(int(10), array->get(0));
+        EXPECT_EQ(int(10), array->get(5));
 
         array->expand();
 
-        CPPUNIT_ASSERT_EQUAL(int(10), array->get(0));
-        CPPUNIT_ASSERT_EQUAL(int(10), array->get(5));
+        EXPECT_EQ(int(10), array->get(0));
+        EXPECT_EQ(int(10), array->get(5));
 
         array->collapse(0);
 
-        CPPUNIT_ASSERT_EQUAL(int(0), array->get(0));
-        CPPUNIT_ASSERT_EQUAL(int(0), array->get(5));
+        EXPECT_EQ(int(0), array->get(0));
+        EXPECT_EQ(int(0), array->get(5));
 
         StridedWriteHandle writeHandle(*array);
 
         writeHandle.set(0, 2, 5);
         writeHandle.set(1, 1, 10);
 
-        CPPUNIT_ASSERT_EQUAL(Index(3), writeHandle.stride());
-        CPPUNIT_ASSERT_EQUAL(Index(2), writeHandle.size());
+        EXPECT_EQ(Index(3), writeHandle.stride());
+        EXPECT_EQ(Index(2), writeHandle.size());
 
         // non-interleaved: 0 0 5 0 10 0
 
-        CPPUNIT_ASSERT_EQUAL(5, array->get(2));
-        CPPUNIT_ASSERT_EQUAL(10, array->get(4));
+        EXPECT_EQ(5, array->get(2));
+        EXPECT_EQ(10, array->get(4));
 
-        CPPUNIT_ASSERT_EQUAL(5, writeHandle.get(0, 2));
-        CPPUNIT_ASSERT_EQUAL(10, writeHandle.get(1, 1));
+        EXPECT_EQ(5, writeHandle.get(0, 2));
+        EXPECT_EQ(10, writeHandle.get(1, 1));
 
         StridedHandle handle(*array);
-        CPPUNIT_ASSERT(handle.hasConstantStride());
+        EXPECT_TRUE(handle.hasConstantStride());
 
-        CPPUNIT_ASSERT_EQUAL(5, handle.get(0, 2));
-        CPPUNIT_ASSERT_EQUAL(10, handle.get(1, 1));
+        EXPECT_EQ(5, handle.get(0, 2));
+        EXPECT_EQ(10, handle.get(1, 1));
 
-        CPPUNIT_ASSERT_EQUAL(Index(3), handle.stride());
-        CPPUNIT_ASSERT_EQUAL(Index(2), handle.size());
+        EXPECT_EQ(Index(3), handle.stride());
+        EXPECT_EQ(Index(2), handle.size());
 
 // as of ABI=6, the base memory requirements of an AttributeArray have been lowered
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
@@ -1377,34 +1348,34 @@ TestAttributeArray::testStrided()
 #else
         size_t arrayMem = 64;
 #endif
-        CPPUNIT_ASSERT_EQUAL(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
+        EXPECT_EQ(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 
     { // dynamic stride
         AttributeArrayI::Ptr array = AttributeArrayI::create(
             /*n=*/2, /*stride=*/7, /*constantStride=*/false);
 
-        CPPUNIT_ASSERT(!array->hasConstantStride());
+        EXPECT_TRUE(!array->hasConstantStride());
 
         // zero indicates dynamic striding
-        CPPUNIT_ASSERT_EQUAL(Index(0), array->stride());
-        CPPUNIT_ASSERT_EQUAL(Index(2), array->size());
+        EXPECT_EQ(Index(0), array->stride());
+        EXPECT_EQ(Index(2), array->size());
         // the actual array size
-        CPPUNIT_ASSERT_EQUAL(Index(7), array->dataSize());
-        CPPUNIT_ASSERT(array->isUniform());
+        EXPECT_EQ(Index(7), array->dataSize());
+        EXPECT_TRUE(array->isUniform());
 
-        CPPUNIT_ASSERT_EQUAL(0, array->get(0));
-        CPPUNIT_ASSERT_EQUAL(0, array->get(6));
-        CPPUNIT_ASSERT_THROW(array->get(7), IndexError); // out-of-range
+        EXPECT_EQ(0, array->get(0));
+        EXPECT_EQ(0, array->get(6));
+        EXPECT_THROW(array->get(7), IndexError); // out-of-range
 
-        CPPUNIT_ASSERT_NO_THROW(StridedHandle::create(*array));
-        CPPUNIT_ASSERT_NO_THROW(StridedWriteHandle::create(*array));
+        EXPECT_NO_THROW(StridedHandle::create(*array));
+        EXPECT_NO_THROW(StridedWriteHandle::create(*array));
 
         // handle is bound as if a linear array with stride 1
         StridedHandle handle(*array);
-        CPPUNIT_ASSERT(!handle.hasConstantStride());
-        CPPUNIT_ASSERT_EQUAL(Index(1), handle.stride());
-        CPPUNIT_ASSERT_EQUAL(array->dataSize(), handle.size());
+        EXPECT_TRUE(!handle.hasConstantStride());
+        EXPECT_EQ(Index(1), handle.stride());
+        EXPECT_EQ(array->dataSize(), handle.size());
     }
 
     { // IO
@@ -1423,7 +1394,7 @@ TestAttributeArray::testStrided()
         std::istringstream istr(ostr.str(), std::ios_base::binary);
         attrB.read(istr);
 
-        CPPUNIT_ASSERT(attrA == attrB);
+        EXPECT_TRUE(attrA == attrB);
     }
 }
 
@@ -1446,7 +1417,7 @@ TestAttributeArray::testDelayedLoad()
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
-        CPPUNIT_ASSERT(tempDirLen > 0 && tempDirLen <= MAX_PATH);
+        EXPECT_TRUE(tempDirLen > 0 && tempDirLen <= MAX_PATH);
         tempDir = tempDirBuffer;
     }
 #else
@@ -1513,47 +1484,47 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(matchingNamePairs(attrA.type(), attrB.type()));
-            CPPUNIT_ASSERT_EQUAL(attrA.size(), attrB.size());
-            CPPUNIT_ASSERT_EQUAL(attrA.isUniform(), attrB.isUniform());
-            CPPUNIT_ASSERT_EQUAL(attrA.isTransient(), attrB.isTransient());
-            CPPUNIT_ASSERT_EQUAL(attrA.isHidden(), attrB.isHidden());
+            EXPECT_TRUE(matchingNamePairs(attrA.type(), attrB.type()));
+            EXPECT_EQ(attrA.size(), attrB.size());
+            EXPECT_EQ(attrA.isUniform(), attrB.isUniform());
+            EXPECT_EQ(attrA.isTransient(), attrB.isTransient());
+            EXPECT_EQ(attrA.isHidden(), attrB.isHidden());
 
             AttributeArrayI attrBcopy(attrB);
             AttributeArrayI attrBequal = attrB;
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrBcopy.isOutOfCore());
-            CPPUNIT_ASSERT(attrBequal.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
+            EXPECT_TRUE(attrBcopy.isOutOfCore());
+            EXPECT_TRUE(attrBequal.isOutOfCore());
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrB).isDataLoaded());
-            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
-            CPPUNIT_ASSERT(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+            EXPECT_TRUE(!static_cast<AttributeArray&>(attrB).isDataLoaded());
+            EXPECT_TRUE(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            EXPECT_TRUE(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
 #endif
 
             attrB.loadData();
             attrBcopy.loadData();
             attrBequal.loadData();
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrBcopy.isOutOfCore());
-            CPPUNIT_ASSERT(!attrBequal.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrBcopy.isOutOfCore());
+            EXPECT_TRUE(!attrBequal.isOutOfCore());
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 6
-            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrB).isDataLoaded());
-            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
-            CPPUNIT_ASSERT(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
+            EXPECT_TRUE(static_cast<AttributeArray&>(attrB).isDataLoaded());
+            EXPECT_TRUE(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
+            EXPECT_TRUE(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
 #endif
 
-            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBcopy.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrBequal.memUsage());
+            EXPECT_EQ(attrA.memUsage(), attrB.memUsage());
+            EXPECT_EQ(attrA.memUsage(), attrBcopy.memUsage());
+            EXPECT_EQ(attrA.memUsage(), attrBequal.memUsage());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrBcopy.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrBequal.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrBcopy.get(i));
+                EXPECT_EQ(attrA.get(i), attrBequal.get(i));
             }
 
             attrB2.readMetadata(filein);
@@ -1563,33 +1534,33 @@ TestAttributeArray::testDelayedLoad()
             inputStream2.setSizeOnly(false);
             attrB2.readPagedBuffers(inputStream2);
 
-            CPPUNIT_ASSERT(matchingNamePairs(attrA2.type(), attrB2.type()));
-            CPPUNIT_ASSERT_EQUAL(attrA2.size(), attrB2.size());
-            CPPUNIT_ASSERT_EQUAL(attrA2.isUniform(), attrB2.isUniform());
-            CPPUNIT_ASSERT_EQUAL(attrA2.isTransient(), attrB2.isTransient());
-            CPPUNIT_ASSERT_EQUAL(attrA2.isHidden(), attrB2.isHidden());
+            EXPECT_TRUE(matchingNamePairs(attrA2.type(), attrB2.type()));
+            EXPECT_EQ(attrA2.size(), attrB2.size());
+            EXPECT_EQ(attrA2.isUniform(), attrB2.isUniform());
+            EXPECT_EQ(attrA2.isTransient(), attrB2.isTransient());
+            EXPECT_EQ(attrA2.isHidden(), attrB2.isHidden());
 
             AttributeArrayF attrB2copy(attrB2);
             AttributeArrayF attrB2equal = attrB2;
 
-            CPPUNIT_ASSERT(attrB2.isOutOfCore());
-            CPPUNIT_ASSERT(attrB2copy.isOutOfCore());
-            CPPUNIT_ASSERT(attrB2equal.isOutOfCore());
+            EXPECT_TRUE(attrB2.isOutOfCore());
+            EXPECT_TRUE(attrB2copy.isOutOfCore());
+            EXPECT_TRUE(attrB2equal.isOutOfCore());
             attrB2.loadData();
             attrB2copy.loadData();
             attrB2equal.loadData();
 
-            CPPUNIT_ASSERT(!attrB2.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB2copy.isOutOfCore());
-            CPPUNIT_ASSERT(!attrB2equal.isOutOfCore());
+            EXPECT_TRUE(!attrB2.isOutOfCore());
+            EXPECT_TRUE(!attrB2copy.isOutOfCore());
+            EXPECT_TRUE(!attrB2equal.isOutOfCore());
 
-            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2copy.memUsage());
-            CPPUNIT_ASSERT_EQUAL(attrA2.memUsage(), attrB2equal.memUsage());
+            EXPECT_EQ(attrA2.memUsage(), attrB2.memUsage());
+            EXPECT_EQ(attrA2.memUsage(), attrB2copy.memUsage());
+            EXPECT_EQ(attrA2.memUsage(), attrB2equal.memUsage());
 
-            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2.get(0));
-            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2copy.get(0));
-            CPPUNIT_ASSERT_EQUAL(attrA2.get(0), attrB2equal.get(0));
+            EXPECT_EQ(attrA2.get(0), attrB2.get(0));
+            EXPECT_EQ(attrA2.get(0), attrB2copy.get(0));
+            EXPECT_EQ(attrA2.get(0), attrB2equal.get(0));
         }
 
         // read in using delayed load and check fill()
@@ -1607,16 +1578,16 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(!attrB.isUniform());
+            EXPECT_TRUE(!attrB.isUniform());
 
             attrB.fill(5);
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(5, attrB.get(i));
+                EXPECT_EQ(5, attrB.get(i));
             }
         }
 
@@ -1635,19 +1606,19 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(!attrB.isUniform());
+            EXPECT_TRUE(!attrB.isUniform());
 
             attrB.setStreaming(true);
 
             {
                 AttributeWriteHandle<int> handle(attrB);
-                CPPUNIT_ASSERT(!attrB.isOutOfCore());
-                CPPUNIT_ASSERT(!attrB.isUniform());
+                EXPECT_TRUE(!attrB.isOutOfCore());
+                EXPECT_TRUE(!attrB.isUniform());
             }
 
-            CPPUNIT_ASSERT(!attrB.isUniform());
+            EXPECT_TRUE(!attrB.isUniform());
         }
 
         // read in using delayed load and check streaming (read handle)
@@ -1665,19 +1636,19 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(!attrB.isUniform());
+            EXPECT_TRUE(!attrB.isUniform());
 
             attrB.setStreaming(true);
 
             {
                 AttributeHandle<int> handle(attrB);
-                CPPUNIT_ASSERT(!attrB.isOutOfCore());
-                CPPUNIT_ASSERT(!attrB.isUniform());
+                EXPECT_TRUE(!attrB.isOutOfCore());
+                EXPECT_TRUE(!attrB.isUniform());
             }
 
-            CPPUNIT_ASSERT(attrB.isUniform());
+            EXPECT_TRUE(attrB.isUniform());
         }
 
         // read in using delayed load and check implicit load through get()
@@ -1695,14 +1666,14 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             attrB.get(0);
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
             }
         }
 
@@ -1721,7 +1692,7 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
         }
 
         // read in using delayed load and check copy and assignment constructors
@@ -1739,27 +1710,27 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             AttributeArrayI attrC(attrB);
             AttributeArrayI attrD = attrB;
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrC.isOutOfCore());
-            CPPUNIT_ASSERT(attrD.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
+            EXPECT_TRUE(attrC.isOutOfCore());
+            EXPECT_TRUE(attrD.isOutOfCore());
 
             attrB.loadData();
             attrC.loadData();
             attrD.loadData();
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrC.isOutOfCore());
-            CPPUNIT_ASSERT(!attrD.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrC.isOutOfCore());
+            EXPECT_TRUE(!attrD.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrD.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrC.get(i));
+                EXPECT_EQ(attrA.get(i), attrD.get(i));
             }
         }
 
@@ -1778,11 +1749,11 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             AttributeHandle<int> handle(attrB);
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
         }
 
         // read in using delayed load and check detaching of file (using collapse())
@@ -1800,16 +1771,16 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT(!attrB.isUniform());
+            EXPECT_TRUE(!attrB.isUniform());
 
             attrB.collapse();
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrB.isUniform());
+            EXPECT_TRUE(!attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isUniform());
 
-            CPPUNIT_ASSERT_EQUAL(0, attrB.get(0));
+            EXPECT_EQ(0, attrB.get(0));
         }
 
         // read in and write out using delayed load to check writing out-of-core attributes
@@ -1827,7 +1798,7 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             std::string filename2 = tempDir + "/openvdb_delayed5";
             std::ofstream fileout2(filename2.c_str(), std::ios_base::binary);
@@ -1859,10 +1830,10 @@ TestAttributeArray::testDelayedLoad()
             inputStream2.setSizeOnly(false);
             attrB2.readPagedBuffers(inputStream2);
 
-            CPPUNIT_ASSERT(attrB2.isOutOfCore());
+            EXPECT_TRUE(attrB2.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrB.get(i), attrB2.get(i));
+                EXPECT_EQ(attrB.get(i), attrB2.get(i));
             }
 
             filein2.close();
@@ -1912,20 +1883,20 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isUniform());
+            EXPECT_TRUE(attrB.isUniform());
 
             attrB.fill(5);
 
-            CPPUNIT_ASSERT(attrB.isUniform());
+            EXPECT_TRUE(attrB.isUniform());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(5, attrB.get(i));
+                EXPECT_EQ(5, attrB.get(i));
             }
         }
 
         AttributeArrayI attrStrided(count, /*stride=*/3);
 
-        CPPUNIT_ASSERT_EQUAL(Index(3), attrStrided.stride());
+        EXPECT_EQ(Index(3), attrStrided.stride());
 
         // Clean up temp files.
         std::remove(mappedFile->filename().c_str());
@@ -1969,7 +1940,7 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT_EQUAL(Index(3), attrB.stride());
+            EXPECT_EQ(Index(3), attrB.stride());
         }
 
         // Clean up temp files.
@@ -2014,14 +1985,14 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
             attrB.loadData();
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
 
-            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrB.memUsage());
+            EXPECT_EQ(attrA.memUsage(), attrB.memUsage());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
             }
         }
 
@@ -2029,7 +2000,7 @@ TestAttributeArray::testDelayedLoad()
         {
             std::unique_ptr<AttributeArrayI> attrB(new AttributeArrayI);
 
-            CPPUNIT_ASSERT(!(attrB->flags() & AttributeArray::PARTIALREAD));
+            EXPECT_TRUE(!(attrB->flags() & AttributeArray::PARTIALREAD));
 
             std::ifstream filein(filename.c_str(), std::ios_base::in | std::ios_base::binary);
             io::setStreamMetadataPtr(filein, streamMetadata);
@@ -2038,19 +2009,19 @@ TestAttributeArray::testDelayedLoad()
             attrB->readMetadata(filein);
 
             // PARTIALREAD flag should now be set
-            CPPUNIT_ASSERT(attrB->flags() & AttributeArray::PARTIALREAD);
+            EXPECT_TRUE(attrB->flags() & AttributeArray::PARTIALREAD);
 
             // copy-construct and assign AttributeArray
             AttributeArrayI attrC(*attrB);
-            CPPUNIT_ASSERT(attrC.flags() & AttributeArray::PARTIALREAD);
+            EXPECT_TRUE(attrC.flags() & AttributeArray::PARTIALREAD);
             AttributeArrayI attrD = *attrB;
-            CPPUNIT_ASSERT(attrD.flags() & AttributeArray::PARTIALREAD);
+            EXPECT_TRUE(attrD.flags() & AttributeArray::PARTIALREAD);
 
             // verify deleting attrB is safe
             attrB.reset();
 
             // verify data is not valid
-            CPPUNIT_ASSERT(!attrC.validData());
+            EXPECT_TRUE(!attrC.validData());
 
             { // attempting to write a partially-read AttributeArray throws
                 std::string filename = tempDir + "/openvdb_partial1";
@@ -2059,7 +2030,7 @@ TestAttributeArray::testDelayedLoad()
                 io::setStreamMetadataPtr(fileout, streamMetadata);
                 io::setDataCompression(fileout, io::COMPRESS_BLOSC);
 
-                CPPUNIT_ASSERT_THROW(attrC.writeMetadata(fileout, false, /*paged=*/true), IoError);
+                EXPECT_THROW(attrC.writeMetadata(fileout, false, /*paged=*/true), IoError);
             }
 
             // continue loading with copy-constructed AttributeArray
@@ -2070,17 +2041,17 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrC.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrC.isOutOfCore());
+            EXPECT_TRUE(attrC.isOutOfCore());
             attrC.loadData();
-            CPPUNIT_ASSERT(!attrC.isOutOfCore());
+            EXPECT_TRUE(!attrC.isOutOfCore());
 
             // verify data is now valid
-            CPPUNIT_ASSERT(attrC.validData());
+            EXPECT_TRUE(attrC.validData());
 
-            CPPUNIT_ASSERT_EQUAL(attrA.memUsage(), attrC.memUsage());
+            EXPECT_EQ(attrA.memUsage(), attrC.memUsage());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
+                EXPECT_EQ(attrA.get(i), attrC.get(i));
             }
         }
 
@@ -2099,14 +2070,14 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             attrB.get(0);
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
             }
         }
 
@@ -2126,27 +2097,27 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             AttributeArrayI attrC(attrB);
             AttributeArrayI attrD = attrB;
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
-            CPPUNIT_ASSERT(attrC.isOutOfCore());
-            CPPUNIT_ASSERT(attrD.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
+            EXPECT_TRUE(attrC.isOutOfCore());
+            EXPECT_TRUE(attrD.isOutOfCore());
 
             attrB.loadData();
             attrC.loadData();
             attrD.loadData();
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
-            CPPUNIT_ASSERT(!attrC.isOutOfCore());
-            CPPUNIT_ASSERT(!attrD.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrC.isOutOfCore());
+            EXPECT_TRUE(!attrD.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrB.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrC.get(i));
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), attrD.get(i));
+                EXPECT_EQ(attrA.get(i), attrB.get(i));
+                EXPECT_EQ(attrA.get(i), attrC.get(i));
+                EXPECT_EQ(attrA.get(i), attrD.get(i));
             }
         }
 
@@ -2165,14 +2136,14 @@ TestAttributeArray::testDelayedLoad()
             inputStream.setSizeOnly(false);
             attrB.readPagedBuffers(inputStream);
 
-            CPPUNIT_ASSERT(attrB.isOutOfCore());
+            EXPECT_TRUE(attrB.isOutOfCore());
 
             AttributeHandle<int> handle(attrB);
 
-            CPPUNIT_ASSERT(!attrB.isOutOfCore());
+            EXPECT_TRUE(!attrB.isOutOfCore());
 
             for (unsigned i = 0; i < unsigned(count); ++i) {
-                CPPUNIT_ASSERT_EQUAL(attrA.get(i), handle.get(i));
+                EXPECT_EQ(attrA.get(i), handle.get(i));
             }
         }
 #endif
@@ -2213,7 +2184,7 @@ TestAttributeArray::testDelayedLoad()
             io::setStreamMetadataPtr(filein, streamMetadata);
             io::setMappedFilePtr(filein, mappedFile);
 
-            CPPUNIT_ASSERT_THROW(attrB.readMetadata(filein), openvdb::IoError);
+            EXPECT_THROW(attrB.readMetadata(filein), openvdb::IoError);
         }
 
         // cleanup temp files
@@ -2222,10 +2193,10 @@ TestAttributeArray::testDelayedLoad()
         std::remove(filename.c_str());
     }
 }
+TEST_F(TestAttributeArray, testDelayedLoad) { testDelayedLoad(); }
 
 
-void
-TestAttributeArray::testDefaultValue()
+TEST_F(TestAttributeArray, testDefaultValue)
 {
     using AttributeArrayF = TypedAttributeArray<float>;
     using AttributeArrayI = TypedAttributeArray<int>;
@@ -2240,19 +2211,18 @@ TestAttributeArray::testDefaultValue()
 
     AttributeArray::Ptr attr =
         AttributeArrayF::create(10, 1, true, &baseDefaultValue);
-    CPPUNIT_ASSERT(attr);
-    CPPUNIT_ASSERT_EQUAL(5.4f, AttributeArrayF::cast(*attr).get(0));
+    EXPECT_TRUE(attr);
+    EXPECT_EQ(5.4f, AttributeArrayF::cast(*attr).get(0));
 
     // default value is different value type, so not used
 
     attr = AttributeArrayI::create(10, 1, true, &baseDefaultValue);
-    CPPUNIT_ASSERT(attr);
-    CPPUNIT_ASSERT_EQUAL(0, AttributeArrayI::cast(*attr).get(0));
+    EXPECT_TRUE(attr);
+    EXPECT_EQ(0, AttributeArrayI::cast(*attr).get(0));
 }
 
 
-void
-TestAttributeArray::testQuaternions()
+TEST_F(TestAttributeArray, testQuaternions)
 {
     using AttributeQF = TypedAttributeArray<math::Quat<float>>;
     using AttributeQD = TypedAttributeArray<QuatR>;
@@ -2260,8 +2230,8 @@ TestAttributeArray::testQuaternions()
     AttributeQF::registerType();
     AttributeQD::registerType();
 
-    CPPUNIT_ASSERT(AttributeQF::attributeType().first == "quats");
-    CPPUNIT_ASSERT(AttributeQD::attributeType().first == "quatd");
+    EXPECT_TRUE(AttributeQF::attributeType().first == "quats");
+    EXPECT_TRUE(AttributeQD::attributeType().first == "quatd");
 
     AttributeQF test(/*size=*/5);
 
@@ -2277,27 +2247,26 @@ TestAttributeArray::testQuaternions()
     { // get some quaternion values
         AttributeHandle<QuatR> orientHandle(orient);
 
-        CPPUNIT_ASSERT_EQUAL(QuatR::zero(), orientHandle.get(3));
-        CPPUNIT_ASSERT_EQUAL(QuatR(1, 2, 3, 4), orientHandle.get(4));
-        CPPUNIT_ASSERT_EQUAL(QuatR::identity(), orientHandle.get(7));
+        EXPECT_EQ(QuatR::zero(), orientHandle.get(3));
+        EXPECT_EQ(QuatR(1, 2, 3, 4), orientHandle.get(4));
+        EXPECT_EQ(QuatR::identity(), orientHandle.get(7));
     }
 
     { // create a quaternion array with a zero uniform value
         AttributeQD zero(/*size=*/10, /*stride=*/1, /*constantStride=*/true, QuatR::zero());
 
-        CPPUNIT_ASSERT_EQUAL(QuatR::zero(), zero.get(5));
+        EXPECT_EQ(QuatR::zero(), zero.get(5));
     }
 }
 
 
-void
-TestAttributeArray::testMatrices()
+TEST_F(TestAttributeArray, testMatrices)
 {
     typedef TypedAttributeArray<Mat4d>      AttributeM;
 
     AttributeM::registerType();
 
-    CPPUNIT_ASSERT(AttributeM::attributeType().first == "mat4d");
+    EXPECT_TRUE(AttributeM::attributeType().first == "mat4d");
 
     AttributeM matrix(/*size=*/10);
 
@@ -2313,15 +2282,15 @@ TestAttributeArray::testMatrices()
     { // get some matrix values
         AttributeHandle<Mat4d> matrixHandle(matrix);
 
-        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), matrixHandle.get(3));
-        CPPUNIT_ASSERT_EQUAL(testMatrix, matrixHandle.get(4));
-        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), matrixHandle.get(7));
+        EXPECT_EQ(Mat4d::zero(), matrixHandle.get(3));
+        EXPECT_EQ(testMatrix, matrixHandle.get(4));
+        EXPECT_EQ(Mat4d::zero(), matrixHandle.get(7));
     }
 
     { // create a matrix array with a zero uniform value
         AttributeM zero(/*size=*/10, /*stride=*/1, /*constantStride=*/true, Mat4d::zero());
 
-        CPPUNIT_ASSERT_EQUAL(Mat4d::zero(), zero.get(5));
+        EXPECT_EQ(Mat4d::zero(), zero.get(5));
     }
 }
 
@@ -2368,7 +2337,7 @@ void sum(const Name& prefix, const AttrT& attr)
         sum += attr.getUnsafe(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum!=ValueType());
+    EXPECT_TRUE(sum!=ValueType());
 }
 
 template <typename CodecT, typename AttrT>
@@ -2382,13 +2351,12 @@ void sumH(const Name& prefix, const AttrT& attr)
         sum += handle.get(i);
     }
     // prevent compiler optimisations removing computation
-    CPPUNIT_ASSERT(sum!=ValueType());
+    EXPECT_TRUE(sum!=ValueType());
 }
 
 } // namespace profile
 
-void
-TestAttributeArray::testProfile()
+TEST_F(TestAttributeArray, testProfile)
 {
     using namespace openvdb::util;
     using namespace openvdb::math;
@@ -2428,7 +2396,7 @@ TestAttributeArray::testProfile()
                 sum += float(values[i]);
             }
             // to prevent optimisation clean up
-            CPPUNIT_ASSERT(sum!=0.0f);
+            EXPECT_TRUE(sum!=0.0f);
         }
     }
 

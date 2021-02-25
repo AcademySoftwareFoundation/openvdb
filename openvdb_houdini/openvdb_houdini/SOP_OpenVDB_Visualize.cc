@@ -182,8 +182,8 @@ newSopOperator(OP_OperatorTable* table)
             "Specify whether to draw the camera frustums\n"
             "of VDBs with frustum transforms.")
         .setDocumentation(
-            "For VDBs with [frustum transforms|http://www.openvdb.org/documentation/"
-            "doxygen/transformsAndMaps.html#sFrustumTransforms],"
+            "For VDBs with [frustum transforms|https://academysoftwarefoundation.github.io/openvdb/"
+            "transformsAndMaps.html#sFrustumTransforms],"
             " generate geometry representing the frustum bounding box."));
 
 #ifdef DWA_OPENVDB
@@ -267,7 +267,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "For voxels, tiles, and leaf nodes rendered as points, add an attribute to"
             " the points that gives the coordinates of the points in the VDB's [index space|"
-            "http://www.openvdb.org/documentation/doxygen/overview.html#secSpaceAndTrans]."));
+            "https://academysoftwarefoundation.github.io/openvdb/overview.html#secSpaceAndTrans]."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addvalue", "Points with Values")
         .setTooltip("Add a voxel/tile value attribute to points.")
@@ -363,14 +363,14 @@ newSopOperator(OP_OperatorTable* table)
 #tags: vdb\n\
 \n\
 \"\"\"Generate geometry to visualize the internal\n\
-[tree structure|http://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
+[tree structure|https://academysoftwarefoundation.github.io/openvdb/overview.html#secTree]\n\
 of a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
 \n\
 This node can be a useful troubleshooting tool.\n\
 Among other things, it allows one to evaluate the\n\
-[sparseness|http://www.openvdb.org/documentation/doxygen/overview.html#secSparsity]\n\
+[sparseness|https://academysoftwarefoundation.github.io/openvdb/overview.html#secSparsity]\n\
 of VDB volumes as well as to examine their extents and the values of individual voxels.\n\
 \n\
 @related\n\

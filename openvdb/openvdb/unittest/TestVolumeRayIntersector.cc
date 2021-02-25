@@ -11,7 +11,7 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/RayIntersector.h>
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 
 #include <cassert>
 #include <deque>
@@ -20,23 +20,15 @@
 
 
 #define ASSERT_DOUBLES_APPROX_EQUAL(expected, actual) \
-    CPPUNIT_ASSERT_DOUBLES_EQUAL((expected), (actual), /*tolerance=*/1.e-6);
+    EXPECT_NEAR((expected), (actual), /*tolerance=*/1.e-6);
 
 
-class TestVolumeRayIntersector : public CppUnit::TestCase
+class TestVolumeRayIntersector : public ::testing::Test
 {
-public:
-    CPPUNIT_TEST_SUITE(TestVolumeRayIntersector);
-    CPPUNIT_TEST(testAll);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testAll();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeRayIntersector);
 
-void
-TestVolumeRayIntersector::testAll()
+TEST_F(TestVolumeRayIntersector, testAll)
 {
     using namespace openvdb;
     typedef math::Ray<double>  RayT;
@@ -52,12 +44,12 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//same as above but with dilation
         FloatGrid grid(0.0f);
@@ -69,12 +61,12 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 0.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//one single leaf node
         FloatGrid grid(0.0f);
@@ -86,12 +78,12 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL( 9.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
      {//same as above but with dilation
         FloatGrid grid(0.0f);
@@ -103,12 +95,12 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid, 1);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leaf nodes
         FloatGrid grid(0.0f);
@@ -121,12 +113,12 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab and leaf
         FloatGrid grid(0.0f);
@@ -140,15 +132,15 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(33.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
     {//two adjacent leafs followed by a gab, a leaf and an active tile
         FloatGrid grid(0.0f);
@@ -162,15 +154,15 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, t1);
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(41.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
 
     {//two adjacent leafs followed by a gab, a leaf and an active tile
@@ -185,11 +177,11 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
 
         std::vector<RayT::TimeSpan> list;
         inter.hits(list);
-        CPPUNIT_ASSERT(list.size() == 2);
+        EXPECT_TRUE(list.size() == 2);
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, list[0].t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, list[0].t1);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, list[1].t0);
@@ -208,11 +200,11 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-1.0, 0.0, 0.0);
         const RayT ray(eye, dir);//ray in index space
         tools::VolumeRayIntersector<FloatGrid> inter(grid);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
 
         std::deque<RayT::TimeSpan> list;
         inter.hits(list);
-        CPPUNIT_ASSERT(list.size() == 2);
+        EXPECT_TRUE(list.size() == 2);
         ASSERT_DOUBLES_APPROX_EQUAL( 1.0, list[0].t0);
         ASSERT_DOUBLES_APPROX_EQUAL(17.0, list[0].t1);
         ASSERT_DOUBLES_APPROX_EQUAL(25.0, list[1].t0);
@@ -229,22 +221,22 @@ TestVolumeRayIntersector::testAll()
         const Vec3T dir(-1.0, 0.0, 0.0);
         const Vec3T eye(50.0, 0.0, 0.0);
         const RayT ray(eye, dir);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));
+        EXPECT_TRUE(inter.setIndexRay(ray));
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(18.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(26.0, t1);
-        CPPUNIT_ASSERT(inter.march(t0, t1));
+        EXPECT_TRUE(inter.march(t0, t1));
         ASSERT_DOUBLES_APPROX_EQUAL(34.0, t0);
         ASSERT_DOUBLES_APPROX_EQUAL(50.0, t1);
-        CPPUNIT_ASSERT(!inter.march(t0, t1));
+        EXPECT_TRUE(!inter.march(t0, t1));
     }
 
     {// Test submitted by "Trevor" @ GitHub
 
         FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
-        tools::dilateVoxels(grid->tree());
+        tools::dilateActiveValues(grid->tree(), 1, tools::NN_FACE, tools::IGNORE_TILES);
         tools::VolumeRayIntersector<FloatGrid> inter(*grid);
 
         //std::cerr << "BBox = " << inter.bbox() << std::endl;
@@ -252,17 +244,17 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-0.25, -0.25, 10.0);
         const Vec3T dir( 0.00,  0.00, -1.0);
         const RayT ray(eye, dir);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+        EXPECT_TRUE(inter.setIndexRay(ray));// hits bbox
 
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(!inter.march(t0, t1));// misses leafs
+        EXPECT_TRUE(!inter.march(t0, t1));// misses leafs
     }
 
     {// Test submitted by "Trevor" @ GitHub
 
         FloatGrid::Ptr grid = createGrid<FloatGrid>(0.0f);
         grid->tree().setValue(Coord(0,0,0), 1.0f);
-        tools::dilateVoxels(grid->tree());
+        tools::dilateActiveValues(grid->tree(), 1, tools::NN_FACE, tools::IGNORE_TILES);
         tools::VolumeRayIntersector<FloatGrid> inter(*grid);
 
         //GridPtrVec grids;
@@ -275,10 +267,10 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(0.75, 0.75, 10.0);
         const Vec3T dir( 0.00,  0.00, -1.0);
         const RayT ray(eye, dir);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+        EXPECT_TRUE(inter.setIndexRay(ray));// hits bbox
 
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));// misses leafs
+        EXPECT_TRUE(inter.march(t0, t1));// misses leafs
         //std::cerr << "t0=" << t0 << " t1=" << t1 << std::endl;
     }
 
@@ -292,10 +284,10 @@ TestVolumeRayIntersector::testAll()
         const Vec3T eye(-0.25, -0.25, 10.0);
         const Vec3T dir( 0.00,  0.00, -1.0);
         const RayT ray(eye, dir);
-        CPPUNIT_ASSERT(inter.setIndexRay(ray));// hits bbox
+        EXPECT_TRUE(inter.setIndexRay(ray));// hits bbox
 
         double t0=0, t1=0;
-        CPPUNIT_ASSERT(inter.march(t0, t1));// hits leafs
+        EXPECT_TRUE(inter.march(t0, t1));// hits leafs
         //std::cerr << "t0=" << t0 << " t1=" << t1 << std::endl;
     }
 }

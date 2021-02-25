@@ -493,14 +493,22 @@ template <typename GridType>
 static void
 sopDilateVoxels(GridType& grid, int count)
 {
-    openvdb::tools::dilateVoxels(grid.tree(), count);
+    // @todo  switch to support tiles
+    openvdb::tools::dilateActiveValues(grid.tree(), count, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
 }
 
 template <typename GridType>
 static void
 sopErodeVoxels(GridType& grid, int count)
 {
-    openvdb::tools::erodeVoxels(grid.tree(), count);
+    // @todo  switch to support tiles
+    openvdb::tools::erodeActiveValues(grid.tree(), count, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
+    if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
+        openvdb::tools::pruneLevelSet(grid.tree());
+    }
+    else {
+        openvdb::tools::pruneInactive(grid.tree());
+    }
 }
 
 // Based on mode the parameters imply, get an index space bounds for this vdb

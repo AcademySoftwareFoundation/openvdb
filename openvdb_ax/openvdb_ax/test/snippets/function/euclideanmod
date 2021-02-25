@@ -1,0 +1,15 @@
+
+int@itest1 = euclideanmod(7,5);
+int@itest2 = euclideanmod(-7,5);
+int@itest3 = euclideanmod(7,-5);
+int@itest4 = euclideanmod(-7,-5);
+
+float@ftest1 = euclideanmod(7.2f,5.7f);
+float@ftest2 = euclideanmod(-7.2f,5.7f);
+float@ftest3 = euclideanmod(7.2f,-5.7f);
+float@ftest4 = euclideanmod(-7.2f,-5.7f);
+
+double@dtest1 = euclideanmod(7.2,5.7);
+double@dtest2 = euclideanmod(-7.2,5.7);
+double@dtest3 = euclideanmod(7.2,-5.7);
+double@dtest4 = euclideanmod(-7.2,-5.7);

@@ -1,0 +1,15 @@
+
+float@test1 += 1.1f;
+float@test2 -= 1.1f;
+float@test3 *= 1.1f;
+float@test4 /= 1.1f;
+float@test5 %= 1.1f;
+
+float local1 = 1.1f,
+      local2 = 2.3f;
+
+local1 += local2;
+float@test6 = local1;
+float@test7 += float@test8;
+float@test9 += local2;
+

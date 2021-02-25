@@ -16,9 +16,11 @@
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
 #include <openvdb/Types.h>
+#include <openvdb/tree/RootNode.h> // for NodeChain
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
+#include <deque>
 #include <functional>
 #include <type_traits>
 
@@ -192,10 +194,6 @@ public:
         , mLeafCount(0)
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
-        , mLeafs(nullptr)
-        , mAuxBuffers(nullptr)
-        , mTask(nullptr)
-        , mIsMaster(true)
     {
         this->rebuild(serial);
     }
@@ -209,10 +207,8 @@ public:
         , mLeafCount(end-begin)
         , mAuxBufferCount(0)
         , mAuxBuffersPerLeaf(auxBuffersPerLeaf)
-        , mLeafs(new LeafType*[mLeafCount])
-        , mAuxBuffers(nullptr)
-        , mTask(nullptr)
-        , mIsMaster(true)
+        , mLeafPtrs(new LeafType*[mLeafCount])
+        , mLeafs(mLeafPtrs.get())
     {
         size_t n = mLeafCount;
         LeafType **target = mLeafs, **source = begin;
@@ -231,16 +227,7 @@ public:
         , mLeafs(other.mLeafs)
         , mAuxBuffers(other.mAuxBuffers)
         , mTask(other.mTask)
-        , mIsMaster(false)
     {
-    }
-
-    virtual ~LeafManager()
-    {
-        if (mIsMaster) {
-            delete [] mLeafs;
-            delete [] mAuxBuffers;
-        }
     }
 
     /// @brief (Re)initialize by resizing (if necessary) and repopulating the leaf array
@@ -250,7 +237,7 @@ public:
     /// of corresponding leaf node buffers.
     void rebuild(bool serial=false)
     {
-        this->initLeafArray();
+        this->initLeafArray(serial);
         this->initAuxBuffers(serial);
     }
     //@{
@@ -285,10 +272,10 @@ public:
     void removeAuxBuffers() { this->rebuildAuxBuffers(0); }
 
     /// @brief Remove the auxiliary buffers and rebuild the leaf array.
-    void rebuildLeafArray()
+    void rebuildLeafArray(bool serial = false)
     {
         this->removeAuxBuffers();
-        this->initLeafArray();
+        this->initLeafArray(serial);
     }
 
     /// @brief Return the total number of allocated auxiliary buffers.
@@ -548,13 +535,8 @@ public:
         transform.run(this->leafRange(grainSize), threaded);
     }
 
-
-    /// @brief Insert pointers to nodes of the specified type into the array.
-    /// @details The type of node pointer is defined by the type
-    /// ArrayT::value_type. If the node type is a LeafNode the nodes
-    /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array)
+    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array)
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
@@ -571,12 +553,8 @@ public:
         OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
     }
 
-    /// @brief Insert node pointers of the specified type into the array.
-    /// @details The type of node pointer is defined by the type
-    /// ArrayT::value_type. If the node type is a LeafNode the nodes
-    /// are inserted from this LeafManager, else of the corresponding tree.
     template<typename ArrayT>
-    void getNodes(ArrayT& array) const
+    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array) const
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
@@ -635,34 +613,102 @@ public:
 
 private:
 
-    // This a simple wrapper for a c-style array so it mimics the api
-    // of a std container, e.g. std::vector or std::deque, and can be
-    // passed to Tree::getNodes().
-    struct MyArray {
-        using value_type = LeafType*;//required by Tree::getNodes
-        value_type* ptr;
-        MyArray(value_type* array) : ptr(array) {}
-        void push_back(value_type leaf) { *ptr++ = leaf; }//required by Tree::getNodes
-    };
-
-    void initLeafArray()
+    void initLeafArray(bool serial = false)
     {
-        const size_t leafCount = mTree->leafCount();
+        // Build an array of all nodes that have leaf nodes as their immediate children
+
+        using NodeChainT = typename NodeChain<RootNodeType, RootNodeType::LEVEL>::Type;
+        using NonConstLeafParentT = typename NodeChainT::template Get</*Level=*/1>;
+        using LeafParentT = typename CopyConstness<TreeType, NonConstLeafParentT>::Type;
+
+        std::deque<LeafParentT*> leafParents;
+        mTree->getNodes(leafParents);
+
+        // Compute the leaf counts for each node
+
+        std::vector<Index32> leafCounts;
+        if (serial) {
+            leafCounts.reserve(leafParents.size());
+            for (LeafParentT* leafParent : leafParents) {
+                leafCounts.push_back(leafParent->childCount());
+            }
+        } else {
+            leafCounts.resize(leafParents.size());
+            tbb::parallel_for(
+                // with typical node sizes and SSE enabled, there are only a handful
+                // of instructions executed per-operation with a default grainsize
+                // of 1, so increase to 64 to reduce parallel scheduling overhead
+                tbb::blocked_range<size_t>(0, leafParents.size(), /*grainsize=*/64),
+                [&](tbb::blocked_range<size_t>& range)
+                {
+                    for (size_t i = range.begin(); i < range.end(); i++) {
+                        leafCounts[i] = leafParents[i]->childCount();
+                    }
+                }
+            );
+        }
+
+        // Turn leaf counts into a cumulative histogram and obtain total leaf count
+
+        for (size_t i = 1; i < leafCounts.size(); i++) {
+            leafCounts[i] += leafCounts[i-1];
+        }
+
+        const size_t leafCount = leafCounts.empty() ? 0 : leafCounts.back();
+
+        // Allocate (or deallocate) the leaf pointer array
+
         if (leafCount != mLeafCount) {
-            delete [] mLeafs;
-            mLeafs = (leafCount == 0) ? nullptr : new LeafType*[leafCount];
+            if (leafCount > 0) {
+                mLeafPtrs.reset(new LeafType*[leafCount]);
+                mLeafs = mLeafPtrs.get();
+            } else {
+                mLeafPtrs.reset();
+                mLeafs = nullptr;
+            }
             mLeafCount = leafCount;
         }
-        MyArray a(mLeafs);
-        mTree->getNodes(a);
+
+        if (mLeafCount == 0)    return;
+
+        // Populate the leaf node pointers
+
+        if (serial) {
+            LeafType** leafPtr = mLeafs;
+            for (LeafParentT* leafParent : leafParents) {
+                for (auto iter = leafParent->beginChildOn(); iter; ++iter) {
+                    *leafPtr++ = &iter.getValue();
+                }
+            }
+        } else {
+            tbb::parallel_for(
+                tbb::blocked_range<size_t>(0, leafParents.size()),
+                [&](tbb::blocked_range<size_t>& range)
+                {
+                    size_t i = range.begin();
+                    LeafType** leafPtr = mLeafs;
+                    if (i > 0)  leafPtr += leafCounts[i-1];
+                    for ( ; i < range.end(); i++) {
+                        for (auto iter = leafParents[i]->beginChildOn(); iter; ++iter) {
+                            *leafPtr++ = &iter.getValue();
+                        }
+                    }
+                }
+            );
+        }
     }
 
     void initAuxBuffers(bool serial)
     {
         const size_t auxBufferCount = mLeafCount * mAuxBuffersPerLeaf;
         if (auxBufferCount != mAuxBufferCount) {
-            delete [] mAuxBuffers;
-            mAuxBuffers = (auxBufferCount == 0) ? nullptr : new NonConstBufferType[auxBufferCount];
+            if (auxBufferCount > 0) {
+                mAuxBufferPtrs.reset(new NonConstBufferType[auxBufferCount]);
+                mAuxBuffers = mAuxBufferPtrs.get();
+            } else {
+                mAuxBufferPtrs.reset();
+                mAuxBuffers = nullptr;
+            }
             mAuxBufferCount = auxBufferCount;
         }
         this->syncAllBuffers(serial);
@@ -745,14 +791,14 @@ private:
     template<typename LeafOp>
     struct LeafReducer
     {
-        LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp), mOwnsOp(false)
+        LeafReducer(LeafOp &leafOp) : mLeafOp(&leafOp)
         {
         }
         LeafReducer(const LeafReducer &other, tbb::split)
-            : mLeafOp(new LeafOp(*(other.mLeafOp), tbb::split())), mOwnsOp(true)
+            : mLeafOpPtr(std::make_unique<LeafOp>(*(other.mLeafOp), tbb::split()))
+            , mLeafOp(mLeafOpPtr.get())
         {
         }
-        ~LeafReducer() { if (mOwnsOp) delete mLeafOp; }
         void run(const LeafRange& range, bool threaded)
         {
             threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
@@ -763,8 +809,8 @@ private:
             for (typename LeafRange::Iterator it = range.begin(); it; ++it) op(*it, it.pos());
         }
         void join(const LeafReducer& other) { mLeafOp->join(*(other.mLeafOp)); }
-        LeafOp *mLeafOp;
-        const bool mOwnsOp;
+        std::unique_ptr<LeafOp> mLeafOpPtr;
+        LeafOp *mLeafOp = nullptr;
     };// LeafReducer
 
     // Helper class to compute a prefix sum of offsets to active voxels
@@ -790,12 +836,13 @@ private:
 
     using FuncType = typename std::function<void (LeafManager*, const RangeType&)>;
 
-    TreeType*            mTree;
-    size_t               mLeafCount, mAuxBufferCount, mAuxBuffersPerLeaf;
-    LeafType**           mLeafs;//array of LeafNode pointers
-    NonConstBufferType*  mAuxBuffers;//array of auxiliary buffers
-    FuncType             mTask;
-    const bool           mIsMaster;
+    TreeType*                           mTree;
+    size_t                              mLeafCount, mAuxBufferCount, mAuxBuffersPerLeaf;
+    std::unique_ptr<LeafType*[]>        mLeafPtrs;
+    LeafType**                          mLeafs = nullptr;//array of LeafNode pointers
+    std::unique_ptr<NonConstBufferType[]> mAuxBufferPtrs;
+    NonConstBufferType*                 mAuxBuffers = nullptr;//array of auxiliary buffers
+    FuncType                            mTask = nullptr;
 };//end of LeafManager class
 
 

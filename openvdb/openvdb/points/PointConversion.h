@@ -1037,40 +1037,6 @@ computeVoxelSize(  const PositionWrapper& positions,
 ////////////////////////////////////////
 
 
-// deprecated functions
-
-template<
-    typename CompressionT,
-    typename PointDataGridT,
-    typename PositionArrayT,
-    typename PointIndexGridT>
-OPENVDB_DEPRECATED
-inline typename PointDataGridT::Ptr
-createPointDataGrid(const PointIndexGridT& pointIndexGrid,
-                    const PositionArrayT& positions,
-                    const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue)
-{
-    return createPointDataGrid<CompressionT, PointDataGridT>(
-        pointIndexGrid, positions, xform, positionDefaultValue.get());
-}
-
-
-template <typename CompressionT, typename PointDataGridT, typename ValueT>
-OPENVDB_DEPRECATED
-inline typename PointDataGridT::Ptr
-createPointDataGrid(const std::vector<ValueT>& positions,
-                    const math::Transform& xform,
-                    Metadata::Ptr positionDefaultValue)
-{
-    return createPointDataGrid<CompressionT, PointDataGridT>(
-        positions, xform, positionDefaultValue.get());
-}
-
-
-////////////////////////////////////////
-
-
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

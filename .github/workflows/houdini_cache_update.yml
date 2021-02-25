@@ -1,0 +1,60 @@
+
+name: Houdini Cache
+
+on:
+  schedule:
+    # run this workflow every sunday at noon UTC
+    - cron:  '0 12 * * 0'
+
+# download the latest production version of Houdini, strip out headers,
+# libraries and binaries required for building OpenVDB and if the build
+# succeeds, put it into the GitHub Actions cache
+
+jobs:
+  houdini18_5:
+    runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
+    container:
+      image: aswf/ci-base:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: download_houdini
+      run: ./ci/download_houdini.sh 18.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+    - name: install_houdini
+      run: ./ci/install_houdini.sh
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      run: ./ci/build_houdini.sh Release ON
+    - name: test
+      run: ./ci/test.sh
+    - name: write_houdini_cache
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+
+  houdini18_0:
+    runs-on: ubuntu-16.04
+    env:
+      CXX: clang++
+    container:
+      image: aswf/ci-base:2019
+    steps:
+    - uses: actions/checkout@v2
+    - name: download_houdini
+      run: ./ci/download_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
+    - name: install_houdini
+      run: ./ci/install_houdini.sh
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      run: ./ci/build_houdini.sh Release ON
+    - name: test
+      run: ./ci/test.sh
+    - name: write_houdini_cache
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
@@ -15,26 +15,17 @@
 
 using namespace openvdb::points;
 
-class TestPointDelete: public CppUnit::TestCase
+class TestPointDelete: public ::testing::Test
 {
 public:
-    void setUp() override { openvdb::initialize(); }
-    void tearDown() override { openvdb::uninitialize(); }
-
-    CPPUNIT_TEST_SUITE(TestPointDelete);
-    CPPUNIT_TEST(testDeleteFromGroups);
-
-    CPPUNIT_TEST_SUITE_END();
-
-    void testDeleteFromGroups();
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::uninitialize(); }
 }; // class TestPointDelete
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestPointDelete);
 
 ////////////////////////////////////////
 
-void
-TestPointDelete::testDeleteFromGroups()
+TEST_F(TestPointDelete, testDeleteFromGroups)
 {
     using openvdb::math::Vec3s;
     using openvdb::tools::PointIndexGrid;
@@ -72,7 +63,7 @@ TestPointDelete::testDeleteFromGroups()
         appendGroup(tree, "test3");
         appendGroup(tree, "test4");
 
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+        EXPECT_EQ(pointCount(tree), Index64(6));
 
         std::vector<short> membership1{1, 0, 0, 0, 0, 1};
 
@@ -87,7 +78,7 @@ TestPointDelete::testDeleteFromGroups()
         deleteFromGroups(tree, groupsToDelete);
 
         // 4 points should have been deleted, so only 2 remain
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(2));
+        EXPECT_EQ(pointCount(tree), Index64(2));
 
         // check that first three groups are deleted but the last is not
 
@@ -96,10 +87,10 @@ TestPointDelete::testDeleteFromGroups()
         AttributeSet attributeSetAfterDeletion = leafIterAfterDeletion->attributeSet();
         AttributeSet::Descriptor& descriptor = attributeSetAfterDeletion.descriptor();
 
-        CPPUNIT_ASSERT(!descriptor.hasGroup("test1"));
-        CPPUNIT_ASSERT(!descriptor.hasGroup("test2"));
-        CPPUNIT_ASSERT(!descriptor.hasGroup("test3"));
-        CPPUNIT_ASSERT(descriptor.hasGroup("test4"));
+        EXPECT_TRUE(!descriptor.hasGroup("test1"));
+        EXPECT_TRUE(!descriptor.hasGroup("test2"));
+        EXPECT_TRUE(!descriptor.hasGroup("test3"));
+        EXPECT_TRUE(descriptor.hasGroup("test4"));
     }
 
     {
@@ -126,7 +117,7 @@ TestPointDelete::testDeleteFromGroups()
         appendGroup(tree, "test");
         appendAttribute(tree, "testAttribute", TypedAttributeArray<int32_t>::attributeType());
 
-        CPPUNIT_ASSERT(tree.beginLeaf());
+        EXPECT_TRUE(tree.beginLeaf());
 
         const PointDataTree::LeafIter leafIter = tree.beginLeaf();
 
@@ -142,18 +133,18 @@ TestPointDelete::testDeleteFromGroups()
 
         deleteFromGroup(tree, "test");
 
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(2));
+        EXPECT_EQ(pointCount(tree), Index64(2));
 
         const PointDataTree::LeafCIter leafIterAfterDeletion = tree.cbeginLeaf();
         const AttributeSet attributeSetAfterDeletion = leafIterAfterDeletion->attributeSet();
         const AttributeSet::Descriptor& descriptor = attributeSetAfterDeletion.descriptor();
 
-        CPPUNIT_ASSERT(descriptor.find("testAttribute") != AttributeSet::INVALID_POS);
+        EXPECT_TRUE(descriptor.find("testAttribute") != AttributeSet::INVALID_POS);
 
         AttributeHandle<int> testAttributeHandle(*attributeSetAfterDeletion.get("testAttribute"));
 
-        CPPUNIT_ASSERT_EQUAL(1, testAttributeHandle.get(0));
-        CPPUNIT_ASSERT_EQUAL(4, testAttributeHandle.get(1));
+        EXPECT_EQ(1, testAttributeHandle.get(0));
+        EXPECT_EQ(4, testAttributeHandle.get(1));
     }
 
     {
@@ -171,7 +162,7 @@ TestPointDelete::testDeleteFromGroups()
         appendGroup(tree, "test3");
         appendGroup(tree, "test4");
 
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(6));
+        EXPECT_EQ(pointCount(tree), Index64(6));
 
         std::vector<short> membership1{1, 0, 1, 1, 0, 1};
 
@@ -190,11 +181,11 @@ TestPointDelete::testDeleteFromGroups()
         const AttributeSet::Descriptor& descriptor = attributeSetAfterDeletion.descriptor();
 
         // no groups should be dropped when invert = true
-        CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(descriptor.groupMap().size()),
+        EXPECT_EQ(static_cast<size_t>(descriptor.groupMap().size()),
                              static_cast<size_t>(4));
 
         // 4 points should remain since test1 and test3 have 4 members between then
-        CPPUNIT_ASSERT_EQUAL(static_cast<size_t>(pointCount(tree)),
+        EXPECT_EQ(static_cast<size_t>(pointCount(tree)),
                              static_cast<size_t>(4));
     }
 
@@ -229,7 +220,7 @@ TestPointDelete::testDeleteFromGroups()
         deleteFromGroups(tree, groupsToDelete, /*invert=*/ false, /*drop=*/ false);
 
         // 4 points should have been deleted, so only 2 remain
-        CPPUNIT_ASSERT_EQUAL(pointCount(tree), Index64(2));
+        EXPECT_EQ(pointCount(tree), Index64(2));
 
         // check that first three groups are deleted but the last is not
 
@@ -240,10 +231,10 @@ TestPointDelete::testDeleteFromGroups()
 
         // all group should still be present
 
-        CPPUNIT_ASSERT(descriptor.hasGroup("test1"));
-        CPPUNIT_ASSERT(descriptor.hasGroup("test2"));
-        CPPUNIT_ASSERT(descriptor.hasGroup("test3"));
-        CPPUNIT_ASSERT(descriptor.hasGroup("test4"));
+        EXPECT_TRUE(descriptor.hasGroup("test1"));
+        EXPECT_TRUE(descriptor.hasGroup("test2"));
+        EXPECT_TRUE(descriptor.hasGroup("test3"));
+        EXPECT_TRUE(descriptor.hasGroup("test4"));
     }
 
 }

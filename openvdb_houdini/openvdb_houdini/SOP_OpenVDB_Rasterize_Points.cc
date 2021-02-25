@@ -2203,7 +2203,7 @@ private:
         const double dxSqr = dx * dx;
 
         openvdb::Coord ijk, pMin, pMax;
-        PosType center, xyz;
+        PosType xyz;
 
         for (; pointIndexIter; ++pointIndexIter) {
 

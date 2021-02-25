@@ -10,10 +10,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBBinaries LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 include(GNUInstallDirs)
 
 ###### OpenVDB Binary Component Options
@@ -69,7 +65,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Tbb_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
@@ -133,12 +129,20 @@ if(OPENVDB_BUILD_VDB_RENDER)
   # headers
 
   target_link_libraries(vdb_render
+    IlmBase::Half
     OpenEXR::IlmImf
     IlmBase::IlmThread
     IlmBase::Iex
     IlmBase::Imath
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
+
+  if(WIN32)
+    get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      target_compile_definitions(vdb_render  PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
 
   if(OPENVDB_ENABLE_RPATH)
     set(OPENVDB_RENDER_RPATHS)

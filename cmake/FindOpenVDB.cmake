@@ -16,6 +16,7 @@ Use this module by invoking find_package with the form::
     [COMPONENTS <libs>...] # OpenVDB libraries by their canonical name
                            # e.g. "openvdb" for "libopenvdb",
                            # "pyopenvdb" for the python plugin
+                           # "openvdb_ax" for the OpenVDB AX extension
                            # "openvdb_houdini" for the houdini plugin
     )
 
@@ -30,6 +31,8 @@ IMPORTED Targets
   The openvdb python library target.
 ``OpenVDB::openvdb_houdini``
   The openvdb houdini library target.
+``OpenVDB::openvdb_ax``
+  The openvdb_ax library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -56,8 +59,8 @@ This will define the following variables:
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
-``OpenVDB_USES_EXR``
-  True if the OpenVDB Library has been built with openexr support
+``OpenVDB_USES_IMATH_HALF``
+  True if the OpenVDB Library has been built with Imath half support
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -104,10 +107,6 @@ may be provided to tell this module where to look.
 cmake_minimum_required(VERSION 3.12)
 include(GNUInstallDirs)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 # Include utility functions for version information
 include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
@@ -126,6 +125,7 @@ set(_OPENVDB_COMPONENT_LIST
   openvdb
   openvdb_je
   pyopenvdb
+  openvdb_ax
   openvdb_houdini
 )
 
@@ -226,7 +226,9 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
     ${OPENVDB_${COMPONENT}_ROOT}
     ${OPENVDB_${COMPONENT}_INCLUDEDIR}
   )
-  list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  if(_VDB_COMPONENT_SEARCH_DIRS)
+    list(REMOVE_DUPLICATES _VDB_COMPONENT_SEARCH_DIRS)
+  endif()
 
   # Look for a standard header files.
   if(${COMPONENT} STREQUAL "openvdb")
@@ -245,6 +247,17 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/python
         ${CMAKE_INSTALL_INCLUDEDIR}/openvdb
+        ${CMAKE_INSTALL_INCLUDEDIR}
+        include
+    )
+  elseif(${COMPONENT} STREQUAL "openvdb_ax")
+    # Look for a standard OpenVDB header file.
+    find_path(OpenVDB_${COMPONENT}_INCLUDE_DIR compiler/Compiler.h
+      ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
+      PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
+      PATH_SUFFIXES
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/openvdb_ax
+        ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax
         ${CMAKE_INSTALL_INCLUDEDIR}
         include
     )
@@ -431,7 +444,6 @@ endif()
 
 # Add standard dependencies
 
-find_package(IlmBase REQUIRED COMPONENTS Half)
 find_package(TBB REQUIRED COMPONENTS tbb)
 find_package(ZLIB REQUIRED)
 
@@ -477,13 +489,33 @@ if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
   endif()
 endif()
 
+# Add deps for openvdb_ax
+
+if(openvdb_ax IN_LIST OpenVDB_FIND_COMPONENTS)
+  find_package(LLVM REQUIRED)
+  find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
+
+  if(found_LLVM)
+    set(LLVM_LIBS "LLVM")
+  else()
+    llvm_map_components_to_libnames(_llvm_libs
+      native core executionengine support mcjit passes objcarcopts)
+    set(LLVM_LIBS "${_llvm_libs}")
+  endif()
+
+  if(NOT OpenVDB_FIND_QUIET)
+    message(STATUS "Found LLVM: ${LLVM_DIR} (found version \"${LLVM_PACKAGE_VERSION}\")")
+  endif()
+  find_package(Boost REQUIRED COMPONENTS random)
+endif()
+
 # As the way we resolve optional libraries relies on library file names, use
 # the configuration options from the main CMakeLists.txt to allow users
 # to manually identify the requirements of OpenVDB builds if they know them.
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
-set(OpenVDB_USES_EXR ${USE_EXR})
+set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -541,14 +573,13 @@ else()
       set(OpenVDB_USES_LOG4CPLUS ON)
     endif()
 
-    string(FIND ${PREREQUISITE} "IlmImf" _HAS_DEP)
+    string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
     if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_EXR ON)
+      set(OpenVDB_USES_IMATH_HALF ON)
     endif()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
-  unset(_HAS_DEP)
 endif()
 
 if(OpenVDB_USES_BLOSC)
@@ -563,49 +594,38 @@ if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
 endif()
 
-if(OpenVDB_USES_EXR)
-  find_package(IlmBase REQUIRED)
-  find_package(OpenEXR REQUIRED)
+if(OpenVDB_USES_IMATH_HALF)
+  find_package(IlmBase REQUIRED COMPONENTS Half)
+  if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
+    #       used in PlatformConfig.h to configure EXR exports. Once this file
+    #       is completely removed, this define can be too
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
 endif()
 
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-if(WIN32)
-  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
-  #       used in PlatformConfig.h to configure EXR exports. Once this file
-  #       is completely removed, this define can be too
-  get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-  if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-    list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-  endif()
-endif()
-
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include OpenEXR and IlmBase deps first to ensure the
-# users chosen namespaced headers are correctly prioritized. Otherwise other
-# include paths from shared installs (including houdini) may pull in the wrong
-# headers
+# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# namespaced headers are correctly prioritized. Otherwise other include paths
+# from shared installs (including houdini) may pull in the wrong headers
 
 set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::iostreams
   Boost::system
-  IlmBase::Half
 )
+
+if(OpenVDB_USES_IMATH_HALF)
+  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
+endif()
 
 if(OpenVDB_ABI)
   list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
-endif()
-
-if(OpenVDB_USES_EXR)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
-    OpenEXR::IlmImf
-  )
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_TOOLS_RAYTRACER_USE_EXR)
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)
@@ -715,6 +735,36 @@ if(OpenVDB_openvdb_houdini_LIBRARY)
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Houdini"
       INTERFACE_COMPILE_FEATURES cxx_std_14
    )
+  endif()
+endif()
+
+# OpenVDB::openvdb_ax
+
+if(OpenVDB_openvdb_ax_LIBRARY)
+  set(OPENVDB_openvdb_ax_LIB_TYPE UNKNOWN)
+  if(OPENVDB_USE_STATIC_LIBS)
+    set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+  elseif(UNIX)
+    get_filename_component(_OPENVDB_openvdb_ax_EXT
+      ${OpenVDB_openvdb_ax_LIBRARY} EXT)
+    if(_OPENVDB_openvdb_ax_EXT STREQUAL ".a")
+      set(OPENVDB_openvdb_ax_LIB_TYPE STATIC)
+    elseif(_OPENVDB_openvdb_ax_EXT STREQUAL ".so" OR
+           _OPENVDB_openvdb_ax_EXT STREQUAL ".dylib")
+      set(OPENVDB_openvdb_ax_LIB_TYPE SHARED)
+    endif()
+  endif()
+
+
+  if(NOT TARGET OpenVDB::openvdb_ax)
+    add_library(OpenVDB::openvdb_ax UNKNOWN IMPORTED)
+    set_target_properties(OpenVDB::openvdb_ax PROPERTIES
+      IMPORTED_LOCATION "${OpenVDB_openvdb_ax_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
+      INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::random;${LLVM_LIBS}"
+      INTERFACE_COMPILE_FEATURES cxx_std_14
+    )
   endif()
 endif()
 

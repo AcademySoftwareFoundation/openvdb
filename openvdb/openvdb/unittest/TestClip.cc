@@ -1,14 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cppunit/extensions/HelperMacros.h>
+#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tools/Clip.h>
 
 
 // See also TestGrid::testClipping()
-class TestClip: public CppUnit::TestFixture
+class TestClip: public ::testing::Test
 {
 public:
     static const openvdb::CoordBBox kCubeBBox, kInnerBBox;
@@ -21,28 +21,10 @@ public:
         }()}
     {}
 
-    void setUp() override;
-    void tearDown() override;
+    void SetUp() override { openvdb::initialize(); }
+    void TearDown() override { openvdb::initialize(); }
 
-    CPPUNIT_TEST_SUITE(TestClip);
-    CPPUNIT_TEST(testBBox);
-    CPPUNIT_TEST(testFrustum);
-    CPPUNIT_TEST(testMaskGrid);
-    CPPUNIT_TEST(testBoolMask);
-    CPPUNIT_TEST(testInvertedBoolMask);
-    CPPUNIT_TEST(testNonBoolMask);
-    CPPUNIT_TEST(testInvertedNonBoolMask);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testBBox();
-    void testFrustum();
-    void testMaskGrid();
-    void testBoolMask();
-    void testInvertedBoolMask();
-    void testNonBoolMask();
-    void testInvertedNonBoolMask();
-
-private:
+protected:
     void validate(const openvdb::FloatGrid&);
 
     const openvdb::FloatGrid mCube;
@@ -54,23 +36,8 @@ const openvdb::CoordBBox
     // The clipping mask is a 1 x 1 x 13 segment extending along the Z axis inside the cube.
     TestClip::kInnerBBox{openvdb::Coord{4, 4, -6}, openvdb::Coord{4, 4, 6}};
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestClip);
-
 
 ////////////////////////////////////////
-
-
-void
-TestClip::setUp()
-{
-    openvdb::initialize();
-}
-
-void
-TestClip::tearDown()
-{
-    openvdb::uninitialize();
-}
 
 
 void
@@ -79,14 +46,14 @@ TestClip::validate(const openvdb::FloatGrid& clipped)
     using namespace openvdb;
 
     const CoordBBox bbox = clipped.evalActiveVoxelBoundingBox();
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.min().x(), bbox.min().x());
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.min().y(), bbox.min().y());
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.min().z(), bbox.min().z());
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.max().x(), bbox.max().x());
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.max().y(), bbox.max().y());
-    CPPUNIT_ASSERT_EQUAL(kInnerBBox.max().z(), bbox.max().z());
-    CPPUNIT_ASSERT_EQUAL(6 + 6 + 1, int(clipped.activeVoxelCount()));
-    CPPUNIT_ASSERT_EQUAL(2, int(clipped.constTree().leafCount()));
+    EXPECT_EQ(kInnerBBox.min().x(), bbox.min().x());
+    EXPECT_EQ(kInnerBBox.min().y(), bbox.min().y());
+    EXPECT_EQ(kInnerBBox.min().z(), bbox.min().z());
+    EXPECT_EQ(kInnerBBox.max().x(), bbox.max().x());
+    EXPECT_EQ(kInnerBBox.max().y(), bbox.max().y());
+    EXPECT_EQ(kInnerBBox.max().z(), bbox.max().z());
+    EXPECT_EQ(6 + 6 + 1, int(clipped.activeVoxelCount()));
+    EXPECT_EQ(2, int(clipped.constTree().leafCount()));
 
     FloatGrid::ConstAccessor acc = clipped.getConstAccessor();
     const float bg = clipped.background();
@@ -96,9 +63,9 @@ TestClip::validate(const openvdb::FloatGrid& clipped)
         for (y = kCubeBBox.min().y(); y <= kCubeBBox.max().y(); ++y) {
             for (z = kCubeBBox.min().z(); z <= kCubeBBox.max().z(); ++z) {
                 if (x == 4 && y == 4 && z >= -6 && z <= 6) {
-                    CPPUNIT_ASSERT_EQUAL(5.f, acc.getValue(Coord(4, 4, z)));
+                    EXPECT_EQ(5.f, acc.getValue(Coord(4, 4, z)));
                 } else {
-                    CPPUNIT_ASSERT_EQUAL(bg, acc.getValue(Coord(x, y, z)));
+                    EXPECT_EQ(bg, acc.getValue(Coord(x, y, z)));
                 }
             }
         }
@@ -110,8 +77,7 @@ TestClip::validate(const openvdb::FloatGrid& clipped)
 
 
 // Test clipping against a bounding box.
-void
-TestClip::testBBox()
+TEST_F(TestClip, testBBox)
 {
     using namespace openvdb;
     BBoxd clipBox(Vec3d(4.0, 4.0, -6.0), Vec3d(4.9, 4.9, 6.0));
@@ -121,8 +87,7 @@ TestClip::testBBox()
 
 
 // Test clipping against a camera frustum.
-void
-TestClip::testFrustum()
+TEST_F(TestClip, testFrustum)
 {
     using namespace openvdb;
 
@@ -143,14 +108,14 @@ TestClip::testFrustum()
 
         const auto bbox = clipped->evalActiveVoxelBoundingBox();
         const auto cubeDim = kCubeBBox.dim();
-        CPPUNIT_ASSERT_EQUAL(kCubeBBox.min().z() + 1, bbox.min().z());
-        CPPUNIT_ASSERT_EQUAL(kCubeBBox.max().z() - 1, bbox.max().z());
-        CPPUNIT_ASSERT(int(bbox.volume()) < int(cubeDim.x() * cubeDim.y() * (cubeDim.z() - 2)));
+        EXPECT_EQ(kCubeBBox.min().z() + 1, bbox.min().z());
+        EXPECT_EQ(kCubeBBox.max().z() - 1, bbox.max().z());
+        EXPECT_TRUE(int(bbox.volume()) < int(cubeDim.x() * cubeDim.y() * (cubeDim.z() - 2)));
 
         // Note: mCube index space corresponds to world space.
         for (auto it = clipped->beginValueOn(); it; ++it) {
             const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
-            CPPUNIT_ASSERT(frustumIndexBBox.isInside(xyz));
+            EXPECT_TRUE(frustumIndexBBox.isInside(xyz));
         }
     }
     {
@@ -158,25 +123,24 @@ TestClip::testFrustum()
         tile.tree().addTile(/*level=*/2, Coord{0}, /*value=*/5.0f, /*active=*/true);
 
         auto clipped = tools::clip(tile, frustum);
-        CPPUNIT_ASSERT(!clipped->empty());
+        EXPECT_TRUE(!clipped->empty());
         for (auto it = clipped->beginValueOn(); it; ++it) {
             const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
-            CPPUNIT_ASSERT(frustumIndexBBox.isInside(xyz));
+            EXPECT_TRUE(frustumIndexBBox.isInside(xyz));
         }
 
         clipped = tools::clip(tile, frustum, /*keepInterior=*/false);
-        CPPUNIT_ASSERT(!clipped->empty());
+        EXPECT_TRUE(!clipped->empty());
         for (auto it = clipped->beginValueOn(); it; ++it) {
             const auto xyz = frustum.applyInverseMap(it.getCoord().asVec3d());
-            CPPUNIT_ASSERT(!frustumIndexBBox.isInside(xyz));
+            EXPECT_TRUE(!frustumIndexBBox.isInside(xyz));
         }
     }
 }
 
 
 // Test clipping against a MaskGrid.
-void
-TestClip::testMaskGrid()
+TEST_F(TestClip, testMaskGrid)
 {
     using namespace openvdb;
     MaskGrid mask(false);
@@ -187,8 +151,7 @@ TestClip::testMaskGrid()
 
 
 // Test clipping against a boolean mask grid.
-void
-TestClip::testBoolMask()
+TEST_F(TestClip, testBoolMask)
 {
     using namespace openvdb;
     BoolGrid mask(false);
@@ -199,8 +162,7 @@ TestClip::testBoolMask()
 
 
 // Test clipping against a boolean mask grid with mask inversion.
-void
-TestClip::testInvertedBoolMask()
+TEST_F(TestClip, testInvertedBoolMask)
 {
     using namespace openvdb;
     // Construct a mask grid that is the "inverse" of the mask used in the other tests.
@@ -217,8 +179,7 @@ TestClip::testInvertedBoolMask()
 
 
 // Test clipping against a non-boolean mask grid.
-void
-TestClip::testNonBoolMask()
+TEST_F(TestClip, testNonBoolMask)
 {
     using namespace openvdb;
     Int32Grid mask(0);
@@ -229,8 +190,7 @@ TestClip::testNonBoolMask()
 
 
 // Test clipping against a non-boolean mask grid with mask inversion.
-void
-TestClip::testInvertedNonBoolMask()
+TEST_F(TestClip, testInvertedNonBoolMask)
 {
     using namespace openvdb;
     // Construct a mask grid that is the "inverse" of the mask used in the other tests.

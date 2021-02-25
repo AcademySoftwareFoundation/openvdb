@@ -36,7 +36,23 @@ public:
     using MyBase = Mat<4, T>;
 
     /// Trivial constructor, the matrix is NOT initialized
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Mat4() = default;
+#else
     Mat4() {}
+
+    /// Copy constructor
+    Mat4(const Mat<4, T> &m)
+    {
+        for (int i = 0; i < 4; ++i) {
+            for (int j = 0; j < 4; ++j) {
+                MyBase::mm[i*4 + j] = m[i][j];
+            }
+        }
+    }
+#endif
 
     /// Constructor given array of elements, the ordering is in row major form:
     /** @verbatim
@@ -97,16 +113,6 @@ public:
             this->setRows(v1, v2, v3, v4);
         } else {
             this->setColumns(v1, v2, v3, v4);
-        }
-    }
-
-    /// Copy constructor
-    Mat4(const Mat<4, T> &m)
-    {
-        for (int i = 0; i < 4; ++i) {
-            for (int j = 0; j < 4; ++j) {
-                MyBase::mm[i*4 + j] = m[i][j];
-            }
         }
     }
 
@@ -177,17 +183,6 @@ public:
         // assert(j>=0 && j<4);
         return Vec4<T>((*this)(0,j), (*this)(1,j), (*this)(2,j), (*this)(3,j));
     }
-
-    //@{
-    /// Array style reference to ith row
-    /// e.g.    m[1][3] = 4;
-    T* operator[](int i) { return &(MyBase::mm[i<<2]); }
-    const T* operator[](int i) const { return &(MyBase::mm[i<<2]); }
-    //@}
-
-    /// Direct access to the internal data
-    T* asPointer() {return MyBase::mm;}
-    const T* asPointer() const {return MyBase::mm;}
 
     /// Alternative indexed reference to the elements
     /// Note that the indices are row first and column second.
@@ -675,7 +670,7 @@ public:
                 }
             }
 
-            det += sign * MyBase::mm[i] * submat.det();
+            det += T(sign) * MyBase::mm[i] * submat.det();
             sign = -sign;
         }
 
@@ -1329,10 +1324,54 @@ inline bool hasTranslation(const Mat4<T>& m) {
     return (m.row(3) != Vec4<T>(0, 0, 0, 1));
 }
 
+template<typename T>
+inline Mat4<T>
+Abs(const Mat4<T>& m)
+{
+    Mat4<T> out;
+    const T* ip = m.asPointer();
+    T* op = out.asPointer();
+    for (unsigned i = 0; i < 16; ++i, ++op, ++ip) *op = math::Abs(*ip);
+    return out;
+}
+
+template<typename Type1, typename Type2>
+inline Mat4<Type1>
+cwiseAdd(const Mat4<Type1>& m, const Type2 s)
+{
+    Mat4<Type1> out;
+    const Type1* ip = m.asPointer();
+    Type1* op = out.asPointer();
+    for (unsigned i = 0; i < 16; ++i, ++op, ++ip) {
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+        *op = *ip + s;
+        OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    }
+    return out;
+}
+
+template<typename T>
+inline bool
+cwiseLessThan(const Mat4<T>& m0, const Mat4<T>& m1)
+{
+    return cwiseLessThan<4, T>(m0, m1);
+}
+
+template<typename T>
+inline bool
+cwiseGreaterThan(const Mat4<T>& m0, const Mat4<T>& m1)
+{
+    return cwiseGreaterThan<4, T>(m0, m1);
+}
 
 using Mat4s = Mat4<float>;
 using Mat4d = Mat4<double>;
 using Mat4f = Mat4d;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+OPENVDB_IS_POD(Mat4s)
+OPENVDB_IS_POD(Mat4d)
+#endif
 
 } // namespace math
 

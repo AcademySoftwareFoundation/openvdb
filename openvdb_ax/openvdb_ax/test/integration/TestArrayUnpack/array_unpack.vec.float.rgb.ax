@@ -1,0 +1,13 @@
+
+vec2f@test1.r = vec2f@test2.g;
+vec2f@test2.g = vec2f@test1.r;
+
+vec3f@test3.g = vec3f@test3.b;
+vec3f@test4.b = vec3f@test4.r;
+vec3f@test3.r = vec3f@test4.g;
+
+vec4f@test5.r = vec4f@test6.b;
+vec4f@test5[3] = vec4f@test5.g;
+vec4f@test5.b = vec4f@test6[3];
+vec4f@test6.g = vec4f@test6.r;
+

@@ -30,11 +30,12 @@ public:
     using ValueType = T;
     enum SIZE_ { size = SIZE };
 
-    // Number of cols, rows, elements
-    static unsigned numRows() { return SIZE; }
-    static unsigned numColumns() { return SIZE; }
-    static unsigned numElements() { return SIZE*SIZE; }
-
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Mat() = default;
+#else
     /// Default ctor.  Does nothing.  Required because declaring a copy (or
     /// other) constructor means the default constructor gets left out.
     Mat() { }
@@ -54,6 +55,12 @@ public:
         }
         return *this;
     }
+#endif
+
+    // Number of cols, rows, elements
+    static unsigned numRows() { return SIZE; }
+    static unsigned numColumns() { return SIZE; }
+    static unsigned numElements() { return SIZE*SIZE; }
 
     /// @return string representation of matrix
     /// Since output is multiline, optional indentation argument prefixes
@@ -111,6 +118,16 @@ public:
         ostr << m.str();
         return ostr;
     }
+
+    /// Direct access to the internal data
+    T* asPointer() { return mm; }
+    const T* asPointer() const { return mm; }
+
+    //@{
+    /// Array style reference to ith row
+    T* operator[](int i) { return &(mm[i*SIZE]); }
+    const T* operator[](int i) const { return &(mm[i*SIZE]); }
+    //@}
 
     void write(std::ostream& os) const {
         os.write(reinterpret_cast<const char*>(&mm), sizeof(T)*SIZE*SIZE);
@@ -931,7 +948,7 @@ lInfinityNorm(const MatType& matrix)
         typename MatType::ValueType column_sum = 0;
 
         for (int i = 0; i<n; ++i) {
-            column_sum += fabs(matrix(i,j));
+            column_sum += std::fabs(matrix(i,j));
         }
         norm = std::max(norm, column_sum);
     }
@@ -952,7 +969,7 @@ lOneNorm(const MatType& matrix)
         typename MatType::ValueType row_sum = 0;
 
         for (int j = 0; j<n; ++j) {
-            row_sum += fabs(matrix(i,j));
+            row_sum += std::fabs(matrix(i,j));
         }
         norm = std::max(norm, row_sum);
     }
@@ -1010,6 +1027,36 @@ polarDecomposition(const MatType& input, MatType& unitary,
 
     positive_hermitian = unitary.transpose() * input;
     return true;
+}
+
+////////////////////////////////////////
+
+/// @return true if m0 < m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+inline bool
+cwiseLessThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p < *m1p;
+    }
+    return *m0p < *m1p;
+}
+
+/// @return true if m0 > m1, comparing components in order of significance.
+template<unsigned SIZE, typename T>
+inline bool
+cwiseGreaterThan(const Mat<SIZE, T>& m0, const Mat<SIZE, T>& m1)
+{
+    const T* m0p = m0.asPointer();
+    const T* m1p = m1.asPointer();
+    constexpr unsigned size = SIZE*SIZE;
+    for (unsigned i = 0; i < size-1; ++i, ++m0p, ++m1p) {
+        if (!math::isExactlyEqual(*m0p, *m1p)) return *m0p > *m1p;
+    }
+    return *m0p > *m1p;
 }
 
 } // namespace math

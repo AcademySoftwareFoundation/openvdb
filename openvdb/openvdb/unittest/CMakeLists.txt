@@ -10,10 +10,7 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
+include(GNUInstallDirs)
 
 ##########################################################################
 
@@ -34,11 +31,12 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
+find_package(GTest ${MINIMUM_GOOGLETEST_VERSION} REQUIRED)
 
 set(OPENVDB_TEST_DEPENDENT_LIBS
   ${OPENVDB_LIB}
-  CppUnit::cppunit
+  GTest::GTest
+  GTest::Main
 )
 
 if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
@@ -103,10 +101,12 @@ set(UNITTEST_SOURCE_FILES
   TestMat4Metadata.cc
   TestMath.cc
   TestMeanCurvature.cc
+  TestMerge.cc
   TestMeshToVolume.cc
   TestMetadata.cc
   TestMetadataIO.cc
   TestMetaMap.cc
+  TestMorphology.cc
   TestMultiResGrid.cc
   TestName.cc
   TestNodeIterator.cc
@@ -188,10 +188,10 @@ if(OPENVDB_ENABLE_RPATH)
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}
-    ${CppUnit_LIBRARY_DIRS}
+    ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_PREFIX}/lib)
+    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

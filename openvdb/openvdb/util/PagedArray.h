@@ -54,31 +54,17 @@ namespace util {
 /// There are three fundamentally different ways to insert elements to
 /// this container - each with different advanteges and disadvanteges.
 ///
-/// The simplest way to insert elements is to use PagedArray::push_back e.g.
+/// The simplest way to insert elements is to use PagedArray::push_back_unsafe
+/// which is @a not thread-safe:
 /// @code
 ///   PagedArray<size_t> array;
-///   for (size_t i=0; i<100000; ++i) array.push_back(i);
+///   for (size_t i=0; i<100000; ++i) array.push_back_unsafe(i);
 /// @endcode
-/// or with TBB task-based multi-threading
-/// @code
-///   PagedArray<size_t> array;
-///   tbb::parallel_for(
-///       tbb::blocked_range<size_t>(0, 10000, array.pageSize()),
-///       [&array](const tbb::blocked_range<size_t>& range) {
-///           for (size_t i=range.begin(); i!=range.end(); ++i) array.push_back(i);
-///       }
-///   );
-/// @endcode
-/// PagedArray::push_back has the advantage that it's thread-safe and
-/// preserves the ordering of the inserted elements. In fact it returns
-/// the linear offset to the added element which can then be used for
-/// fast O(1) random access. The disadvantage is it's the slowest of
-/// the three different ways of inserting elements.
 ///
-/// The fastest way (by far) to insert elements by means of a PagedArray::ValueBuffer, e.g.
+/// The fastest way (by far) to insert elements is by means of a PagedArray::ValueBuffer:
 /// @code
 ///   PagedArray<size_t> array;
-///   PagedArray<size_t>::ValueBuffer buffer(array);
+///   auto buffer = array.getBuffer();
 ///   for (size_t i=0; i<100000; ++i) buffer.push_back(i);
 ///   buffer.flush();
 /// @endcode
@@ -87,17 +73,17 @@ namespace util {
 ///   PagedArray<size_t> array;
 ///   {
 ///       //local scope of a single thread
-///       PagedArray<size_t>::ValueBuffer buffer(array);
+///       auto buffer = array.getBuffer();
 ///       for (size_t i=0; i<100000; ++i) buffer.push_back(i);
 ///   }
 /// @endcode
-/// or with TBB task-based multi-threading
+/// or with TBB task-based multi-threading:
 /// @code
 ///   PagedArray<size_t> array;
 ///   tbb::parallel_for(
 ///       tbb::blocked_range<size_t>(0, 10000, array.pageSize()),
 ///       [&array](const tbb::blocked_range<size_t>& range) {
-///           PagedArray<size_t>::ValueBuffer buffer(array);
+///           auto buffer = array.getBuffer();
 ///           for (size_t i=range.begin(); i!=range.end(); ++i) buffer.push_back(i);
 ///       }
 ///   );
@@ -106,19 +92,19 @@ namespace util {
 /// to fewer concurrent instantiations of partially full ValueBuffers)
 /// @code
 ///   PagedArray<size_t> array;
-///   PagedArray<size_t>::ValueBuffer exemplar(array);//dummy used for initialization
+///   auto exemplar = array.getBuffer();//dummy used for initialization
 ///   tbb::enumerable_thread_specific<PagedArray<size_t>::ValueBuffer>
 ///       pool(exemplar);//thread local storage pool of ValueBuffers
 ///   tbb::parallel_for(
 ///       tbb::blocked_range<size_t>(0, 10000, array.pageSize()),
 ///       [&pool](const tbb::blocked_range<size_t>& range) {
-///           PagedArray<size_t>::ValueBuffer &buffer = pool.local();
+///           auto &buffer = pool.local();
 ///           for (size_t i=range.begin(); i!=range.end(); ++i) buffer.push_back(i);
 ///       }
 ///   );
 ///   for (auto i=pool.begin(); i!=pool.end(); ++i) i->flush();
 /// @endcode
-/// This technique generally outperforms PagedArray::push_back,
+/// This technique generally outperforms PagedArray::push_back_unsafe,
 /// std::vector::push_back, std::deque::push_back and even
 /// tbb::concurrent_vector::push_back. Additionally it
 /// is thread-safe as long as each thread has it's own instance of a
@@ -156,6 +142,7 @@ template<typename ValueT, size_t Log2PageSize = 10UL>
 class PagedArray
 {
 private:
+    static_assert(Log2PageSize > 1UL, "Expected Log2PageSize > 1");
     class Page;
 
     // must allow mutiple threads to call operator[] as long as only one thread calls push_back
@@ -188,34 +175,26 @@ public:
     ///          make sure to create an instance per thread!
     class ValueBuffer;
 
+    /// @return a new instance of a ValueBuffer which supports thread-safe push_back!
+    ValueBuffer getBuffer() { return ValueBuffer(*this); }
+
     /// Const std-compliant iterator
     class ConstIterator;
 
      /// Non-const std-compliant iterator
     class Iterator;
 
-    /// @brief   Thread safe insertion, adds a new element at
-    ///          the end and increases the container size by one and
-    ///          returns the linear offset for the inserted element.
-    ///
-    /// @param value value to be added to this PagedArray
-    ///
-    /// @details Constant time complexity. May allocate a new page.
-    size_t push_back(const ValueType& value)
+    /// @brief This method is deprecated and will be removed shortly!
+    [[deprecated]] size_t push_back(const ValueType& value)
     {
-        const size_t index = mSize.fetch_and_increment();
-        if (index >= mCapacity) this->grow(index);
-        (*mPageTable[index >> Log2PageSize])[index] = value;
-        return index;
+        return this->push_back_unsafe(value);
     }
 
-    /// @brief Slightly faster than the thread-safe push_back above.
-    ///
     /// @param value value to be added to this PagedArray
     ///
     /// @note For best performance consider using the ValueBuffer!
     ///
-    /// @warning Not thread-safe!
+    /// @warning Not thread-safe and mostly intended for debugging!
     size_t push_back_unsafe(const ValueType& value)
     {
         const size_t index = mSize.fetch_and_increment();
@@ -599,6 +578,7 @@ public:
     PagedArrayType& parent() const { return *mParent; }
     /// @brief Return the current number of elements cached in this buffer.
     size_t size() const { return mSize; }
+    static size_t pageSize() { return 1UL << Log2PageSize; }
 private:
     PagedArray* mParent;
     Page*       mPage;

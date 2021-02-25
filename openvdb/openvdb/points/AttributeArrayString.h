@@ -25,14 +25,6 @@ namespace points {
 ////////////////////////////////////////
 
 
-// StringIndexType is now deprecated, use Index directly
-#ifdef _MSC_VER
-// (deprecations on aliases are not supported on Windows)
-using StringIndexType = Index;
-#else
-using StringIndexType OPENVDB_DEPRECATED = Index;
-#endif
-
 namespace attribute_traits
 {
     template <bool Truncate> struct StringTypeTrait { using Type = Index; };

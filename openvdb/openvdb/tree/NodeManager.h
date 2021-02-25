@@ -3,13 +3,12 @@
 
 /// @file tree/NodeManager.h
 ///
-/// @author Ken Museth
+/// @authors Ken Museth, Dan Bailey
 ///
 /// @brief NodeManager produces linear arrays of all tree nodes
 /// allowing for efficient threading and bottom-up processing.
 ///
 /// @note A NodeManager can be constructed from a Tree or LeafManager.
-/// The latter is slightly more efficient since the cached leaf nodes will be reused.
 
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
@@ -31,7 +30,21 @@ template<typename TreeOrLeafManagerT, Index LEVELS = TreeOrLeafManagerT::RootNod
 class NodeManager;
 
 
+// Produce linear arrays of all tree nodes lazily, to facilitate efficient threading
+// of topology-changing top-down workflows.
+template<typename TreeOrLeafManagerT, Index _LEVELS = TreeOrLeafManagerT::RootNodeType::LEVEL>
+class DynamicNodeManager;
+
+
 ////////////////////////////////////////
+
+
+// This is a dummy node filtering class used by the NodeManager class to match
+// the internal filtering interface used by the DynamicNodeManager.
+struct NodeFilter
+{
+    static bool valid(size_t) { return true; }
+}; // struct NodeFilter
 
 
 /// @brief This class caches tree nodes of a specific type in a linear array.
@@ -41,22 +54,135 @@ template<typename NodeT>
 class NodeList
 {
 public:
-    using value_type = NodeT*;
-    using ListT = std::deque<value_type>;
+    NodeList() = default;
 
-    NodeList() {}
+    NodeT& operator()(size_t n) const { assert(n<mNodeCount); return *(mNodes[n]); }
 
-    void push_back(NodeT* node) { mList.push_back(node); }
+    NodeT*& operator[](size_t n) { assert(n<mNodeCount); return mNodes[n]; }
 
-    NodeT& operator()(size_t n) const { assert(n<mList.size()); return *(mList[n]); }
+    Index64 nodeCount() const { return mNodeCount; }
 
-    NodeT*& operator[](size_t n) { assert(n<mList.size()); return mList[n]; }
+    void clear()
+    {
+        mNodePtrs.reset();
+        mNodes = nullptr;
+        mNodeCount = 0;
+    }
 
-    Index64 nodeCount() const { return mList.size(); }
+    // initialize this node list from the provided root node
+    template <typename RootT>
+    bool initRootChildren(RootT& root)
+    {
+        // Allocate (or deallocate) the node pointer array
 
-    void clear() { mList.clear(); }
+        size_t nodeCount = root.childCount();
 
-    void resize(size_t n) { mList.resize(n); }
+        if (nodeCount != mNodeCount) {
+            if (nodeCount > 0) {
+                mNodePtrs.reset(new NodeT*[nodeCount]);
+                mNodes = mNodePtrs.get();
+            } else {
+                mNodePtrs.reset();
+                mNodes = nullptr;
+            }
+            mNodeCount = nodeCount;
+        }
+
+        if (mNodeCount == 0)    return false;
+
+        // Populate the node pointers
+
+        NodeT** nodePtr = mNodes;
+        for (auto iter = root.beginChildOn(); iter; ++iter) {
+            *nodePtr++ = &iter.getValue();
+        }
+
+        return true;
+    }
+
+    // initialize this node list from another node list containing the parent nodes
+    template <typename ParentsT, typename NodeFilterT>
+    bool initNodeChildren(ParentsT& parents, const NodeFilterT& nodeFilter = NodeFilterT(), bool serial = false)
+    {
+        // Compute the node counts for each node
+
+        std::vector<Index32> nodeCounts;
+        if (serial) {
+            nodeCounts.reserve(parents.nodeCount());
+            for (size_t i = 0; i < parents.nodeCount(); i++) {
+                if (!nodeFilter.valid(i))   nodeCounts.push_back(0);
+                else                        nodeCounts.push_back(parents(i).childCount());
+            }
+        } else {
+            nodeCounts.resize(parents.nodeCount());
+            tbb::parallel_for(
+                // with typical node sizes and SSE enabled, there are only a handful
+                // of instructions executed per-operation with a default grainsize
+                // of 1, so increase to 64 to reduce parallel scheduling overhead
+                tbb::blocked_range<Index64>(0, parents.nodeCount(), /*grainsize=*/64),
+                [&](tbb::blocked_range<Index64>& range)
+                {
+                    for (Index64 i = range.begin(); i < range.end(); i++) {
+                        if (!nodeFilter.valid(i))   nodeCounts[i] = 0;
+                        else                        nodeCounts[i] = parents(i).childCount();
+                    }
+                }
+            );
+        }
+
+        // Turn node counts into a cumulative histogram and obtain total node count
+
+        for (size_t i = 1; i < nodeCounts.size(); i++) {
+            nodeCounts[i] += nodeCounts[i-1];
+        }
+
+        const size_t nodeCount = nodeCounts.empty() ? 0 : nodeCounts.back();
+
+        // Allocate (or deallocate) the node pointer array
+
+        if (nodeCount != mNodeCount) {
+            if (nodeCount > 0) {
+                mNodePtrs.reset(new NodeT*[nodeCount]);
+                mNodes = mNodePtrs.get();
+            } else {
+                mNodePtrs.reset();
+                mNodes = nullptr;
+            }
+            mNodeCount = nodeCount;
+        }
+
+        if (mNodeCount == 0)    return false;
+
+        // Populate the node pointers
+
+        if (serial) {
+            NodeT** nodePtr = mNodes;
+            for (size_t i = 0; i < parents.nodeCount(); i++) {
+                if (!nodeFilter.valid(i))   continue;
+                for (auto iter = parents(i).beginChildOn(); iter; ++iter) {
+                    *nodePtr++ = &iter.getValue();
+                }
+            }
+        } else {
+            tbb::parallel_for(
+                tbb::blocked_range<Index64>(0, parents.nodeCount()),
+                [&](tbb::blocked_range<Index64>& range)
+                {
+                    Index64 i = range.begin();
+                    NodeT** nodePtr = mNodes;
+                    if (i > 0)  nodePtr += nodeCounts[i-1];
+                    for ( ; i < range.end(); i++) {
+                        if (!nodeFilter.valid(i))   continue;
+                        for (auto iter = parents(i).beginChildOn(); iter; ++iter) {
+                            *nodePtr++ = &iter.getValue();
+                        }
+                    }
+                }
+            );
+        }
+
+        return true;
+    }
 
     class NodeRange
     {
@@ -152,10 +278,42 @@ public:
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
+    // identical to foreach except the operator() method has a node index
+    template<typename NodeOp>
+    void foreachWithIndex(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeTransformer<NodeOp, OpWithIndex> transform(op);
+        transform.run(this->nodeRange(grainSize), threaded);
+    }
+
+    // identical to reduce except the operator() method has a node index
+    template<typename NodeOp>
+    void reduceWithIndex(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        NodeReducer<NodeOp, OpWithIndex> transform(op);
+        transform.run(this->nodeRange(grainSize), threaded);
+    }
+
 private:
 
+    // default execution in the NodeManager ignores the node index
+    // given by the iterator position
+    struct OpWithoutIndex
+    {
+        template <typename T>
+        static void eval(T& node, typename NodeRange::Iterator& iter) { node(*iter); }
+    };
+
+    // execution in the DynamicNodeManager matches that of the LeafManager in
+    // passing through the node index given by the iterator position
+    struct OpWithIndex
+    {
+        template <typename T>
+        static void eval(T& node, typename NodeRange::Iterator& iter) { node(*iter, iter.pos()); }
+    };
+
     // Private struct of NodeList that performs parallel_for
-    template<typename NodeOp>
+    template<typename NodeOp, typename OpT = OpWithoutIndex>
     struct NodeTransformer
     {
         NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp)
@@ -167,43 +325,48 @@ private:
         }
         void operator()(const NodeRange& range) const
         {
-            for (typename NodeRange::Iterator it = range.begin(); it; ++it) mNodeOp(*it);
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+                OpT::template eval(mNodeOp, it);
+            }
         }
         const NodeOp mNodeOp;
     };// NodeList::NodeTransformer
 
     // Private struct of NodeList that performs parallel_reduce
-    template<typename NodeOp>
+    template<typename NodeOp, typename OpT = OpWithoutIndex>
     struct NodeReducer
     {
-        NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp), mOwnsOp(false)
+        NodeReducer(NodeOp& nodeOp) : mNodeOp(&nodeOp)
         {
         }
-        NodeReducer(const NodeReducer& other, tbb::split) :
-            mNodeOp(new NodeOp(*(other.mNodeOp), tbb::split())), mOwnsOp(true)
+        NodeReducer(const NodeReducer& other, tbb::split)
+            : mNodeOpPtr(std::make_unique<NodeOp>(*(other.mNodeOp), tbb::split()))
+            , mNodeOp(mNodeOpPtr.get())
         {
         }
-        ~NodeReducer() { if (mOwnsOp) delete mNodeOp; }
         void run(const NodeRange& range, bool threaded = true)
         {
             threaded ? tbb::parallel_reduce(range, *this) : (*this)(range);
         }
         void operator()(const NodeRange& range)
         {
-            NodeOp &op = *mNodeOp;
-            for (typename NodeRange::Iterator it = range.begin(); it; ++it) op(*it);
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+                OpT::template eval(*mNodeOp, it);
+            }
         }
         void join(const NodeReducer& other)
         {
             mNodeOp->join(*(other.mNodeOp));
         }
-        NodeOp *mNodeOp;
-        const bool mOwnsOp;
+        std::unique_ptr<NodeOp> mNodeOpPtr;
+        NodeOp *mNodeOp = nullptr;
     };// NodeList::NodeReducer
 
 
 protected:
-    ListT mList;
+    size_t mNodeCount = 0;
+    std::unique_ptr<NodeT*[]> mNodePtrs;
+    NodeT** mNodes = nullptr;
 };// NodeList
 
 
@@ -218,25 +381,25 @@ template<typename NodeT, Index LEVEL>
 class NodeManagerLink
 {
 public:
-    NodeManagerLink() {}
+    using NonConstChildNodeType = typename NodeT::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<NodeT, NonConstChildNodeType>::Type;
 
-    virtual ~NodeManagerLink() {}
+    NodeManagerLink() = default;
 
     void clear() { mList.clear(); mNext.clear(); }
 
-    template<typename ParentT, typename TreeOrLeafManagerT>
-    void init(ParentT& parent, TreeOrLeafManagerT& tree)
+    template <typename RootT>
+    void initRootChildren(RootT& root, bool serial = false)
     {
-        parent.getNodes(mList);
-        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.init(mList(i), tree);
+        mList.initRootChildren(root);
+        mNext.initNodeChildren(mList, serial);
     }
 
-    template<typename ParentT>
-    void rebuild(ParentT& parent)
+    template<typename ParentsT>
+    void initNodeChildren(ParentsT& parents, bool serial = false)
     {
-        mList.clear();
-        parent.getNodes(mList);
-        for (size_t i=0, n=mList.nodeCount(); i<n; ++i) mNext.rebuild(mList(i));
+        mList.initNodeChildren(parents, NodeFilter(), serial);
+        mNext.initNodeChildren(mList, serial);
     }
 
     Index64 nodeCount() const { return mList.nodeCount() + mNext.nodeCount(); }
@@ -276,7 +439,7 @@ public:
 
 protected:
     NodeList<NodeT> mList;
-    NodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+    NodeManagerLink<ChildNodeType, LEVEL-1> mNext;
 };// NodeManagerLink class
 
 
@@ -290,15 +453,16 @@ template<typename NodeT>
 class NodeManagerLink<NodeT, 0>
 {
 public:
-    NodeManagerLink() {}
-
-    virtual ~NodeManagerLink() {}
+    NodeManagerLink() = default;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList.clear(); }
 
-    template<typename ParentT>
-    void rebuild(ParentT& parent) { mList.clear(); parent.getNodes(mList); }
+    template <typename RootT>
+    void initRootChildren(RootT& root, bool /*serial*/ = false) { mList.initRootChildren(root); }
+
+    template<typename ParentsT>
+    void initNodeChildren(ParentsT& parents, bool serial = false) { mList.initNodeChildren(parents, NodeFilter(), serial); }
 
     Index64 nodeCount() const { return mList.nodeCount(); }
 
@@ -328,17 +492,6 @@ public:
         mList.reduce(op, threaded, grainSize);
     }
 
-    template<typename ParentT, typename TreeOrLeafManagerT>
-    void init(ParentT& parent, TreeOrLeafManagerT& tree)
-    {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT::LEVEL == 0) {
-            tree.getNodes(mList);
-        } else {
-            parent.getNodes(mList);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
 protected:
     NodeList<NodeT> mList;
 };// NodeManagerLink class
@@ -359,19 +512,26 @@ public:
     static const Index LEVELS = _LEVELS;
     static_assert(LEVELS > 0,
         "expected instantiation of template specialization"); // see specialization below
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
+    using NonConstChildNodeType = typename RootNodeType::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstChildNodeType>::Type;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { mChain.init(mRoot, tree); }
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false)
+        : mRoot(tree.root())
+    {
+        this->rebuild(serial);
+    }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mChain.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() { mChain.rebuild(mRoot); }
+    void rebuild(bool serial = false) { mChain.initRootChildren(mRoot, serial); }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -530,11 +690,319 @@ public:
 
 protected:
     RootNodeType& mRoot;
-    NodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+    NodeManagerLink<ChildNodeType, LEVELS-1> mChain;
+};// NodeManager class
+
+
+////////////////////////////////////////////
+
+
+// Wraps a user-supplied DynamicNodeManager operator and stores the return
+// value of the operator() method to the index of the node in a bool array
+template <typename OpT>
+struct ForeachFilterOp
+{
+    explicit ForeachFilterOp(const OpT& op, openvdb::Index64 size)
+        : mOp(op)
+        , mValidPtr(std::make_unique<bool[]>(size))
+        , mValid(mValidPtr.get()) { }
+
+    ForeachFilterOp(const ForeachFilterOp& other)
+        : mOp(other.mOp)
+        , mValid(other.mValid) { }
+
+    template<typename NodeT>
+    void operator()(NodeT& node, size_t idx) const
+    {
+        mValid[idx] = mOp(node, idx);
+    }
+
+    bool valid(size_t idx) const { return mValid[idx]; }
+
+    const OpT& op() const { return mOp; }
 
 private:
-    NodeManager(const NodeManager&) {}//disallow copy-construction
-};// NodeManager class
+    const OpT& mOp;
+    std::unique_ptr<bool[]> mValidPtr;
+    bool* mValid = nullptr;
+}; // struct ForeachFilterOp
+
+
+// Wraps a user-supplied DynamicNodeManager operator and stores the return
+// value of the operator() method to the index of the node in a bool array
+template <typename OpT>
+struct ReduceFilterOp
+{
+    ReduceFilterOp(OpT& op, openvdb::Index64 size)
+        : mOp(&op)
+        , mValidPtr(std::make_unique<bool[]>(size))
+        , mValid(mValidPtr.get()) { }
+
+    ReduceFilterOp(const ReduceFilterOp& other)
+        : mOp(other.mOp)
+        , mValid(other.mValid) { }
+
+    ReduceFilterOp(const ReduceFilterOp& other, tbb::split)
+        : mOpPtr(std::make_unique<OpT>(*(other.mOp), tbb::split()))
+        , mOp(mOpPtr.get())
+        , mValid(other.mValid) { }
+
+    template<typename NodeT>
+    void operator()(NodeT& node, size_t idx) const
+    {
+        mValid[idx] = (*mOp)(node, idx);
+    }
+
+    void join(const ReduceFilterOp& other)
+    {
+        mOp->join(*(other.mOp));
+    }
+
+    bool valid(size_t idx) const
+    {
+        return mValid[idx];
+    }
+
+    OpT& op() { return *mOp; }
+
+private:
+    std::unique_ptr<OpT> mOpPtr;
+    OpT* mOp = nullptr;
+    std::unique_ptr<bool[]> mValidPtr;
+    bool* mValid = nullptr;
+}; // struct ReduceFilterOp
+
+
+/// @brief This class is a link in a chain that each caches tree nodes
+/// of a specific type in a linear array.
+///
+/// @note It is for internal use and should rarely be used directly.
+template<typename NodeT, Index LEVEL>
+class DynamicNodeManagerLink
+{
+public:
+    DynamicNodeManagerLink() = default;
+
+    template<typename NodeOpT, typename RootT>
+    void foreachTopDown(const NodeOpT& op, RootT& root, bool threaded, size_t grainSize)
+    {
+        if (!op(root, /*index=*/0))         return;
+        if (!mList.initRootChildren(root))  return;
+        ForeachFilterOp<NodeOpT> filterOp(op, mList.nodeCount());
+        mList.foreachWithIndex(filterOp, threaded, grainSize);
+        mNext.foreachTopDownRecurse(filterOp, mList, threaded, grainSize);
+    }
+
+    template<typename FilterOpT, typename ParentT>
+    void foreachTopDownRecurse(const FilterOpT& filterOp, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
+        FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
+        mList.foreachWithIndex(childFilterOp, threaded, grainSize);
+    }
+
+    template<typename NodeOpT, typename RootT>
+    void reduceTopDown(NodeOpT& op, RootT& root, bool threaded, size_t grainSize)
+    {
+        if (!op(root, /*index=*/0))         return;
+        if (!mList.initRootChildren(root))  return;
+        ReduceFilterOp<NodeOpT> filterOp(op, mList.nodeCount());
+        mList.reduceWithIndex(filterOp, threaded, grainSize);
+        mNext.reduceTopDownRecurse(filterOp, mList, threaded, grainSize);
+    }
+
+    template<typename FilterOpT, typename ParentT>
+    void reduceTopDownRecurse(FilterOpT& filterOp, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
+        FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
+        mList.reduceWithIndex(childFilterOp, threaded, grainSize);
+    }
+
+protected:
+    NodeList<NodeT> mList;
+    DynamicNodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+};// DynamicNodeManagerLink class
+
+
+/// @private
+/// @brief Specialization that terminates the chain of cached tree nodes
+/// @note It is for internal use and should rarely be used directly.
+template<typename NodeT>
+class DynamicNodeManagerLink<NodeT, 0>
+{
+public:
+    DynamicNodeManagerLink() = default;
+
+    template<typename NodeFilterOp, typename ParentT>
+    void foreachTopDownRecurse(const NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        if (!mList.initNodeChildren(parent, nodeFilterOp, !threaded))   return;
+        mList.foreachWithIndex(nodeFilterOp.op(), threaded, grainSize);
+    }
+
+    template<typename NodeFilterOp, typename ParentT>
+    void reduceTopDownRecurse(NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded, size_t grainSize)
+    {
+        if (!mList.initNodeChildren(parent, nodeFilterOp, !threaded))   return;
+        mList.reduceWithIndex(nodeFilterOp.op(), threaded, grainSize);
+    }
+
+protected:
+    NodeList<NodeT> mList;
+};// DynamicNodeManagerLink class
+
+
+template<typename TreeOrLeafManagerT, Index _LEVELS>
+class DynamicNodeManager
+{
+public:
+    static const Index LEVELS = _LEVELS;
+    static_assert(LEVELS > 0,
+        "expected instantiation of template specialization"); // see specialization below
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    /// @brief   Threaded method that applies a user-supplied functor
+    ///          to all the nodes in the tree.
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @note There are two key differences to the interface of the
+    /// user-supplied functor to the NodeManager class - (1) the operator()
+    /// method aligns with the LeafManager class in expecting the index of the
+    /// node in a linear array of identical node types, (2) the operator()
+    /// method returns a boolean termination value with true indicating that
+    /// children of this node should be processed, false indicating the
+    /// early-exit termination should occur.
+    ///
+    /// @par Example:
+    /// @code
+    /// // Functor to densify the first child node in a linear array. Note
+    /// // this implementation also illustrates how different
+    /// // computation can be applied to the different node types.
+    ///
+    /// template<typename TreeT>
+    /// struct DensifyOp
+    /// {
+    ///     using RootT = typename TreeT::RootNodeType;
+    ///     using LeafT = typename TreeT::LeafNodeType;
+    ///
+    ///     DensifyOp() = default;
+    ///
+    ///     // Processes the root node. Required by the DynamicNodeManager
+    ///     bool operator()(RootT&, size_t) const { return true; }
+    ///
+    ///     // Processes the internal nodes. Required by the DynamicNodeManager
+    ///     template<typename NodeT>
+    ///     bool operator()(NodeT& node, size_t idx) const
+    ///     {
+    ///         // densify child
+    ///         for (auto iter = node.cbeginValueAll(); iter; ++iter) {
+    ///             const openvdb::Coord ijk = iter.getCoord();
+    ///             node.addChild(new typename NodeT::ChildNodeType(iter.getCoord(), NodeT::LEVEL, true));
+    ///         }
+    ///         // early-exit termination for all non-zero index children
+    ///         return idx == 0;
+    ///     }
+    ///     // Processes the leaf nodes. Required by the DynamicNodeManager
+    ///     bool operator()(LeafT&, size_t) const
+    ///     {
+    ///         return true;
+    ///     }
+    /// };// DensifyOp
+    ///
+    /// // usage:
+    /// DensifyOp<FloatTree> op;
+    /// tree::DynamicNodeManager<FloatTree> nodes(tree);
+    /// nodes.foreachTopDown(op);
+    ///
+    /// @endcode
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mChain.foreachTopDown(op, mRoot, threaded, grainSize);
+    }
+
+    /// @brief   Threaded method that processes nodes with a user supplied functor
+    ///
+    /// @param op        user-supplied functor, see examples for interface details.
+    /// @param threaded  optional toggle to disable threading, on by default.
+    /// @param grainSize optional parameter to specify the grainsize
+    ///                  for threading, one by default.
+    ///
+    /// @note There are two key differences to the interface of the
+    /// user-supplied functor to the NodeManager class - (1) the operator()
+    /// method aligns with the LeafManager class in expecting the index of the
+    /// node in a linear array of identical node types, (2) the operator()
+    /// method returns a boolean termination value with true indicating that
+    /// children of this node should be processed, false indicating the
+    /// early-exit termination should occur.
+    ///
+    /// @par Example:
+    /// @code
+    ///  // Functor to count nodes in a tree
+    ///  template<typename TreeType>
+    ///  struct NodeCountOp
+    ///  {
+    ///      NodeCountOp() : nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      NodeCountOp(const NodeCountOp& other, tbb::split) :
+    ///          nodeCount(TreeType::DEPTH, 0), totalCount(0)
+    ///      {
+    ///      }
+    ///      void join(const NodeCountOp& other)
+    ///      {
+    ///          for (size_t i = 0; i < nodeCount.size(); ++i) {
+    ///              nodeCount[i] += other.nodeCount[i];
+    ///          }
+    ///          totalCount += other.totalCount;
+    ///      }
+    ///      // do nothing for the root node
+    ///      bool operator()(const typename TreeT::RootNodeType& node, size_t)
+    ///      {
+    ///          return true;
+    ///      }
+    ///      // count the internal and leaf nodes
+    ///      template<typename NodeT>
+    ///      bool operator()(const NodeT& node, size_t)
+    ///      {
+    ///          ++(nodeCount[NodeT::LEVEL]);
+    ///          ++totalCount;
+    ///          return true;
+    ///      }
+    ///      std::vector<openvdb::Index64> nodeCount;
+    ///      openvdb::Index64 totalCount;
+    /// };
+    ///
+    /// // usage:
+    /// NodeCountOp<FloatTree> op;
+    /// tree::DynamicNodeManager<FloatTree> nodes(tree);
+    /// nodes.reduceTopDown(op);
+    ///
+    /// @endcode
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        mChain.reduceTopDown(op, mRoot, threaded, grainSize);
+    }
+
+protected:
+    RootNodeType& mRoot;
+    DynamicNodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+};// DynamicNodeManager class
+
 
 
 ////////////////////////////////////////////
@@ -546,19 +1014,20 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 0>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static const Index LEVELS = 0;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) {}
+    NodeManager(TreeOrLeafManagerT& tree, bool /*serial*/ = false) : mRoot(tree.root()) { }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() {}
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() {}
+    void rebuild(bool /*serial*/ = false) { }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -582,9 +1051,6 @@ public:
 
 protected:
     RootNodeType& mRoot;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<0>
 
 
@@ -597,29 +1063,25 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false)
+        : mRoot(tree.root())
     {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            mRoot.getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild() { mList0.clear(); mRoot.getNodes(mList0); }
+    void rebuild(bool /*serial*/ = false) { mList0.initRootChildren(mRoot); }
 
     /// @brief Return a reference to the root node.
     const RootNodeType& root() const { return mRoot; }
@@ -661,14 +1123,12 @@ public:
 
 protected:
     using NodeT1 = RootNodeType;
-    using NodeT0 = typename NodeT1::ChildNodeType;
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;
     using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<1>
 
 
@@ -681,35 +1141,27 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList1.initRootChildren(mRoot);
+        mList0.initNodeChildren(mList1, NodeFilter(), serial);
     }
 
     /// @brief Return a reference to the root node.
@@ -759,8 +1211,10 @@ public:
 
 protected:
     using NodeT2 = RootNodeType;
-    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // upper level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT1 = NodeList<NodeT1>; // upper level
     using ListT0 = NodeList<NodeT0>; // lower level
@@ -768,9 +1222,6 @@ protected:
     NodeT2& mRoot;
     ListT1 mList1;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<2>
 
 
@@ -783,37 +1234,28 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete;
 
     /// @brief Clear all the cached tree nodes
     void clear() { mList0.clear(); mList1.clear(); mList2.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList2.initRootChildren(mRoot);
+        mList1.initNodeChildren(mList2, NodeFilter(), serial);
+        mList0.initNodeChildren(mList1, NodeFilter(), serial);
     }
 
     /// @brief Return a reference to the root node.
@@ -868,9 +1310,12 @@ public:
 
 protected:
     using NodeT3 = RootNodeType;
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
-    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
     using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
@@ -880,9 +1325,6 @@ protected:
     ListT2 mList2;
     ListT1 mList1;
     ListT0 mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<3>
 
 
@@ -895,39 +1337,29 @@ template<typename TreeOrLeafManagerT>
 class NodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
-    NodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root())
+    NodeManager(TreeOrLeafManagerT& tree, bool serial = false) : mRoot(tree.root())
     {
-        mRoot.getNodes(mList3);
-        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if (TreeOrLeafManagerT::DEPTH == 2 && NodeT0::LEVEL == 0) {
-            tree.getNodes(mList0);
-        } else {
-            for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
-        }
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        this->rebuild(serial);
     }
 
-    virtual ~NodeManager() {}
+    NodeManager(const NodeManager&) = delete; // disallow copy-construction
 
     /// @brief Clear all the cached tree nodes
-    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear; }
+    void clear() { mList0.clear(); mList1.clear(); mList2.clear(); mList3.clear(); }
 
     /// @brief Clear and recache all the tree nodes from the
     /// tree. This is required if tree nodes have been added or removed.
-    void rebuild()
+    void rebuild(bool serial = false)
     {
-        this->clear();
-        mRoot.getNodes(mList3);
-        for (size_t i=0, n=mList3.nodeCount(); i<n; ++i) mList3(i).getNodes(mList2);
-        for (size_t i=0, n=mList2.nodeCount(); i<n; ++i) mList2(i).getNodes(mList1);
-        for (size_t i=0, n=mList1.nodeCount(); i<n; ++i) mList1(i).getNodes(mList0);
+        mList3.initRootChildren(mRoot);
+        mList2.initNodeChildren(mList3, NodeFilter(), serial);
+        mList1.initNodeChildren(mList2, NodeFilter(), serial);
+        mList0.initNodeChildren(mList1, NodeFilter(), serial);
     }
 
     /// @brief Return a reference to the root node.
@@ -990,10 +1422,14 @@ public:
 
 protected:
     using NodeT4 = RootNodeType;
-    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT3 = typename NodeT4::ChildNodeType;
+    using NodeT3 = typename CopyConstness<RootNodeType, NonConstNodeT3>::Type;  // upper level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper mid level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // lower mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
     using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
@@ -1005,10 +1441,280 @@ protected:
     ListT2  mList2;
     ListT1  mList1;
     ListT0  mList0;
-
-private:
-    NodeManager(const NodeManager&) {} // disallow copy-construction
 }; // NodeManager<4>
+
+
+////////////////////////////////////////////
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with one level of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 1>
+{
+public:
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
+    static const Index LEVELS = 1;
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list0
+        if (!mList0.initRootChildren(mRoot))                        return;
+        ForeachFilterOp<NodeOp> nodeOp(op, mList0.nodeCount());
+        mList0.foreachWithIndex(nodeOp, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list0
+        if (!mList0.initRootChildren(mRoot))                        return;
+        ReduceFilterOp<NodeOp> nodeOp(op, mList0.nodeCount());
+        mList0.reduceWithIndex(nodeOp, threaded, grainSize);
+    }
+
+protected:
+    using NodeT1 = RootNodeType;
+    using NodeT0 = typename NodeT1::ChildNodeType;
+
+    using ListT0 = NodeList<NodeT0>;
+
+    NodeT1& mRoot;
+    ListT0 mList0;
+};// DynamicNodeManager<1> class
+
+
+////////////////////////////////////////////
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with two levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 2>
+{
+public:
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
+    static const Index LEVELS = 2;
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list1
+        if (!mList1.initRootChildren(mRoot))                        return;
+        ForeachFilterOp<NodeOp> nodeOp(op, mList1.nodeCount());
+        mList1.foreachWithIndex(nodeOp, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp, !threaded))   return;
+        mList0.foreachWithIndex(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list1
+        if (!mList1.initRootChildren(mRoot))                        return;
+        ReduceFilterOp<NodeOp> nodeOp(op, mList1.nodeCount());
+        mList1.reduceWithIndex(nodeOp, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp, !threaded))   return;
+        mList0.reduceWithIndex(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT2 = RootNodeType;
+    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT1 = NodeList<NodeT1>; // upper level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
+
+    NodeT2& mRoot;
+    ListT1 mList1;
+    ListT0 mList0;
+};// DynamicNodeManager<2> class
+
+
+////////////////////////////////////////////
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with three levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 3>
+{
+public:
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
+    static const Index LEVELS = 3;
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list2
+        if (!mList2.initRootChildren(mRoot))                        return;
+        ForeachFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
+        mList2.foreachWithIndex(nodeOp2, threaded, grainSize);
+        // list1
+        if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
+        ForeachFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
+        mList1.foreachWithIndex(nodeOp1, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
+        mList0.foreachWithIndex(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list2
+        if (!mList2.initRootChildren(mRoot))                        return;
+        ReduceFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
+        mList2.reduceWithIndex(nodeOp2, threaded, grainSize);
+        // list1
+        if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
+        ReduceFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
+        mList1.reduceWithIndex(nodeOp1, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
+        mList0.reduceWithIndex(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT3 = RootNodeType;
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
+    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
+
+    NodeT3& mRoot;
+    ListT2 mList2;
+    ListT1 mList1;
+    ListT0 mList0;
+};// DynamicNodeManager<3> class
+
+
+////////////////////////////////////////////
+
+
+/// @private
+/// Template specialization of the DynamicNodeManager with four levels of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 4>
+{
+public:
+    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
+    static const Index LEVELS = 4;
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list3
+        if (!mList3.initRootChildren(mRoot))                        return;
+        ForeachFilterOp<NodeOp> nodeOp3(op, mList3.nodeCount());
+        mList3.foreachWithIndex(nodeOp3, threaded, grainSize);
+        // list2
+        if (!mList2.initNodeChildren(mList3, nodeOp3, !threaded))   return;
+        ForeachFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
+        mList2.foreachWithIndex(nodeOp2, threaded, grainSize);
+        // list1
+        if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
+        ForeachFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
+        mList1.foreachWithIndex(nodeOp1, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
+        mList0.foreachWithIndex(op, threaded, grainSize);
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+        // list3
+        if (!mList3.initRootChildren(mRoot))                        return;
+        ReduceFilterOp<NodeOp> nodeOp3(op, mList3.nodeCount());
+        mList3.reduceWithIndex(nodeOp3, threaded, grainSize);
+        // list2
+        if (!mList2.initNodeChildren(mList3, nodeOp3, !threaded))   return;
+        ReduceFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
+        mList2.reduceWithIndex(nodeOp2, threaded, grainSize);
+        // list1
+        if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
+        ReduceFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
+        mList1.reduceWithIndex(nodeOp1, threaded, grainSize);
+        // list0
+        if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
+        mList0.reduceWithIndex(op, threaded, grainSize);
+    }
+
+protected:
+    using NodeT4 = RootNodeType;
+    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
+    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
+    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
+    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+
+    using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
+    using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
+    using ListT1 = NodeList<NodeT1>; // lower mid level of internal nodes
+    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
+
+    NodeT4& mRoot;
+    ListT3 mList3;
+    ListT2 mList2;
+    ListT1 mList1;
+    ListT0 mList0;
+};// DynamicNodeManager<4> class
+
 
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
