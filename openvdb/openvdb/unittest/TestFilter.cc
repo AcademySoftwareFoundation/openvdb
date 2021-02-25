@@ -5,27 +5,11 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/tools/ValueTransformer.h>
-#include <cppunit/extensions/HelperMacros.h>
 #include "util.h" // for unittest_util::makeSphere()
+#include "gtest/gtest.h"
 
-class TestFilter : public CppUnit::TestCase
-{
-public:
-    CPPUNIT_TEST_SUITE(TestFilter);
-    CPPUNIT_TEST(testOffset);
-    CPPUNIT_TEST(testMedian);
-    CPPUNIT_TEST(testMean);
-    // @todo gaussian!
-    CPPUNIT_TEST(testFilterTiles);
-    CPPUNIT_TEST_SUITE_END();
-
-    void testOffset();
-    void testMedian();
-    void testMean();
-    void testFilterTiles();
-};
-
-CPPUNIT_TEST_SUITE_REGISTRATION(TestFilter);
+// @todo gaussian!
+class TestFilter: public ::testing::Test {};
 
 
 ////////////////////////////////////////
@@ -42,7 +26,7 @@ createReferenceGrid(const openvdb::Coord& dim)
     unittest_util::makeSphere<openvdb::FloatGrid>(
         dim, center, radius, *referenceGrid, unittest_util::SPHERE_DENSE);
 
-    CPPUNIT_ASSERT_EQUAL(dim[0]*dim[1]*dim[2],
+    EXPECT_EQ(dim[0]*dim[1]*dim[2],
         int(referenceGrid->tree().activeVoxelCount()));
     return referenceGrid;
 }
@@ -51,8 +35,7 @@ createReferenceGrid(const openvdb::Coord& dim)
 ////////////////////////////////////////
 
 
-void
-TestFilter::testOffset()
+TEST_F(TestFilter, testOffset)
 {
     const openvdb::Coord dim(40);
     const openvdb::FloatGrid::ConstPtr referenceGrid = createReferenceGrid(dim);
@@ -73,7 +56,7 @@ TestFilter::testOffset()
                 xyz[2]=z;
                 float delta = sphere.getValue(xyz) + offset - tree.getValue(xyz);
                 //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
+                EXPECT_NEAR(0.0f, delta, /*tolerance=*/0.0001);
             }
         }
     }
@@ -87,15 +70,14 @@ TestFilter::testOffset()
                 xyz[2]=z;
                 float delta = sphere.getValue(xyz) - tree.getValue(xyz);
                 //if (fabs(delta)>0.0001f) std::cerr << " failed at " << xyz << std::endl;
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(0.0f, delta, /*tolerance=*/0.0001);
+                EXPECT_NEAR(0.0f, delta, /*tolerance=*/0.0001);
             }
         }
     }
 }
 
 
-void
-TestFilter::testMedian()
+TEST_F(TestFilter, testMedian)
 {
     const openvdb::Coord dim(40);
     const openvdb::FloatGrid::ConstPtr referenceGrid = createReferenceGrid(dim);
@@ -127,9 +109,9 @@ TestFilter::testMedian()
                 }
                 std::sort(tmp.begin(), tmp.end());
                 stencil.moveTo(xyz);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                EXPECT_NEAR(
                     tmp[(tmp.size()-1)/2], stencil.median(), /*tolerance=*/0.0001);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                EXPECT_NEAR(
                     stencil.median(), filteredTree.getValue(xyz), /*tolerance=*/0.0001);
                 tmp.clear();
             }
@@ -138,8 +120,7 @@ TestFilter::testMedian()
 }
 
 
-void
-TestFilter::testMean()
+TEST_F(TestFilter, testMean)
 {
     const openvdb::Coord dim(40);
     const openvdb::FloatGrid::ConstPtr referenceGrid = createReferenceGrid(dim);
@@ -171,9 +152,9 @@ TestFilter::testMean()
                     }
                 }
                 stencil.moveTo(xyz);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                EXPECT_NEAR(
                     sum/count, stencil.mean(), /*tolerance=*/0.0001);
-                CPPUNIT_ASSERT_DOUBLES_EQUAL(
+                EXPECT_NEAR(
                     stencil.mean(), filteredTree.getValue(xyz), 0.0001);
             }
         }
@@ -181,8 +162,7 @@ TestFilter::testMean()
 }
 
 
-void
-TestFilter::testFilterTiles()
+TEST_F(TestFilter, testFilterTiles)
 {
     using openvdb::Coord;
     using openvdb::Index32;
@@ -206,7 +186,7 @@ TestFilter::testFilterTiles()
         CheckMeanValues(openvdb::math::DenseStencil<openvdb::FloatGrid>& s) : mStencil(s) {}
         inline void operator()(const openvdb::FloatTree::ValueOnCIter& iter) const {
             mStencil.moveTo(iter.getCoord());
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(mStencil.mean(), *iter, /*tolerance=*/0.0001);
+            EXPECT_NEAR(mStencil.mean(), *iter, /*tolerance=*/0.0001);
         }
     };
 
@@ -215,7 +195,7 @@ TestFilter::testFilterTiles()
         CheckMedianValues(openvdb::math::DenseStencil<openvdb::FloatGrid>& s) : mStencil(s) {}
         inline void operator()(const openvdb::FloatTree::ValueOnCIter& iter) const {
             mStencil.moveTo(iter.getCoord());
-            CPPUNIT_ASSERT_DOUBLES_EQUAL(mStencil.median(), *iter, /*tolerance=*/0.0001);
+            EXPECT_NEAR(mStencil.median(), *iter, /*tolerance=*/0.0001);
         }
     };
 
@@ -265,11 +245,11 @@ TestFilter::testFilterTiles()
                 openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(0.0f);
                 auto& tree = ref->tree();
                 tree.addTile(test.mLevel, Coord(0), 1.0f, true);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
                 refTile = ref;
             }
 
@@ -282,20 +262,20 @@ TestFilter::testFilterTiles()
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.offset(1.0f);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
                 // enable
                 filter.setProcessTiles(true);
                 filter.offset(1.0f);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(2.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(2.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
             }
 
             { // mean
@@ -305,18 +285,18 @@ TestFilter::testFilterTiles()
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.mean(width, iter);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
                 // enable
                 filter.setProcessTiles(true);
                 filter.mean(width, iter);
-                CPPUNIT_ASSERT_EQUAL(test.mLeafs, tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(test.mTiles, tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(test.mLeafs, tree.leafCount());
+                EXPECT_EQ(test.mTiles, tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 CheckMeanValues op(stencil);
                 openvdb::tools::foreach(tree.cbeginValueOn(), op, true, false);
             }
@@ -328,18 +308,18 @@ TestFilter::testFilterTiles()
                 // disable tile processing, do nothing
                 filter.setProcessTiles(false);
                 filter.median(width, iter);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
                 // enable
                 filter.setProcessTiles(true);
                 filter.median(width, iter);
-                CPPUNIT_ASSERT_EQUAL(test.mLeafs, tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(test.mTiles, tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(test.mLeafs, tree.leafCount());
+                EXPECT_EQ(test.mTiles, tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
                 CheckMedianValues op(stencil);
                 openvdb::tools::foreach(tree.cbeginValueOn(), op, true, false);
 
@@ -359,11 +339,11 @@ TestFilter::testFilterTiles()
                 openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
                 auto& tree = ref->tree();
                 tree.addTile(test.mLevel, Coord(0), 1.0f, true);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
                 refTile = ref;
             }
 
@@ -375,11 +355,11 @@ TestFilter::testFilterTiles()
                 openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
                 filter.setProcessTiles(true);
                 filter.mean(width, iter);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
             }
 
             { // median
@@ -388,11 +368,11 @@ TestFilter::testFilterTiles()
                 openvdb::tools::Filter<openvdb::FloatGrid> filter(*grid);
                 filter.setProcessTiles(true);
                 filter.median(width, iter);
-                CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-                CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-                CPPUNIT_ASSERT_EQUAL(test.mVoxels, tree.activeVoxelCount());
-                CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-                CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+                EXPECT_EQ(Index32(0), tree.leafCount());
+                EXPECT_EQ(Index64(1), tree.activeTileCount());
+                EXPECT_EQ(test.mVoxels, tree.activeVoxelCount());
+                EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+                EXPECT_TRUE(tree.isValueOn(Coord(0)));
             }
         }
     }
@@ -407,11 +387,11 @@ TestFilter::testFilterTiles()
             openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
             auto& tree = ref->tree();
             tree.addTile(1, Coord(0), 1.0f, true);
-            CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
-            CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-            CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.activeTileCount());
+            EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
+            EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+            EXPECT_TRUE(tree.isValueOn(Coord(0)));
             refTile = ref;
         }
 
@@ -422,21 +402,21 @@ TestFilter::testFilterTiles()
             //
             filter.setProcessTiles(true);
             filter.mean(1, 1);
-            CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
-            CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-            CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.activeTileCount());
+            EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
+            EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+            EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
             // create leaf neighbour
             tree.touchLeaf(Coord(-1,0,0));
-            CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.activeTileCount());
 
             filter.mean(1, 1);
-            CPPUNIT_ASSERT_EQUAL(Index32(2), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(0), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
+            EXPECT_EQ(Index32(2), tree.leafCount());
+            EXPECT_EQ(Index64(0), tree.activeTileCount());
+            EXPECT_EQ(Index64(LeafT::NUM_VALUES), tree.activeVoxelCount());
         }
     }
 
@@ -446,19 +426,19 @@ TestFilter::testFilterTiles()
             openvdb::FloatGrid::Ptr ref = openvdb::FloatGrid::create(1.0f);
             auto& tree = ref->tree();
             tree.addTile(level, Coord(0), 1.0f, true);
-            CPPUNIT_ASSERT_EQUAL(Index32(0), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(1.0f, tree.getValue(Coord(0)));
-            CPPUNIT_ASSERT(tree.isValueOn(Coord(0)));
+            EXPECT_EQ(Index32(0), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.activeTileCount());
+            EXPECT_EQ(1.0f, tree.getValue(Coord(0)));
+            EXPECT_TRUE(tree.isValueOn(Coord(0)));
 
             // create a leaf and tile neighbour
             tree.touchLeaf(Coord(-int(LeafT::DIM),0,0));
-            CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(1), tree.activeTileCount());
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(1), tree.activeTileCount());
             // create tile level 1 neighbour with a different value
             tree.addTile(1, Coord(-int(LeafT::DIM),0,LeafT::DIM*3), 2.0f, true);
-            CPPUNIT_ASSERT_EQUAL(Index32(1), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(2), tree.activeTileCount());
+            EXPECT_EQ(Index32(1), tree.leafCount());
+            EXPECT_EQ(Index64(2), tree.activeTileCount());
             return ref;
         };
 
@@ -473,10 +453,10 @@ TestFilter::testFilterTiles()
             // (+ itself becomes a leaf)
             filter.mean(/*width*/LeafT::DIM+1, /*iter*/1);
             // 2 leaf nodes from the tile/leaf neighbours + their neighbours
-            CPPUNIT_ASSERT_EQUAL(Index32(2+4+5), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL((Index64(InternalNode1::NUM_VALUES) - 1) +
+            EXPECT_EQ(Index32(2+4+5), tree.leafCount());
+            EXPECT_EQ((Index64(InternalNode1::NUM_VALUES) - 1) +
                 (Index64(InternalNode2::NUM_VALUES) - (4+5)), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(InternalNode1::NUM_VOXELS) +
+            EXPECT_EQ(Index64(InternalNode1::NUM_VOXELS) +
                 Index64(LeafT::NUM_VOXELS), tree.activeVoxelCount());
         }
 
@@ -487,10 +467,10 @@ TestFilter::testFilterTiles()
             filter.setProcessTiles(true);
             // with width = 2 and iter = 2, edge/vertex neighbours should also be voxelized
             filter.mean(/*width*/2, /*iter*/2);
-            CPPUNIT_ASSERT_EQUAL(Index32(2+4+6), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL((Index64(InternalNode1::NUM_VALUES) - 1) +
+            EXPECT_EQ(Index32(2+4+6), tree.leafCount());
+            EXPECT_EQ((Index64(InternalNode1::NUM_VALUES) - 1) +
                 (Index64(InternalNode2::NUM_VALUES) - (4+6)), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(InternalNode1::NUM_VOXELS) +
+            EXPECT_EQ(Index64(InternalNode1::NUM_VOXELS) +
                 Index64(LeafT::NUM_VOXELS), tree.activeVoxelCount());
         }
 
@@ -501,9 +481,9 @@ TestFilter::testFilterTiles()
             filter.setProcessTiles(true);
             // with width = 1 and iter = 9 - checks an iter count > LeafT::DIM
             filter.mean(/*width*/1, /*iter*/LeafT::DIM+1);
-            CPPUNIT_ASSERT_EQUAL(Index32(38), tree.leafCount());
-            CPPUNIT_ASSERT_EQUAL((Index64(InternalNode2::NUM_VALUES) - 36), tree.activeTileCount());
-            CPPUNIT_ASSERT_EQUAL(Index64(InternalNode2::NUM_VOXELS) +
+            EXPECT_EQ(Index32(38), tree.leafCount());
+            EXPECT_EQ((Index64(InternalNode2::NUM_VALUES) - 36), tree.activeTileCount());
+            EXPECT_EQ(Index64(InternalNode2::NUM_VOXELS) +
                 Index64(LeafT::NUM_VOXELS), tree.activeVoxelCount());
         }
     }
