@@ -37,6 +37,9 @@ API changes:
 - Deprecated @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink
   and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
   new morphology methods.
+- The @vdblink::tools::Film tools::Film@endlink class no longer has a
+  saveExr method in any build configuration. Sample code for saving exrs
+  from this object can be found in the command line render tool.
 
 @par
 Houdini:
@@ -52,9 +55,6 @@ Build:
   This is fully bitwise compatible, but may require switching Half
   references to math::Half. The USE_IMATH_HALF build configuration can
   be used to switch back to OpenEXR based half.
-- The @vdblink::tools::Film tools::Film@endlink class no longer has a
-  saveExr method in any build configuration. Sample code for saving exrs
-  from this object can be found in the command line render tool.
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par
