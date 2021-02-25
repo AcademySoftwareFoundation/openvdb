@@ -15,12 +15,18 @@ Version 8.0.2 - In development
     - Added an optional argument to Tree::topologyUnion() which preserves
       active tiles on the destination tree should they overlap leaf nodes
       from the source tree.
+    - Reduced the time spent in the hot path of openvdb::initialize() and
+      openvdb::uninitialize() by leveraging atomics with double-checked locks.
+      [Contributed by Ben FrantzDale].
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
       and tools::deactivate() to a new header, Activate.h.
     - Deprecated tools::dilateVoxels() and tools::erodeVoxels() in favour of
       new morphology methods.
+    - The openvdb::tools::Film class no longer has a saveExr method in
+      any build configuration. Sample code for saving exrs from this
+      object can be found in the command line render tool.
 
     Houdini:
     - Updated the VDB Activate SOP and others to use the multi-threaded
@@ -28,6 +34,13 @@ Version 8.0.2 - In development
       increase.
     - Introduced the VDB AX SOP which provides an interface for running
       OpenVDB AX code in Houdini on VDB grids.
+
+    Build:
+    - Dependency on OpenEXR's Half implementation has been removed from the
+      core library by naturalizing the implementation into openvdb::math.
+      This is fully bitwise compatible, but may require switching Half
+      references to math::Half. The USE_IMATH_HALF build configuration can
+      be used to switch back to OpenEXR based half.
 
 Version 8.0.1 - February 5, 2021
 
