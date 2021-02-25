@@ -5,8 +5,11 @@
 ///
 /// @file tools/Filter.h
 ///
-/// @brief Filtering of VDB volumes. All operations can optionally
-/// be masked with another grid that acts as an alpha-mask.
+/// @brief  Filtering of VDB volumes. All operations can optionally be masked
+///         with another grid that acts as an alpha-mask. By default, filtering
+///         operations do not modify the topology of the input tree and thus do
+///         not process active tiles. However Filter::setProcessTiles can be
+///         used to process active tiles, densifying them on demand when necessary.
 
 #ifndef OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
