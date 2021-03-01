@@ -116,7 +116,6 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_5 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -187,7 +186,6 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
-  OPENVDB_USE_DEPRECATED_ABI_5
   OPENVDB_USE_DEPRECATED_ABI_6
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
@@ -701,17 +699,14 @@ if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
 endif()
 
 if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if((OpenVDB_ABI EQUAL 5 AND OPENVDB_USE_DEPRECATED_ABI_5) OR
-     (OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
+  if((OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
     message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
       "are deprecated and will soon be removed.")
   else()
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 or
-      OPENVDB_USE_DEPRECATED_ABI_6 to ON to suppress this error.")
+      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_6 to ON to suppress this error.")
   endif()
   # global target definition
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_5)
   add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_6)
 endif()
 
