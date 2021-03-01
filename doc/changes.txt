@@ -2,9 +2,9 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v8_0_2_changes"></a>@endhtmlonly
+@htmlonly <a name="v8_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.0.2</B> - <I>In development</I>
+<B>Version 8.1.0</B> - <I>In development</I>
 
 @par
 New features:
