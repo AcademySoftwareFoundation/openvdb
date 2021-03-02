@@ -267,7 +267,7 @@ public:
     template<typename NodeOp>
     void foreach(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
-        NodeTransformer<NodeOp> transform(op);
+        NodeTransformerCopy<NodeOp> transform(op); // always deep-copies the op
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
@@ -314,6 +314,26 @@ private:
 
     // Private struct of NodeList that performs parallel_for
     template<typename NodeOp, typename OpT = OpWithoutIndex>
+    struct NodeTransformerCopy
+    {
+        NodeTransformerCopy(const NodeOp& nodeOp) : mNodeOp(nodeOp)
+        {
+        }
+        void run(const NodeRange& range, bool threaded = true)
+        {
+            threaded ? tbb::parallel_for(range, *this) : (*this)(range);
+        }
+        void operator()(const NodeRange& range) const
+        {
+            for (typename NodeRange::Iterator it = range.begin(); it; ++it) {
+                OpT::template eval(mNodeOp, it);
+            }
+        }
+        const NodeOp mNodeOp;
+    };// NodeList::NodeTransformerCopy
+
+    // Private struct of NodeList that performs parallel_for
+    template<typename NodeOp, typename OpT = OpWithoutIndex>
     struct NodeTransformer
     {
         NodeTransformer(const NodeOp& nodeOp) : mNodeOp(nodeOp)
@@ -329,7 +349,7 @@ private:
                 OpT::template eval(mNodeOp, it);
             }
         }
-        const NodeOp mNodeOp;
+        const NodeOp& mNodeOp;
     };// NodeList::NodeTransformer
 
     // Private struct of NodeList that performs parallel_reduce
@@ -885,6 +905,9 @@ public:
     /// method returns a boolean termination value with true indicating that
     /// children of this node should be processed, false indicating the
     /// early-exit termination should occur.
+    ///
+    /// @note Unlike the NodeManager, the foreach() method of the
+    /// DynamicNodeManager uses copy-by-reference for the user-supplied functor.
     ///
     /// @par Example:
     /// @code
