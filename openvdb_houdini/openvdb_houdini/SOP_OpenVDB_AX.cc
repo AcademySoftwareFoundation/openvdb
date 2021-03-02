@@ -129,6 +129,7 @@ void checkAttributesAgainstList(const std::string& list,
         throw std::runtime_error(msg.c_str());
     }
 }
+
 ////////////////////////////////////////
 
 
@@ -334,11 +335,13 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMoneDefaults));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "createattributes", "Create New Attributes")
         .setDefault(PRMoneDefaults));
+
     //////////
     // Register this operator.
 
     hvdb::OpenVDBOpFactory factory("VDB AX", SOP_OpenVDB_AX::factory, parms, *table);
 
+    factory.setObsoleteParms(obsoleteParms);
     factory.addInput("VDBs to manipulate");
     factory.addAliasVerbatim("DW_OpenVDBAX");
     factory.addAliasVerbatim("DN_OpenVDBAX");
@@ -799,6 +802,19 @@ SOP_OpenVDB_AX::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
     resolveRenamedParm(*obsoleteParms, "targettype", "runover");
     resolveRenamedParm(*obsoleteParms, "pointsgroup", "vdbpointsgroup");
 
+    // sync createattributes or createmissing to attributestocreate. if either
+    // are not default, then they existed previously with old settings
+    // (i.e. they were off) and attributestocreate needs to be cleared
+
+    PRM_Parm* parm = obsoleteParms->getParmPtr("createattributes");
+    bool update = parm && !parm->isFactoryDefault();
+    parm = obsoleteParms->getParmPtr("createmissing");
+    update |= parm && !parm->isFactoryDefault();
+
+    if (update && this->hasParm("attributestocreate")) {
+        this->getParm("attributestocreate").setValue(/*time*/0, "", CH_STRING_LITERAL);
+    }
+
     // Delegate to the base class.
     hvdb::SOP_NodeVDB::resolveObsoleteParms(obsoleteParms);
 }
@@ -840,7 +856,8 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
     // This map contains sync version parameters which instances of this
     // node are expected to apply sequentially in ascending order from their
     // old version (exclusive) to their current version (inclusive).
-    static const std::unordered_map<std::string, ParamMap> versions = {{
+    static const std::unordered_map<std::string, ParamMap> versions = {
+        {
         "0.1.0", {
             // We can't just return 0 as the expected behaviour here is for points to always
             // create attribute and for volumes to error. This preserves that behaviour.
@@ -853,35 +870,7 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
             }
         }},
         {
-        "0.3.0", {
-            { "attributestocreate",
-                [](const SOP_OpenVDB_AX& node) -> std::string {
-                    const bool createMissing = static_cast<bool>(node.evalInt("createmissing", 0, 0));
-                    if (createMissing == 1) return "*";
-                    else return "";
-                }
-            }
-        }},
-        {
-        "1.0.0", {
-            { "attributestocreate",
-                [](const SOP_OpenVDB_AX& node) -> std::string {
-                    const bool createMissing = static_cast<bool>(node.evalInt("createattributes", 0, 0));
-                    if (createMissing == 1) return "*";
-                    else return "";
-                }
-            },
-        }},
-        {
-        "8.0.0", {
-            // ax, ax sop and vdb versions re-synced at this version
-            { "attributestocreate",
-                [](const SOP_OpenVDB_AX& node) -> std::string {
-                    const bool createMissing = static_cast<bool>(node.evalInt("createattributes", 0, 0));
-                    if (createMissing == 1) return "*";
-                    else return "";
-                }
-            },
+        "8.0.2", {
             { "ignoretiles",
                 [](const SOP_OpenVDB_AX& node) -> std::string {
                     return "1";
@@ -957,6 +946,7 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
 
 
 ////////////////////////////////////////
+
 namespace {
 struct DensifyOp {
     DensifyOp() {}
