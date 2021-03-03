@@ -72,6 +72,7 @@ set(UNITTEST_SOURCE_FILES
   TestExceptions.cc
   TestFastSweeping.cc
   TestFile.cc
+  TestFilter.cc
   TestFindActiveValues.cc
   TestFloatMetadata.cc
   TestGradient.cc
