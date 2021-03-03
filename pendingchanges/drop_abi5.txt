@@ -1,0 +1,1 @@
+As of this release, support for grid ABI=5 has been removed.
