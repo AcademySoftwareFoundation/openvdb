@@ -80,14 +80,12 @@ TEST_F(TestAttributeGroup, testAttributeGroup)
         EXPECT_EQ(attr.isHidden(), attrB.isHidden());
         EXPECT_EQ(isGroup(attr), isGroup(attrB));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         AttributeArray& baseAttr(attr);
         EXPECT_EQ(Name(typeNameAsString<GroupType>()), baseAttr.valueType());
         EXPECT_EQ(Name("grp"), baseAttr.codecType());
         EXPECT_EQ(Index(1), baseAttr.valueTypeSize());
         EXPECT_EQ(Index(1), baseAttr.storageTypeSize());
         EXPECT_TRUE(!baseAttr.valueTypeIsFloatingPoint());
-#endif
     }
 
     { // casting

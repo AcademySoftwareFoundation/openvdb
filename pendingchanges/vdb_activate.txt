@@ -1,0 +1,16 @@
+
+    Improvements:
+    - Significant performance improvements to tools::activate and
+      tools::deactivate through use of the DynamicNodeManager to parallelize
+      tile processing.
+
+    Bug fixes:
+    - tools::deactivate now also works with a MaskTree.
+
+    API changes:
+    - Added ability to run tools::activate and tools::deactivate
+      single-threaded.
+
+    Houdini:
+    - VDB Activate SOP now uses the multi-threaded tools::deactivate for much
+      faster performance.

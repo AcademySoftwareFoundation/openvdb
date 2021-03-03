@@ -51,8 +51,6 @@ AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
 // AttributeArray implementation
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 AttributeArray::AttributeArray(const AttributeArray& rhs)
     : AttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
@@ -90,7 +88,6 @@ AttributeArray::operator=(const AttributeArray& rhs)
     else                            mPageHandle.reset();
     return *this;
 }
-#endif
 
 
 AttributeArray::Ptr

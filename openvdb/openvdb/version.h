@@ -49,8 +49,8 @@
 
 // Library major, minor and patch version numbers
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER 8
-#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 0
-#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 2
+#define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER 1
+#define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER 0
 
 // If OPENVDB_ABI_VERSION_NUMBER is already defined (e.g., via -DOPENVDB_ABI_VERSION_NUMBER=N)
 // use that ABI version.  Otherwise, use this library version's default ABI.
@@ -66,12 +66,6 @@
 // directive. Note that an error is also set in openvdb.cc which enforces stricter
 // behavior during compilation of the library. Both can be optionally suppressed
 // by defining OPENVDB_USE_DEPRECATED_ABI_<VERSION>.
-#ifndef OPENVDB_USE_DEPRECATED_ABI_5
-    #if OPENVDB_ABI_VERSION_NUMBER == 5
-        PRAGMA(message("NOTE: ABI = 5 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_5 "
-            "suppresses this message"))
-    #endif
-#endif
 #ifndef OPENVDB_USE_DEPRECATED_ABI_6
     #if OPENVDB_ABI_VERSION_NUMBER == 6
         PRAGMA(message("NOTE: ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 "

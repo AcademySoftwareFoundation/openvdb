@@ -27,6 +27,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
+#include <openvdb/tools/Activate.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/Prune.h>
 
@@ -257,6 +258,20 @@ instead and activated as if they were specified as World Positions.)"));
     up the voxels you didn't need to use.
 */
 
+    // Deactivation tolerance slider
+    parms.add(hutil::ParmFactory(PRM_FLT, "bgtolerance", "Deactivate Tolerance")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setTooltip(
+            "Deactivate active output voxels whose values\n"
+            "equal the output VDB's background value.\n"
+            "Voxel values are considered equal if they differ\n"
+            "by less than the specified tolerance.")
+        .setDocumentation(
+            "When deactivation of background voxels is enabled,"
+            " voxel values are considered equal to the background"
+            " if they differ by less than this tolerance."));
+
     parms.addFolder("Fill SDF");
 /*
     Any voxels that are inside the SDF will be marked active.  If they
@@ -415,45 +430,19 @@ sopDoPrune(GridType &grid, bool doprune, double tolerance)
     }
 }
 
-// The result of the union of active regions goes into grid_a
+
 template <typename GridType>
 static void
-sopDeactivate(GridType &grid, int dummy)
+sopDeactivate(GridType &grid, double tolerance)
 {
-    typename GridType::Accessor         access = grid.getAccessor();
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
 
-    ValueT              background = grid.background();
-    ValueT              value;
-    UT_Interrupt        *boss = UTgetInterrupt();
-
-    for (typename GridType::ValueOnCIter
-         iter = grid.cbeginValueOn(); iter; ++iter)
-    {
-        if (boss->opInterrupt())
-            break;
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-        {
-            for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-            {
-                for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-                {
-                    openvdb::Coord coord(i, j, k);
-
-                    // If it is on...
-                    if (access.probeValue(coord, value))
-                    {
-                        if (value == background)
-                        {
-                            access.setValueOff(coord);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    const auto value = openvdb::zeroVal<ValueT>() + tolerance;
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    openvdb::tools::deactivate(grid.tree(), grid.background(), static_cast<ValueT>(value));
 }
+
 
 template <typename GridType>
 static void
@@ -696,7 +685,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                         break;
                     UTvdbCallAllTopology(vdb->getStorageType(),
                                      sopDeactivate,
-                                     vdb->getGrid(), 1);
+                                     vdb->getGrid(), evalFloat("bgtolerance", 0, t));
                     break;
                 }
 

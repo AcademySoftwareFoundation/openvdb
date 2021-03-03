@@ -358,16 +358,15 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
       PATH_SUFFIXES ${OPENVDB_PYTHON_PATH_SUFFIXES}
     )
     set(CMAKE_FIND_LIBRARY_PREFIXES ${_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_PREFIXES})
-  elseif(${COMPONENT} STREQUAL "openvdb" OR
-         ${COMPONENT} STREQUAL "openvdb_houdini")
+  elseif(${COMPONENT} STREQUAL "openvdb_je")
+    # alias to the result of openvdb which should be handled first
+    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
+  else()
     find_library(OpenVDB_${COMPONENT}_LIBRARY ${LIB_NAME}
       ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
       PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
       PATH_SUFFIXES ${OPENVDB_LIB_PATH_SUFFIXES}
     )
-  elseif(${COMPONENT} STREQUAL "openvdb_je")
-    # alias to the result of openvdb which should be handled first
-    set(OpenVDB_${COMPONENT}_LIBRARY ${OpenVDB_openvdb_LIBRARY})
   endif()
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
@@ -506,7 +505,6 @@ if(openvdb_ax IN_LIST OpenVDB_FIND_COMPONENTS)
   if(NOT OpenVDB_FIND_QUIET)
     message(STATUS "Found LLVM: ${LLVM_DIR} (found version \"${LLVM_PACKAGE_VERSION}\")")
   endif()
-  find_package(Boost REQUIRED COMPONENTS random)
 endif()
 
 # As the way we resolve optional libraries relies on library file names, use
@@ -762,7 +760,7 @@ if(OpenVDB_openvdb_ax_LIBRARY)
       IMPORTED_LOCATION "${OpenVDB_openvdb_ax_LIBRARY}"
       INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_openvdb_ax_INCLUDE_DIR}"
       INTERFACE_SYSTEM_INCLUDE_DIRECTORIES "${LLVM_INCLUDE_DIRS}"
-      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;Boost::random;${LLVM_LIBS}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;${LLVM_LIBS}"
       INTERFACE_COMPILE_FEATURES cxx_std_14
     )
   endif()
