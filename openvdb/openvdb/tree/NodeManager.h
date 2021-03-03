@@ -278,7 +278,8 @@ public:
         transform.run(this->nodeRange(grainSize), threaded);
     }
 
-    // identical to foreach except the operator() method has a node index
+    // identical to foreach except the operator() method has a node index and
+    // the operator is referenced instead of copied in NodeTransformer
     template<typename NodeOp>
     void foreachWithIndex(const NodeOp& op, bool threaded = true, size_t grainSize=1)
     {
