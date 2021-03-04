@@ -53,6 +53,7 @@ endif()
 
 set(UNITTEST_SOURCE_FILES
   main.cc
+  TestActivate.cc
   TestAttributeArray.cc
   TestAttributeArrayString.cc
   TestAttributeGroup.cc
