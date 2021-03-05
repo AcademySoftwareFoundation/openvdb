@@ -40,7 +40,7 @@ TEST_F(TestNodeVisitor, testNodeCount)
 
     EXPECT_EQ(nodeCount1.size(), nodeCount2.size());
 
-    for (int i = 0; i < nodeCount1.size(); i++) {
+    for (size_t i = 0; i < nodeCount1.size(); i++) {
         EXPECT_EQ(nodeCount1[i], nodeCount2[i]);
     }
 }
@@ -111,7 +111,7 @@ struct StoreOriginsOp
     StoreOriginsOp(std::vector<openvdb::Coord>& _origins)
         : origins(_origins) { }
 
-    void operator()(const RootT& root, size_t idx)
+    void operator()(const RootT&, size_t idx)
     {
         // root node has no origin
         origins[idx] = openvdb::Coord::max();
