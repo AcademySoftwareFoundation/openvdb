@@ -12,6 +12,7 @@ class TestNodeVisitor: public ::testing::Test
 };
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
 struct NodeCountOp
 {
     template <typename NodeT>
@@ -44,6 +45,7 @@ TEST_F(TestNodeVisitor, testNodeCount)
         EXPECT_EQ(nodeCount1[i], nodeCount2[i]);
     }
 }
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 7
 
 
 template <typename TreeT>
@@ -103,6 +105,7 @@ TEST_F(TestNodeVisitor, testDepthFirst)
 }
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 7
 template <typename TreeT>
 struct StoreOriginsOp
 {
@@ -164,6 +167,8 @@ TEST_F(TestNodeVisitor, testOriginArray)
 
     EXPECT_EQ(idx, origins.size());
 }
+#endif // OPENVDB_ABI_VERSION_NUMBER >= 7
+
 
 template <typename TreeType>
 struct DeactivateOp
