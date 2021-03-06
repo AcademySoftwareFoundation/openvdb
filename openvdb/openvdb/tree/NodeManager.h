@@ -802,6 +802,9 @@ template<typename NodeT, Index LEVEL>
 class DynamicNodeManagerLink
 {
 public:
+    using NonConstChildNodeType = typename NodeT::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<NodeT, NonConstChildNodeType>::Type;
+
     DynamicNodeManagerLink() = default;
 
     template<typename NodeOpT, typename RootT>
@@ -820,6 +823,7 @@ public:
         if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
         FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
         mList.foreachWithIndex(childFilterOp, threaded, grainSize);
+        mNext.foreachTopDownRecurse(childFilterOp, mList, threaded, grainSize);
     }
 
     template<typename NodeOpT, typename RootT>
@@ -838,11 +842,12 @@ public:
         if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
         FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
         mList.reduceWithIndex(childFilterOp, threaded, grainSize);
+        mNext.reduceTopDownRecurse(childFilterOp, mList, threaded, grainSize);
     }
 
 protected:
     NodeList<NodeT> mList;
-    DynamicNodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+    DynamicNodeManagerLink<ChildNodeType, LEVEL-1> mNext;
 };// DynamicNodeManagerLink class
 
 
@@ -881,7 +886,10 @@ public:
     static const Index LEVELS = _LEVELS;
     static_assert(LEVELS > 0,
         "expected instantiation of template specialization"); // see specialization below
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
+    using NonConstChildNodeType = typename RootNodeType::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstChildNodeType>::Type;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
     explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
@@ -889,7 +897,7 @@ public:
     DynamicNodeManager(const DynamicNodeManager&) = delete;
 
     /// @brief Return a reference to the root node.
-    const RootNodeType& root() const { return mRoot; }
+    const NonConstRootNodeType& root() const { return mRoot; }
 
     /// @brief   Threaded method that applies a user-supplied functor
     ///          to all the nodes in the tree.
@@ -1024,7 +1032,7 @@ public:
 
 protected:
     RootNodeType& mRoot;
-    DynamicNodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+    DynamicNodeManagerLink<ChildNodeType, LEVELS-1> mChain;
 };// DynamicNodeManager class
 
 
@@ -1477,7 +1485,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
@@ -1512,8 +1521,8 @@ public:
 
 protected:
     using NodeT1 = RootNodeType;
-    using NodeT0 = typename NodeT1::ChildNodeType;
-
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;
     using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
@@ -1530,7 +1539,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
@@ -1571,11 +1581,13 @@ public:
 
 protected:
     using NodeT2 = RootNodeType;
-    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // upper level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
-    using ListT1 = NodeList<NodeT1>; // upper level of internal nodes
-    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
+    using ListT1 = NodeList<NodeT1>; // upper level
+    using ListT0 = NodeList<NodeT0>; // lower level
 
     NodeT2& mRoot;
     ListT1 mList1;
@@ -1592,7 +1604,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
@@ -1641,9 +1654,12 @@ public:
 
 protected:
     using NodeT3 = RootNodeType;
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
-    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
     using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
@@ -1665,7 +1681,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
@@ -1722,10 +1739,14 @@ public:
 
 protected:
     using NodeT4 = RootNodeType;
-    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT3 = typename NodeT4::ChildNodeType;
+    using NodeT3 = typename CopyConstness<RootNodeType, NonConstNodeT3>::Type;  // upper level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper mid level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // lower mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
     using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes
