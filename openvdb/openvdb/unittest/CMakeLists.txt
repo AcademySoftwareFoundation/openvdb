@@ -128,6 +128,7 @@ set(UNITTEST_SOURCE_FILES
   TestPointPartitioner.cc
   TestPointSample.cc
   TestPointScatter.cc
+  TestPointStatistics.cc
   TestPointsToMask.cc
   TestPoissonSolver.cc
   TestPotentialFlow.cc
