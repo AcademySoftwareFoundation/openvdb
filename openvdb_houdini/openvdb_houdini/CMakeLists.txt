@@ -257,6 +257,7 @@ if(NOT OPENVDB_DSO_NAMES)
     SOP_OpenVDB_Points_Convert
     SOP_OpenVDB_Points_Delete
     SOP_OpenVDB_Points_Group
+    SOP_OpenVDB_Points_Surfacer
     SOP_OpenVDB_Potential_Flow
     SOP_OpenVDB_Prune
     SOP_OpenVDB_Rasterize_Points
