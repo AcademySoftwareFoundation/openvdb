@@ -3,7 +3,7 @@
 
 #include "TestHarness.h"
 
-#include "../test/util.h"
+#include "../util.h"
 
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/math/OpenSimplexNoise.h>
