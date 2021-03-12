@@ -74,7 +74,6 @@ may be provided to tell this module where to look.
 cmake_minimum_required(VERSION 3.12)
 include(GNUInstallDirs)
 
-
 mark_as_advanced(
   Blosc_INCLUDE_DIR
   Blosc_LIBRARY
@@ -184,18 +183,82 @@ else()
   endif()
 endif()
 
-# libblosc is the name of the blosc static lib on windows
+set(Blosc_LIB_COMPONENTS "")
+# NOTE: Search for debug version first (see vcpkg hack)
+list(APPEND BLOSC_BUILD_TYPES DEBUG RELEASE)
 
-find_library(Blosc_LIBRARY blosc libblosc
-  ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
-  PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
-  PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
-)
+foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
+
+  set(_BLOSC_CMAKE_IGNORE_PATH ${CMAKE_IGNORE_PATH})
+  if(VCPKG_TOOLCHAIN)
+    # Blosc is installed very strangely in VCPKG (debug/release libs have the
+    # same name, static build uses external deps, dll doesn't) and blosc itself
+    # comes with almost zero downstream CMake support for us to detect settings.
+    # We should not support external package managers in our own modules like
+    # this, but there doesn't seem to be a work around
+    if(BUILD_TYPE STREQUAL RELEASE)
+      if(EXISTS ${Blosc_LIBRARY_DEBUG})
+        get_filename_component(_BLOSC_DEBUG_DIR ${Blosc_LIBRARY_DEBUG} DIRECTORY)
+        list(APPEND CMAKE_IGNORE_PATH ${_BLOSC_DEBUG_DIR})
+      endif()
+    endif()
+  endif()
+
+  find_library(Blosc_LIBRARY_${BUILD_TYPE} blosc
+    ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
+    PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
+    PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
+  )
+
+  list(APPEND Blosc_LIB_COMPONENTS ${Blosc_LIBRARY_${BUILD_TYPE}})
+  set(CMAKE_IGNORE_PATH ${_BLOSC_CMAKE_IGNORE_PATH})
+endforeach()
 
 # Reset library suffix
 
 set(CMAKE_FIND_LIBRARY_SUFFIXES ${_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
 unset(_BLOSC_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
+
+if(Blosc_LIBRARY_DEBUG AND Blosc_LIBRARY_RELEASE)
+  # if the generator is multi-config or if CMAKE_BUILD_TYPE is set for
+  # single-config generators, set optimized and debug libraries
+  get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+  if(_isMultiConfig OR CMAKE_BUILD_TYPE)
+    set(Blosc_LIBRARY optimized ${Blosc_LIBRARY_RELEASE} debug ${Blosc_LIBRARY_DEBUG})
+  else()
+    # For single-config generators where CMAKE_BUILD_TYPE has no value,
+    # just use the release libraries
+    set(Blosc_LIBRARY ${Blosc_LIBRARY_RELEASE})
+  endif()
+  # FIXME: This probably should be set for both cases
+  set(Blosc_LIBRARIES optimized ${Blosc_LIBRARY_RELEASE} debug ${Blosc_LIBRARY_DEBUG})
+endif()
+
+# if only the release version was found, set the debug variable also to the release version
+if(Blosc_LIBRARY_RELEASE AND NOT Blosc_LIBRARY_DEBUG)
+  set(Blosc_LIBRARY_DEBUG ${Blosc_LIBRARY_RELEASE})
+  set(Blosc_LIBRARY       ${Blosc_LIBRARY_RELEASE})
+  set(Blosc_LIBRARIES     ${Blosc_LIBRARY_RELEASE})
+endif()
+
+# if only the debug version was found, set the release variable also to the debug version
+if(Blosc_LIBRARY_DEBUG AND NOT Blosc_LIBRARY_RELEASE)
+  set(Blosc_LIBRARY_RELEASE ${Blosc_LIBRARY_DEBUG})
+  set(Blosc_LIBRARY         ${Blosc_LIBRARY_DEBUG})
+  set(Blosc_LIBRARIES       ${Blosc_LIBRARY_DEBUG})
+endif()
+
+# If the debug & release library ends up being the same, omit the keywords
+if("${Blosc_LIBRARY_RELEASE}" STREQUAL "${Blosc_LIBRARY_DEBUG}")
+  set(Blosc_LIBRARY   ${Blosc_LIBRARY_RELEASE} )
+  set(Blosc_LIBRARIES ${Blosc_LIBRARY_RELEASE} )
+endif()
+
+if(Blosc_LIBRARY)
+  set(Blosc_FOUND TRUE)
+else()
+  set(Blosc_FOUND FALSE)
+endif()
 
 # ------------------------------------------------------------------------
 #  Cache and set Blosc_FOUND
@@ -230,25 +293,60 @@ if(Blosc_FOUND)
   set(Blosc_LIBRARIES ${Blosc_LIBRARY})
   set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
 
-  get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY} DIRECTORY)
+  get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY_RELEASE} DIRECTORY)
 
   if(NOT TARGET Blosc::blosc)
     add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
     set_target_properties(Blosc::blosc PROPERTIES
-      IMPORTED_LOCATION "${Blosc_LIBRARIES}"
       INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
-      INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}"
-    )
+      INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}")
+
+    # Standard location
+    set_target_properties(Blosc::blosc PROPERTIES
+      IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
+      IMPORTED_LOCATION "${Blosc_LIBRARY}")
+
+    # Release location
+    if(EXISTS "${Blosc_LIBRARY_RELEASE}")
+      set_property(TARGET Blosc::blosc APPEND PROPERTY
+        IMPORTED_CONFIGURATIONS RELEASE)
+      set_target_properties(Blosc::blosc PROPERTIES
+        IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+        IMPORTED_LOCATION_RELEASE "${Blosc_LIBRARY_RELEASE}")
+    endif()
+
+    # Debug location
+    if(EXISTS "${Blosc_LIBRARY_DEBUG}")
+      set_property(TARGET Blosc::blosc APPEND PROPERTY
+        IMPORTED_CONFIGURATIONS DEBUG)
+      set_target_properties(Blosc::blosc PROPERTIES
+        IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
+        IMPORTED_LOCATION_DEBUG "${Blosc_LIBRARY_DEBUG}")
+    endif()
 
     # Blosc may optionally be compiled with external sources for
-    # lz4, snappy, zlib and zstd. Add them as interface libs if
-    # requested (there doesn't seem to be a way to figure this
-    # out automatically).
+    # lz4, snappy and zlib . Add them as interface libs if requested
+    # (there doesn't seem to be a way to figure this out automatically).
+    # We assume they live along side blosc
     if(BLOSC_USE_EXTERNAL_SOURCES)
+      get_filename_component(Blosc_LIBRARY_DIR_RELEASE ${Blosc_LIBRARY_RELEASE} DIRECTORY)
+      get_filename_component(Blosc_LIBRARY_DIR_DEBUG ${Blosc_LIBRARY_DEBUG} DIRECTORY)
       set_target_properties(Blosc::blosc PROPERTIES
-        INTERFACE_LINK_DIRECTORIES "${Blosc_LIBRARY_DIRS}"
-        INTERFACE_LINK_LIBRARIES "lz4;snappy;zlib;zstd_static"
-      )
+        INTERFACE_LINK_DIRECTORIES
+           "\$<\$<CONFIG:Release>:${Blosc_LIBRARY_DIR_RELEASE}>;\$<\$<CONFIG:Debug>:${Blosc_LIBRARY_DIR_DEBUG}>")
+      target_link_libraries(Blosc::blosc INTERFACE
+        $<$<CONFIG:Release>:lz4;snappy;zlib>
+        $<$<CONFIG:Debug>:lz4d;snappyd;zlibd>)
+
+      if(BLOSC_USE_STATIC_LIBS)
+        target_link_libraries(Blosc::blosc INTERFACE
+          $<$<CONFIG:Release>:zstd_static>
+          $<$<CONFIG:Debug>:zstd_staticd>)
+      else()
+        target_link_libraries(Blosc::blosc INTERFACE
+          $<$<CONFIG:Release>:zstd>
+          $<$<CONFIG:Debug>:zstdd>)
+      endif()
     endif()
   endif()
 elseif(Blosc_FIND_REQUIRED)
