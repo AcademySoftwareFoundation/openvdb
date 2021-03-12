@@ -2,7 +2,7 @@
 
 set -ex
 
-VCPKG_ROOT="$1"; shift
+BUILD_TYPE="$1"; shift
 CMAKE_EXTRA="$@"
 
 mkdir build
@@ -18,8 +18,7 @@ cmake --version
 cmake \
   -G "Visual Studio 16 2019" -A x64 \
   -DVCPKG_TARGET_TRIPLET="${VCPKG_DEFAULT_TRIPLET}" \
-  -DCMAKE_BUILD_TYPE=Release \
-  -DCMAKE_TOOLCHAIN_FILE="${VCPKG_ROOT}\scripts\buildsystems\vcpkg.cmake" \
+  -DCMAKE_TOOLCHAIN_FILE="${VCPKG_INSTALLATION_ROOT}\scripts\buildsystems\vcpkg.cmake" \
   -DOPENVDB_BUILD_BINARIES=ON \
   -DOPENVDB_BUILD_VDB_PRINT=ON \
   -DOPENVDB_BUILD_VDB_LOD=ON \
@@ -32,4 +31,4 @@ cmake \
   ${CMAKE_EXTRA} \
   ..
 
-cmake --build . --parallel 4 --config Release --target install
+cmake --build . --parallel 4 --config $BUILD_TYPE --target install
