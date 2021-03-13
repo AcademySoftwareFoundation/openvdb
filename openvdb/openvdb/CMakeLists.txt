@@ -31,8 +31,7 @@ mark_as_advanced(
 
 if(NOT OPENVDB_CORE_SHARED AND NOT OPENVDB_CORE_STATIC)
   message(FATAL_ERROR "Both static and shared core OpenVDB libraries have been disabled. "
-    "At least one must be enabled when building the core library."
-  )
+    "At least one must be enabled when building the core library.")
 endif()
 
 #########################################################################
@@ -40,6 +39,65 @@ endif()
 message(STATUS "----------------------------------------------------")
 message(STATUS "------------- Configuring OpenVDBCore --------------")
 message(STATUS "----------------------------------------------------")
+
+##########################################################################
+
+# Win32 checks - we don't set any explicit settings so allow for all build
+# types, but warn in cases where they probably have not been intended
+
+if(WIN32)
+  if(VCPKG_TOOLCHAIN AND VCPKG_TARGET_TRIPLET)
+    string(FIND ${VCPKG_TARGET_TRIPLET} "static" _BUILDING_STATIC_TRIPLET)
+    if(_BUILDING_STATIC_TRIPLET EQUAL -1)
+      # x64-windows
+      if(OPENVDB_CORE_STATIC)
+        # building the static lib - check to see if we've explicitly set /MD
+        if(NOT CMAKE_MSVC_RUNTIME_LIBRARY OR NOT
+          (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDLL OR
+           CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL))
+          # /MD not set, /MT will be used
+          message(WARNING "Detected VCPKG toolchain is using a mismatching triplet for "
+            "OpenVDB build artifacts. ${VCPKG_TARGET_TRIPLET} is dynamic, but OPENVDB_CORE_STATIC "
+            "is ON. The static build of OpenVDB may not build correctly. It it recommended to only "
+            "configure either the static or shared library on Windows in a single run of CMake.")
+        endif()
+      endif()
+    else()
+      # x64-windows-static
+      if(OPENVDB_CORE_SHARED)
+        # building the shared lib - check to see if we've explicitly set /MT
+        if(NOT CMAKE_MSVC_RUNTIME_LIBRARY OR NOT
+          (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
+           CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug))
+          # /MT not set, /MD will be used
+          message(WARNING "Detected VCPKG toolchain is using a mismatching triplet for "
+            "OpenVDB build artifacts. ${VCPKG_TARGET_TRIPLET} is static, but OPENVDB_CORE_SHARED "
+            "is ON. The shared build of OpenVDB may not build correctly. It it recommended to only "
+            "configure either the static or shared library on Windows in a single run of CMake.")
+        endif()
+      endif()
+    endif()
+  endif()
+
+  if(CMAKE_MSVC_RUNTIME_LIBRARY)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreaded" OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDebug")
+      if(OPENVDB_CORE_SHARED)
+         message(WARNING "Unexpected value for the Windows CRT with target build artifacts."
+          "You are attempting to use the static CRT (/MT) with a dynamic configuration of OpenVDB."
+          "This is not recommended and may cause failures.")
+      endif()
+    endif()
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL" OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDebugDLL")
+      if(OPENVDB_CORE_STATIC)
+         message(WARNING "Unexpected value for the Windows CRT with target build artifacts."
+          "You are attempting to use the dyanmic CRT (/MD) with a static configuration of OpenVDB."
+          "This is not recommended and may cause failures.")
+      endif()
+    endif()
+  endif()
+endif()
 
 ##########################################################################
 
@@ -428,10 +486,16 @@ if(OPENVDB_CORE_STATIC)
   )
 
   set_target_properties(openvdb_static
-    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
-  )
+    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
 
   if(WIN32)
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+      # also add it explicitly as a compile option
+      set_target_properties(openvdb_static PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+      target_compile_options(openvdb_static PUBLIC "/MT$<$<CONFIG:Debug>:d>")
+    endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
 endif()
@@ -473,6 +537,16 @@ if(OPENVDB_CORE_SHARED)
     set_target_properties(openvdb_shared
       PROPERTIES INSTALL_RPATH "${RPATHS}"
     )
+  endif()
+
+  if(WIN32)
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+      # also add it explicitly as a compile option
+      set_target_properties(openvdb_shared PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+      target_compile_options(openvdb_shared PUBLIC "/MD$<$<CONFIG:Debug>:d>")
+    endif()
   endif()
 endif()
 
