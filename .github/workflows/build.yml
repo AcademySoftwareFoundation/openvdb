@@ -25,6 +25,8 @@ on:
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
+    # run this workflow every midnight Tuesday
+    - cron:  '0 0 * * 2'
 
 jobs:
   linux-vfx:
@@ -37,12 +39,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'DebugNoInfo', test: 'OFF' } # tests take too long..
-          - { cxx: g++,     image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: g++,     image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2019', abi: '6', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2020', abi: '7', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Debug',   test: 'OFF' }
+          - { cxx: g++,     image: '2020', abi: '7', build: 'Release', test: 'ON'  }
+          - { cxx: g++,     image: '2021', abi: '8', build: 'Release', test: 'ON'  }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
@@ -51,7 +53,9 @@ jobs:
     - name: build
       run: ./ci/build.sh ${{ matrix.config.build }} ${{ matrix.config.abi }} ON None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
-      if: matrix.config.test == 'ON'
+      # Always run tests on weekly builds
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 0 * * 2') || matrix.config.test == 'ON'
       run: |
         ./ci/test.sh
         ./ci/test_install.sh
@@ -67,10 +71,10 @@ jobs:
           # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_CORE_STATIC=ON -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_CORE_STATIC=ON -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows',        build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=ON  -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=ON  -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows-static', build: 'Release', test: 'ON',  cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', build: 'Debug',   test: 'OFF', cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        build: 'Release', test: 'ON',  cmake: '-DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        build: 'Debug',   test: 'OFF', cmake: '-DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -87,6 +91,9 @@ jobs:
       run: ./ci/build_windows.sh ${{ matrix.config.build }} ${{ matrix.config.cmake }}
     - name: test
       shell: bash
+      # Always run tests on weekly builds
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 0 * * 2') || matrix.config.test == 'ON'
       run: ./ci/test.sh
 
   testabi8lite:
