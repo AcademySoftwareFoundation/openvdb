@@ -28,7 +28,15 @@ cmake \
   -DBOOST_ROOT="${BOOST_ROOT_1_72_0}" \
   -DBOOST_INCLUDEDIR="${BOOST_ROOT_1_72_0}\boost\include" \
   -DBOOST_LIBRARYDIR="${BOOST_ROOT_1_72_0}\lib" \
+  -DMSVC_MP_THREAD_COUNT=4 \
   ${CMAKE_EXTRA} \
   ..
+
+# NOTE: --parallel only effects the number of projects build, not t-units.
+# We support this with out own MSVC_MP_THREAD_COUNT option.
+# Alternatively it is mentioned that the following should work:
+#   cmake --build . --  /p:CL_MPcount=8
+# However it does not seem to for our project.
+# https://gitlab.kitware.com/cmake/cmake/-/issues/20564
 
 cmake --build . --parallel 4 --config $BUILD_TYPE --target install

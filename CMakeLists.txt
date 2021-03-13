@@ -123,6 +123,11 @@ option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
+set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
+The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
+cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
+NOT the number of TU's ]=])
+
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -568,6 +573,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(/wd4275)
     # Truncation from 'int' to 'bool'
     add_compile_options(/wd4305)
+  endif()
+  # If a user has explicitly requested a parallel build, configure this during CMake
+  if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+    add_compile_options(/MP${MSVC_MP_THREAD_COUNT})
   endif()
 endif()
 
