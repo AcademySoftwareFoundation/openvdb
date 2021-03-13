@@ -128,7 +128,6 @@ TEST_F(TestStreamCompression, testBlosc)
 
     { // valid buffer
         // compress
-
         std::unique_ptr<int[]> uncompressedBuffer(new int[count]);
 
         for (int i = 0; i < count; i++) {
@@ -243,7 +242,7 @@ TEST_F(TestStreamCompression, testBlosc)
         // compress
 
         std::vector<int> smallBuffer;
-        smallBuffer.reserve(count);
+        smallBuffer.resize(count);
 
         for (int i = 0; i < count; i++)     smallBuffer[i] = i;
 

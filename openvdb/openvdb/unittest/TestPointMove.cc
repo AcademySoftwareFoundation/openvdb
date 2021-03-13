@@ -327,11 +327,23 @@ void TestPointMove::testCachedDeformer()
 
     leafIndex = 0;
     for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        // odd filter writes to mapData, not vecData
+        EXPECT_TRUE(cache.leafs[leafIndex].vecData.empty());
+        const auto& data = cache.leafs[leafIndex].mapData;
+
         for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
             AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
             Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
-            Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
+
+            const auto miter = data.find(*iter);
+            if (!oddFilter.valid(iter)) {
+                EXPECT_TRUE(miter == data.cend());
+            }
+            else {
+                EXPECT_TRUE(miter != data.cend());
+                const Vec3f& cachePosition = miter->second;
+                EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
+            }
         }
         leafIndex++;
     }
