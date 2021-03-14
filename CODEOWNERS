@@ -5,34 +5,26 @@
 # https://git-scm.com/docs/gitignore#_pattern_format
 
 # Admin/General
-/.github/                                                           @kmuseth @pcucka @jmlait @idclip @danrbailey
-/ci/                                                                @kmuseth @pcucka @jmlait @idclip @danrbailey
-/cmake/                                                             @kmuseth @pcucka @jmlait @idclip @danrbailey
-/doc/                                                               @kmuseth @pcucka @jmlait @idclip @danrbailey
-/tsc/                                                               @kmuseth @pcucka @jmlait @idclip @danrbailey
-CODEOWNERS                                                          @kmuseth @pcucka @jmlait @idclip @danrbailey
-LICENSE                                                             @kmuseth @pcucka @jmlait @idclip @danrbailey
-CHANGES                                                             @kmuseth @pcucka @jmlait @idclip @danrbailey
-*.md                                                                @kmuseth @pcucka @jmlait @idclip @danrbailey
+/.github/                                                           @kmuseth @apradhana @jmlait @idclip @danrbailey
+/ci/                                                                @kmuseth @apradhana @jmlait @idclip @danrbailey
+/cmake/                                                             @kmuseth @apradhana @jmlait @idclip @danrbailey
+/doc/                                                               @kmuseth @apradhana @jmlait @idclip @danrbailey
+/pendingchanges/                                                    @kmuseth @apradhana @jmlait @idclip @danrbailey
+/tsc/                                                               @kmuseth @apradhana @jmlait @idclip @danrbailey
+CODEOWNERS                                                          @kmuseth @apradhana @jmlait @idclip @danrbailey
+LICENSE                                                             @kmuseth @apradhana @jmlait @idclip @danrbailey
+CHANGES                                                             @kmuseth @apradhana @jmlait @idclip @danrbailey
+*.md                                                                @kmuseth @apradhana @jmlait @idclip @danrbailey
 
 # Core OpenVDB Library
-/openvdb/openvdb/cmd/                                               @kmuseth @pcucka
-/openvdb/openvdb/io/                                                @kmuseth @pcucka
-/openvdb/openvdb/math/                                              @kmuseth @pcucka
+/openvdb/                                                           @kmuseth
 /openvdb/openvdb/points/                                            @danrbailey @idclip
-/openvdb/openvdb/python/                                            @kmuseth @pcucka
-/openvdb/openvdb/tools/                                             @kmuseth @pcucka
-/openvdb/openvdb/tree/                                              @kmuseth @pcucka
-/openvdb/openvdb/util/                                              @kmuseth @pcucka
-/openvdb/openvdb/viewer/                                            @kmuseth @pcucka
-/openvdb/openvdb/*.cc                                               @kmuseth @pcucka
-/openvdb/openvdb/*.h                                                @kmuseth @pcucka
 
 # OpenVDB AX
 /openvdb_ax/                                                        @idclip
 
 # OpenVDB Houdini - Default
-/openvdb_houdini/                                                   @kmuseth @pcucka
+/openvdb_houdini/                                                   @kmuseth
 
 # OpenVDB Houdini - VDB Primitive and SideFX Utils
 /openvdb_houdini/openvdb_houdini/GEO_PrimVDB.*                      @jmlait
