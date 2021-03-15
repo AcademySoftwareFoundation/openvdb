@@ -1111,6 +1111,8 @@ bool ComputeGenerator::visit(const ast::ArrayPack* node)
     // or another array
     if (num == 1) return true;
 
+    llvm::Type* strtype = LLVMType<AXString>::get(mContext);
+
     std::vector<llvm::Value*> values;
     values.reserve(num);
     for (size_t i = 0; i < num; ++i) {
@@ -1118,7 +1120,16 @@ bool ComputeGenerator::visit(const ast::ArrayPack* node)
         if (value->getType()->isPointerTy()) {
             value = mBuilder.CreateLoad(value);
         }
-        values.push_back(value);
+        if (value->getType()->isArrayTy()) {
+            mLog.error("cannot build nested arrays", node->child(num-(i+1)));
+            return false;
+        }
+        if (value->getType() == strtype) {
+            mLog.error("cannot build arrays of strings", node->child(num-(i+1)));
+            return false;
+        }
+
+        values.emplace_back(value);
     }
 
     // reserve the values
@@ -1427,8 +1438,18 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
             rhs = scalarToMatrix(rhs, mBuilder, lsize == 9 ? 3 : 4);
             rtype = rhs->getType()->getPointerElementType();
             rsize = lsize;
+            if (auto* child = node->child(0)) {
+                if (child->isType<ast::ArrayPack>()) {
+                    mLog.error("unable to deduce implicit {...} type for binary op as value "
+                        "may be a matrix or array. assign to a local mat variable", child);
+                    return false;
+                }
+            }
+            if (!mLog.warning("implicit cast to matrix from scalar. resulting "
+                "cast will be equal to scalar * identity.", node->child(1))) return false;
         }
     }
+
     if (rsize == 9 || rsize == 16) {
         if (ltype->isIntegerTy() || ltype->isFloatingPointTy()) {
             if (lhs->getType()->isPointerTy()) {
@@ -1438,6 +1459,15 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
             lhs = scalarToMatrix(lhs, mBuilder, rsize == 9 ? 3 : 4);
             ltype = lhs->getType()->getPointerElementType();
             lsize = rsize;
+            if (auto* child = node->child(1)) {
+                if (child->isType<ast::ArrayPack>()) {
+                    mLog.error("unable to deduce implicit {...} type for binary op as value "
+                        "may be a matrix or array. assign to a local mat variable", child);
+                    return false;
+                }
+            }
+            if (!mLog.warning("implicit cast to matrix from scalar. resulting "
+                "cast will be equal to scalar * identity.", node->child(0))) return false;
         }
     }
 
@@ -1462,7 +1492,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 result = this->getFunction("pretransform")->execute({lhs, rhs}, mBuilder);
             }
             else if ((lsize == 3 && rsize ==  9) ||
-                     (lsize == 4 && rsize == 16) ||
+                     (lsize == 3 && rsize == 16) ||
                      (lsize == 4 && rsize == 16)) {
                 // vector matrix multiplication all handled through transform
                 result = this->getFunction("transform")->execute({lhs, rhs}, mBuilder);

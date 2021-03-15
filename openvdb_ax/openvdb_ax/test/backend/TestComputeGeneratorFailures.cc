@@ -69,6 +69,9 @@ static const std::vector<std::string> tests {
     "string a,b; a ^ b;",
     "string a,b; a | b;",
     "string a,b; a || b;",
+    "string a,b; a * b;",
+    "string a,b; a - b;",
+    "string a,b; a / b;",
     "vec2d a,b; a & b;",
     "vec2d a,b; a && b;",
     "vec2d a,b; a << b;",
@@ -187,6 +190,11 @@ static const std::vector<std::string> tests {
     "vec4i a; vec3i b; a=b;",
     "mat4f a; mat3f b; a=b;",
     "mat4d a; mat3d b; a=b;",
+    "vec2f a = {1,2,3};",
+    "vec3f a = {1,2};",
+    "vec4f a = {1,2};",
+    "mat3f a = {1,2};",
+    "mat4f a = {1,2};",
     /// string assignments
     "string a = 1;",
     "int a; string b; b=a;",
@@ -202,6 +210,15 @@ static const std::vector<std::string> tests {
     "vec3f a; a[1,1];",
     "mat3f a; vec3f b; a[b,1];",
     "mat3f a; vec3f b; a[1,b];",
+    /// array packs
+    "{1, {2,3}};",
+    "{{1,2}, 3};",
+    "{1, 2, \"a\"};",
+    "vec2f a; {1, 2, a};",
+    "vec3f a; {1, 2, a};",
+    "mat3f a; {1, 2, a};",
+    "mat4f a; {1, 2, a};",
+    "string a; {1, 2, a};",
     /// unsupported implicit casts/ops
     "vec2f a; vec3f b; a*b;",
     "vec3f a; vec4f b; a*b;",
@@ -210,9 +227,22 @@ static const std::vector<std::string> tests {
     "mat3f a; mat4f b; a*b;",
     "string a; mat4f b; a*b;",
     "int a; string b; a*b;",
-    "string a; string b; a*b;",
-    "string a; string b; a-b;",
-    "string a; string b; a/b;",
+    "{0,0,0,0,0,0,0,0,0} * 0;"
+    "0 * {0,0,0,0,0,0,0,0,0};"
+    "{0,0,0,0,0,0,0,0,0} + 0;"
+    "{0,0,0,0,0,0,0,0,0} - 0;"
+    "{0,0,0,0,0,0,0,0,0} / 0;"
+    "0 * {.0f,0,0,0,0,0,0,0,0};"
+    "{.0f,0,0,0,0,0,0,0,0} * 0;"
+    "{0.0,0,0,0,0,0,0,0,0} * 0;"
+    "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} * 0;"
+    "0 * {0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};"
+    "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} + 0;"
+    "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} - 0;"
+    "{0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} / 0;"
+    "0 * {.0f,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0};"
+    "{.0f,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} * 0;"
+    "{0.0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0} * 0;"
     "~0.0f;",
     "vec3f a; ~a;"
     /// loops
@@ -330,6 +360,7 @@ TestComputeGeneratorFailures::testFailures()
         const openvdb::ax::ast::Tree::ConstPtr ast =
             openvdb::ax::ast::parse(code.c_str(), logger);
         CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unable to parse", code), ast.get());
+        CPPUNIT_ASSERT(!logger.hasError());
 
         unittest_util::LLVMState state;
         openvdb::ax::codegen::codegen_internal::ComputeGenerator gen(state.module(), opts, reg, logger);
