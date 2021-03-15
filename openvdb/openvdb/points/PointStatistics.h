@@ -549,7 +549,7 @@ inline bool accumulate(const PointDataTreeT& points,
                     auto total = ResultT(handle.get(0));
                     for (size_t i = 1; i < size; ++i) {
                         assert(i < size_t(std::numeric_limits<Index>::max()));
-                        total += handle.get(Index(i));
+                        total += ResultT(handle.get(Index(i)));
                     }
                     values[leaf.pos()].reset(new ResultT(total));
                 }
@@ -558,7 +558,7 @@ inline bool accumulate(const PointDataTreeT& points,
                     if (!iter) continue;
                     auto total = ResultT(handle.get(*iter));
                     ++iter;
-                    for (; iter; ++iter) total += handle.get(*iter);
+                    for (; iter; ++iter) total += ResultT(handle.get(*iter));
                     values[leaf.pos()].reset(new ResultT(total));
                 }
             }

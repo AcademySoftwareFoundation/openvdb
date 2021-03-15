@@ -47,7 +47,7 @@ TEST_F(TestPointStatistics, testEvalMinMax)
             .attribute<float>(zeroVal<float>(), "test")
             .get();
         int32_t min=-1, max=-2;
-        EXPECT_THROW(points::evalMinMax<int32_t>(points->tree(), "test", min, max), TypeError);
+        EXPECT_ANY_THROW(points::evalMinMax<int32_t>(points->tree(), "test", min, max));
         EXPECT_EQ(int32_t(-1), min);
         EXPECT_EQ(int32_t(-2), max);
     }
@@ -308,7 +308,7 @@ TEST_F(TestPointStatistics, testEvalAverage)
             .attribute<float>(zeroVal<float>(), "test")
             .get();
         int32_t avg=-1;
-        EXPECT_THROW(points::evalAverage<int32_t>(points->tree(), "test", avg), TypeError);
+        EXPECT_ANY_THROW(points::evalAverage<int32_t>(points->tree(), "test", avg));
         EXPECT_EQ(int32_t(-1), avg);
     }
 
@@ -526,7 +526,7 @@ TEST_F(TestPointStatistics, testAccumulate)
             .attribute<float>(zeroVal<float>(), "test")
             .get();
         int32_t total=-1;
-        EXPECT_THROW(points::accumulate<int32_t>(points->tree(), "test", total), TypeError);
+        EXPECT_ANY_THROW(points::accumulate<int32_t>(points->tree(), "test", total));
         EXPECT_EQ(int32_t(-1), total);
     }
 
