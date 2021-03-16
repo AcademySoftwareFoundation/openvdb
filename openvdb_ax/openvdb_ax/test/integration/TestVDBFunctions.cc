@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "TestHarness.h"
-#include "util.h"
+#include "../util.h"
 
 #include <openvdb_ax/ax.h>
 #include <openvdb_ax/codegen/Types.h>
