@@ -21,6 +21,8 @@
 #include "../ast/Scanners.h"
 
 #include <openvdb/version.h>
+#include <openvdb/Types.h>
+#include <openvdb/util/Name.h>
 
 #include <unordered_map>
 

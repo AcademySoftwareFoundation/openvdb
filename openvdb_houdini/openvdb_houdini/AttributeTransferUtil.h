@@ -1258,9 +1258,12 @@ TransferPrimitiveAttributesOp<GridType>::copyPrimAttrs(
     // Find closest source primitive to current avg. vertex position.
     const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
 
-    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+    std::vector<GA_Index> primitives, similarPrimitives;
     IndexT primIndex;
     openvdb::Coord ijk;
+
+    primitives.reserve(8);
+    similarPrimitives.reserve(8);
     for (int d = 0; d < 8; ++d) {
         ijk[0] = coord[0] + (((d & 0x02) >> 1) ^ (d & 0x01));
         ijk[1] = coord[1] + ((d & 0x02) >> 1);
@@ -1321,8 +1324,10 @@ TransferPrimitiveAttributesOp<GridType>::copyVertAttrs(
     openvdb::Vec3d pos, uvw;
     openvdb::Coord ijk;
     UT_Vector3 sourceNormal;
-    std::vector<GA_Index> primitives(8), similarPrimitives(8);
+    std::vector<GA_Index> primitives, similarPrimitives;
 
+    primitives.reserve(8);
+    similarPrimitives.reserve(8);
     for (GA_Size vtx = 0, vtxN = targetPrim.getVertexCount(); vtx < vtxN; ++vtx) {
         pos = UTvdbConvert(targetPrim.getPos3(vtx));
         const auto coord = openvdb::Coord::floor(transform.worldToIndex(pos));
@@ -1407,9 +1412,10 @@ TransferPointAttributesOp<GridType>::operator()(const GA_SplittableRange& range)
     typename GridType::ConstAccessor polyIdxAcc = mIndexGrid.getConstAccessor();
     const openvdb::math::Transform& transform = mIndexGrid.transform();
     openvdb::Vec3d pos, indexPos, uvw;
-    std::vector<GA_Index> primitives(8);
+    std::vector<GA_Index> primitives;
     openvdb::Coord ijk, coord;
 
+    primitives.reserve(8);
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
             for (target = start; target < end; ++target) {
