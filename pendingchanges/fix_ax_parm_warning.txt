@@ -1,0 +1,2 @@
+    Houdini:
+    - Fixed a parameter warning in VDB AX SOP.
