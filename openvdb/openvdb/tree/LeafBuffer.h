@@ -23,29 +23,6 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
 
-namespace internal {
-
-/// @internal For delayed loading to be threadsafe, LeafBuffer::mOutOfCore must be
-/// memory-fenced when it is set in LeafBuffer::doLoad(), otherwise that operation
-/// could be reordered ahead of others in doLoad(), with the possible result that
-/// other threads could see the buffer as in-core before it has been fully loaded.
-/// Making mOutOfCore a TBB atomic solves the problem, since TBB atomics are release-fenced
-/// by default (unlike STL atomics, which are not even guaranteed to be lock-free).
-/// However, TBB atomics have stricter alignment requirements than their underlying value_types,
-/// so a LeafBuffer with an atomic mOutOfCore is potentially ABI-incompatible with
-/// its non-atomic counterpart.
-/// This helper class conditionally declares mOutOfCore as an atomic only if doing so
-/// doesn't break ABI compatibility.
-template<typename T>
-struct LeafBufferFlags
-{
-    /// The type of LeafBuffer::mOutOfCore
-    using type = std::atomic<Index32>; // FIXME: Can we make this change from tbb::atomic to std::atomic, or do we need an ABI bump for that?
-    static constexpr bool IsAtomic = true;
-};
-
-} // namespace internal
-
 
 /// @brief Array of fixed size 2<SUP>3<I>Log2Dim</I></SUP> that stores
 /// the voxel values of a LeafNode
@@ -142,7 +119,7 @@ private:
     inline void doLoad() const;
     inline bool detachFromFile();
 
-    using FlagsType = typename internal::LeafBufferFlags<ValueType>::type;
+    using FlagsType = std::atomic<Index32>;
 
     union {
         ValueType* mData;
