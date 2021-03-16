@@ -909,6 +909,10 @@ public:
     ///
     /// @note Unlike the NodeManager, the foreach() method of the
     /// DynamicNodeManager uses copy-by-reference for the user-supplied functor.
+    /// This can be an issue when using a shared Accessor or shared Sampler in
+    /// the operator as they are not inherently thread-safe. For these use
+    /// cases, it is recommended to create the Accessor or Sampler in the
+    /// operator execution itself.
     ///
     /// @par Example:
     /// @code
