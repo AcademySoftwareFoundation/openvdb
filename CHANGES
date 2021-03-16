@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 7.2.3 - March 4, 2021
+Version 7.2.3 - March 16, 2021
 
     Bug fixes:
     - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
