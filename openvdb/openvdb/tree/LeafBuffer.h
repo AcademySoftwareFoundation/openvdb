@@ -7,9 +7,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
-#include <tbb/atomic.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
+#include <atomic>
 #include <cstddef> // for offsetof()
 #include <iostream>
 #include <memory>
@@ -40,7 +40,7 @@ template<typename T>
 struct LeafBufferFlags
 {
     /// The type of LeafBuffer::mOutOfCore
-    using type = tbb::atomic<Index32>;
+    using type = std::atomic<Index32>; // FIXME: Can we make this change from tbb::atomic to std::atomic, or do we need an ABI bump for that?
     static constexpr bool IsAtomic = true;
 };
 
@@ -193,7 +193,7 @@ template<typename T, Index Log2Dim>
 inline
 LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
     : mData(nullptr)
-    , mOutOfCore(other.mOutOfCore)
+    , mOutOfCore(other.mOutOfCore.load())
 {
     if (other.isOutOfCore()) {
         mFileInfo = new FileInfo(*other.mFileInfo);
@@ -228,7 +228,8 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
             if (other.isOutOfCore()) this->deallocate();
         }
         if (other.isOutOfCore()) {
-            mOutOfCore = other.mOutOfCore;
+            mOutOfCore.store(other.mOutOfCore.load(std::memory_order_acquire),
+                             std::memory_order_release);
             mFileInfo = new FileInfo(*other.mFileInfo);
         } else if (other.mData != nullptr) {
             this->allocate();
@@ -275,7 +276,14 @@ inline void
 LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
 {
     std::swap(mData, other.mData);
-    std::swap(mOutOfCore, other.mOutOfCore);
+
+    // Two atomics can't be swapped because it would require hardware support:
+    // https://en.wikipedia.org/wiki/Double_compare-and-swap
+    // Note that there's a window in which other.mOutOfCore could be written
+    // between our load from it and our store to it.
+    auto tmp = other.mOutOfCore.load(std::memory_order_acquire);
+    tmp = mOutOfCore.exchange(std::move(tmp));
+    other.mOutOfCore.store(std::move(tmp), std::memory_order_release);
 }
 
 

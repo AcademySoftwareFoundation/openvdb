@@ -6,7 +6,7 @@
 #include <openvdb/Metadata.h>
 #include <boost/algorithm/string/case_conv.hpp>
 #include <boost/algorithm/string/trim.hpp>
-#include <tbb/mutex.h>
+#include <mutex>
 
 
 namespace openvdb {
@@ -38,12 +38,9 @@ namespace {
 using GridFactoryMap = std::map<Name, GridBase::GridFactory>;
 using GridFactoryMapCIter = GridFactoryMap::const_iterator;
 
-using Mutex = tbb::mutex;
-using Lock = Mutex::scoped_lock;
-
 struct LockedGridRegistry {
     LockedGridRegistry() {}
-    Mutex mMutex;
+    std::mutex mMutex;
     GridFactoryMap mMap;
 };
 
@@ -63,7 +60,7 @@ bool
 GridBase::isRegistered(const Name& name)
 {
     LockedGridRegistry* registry = getGridRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     return (registry->mMap.find(name) != registry->mMap.end());
 }
@@ -73,7 +70,7 @@ void
 GridBase::registerGrid(const Name& name, GridFactory factory)
 {
     LockedGridRegistry* registry = getGridRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     if (registry->mMap.find(name) != registry->mMap.end()) {
         OPENVDB_THROW(KeyError, "Grid type " << name << " is already registered");
@@ -87,7 +84,7 @@ void
 GridBase::unregisterGrid(const Name& name)
 {
     LockedGridRegistry* registry = getGridRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     registry->mMap.erase(name);
 }
@@ -97,7 +94,7 @@ GridBase::Ptr
 GridBase::createGrid(const Name& name)
 {
     LockedGridRegistry* registry = getGridRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     GridFactoryMapCIter iter = registry->mMap.find(name);
 
@@ -113,7 +110,7 @@ void
 GridBase::clearRegistry()
 {
     LockedGridRegistry* registry = getGridRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     registry->mMap.clear();
 }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "Maps.h"
-#include <tbb/mutex.h>
+#include <mutex>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -11,13 +11,10 @@ namespace math {
 
 namespace {
 
-using Mutex = tbb::mutex;
-using Lock = Mutex::scoped_lock;
-
 // Declare this at file scope to ensure thread-safe initialization.
 // NOTE: Do *NOT* move this into Maps.h or else we will need to pull in
 //       Windows.h with things like 'rad2' defined!
-Mutex sInitMapRegistryMutex;
+std::mutex sInitMapRegistryMutex;
 
 } // unnamed namespace
 
@@ -37,7 +34,7 @@ MapRegistry::staticInstance()
 MapRegistry*
 MapRegistry::instance()
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
     return staticInstance();
 }
 
@@ -45,7 +42,7 @@ MapRegistry::instance()
 MapBase::Ptr
 MapRegistry::createMap(const Name& name)
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
     MapDictionary::const_iterator iter = staticInstance()->mMap.find(name);
 
     if (iter == staticInstance()->mMap.end()) {
@@ -59,7 +56,7 @@ MapRegistry::createMap(const Name& name)
 bool
 MapRegistry::isRegistered(const Name& name)
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
     return (staticInstance()->mMap.find(name) != staticInstance()->mMap.end());
 }
 
@@ -67,7 +64,7 @@ MapRegistry::isRegistered(const Name& name)
 void
 MapRegistry::registerMap(const Name& name, MapBase::MapFactory factory)
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
 
     if (staticInstance()->mMap.find(name) != staticInstance()->mMap.end()) {
         OPENVDB_THROW(KeyError, "Map type " << name << " is already registered");
@@ -80,7 +77,7 @@ MapRegistry::registerMap(const Name& name, MapBase::MapFactory factory)
 void
 MapRegistry::unregisterMap(const Name& name)
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
     staticInstance()->mMap.erase(name);
 }
 
@@ -88,7 +85,7 @@ MapRegistry::unregisterMap(const Name& name)
 void
 MapRegistry::clear()
 {
-    Lock lock(sInitMapRegistryMutex);
+    std::lock_guard<std::mutex> lock(sInitMapRegistryMutex);
     staticInstance()->mMap.clear();
 }
 

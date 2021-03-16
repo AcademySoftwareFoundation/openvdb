@@ -65,7 +65,7 @@ AttributeArray::AttributeArray(const AttributeArray& rhs)
     : mIsUniform(rhs.mIsUniform)
     , mFlags(rhs.mFlags)
     , mUsePagedRead(rhs.mUsePagedRead)
-    , mOutOfCore(rhs.mOutOfCore)
+    , mOutOfCore(rhs.mOutOfCore.load())
     , mPageHandle()
 {
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
@@ -82,7 +82,7 @@ AttributeArray::operator=(const AttributeArray& rhs)
     mIsUniform = rhs.mIsUniform;
     mFlags = rhs.mFlags;
     mUsePagedRead = rhs.mUsePagedRead;
-    mOutOfCore = rhs.mOutOfCore;
+    mOutOfCore.store(rhs.mOutOfCore);
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
     else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
     else                            mPageHandle.reset();

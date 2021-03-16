@@ -20,8 +20,8 @@
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <tbb/tick_count.h>
-#include <tbb/atomic.h>
 
+#include <atomic>
 #include <cstdio> // for std::remove()
 #include <fstream>
 #include <sstream>

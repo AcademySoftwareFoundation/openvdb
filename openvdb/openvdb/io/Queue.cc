@@ -10,16 +10,15 @@
 #include "Stream.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
-#include <tbb/atomic.h>
 #include <tbb/concurrent_hash_map.h>
-#include <tbb/mutex.h>
 #include <tbb/task.h>
 #include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <tbb/tick_count.h>
 #include <algorithm> // for std::max()
+#include <atomic>
 #include <iostream>
 #include <map>
-
+#include <mutex>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -27,10 +26,6 @@ namespace OPENVDB_VERSION_NAME {
 namespace io {
 
 namespace {
-
-using Mutex = tbb::mutex;
-using Lock = Mutex::scoped_lock;
-
 
 // Abstract base class for queuable TBB tasks that adds a task completion callback
 class Task: public tbb::task
@@ -139,7 +134,7 @@ struct Queue::Impl
             // invokes a notifier method such as removeNotifier() on this queue,
             // the result will be a deadlock.
             /// @todo Is it worth trying to avoid such deadlocks?
-            Lock lock(mNotifierMutex);
+            std::lock_guard<std::mutex> lock(mNotifierMutex);
             if (!mNotifiers.empty()) {
                 didNotify = true;
                 for (NotifierMap::const_iterator it = mNotifiers.begin();
@@ -184,12 +179,12 @@ struct Queue::Impl
 
     Index32 mTimeout;
     Index32 mCapacity;
-    tbb::atomic<Int32> mNumTasks;
+    std::atomic<Int32> mNumTasks;
     Index32 mNextId;
     StatusMap mStatus;
     NotifierMap mNotifiers;
     Index32 mNextNotifierId;
-    Mutex mNotifierMutex;
+    std::mutex mNotifierMutex;
 };
 
 
@@ -255,7 +250,7 @@ Queue::status(Id id) const
 Queue::Id
 Queue::addNotifier(Notifier notify)
 {
-    Lock lock(mImpl->mNotifierMutex);
+    std::lock_guard<std::mutex> lock(mImpl->mNotifierMutex);
     Queue::Id id = mImpl->mNextNotifierId++;
     mImpl->mNotifiers[id] = notify;
     return id;
@@ -265,7 +260,7 @@ Queue::addNotifier(Notifier notify)
 void
 Queue::removeNotifier(Id id)
 {
-    Lock lock(mImpl->mNotifierMutex);
+    std::lock_guard<std::mutex> lock(mImpl->mNotifierMutex);
     Impl::NotifierMap::iterator it = mImpl->mNotifiers.find(id);
     if (it != mImpl->mNotifiers.end()) {
         mImpl->mNotifiers.erase(it);
@@ -276,7 +271,7 @@ Queue::removeNotifier(Id id)
 void
 Queue::clearNotifiers()
 {
-    Lock lock(mImpl->mNotifierMutex);
+    std::lock_guard<std::mutex> lock(mImpl->mNotifierMutex);
     mImpl->mNotifiers.clear();
 }
 

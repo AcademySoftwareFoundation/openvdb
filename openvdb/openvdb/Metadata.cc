@@ -3,9 +3,9 @@
 
 #include "Metadata.h"
 
-#include <tbb/mutex.h>
 #include <algorithm> // for std::min()
 #include <map>
+#include <mutex>
 #include <sstream>
 #include <vector>
 
@@ -14,9 +14,6 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-using Mutex = tbb::mutex;
-using Lock = Mutex::scoped_lock;
-
 using createMetadata = Metadata::Ptr (*)();
 using MetadataFactoryMap = std::map<Name, createMetadata>;
 using MetadataFactoryMapCIter = MetadataFactoryMap::const_iterator;
@@ -24,7 +21,7 @@ using MetadataFactoryMapCIter = MetadataFactoryMap::const_iterator;
 struct LockedMetadataTypeRegistry {
     LockedMetadataTypeRegistry() {}
     ~LockedMetadataTypeRegistry() {}
-    Mutex mMutex;
+    std::mutex mMutex;
     MetadataFactoryMap mMap;
 };
 
@@ -40,7 +37,7 @@ bool
 Metadata::isRegisteredType(const Name &typeName)
 {
     LockedMetadataTypeRegistry *registry = getMetadataTypeRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     return (registry->mMap.find(typeName) != registry->mMap.end());
 }
@@ -49,7 +46,7 @@ void
 Metadata::registerType(const Name &typeName, Metadata::Ptr (*createMetadata)())
 {
     LockedMetadataTypeRegistry *registry = getMetadataTypeRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     if (registry->mMap.find(typeName) != registry->mMap.end()) {
         OPENVDB_THROW(KeyError,
@@ -63,7 +60,7 @@ void
 Metadata::unregisterType(const Name &typeName)
 {
     LockedMetadataTypeRegistry *registry = getMetadataTypeRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     registry->mMap.erase(typeName);
 }
@@ -72,7 +69,7 @@ Metadata::Ptr
 Metadata::createMetadata(const Name &typeName)
 {
     LockedMetadataTypeRegistry *registry = getMetadataTypeRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     MetadataFactoryMapCIter iter = registry->mMap.find(typeName);
 
@@ -88,7 +85,7 @@ void
 Metadata::clearRegistry()
 {
     LockedMetadataTypeRegistry *registry = getMetadataTypeRegistry();
-    Lock lock(registry->mMutex);
+    std::lock_guard<std::mutex> lock(registry->mMutex);
 
     registry->mMap.clear();
 }
