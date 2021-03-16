@@ -14,7 +14,7 @@
 
 #include <openvdb/version.h>
 
-#include <ostream>
+#include <iostream>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
