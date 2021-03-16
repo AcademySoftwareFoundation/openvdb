@@ -1,0 +1,4 @@
+    Improvements:
+    - Replace tbb::mutex with std::mutex and tbb::atomic with std::atomic as
+      these have now been removed in TBB 2021.
+      [Contributed by Ben FrantzDale].
