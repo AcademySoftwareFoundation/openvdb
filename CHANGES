@@ -48,10 +48,6 @@ Version 8.0.1 - February 5, 2021
     - Fixed a bug in the new CSG intersection merge algorithm where data
       outside of the intersection region was not being removed.
 
-    Bug fixes:
-    - Fixed a bug in the new CSG intersection merge algorithm where data
-      outside of the intersection region was not being removed.
-
     Build:
     - Fixed various incorrect RPATH directory paths in CMake
     - Dropped the minimum boost requirement back to 1.61.
@@ -132,6 +128,12 @@ Version 8.0.0 - December 23, 2020
       [Reported by Alexander Hagen]
     - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
       attribute.
+
+Version 7.2.3 - March 16, 2021
+
+    Bug fixes:
+    - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+      performance regression.
 
 Version 7.2.2 - February 4, 2021
 
