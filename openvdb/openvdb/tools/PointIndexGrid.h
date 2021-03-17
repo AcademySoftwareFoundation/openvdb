@@ -27,9 +27,9 @@
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/Tree.h>
 
-#include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <atomic>
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::sqrt()
 #include <deque>
@@ -343,7 +343,7 @@ namespace point_index_grid_internal {
 template<typename PointArrayT>
 struct ValidPartitioningOp
 {
-    ValidPartitioningOp(tbb::atomic<bool>& hasChanged,
+    ValidPartitioningOp(std::atomic<bool>& hasChanged,
         const PointArrayT& points, const math::Transform& xform)
         : mPoints(&points)
         , mTransform(&xform)
@@ -382,7 +382,7 @@ struct ValidPartitioningOp
 
                 mPoints->getPos(*begin, point);
                 if (voxelCoord != mTransform->worldToIndexCellCentered(point)) {
-                    mHasChanged->fetch_and_store(true);
+                    mHasChanged->store(true);
                     break;
                 }
 
@@ -394,7 +394,7 @@ struct ValidPartitioningOp
 private:
     PointArrayT         const * const mPoints;
     math::Transform     const * const mTransform;
-    tbb::atomic<bool>         * const mHasChanged;
+    std::atomic<bool>         * const mHasChanged;
 };
 
 
@@ -1311,7 +1311,7 @@ isValidPartition(const PointArrayT& points, const GridT& grid)
         return false;
     }
 
-    tbb::atomic<bool> changed;
+    std::atomic<bool> changed;
     changed = false;
 
     point_index_grid_internal::ValidPartitioningOp<PointArrayT>

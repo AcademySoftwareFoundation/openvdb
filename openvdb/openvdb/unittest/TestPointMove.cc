@@ -10,8 +10,8 @@
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
-#include <tbb/atomic.h>
 #include <algorithm>
+#include <atomic>
 #include <map>
 #include <sstream>
 #include <string>
@@ -699,8 +699,8 @@ struct CustomDeformer
     using LeafT = PointDataGrid::TreeType::LeafNodeType;
 
     CustomDeformer(const openvdb::Vec3d& offset,
-                   tbb::atomic<int>& resetCalls,
-                   tbb::atomic<int>& applyCalls)
+                   std::atomic<int>& resetCalls,
+                   std::atomic<int>& applyCalls)
         : mOffset(offset)
         , mResetCalls(resetCalls)
         , mApplyCalls(applyCalls) { }
@@ -722,8 +722,8 @@ struct CustomDeformer
     }
 
     const openvdb::Vec3d mOffset;
-    tbb::atomic<int>& mResetCalls;
-    tbb::atomic<int>& mApplyCalls;
+    std::atomic<int>& mResetCalls;
+    std::atomic<int>& mApplyCalls;
 }; // struct CustomDeformer
 
 // Custom Deformer that always returns the position supplied in the constructor
@@ -767,7 +767,7 @@ TEST_F(TestPointMove, testCustomDeformer)
         const int leafCount = points->tree().leafCount();
         const int pointCount = int(positions.size());
 
-        tbb::atomic<int> resetCalls, applyCalls;
+        std::atomic<int> resetCalls, applyCalls;
         resetCalls = 0;
         applyCalls = 0;
 

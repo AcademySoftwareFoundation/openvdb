@@ -45,8 +45,7 @@
 #include <UT/UT_Ramp.h>
 #include <UT/UT_Version.h>
 
-#include <tbb/mutex.h>
-
+#include <mutex>
 #include <sstream>
 #include <string>
 

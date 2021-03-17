@@ -27,8 +27,8 @@
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include "gtest/gtest.h"
-#include <tbb/atomic.h>
 #include <algorithm> // for std::sort
+#include <atomic>
 #include <random>
 #include <sstream>
 
@@ -1477,21 +1477,22 @@ struct FloatToVec
     // Transform a scalar value into a vector value.
     static openvdb::Vec3s toVec(const ValueT& v) { return openvdb::Vec3s(v, v*2, v*3); }
 
-    FloatToVec() { numTiles = 0; }
+    FloatToVec() : numTiles{0} {}
+    FloatToVec(const FloatToVec& other) : numTiles{other.numTiles.load(std::memory_order_acquire)} {}
 
     void operator()(const InIterT& it, Accessor& acc)
     {
         if (it.isVoxelValue()) { // set a single voxel
             acc.setValue(it.getCoord(), toVec(*it));
         } else { // fill an entire tile
-            numTiles.fetch_and_increment();
+            numTiles.fetch_add(1);
             openvdb::CoordBBox bbox;
             it.getBoundingBox(bbox);
             acc.tree().fill(bbox, toVec(*it));
         }
     }
 
-    tbb::atomic<int> numTiles;
+    std::atomic<int> numTiles;
 };
 
 }
