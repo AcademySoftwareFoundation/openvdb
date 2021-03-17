@@ -105,7 +105,9 @@ if(USE_PKGCONFIG)
   if(NOT DEFINED PKG_CONFIG_FOUND)
     find_package(PkgConfig)
   endif()
-  pkg_check_modules(PC_Blosc QUIET blosc)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(PC_Blosc QUIET blosc)
+  endif()
 endif()
 
 # ------------------------------------------------------------------------
@@ -286,82 +288,92 @@ find_package_handle_standard_args(Blosc
   VERSION_VAR Blosc_VERSION
 )
 
-if(Blosc_FOUND)
-  # Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
-  # lib is in use. If win32, we can't mark the import .libs as shared, so
-  # these are always marked as UNKNOWN. Otherwise, infer from extension.
-  set(BLOSC_LIB_TYPE UNKNOWN)
-  if(BLOSC_USE_STATIC_LIBS)
-    set(BLOSC_LIB_TYPE STATIC)
-  elseif(UNIX)
-    get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
-    if(_BLOSC_EXT STREQUAL ".a")
-      set(BLOSC_LIB_TYPE STATIC)
-    elseif(_BLOSC_EXT STREQUAL ".so" OR
-           _BLOSC_EXT STREQUAL ".dylib")
-      set(BLOSC_LIB_TYPE SHARED)
-    endif()
+if(NOT Blosc_FOUND)
+  if(Blosc_FIND_REQUIRED)
+    message(FATAL_ERROR "Unable to find Blosc")
   endif()
-
-  set(Blosc_LIBRARIES ${Blosc_LIBRARY})
-  set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
-
-  get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY_RELEASE} DIRECTORY)
-
-  if(NOT TARGET Blosc::blosc)
-    add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
-    set_target_properties(Blosc::blosc PROPERTIES
-      INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
-      INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}")
-
-    # Standard location
-    set_target_properties(Blosc::blosc PROPERTIES
-      IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
-      IMPORTED_LOCATION "${Blosc_LIBRARY}")
-
-    # Release location
-    if(EXISTS "${Blosc_LIBRARY_RELEASE}")
-      set_property(TARGET Blosc::blosc APPEND PROPERTY
-        IMPORTED_CONFIGURATIONS RELEASE)
-      set_target_properties(Blosc::blosc PROPERTIES
-        IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
-        IMPORTED_LOCATION_RELEASE "${Blosc_LIBRARY_RELEASE}")
-    endif()
-
-    # Debug location
-    if(EXISTS "${Blosc_LIBRARY_DEBUG}")
-      set_property(TARGET Blosc::blosc APPEND PROPERTY
-        IMPORTED_CONFIGURATIONS DEBUG)
-      set_target_properties(Blosc::blosc PROPERTIES
-        IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
-        IMPORTED_LOCATION_DEBUG "${Blosc_LIBRARY_DEBUG}")
-    endif()
-
-    # Blosc may optionally be compiled with external sources for
-    # lz4, snappy and zlib . Add them as interface libs if requested
-    # (there doesn't seem to be a way to figure this out automatically).
-    # We assume they live along side blosc
-    if(BLOSC_USE_EXTERNAL_SOURCES)
-      get_filename_component(Blosc_LIBRARY_DIR_RELEASE ${Blosc_LIBRARY_RELEASE} DIRECTORY)
-      get_filename_component(Blosc_LIBRARY_DIR_DEBUG ${Blosc_LIBRARY_DEBUG} DIRECTORY)
-      set_target_properties(Blosc::blosc PROPERTIES
-        INTERFACE_LINK_DIRECTORIES
-           "\$<\$<CONFIG:Release>:${Blosc_LIBRARY_DIR_RELEASE}>;\$<\$<CONFIG:Debug>:${Blosc_LIBRARY_DIR_DEBUG}>")
-      target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:lz4;snappy;zlib>
-        $<$<CONFIG:Debug>:lz4d;snappyd;zlibd>)
-
-      if(BLOSC_USE_STATIC_LIBS)
-        target_link_libraries(Blosc::blosc INTERFACE
-          $<$<CONFIG:Release>:zstd_static>
-          $<$<CONFIG:Debug>:zstd_staticd>)
-      else()
-        target_link_libraries(Blosc::blosc INTERFACE
-          $<$<CONFIG:Release>:zstd>
-          $<$<CONFIG:Debug>:zstdd>)
-      endif()
-    endif()
-  endif()
-elseif(Blosc_FIND_REQUIRED)
-  message(FATAL_ERROR "Unable to find Blosc")
+  return()
 endif()
+
+# Partition release/debug lib vars
+
+set(Blosc_RELEASE_LIBRARIES ${Blosc_LIBRARY_RELEASE})
+get_filename_component(Blosc_RELEASE_LIBRARY_DIRS ${Blosc_RELEASE_LIBRARIES} DIRECTORY)
+set(Blosc_DEBUG_LIBRARIES ${Blosc_LIBRARY_DEBUG})
+get_filename_component(Blosc_DEBUG_LIBRARY_DIRS ${Blosc_DEBUG_LIBRARIES} DIRECTORY)
+set(Blosc_LIBRARIES ${Blosc_RELEASE_LIBRARIES})
+set(Blosc_LIBRARY_DIRS ${Blosc_RELEASE_LIBRARY_DIRS})
+set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
+set(Blosc_INCLUDE_DIRS ${Blosc_INCLUDE_DIR})
+
+# Configure lib type. If XXX_USE_STATIC_LIBS, we always assume a static
+# lib is in use. If win32, we can't mark the import .libs as shared, so
+# these are always marked as UNKNOWN. Otherwise, infer from extension.
+set(BLOSC_LIB_TYPE UNKNOWN)
+if(BLOSC_USE_STATIC_LIBS)
+  set(BLOSC_LIB_TYPE STATIC)
+elseif(UNIX)
+  get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
+  if(_BLOSC_EXT STREQUAL ".a")
+    set(BLOSC_LIB_TYPE STATIC)
+  elseif(_BLOSC_EXT STREQUAL ".so" OR
+         _BLOSC_EXT STREQUAL ".dylib")
+    set(BLOSC_LIB_TYPE SHARED)
+  endif()
+endif()
+
+get_filename_component(Blosc_LIBRARY_DIRS ${Blosc_LIBRARY_RELEASE} DIRECTORY)
+
+if(NOT TARGET Blosc::blosc)
+  add_library(Blosc::blosc ${BLOSC_LIB_TYPE} IMPORTED)
+  set_target_properties(Blosc::blosc PROPERTIES
+    INTERFACE_COMPILE_OPTIONS "${PC_Blosc_CFLAGS_OTHER}"
+    INTERFACE_INCLUDE_DIRECTORIES "${Blosc_INCLUDE_DIRS}")
+
+  # Standard location
+  set_target_properties(Blosc::blosc PROPERTIES
+    IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
+    IMPORTED_LOCATION "${Blosc_LIBRARY}")
+
+  # Release location
+  if(EXISTS "${Blosc_LIBRARY_RELEASE}")
+    set_property(TARGET Blosc::blosc APPEND PROPERTY
+      IMPORTED_CONFIGURATIONS RELEASE)
+    set_target_properties(Blosc::blosc PROPERTIES
+      IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
+      IMPORTED_LOCATION_RELEASE "${Blosc_LIBRARY_RELEASE}")
+  endif()
+
+  # Debug location
+  if(EXISTS "${Blosc_LIBRARY_DEBUG}")
+    set_property(TARGET Blosc::blosc APPEND PROPERTY
+      IMPORTED_CONFIGURATIONS DEBUG)
+    set_target_properties(Blosc::blosc PROPERTIES
+      IMPORTED_LINK_INTERFACE_LANGUAGES_DEBUG "CXX"
+      IMPORTED_LOCATION_DEBUG "${Blosc_LIBRARY_DEBUG}")
+  endif()
+
+  # Blosc may optionally be compiled with external sources for
+  # lz4, snappy and zlib . Add them as interface libs if requested
+  # (there doesn't seem to be a way to figure this out automatically).
+  # We assume they live along side blosc
+  if(BLOSC_USE_EXTERNAL_SOURCES)
+    set_target_properties(Blosc::blosc PROPERTIES
+      INTERFACE_LINK_DIRECTORIES
+         "\$<\$<CONFIG:Release>:${Blosc_RELEASE_LIBRARY_DIRS}>;\$<\$<CONFIG:Debug>:${Blosc_DEBUG_LIBRARY_DIRS}>")
+    target_link_libraries(Blosc::blosc INTERFACE
+      $<$<CONFIG:Release>:lz4;snappy;zlib>
+      $<$<CONFIG:Debug>:lz4d;snappyd;zlibd>)
+
+    if(BLOSC_USE_STATIC_LIBS)
+      target_link_libraries(Blosc::blosc INTERFACE
+        $<$<CONFIG:Release>:zstd_static>
+        $<$<CONFIG:Debug>:zstd_staticd>)
+    else()
+      target_link_libraries(Blosc::blosc INTERFACE
+        $<$<CONFIG:Release>:zstd>
+        $<$<CONFIG:Debug>:zstdd>)
+    endif()
+  endif()
+endif()
+
