@@ -767,8 +767,7 @@ scalarToMatrix(llvm::Value* scalar,
         insertStaticAlloca(builder,
             llvm::ArrayType::get(type, dim*dim));
 
-    llvm::Value* zero = llvm::ConstantFP::get(type, 0.0);
-
+    llvm::Value* zero = llvmConstant(0, type);
     for (size_t i = 0; i < dim*dim; ++i) {
         llvm::Value* m = ((i % (dim+1) == 0) ? scalar : zero);
         llvm::Value* element = builder.CreateConstGEP2_64(array, 0, i);
