@@ -32,6 +32,17 @@ This will define the following variables:
   The version of the Blosc library which was found.
 ``Blosc_INCLUDE_DIRS``
   Include directories needed to use Blosc.
+``Blosc_RELEASE_LIBRARIES``
+  Libraries needed to link to the release version of Blosc.
+``Blosc_RELEASE_LIBRARY_DIRS``
+  Blosc release library directories.
+``Blosc_DEBUG_LIBRARIES``
+  Libraries needed to link to the debug version of Blosc.
+``Blosc_DEBUG_LIBRARY_DIRS``
+  Blosc debug library directories.
+
+Deprecated - use [RELEASE|DEBUG] variants:
+
 ``Blosc_LIBRARIES``
   Libraries needed to link to Blosc.
 ``Blosc_LIBRARY_DIRS``
@@ -45,7 +56,11 @@ The following cache variables may also be set:
 ``Blosc_INCLUDE_DIR``
   The directory containing ``blosc.h``.
 ``Blosc_LIBRARY``
-  The path to the Blosc library.
+  The path to the Blosc library. may include target_link_libraries() debug/optimized keywords
+``Blosc_LIBRARY_RELEASE``
+  The path to the Blosc release library.
+``Blosc_LIBRARY_DEBUG``
+  The path to the Blosc debug library.
 
 Hints
 ^^^^^

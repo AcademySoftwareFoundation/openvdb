@@ -63,15 +63,12 @@ The following cache variables may also be set:
 
 ``Tbb_INCLUDE_DIR``
   The directory containing ``tbb/tbb_stddef.h``.
+``Tbb_{COMPONENT}_LIBRARY``
+  Individual component libraries for Tbb. may include target_link_libraries() debug/optimized keywords.
 ``Tbb_{COMPONENT}_LIBRARY_RELEASE``
   Individual component libraries for Tbb release
 ``Tbb_{COMPONENT}_LIBRARY_DEBUG``
   Individual debug component libraries for Tbb debug
-
-Deprecated - use [RELEASE|DEBUG] variants:
-
-``Tbb_{COMPONENT}_LIBRARY``
-  Individual component libraries for Tbb
 
 Hints
 ^^^^^

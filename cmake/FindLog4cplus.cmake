@@ -57,15 +57,12 @@ The following cache variables may also be set:
 
 ``Log4cplus_INCLUDE_DIR``
   The directory containing ``log4cplus/version.h``.
+``Log4cplus_LIBRARY``
+  The path to the Log4cplus library. may include target_link_libraries() debug/optimized keywords.
 ``Log4cplus_LIBRARY_RELEASE``
   The path to the Log4cplus release library.
 ``Log4cplus_LIBRARY_DEBUG``
   The path to the Log4cplus debug library.
-
-Deprecated - use [RELEASE|DEBUG] variants:
-
-``Log4cplus_LIBRARY``
-  The path to the Log4cplus library.
 
 Hints
 ^^^^^

@@ -36,14 +36,25 @@ This will define the following variables:
   The version of the OpenEXR library which was found.
 ``OpenEXR_INCLUDE_DIRS``
   Include directories needed to use OpenEXR.
-``OpenEXR_LIBRARIES``
-  Libraries needed to link to OpenEXR.
-``OpenEXR_LIBRARY_DIRS``
-  OpenEXR library directories.
+``OpenEXR_RELEASE_LIBRARIES``
+  Libraries needed to link to the release version of OpenEXR.
+``OpenEXR_RELEASE_LIBRARY_DIRS``
+  OpenEXR release library directories.
+``OpenEXR_DEBUG_LIBRARIES``
+  Libraries needed to link to the debug version of OpenEXR.
+``OpenEXR_DEBUG_LIBRARY_DIRS``
+  OpenEXR debug library directories.
 ``OpenEXR_DEFINITIONS``
   Definitions to use when compiling code that uses OpenEXR.
 ``OpenEXR_{COMPONENT}_FOUND``
   True if the system has the named OpenEXR component.
+
+Deprecated - use [RELEASE|DEBUG] variants:
+
+``OpenEXR_LIBRARIES``
+  Libraries needed to link to OpenEXR.
+``OpenEXR_LIBRARY_DIRS``
+  OpenEXR library directories.
 
 Cache Variables
 ^^^^^^^^^^^^^^^
@@ -53,7 +64,11 @@ The following cache variables may also be set:
 ``OpenEXR_INCLUDE_DIR``
   The directory containing ``OpenEXR/config-auto.h``.
 ``OpenEXR_{COMPONENT}_LIBRARY``
-  Individual component libraries for OpenEXR
+  Individual component libraries for OpenEXR. may include target_link_libraries() debug/optimized keywords.
+``OpenEXR_{COMPONENT}_LIBRARY_RELEASE``
+  Individual component libraries for OpenEXR release
+``OpenEXR_{COMPONENT}_LIBRARY_DEBUG``
+  Individual component libraries for OpenEXR debug
 
 Hints
 ^^^^^

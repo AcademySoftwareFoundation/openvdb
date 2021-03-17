@@ -67,15 +67,12 @@ The following cache variables may also be set:
 
 ``IlmBase_INCLUDE_DIR``
   The directory containing ``IlmBase/config-auto.h``.
+``IlmBase_{COMPONENT}_LIBRARY``
+  Individual component libraries for IlmBase. may include target_link_libraries() debug/optimized keywords.
 ``IlmBase_{COMPONENT}_LIBRARY_RELEASE``
   Individual component libraries for IlmBase release
 ``IlmBase_{COMPONENT}_LIBRARY_DEBUG``
   Individual component libraries for IlmBase debug
-
-Deprecated - use [RELEASE|DEBUG] variants:
-
-``IlmBase_{COMPONENT}_LIBRARY``
-  Individual component libraries for IlmBase
 
 Hints
 ^^^^^
