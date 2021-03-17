@@ -85,6 +85,8 @@ may be provided to tell this module where to look.
   Preferred include directory e.g. <prefix>/include
 ``TBB_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
+``TBB_DEBUG_SUFFIX``
+  Suffix of the debug version of tbb. Defaults to "_debug".
 ``SYSTEM_LIBRARY_PATHS``
   Global list of library paths intended to be searched by and find_xxx call
 ``TBB_USE_STATIC_LIBS``
@@ -211,6 +213,9 @@ list(APPEND _TBB_LIBRARYDIR_SEARCH_DIRS
 
 # Library suffix handling
 
+if(NOT DEFINED TBB_DEBUG_SUFFIX)
+  set(TBB_DEBUG_SUFFIX _debug)
+endif()
 set(_TBB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 if(WIN32)
@@ -229,12 +234,12 @@ list(APPEND TBB_BUILD_TYPES RELEASE DEBUG)
 foreach(COMPONENT ${TBB_FIND_COMPONENTS})
   foreach(BUILD_TYPE ${TBB_BUILD_TYPES})
 
-    set(TBB_LIB_NAME ${COMPONENT})
+    set(_TBB_LIB_NAME ${COMPONENT})
     if(BUILD_TYPE STREQUAL DEBUG)
-      set(TBB_LIB_NAME ${TBB_LIB_NAME}_debug)
+      set(_TBB_LIB_NAME "${_TBB_LIB_NAME}${TBB_DEBUG_SUFFIX}")
     endif()
 
-    find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${TBB_LIB_NAME}
+    find_library(Tbb_${COMPONENT}_LIBRARY_${BUILD_TYPE} ${_TBB_LIB_NAME}
       ${_FIND_TBB_ADDITIONAL_OPTIONS}
       PATHS ${_TBB_LIBRARYDIR_SEARCH_DIRS}
       PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib
@@ -337,7 +342,7 @@ set(Tbb_DEBUG_LIBRARIES "")
 set(Tbb_DEBUG_LIBRARY_DIRS "")
 foreach(LIB ${Tbb_LIB_COMPONENTS})
   get_filename_component(_TBB_LIBDIR ${LIB} DIRECTORY)
-  string(FIND LIB debug _TBB_IS_DEBUG_COMP)
+  string(FIND LIB ${TBB_DEBUG_SUFFIX} _TBB_IS_DEBUG_COMP)
   if(${_TBB_IS_DEBUG_COMP} EQUAL -1)
     list(APPEND Tbb_RELEASE_LIBRARIES ${LIB})
     list(APPEND Tbb_RELEASE_LIBRARY_DIRS ${_TBB_LIBDIR})

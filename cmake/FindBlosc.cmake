@@ -59,6 +59,8 @@ may be provided to tell this module where to look.
   Preferred include directory e.g. <prefix>/include
 ``BLOSC_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
+``BLOSC_DEBUG_SUFFIX``
+  Suffix of the debug version of blosc. Defaults to "_d", OR the empty string for VCPKG_TOOLCHAIN
 ``SYSTEM_LIBRARY_PATHS``
   Global list of library paths intended to be searched by and find_xxx call
 ``BLOSC_USE_STATIC_LIBS``
@@ -188,6 +190,7 @@ set(Blosc_LIB_COMPONENTS "")
 list(APPEND BLOSC_BUILD_TYPES DEBUG RELEASE)
 
 foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
+  set(_BLOSC_LIB_NAME blosc)
 
   set(_BLOSC_CMAKE_IGNORE_PATH ${CMAKE_IGNORE_PATH})
   if(VCPKG_TOOLCHAIN)
@@ -196,6 +199,9 @@ foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
     # comes with almost zero downstream CMake support for us to detect settings.
     # We should not support external package managers in our own modules like
     # this, but there doesn't seem to be a work around
+    if(NOT DEFINED BLOSC_DEBUG_SUFFIX)
+      set(BLOSC_DEBUG_SUFFIX "")
+    endif()
     if(BUILD_TYPE STREQUAL RELEASE)
       if(EXISTS ${Blosc_LIBRARY_DEBUG})
         get_filename_component(_BLOSC_DEBUG_DIR ${Blosc_LIBRARY_DEBUG} DIRECTORY)
@@ -204,7 +210,14 @@ foreach(BUILD_TYPE ${BLOSC_BUILD_TYPES})
     endif()
   endif()
 
-  find_library(Blosc_LIBRARY_${BUILD_TYPE} blosc
+  if(BUILD_TYPE STREQUAL DEBUG)
+    if(NOT DEFINED BLOSC_DEBUG_SUFFIX)
+      set(BLOSC_DEBUG_SUFFIX _d)
+    endif()
+    set(_BLOSC_LIB_NAME "${_BLOSC_LIB_NAME}${BLOSC_DEBUG_SUFFIX}")
+  endif()
+
+  find_library(Blosc_LIBRARY_${BUILD_TYPE} ${_BLOSC_LIB_NAME}
     ${_FIND_BLOSC_ADDITIONAL_OPTIONS}
     PATHS ${_BLOSC_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib

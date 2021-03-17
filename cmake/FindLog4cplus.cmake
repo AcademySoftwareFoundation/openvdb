@@ -79,6 +79,8 @@ may be provided to tell this module where to look.
   Preferred include directory e.g. <prefix>/include
 ``LOG4CPLUS_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
+``LOG4CPLUS_DEBUG_SUFFIX``
+  Suffix of the debug version of the log4cplus lib. Defaults to "D".
 ``SYSTEM_LIBRARY_PATHS``
   Global list of library paths intended to be searched by and find_xxx call
 ``LOG4CPLUS_USE_STATIC_LIBS``
@@ -168,6 +170,10 @@ endif()
 #  Search for Log4cplus lib DIR
 # ------------------------------------------------------------------------
 
+if(NOT DEFINED LOG4CPLUS_DEBUG_SUFFIX)
+  set(LOG4CPLUS_DEBUG_SUFFIX D)
+endif()
+
 set(_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS "")
 list(APPEND _LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS
   ${LOG4CPLUS_LIBRARYDIR}
@@ -194,13 +200,12 @@ set(Log4cplus_LIB_COMPONENTS "")
 list(APPEND LOG4CPLUS_BUILD_TYPES RELEASE DEBUG)
 
 foreach(BUILD_TYPE ${LOG4CPLUS_BUILD_TYPES})
-
-  set(LOG4CPLUS_LIB_NAME log4cplus)
+  set(_LOG4CPLUS_LIB_NAME log4cplus)
   if(BUILD_TYPE STREQUAL DEBUG)
-    set(LOG4CPLUS_LIB_NAME ${LOG4CPLUS_LIB_NAME}D)
+    set(_LOG4CPLUS_LIB_NAME "${_LOG4CPLUS_LIB_NAME}${LOG4CPLUS_DEBUG_SUFFIX}")
   endif()
 
-  find_library(Log4cplus_LIBRARY_${BUILD_TYPE} ${LOG4CPLUS_LIB_NAME}
+  find_library(Log4cplus_LIBRARY_${BUILD_TYPE} ${_LOG4CPLUS_LIB_NAME}
     ${_FIND_LOG4CPLUS_ADDITIONAL_OPTIONS}
     PATHS ${_LOG4CPLUS_LIBRARYDIR_SEARCH_DIRS}
     PATH_SUFFIXES ${CMAKE_INSTALL_LIBDIR} lib64 lib

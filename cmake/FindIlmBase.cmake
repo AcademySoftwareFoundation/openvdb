@@ -89,6 +89,8 @@ may be provided to tell this module where to look.
   Preferred include directory e.g. <prefix>/include
 ``ILMBASE_LIBRARYDIR``
   Preferred library directory e.g. <prefix>/lib
+``ILMBASE_DEBUG_SUFFIX``
+  Suffix of the debug version of ilmbase libs. Defaults to "_d".
 ``SYSTEM_LIBRARY_PATHS``
   Global list of library paths intended to be searched by and find_xxx call
 ``ILMBASE_USE_STATIC_LIBS``
@@ -212,6 +214,10 @@ endif()
 #  Search for ILMBASE lib DIR
 # ------------------------------------------------------------------------
 
+if(NOT DEFINED ILMBASE_DEBUG_SUFFIX)
+  set(ILMBASE_DEBUG_SUFFIX _d)
+endif()
+
 set(_ILMBASE_LIBRARYDIR_SEARCH_DIRS "")
 
 # Append to _ILMBASE_LIBRARYDIR_SEARCH_DIRS in priority order
@@ -229,29 +235,30 @@ list(APPEND ILM_BUILD_TYPES RELEASE DEBUG)
 foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
   foreach(BUILD_TYPE ${ILM_BUILD_TYPES})
 
-    set(_IlmBase_Version_Suffix "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}")
+    set(_TMP_SUFFIX "")
     if(BUILD_TYPE STREQUAL DEBUG)
-      set(_IlmBase_Version_Suffix "${_IlmBase_Version_Suffix}_d")
+      set(_TMP_SUFFIX ${ILMBASE_DEBUG_SUFFIX})
     endif()
 
+    set(_IlmBase_Version_Suffix "-${IlmBase_VERSION_MAJOR}_${IlmBase_VERSION_MINOR}")
     set(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
     if(WIN32)
       if(ILMBASE_USE_STATIC_LIBS)
-        set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
+        set(CMAKE_FIND_LIBRARY_SUFFIXES "${_TMP_SUFFIX}.lib")
       endif()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.lib")
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}${_TMP_SUFFIX}.lib")
     else()
       if(ILMBASE_USE_STATIC_LIBS)
-        set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
+        set(CMAKE_FIND_LIBRARY_SUFFIXES "${_TMP_SUFFIX}.a")
       else()
         if(APPLE)
-          list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.dylib")
+          list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}${_TMP_SUFFIX}.dylib")
         else()
-          list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.so")
+          list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}${_TMP_SUFFIX}.so")
         endif()
       endif()
-      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}.a")
+      list(APPEND CMAKE_FIND_LIBRARY_SUFFIXES "${_IlmBase_Version_Suffix}${_TMP_SUFFIX}.a")
     endif()
 
     # Find the lib
@@ -269,6 +276,7 @@ foreach(COMPONENT ${IlmBase_FIND_COMPONENTS})
     set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
     unset(_ILMBASE_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
     unset(_IlmBase_Version_Suffix)
+    unset(_TMP_SUFFIX)
   endforeach()
 
   if(IlmBase_${COMPONENT}_LIBRARY_DEBUG AND IlmBase_${COMPONENT}_LIBRARY_RELEASE)
@@ -342,7 +350,7 @@ set(IlmBase_DEBUG_LIBRARIES "")
 set(IlmBase_DEBUG_LIBRARY_DIRS "")
 foreach(LIB ${IlmBase_LIB_COMPONENTS})
   get_filename_component(_ILM_LIBDIR ${LIB} DIRECTORY)
-  string(FIND LIB _d _ILMBASE_IS_DEBUG_COMP)
+  string(FIND LIB ${ILMBASE_DEBUG_SUFFIX} _ILMBASE_IS_DEBUG_COMP)
   if(${_ILMBASE_IS_DEBUG_COMP} EQUAL -1)
     list(APPEND IlmBase_RELEASE_LIBRARIES ${LIB})
     list(APPEND IlmBase_RELEASE_LIBRARY_DIRS ${_ILM_LIBDIR})
