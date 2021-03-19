@@ -22,7 +22,7 @@ namespace tools {
 
 /// @brief Return the total number of active voxels in the tree.
 template <typename TreeT>
-Index64 activeVoxelCount(const TreeT& tree, bool threaded = true);
+Index64 countActiveVoxels(const TreeT& tree, bool threaded = true);
 
 
 ////////////////////////////////////////
@@ -68,7 +68,7 @@ struct ActiveVoxelCountOp
 
 
 template <typename TreeT>
-Index64 activeVoxelCount(const TreeT& tree, bool threaded)
+Index64 countActiveVoxels(const TreeT& tree, bool threaded)
 {
     count_internal::ActiveVoxelCountOp<TreeT> op;
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);

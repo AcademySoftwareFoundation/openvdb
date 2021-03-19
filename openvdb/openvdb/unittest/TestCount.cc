@@ -24,7 +24,7 @@ TEST_F(TestCount, testActiveVoxelCount)
 
     Index64 activeVoxelCount1 = grid->tree().activeVoxelCount();
 
-    Index64 activeVoxelCount2 = tools::activeVoxelCount(grid->tree());
+    Index64 activeVoxelCount2 = tools::countActiveVoxels(grid->tree());
 
     EXPECT_EQ(activeVoxelCount1, activeVoxelCount2);
 }
