@@ -25,6 +25,11 @@ template <typename TreeT>
 Index64 countActiveVoxels(const TreeT& tree, bool threaded = true);
 
 
+/// @brief Return the total amount of memory in bytes occupied by this tree.
+template <typename TreeT>
+Index64 memUsage(const TreeT& tree, bool threaded = true);
+
+
 ////////////////////////////////////////
 
 
@@ -61,6 +66,44 @@ struct ActiveVoxelCountOp
     openvdb::Index64 count{0};
 };
 
+template<typename TreeType>
+struct MemUsageOp
+{
+    using RootT = typename TreeType::RootNodeType;
+    using LeafT = typename TreeType::LeafNodeType;
+
+    MemUsageOp() = default;
+    MemUsageOp(const MemUsageOp&, tbb::split) { }
+
+    bool operator()(const RootT& root, size_t)
+    {
+        count += sizeof(root);
+        return true;
+    }
+
+    template<typename NodeT>
+    bool operator()(const NodeT& node, size_t)
+    {
+        count += NodeT::NUM_VALUES * sizeof(typename NodeT::UnionType) +
+            node.getChildMask().memUsage() + node.getValueMask().memUsage() +
+            sizeof(Coord);
+        return true;
+    }
+
+    bool operator()(const LeafT& leaf, size_t)
+    {
+        count += leaf.memUsage();
+        return false;
+    }
+
+    void join(const MemUsageOp& other)
+    {
+        count += other.count;
+    }
+
+    openvdb::Index64 count{0};
+};
+
 } // namespace count_internal
 
 
@@ -75,6 +118,17 @@ Index64 countActiveVoxels(const TreeT& tree, bool threaded)
     nodeManager.reduceTopDown(op, threaded);
     return op.count;
 }
+
+
+template <typename TreeT>
+Index64 memUsage(const TreeT& tree, bool threaded)
+{
+    count_internal::MemUsageOp<TreeT> op;
+    tree::DynamicNodeManager<const TreeT> nodeManager(tree);
+    nodeManager.reduceTopDown(op, threaded);
+    return op.count + sizeof(tree);
+}
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
