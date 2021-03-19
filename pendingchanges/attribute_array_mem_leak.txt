@@ -1,0 +1,2 @@
+    Bug fixes:
+    - Fix a memory leak in AttributeArray when delayed-loading is disabled.
