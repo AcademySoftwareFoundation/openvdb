@@ -49,12 +49,14 @@ Houdini:
 - Introduced the VDB AX SOP which provides an interface for running
   OpenVDB AX code in Houdini on VDB grids.
 
+@par
 Build:
 - Dependency on OpenEXR's Half implementation has been removed from the
   core library by naturalizing the implementation into openvdb::math.
   This is fully bitwise compatible, but may require switching Half
   references to math::Half. The USE_IMATH_HALF build configuration can
   be used to switch back to OpenEXR based half.
+
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
 @par
@@ -66,10 +68,6 @@ Bug fixes:
   outside of the intersection region was not being removed.
 
 @par
-Bug fixes:
-- Fixed a bug in the new CSG intersection merge algorithm where data
-  outside of the intersection region was not being removed.
-
 Build:
 - Fixed various incorrect RPATH directory paths in CMake
 - Dropped the minimum boost requirement back to 1.61.
@@ -80,6 +78,7 @@ Build:
 Houdini:
 - VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
   because unary negation is undefined on bools in the template expansion.
+
 
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
@@ -170,6 +169,16 @@ Build:
   [Reported&nbsp;by&nbsp;Alexander&nbsp;Hagen]
 - Removed OPENVDB_DEPRECATED macro in favor of C++14 <TT>[[deprecated]]</TT>
   attribute.
+
+
+@htmlonly <a name="v7_2_3_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.3</B> - <I><March 16, 2021</I>
+
+@par
+Bug fixes:
+- Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+  performance regression.
 
 
 @htmlonly <a name="v7_2_2_changes"></a>@endhtmlonly
