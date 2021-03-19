@@ -25,6 +25,12 @@ template <typename TreeT>
 Index64 countActiveVoxels(const TreeT& tree, bool threaded = true);
 
 
+/// @brief Return the total number of active voxels in the tree that intersects
+/// a bounding box.
+template <typename TreeT>
+Index64 countActiveVoxels(const TreeT& tree, const CoordBBox& bbox, bool threaded = true);
+
+
 /// @brief Return the total amount of memory in bytes occupied by this tree.
 template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
@@ -64,6 +70,85 @@ struct ActiveVoxelCountOp
     }
 
     openvdb::Index64 count{0};
+};
+
+template<typename TreeType>
+struct ActiveVoxelCountBBoxOp
+{
+    using LeafT = typename TreeType::LeafNodeType;
+
+    explicit ActiveVoxelCountBBoxOp(const CoordBBox& bbox)
+        : mBBox(bbox) { }
+    ActiveVoxelCountBBoxOp(const ActiveVoxelCountBBoxOp& other, tbb::split)
+        : mBBox(other.mBBox) { }
+
+    template<typename NodeT>
+    bool operator()(const NodeT& node, size_t)
+    {
+        if (!mBBox.hasOverlap(node.getNodeBoundingBox()))   return false;
+
+        // count any overlapping regions in active tiles
+        for (auto iter = node.cbeginValueOn(); iter; ++iter) {
+            CoordBBox bbox(CoordBBox::createCube(iter.getCoord(), NodeT::ChildNodeType::DIM));
+
+            if (!bbox.hasOverlap(mBBox)) {
+                // box is completely outside the active tile
+                continue;
+            } else if (bbox.isInside(mBBox)) {
+                // bbox is completely inside the active tile
+                count += bbox.volume();
+            } else if (mBBox.isInside(bbox)) {
+                // active tile is completely inside bbox
+                count += mBBox.volume();
+            } else {
+                // partial overlap between tile and bbox
+                bbox.intersect(mBBox);
+                count += bbox.volume();
+            }
+        }
+
+        // return true if any child nodes overlap with the bounding box
+        for (auto iter = node.cbeginChildOn(); iter; ++iter) {
+            if (mBBox.hasOverlap(iter->getNodeBoundingBox()))    return true;
+        }
+
+        // otherwise return false to prevent recursion along this branch
+        return false;
+    }
+
+    inline bool operator()(const LeafT& leaf, size_t)
+    {
+        // note: the true/false return value does nothing
+
+        CoordBBox bbox = leaf.getNodeBoundingBox();
+
+        if (mBBox.isInside(bbox)) {
+            // leaf node is completely inside bbox
+            count += leaf.onVoxelCount();
+        } else if (!bbox.hasOverlap(mBBox)) {
+            // bbox is completely outside the leaf node
+            return false;
+        } else if (leaf.isDense()) {
+            // partial overlap between dense leaf node and bbox
+            bbox.intersect(mBBox);
+            count += bbox.volume();
+        } else {
+            // partial overlap between sparse leaf node and bbox
+            for (auto i = leaf.cbeginValueOn(); i; ++i) {
+                if (mBBox.isInside(i.getCoord())) ++count;
+            }
+        }
+        return false;
+    }
+
+    void join(const ActiveVoxelCountBBoxOp& other)
+    {
+        count += other.count;
+    }
+
+    openvdb::Index64 count{0};
+private:
+    CoordBBox mBBox;
 };
 
 template<typename TreeType>
@@ -114,6 +199,19 @@ template <typename TreeT>
 Index64 countActiveVoxels(const TreeT& tree, bool threaded)
 {
     count_internal::ActiveVoxelCountOp<TreeT> op;
+    tree::DynamicNodeManager<const TreeT> nodeManager(tree);
+    nodeManager.reduceTopDown(op, threaded);
+    return op.count;
+}
+
+
+template <typename TreeT>
+Index64 countActiveVoxels(const TreeT& tree, const CoordBBox& bbox, bool threaded)
+{
+    if (bbox.empty())                   return Index64(0);
+    else if (bbox == CoordBBox::inf())  return countActiveVoxels(tree, threaded);
+
+    count_internal::ActiveVoxelCountBBoxOp<TreeT> op(bbox);
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);
     nodeManager.reduceTopDown(op, threaded);
     return op.count;
