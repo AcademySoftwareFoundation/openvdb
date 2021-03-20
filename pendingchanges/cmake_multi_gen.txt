@@ -1,0 +1,9 @@
+
+    Build:
+    - Blosc, Log4cplus, IlmBase, OpenEXR and TBB find modules now configure release and debug library variants
+    - Fixed an issue where FindBlosc wouldn't add zstd as a dep in non static builds BLOSC_USE_EXTERNAL_SOURCES
+    - Fixed Log4cplus interface language and missing interface libraries on Win32
+    - Removed Jemalloc and Tbbmalloc logic from the core library builds
+    - The variable CMAKE_MSVC_RUNTIME_LIBRARY is no longer set by the OpenVDB CMake. If CMAKE_MSVC_RUNTIME_LIBRARY
+    is not explicitly provided, OpenVDB configures the static library with /MT(d) and the dynamic library with /MD(d)
+    [Reported by Jérémie Dumas]
