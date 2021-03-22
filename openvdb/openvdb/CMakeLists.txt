@@ -319,6 +319,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/MeshToVolume.h
   tools/Morphology.h
   tools/MultiResGrid.h
+  tools/NodeVisitor.h
   tools/ParticleAtlas.h
   tools/ParticlesToLevelSet.h
   tools/PointAdvect.h
