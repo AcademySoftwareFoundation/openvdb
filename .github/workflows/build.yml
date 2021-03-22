@@ -25,6 +25,9 @@ on:
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
+    # run this workflow every Monday 00:00 UTC
+    # warning: This pattern is checked in various places below
+    - cron:  '0 0 * * 1'
 
 jobs:
   linux-vfx:
@@ -37,12 +40,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'DebugNoInfo', test: 'OFF' } # tests take too long..
-          - { cxx: g++,     image: '2020', abi: '7', build: 'Release',     test: 'ON'  }
-          - { cxx: g++,     image: '2021', abi: '8', build: 'Release',     test: 'ON'  }
+          - { cxx: clang++, image: '2019', abi: '6', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2020', abi: '7', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Debug',   test: 'OFF' }
+          - { cxx: g++,     image: '2020', abi: '7', build: 'Release', test: 'ON'  }
+          - { cxx: g++,     image: '2021', abi: '8', build: 'Release', test: 'ON'  }
       fail-fast: false
     steps:
     - uses: actions/checkout@v1
@@ -51,10 +54,48 @@ jobs:
     - name: build
       run: ./ci/build.sh ${{ matrix.config.build }} ${{ matrix.config.abi }} ON None "core,python,bin,test" -DOPENVDB_CXX_STRICT=ON
     - name: test
-      if: matrix.config.test == 'ON'
+      # Always run tests on weekly builds
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 0 * * 1') || matrix.config.test == 'ON'
       run: |
         ./ci/test.sh
         ./ci/test_install.sh
+
+  windows:
+    runs-on: windows-2019
+    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          - { vc: 'x64-windows-static', build: 'Release', test: 'ON',  cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', build: 'Debug',   test: 'OFF', cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        build: 'Release', test: 'ON',  cmake: '-DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        build: 'Debug',   test: 'OFF', cmake: '-DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - name: path
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install
+      shell: bash
+      run: ./ci/install_windows.sh
+    - name: build
+      shell: bash
+      run: ./ci/build_windows.sh ${{ matrix.config.build }} ${{ matrix.config.cmake }}
+    - name: test
+      shell: bash
+      # Always run tests on weekly builds
+      # https://github.community/t/distinct-job-for-each-schedule/17811/2
+      if: contains(github.event.schedule, '0 0 * * 1') || matrix.config.test == 'ON'
+      run: ./ci/test.sh
 
   testabi8lite:
     runs-on: ubuntu-16.04
@@ -133,55 +174,6 @@ jobs:
     - name: build
       run: ./ci/build.sh Release 8 OFF None "core,test" -DUSE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=`pwd`
     - name: test
-      run: ./ci/test.sh
-
-  testwindows2019md:
-    runs-on: windows-2019
-    env:
-      VCPKG_DEFAULT_TRIPLET: x64-windows
-    steps:
-    - uses: actions/checkout@v2
-    - name: path
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: install
-      shell: bash
-      run: ./ci/install_windows.sh
-    - name: build
-      shell: bash
-      run: ./ci/build_windows.sh "${VCPKG_INSTALLATION_ROOT}"
-    - name: test
-      shell: bash
-      run: ./ci/test.sh
-
-  testwindows2019mt:
-    runs-on: windows-2019
-    env:
-      VCPKG_DEFAULT_TRIPLET: x64-windows-static
-    steps:
-    - uses: actions/checkout@v2
-    - name: path
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\x64-windows-static\lib" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\Release" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-    - name: install
-      shell: bash
-      run: ./ci/install_windows.sh
-    - name: build
-      shell: bash
-      run: |
-        # static build of blosc from vcpkg does not build internal sources.
-        # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
-        # Boost as both shared and static libs are installed.
-        ./ci/build_windows.sh "${VCPKG_INSTALLATION_ROOT}" \
-          -DUSE_STATIC_DEPENDENCIES=ON \
-          -DBLOSC_USE_EXTERNAL_SOURCES=ON \
-          -DCMAKE_MSVC_RUNTIME_LIBRARY=MultiThreaded
-    - name: test
-      shell: bash
       run: ./ci/test.sh
 
   testmacos1015:

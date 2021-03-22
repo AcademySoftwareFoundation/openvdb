@@ -31,8 +31,7 @@ mark_as_advanced(
 
 if(NOT OPENVDB_CORE_SHARED AND NOT OPENVDB_CORE_STATIC)
   message(FATAL_ERROR "Both static and shared core OpenVDB libraries have been disabled. "
-    "At least one must be enabled when building the core library."
-  )
+    "At least one must be enabled when building the core library.")
 endif()
 
 #########################################################################
@@ -43,7 +42,91 @@ message(STATUS "----------------------------------------------------")
 
 ##########################################################################
 
+# Win32 checks - we don't set any explicit settings so allow for all build
+# types, but warn in cases where they probably have not been intended
+
+if(WIN32)
+  if(VCPKG_TOOLCHAIN AND VCPKG_TARGET_TRIPLET)
+    string(FIND ${VCPKG_TARGET_TRIPLET} "static" _BUILDING_STATIC_TRIPLET)
+    if(_BUILDING_STATIC_TRIPLET EQUAL -1)
+      # x64-windows
+      if(OPENVDB_CORE_STATIC)
+        # building the static lib - check to see if we've explicitly set /MD
+        if(NOT CMAKE_MSVC_RUNTIME_LIBRARY OR NOT
+          (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDLL OR
+           CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL))
+          # /MD not set, /MT will be used
+          message(WARNING "Detected VCPKG toolchain is using a mismatching triplet for "
+            "OpenVDB build artifacts. ${VCPKG_TARGET_TRIPLET} is dynamic, but OPENVDB_CORE_STATIC "
+            "is ON. The static build of OpenVDB may not build correctly. It it recommended to only "
+            "configure either the static or shared library on Windows in a single run of CMake.")
+        endif()
+      endif()
+    else()
+      # x64-windows-static
+      if(OPENVDB_CORE_SHARED)
+        # building the shared lib - check to see if we've explicitly set /MT
+        if(NOT CMAKE_MSVC_RUNTIME_LIBRARY OR NOT
+          (CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
+           CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug))
+          # /MT not set, /MD will be used
+          message(WARNING "Detected VCPKG toolchain is using a mismatching triplet for "
+            "OpenVDB build artifacts. ${VCPKG_TARGET_TRIPLET} is static, but OPENVDB_CORE_SHARED "
+            "is ON. The shared build of OpenVDB may not build correctly. It it recommended to only "
+            "configure either the static or shared library on Windows in a single run of CMake.")
+        endif()
+      endif()
+    endif()
+  endif()
+
+  if(CMAKE_MSVC_RUNTIME_LIBRARY)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreaded" OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDebug")
+      if(OPENVDB_CORE_SHARED)
+         message(WARNING "Unexpected value for the Windows CRT with target build artifacts."
+          "You are attempting to use the static CRT (/MT) with a dynamic configuration of OpenVDB."
+          "This is not recommended and may cause failures.")
+      endif()
+    endif()
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDLL" OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL "MultiThreadedDebugDLL")
+      if(OPENVDB_CORE_STATIC)
+         message(WARNING "Unexpected value for the Windows CRT with target build artifacts."
+          "You are attempting to use the dyanmic CRT (/MD) with a static configuration of OpenVDB."
+          "This is not recommended and may cause failures.")
+      endif()
+    endif()
+  endif()
+endif()
+
+##########################################################################
+
 # Collect and configure lib dependencies
+
+if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
+  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
+  #        boost shared libraries (more specifically libraries built with -fPIC).
+  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
+  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
+  set(BUILD_SHARED_LIBS ON)
+  set(Boost_USE_STATIC_LIBS OFF)
+endif()
+
+find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
+  if(${Boost_LIB_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
+    message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
+find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
+  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
+    message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 if(USE_IMATH_HALF)
   find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
@@ -55,20 +138,13 @@ if(USE_IMATH_HALF)
   endif()
 endif()
 
-find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
-
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
-  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
-    message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
-endif()
-
 if(USE_LOG4CPLUS)
+  # Find Log4CPlus libraries
   find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
 endif()
 
 if(USE_BLOSC)
+  # Find Blosc libraries
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
   if(Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION)
     message(WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
@@ -88,24 +164,6 @@ if(USE_BLOSC OR USE_ZLIB)
   find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
 endif()
 
-if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
-  # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
-  #        boost shared libraries (more specifically libraries built with -fPIC).
-  #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
-  #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
-  set(BUILD_SHARED_LIBS ON)
-  set(Boost_USE_STATIC_LIBS OFF)
-endif()
-
-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
-
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
-  if(${Boost_LIB_VERSION} VERSION_LESS FUTURE_MINIMUM_BOOST_VERSION)
-    message(DEPRECATION "Support for Boost versions < ${FUTURE_MINIMUM_BOOST_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
-endif()
-
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
@@ -121,9 +179,7 @@ set(OPENVDB_CORE_DEPENDENT_LIBS
 )
 
 if(USE_IMATH_HALF)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    IlmBase::Half
-  )
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS IlmBase::Half)
 endif()
 
 if(WIN32)
@@ -154,23 +210,10 @@ if(USE_BLOSC OR USE_ZLIB)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
 
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-  TBB::tbb
-)
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
 
 if(UNIX)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
-endif()
-
-if(TARGET Jemalloc::jemalloc)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Jemalloc::jemalloc)
-endif()
-
-if(TARGET TBB::tbbmalloc AND TARGET TBB::tbbmalloc_proxy)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-    TBB::tbbmalloc
-    TBB::tbbmalloc_proxy
-  )
 endif()
 
 ##########################################################################
@@ -413,7 +456,7 @@ if(WIN32)
   #       used in PlatformConfig.h to configure EXR exports. Once this file
   #       is completely removed, this define can be too
   if(USE_IMATH_HALF)
-    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()
@@ -443,10 +486,16 @@ if(OPENVDB_CORE_STATIC)
   )
 
   set_target_properties(openvdb_static
-    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME}
-  )
+    PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
 
   if(WIN32)
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+      # also add it explicitly as a compile option
+      set_target_properties(openvdb_static PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+      target_compile_options(openvdb_static PUBLIC "/MT$<$<CONFIG:Debug>:d>")
+    endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
 endif()
@@ -488,6 +537,16 @@ if(OPENVDB_CORE_SHARED)
     set_target_properties(openvdb_shared
       PROPERTIES INSTALL_RPATH "${RPATHS}"
     )
+  endif()
+
+  if(WIN32)
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
+      # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
+      # also add it explicitly as a compile option
+      set_target_properties(openvdb_shared PROPERTIES
+        MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
+      target_compile_options(openvdb_shared PUBLIC "/MD$<$<CONFIG:Debug>:d>")
+    endif()
   endif()
 endif()
 
