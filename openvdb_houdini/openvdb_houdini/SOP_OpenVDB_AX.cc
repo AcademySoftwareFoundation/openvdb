@@ -45,8 +45,7 @@
 #include <UT/UT_Ramp.h>
 #include <UT/UT_Version.h>
 
-#include <tbb/mutex.h>
-
+#include <mutex>
 #include <sstream>
 #include <string>
 
@@ -1264,8 +1263,10 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 throw std::runtime_error("No volume executable has been built");
             }
 
+#ifdef DNEG_OPENVDB_AX
             const ax::VolumeExecutable::IterType
                 iterType = static_cast<ax::VolumeExecutable::IterType>(evalInt("activity", 0, time));
+#endif
 
             const size_t size = grids.size();
 
@@ -1295,7 +1296,9 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 applyOpToWriteGrids(op);
             }
 
+#ifdef DNEG_OPENVDB_AX
             mCompilerCache.mVolumeExecutable->setValueIterator(iterType);
+#endif
             mCompilerCache.mVolumeExecutable->setCreateMissing(true);
             mCompilerCache.mVolumeExecutable->execute(grids);
 

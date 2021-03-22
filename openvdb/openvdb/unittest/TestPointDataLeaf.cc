@@ -269,8 +269,8 @@ TEST_F(TestPointDataLeaf, testOffsets)
 
         // empty Descriptor should throw on leaf node initialize
         auto emptyDescriptor = std::make_shared<Descriptor>();
-        LeafType* emptyLeafNode = new LeafType();
-        EXPECT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5),
+        LeafType emptyLeafNode;
+        EXPECT_THROW(emptyLeafNode.initializeAttributes(emptyDescriptor, 5),
             openvdb::IndexError);
 
         // create a non-empty Descriptor

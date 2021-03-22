@@ -14,13 +14,13 @@
 #include "../grammar/generated/axparser.h"
 #endif
 
-#include <tbb/mutex.h>
+#include <mutex>
 #include <string>
 #include <memory>
 
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sInitMutex;
+std::mutex sInitMutex;
 }
 
 openvdb::ax::Logger* axlog = nullptr;
@@ -38,7 +38,7 @@ extern void axerror (openvdb::ax::ast::Tree**, char const *s) {
 openvdb::ax::ast::Tree::ConstPtr
 openvdb::ax::ast::parse(const char* code, openvdb::ax::Logger& logger)
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     axlog = &logger; // for lexer errs
     logger.setSourceCode(code);
 

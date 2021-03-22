@@ -10,8 +10,8 @@
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
-#include <tbb/atomic.h>
 #include <algorithm>
+#include <atomic>
 #include <map>
 #include <sstream>
 #include <string>
@@ -327,11 +327,23 @@ void TestPointMove::testCachedDeformer()
 
     leafIndex = 0;
     for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
+        // odd filter writes to mapData, not vecData
+        EXPECT_TRUE(cache.leafs[leafIndex].vecData.empty());
+        const auto& data = cache.leafs[leafIndex].mapData;
+
         for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
             AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
             Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
-            Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
+
+            const auto miter = data.find(*iter);
+            if (!oddFilter.valid(iter)) {
+                EXPECT_TRUE(miter == data.cend());
+            }
+            else {
+                EXPECT_TRUE(miter != data.cend());
+                const Vec3f& cachePosition = miter->second;
+                EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
+            }
         }
         leafIndex++;
     }
@@ -687,8 +699,8 @@ struct CustomDeformer
     using LeafT = PointDataGrid::TreeType::LeafNodeType;
 
     CustomDeformer(const openvdb::Vec3d& offset,
-                   tbb::atomic<int>& resetCalls,
-                   tbb::atomic<int>& applyCalls)
+                   std::atomic<int>& resetCalls,
+                   std::atomic<int>& applyCalls)
         : mOffset(offset)
         , mResetCalls(resetCalls)
         , mApplyCalls(applyCalls) { }
@@ -710,8 +722,8 @@ struct CustomDeformer
     }
 
     const openvdb::Vec3d mOffset;
-    tbb::atomic<int>& mResetCalls;
-    tbb::atomic<int>& mApplyCalls;
+    std::atomic<int>& mResetCalls;
+    std::atomic<int>& mApplyCalls;
 }; // struct CustomDeformer
 
 // Custom Deformer that always returns the position supplied in the constructor
@@ -755,7 +767,7 @@ TEST_F(TestPointMove, testCustomDeformer)
         const int leafCount = points->tree().leafCount();
         const int pointCount = int(positions.size());
 
-        tbb::atomic<int> resetCalls, applyCalls;
+        std::atomic<int> resetCalls, applyCalls;
         resetCalls = 0;
         applyCalls = 0;
 

@@ -24,8 +24,6 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/version.hpp> // for BOOST_VERSION
 
-#include <tbb/atomic.h>
-
 #ifdef _MSC_VER
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
@@ -38,6 +36,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <unistd.h> // for unlink()
 #endif
 
+#include <atomic>
 #include <fstream>
 #include <numeric> // for std::iota()
 
@@ -97,7 +96,7 @@ private:
         boost::interprocess::mapped_region mRegion;
         bool mAutoDelete = false;
         Notifier mNotifier;
-        mutable tbb::atomic<openvdb::Index64> mLastWriteTime;
+        mutable std::atomic<openvdb::Index64> mLastWriteTime;
     }; // class Impl
     std::unique_ptr<Impl> mImpl;
 }; // class ProxyMappedFile
@@ -128,7 +127,6 @@ TEST_F(TestStreamCompression, testBlosc)
 
     { // valid buffer
         // compress
-
         std::unique_ptr<int[]> uncompressedBuffer(new int[count]);
 
         for (int i = 0; i < count; i++) {
@@ -243,7 +241,7 @@ TEST_F(TestStreamCompression, testBlosc)
         // compress
 
         std::vector<int> smallBuffer;
-        smallBuffer.reserve(count);
+        smallBuffer.resize(count);
 
         for (int i = 0; i < count; i++)     smallBuffer[i] = i;
 

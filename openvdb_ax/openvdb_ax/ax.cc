@@ -15,7 +15,7 @@
 #include <llvm/Support/ManagedStatic.h> // llvm_shutdown
 #include <llvm/ExecutionEngine/MCJIT.h> // LLVMLinkInMCJIT
 
-#include <tbb/mutex.h>
+#include <mutex>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -107,20 +107,20 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
 
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sInitMutex;
+std::mutex sInitMutex;
 bool sIsInitialized = false;
 bool sShutdown = false;
 }
 
 bool isInitialized()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     return sIsInitialized;
 }
 
 void initialize()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     if (sIsInitialized) return;
 
     if (sShutdown) {
@@ -189,7 +189,7 @@ void initialize()
 
 void uninitialize()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     if (!sIsInitialized) return;
 
     // @todo consider replacing with storage to Support/InitLLVM

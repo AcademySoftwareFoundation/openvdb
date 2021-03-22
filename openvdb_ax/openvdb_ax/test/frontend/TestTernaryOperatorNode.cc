@@ -5,7 +5,8 @@
 #include <openvdb_ax/ast/Scanners.h>
 #include <openvdb_ax/ast/PrintTree.h>
 #include <openvdb_ax/Exceptions.h>
-#include <openvdb_ax/test/util.h>
+
+#include "../util.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 

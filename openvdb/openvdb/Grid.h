@@ -978,14 +978,7 @@ public:
     /// Return @c true if this grid type is registered.
     static bool isRegistered() { return GridBase::isRegistered(Grid::gridType()); }
     /// Register this grid type along with a factory function.
-    static void registerGrid()
-    {
-        GridBase::registerGrid(Grid::gridType(), Grid::factory);
-        if (!tree::internal::LeafBufferFlags<ValueType>::IsAtomic) {
-            OPENVDB_LOG_WARN("delayed loading of grids of type " << Grid::gridType()
-                << " might not be threadsafe on this platform");
-        }
-    }
+    static void registerGrid() { GridBase::registerGrid(Grid::gridType(), Grid::factory); }
     /// Remove this grid type from the registry.
     static void unregisterGrid() { GridBase::unregisterGrid(Grid::gridType()); }
 

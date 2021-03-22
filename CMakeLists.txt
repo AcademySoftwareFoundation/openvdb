@@ -123,6 +123,11 @@ option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
+set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
+The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
+cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
+NOT the number of TU's ]=])
+
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -277,12 +282,10 @@ endif()
 # Configure MS Runtime
 
 if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
+  # CMAKE_MSVC_RUNTIME_LIBRARY selects the MSVC runtime library for use by compilers
+  # targeting the MSVC ABI. Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug
+  # MultiThreadedDebugDLL. If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
   message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
-elseif(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "" CACHE STRING
-    "Select the MSVC runtime library for use by compilers targeting the MSVC ABI.
-    Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug MultiThreadedDebugDLL.
-    If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL." FORCE)
 endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
@@ -303,7 +306,6 @@ if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
     endif()
   endif()
 endif()
-
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -430,12 +432,18 @@ if(OPENVDB_CODE_COVERAGE)
   set(CMAKE_BUILD_TYPE Debug CACHE STRING
     "Code coverage requires debug mode." FORCE
   )
-elseif(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING
-    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
-  )
 endif()
-message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+
+# CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
+get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _isMultiConfig)
+  if(NOT CMAKE_BUILD_TYPE)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING
+      "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
+    )
+  endif()
+  message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+endif()
 
 # Code coverage configuration
 
@@ -565,6 +573,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(/wd4275)
     # Truncation from 'int' to 'bool'
     add_compile_options(/wd4305)
+  endif()
+  # If a user has explicitly requested a parallel build, configure this during CMake
+  if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+    add_compile_options(/MP${MSVC_MP_THREAD_COUNT})
   endif()
 endif()
 
