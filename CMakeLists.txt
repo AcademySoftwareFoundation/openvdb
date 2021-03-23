@@ -73,7 +73,6 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -194,7 +193,6 @@ mark_as_advanced(
   OPENVDB_USE_DEPRECATED_ABI_6
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
-  OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
   OPENVDB_SIMD
@@ -423,38 +421,30 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration - default to Release if none is set unless
-# code coverage is in use, in which case override to Debug
+# Build type configuration
 
 if(OPENVDB_CODE_COVERAGE)
-  message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
-    "to Debug.")
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-    "Code coverage requires debug mode." FORCE
-  )
+  message(DEPRECATION "The OPENVDB_CODE_COVERAGE option is deprecated. Choose instead the unique"
+    "build type -DCMAKE_BUILD_TYPE=coverage")
+  set(CMAKE_BUILD_TYPE coverage)
+endif()
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+include(cmake/config/OpenVDBBuildTypes.cmake)
+
+if(CMAKE_BUILD_TYPE EQUAL coverage)
+  # use .gcno extension instead of .cc.gcno
+  # @note This is an undocumented internal cmake var and does not work
+  # with multi config generators
+  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
 endif()
 
 # CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
 get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
 if(NOT _isMultiConfig)
-  if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE Release CACHE STRING
-      "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
-    )
-  endif()
   message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
-endif()
-
-# Code coverage configuration
-
-if(OPENVDB_CODE_COVERAGE)
-  # set gcov compile and link flags
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-
-  # use .gcno extension instead of .cc.gcno
-  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
 endif()
 
 #########################################################################
