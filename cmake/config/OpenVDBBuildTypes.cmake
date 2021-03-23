@@ -1,68 +1,60 @@
+
+# Requires add_link_options from 3.13
+cmake_minimum_required(VERSION 3.13)
+
 # Build Types
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}
-    CACHE STRING [=[Choose the type of build. CMake natively supports the following options: None Debug Release
-        RelWithDebInfo MinSizeRel. OpenVDB additionally supports the following sanitizers and tools:
-        coverage tsan asan lsan msan ubsan]=]
-    FORCE)
+  CACHE STRING [=[Choose the type of build. CMake natively supports the following options: None Debug Release
+    RelWithDebInfo MinSizeRel. OpenVDB additionally supports the following sanitizers and tools:
+    coverage tsan asan lsan msan ubsan]=]
+  FORCE)
+
+# Note that the thread, address and memory sanitizers are incompatible with each other
+set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan)
+
+# Set all build flags to empty (unless they have been provided)
 
 # DebugNoInfo - An internal build type only used by the OpenVDB CI. no optimizations, no symbols, asserts enabled
-set(CMAKE_CXX_FLAGS_DebugNoInfo ""
-  CACHE STRING "Flags used by the C++ compiler during DebugNoInfo builds." FORCE)
+set(CMAKE_CXX_FLAGS_DebugNoInfo "" CACHE STRING "Flags used by the C++ compiler during DebugNoInfo builds.")
+
+foreach(TYPE ${EXTRA_BUILD_TYPES})
+  set(CMAKE_CXX_FLAGS_${U_TYPE} "" CACHE STRING "Flags used by the C++ compiler during ${TYPE} builds.")
+  set(CMAKE_SHARED_LINKER_FLAGS_${U_TYPE} "" CACHE STRING "Flags used by the linker during ${TYPE} builds.")
+  set(CMAKE_EXE_LINKER_FLAGS_${U_TYPE} "" CACHE STRING "Flags used by the linker during ${TYPE} builds.")
+endforeach()
+
+# Init generator options - we use generator expressions to allow builds with both
+# clang and GCC. Sanitizers are currently only configured for clang and GCC.
+# @todo from CMake 3.15, switch to comma list of CXX_COMPILER_ID.
 
 # Coverage
-set(CMAKE_CXX_FLAGS_COVERAGE "--coverage"
-  CACHE STRING "Flags used by the C++ compiler during code coverage builds." FORCE)
-set(CMAKE_STATIC_LINKER_FLAGS_COVERAGE "--coverage"
-  CACHE STRING "Flags used by the linker during code coverage builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_COVERAGE "--coverage"
-  CACHE STRING "Flags used by the linker during code coverage builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_COVERAGE "--coverage"
-  CACHE STRING "Flags used by the linker during code coverage builds." FORCE)
-
-# Note that the thread, address and memory sanitizers are icompatible with each other
-set(SANITIZERS tsan asan lsan msan ubsan)
+add_compile_options("$<$<CONFIG:COVERAGE>:--coverage>")
+add_link_options("$<$<CONFIG:COVERAGE>:--coverage>")
 
 # ThreadSanitizer
-set(CMAKE_CXX_FLAGS_TSAN "-fsanitize=thread -g -O1"
-  CACHE STRING "Flags used by the C++ compiler during ThreadSanitizer builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_TSAN "-fsanitize=thread"
-  CACHE STRING "Flags used by the linker during ThreadSanitizer builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_TSAN "-fsanitize=thread"
-  CACHE STRING "Flags used by the linker during ThreadSanitizer builds." FORCE)
+add_compile_options("$<$<AND:$<CONFIG:TSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=thread>")
+add_compile_options("$<$<AND:$<CONFIG:TSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-g;-O1>")
+add_link_options("$<$<AND:$<CONFIG:TSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=thread>")
 
 # AddressSanitize
-if(CMAKE_CXX_COMPILER_ID STREQUAL Clang)
-  set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-optimize-sibling-calls -fsanitize-address-use-after-scope -fno-omit-frame-pointer -g -O1"
-    CACHE STRING "Flags used by the C++ compiler during AddressSanitizer builds." FORCE)
-  set(CMAKE_SHARED_LINKER_FLAGS_ASAN "-fsanitize=address"
-    CACHE STRING "Flags used by the linker during AddressSanitizer builds." FORCE)
-  set(CMAKE_EXE_LINKER_FLAGS_ASAN "-fsanitize=address"
-    CACHE STRING "Flags used by the linker during AddressSanitizer builds." FORCE)
-elseif(CMAKE_CXX_COMPILER_ID STREQUAL GNU)
-  set(CMAKE_CXX_FLAGS_ASAN "-fsanitize=address -fno-optimize-sibling-calls -fno-omit-frame-pointer -g -O1"
-    CACHE STRING "Flags used by the C++ compiler during AddressSanitizer builds." FORCE)
-endif()
+add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=address>")
+add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-omit-frame-pointer;-g;-O1>")
+add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize-address-use-after-scope;-fno-optimize-sibling-calls>")
+# -fsanitize-address-use-after-scope added in GCC 7
+add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,7.0.0>>:-fsanitize-address-use-after-scope>")
+add_link_options("$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=address>")
 
 # LeakSanitizer
-set(CMAKE_CXX_FLAGS_LSAN "-fsanitize=leak -fno-omit-frame-pointer -g -O1"
-  CACHE STRING "Flags used by the C++ compiler during LeakSanitizer builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_LSAN "-fsanitize=leak"
-  CACHE STRING "Flags used by the linker during LeakSanitizer builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_LSAN "-fsanitize=leak"
-  CACHE STRING "Flags used by the linker during LeakSanitizer builds." FORCE)
+add_compile_options("$<$<AND:$<CONFIG:LSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=leak>")
+add_compile_options("$<$<AND:$<CONFIG:LSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-omit-frame-pointer;-g;-O1>")
+add_link_options("$<$<AND:$<CONFIG:LSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=leak>")
 
 # MemorySanitizer
-set(CMAKE_CXX_FLAGS_MSAN "-fsanitize=memory -fno-optimize-sibling-calls -fsanitize-memory-track-origins=2 -fno-omit-frame-pointer -g -O2"
-  CACHE STRING "Flags used by the C++ compiler during MemorySanitizer builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_MSAN "-fsanitize=memory"
-  CACHE STRING "Flags used by the linker during MemorySanitizer builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_MSAN "-fsanitize=memory"
-  CACHE STRING "Flags used by the linker during MemorySanitizer builds." FORCE)
+add_compile_options("$<$<AND:$<CONFIG:MSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=memory>")
+add_compile_options("$<$<AND:$<CONFIG:MSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-omit-frame-pointer;-g;-O2>")
+add_compile_options("$<$<AND:$<CONFIG:MSAN>,$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:--fno-optimize-sibling-calls;-fsanitize-memory-track-origins=2>")
+add_link_options("$<$<AND:$<CONFIG:MSAN>,$<OR:$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=memory>")
 
 # UndefinedBehaviour
-set(CMAKE_CXX_FLAGS_UBSAN "-fsanitize=undefined"
-  CACHE STRING "Flags used by the C++ compiler during UndefinedBehaviourSanitizer builds." FORCE)
-set(CMAKE_SHARED_LINKER_FLAGS_UBSAN "-fsanitize=undefined"
-  CACHE STRING "Flags used by the linker during UndefinedBehaviourSanitizer builds." FORCE)
-set(CMAKE_EXE_LINKER_FLAGS_UBSAN "-fsanitize=undefined"
-  CACHE STRING "Flags used by the linker during UndefinedBehaviourSanitizer builds." FORCE)
+add_compile_options("$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=undefined>")
+add_link_options("$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fsanitize=undefined>")
