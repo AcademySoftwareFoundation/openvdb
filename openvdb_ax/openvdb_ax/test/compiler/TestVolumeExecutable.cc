@@ -272,23 +272,26 @@ TestVolumeExecutable::testCompilerCases()
     // with copied tree
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::VolumeExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::VolumeExecutable>(*(tree->copy()), logger); // empty
+            compiler->compile<openvdb::ax::VolumeExecutable>(*copy, logger); // empty
         CPPUNIT_ASSERT(executable);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::VolumeExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::VolumeExecutable>(*(tree->copy()), logger); // undeclared variable error
+            compiler->compile<openvdb::ax::VolumeExecutable>(*copy, logger); // undeclared variable error
         CPPUNIT_ASSERT(!executable);
         CPPUNIT_ASSERT(logger.hasError());
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::VolumeExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::VolumeExecutable>(*(tree->copy()), logger); // warning
+            compiler->compile<openvdb::ax::VolumeExecutable>(*copy, logger); // warning
         CPPUNIT_ASSERT(executable);
         CPPUNIT_ASSERT(logger.hasWarning());
     }
