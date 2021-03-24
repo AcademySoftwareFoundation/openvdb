@@ -3,10 +3,15 @@ OpenVDB Version History
 
 Version 8.1.0 - In development
 
+      As of this release, support for grid ABI=5 has been removed.
+
     New features:
     - Added tools::erodeActiveValues() to match the existing
       tools::dilateActiveValues(). New erosion tools support all tile policies
       and edge/vertex neighbour patterns.
+    - Added support for automatic filtering of active tiles in tools::Filter
+      by setting tools::Filter::setProcessTiles. Active tiles are densified
+      on demand, only when necessary.
 
     Improvements:
     - Significant performance improvements to large dilations with
@@ -18,6 +23,27 @@ Version 8.1.0 - In development
     - Reduced the time spent in the hot path of openvdb::initialize() and
       openvdb::uninitialize() by leveraging atomics with double-checked locks.
       [Contributed by Ben FrantzDale].
+    - Extended tree::DynamicNodeManager to allow for use with a const tree.
+    - Replace tbb::mutex with std::mutex and tbb::atomic with std::atomic as
+      these have now been removed in TBB 2021.
+      [Contributed by Ben FrantzDale].
+    - Significant performance improvements to tools::activate and
+      tools::deactivate through use of the DynamicNodeManager to parallelize
+      tile processing.
+
+    Bug Fixes:
+    - Fix a memory leak in AttributeArray when delayed-loading is disabled.
+    - Fixed a crash in OpenVDB AX when declaring arrays with non-scalar
+      elements (unsupported) i.e. {"foo", 1, 2}, {1, {1,2}, 3} etc.
+    - Fixed a bug in OpenVDB AX which would cause an error when multiplying a
+      vec3 by a mat4.
+    - In OpenVDB AX, improved the error message produced when attempting to use
+      a matrix literal (i.e. {1,2,3...}) in a binary expression (this is
+      invalid but would previously print out bad IR).
+    - Fixed a non-deterministic failure in the TestStreamCompression unit test.
+    - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+      performance regression.
+    - tools::deactivate now also works with a MaskTree.
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
@@ -27,6 +53,8 @@ Version 8.1.0 - In development
     - The openvdb::tools::Film class no longer has a saveExr method in
       any build configuration. Sample code for saving exrs from this
       object can be found in the command line render tool.
+    - Added ability to run tools::activate and tools::deactivate
+      single-threaded.
 
     Houdini:
     - Updated the VDB Activate SOP and others to use the multi-threaded
@@ -34,6 +62,12 @@ Version 8.1.0 - In development
       increase.
     - Introduced the VDB AX SOP which provides an interface for running
       OpenVDB AX code in Houdini on VDB grids.
+    - Updated the VDB Smooth SOP to support the filtering of active tiles.
+    - Fixed a parameter warning in VDB AX SOP.
+    - Transfer Surface Attributes in Convert VDB SOP could use uninitialised
+      memory.
+    - VDB Activate SOP now uses the multi-threaded tools::deactivate for much
+      faster performance.
 
     Build:
     - Dependency on OpenEXR's Half implementation has been removed from the
@@ -41,6 +75,19 @@ Version 8.1.0 - In development
       This is fully bitwise compatible, but may require switching Half
       references to math::Half. The USE_IMATH_HALF build configuration can
       be used to switch back to OpenEXR based half.
+    - Blosc, Log4cplus, IlmBase, OpenEXR and TBB find modules now configure
+      release and debug library variants.
+      [Reported by Matthew Cong]
+    - Fixed an issue where FindBlosc wouldn't add zstd as a dep in non static
+      builds BLOSC_USE_EXTERNAL_SOURCES.
+    - Fixed Log4cplus interface language and missing interface libraries on
+      Win32.
+    - Removed Jemalloc and Tbbmalloc logic from the core library builds.
+    - The variable CMAKE_MSVC_RUNTIME_LIBRARY is no longer set by the OpenVDB
+      CMake. If CMAKE_MSVC_RUNTIME_LIBRARY is not explicitly provided, OpenVDB
+      configures the static library with /MT(d) and the dynamic library
+      with /MD(d).
+      [Reported by Jérémie Dumas]
 
 Version 8.0.1 - February 5, 2021
 

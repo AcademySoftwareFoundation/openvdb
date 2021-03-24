@@ -1,2 +1,0 @@
-    Bug fixes:
-    - Fixed a non-deterministic failure in the TestStreamCompression unit test.

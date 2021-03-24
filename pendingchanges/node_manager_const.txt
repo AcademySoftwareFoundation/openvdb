@@ -1,2 +1,0 @@
-    Improvements:
-    - Extended tree::DynamicNodeManager to allow for use with a const tree.

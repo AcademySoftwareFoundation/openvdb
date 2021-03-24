@@ -1,9 +1,0 @@
-
-    New features:
-    - Added support for automatic filtering of active tiles in tools::Filter
-      by setting tools::Filter::setProcessTiles. Active tiles are densified
-      on demand, only when necessary.
-
-    Houdini:
-    - Updated the VDB Smooth SOP to support the filtering of active tiles.
-
