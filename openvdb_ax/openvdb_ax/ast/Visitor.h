@@ -358,8 +358,8 @@ private:
     /// @return Const pointer to the node
     template <bool V, typename NodeT>
     inline typename std::enable_if<V, const NodeT*>::type
-    strip(const NodeT& node) {
-        return &node;
+    strip(const NodeT* node) {
+        return node;
     }
 
     /// @brief  Enabled for non-const traversals, where by a const stripped node
@@ -368,8 +368,8 @@ private:
     /// @return Non-const pointer to the node
     template <bool V, typename NodeT>
     inline typename std::enable_if<!V, typename std::remove_const<NodeT>::type*>::type
-    strip(const NodeT& node) {
-        return &(const_cast<NodeT&>(node));
+    strip(const NodeT* node) {
+        return const_cast<NodeT*>(node);
     }
 
     /// @brief  Implements recursive hierarchical visits to a given AST node
@@ -383,10 +383,10 @@ private:
             if (auto base = node.NodeT::basetype()) {
                 if (!hierarchyVisits(*base)) return false;
             }
-            if (!this->derived().visit(this->strip<ConstVisit>(node))) return false;
+            if (!this->derived().visit(this->strip<ConstVisit>(&node))) return false;
         }
         else {
-            if (!this->derived().visit(this->strip<ConstVisit>(node))) return false;
+            if (!this->derived().visit(this->strip<ConstVisit>(&node))) return false;
             if (auto base = node.NodeT::basetype()) {
                 return hierarchyVisits(*base);
             }
@@ -409,7 +409,7 @@ private:
             if (this->derived().reverseChildVisits()) {
                 if (children != 0) {
                     for (int64_t i = static_cast<int64_t>(children - 1); i >= 0; --i) {
-                        auto child = this->strip<ConstVisit>(*(node->child(i)));
+                        auto child = this->strip<ConstVisit>(node->child(i));
                         if (!this->derived().traverse(child)) {
                             return false;
                         }
@@ -418,7 +418,7 @@ private:
             }
             else {
                 for (size_t i = 0; i < children; ++i) {
-                    auto child = this->strip<ConstVisit>(*(node->child(i)));
+                    auto child = this->strip<ConstVisit>(node->child(i));
                     if (!this->derived().traverse(child)) {
                         return false;
                     }
@@ -441,7 +441,7 @@ private:
             if (this->derived().reverseChildVisits()) {
                 if (children != 0) {
                     for (int64_t i = static_cast<int64_t>(children - 1); i >= 0; --i) {
-                        auto child = this->strip<ConstVisit>(*(node->child(i)));
+                        auto child = this->strip<ConstVisit>(node->child(i));
                         if (!this->derived().traverse(child)) {
                             return false;
                         }
@@ -450,7 +450,7 @@ private:
             }
             else {
                 for (size_t i = 0; i < children; ++i) {
-                    auto child = this->strip<ConstVisit>(*(node->child(i)));
+                    auto child = this->strip<ConstVisit>(node->child(i));
                     if (!this->derived().traverse(child)) {
                         return false;
                     }
