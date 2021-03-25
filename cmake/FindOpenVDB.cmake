@@ -279,12 +279,19 @@ endforeach()
 set(OpenVDB_INCLUDE_DIR ${OpenVDB_openvdb_INCLUDE_DIR}
   CACHE PATH "The OpenVDB core include directory")
 
-OPENVDB_VERSION_FROM_HEADER("${OpenVDB_INCLUDE_DIR}/openvdb/version.h"
+set(_OPENVDB_VERSION_HEADER "${OpenVDB_INCLUDE_DIR}/openvdb/version.h")
+OPENVDB_VERSION_FROM_HEADER("${_OPENVDB_VERSION_HEADER}"
   VERSION OpenVDB_VERSION
   MAJOR   OpenVDB_MAJOR_VERSION
   MINOR   OpenVDB_MINOR_VERSION
   PATCH   OpenVDB_PATCH_VERSION
+  ABI     OpenVDB_ABI # Will be empty for the older version.h header
 )
+
+set(_OPENVDB_HAS_NEW_VERSION_HEADER FALSE)
+if(OpenVDB_ABI)
+  set(_OPENVDB_HAS_NEW_VERSION_HEADER TRUE)
+endif()
 
 # ------------------------------------------------------------------------
 #  Search for OPENVDB lib DIR
@@ -404,19 +411,22 @@ find_package_handle_standard_args(OpenVDB
 #  Determine ABI number
 # ------------------------------------------------------------------------
 
-# Set the ABI number the library was built against. Uses vdb_print
+# Set the ABI number the library was built against. The old system,
+# which didn't define the ABI in the build config, uses vdb_print
 
-if(_OPENVDB_INSTALL)
-  OPENVDB_ABI_VERSION_FROM_PRINT(
-    "${_OPENVDB_INSTALL}/bin/vdb_print"
-    ABI OpenVDB_ABI
-  )
-else()
-  # Try and find vdb_print from the include path
-  OPENVDB_ABI_VERSION_FROM_PRINT(
-    "${OpenVDB_INCLUDE_DIR}/../bin/vdb_print"
-    ABI OpenVDB_ABI
-  )
+if(NOT _OPENVDB_HAS_NEW_VERSION_HEADER)
+  if(_OPENVDB_INSTALL)
+    OPENVDB_ABI_VERSION_FROM_PRINT(
+      "${_OPENVDB_INSTALL}/bin/vdb_print"
+      ABI OpenVDB_ABI
+    )
+  else()
+    # Try and find vdb_print from the include path
+    OPENVDB_ABI_VERSION_FROM_PRINT(
+      "${OpenVDB_INCLUDE_DIR}/../bin/vdb_print"
+      ABI OpenVDB_ABI
+    )
+  endif()
 endif()
 
 if(NOT OpenVDB_FIND_QUIET)
@@ -444,7 +454,6 @@ endif()
 # Add standard dependencies
 
 find_package(TBB REQUIRED COMPONENTS tbb)
-find_package(ZLIB REQUIRED)
 
 if(NOT OPENVDB_USE_STATIC_LIBS AND NOT Boost_USE_STATIC_LIBS)
   # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
@@ -517,19 +526,32 @@ set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
+  if(OPENVDB_USE_STATIC_LIBS)
+    list(APPEND OpenVDB_DEFINITIONS OPENVDB_STATICLIB)
+  else()
+    list(APPEND OpenVDB_DEFINITIONS OPENVDB_DLL)
+  endif()
+  # Newer version of OpenVDB define these in Platform.h, but they are also
+  # provided here to maintain backwards compatibility with header include
+  # others
   list(APPEND OpenVDB_DEFINITIONS _WIN32)
   list(APPEND OpenVDB_DEFINITIONS NOMINMAX)
 endif()
 
-if(OPENVDB_USE_STATIC_LIBS)
-  if(WIN32)
-    list(APPEND OpenVDB_DEFINITIONS OPENVDB_STATICLIB)
-  endif()
-else()
-  if(WIN32)
-    list(APPEND OpenVDB_DEFINITIONS OPENVDB_DLL)
-  endif()
+if(OpenVDB_ABI)
+  # Newer version of OpenVDB defines this in version.h, but it is are also
+  # provided here to maintain backwards compatibility with header include
+  # others
+  list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
+endif()
 
+# Configure deps
+
+if(_OPENVDB_HAS_NEW_VERSION_HEADER)
+  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
+  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
+  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
+elseif(NOT OPENVDB_USE_STATIC_LIBS)
   # Use GetPrerequisites to see which libraries this OpenVDB lib has linked to
   # which we can query for optional deps. This basically runs ldd/otoll/objdump
   # etc to track deps. We could use a vdb_config binary tools here to improve
@@ -594,14 +616,6 @@ endif()
 
 if(OpenVDB_USES_IMATH_HALF)
   find_package(IlmBase REQUIRED COMPONENTS Half)
-  if(WIN32)
-    # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
-    #       used in PlatformConfig.h to configure EXR exports. Once this file
-    #       is completely removed, this define can be too
-    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-    endif()
-  endif()
 endif()
 
 if(UNIX)
@@ -620,10 +634,6 @@ set(_OPENVDB_VISIBLE_DEPENDENCIES
 
 if(OpenVDB_USES_IMATH_HALF)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
-endif()
-
-if(OpenVDB_ABI)
-  list(APPEND OpenVDB_DEFINITIONS OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 endif()
 
 if(OpenVDB_USES_LOG4CPLUS)

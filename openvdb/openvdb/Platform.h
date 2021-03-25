@@ -6,8 +6,6 @@
 #ifndef OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 #define OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-#include "PlatformConfig.h"
-
 #define PRAGMA(x) _Pragma(#x)
 
 /// @name Utilities
@@ -54,6 +52,25 @@
     #endif
 #endif
 
+/// Windows defines
+#ifdef _WIN32
+    // Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
+    // defined on MSVC
+    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
+    #ifndef _USE_MATH_DEFINES
+        #define _USE_MATH_DEFINES
+    #endif
+    ///Disable the non-portable Windows definitions of min() and max() macros
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+
+    // By default, assume we're building OpenVDB as a DLL if we're dynamically
+    // linking in the CRT, unless OPENVDB_STATICLIB is defined.
+    #if defined(_DLL) && !defined(OPENVDB_STATICLIB) && !defined(OPENVDB_DLL)
+        #define OPENVDB_DLL
+    #endif
+#endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:

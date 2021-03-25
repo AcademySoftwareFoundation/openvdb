@@ -1186,7 +1186,7 @@ TEST_F(TestPointDataLeaf, testIO)
                 AttributeF::cast(leafFromDisk->constAttributeArray("density")));
 
             EXPECT_TRUE(leafFromDisk->buffer().isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(position.isOutOfCore());
             EXPECT_TRUE(density.isOutOfCore());
 #else
@@ -1201,7 +1201,7 @@ TEST_F(TestPointDataLeaf, testIO)
             // ensure out-of-core data is now in-core after pre-fetching
 
             EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(position.isOutOfCore());
             EXPECT_TRUE(density.isOutOfCore());
 #else
@@ -1233,7 +1233,7 @@ TEST_F(TestPointDataLeaf, testIO)
 
             EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
             EXPECT_TRUE(!position2.isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(density2.isOutOfCore());
 #else
             EXPECT_TRUE(!density2.isOutOfCore());

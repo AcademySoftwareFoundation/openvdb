@@ -232,13 +232,24 @@ endif()
 
 ##### Core library configuration
 
-# Configure the BuildConfig header
+# Configure the version header
 
 if(USE_IMATH_HALF)
-  set(OPENVDB_BUILDCONFIG_USE_IMATH_HALF 1)
+  set(OPENVDB_USE_IMATH_HALF 1)
+endif()
+if(USE_ZLIB)
+  set(OPENVDB_USE_ZLIB 1)
+  if(USE_BLOSC)
+    set(OPENVDB_USE_BLOSC 1)
+  endif()
 endif()
 
-configure_file(BuildConfig.h.in BuildConfig.h)
+# Configure VDB version in the form: ("%02x%02x%04x", major, minor, patch)
+math(EXPR OPENVDB_PACKED_VERSION "${OpenVDB_MAJOR_VERSION} << 24")
+math(EXPR OPENVDB_PACKED_VERSION "${OPENVDB_PACKED_VERSION} | ((${OpenVDB_MINOR_VERSION} & 0xFF) << 16)")
+math(EXPR OPENVDB_PACKED_VERSION "${OPENVDB_PACKED_VERSION} | (${OpenVDB_PATCH_VERSION} & 0xFFFF)")
+
+configure_file(version.h.in openvdb/version.h)
 
 ##########################################################################
 
@@ -281,7 +292,6 @@ set(OPENVDB_LIBRARY_INCLUDE_FILES
   PlatformConfig.h
   Types.h
   TypeList.h
-  version.h
 )
 
 set(OPENVDB_LIBRARY_IO_INCLUDE_FILES
@@ -455,26 +465,7 @@ endif()
 
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
-if(USE_BLOSC)
-  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_USE_BLOSC)
-endif()
 
-if(USE_BLOSC OR USE_ZLIB)
-  list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_USE_ZLIB)
-endif()
-
-# Public defines
-if(WIN32)
-  # @note OPENVDB_OPENEXR_STATICLIB is old functionality from the makefiles
-  #       used in PlatformConfig.h to configure EXR exports. Once this file
-  #       is completely removed, this define can be too
-  if(USE_IMATH_HALF)
-    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
-    endif()
-  endif()
-  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_WIN32 -DNOMINMAX)
-endif()
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
 endif()
@@ -485,7 +476,7 @@ endif()
 
 if(OPENVDB_CORE_STATIC)
   target_include_directories(openvdb_static
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
     PRIVATE .
   )
 
@@ -517,7 +508,7 @@ endif()
 
 if(OPENVDB_CORE_SHARED)
   target_include_directories(openvdb_shared
-    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR}
+    PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
     PRIVATE .
   )
 
@@ -584,7 +575,7 @@ if(OPENVDB_CORE_SHARED)
 endif()
 
 install(FILES ${OPENVDB_LIBRARY_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
-install(FILES ${CMAKE_CURRENT_BINARY_DIR}/BuildConfig.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
+install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR})
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${OPENVDB_INSTALL_INCLUDEDIR}/points)

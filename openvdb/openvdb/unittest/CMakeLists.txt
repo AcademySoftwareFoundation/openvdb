@@ -187,7 +187,6 @@ add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
 if(USE_BLOSC OR OpenVDB_USES_BLOSC)
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
   list(APPEND OPENVDB_TEST_DEPENDENT_LIBS Blosc::blosc)
-  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_BLOSC")
 endif()
 
 if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
@@ -205,7 +204,6 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
     unset(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
   endif()
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
-  target_compile_definitions(vdb_test PRIVATE "-DOPENVDB_USE_ZLIB")
 endif()
 
 target_link_libraries(vdb_test

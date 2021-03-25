@@ -50,7 +50,14 @@ if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif()
 
-project(OpenVDB LANGUAGES CXX)
+###### Version
+
+set(OpenVDB_MAJOR_VERSION 8)
+set(OpenVDB_MINOR_VERSION 1)
+set(OpenVDB_PATCH_VERSION 0)
+set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
+
+project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
 
 ###### OpenVDB Build/Component Options
 
@@ -204,6 +211,8 @@ mark_as_advanced(
 # Configure minimum version requirements - some are treated specially and fall
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
+set(MINIMUM_CXX_STANDARD 14)
+
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
 # Later versions (including 1.5.4), can be buggy on certain platforms.
@@ -211,7 +220,6 @@ set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 6)
-set(MINIMUM_CXX_STANDARD 14)
 set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
 set(FUTURE_OPENVDB_ABI_VERSION 9)
 
@@ -403,6 +411,14 @@ if(NOT (
   return()
 endif()
 
+if(WIN32)
+  if(OPENVDB_BUILD_AX OR
+     OPENVDB_BUILD_AX_BINARIES OR
+     OPENVDB_BUILD_AX_UNITTESTS)
+    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
+  endif()
+endif()
+
 if(USE_MAYA AND USE_HOUDINI)
   # @todo technically this is possible so long as library versions match
   # exactly but it's difficult to validate and dangerous
@@ -537,12 +553,6 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   endif()
   # Increase the number of sections that an object file can contain
   add_compile_options(/bigobj)
-  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-  # defined on MSVC
-  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
-  add_definitions(-D_USE_MATH_DEFINES)
-  # Disable the non-portable Windows definitions of min() and max() macros
-  add_definitions(-DNOMINMAX)
   # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
   add_definitions(-DWIN32_LEAN_AND_MEAN)
   # Disable non-secure CRT library function warnings
@@ -634,7 +644,8 @@ endif()
 # Configure OpenVDB Library and ABI versions
 
 if(NOT OPENVDB_BUILD_CORE)
-  # Find VDB installation and determine lib/abi versions
+  # Find VDB installation and determine lib/abi versions. This resets the
+  # version and ABI numbers
   find_package(OpenVDB REQUIRED)
   # Check ABI version was found and explicitly error if attempting to build against
   # an incompatible Houdini version
@@ -645,31 +656,11 @@ if(NOT OPENVDB_BUILD_CORE)
         "ABI ${OpenVDB_ABI}.")
     endif()
   endif()
-else()
-  include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
-  set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
-  if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
-    message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
-  endif()
-
-  OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
-    VERSION OpenVDB_VERSION
-    MAJOR   OpenVDB_MAJOR_VERSION
-    MINOR   OpenVDB_MINOR_VERSION
-    PATCH   OpenVDB_PATCH_VERSION
-  )
-  message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 endif()
+
+message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 
 # Locate openvdb_ax if necessary
-
-if(WIN32)
-  if(OPENVDB_BUILD_AX OR
-     OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
-    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
-  endif()
-endif()
 
 if(NOT OPENVDB_BUILD_AX AND
    (OPENVDB_BUILD_AX_BINARIES OR
@@ -699,46 +690,44 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
   set(OpenVDB_ABI ${OPENVDB_HOUDINI_ABI})
 endif()
 
+# Validate ABI value if outside supported range
+
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
   message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
     "no longer supported.")
 endif()
 
 if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if((OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
-    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated and will soon be removed.")
-  else()
+  if(NOT OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
       "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI} to ON to "
       "suppress this error.")
   endif()
+
+  message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+    "are deprecated and will soon be removed.")
   # global target definition
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_6)
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
 endif()
 
 if(OpenVDB_ABI EQUAL FUTURE_OPENVDB_ABI_VERSION)
-  if(OPENVDB_USE_FUTURE_ABI_9)
-    message(WARNING "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
-      "in active development and have not been finalized.")
-  else()
+  if(NOT OPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI})
     message(FATAL_ERROR "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
       "in active development and have not been finalized. Set CMake option "
       "OPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI} to ON to suppress this error.")
   endif()
+
+  message(WARNING "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
+    "in active development and have not been finalized.")
   # global target definition
-  add_definitions(-DOPENVDB_USE_FUTURE_ABI_9)
+  add_definitions(-DOPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI})
 endif()
 
-# The ABI is a global target definition, applicable to all components, so just add it
-# via add_definitions()
-
-add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
 message(STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
 
 # Always force set as we may need to change it if it's incompatible with Houdini
 set(OPENVDB_ABI_VERSION_NUMBER ${OpenVDB_ABI} CACHE STRING [=[
-Build for compatibility with version N of the OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features
+Build for compatibility with version N of the OpenVDB Grid ABI, where N is 6, 7, 8 etc. (some newer features
 will be disabled). If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the installed vdb_print binary to
 determine the ABI number. You may set this to force a given ABI number.]=] FORCE)
 
