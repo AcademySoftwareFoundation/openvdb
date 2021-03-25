@@ -19,6 +19,7 @@
     <prefix>/python2.7libs - python.rc for Houdini startup
     <prefix>/scripts/sop   - Relevant SOP scripts
     <prefix>/dso           - Location of DSOs
+    <prefix>/help          - Individual help files
 
   By default, the prefix is set to the value returned by the Houdini
   CMake configuration. This is the default installation path for all
@@ -110,6 +111,8 @@ set(OPENVDB_HOUDINI_MANTRA_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/dso/
   CACHE PATH "Install path for the OpenVDB Houdini mantra nodes")
 set(OPENVDB_HOUDINI_SOP_SCRIPT_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/scripts/sop
   CACHE PATH "Install path for the OpenVDB Houdini node scripts")
+set(OPENVDB_HOUDINI_HELP_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/help
+  CACHE PATH "Install path for the OpenVDB Houdini help files")
 set(OPENVDB_HOUDINI_ICON_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/config/Icons
   CACHE PATH "Install path for the OpenVDB Houdini node icons")
 set(OPENVDB_HOUDINI_PYTHON_INSTALL_PREFIX ${OPENVDB_HOUDINI_INSTALL_PREFIX}/python2.7libs
@@ -423,6 +426,9 @@ install(FILES
   DW_OpenVDBRasterizePoints.cmd
   DESTINATION ${OPENVDB_HOUDINI_SOP_SCRIPT_INSTALL_PREFIX}
 )
+
+install(DIRECTORY help/
+  DESTINATION ${OPENVDB_HOUDINI_HELP_INSTALL_PREFIX})
 
 if(OPENVDB_INSTALL_HOUDINI_PYTHONRC)
   install(FILES
