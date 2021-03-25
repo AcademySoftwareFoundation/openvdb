@@ -1,0 +1,39 @@
+
+mat3d inputd = {
+    1.0, -1.0, 0.0,
+    2.0, 2.0, 0.0,
+    0.0, 0.0, -1.0
+};
+
+mat3d singulard = {
+    1.0, 2.0, 3.0,
+    4.0, 5.0, 6.0,
+    7.0, 8.0, 9.0
+};
+
+mat3d invd;
+invd = inverse(inputd);
+mat3d sind;
+sind = inverse(singulard);
+
+mat3f inputf = {
+    1.0f, -1.0f, 0.0f,
+    2.0f, 2.0f, 0.0f,
+    0.0f, 0.0f, -1.0f
+};
+
+mat3f singularf = {
+    1.0f, 2.0f, 3.0f,
+    4.0f, 5.0f, 6.0f,
+    7.0f, 8.0f, 9.0f
+};
+
+mat3f invf;
+invf = inverse(inputf);
+mat3f sinf;
+sinf = inverse(singularf);
+
+mat3d@test1 = invd;
+mat3f@test2 = invf;
+mat3d@test3 = sind;
+mat3f@test4 = sinf;
