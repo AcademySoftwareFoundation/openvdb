@@ -1,5 +1,0 @@
-    Bug fixes:
-    - Fixed a crash in OpenVDB AX when declaring arrays with non-scalar elements (unsupported) i.e. {"foo", 1, 2}, {1, {1,2}, 3} etc.
-    - Fixed a bug in OpenVDB AX which would cause an error when multiplying a vec3 by a mat4.
-    - In OpenVDB AX, improved the error message produced when attempting to use a matrix literal (i.e. {1,2,3...}) in a binary expression (this is invalid but would previously print out bad IR).
-

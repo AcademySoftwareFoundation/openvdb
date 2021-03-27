@@ -1,4 +1,0 @@
-
-    Houdini:
-    - Transfer Surface Attributes in Convert VDB SOP could use uninitialised
-      memory.
