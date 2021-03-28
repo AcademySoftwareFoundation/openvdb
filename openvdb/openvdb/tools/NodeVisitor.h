@@ -120,13 +120,16 @@ struct DepthFirstNodeVisitor;
 template <typename NodeT, Index LEVEL>
 struct DepthFirstNodeVisitor
 {
+    using NonConstChildType = typename NodeT::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<NodeT, NonConstChildType>::Type;
+
     template <typename OpT>
     static size_t visit(NodeT& node, OpT& op, size_t idx = 0)
     {
         size_t offset = 0;
         op(node, idx + offset++);
-        for (typename NodeT::ChildOnIter iter = node.beginChildOn(); iter; ++iter) {
-            offset += DepthFirstNodeVisitor<typename NodeT::ChildNodeType>::visit(
+        for (auto iter = node.beginChildOn(); iter; ++iter) {
+            offset += DepthFirstNodeVisitor<ChildNodeType>::visit(
                 *iter, op, idx + offset);
         }
         return offset;
@@ -150,8 +153,10 @@ struct DepthFirstNodeVisitor<NodeT, 0>
 template <typename TreeT, typename OpT>
 size_t visitNodesDepthFirst(TreeT& tree, OpT& op, size_t idx)
 {
-    return DepthFirstNodeVisitor<typename TreeT::RootNodeType>::visit(
-        tree.root(), op, idx);
+    using NonConstRootNodeType = typename TreeT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeT, NonConstRootNodeType>::Type;
+
+    return DepthFirstNodeVisitor<RootNodeType>::visit(tree.root(), op, idx);
 }
 
 

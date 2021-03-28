@@ -67,10 +67,19 @@ TEST_F(TestNodeVisitor, testLeafCount)
 
     FloatGrid::Ptr grid = tools::createLevelSetCube<FloatGrid>(/*scale=*/10.0f);
 
-    LeafCountOp<FloatTree> leafCountOp;
-    tools::visitNodesDepthFirst(grid->tree(), leafCountOp);
+    { // non-const tree
+        LeafCountOp<FloatTree> leafCountOp;
+        tools::visitNodesDepthFirst(grid->tree(), leafCountOp);
 
-    EXPECT_EQ(grid->tree().leafCount(), leafCountOp.count);
+        EXPECT_EQ(grid->tree().leafCount(), leafCountOp.count);
+    }
+
+    { // const tree
+        LeafCountOp<FloatTree> leafCountOp;
+        tools::visitNodesDepthFirst(grid->constTree(), leafCountOp);
+
+        EXPECT_EQ(grid->tree().leafCount(), leafCountOp.count);
+    }
 }
 
 
