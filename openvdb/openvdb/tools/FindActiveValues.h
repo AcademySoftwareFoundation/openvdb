@@ -27,6 +27,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/ValueAccessor.h>
 
+#include "Count.h" // tools::countActiveVoxels()
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -108,6 +110,7 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
 template<typename TreeT>
+[[deprecated("Use tools::countActiveVoxels() instead.")]]
 inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox);
 
@@ -170,6 +173,7 @@ public:
     bool noActiveValues(const CoordBBox &bbox, bool useAccessor = false) const { return !this->anyActiveValues(bbox, useAccessor); }
 
     /// @brief Returns the number of active voxels intersected by the specified bounding box.
+    [[deprecated("Use tools::countActiveVoxels() instead")]]
     Index64 count(const CoordBBox &bbox) const;
 
     /// @brief Return a vector with bounding boxes that represents all the intersections
@@ -201,7 +205,6 @@ private:
     inline bool anyActiveVoxels(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const;
     static bool anyActiveTiles( const typename TreeT::LeafNodeType*, const CoordBBox& ) {return false;}
     void activeTiles(const typename TreeT::LeafNodeType*, const CoordBBox&, std::vector<TileDataT>&) const {;}// no-op
-    inline Index64 count(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const;
 
     // process internal nodes
     template<typename NodeT>
@@ -212,8 +215,6 @@ private:
     bool anyActiveTiles(const NodeT* node, const CoordBBox &bbox) const;
     template<typename NodeT>
     void activeTiles(const NodeT* node, const CoordBBox &bbox, std::vector<TileDataT> &tiles) const;
-    template<typename NodeT>
-    Index64 count(const NodeT* node, const CoordBBox &bbox) const;
 
     using AccT = tree::ValueAccessor<const TreeT, false/* IsSafe */>;
     using RootChildType = typename TreeT::RootNodeType::ChildNodeType;
@@ -328,30 +329,7 @@ bool FindActiveValues<TreeT>::anyActiveTiles(const CoordBBox &bbox) const
 template<typename TreeT>
 Index64 FindActiveValues<TreeT>::count(const CoordBBox &bbox) const
 {
-    Index64 count = 0;
-    for (auto& tile : mRootTiles) {//loop over active tiles only
-        if (!tile.bbox.hasOverlap(bbox)) {
-            continue;//ignore non-overlapping tiles
-        } else if (tile.bbox.isInside(bbox)) {
-            return bbox.volume();// bbox is completely inside the active tile
-        } else if (bbox.isInside(tile.bbox)) {
-            count += RootChildType::NUM_VOXELS;
-        } else {// partial overlap between tile and bbox
-            auto tmp = tile.bbox;
-            tmp.intersect(bbox);
-            count += tmp.volume();
-        }
-    }
-    for (auto &node : mRootNodes) {//loop over child nodes of the root node only
-        if ( !node.bbox.hasOverlap(bbox) ) {
-            continue;//ignore non-overlapping child nodes
-        } else if ( node.bbox.isInside(bbox) ) {
-            return this->count(node.child, bbox);// bbox is completely inside the child node
-        } else {
-            count += this->count(node.child, bbox);
-        }
-    }
-    return count;
+    return tools::countActiveVoxels(mAcc.tree(), bbox);
 }
 
 template<typename TreeT>
@@ -485,68 +463,6 @@ bool FindActiveValues<TreeT>::anyActiveTiles(const NodeT* node, const CoordBBox 
         }
     }
     return active;
-}
-
-template<typename TreeT>
-inline Index64 FindActiveValues<TreeT>::count(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const
-{
-    Index64 count = 0;
-    if (leaf->getValueMask().isOn()) {
-        auto b = leaf->getNodeBoundingBox();
-        b.intersect(bbox);
-        count = b.volume();
-    } else {
-        for (auto i = leaf->cbeginValueOn(); i; ++i) {
-            if (bbox.isInside(i.getCoord())) ++count;
-        }
-    }
-    return count;
-}
-
-template<typename TreeT>
-template<typename NodeT>
-Index64 FindActiveValues<TreeT>::count(const NodeT* node, const CoordBBox &bbox) const
-{
-    Index64 count = 0;
-
-    // Generate a bit masks
-    auto mask = this->getBBoxMask(bbox, node);
-    const auto childMask = mask & node->getChildMask();// prune the child mask with the bbox mask
-    mask &= node->getValueMask();// prune active tile mask with the bbox mask
-    const auto* table = node->getTable();
-
-    {// Check child nodes
-        using ChildT = typename NodeT::ChildNodeType;
-        using RangeT = tbb::blocked_range<typename std::vector<const ChildT*>::iterator>;
-        std::vector<const ChildT*> childNodes(childMask.countOn());
-        int j=0;
-        for (auto i = childMask.beginOn(); i; ++i, ++j) childNodes[j] = table[i.pos()].getChild();
-        count += tbb::parallel_reduce( RangeT(childNodes.begin(), childNodes.end()), 0,
-            [&](const RangeT& r, Index64 sum)->Index64 {
-                for ( auto i = r.begin(); i != r.end(); ++i ) sum += this->count(*i, bbox);
-                return sum;
-            }, []( Index64 a, Index64 b )->Index64 { return a+b; }
-        );
-    }
-
-    {// Check active tiles
-        std::vector<Coord> coords(mask.countOn());
-        using RangeT = tbb::blocked_range<typename std::vector<Coord>::iterator>;
-        int j=0;
-        for (auto i = mask.beginOn(); i; ++i, ++j) coords[j] = node->offsetToGlobalCoord(i.pos());
-        count += tbb::parallel_reduce( RangeT(coords.begin(), coords.end()), 0,
-            [&bbox](const RangeT& r, Index64 sum)->Index64 {
-                for ( auto i = r.begin(); i != r.end(); ++i ) {
-                    auto b = CoordBBox::createCube(*i, NodeT::ChildNodeType::DIM);
-                    b.intersect(bbox);
-                    sum += b.volume();
-                }
-                return sum;
-            }, []( Index64 a, Index64 b )->Index64 { return a+b; }
-        );
-    }
-
-    return count;
 }
 
 // process internal node
@@ -684,8 +600,7 @@ template<typename TreeT>
 inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
-    FindActiveValues<TreeT> op(tree);
-    return op.count(bbox);
+    return tools::countActiveVoxels(tree, bbox);
 }
 
 // Implementation of stand-alone function
