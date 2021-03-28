@@ -73,7 +73,6 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -123,6 +122,11 @@ option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
+set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
+The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
+cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
+NOT the number of TU's ]=])
+
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -189,7 +193,6 @@ mark_as_advanced(
   OPENVDB_USE_DEPRECATED_ABI_6
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
-  OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
   OPENVDB_SIMD
@@ -277,12 +280,10 @@ endif()
 # Configure MS Runtime
 
 if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
+  # CMAKE_MSVC_RUNTIME_LIBRARY selects the MSVC runtime library for use by compilers
+  # targeting the MSVC ABI. Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug
+  # MultiThreadedDebugDLL. If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
   message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
-elseif(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "" CACHE STRING
-    "Select the MSVC runtime library for use by compilers targeting the MSVC ABI.
-    Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug MultiThreadedDebugDLL.
-    If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL." FORCE)
 endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
@@ -303,7 +304,6 @@ if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
     endif()
   endif()
 endif()
-
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -421,32 +421,30 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration - default to Release if none is set unless
-# code coverage is in use, in which case override to Debug
+# Build type configuration
 
 if(OPENVDB_CODE_COVERAGE)
-  message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
-    "to Debug.")
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-    "Code coverage requires debug mode." FORCE
-  )
-elseif(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING
-    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
-  )
+  message(DEPRECATION "The OPENVDB_CODE_COVERAGE option is deprecated. Choose instead the unique"
+    "build type -DCMAKE_BUILD_TYPE=coverage")
+  set(CMAKE_BUILD_TYPE coverage)
 endif()
-message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-# Code coverage configuration
+include(cmake/config/OpenVDBBuildTypes.cmake)
 
-if(OPENVDB_CODE_COVERAGE)
-  # set gcov compile and link flags
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-
+if(CMAKE_BUILD_TYPE EQUAL coverage)
   # use .gcno extension instead of .cc.gcno
+  # @note This is an undocumented internal cmake var and does not work
+  # with multi config generators
   set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
+endif()
+
+# CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
+get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _isMultiConfig)
+  message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
 endif()
 
 #########################################################################
@@ -565,6 +563,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(/wd4275)
     # Truncation from 'int' to 'bool'
     add_compile_options(/wd4305)
+  endif()
+  # If a user has explicitly requested a parallel build, configure this during CMake
+  if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+    add_compile_options(/MP${MSVC_MP_THREAD_COUNT})
   endif()
 endif()
 

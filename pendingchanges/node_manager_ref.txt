@@ -1,3 +1,0 @@
-    Bug fixes:
-    - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
-      performance regression.

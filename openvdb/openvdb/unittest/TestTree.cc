@@ -2717,6 +2717,17 @@ TEST_F(TestTree, testGetNodes)
     */
 }// testGetNodes
 
+// unique_ptr wrapper around a value type for a stl container
+template <typename NodeT, template<class, class> class Container>
+struct SafeArray {
+    using value_type = NodeT*;
+    inline void reserve(const size_t size) { mContainer.reserve(size); }
+    void push_back(value_type ptr) { mContainer.emplace_back(ptr); }
+    size_t size() const { return mContainer.size(); }
+    inline const NodeT* operator[](const size_t idx) const { return mContainer[idx].get(); }
+    Container<std::unique_ptr<NodeT>, std::allocator<std::unique_ptr<NodeT>>> mContainer;
+};
+
 TEST_F(TestTree, testStealNodes)
 {
     //openvdb::util::CpuTimer timer;
@@ -2742,7 +2753,7 @@ TEST_F(TestTree, testStealNodes)
 
     {//testing Tree::stealNodes() with std::vector<T*>
         FloatTree tree2 = tree;
-        std::vector<openvdb::FloatTree::LeafNodeType*> array;
+        SafeArray<openvdb::FloatTree::LeafNodeType, std::vector> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::vector<T*> and Tree::stealNodes()");
         tree2.stealNodes(array);
@@ -2755,7 +2766,7 @@ TEST_F(TestTree, testStealNodes)
     }
     {//testing Tree::stealNodes() with std::vector<const T*>
         FloatTree tree2 = tree;
-        std::vector<const openvdb::FloatTree::LeafNodeType*> array;
+        SafeArray<const openvdb::FloatTree::LeafNodeType, std::vector> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::vector<const T*> and Tree::stealNodes()");
         tree2.stealNodes(array);
@@ -2768,7 +2779,7 @@ TEST_F(TestTree, testStealNodes)
     }
     {//testing Tree::stealNodes() const with std::vector<const T*>
         FloatTree tree2 = tree;
-        std::vector<const openvdb::FloatTree::LeafNodeType*> array;
+        SafeArray<const openvdb::FloatTree::LeafNodeType, std::vector> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::vector<const T*> and Tree::stealNodes() const");
         tree2.stealNodes(array);
@@ -2781,7 +2792,7 @@ TEST_F(TestTree, testStealNodes)
     }
     {//testing Tree::stealNodes() with std::vector<T*> and std::vector::reserve
         FloatTree tree2 = tree;
-        std::vector<openvdb::FloatTree::LeafNodeType*> array;
+        SafeArray<openvdb::FloatTree::LeafNodeType, std::vector> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::vector<T*>, std::vector::reserve and Tree::stealNodes");
         array.reserve(tree2.leafCount());
@@ -2795,7 +2806,7 @@ TEST_F(TestTree, testStealNodes)
     }
     {//testing Tree::getNodes() with std::deque<T*>
         FloatTree tree2 = tree;
-        std::deque<const openvdb::FloatTree::LeafNodeType*> array;
+        SafeArray<const openvdb::FloatTree::LeafNodeType, std::deque> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::deque<T*> and Tree::stealNodes");
         tree2.stealNodes(array);
@@ -2808,7 +2819,7 @@ TEST_F(TestTree, testStealNodes)
     }
     {//testing Tree::getNodes() with std::deque<T*>
         FloatTree tree2 = tree;
-        std::deque<const openvdb::FloatTree::RootNodeType::ChildNodeType*> array;
+        SafeArray<const openvdb::FloatTree::RootNodeType::ChildNodeType, std::deque> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::deque<T*> and Tree::stealNodes");
         tree2.stealNodes(array, 0.0f, true);
@@ -2817,8 +2828,9 @@ TEST_F(TestTree, testStealNodes)
         EXPECT_EQ(size_t(0), size_t(tree2.leafCount()));
     }
     {//testing Tree::getNodes() with std::deque<T*>
+        using NodeT = openvdb::FloatTree::RootNodeType::ChildNodeType::ChildNodeType;
         FloatTree tree2 = tree;
-        std::deque<const openvdb::FloatTree::RootNodeType::ChildNodeType::ChildNodeType*> array;
+        SafeArray<const NodeT, std::deque> array;
         EXPECT_EQ(size_t(0), array.size());
         //timer.start("\nstd::deque<T*> and Tree::stealNodes");
         tree2.stealNodes(array);
@@ -3125,7 +3137,9 @@ TEST_F(TestTree, testInternalNode)
         EXPECT_TRUE(internalNode.isChildMaskOn(index2));
 
         // fail otherwise
-        EXPECT_TRUE(!internalNode.addChild(new ChildType(c0.offsetBy(8000,0,0))));
+        auto* child = new ChildType(c0.offsetBy(8000,0,0));
+        EXPECT_TRUE(!internalNode.addChild(child));
+        delete child;
     }
 }
 
