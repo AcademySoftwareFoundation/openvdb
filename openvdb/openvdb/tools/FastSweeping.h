@@ -1011,11 +1011,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
 #endif
     }// FastSweeping::InitExt::run
 
+    // int implements an update if minD needs to be updated
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT sumHelper(ExtT ext, const SdfT& /* d2 */) const { return ext; }// int implementation
+    void sumHelper(ExtT& sum2, ExtT ext, bool update, const SdfT& /* d2 */) const { if (update) sum2 = ext; }// int implementation
 
+    // non-int implements a weighted sum
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
-    ExtT sumHelper(ExtT ext, const SdfT& d2) const {return ExtT(d2 * ext); }// non-int implementation
+    void sumHelper(ExtT& sum2, ExtT ext, bool /* update */, const SdfT&  d2) const { sum2 += d2 * ext; }// non-int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT extValHelper(ExtT extSum, const SdfT& /* sdfSum */) const { return extSum; }// int implementation
@@ -1057,6 +1059,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                         } else {//voxel is neighboring the iso-surface
                             SdfValueT sum1 = 0;
                             ExtValueT sum2 = zeroVal<ExtValueT>();
+                            // minD is used to update sum2 in the integer case,
+                            // where we choose the value of the extension grid corresponding to
+                            // the smallest value of d in the 6 direction neighboring the current
+                            // voxel.
+                            SdfValueT minD = std::numeric_limits<SdfValueT>::max();
                             for (int n=0, i=0; i<6;) {
                                 SdfValueT d = std::numeric_limits<SdfValueT>::max(), d2;
                                 if (mask.test(i++)) {
@@ -1076,8 +1083,9 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                                     const Vec3R xyz(static_cast<SdfValueT>(ijk[0])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][0]),
                                                     static_cast<SdfValueT>(ijk[1])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][1]),
                                                     static_cast<SdfValueT>(ijk[2])+d*static_cast<SdfValueT>(FastSweeping::mOffset[n][2]));
-                                    ExtValueT tmp = sumHelper(ExtValueT(op(xform.indexToWorld(xyz))), d2);
-                                    sum2 += tmp;
+                                    // If current d is less than minD, update minD
+                                    sumHelper(sum2, ExtValueT(op(xform.indexToWorld(xyz))), d < minD, d2);
+                                    if (d < minD) minD = d;
                                 }
                             }//look over six cases
                             ext[voxelIter.pos()] = extValHelper(sum2, sum1);
