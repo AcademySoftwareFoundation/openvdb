@@ -309,10 +309,11 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT_EQUAL(std::string(""), std::string(test->argName(0)));
     CPPUNIT_ASSERT_EQUAL(std::string(""), std::string(test->argName(1)));
 
-    // test create
+    // test create detached
     llvm::Function* function = test->create(C);
+    llvm::Function* function2 = test->create(C);
     // additional create call should create a new function
-    CPPUNIT_ASSERT(function != test->create(C));
+    CPPUNIT_ASSERT(function != function2);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
     CPPUNIT_ASSERT(function->empty());
@@ -324,6 +325,8 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT_EQUAL(1u, ftype->getNumParams());
     CPPUNIT_ASSERT(ftype->getParamType(0)->isIntegerTy(32));
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
+    delete function2;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.test"));
@@ -365,7 +368,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT_EQUAL(size_t(0), test->size());
     CPPUNIT_ASSERT_EQUAL(std::string(""), std::string(test->argName(0)));
 
-    // test create
+    // test create detached
     function = test->create(C);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
@@ -377,6 +380,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(ftype->getReturnType()->isIntegerTy(32));
     CPPUNIT_ASSERT_EQUAL(0u, ftype->getNumParams());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.empty.test"));
@@ -418,7 +422,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(types[4]->isFloatTy());
     CPPUNIT_ASSERT(types[5]->isDoubleTy());
 
-    // test create
+    // test create detached
     function = test->create(C);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
@@ -436,6 +440,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(ftype->getParamType(4)->isFloatTy());
     CPPUNIT_ASSERT(ftype->getParamType(5)->isDoubleTy());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.scalars.test"));
@@ -476,7 +481,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(types[4] == llvm::Type::getFloatTy(C)->getPointerTo());
     CPPUNIT_ASSERT(types[5] == llvm::Type::getDoubleTy(C)->getPointerTo());
 
-    // test create
+    // test create detached
     function = test->create(C);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
@@ -494,6 +499,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(ftype->getParamType(4) == llvm::Type::getFloatTy(C)->getPointerTo());
     CPPUNIT_ASSERT(ftype->getParamType(5) == llvm::Type::getDoubleTy(C)->getPointerTo());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.scalarptrs.test"));
@@ -545,7 +551,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(types[13] == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo());
     CPPUNIT_ASSERT(types[14] == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo());
 
-    // test create
+    // test create detached
     function = test->create(C);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
@@ -572,6 +578,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(ftype->getParamType(13) == llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo());
     CPPUNIT_ASSERT(ftype->getParamType(14) == llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.arrayptrs.test"));
@@ -615,7 +622,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(types[4] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
     CPPUNIT_ASSERT(types[5] == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
 
-    // test create
+    // test create detached
     function = test->create(C);
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(!function->isVarArg());
@@ -633,6 +640,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(ftype->getParamType(4) == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo());
     CPPUNIT_ASSERT(ftype->getParamType(5) == llvm::Type::getFloatTy(C)->getPointerTo()->getPointerTo()->getPointerTo());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
 
     // test create with a module (same as above, but check inserted into M)
     CPPUNIT_ASSERT(!M.getFunction("ax.vptrs.test"));
@@ -676,6 +684,7 @@ TestFunctionTypes::testFunctionCreate()
     CPPUNIT_ASSERT(list.hasParamAttr(1, llvm::Attribute::WriteOnly));
     CPPUNIT_ASSERT(list.hasFnAttribute(llvm::Attribute::ReadOnly));
     CPPUNIT_ASSERT(list.hasAttribute(llvm::AttributeList::ReturnIndex, llvm::Attribute::NoAlias));
+    delete function;
 }
 
 void
@@ -1716,11 +1725,13 @@ TestFunctionTypes::testIRFunctions()
 
     // Test function prototype creation
     CPPUNIT_ASSERT(!M.getFunction("ax.ir.test"));
+    // detached
     function = test->create(C);
+    llvm::Function* function2 = test->create(C);
     CPPUNIT_ASSERT(!M.getFunction("ax.ir.test"));
     CPPUNIT_ASSERT(function);
     CPPUNIT_ASSERT(function->empty());
-    CPPUNIT_ASSERT(function != test->create(C));
+    CPPUNIT_ASSERT(function != function2);
     CPPUNIT_ASSERT(!function->isVarArg());
     CPPUNIT_ASSERT_EQUAL(size_t(2), function->arg_size());
 
@@ -1731,6 +1742,8 @@ TestFunctionTypes::testIRFunctions()
     CPPUNIT_ASSERT(ftype->getParamType(0)->isFloatTy());
     CPPUNIT_ASSERT(ftype->getParamType(1)->isFloatTy());
     CPPUNIT_ASSERT(function->getAttributes().isEmpty());
+    delete function;
+    delete function2;
 
     // Test function creation with module and IR generation
     CPPUNIT_ASSERT(!M.getFunction("ax.ir.test"));

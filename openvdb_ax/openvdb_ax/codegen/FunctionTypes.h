@@ -290,6 +290,8 @@ struct Function
     ///          of the modules function list. If no module is provided, the
     ///          function is left detached and must be added to a valid Module
     ///          to be callable.
+    /// @warning If a module is not provided, the caller takes ownership of the
+    ///          returned function and is responsible for deallocating it.
     /// @note    The body of the function is left to derived classes to
     ///          implement. As you need a Module to generate the prototype/body,
     ///          this function serves two purposes. The first is to return the

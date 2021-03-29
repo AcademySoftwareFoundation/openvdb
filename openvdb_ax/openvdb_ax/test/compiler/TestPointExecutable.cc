@@ -274,22 +274,25 @@ TestPointExecutable::testCompilerCases()
     // with copied tree
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // empty
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // empty
         CPPUNIT_ASSERT(executable);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // undeclared variable error
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // undeclared variable error
         CPPUNIT_ASSERT(!executable);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // warning
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // warning
         CPPUNIT_ASSERT(executable);
     }
     logger.clear();
