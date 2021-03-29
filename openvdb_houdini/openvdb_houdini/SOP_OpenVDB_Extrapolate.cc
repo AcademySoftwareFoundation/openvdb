@@ -138,9 +138,9 @@ public:
         template<typename FSGridT>
         bool processHelper(
             FastSweepingParms& parms,
-            hvdb::GU_PrimVDB* lsPrim,
+            GU_PrimVDB* lsPrim,
             typename FSGridT::ValueType fsIsoValue = typename FSGridT::ValueType(0),
-            const hvdb::GU_PrimVDB* maskPrim = nullptr);
+            const GU_PrimVDB* maskPrim = nullptr);
 
         /// @brief Process the Fast Sweeping operation.
         /// @details Calls the appropriate Fast Sweeping function from
@@ -149,10 +149,10 @@ public:
         template<typename FSGridT, typename ExtGridT = FSGridT>
         bool process(
             FastSweepingParms& parms,
-            hvdb::GU_PrimVDB* lsPrim,
+            GU_PrimVDB* lsPrim,
             typename FSGridT::ValueType fsIsoValue = typename FSGridT::ValueType(0),
-            const hvdb::GU_PrimVDB* maskPrim = nullptr,
-            hvdb::GU_PrimVDB* exPrim = nullptr,
+            const GU_PrimVDB* maskPrim = nullptr,
+            GU_PrimVDB* exPrim = nullptr,
             const typename ExtGridT::ValueType& background = typename ExtGridT::ValueType(0));
     }; // class Cache
 
@@ -365,9 +365,9 @@ template<typename FSGridT>
 bool
 SOP_OpenVDB_Extrapolate::Cache::processHelper(
     FastSweepingParms& parms,
-    hvdb::GU_PrimVDB* lsPrim,
+    GU_PrimVDB* lsPrim,
     typename FSGridT::ValueType fsIsoValue,
-    const hvdb::GU_PrimVDB* maskPrim)
+    const GU_PrimVDB* maskPrim)
 {
     using namespace openvdb;
     using namespace openvdb::tools;
@@ -501,10 +501,10 @@ template<typename FSGridT, typename ExtGridT>
 bool
 SOP_OpenVDB_Extrapolate::Cache::process(
     FastSweepingParms& parms,
-    hvdb::GU_PrimVDB* lsPrim,
+    GU_PrimVDB* lsPrim,
     typename FSGridT::ValueType fsIsoValue,
-    const hvdb::GU_PrimVDB* maskPrim,
-    hvdb::GU_PrimVDB* exPrim,
+    const GU_PrimVDB* maskPrim,
+    GU_PrimVDB* exPrim,
     const typename ExtGridT::ValueType& background)
 {
     using namespace openvdb::tools;
