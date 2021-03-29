@@ -245,6 +245,14 @@ newSopOperator(OP_OperatorTable* table)
             "     Note that this mode only uses the first fog/sdf grid\n"
             "     specified by the Source Group parameter."));
 
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "convertorrenormalize", "Convert Fog To SDF or Renormalize SDF")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip("Only works for when using Extend Field(s) of Scalar VDB.\n"
+            "If checked, it will either convert the Fog Grid to SDF or renormalize an SDF.")
+        .setDocumentation(
+            "Use this option if one wants to convert the Fog grid specified by the Source group\n"
+            "to be an SDF or to renormalize an SDF."));
+
     parms.add(hutil::ParmFactory(PRM_INT_J, "sweeps", "Iterations")
          .setDefault(1)
          .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5)
@@ -286,14 +294,6 @@ newSopOperator(OP_OperatorTable* table)
              "__Faces__ is fastest.  __Faces, Edges and Vertices__ is slowest\n"
              "but can produce the best results for large dilations.\n"
              "__Faces and Edges__ is intermediate in speed and quality.\n"));
-
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "convertorrenormalize", "Convert Fog To SDF or Renormalize SDF")
-        .setDefault(PRMzeroDefaults)
-        .setTooltip("Only works for when using Extend Field(s) of Scalar VDB.\n"
-            "If checked, it will either convert the Fog Grid to SDF or renormalize an SDF.")
-        .setDocumentation(
-            "Use this option if one wants to convert the Fog grid specified by the Source group\n"
-            "to be an SDF or to renormalize an SDF."));
 
     hvdb::OpenVDBOpFactory("VDB Extrapolate", SOP_OpenVDB_Extrapolate::factory, parms, *table)
         .addInput("Source VDB(s)")
