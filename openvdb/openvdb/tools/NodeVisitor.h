@@ -90,11 +90,86 @@ namespace tools {
 ///     }
 /// private:
 ///     const ValueT mOffset;
-// };
+/// };
 ///
 /// // usage:
 /// OffsetByLevelOp<FloatTree> op(3.0f);
 /// visitNodesDepthFirst(tree, op);
+///
+/// @endcode
+///
+/// @par Here is an example when migrating from using the deprecated Tree::visit()
+/// method. The main difference between the Tree::visit() method and this new
+/// method is that the Tree::visit() method expected an object that can visit
+/// tiles, values and nodes. In contrast, the visitNodesDepthFirst() method
+/// visits only nodes and expects you to provide iteration over tiles and
+/// voxels.
+///
+/// @par Tree::visit() operator methods:
+///
+/// @code
+/// template <typename IterT>
+/// bool operator()(IterT &iter)
+/// {
+///     typename IterT::NonConstValueType value;
+///     typename IterT::ChildNodeType *child = iter.probeChild(value);
+///
+///     if (child)
+///     {
+///         // If it is a leaf, process it now
+///         if (child->getLevel() == 0)
+///         {
+///             processNode(*child);
+///             return true;
+///         }
+///         // Otherwise, we want to keep digging down
+///         return false;
+///     }
+///
+///     // No child, this is a constant node!
+///     if (iter.isValueOn())
+///     {
+///         openvdb::CoordBBox  b;
+///         b.min() = iter.getCoord();
+///         b.max() = b.min().offsetBy(IterT::ChildNodeType::DIM);
+///
+///         processNodeBlock(b);
+///     }
+///
+///     // No need to dig further as there is no child.
+///     return true;
+/// }
+///
+/// bool operator()(typename GridType::TreeType::LeafNodeType::ChildAllIter &)
+/// { return true; }
+/// bool operator()(typename GridType::TreeType::LeafNodeType::ChildAllCIter &)
+/// { return true; }
+///
+/// @endcode
+///
+/// @par tools::visitNodesDepthFirst() operator methods:
+///
+/// @code
+/// using LeafT = typename GridType::TreeType::LeafNodeType;
+///
+/// template <typename NodeT>
+/// void operator()(const NodeT &node, size_t)
+/// {
+///     // iterate over active tiles
+///     for (auto iter = node.beginValueOn(); iter; ++iter)
+///     {
+///         openvdb::CoordBBox  b;
+///         b.min() = iter.getCoord();
+///         b.max() = b.min().offsetBy(NodeT::ChildNodeType::DIM);
+///
+///         processNodeBlock(b);
+///     }
+/// }
+///
+/// void operator()(const LeafT &leaf, size_t)
+/// {
+///     processNode(leaf);
+/// }
 ///
 /// @endcode
 template <typename TreeT, typename OpT>
