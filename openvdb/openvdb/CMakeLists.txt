@@ -434,6 +434,7 @@ set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/NodeMasks.h
   util/NullInterrupter.h
   util/PagedArray.h
+  util/Threading.h
   util/Util.h
 )
 

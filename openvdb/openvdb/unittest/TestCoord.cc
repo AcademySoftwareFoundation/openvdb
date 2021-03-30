@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/Types.h>
+#include <openvdb/math/Coord.h>
 
 #include <gtest/gtest.h>
-#include <tbb/tbb_stddef.h> // for tbb::split
 
 #include <unordered_map>
 #include <sstream>

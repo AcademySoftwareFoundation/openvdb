@@ -10,15 +10,15 @@
 #ifndef OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
-#include <openvdb/util/NullInterrupter.h>
-#include <openvdb/tools/Interpolation.h>
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/util/Threading.h"
+#include "openvdb/tools/Interpolation.h"
 
 #include "PointDataGrid.h"
 #include "PointAttribute.h"
 
 #include <sstream>
 #include <type_traits>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -299,7 +299,7 @@ private:
             using TargetHandleT = AttributeWriteHandle<typename SamplerWrapperT::ValueType>;
 
             if (util::wasInterrupted(interrupter)) {
-                tbb::task::self().cancel_group_execution();
+                util::cancelGroupExecution();
                 return;
             }
 
