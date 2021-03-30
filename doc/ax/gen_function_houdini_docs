@@ -1,0 +1,103 @@
+#!/bin/bash
+
+BINARY=$1
+if [ -z $BINARY ]; then
+    BINARY=vdb_ax
+fi
+
+# Generates a houdini html function file using the available vdb_ax binary
+
+# Add the header for the file
+echo -n "
+<style>
+
+.axsignature {
+  position: relative;
+  color: #888; }
+.axname {
+  color: black; }
+.axstring {
+  color: #c39c79; }
+.axvec {
+  color: #8d31ae; }
+.axmat {
+  color: #60bc8f; }
+.axint {
+  color: #91a835; }
+.axfloat {
+  color: #06C; }
+.axdouble {
+  color: #06C; }
+.axvoid {
+  color: #ccc; }
+
+</style>
+
+Function ||
+    Description ||
+        Signatures ||
+" > functions.txt
+
+# Echo out the full descriptions
+echo "" > tmp.txt
+$BINARY functions --list >> tmp.txt
+echo "" >> tmp.txt
+
+# Get a list of names
+names=$($BINARY functions --list-names)
+names="${names//$'\n'/}"
+
+# For each line in the full function file, see which function we're processing
+# and update each signature with the function name
+found=""
+new_data=""
+while IFS= read -r line; do
+    # Scan for a function switch
+    for name in $names; do
+        name="${name//$','/}"
+        if [[ "$name" == "$line" ]]; then
+            found=$name
+            break
+        fi
+    done
+
+    # If processing a function signature, add the function name
+    if [[ $line == "|  -"*"("* ]]; then
+      line=$(sed 's/(/'" $found"'(/g' <<<"$line")
+    fi
+    new_data+=$line"\n"
+done < tmp.txt
+
+echo -e "$new_data" > tmp.txt
+
+# look for functions such:
+# \n
+# functionname
+# |
+# and wrap the name in code and format the end
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/\n\([a-z0-9]\+\)\n|/\n<p><code>\1<\/code><\/p>  |/g' tmp.txt
+
+# # Remove all "| -" which exist before the function help
+sed -i 's/| - /\t/g' tmp.txt
+# Replace pipes with tabs
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/|   /\t/g' tmp.txt
+# # # Replace |\n with " |\n"
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/\n|\n/ |\n/g' tmp.txt
+# # add usage sig
+sed -i 's/|  - \(.*\)/\t\t<div class="usage item"><code class="axsignature">\1<\/code><\/div>/g' tmp.txt
+# Format parms
+sed -i 's/\(void\)/<span class="axvoid">\1<\/span>/g' tmp.txt
+sed -i 's/\(bool\)/<span class="axbool">\1<\/span>/g' tmp.txt
+sed -i 's/\(int32\)/<span class="axint">\1<\/span>/g' tmp.txt
+sed -i 's/\(int64\)/<span class="axint">\1<\/span>/g' tmp.txt
+sed -i 's/\(float\)/<span class="axfloat">\1<\/span>/g' tmp.txt
+sed -i 's/\(double\)/<span class="axdouble">\1<\/span>/g' tmp.txt
+sed -i 's/\(string\)/<span class="axstring">\1<\/span>/g' tmp.txt
+sed -i 's/\(vec[234][ifd]\)/<span class="axvec">\1<\/span>/g' tmp.txt
+sed -i 's/\(mat[234][ifd]\)/<span class="axmat">\1<\/span>/g' tmp.txt
+sed -i 's/ \([a-z]\+\)(/ <span class="axname">\1<\/span>(/g' tmp.txt
+
+# Combine
+cat tmp.txt >> functions.txt
+# cleanup
+rm tmp.txt

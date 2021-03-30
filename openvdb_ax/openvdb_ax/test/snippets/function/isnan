@@ -1,0 +1,56 @@
+float finitef = -1.0f;
+double finited = -1.0;
+
+vec2d finite2d = {-1.0,0.0};
+vec2f finite2f = {-1.0f,0.0f};
+
+vec3d finite3d = {-1.0,0.0,0.0};
+vec3f finite3f = {-1.0f,0.0f,0.0f};
+
+vec4d finite4d = {-1.0,0.0,0.0,1000000.0};
+vec4f finite4f = {-1.0f,0.0f,0.0f,1000000.0f};
+
+mat3d finitemat3d = -identity3();
+mat3f finitemat3f = -identity3();
+
+mat4d finitemat4d = -identity4();
+mat4f finitemat4f = -identity4();
+
+bool@test1 =  isnan(finited);
+bool@test2 =  isnan(finitef);
+bool@test3 =  isnan(finite2d);
+bool@test4 =  isnan(finite2f);
+bool@test5 =  isnan(finite3d);
+bool@test6 =  isnan(finite3f);
+bool@test7 =  isnan(finite4d);
+bool@test8 =  isnan(finite4f);
+bool@test9 =  isnan(finitemat3d);
+bool@test10 = isnan(finitemat3f);
+bool@test11 = isnan(finitemat4d);
+bool@test12 = isnan(finitemat4f);
+
+finitef = sqrt(finitef);
+finited = sqrt(finited);
+finite2d[0] = sqrt(finite2d[0]);
+finite2f[0] = sqrt(finite2f[0]);
+finite3d[0] = sqrt(finite3d[0]);
+finite3f[0] = sqrt(finite3f[0]);
+finite4d[0] = sqrt(finite4d[0]);
+finite4f[0] = sqrt(finite4f[0]);
+finitemat3d[0] = sqrt(finitemat3d[0]);
+finitemat3f[0] = sqrt(finitemat3f[0]);
+finitemat4d[0] = sqrt(finitemat4d[0]);
+finitemat4f[0] = sqrt(finitemat4f[0]);
+
+bool@test13 = isnan(finited);
+bool@test14 = isnan(finitef);
+bool@test15 = isnan(finite2d);
+bool@test16 = isnan(finite2f);
+bool@test17 = isnan(finite3d);
+bool@test18 = isnan(finite3f);
+bool@test19 = isnan(finite4d);
+bool@test20 = isnan(finite4f);
+bool@test21 = isnan(finitemat3d);
+bool@test22 = isnan(finitemat3f);
+bool@test23 = isnan(finitemat4d);
+bool@test24 = isnan(finitemat4f);
