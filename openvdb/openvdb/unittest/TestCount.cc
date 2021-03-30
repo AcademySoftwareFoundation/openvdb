@@ -139,7 +139,6 @@ TEST_F(TestCount, testMemUsage)
 
     using Internal1NodeT = FloatTree::RootNodeType::ChildNodeType;
     using Internal2NodeT = Internal1NodeT::ChildNodeType;
-    using LeafNodeT = Internal2NodeT::ChildNodeType;
 
     const auto& tree = grid->tree();
 
