@@ -1017,7 +1017,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
 
     // non-int implements a weighted sum
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<!std::is_same<ExtT, int>::value, int>::type = 0>
-    void sumHelper(ExtT& sum2, ExtT ext, bool /* update */, const SdfT&  d2) const { sum2 += d2 * ext; }// non-int implementation
+    void sumHelper(ExtT& sum2, ExtT ext, bool /* update */, const SdfT&  d2) const { sum2 += static_cast<ExtValueT>(d2 * ext); }// non-int implementation
 
     template<typename ExtT = ExtValueT, typename SdfT = SdfValueT, typename std::enable_if<std::is_same<ExtT, int>::value, int>::type = 0>
     ExtT extValHelper(ExtT extSum, const SdfT& /* sdfSum */) const { return extSum; }// int implementation
