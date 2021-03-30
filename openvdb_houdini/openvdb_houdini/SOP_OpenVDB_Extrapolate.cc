@@ -403,6 +403,14 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
                 continue;
             }
 
+            // Add warning if extension grid does not have the same transform as Fast Sweeping grid.
+            if (extGridBase->transform() != (lsPrim->getGridPtr())->transform()) {
+                std::string msg = "Skipping extending Extension grid " + parms.mExtPrimName + " because it does "
+                                  "not have the same transform as Fast Sweeping grid " + parms.mFSPrimName;
+                addWarning(SOP_MESSAGE, msg.c_str());
+                continue;
+            }
+
             // Call process with the correct template.
             switch (extType) {
                 case UT_VDB_FLOAT:
@@ -598,6 +606,13 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped in Mask operation because it is not a level set."
                     " You may want to convert the FOG VDB into a level set before calling this mode.";
                 addMessage(SOP_MESSAGE, msg.c_str());
+                return false;
+            }
+
+            // Add warning if extension grid does not have the same transform as Fast Sweeping grid.
+            if (fsGrid->transform() != (maskPrim->getGridPtr())->transform()) {
+                std::string msg = "Mask grid does not have the same transform as Fast Sweeping grid " + parms.mFSPrimName;
+                addWarning(SOP_MESSAGE, msg.c_str());
                 return false;
             }
 
