@@ -96,10 +96,10 @@ struct ActiveVoxelCountBBoxOp
                 continue;
             } else if (bbox.isInside(mBBox)) {
                 // bbox is completely inside the active tile
-                count += bbox.volume();
+                count += mBBox.volume();
             } else if (mBBox.isInside(bbox)) {
                 // active tile is completely inside bbox
-                count += mBBox.volume();
+                count += bbox.volume();
             } else {
                 // partial overlap between tile and bbox
                 bbox.intersect(mBBox);
