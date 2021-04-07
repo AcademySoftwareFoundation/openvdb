@@ -128,6 +128,7 @@ option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" O
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
+option(OPENVDB_NO_SYMBOL_EXPORT "Disable symbol visibility for OPENVDB_API functions" OFF)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -206,6 +207,7 @@ mark_as_advanced(
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
   OPENVDB_SIMD
+  OPENVDB_NO_SYMBOL_EXPORT
 )
 
 # Configure minimum version requirements - some are treated specially and fall
@@ -623,6 +625,13 @@ if(OPENVDB_SIMD STREQUAL "AVX")
 elseif(OPENVDB_SIMD STREQUAL "SSE42")
   add_compile_options(-msse4.2)
   add_definitions(-DOPENVDB_USE_SSE42)
+endif()
+
+if(OPENVDB_NO_SYMBOL_EXPORT)
+  if( (NOT DEFINED OPENVDB_CORE_SHARED) OR (OPENVDB_CORE_SHARED) )
+    message(FATAL_ERROR "Only use OPENVDB_NO_SYMBOL_EXPORT when OPENVDB_CORE_SHARED is disabled.")
+  endif()
+  add_definitions(-DOPENVDB_NO_SYMBOL_EXPORT)
 endif()
 
 #########################################################################

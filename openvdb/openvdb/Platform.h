@@ -214,18 +214,23 @@
 #ifdef OPENVDB_IMPORT
 #undef OPENVDB_IMPORT
 #endif
-#ifdef __GNUC__
-    #define OPENVDB_EXPORT __attribute__((visibility("default")))
-    #define OPENVDB_IMPORT __attribute__((visibility("default")))
-#endif
-#ifdef _WIN32
-    #ifdef OPENVDB_DLL
-        #define OPENVDB_EXPORT __declspec(dllexport)
-        #define OPENVDB_IMPORT __declspec(dllimport)
-    #else
-        #define OPENVDB_EXPORT
-        #define OPENVDB_IMPORT
+#ifndef OPENVDB_NO_SYMBOL_EXPORT
+    #ifdef __GNUC__
+        #define OPENVDB_EXPORT __attribute__((visibility("default")))
+        #define OPENVDB_IMPORT __attribute__((visibility("default")))
     #endif
+    #ifdef _WIN32
+        #ifdef OPENVDB_DLL
+            #define OPENVDB_EXPORT __declspec(dllexport)
+            #define OPENVDB_IMPORT __declspec(dllimport)
+        #else
+            #define OPENVDB_EXPORT
+            #define OPENVDB_IMPORT
+        #endif
+    #endif
+#else
+    #define OPENVDB_EXPORT
+    #define OPENVDB_IMPORT
 #endif
 
 /// All classes and public free standing functions must be explicitly marked
