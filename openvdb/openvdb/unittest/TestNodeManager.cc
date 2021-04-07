@@ -323,7 +323,7 @@ TEST_F(TestNodeManager, testDynamic)
     { // use DynamicNodeManager::foreachTopDown
         Int32Tree tree(sourceTree);
         openvdb::tree::DynamicNodeManager<Int32Tree> manager(tree);
-        manager.foreachTopDown(expandOp);
+        manager.foreachTopDown(expandOp, /*threaded=*/true, /*leafGrainSize=*/32, /*nonLeafGrainSize=*/8);
         EXPECT_EQ(Index32(32768), tree.leafCount());
 
         SumOp<Int32Tree> sumOp;
