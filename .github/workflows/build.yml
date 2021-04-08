@@ -43,6 +43,7 @@ jobs:
           - { cxx: clang++, image: '2019', abi: '6', build: 'Release', test: 'ON'  }
           - { cxx: clang++, image: '2020', abi: '7', build: 'Release', test: 'ON'  }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Release', test: 'ON'  }
+          - { cxx: clang++, image: '2021', abi: '9', build: 'Release', test: 'ON'  }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Debug',   test: 'OFF' }
           - { cxx: g++,     image: '2020', abi: '7', build: 'Release', test: 'ON'  }
           - { cxx: g++,     image: '2021', abi: '8', build: 'Release', test: 'ON'  }
