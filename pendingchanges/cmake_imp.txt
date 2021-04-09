@@ -1,0 +1,6 @@
+    Build:
+    - The value of CONCURRENT_MALLOC is now respected when building the vdb_ax command line binary.
+    - Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the uninstall build target.
+    [Contributed by Jérémie Dumas]
+    - Improved the behaviour of locating static zlib libraries when USE_STATIC_DEPENDENCIES is enabled.
+    - Fixed an issue where extra hboost libraries could not be found when building against Houdini 18.5 on Windows.

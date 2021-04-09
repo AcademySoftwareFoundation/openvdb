@@ -26,9 +26,21 @@ else()
   set(OPENVDBAX_LIB openvdb_ax)
 endif()
 
+set(OPENVDB_BINARIES_DEPENDENT_LIBS
+  ${OPENVDBAX_LIB}
+)
+
+if(CONCURRENT_MALLOC STREQUAL "Jemalloc")
+  find_package(Jemalloc REQUIRED)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS Jemalloc::jemalloc)
+elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
+  find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbbmalloc)
+  list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
+endif()
+
 set(VDB_AX_SOURCE_FILES openvdb_ax.cc)
 add_executable(vdb_ax ${VDB_AX_SOURCE_FILES})
-target_link_libraries(vdb_ax ${OPENVDBAX_LIB})
+target_link_libraries(vdb_ax ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
 if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
