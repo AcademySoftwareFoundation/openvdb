@@ -56,7 +56,17 @@
 // use that ABI version.  Otherwise, use this library version's default ABI.
 #ifdef OPENVDB_ABI_VERSION_NUMBER
     #if OPENVDB_ABI_VERSION_NUMBER > OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
-        #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR VERSION_NUMBER
+        // If using a future OPENVDB_ABI_VERSION_NUMBER, issue a message directive.
+        // This can be optionally suppressed by setting the CMake option
+        // OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
+        #if OPENVDB_ABI_VERSION_NUMBER == 9
+            #ifndef OPENVDB_USE_FUTURE_ABI_9
+                PRAGMA(message("NOTE: ABI = 9 is still in active development and has not been finalized, "
+                    "CMake option OPENVDB_USE_FUTURE_ABI_9 suppresses this message"))
+            #endif
+        #else
+            #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR VERSION_NUMBER
+        #endif
     #endif
 #else
     #define OPENVDB_ABI_VERSION_NUMBER OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
