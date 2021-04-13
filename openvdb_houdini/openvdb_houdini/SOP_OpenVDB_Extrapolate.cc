@@ -8,10 +8,10 @@
 // @brief Extrapolate SDF or attributes off a level set surface
 
 #include <houdini_utils/ParmFactory.h>
-#include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb/tools/Interpolation.h>
+#include <openvdb_houdini/Utils.h>
 #include <openvdb/tools/FastSweeping.h>
+#include <openvdb/tools/Interpolation.h>
 #include <stdexcept>
 #include <string>
 
@@ -28,9 +28,9 @@ struct FastSweepingParms {
         mExtGroup(nullptr),
         mMode(""),
         mNeedExt(false),
+        mIgnoreTiles(false),
         mConvertOrRenormalize(false),
         mNSweeps(1),
-        mIgnoreTiles(false),
         mPattern(""),
         mDilate(1),
         mFSPrimName(""),
@@ -45,9 +45,9 @@ struct FastSweepingParms {
     const GA_PrimitiveGroup* mExtGroup;
     UT_String mMode;
     bool mNeedExt;
-    int mNSweeps;
     bool mIgnoreTiles;
     bool mConvertOrRenormalize;
+    int mNSweeps;
     UT_String mPattern;
     int mDilate;
     std::string mFSPrimName;
@@ -62,7 +62,7 @@ struct FastSweepingParms {
 };
 
 
-/// @brief Helper class for use with GEOvdbApply and calling
+/// @brief Helper class to be used with GEOvdbApply and calling
 ///        openvdb::tools::maskSdf. The mask VDB is allowed to be
 ///        of any grid type.
 template <typename GridT>
@@ -129,7 +129,7 @@ public:
         OP_ERROR cookVDBSop(OP_Context&) override;
         OP_ERROR evalFastSweepingParms(OP_Context&, FastSweepingParms&);
     private:
-        /// @brief Helper function to process the chosen operation.
+        /// @brief Helper function to process the chosen mode of operation.
         /// @details The template parameter resolves the type of the scalar
         ///          Fast Sweeping grid, i.e. UT_VDB_FLOAT or UT_VDB_DOUBLE.
         ///          If the chosen operation needs an extension grid, then
@@ -176,94 +176,103 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceList(&hutil::PrimGroupMenuInput1)
         .setTooltip("Specify a subset of the input VDB scalar grid(s).")
         .setDocumentation(
-            "A subset of the input VDB scalar grid(s) to be processed"
-            " (see [specifying volumes|/model/volumes#group])"));
+            "A subset of the input VDB scalar grid(s) to be processed\n"
+            "in an operation involving Fast Sweeping.\n"
+            "(see [specifying volumes|/model/volumes#group])."));
 
     // Extension fields
     parms.add(hutil::ParmFactory(PRM_STRING, "extfields", "Extension Group")
         .setChoiceList(&hutil::PrimGroupMenuInput1)
-        .setTooltip("Specify a subset of the VDB grid(s) to be extended off"
-            " the surface defined by the scalar VDB defined by the Source Group")
-        .setDocumentation("Arbitrary VDB fields picked up by this group"
-            " will be extended off an iso-surface of a scalar VDB (fog/level set)"
-            " as specified by Source Group. The modes that allow the use of this"
-            " parameter are Extend Field(s) Off Scalar VDB and Extend Field(s) and"
-            " Recompute SDF."));
+        .setTooltip("Specify a subset of the VDB grid(s) to be extended off\n"
+            "the surface defined by the scalar grid as specified by the __Source Group__.")
+        .setDocumentation("Arbitrary VDB fields picked up by this group\n"
+            "will be extended off an iso-surface of a scalar VDB (fog/level set)\n"
+            "as specified by the __Source Group__. The mode enables this\n"
+            "parameter is __Extend Field(s) Off Scalar VDB__."));
 
     // Mask grid
     parms.add(hutil::ParmFactory(PRM_STRING, "mask", "Mask VDB")
         .setChoiceList(&hutil::PrimGroupMenuInput2)
         .setTooltip("Specify a VDB volume whose active voxels are to be used as a mask.")
         .setDocumentation(
-            "A VDB volume whose active voxels are to be used as a mask"
-            " (see [specifying volumes|/model/volumes#group])"));
+            "A VDB volume whose active voxels are to be used as a mask\n"
+            "(see [specifying volumes|/model/volumes#group]).\n"
+            "The mode that enables the use of this parameter is\n"
+            "__Expand SDF Into Mask SDF__."));
 
     // Sweep
     parms.add(hutil::ParmFactory(PRM_HEADING, "sweep", "General Sweep")
          .setDocumentation(
-             "These control the Fast Sweeping parameters."));
+             "These parameters control the Fast Sweeping operation."));
 
     // Modes
     parms.add(hutil::ParmFactory(PRM_STRING, "mode", "Operation")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
-            "dilate",       "Expand SDF Narrowband",
-            "mask",         "Expand SDF Into Mask SDF",
-            "convert",      "Convert Fog VDB To SDF", ///< @todo move to Convert SOP
-            "renormalize",  "Renormalize SDF", // by solving the Eikonal equation
-            "scalarext",    "Extend Field(s) Off Scalar VDB",
+            "dilate",      "Expand SDF Narrowband",
+            "mask",        "Expand SDF Into Mask SDF",
+            "convert",     "Convert Fog VDB To SDF", ///< @todo move to Convert SOP
+            "renormalize", "Renormalize SDF", // by solving the Eikonal equation
+            "scalarext",   "Extend Field(s) Off Scalar VDB",
         })
         .setDefault("dilate")
-        .setTooltip("The mode Expand SDF Narrowband, Expand SDF Into Mask SDF,\n"
-            "Convert Fog VDB to SDF, and Renormalize SDF will modify the scalar grid(s)\n"
-            "specified by the Source Group parameter. The mode Extend Field(s) Off\n"
-            "Scalar VDB will modify the grid(s) specified by the Extension Group\n"
-            "parameter and possibly the scalar grid specified by the Source Group.")
+        .setTooltip("The mode __Expand SDF Narrowband__, __Expand SDF Into Mask SDF__,\n"
+            "__Convert Fog VDB To SDF__, and __Renormalize SDF__ will modify the scalar grid(s)\n"
+            "specified by the __Source Group__ parameter. The mode\n"
+            "__Extend Field(s) Off Scalar VDB__ will modify the grid(s) specified by the\n"
+            "__Extension Group__ parameter and possibly the scalar grid specified by the __Source Group__\n"
+            "if the toggle __Convert Fog To SDF or Renormalize SDF__ is checked.")
         .setDocumentation(
             "The operation to perform\n\n"
-            "Expand SDF Narrowband:\n"
-            "    Dilates the narrowband of an existing signed distance field by a specified \n"
+            "__Expand SDF Narrowband__:\n"
+            "    Dilates the narrowband of an existing signed distance field by a specified\n"
             "    number of voxels.\n"
-            "Expand SDF Into Mask SDF:\n"
+            "__Expand SDF Into Mask SDF__:\n"
             "    Expand/extrapolate an existing signed distance field into\n"
             "    a mask.\n"
-            "Convert Scalar VDB To SDF:\n"
-            "    Converts a scalar fog volume into a signed distance\n"
-            "    function. Active input voxels with scalar values above\n"
+            "__Convert Fog VDB To SDF__:\n"
+            "    Converts a scalar Fog volume into a signed distance\n"
+            "    grid. Active input voxels with scalar values above\n"
             "    the given isoValue will have NEGATIVE distance\n"
             "    values on output, i.e. they are assumed to be INSIDE\n"
             "    the iso-surface.\n"
-            "Renormalize SDF:\n"
+            "__Renormalize SDF__:\n"
             "    Given an existing approximate SDF it solves the Eikonal\n"
             "    equation for all its active voxels. Active input voxels\n"
             "    with a signed distance value above the given isoValue\n"
             "    will have POSITIVE distance values on output, i.e. they are\n"
             "    assumed to be OUTSIDE the iso-surface.\n"
-            "Extend Field(s) Off Scalar VDB:\n"
+            "__Extend Field(s) Off Scalar VDB__:\n"
             "     Computes the extension of a scalar field, defined by the\n"
             "     specified functor, off an iso-surface from an input\n"
-            "     Fog or SDF volume.\n"
-            "     Note that this mode only uses the first fog/sdf grid\n"
-            "     specified by the Source Group parameter."));
+            "     Fog or SDF volume. The functor samples the extension field\n"
+            "     around the iso-surface of an input Fog or SDF volume.\n"
+            "     This mode only uses the first Fog or SDF grid\n"
+            "     specified by the __Source Group__ parameter."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "convertorrenormalize", "Convert Fog To SDF or Renormalize SDF")
         .setDefault(PRMzeroDefaults)
-        .setTooltip("Only works for when using Extend Field(s) of Scalar VDB.\n"
-            "If checked, it will either convert the Fog Grid to SDF or renormalize an SDF.")
+        .setTooltip("Only works when __Extend Field(s) of Scalar VDB__ is chosen.\n"
+            "If checked, it will either convert a Fog Grid to an SDF or it will renormalize an SDF.")
         .setDocumentation(
-            "Use this option if one wants to convert the Fog grid specified by the Source group\n"
+            "Use this option if one wants to convert the Fog grid specified by the __Source Group__\n"
             "to be an SDF or to renormalize an SDF."));
 
     parms.add(hutil::ParmFactory(PRM_INT_J, "sweeps", "Iterations")
          .setDefault(1)
          .setRange(PRM_RANGE_RESTRICTED, 1, PRM_RANGE_UI, 5)
          .setTooltip(
-            "The desired number of iterations of the Fast Sweeping algorithm"
-            " (one is often enough)"));
+            "The desired number of iterations of the Fast Sweeping algorithm\n"
+            "(one is often enough).")
+         .setDocumentation(
+            "The number of iterations of the Fast Sweeping algorithm\n"
+            "(one is often enough)."));
 
     parms.add(hutil::ParmFactory(PRM_FLT_J, "isovalue", "Isovalue")
          .setDefault(0.5)
          .setRange(PRM_RANGE_UI, -3, PRM_RANGE_UI, 3)
-         .setTooltip("Isovalue for which the SDF is computed"));
+         .setTooltip("Use this to define an implicit surface from the Fog volume or SDF\n"
+             "specified by the __Source Group__.")
+         .setDocumentation("Isovalue defining an implicit surface from Fog volume or SDF."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "ignoretiles", "Ignore Active Tiles")
         .setDefault(PRMzeroDefaults)
@@ -278,7 +287,10 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_INT_J, "dilate", "Dilation")
         .setDefault(3)
         .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 10)
-        .setTooltip("The number of voxels by which to dilate the level set narrow band"));
+        .setTooltip("The number of voxels by which to dilate the level set narrow band.\n"
+            "Works with __Expand SDF Narrowband__ mode of operation")
+        .setDocumentation(
+            "Specifies the number of voxels around an SDF narrow-band to be dilated."));
 
     // Dilation Pattern
     parms.add(hutil::ParmFactory(PRM_STRING, "pattern", "Dilation Pattern")
@@ -291,7 +303,7 @@ newSopOperator(OP_OperatorTable* table)
          .setTooltip("Select the neighborhood pattern for the dilation operation.")
          .setDocumentation(
              "The neighborhood pattern for the dilation operation\n\n"
-             "__Faces__ is fastest.  __Faces, Edges and Vertices__ is slowest\n"
+             "__Faces__ is fastest. __Faces, Edges and Vertices__ is slowest\n"
              "but can produce the best results for large dilations.\n"
              "__Faces and Edges__ is intermediate in speed and quality.\n"));
 
@@ -385,7 +397,8 @@ SOP_OpenVDB_Extrapolate::Cache::processHelper(
             throw std::runtime_error(msg);
         }
 
-        // Go through the extension fields and extend each one according to the chosen mode
+        // Go through the extension fields specified by the extension group
+        // and extend each one according to the chosen mode
         for (; extPrim; ++extPrim) {
             // Reset the new extension grid placeholder
             parms.mNewExtGrid.reset();
@@ -531,7 +544,6 @@ SOP_OpenVDB_Extrapolate::Cache::process(
         }
         SamplerT sampler(*extGrid);
         DirichletSamplerOp<ExtGridT> op(extGrid, sampler);
-        using OpT = DirichletSamplerOp<ExtGridT>;
 
         if (parms.mMode == "scalarext") {
             if (!parms.mConvertOrRenormalize) {
@@ -594,8 +606,8 @@ SOP_OpenVDB_Extrapolate::Cache::process(
             lsPrim->setVisualization(GEO_VOLUMEVIS_ISO, lsPrim->getVisIso(), lsPrim->getVisDensity());
         } else if (parms.mMode == "renormalize") {
             if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
-                std::string msg = "VDB primitive " + parms.mFSPrimName + " was not renormalized because it is not a level set."
-                    " You may want to convert the FOG VDB into a level set before calling this mode.";
+                std::string msg = "VDB primitive " + parms.mFSPrimName + " was not renormalized because it is not a level set.\n"
+                    "You may want to convert the FOG VDB into a level set before calling this mode.";
                 addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
@@ -603,8 +615,8 @@ SOP_OpenVDB_Extrapolate::Cache::process(
             parms.mNewFSGrid = sdfToSdf(*fsGrid, fsIsoValue, parms.mNSweeps);
         } else if (parms.mMode == "mask") {
             if (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET) {
-                std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped in Mask operation because it is not a level set."
-                    " You may want to convert the FOG VDB into a level set before calling this mode.";
+                std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped in mask-operation because it is not a level set.\n"
+                    "You may want to convert the FOG VDB into a level set before calling this mode.";
                 addMessage(SOP_MESSAGE, msg.c_str());
                 return false;
             }
@@ -698,8 +710,12 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
 
         UT_AutoInterrupt progress("Performing Fast Sweeping");
 
-        // Go through the VDB primitives and process them
-        // We only process grids of types UT_VDB_FLOAT and UT_VDB_DOUBLE in Fast Sweeping.
+        // The behavior of this SOP depends on whether there is a extension field to be extended.
+        // When there is no field to be extended, go through the VDB primitives as specified by the
+        // Source Group and update the scalar VDB primitives. If there is a field to be extended,
+        // only use the first scalar group in the Source Group as the underlying Fast Sweeping grid.
+        // Note that only UT_VDB_FLOAT and UT_VDB_DOUBLE are supported as scalar (floating-point)
+        // Fast Sweeping grids.
         for (hvdb::VdbPrimIterator it(gdp, parms.mFSGroup); it; ++it) {
             // Reset the new fast sweeping grid placeholder
             parms.mNewFSGrid.reset();
@@ -729,7 +745,7 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
                 }
                 default:
                 {
-                    std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped to be treated as a source group because it is not a floating-point Grid.";
+                    std::string msg = "VDB primitive " + parms.mFSPrimName + " was skipped to be treated as a source group because it is not a floating-point grid.";
                     addMessage(SOP_MESSAGE, msg.c_str());
                     break;
                 }
