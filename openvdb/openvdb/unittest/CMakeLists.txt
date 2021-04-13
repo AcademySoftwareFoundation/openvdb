@@ -63,8 +63,9 @@ set(UNITTEST_SOURCE_FILES
 
 if(OPENVDB_TESTS)
   foreach(test ${OPENVDB_TESTS})
+    file(GLOB UNITTEST_GLOB Test${test}*.cc)
     list(APPEND UNITTEST_SOURCE_FILES
-      Test${test}.cc
+      ${UNITTEST_GLOB}
     )
   endforeach()
 else()
