@@ -63,7 +63,7 @@ set(UNITTEST_SOURCE_FILES
 
 if(OPENVDB_TESTS)
   foreach(test ${OPENVDB_TESTS})
-    file(GLOB UNITTEST_GLOB Test${test}*.cc)
+    file(GLOB UNITTEST_GLOB CONFIGURE_DEPENDS Test${test}*.cc)
     list(APPEND UNITTEST_SOURCE_FILES
       ${UNITTEST_GLOB}
     )
