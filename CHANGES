@@ -12,6 +12,8 @@ Version 8.1.0 - In development
     - Added support for automatic filtering of active tiles in tools::Filter
       by setting tools::Filter::setProcessTiles. Active tiles are densified
       on demand, only when necessary.
+    - Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
+      visit nodes in a tree or sub-tree in single-threaded depth-first order.
 
     Improvements:
     - Significant performance improvements to large dilations with
@@ -30,6 +32,13 @@ Version 8.1.0 - In development
     - Significant performance improvements to tools::activate and
       tools::deactivate through use of the DynamicNodeManager to parallelize
       tile processing.
+    - Added degree() and radians() AX helper functions for converting radians
+      to degrees and vice versa, respectively.
+    - Added adjoint(), cofactor() and inverse() AX matrix functions.
+    - Added sort(), argsort(), isfinite(), isinf() and isnan() AX utility and
+      math functions.
+    - Added Vec4 argument support to normalize() AX function.
+    - Removed unused int16 AX modulo function signatures.
 
     Bug Fixes:
     - Fix a memory leak in AttributeArray when delayed-loading is disabled.
@@ -44,6 +53,9 @@ Version 8.1.0 - In development
     - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
       performance regression.
     - tools::deactivate now also works with a MaskTree.
+    - Fixed a memory leak in the OpenVDB AX parser
+    - Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
+    - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
@@ -68,6 +80,7 @@ Version 8.1.0 - In development
       memory.
     - VDB Activate SOP now uses the multi-threaded tools::deactivate for much
       faster performance.
+    - Improved the formatting and updated the OpenVDB AX SOPs help card.
 
     Build:
     - Dependency on OpenEXR's Half implementation has been removed from the
@@ -88,6 +101,17 @@ Version 8.1.0 - In development
       configures the static library with /MT(d) and the dynamic library
       with /MD(d).
       [Reported by Jérémie Dumas]
+    - Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to
+      use it without errors.
+    - The value of CONCURRENT_MALLOC is now respected when building the vdb_ax
+      command line binary.
+    - Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the
+      uninstall build target.
+      [Contributed by Jérémie Dumas]
+    - Improved the behaviour of locating static zlib libraries when
+      USE_STATIC_DEPENDENCIES is enabled.
+    - Fixed an issue where extra hboost libraries could not be found when
+      building against Houdini 18.5 on Windows.
 
 Version 8.0.1 - February 5, 2021
 

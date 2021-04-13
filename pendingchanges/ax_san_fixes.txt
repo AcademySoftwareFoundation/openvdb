@@ -1,5 +1,0 @@
-    Bug fixes:
-    - Fixed a memory leak in the OpenVDB AX parser
-    - Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
-    - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
-
