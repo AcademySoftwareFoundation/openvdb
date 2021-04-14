@@ -272,7 +272,6 @@ public:
     void nodeCount(std::vector<Index32> &vec) const;
     Index32 nonLeafCount() const;
     Index32 childCount() const;
-    [[deprecated("Active voxels can now only be computed for the entire Tree. See Tree::activeVoxelCount().")]]
     Index64 onVoxelCount() const;
     Index64 offVoxelCount() const;
     Index64 onLeafVoxelCount() const;
@@ -280,7 +279,6 @@ public:
     Index64 onTileCount() const;
 
     /// Return the total amount of memory in bytes occupied by this node and its children.
-    [[deprecated("Memory usage can now only be computed for the entire Tree. See Tree::memUsage().")]]
     Index64 memUsage() const;
 
     /// @brief Expand the specified bounding box so that it includes the active tiles
