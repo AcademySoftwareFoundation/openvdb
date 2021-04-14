@@ -33,5 +33,7 @@ TEST_F(TestLevelSetRebuild, test)
 
     auto newMeta = (*newGrid)["foo"];
     EXPECT_TRUE(newMeta);
-    if (newMeta) EXPECT_EQ(newMeta->str(), "bar");
+    if (newMeta) {
+        EXPECT_EQ(newMeta->str(), "bar");
+    }
 }
