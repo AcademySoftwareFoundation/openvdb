@@ -113,6 +113,7 @@ else()
     TestLeafMask.cc
     TestLeafOrigin.cc
     TestLevelSetRayIntersector.cc
+    TestLevelSetRebuild.cc
     TestLevelSetUtil.cc
     TestLinearInterp.cc
     TestMaps.cc
