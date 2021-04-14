@@ -493,11 +493,13 @@ template<typename TreeT>
 inline Index64 FindActiveValues<TreeT>::count(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const
 {
     Index64 count = 0;
-    if (leaf->getValueMask().isOn()) {
-        auto b = leaf->getNodeBoundingBox();
+    auto b = leaf->getNodeBoundingBox();
+    if (b.isInside(bbox)) { // leaf node is completely inside bbox
+        count = leaf->onVoxelCount();
+    } else if (leaf->isDense()) {
         b.intersect(bbox);
         count = b.volume();
-    } else {
+    } else if (b.hasOverlap(bbox)) {
         for (auto i = leaf->cbeginValueOn(); i; ++i) {
             if (bbox.isInside(i.getCoord())) ++count;
         }
