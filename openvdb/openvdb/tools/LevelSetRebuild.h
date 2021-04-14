@@ -245,13 +245,18 @@ doLevelSetRebuild(const GridType& grid, typename GridType::ValueType iso,
 
     QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, primitives);
 
+    typename GridType::Ptr newGrid;
+
     if (interrupter) {
-        return meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
+        newGrid = meshToVolume<GridType>(*interrupter, mesh, *transform, exBandWidth, inBandWidth,
+            DISABLE_RENORMALIZATION, nullptr);
+    } else {
+        newGrid = meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
             DISABLE_RENORMALIZATION, nullptr);
     }
 
-    return meshToVolume<GridType>(mesh, *transform, exBandWidth, inBandWidth,
-        DISABLE_RENORMALIZATION, nullptr);
+    newGrid->insertMeta(*grid.copyMeta());
+    return newGrid;
 }
 
 
