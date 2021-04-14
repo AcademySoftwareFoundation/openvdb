@@ -67,7 +67,7 @@ inline void appendAttribute(PointDataTreeT& tree,
 /// @param transient          mark attribute as transient
 template <typename ValueType,
           typename CodecType = NullCodec,
-          typename PointDataTreeT = PointDataTree>
+          typename PointDataTreeT>
 inline void appendAttribute(PointDataTreeT& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
