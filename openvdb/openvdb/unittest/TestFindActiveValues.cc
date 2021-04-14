@@ -139,6 +139,8 @@ TEST_F(TestFindActiveValues, testSphere2)
         //openvdb::util::CpuTimer timer("\nfull domain");
         EXPECT_TRUE(openvdb::tools::anyActiveValues(tree, bbox));
         //timer.stop();
+        openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
+        EXPECT_TRUE(op.count(bbox) == tree.activeVoxelCount());
     }
     {// find largest inscribed cube in index space containing NO active values
         openvdb::tools::FindActiveValues<openvdb::FloatTree> op(tree);
@@ -194,6 +196,7 @@ TEST_F(TestFindActiveValues, testSparseBox)
             EXPECT_TRUE( op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
             EXPECT_TRUE(!op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), i)));
         }
+        EXPECT_TRUE(op.count(bbox) == bbox.volume());
 
         auto bbox2 = openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), 1);
         //double t = 0.0;
@@ -247,6 +250,7 @@ TEST_F(TestFindActiveValues, testDenseBox)
           EXPECT_TRUE(op.anyActiveValues(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
           EXPECT_TRUE(op.anyActiveVoxels(openvdb::CoordBBox::createCube(openvdb::Coord(0), i)));
       }
+      EXPECT_TRUE(op.count(bbox) == bbox.volume());
 
       auto bbox2 = openvdb::CoordBBox::createCube(openvdb::Coord(-half_dim), 1);
       //double t = 0.0;
@@ -284,6 +288,7 @@ TEST_F(TestFindActiveValues, testBenchmarks)
           if (!test) break;
       }
       //std::cout << "\n*The slowest sparse test " << t << " milliseconds\n";
+      EXPECT_TRUE(op.count(bbox) == bbox.volume());
     }
     {//benchmark test against active voxels in a densely filled box
       using namespace openvdb;
@@ -301,6 +306,7 @@ TEST_F(TestFindActiveValues, testBenchmarks)
           if (!test) break;
       }
       //std::cout << "*The slowest dense test " << t << " milliseconds\n";
+      EXPECT_TRUE(op.count(bbox) == bbox.volume());
     }
     {//benchmark test against active voxels in a densely filled box
       using namespace openvdb;
