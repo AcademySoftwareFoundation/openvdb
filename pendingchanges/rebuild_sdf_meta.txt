@@ -1,0 +1,3 @@
+    Bug Fixes:
+    - Fix a bug in tools::levelSetRebuild() where metadata was not being copied
+      from the input grid when rebuilding.
