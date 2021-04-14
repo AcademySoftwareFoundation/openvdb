@@ -27,6 +27,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/ValueAccessor.h>
 
+#include "Count.h" // tools::countActiveVoxels()
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -684,8 +686,7 @@ template<typename TreeT>
 inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
-    FindActiveValues<TreeT> op(tree);
-    return op.count(bbox);
+    return tools::countActiveVoxels(tree, bbox);
 }
 
 // Implementation of stand-alone function
