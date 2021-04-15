@@ -619,7 +619,7 @@ createPointDataGrid(const PointIndexGridT& pointIndexGrid,
                     const Metadata* positionDefaultValue)
 {
     using PointDataTreeT        = typename PointDataGridT::TreeType;
-    using LeafT                 = typename PointDataTree::LeafNodeType;
+    using LeafT                 = typename PointDataTreeT::LeafNodeType;
     using PointIndexLeafT       = typename PointIndexGridT::TreeType::LeafNodeType;
     using PointIndexT           = typename PointIndexLeafT::ValueType;
     using LeafManagerT          = typename tree::LeafManager<PointDataTreeT>;
@@ -855,7 +855,7 @@ convertPointDataGridGroup(  Group& group,
     if (!iter)  return;
 
     LeafManagerT leafManager(tree);
-    ConvertPointDataGridGroupOp<PointDataTree, Group, FilterT> convert(
+    ConvertPointDataGridGroupOp<PointDataTreeT, Group, FilterT> convert(
                     group, pointOffsets, startOffset, index,
                     filter, inCoreOnly);
     tbb::parallel_for(leafManager.leafRange(), convert);

@@ -42,16 +42,16 @@ inline void deleteMissingPointGroups(   std::vector<std::string>& groups,
 ///
 /// @param tree          the PointDataTree to be appended to.
 /// @param group         name of the new group.
-template <typename PointDataTree>
-inline void appendGroup(PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void appendGroup(PointDataTreeT& tree,
                         const Name& group);
 
 /// @brief Appends new empty groups to the VDB tree.
 ///
 /// @param tree          the PointDataTree to be appended to.
 /// @param groups        names of the new groups.
-template <typename PointDataTree>
-inline void appendGroups(PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void appendGroups(PointDataTreeT& tree,
                          const std::vector<Name>& groups);
 
 /// @brief Drops an existing group from the VDB tree.
@@ -60,8 +60,8 @@ inline void appendGroups(PointDataTree& tree,
 /// @param group         name of the group.
 /// @param compact       compact attributes if possible to reduce memory - if dropping
 ///                      more than one group, compacting once at the end will be faster
-template <typename PointDataTree>
-inline void dropGroup(  PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void dropGroup(  PointDataTreeT& tree,
                         const Name& group,
                         const bool compact = true);
 
@@ -69,21 +69,21 @@ inline void dropGroup(  PointDataTree& tree,
 ///
 /// @param tree          the PointDataTree to be dropped from.
 /// @param groups        names of the groups.
-template <typename PointDataTree>
-inline void dropGroups( PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void dropGroups( PointDataTreeT& tree,
                         const std::vector<Name>& groups);
 
 /// @brief Drops all existing groups from the VDB tree, the tree is compacted after dropping.
 ///
 /// @param tree          the PointDataTree to be dropped from.
-template <typename PointDataTree>
-inline void dropGroups( PointDataTree& tree);
+template <typename PointDataTreeT>
+inline void dropGroups( PointDataTreeT& tree);
 
 /// @brief Compacts existing groups of a VDB Tree to use less memory if possible.
 ///
 /// @param tree          the PointDataTree to be compacted.
-template <typename PointDataTree>
-inline void compactGroups(PointDataTree& tree);
+template <typename PointDataTreeT>
+inline void compactGroups(PointDataTreeT& tree);
 
 /// @brief Sets group membership from a PointIndexTree-ordered vector.
 ///
@@ -94,9 +94,9 @@ inline void compactGroups(PointDataTree& tree);
 /// @param remove        if @c true also perform removal of points from the group.
 ///
 /// @note vector<bool> is not thread-safe on concurrent write, so use vector<short> instead
-template <typename PointDataTree, typename PointIndexTree>
-inline void setGroup(   PointDataTree& tree,
-                        const PointIndexTree& indexTree,
+template <typename PointDataTreeT, typename PointIndexTreeT>
+inline void setGroup(   PointDataTreeT& tree,
+                        const PointIndexTreeT& indexTree,
                         const std::vector<short>& membership,
                         const Name& group,
                         const bool remove = false);
@@ -106,8 +106,8 @@ inline void setGroup(   PointDataTree& tree,
 /// @param tree         the PointDataTree.
 /// @param group        the name of the group.
 /// @param member       true / false for membership of the group.
-template <typename PointDataTree>
-inline void setGroup(   PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void setGroup(   PointDataTreeT& tree,
                         const Name& group,
                         const bool member = true);
 
@@ -116,8 +116,8 @@ inline void setGroup(   PointDataTree& tree,
 /// @param tree     the PointDataTree.
 /// @param group    the name of the group.
 /// @param filter   filter data that is used to create a per-leaf filter
-template <typename PointDataTree, typename FilterT>
-inline void setGroupByFilter(   PointDataTree& tree,
+template <typename PointDataTreeT, typename FilterT>
+inline void setGroupByFilter(   PointDataTreeT& tree,
                                 const Name& group,
                                 const FilterT& filter);
 
@@ -163,10 +163,10 @@ struct CopyGroupOp {
 
 
 /// Set membership on or off for the specified group
-template <typename PointDataTree, bool Member>
+template <typename PointDataTreeT, bool Member>
 struct SetGroupOp
 {
-    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeT>;
     using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
     SetGroupOp(const AttributeSet::Descriptor::GroupIndex& index)
@@ -192,17 +192,17 @@ struct SetGroupOp
 }; // struct SetGroupOp
 
 
-template <typename PointDataTree, typename PointIndexTree, bool Remove>
+template <typename PointDataTreeT, typename PointIndexTreeT, bool Remove>
 struct SetGroupFromIndexOp
 {
-    using LeafManagerT          = typename tree::LeafManager<PointDataTree>;
+    using LeafManagerT          = typename tree::LeafManager<PointDataTreeT>;
     using LeafRangeT            = typename LeafManagerT::LeafRange;
-    using PointIndexLeafNode    = typename PointIndexTree::LeafNodeType;
+    using PointIndexLeafNode    = typename PointIndexTreeT::LeafNodeType;
     using IndexArray            = typename PointIndexLeafNode::IndexArray;
     using GroupIndex            = AttributeSet::Descriptor::GroupIndex;
     using MembershipArray       = std::vector<short>;
 
-    SetGroupFromIndexOp(const PointIndexTree& indexTree,
+    SetGroupFromIndexOp(const PointIndexTreeT& indexTree,
                         const MembershipArray& membership,
                         const GroupIndex& index)
         : mIndexTree(indexTree)
@@ -246,18 +246,18 @@ struct SetGroupFromIndexOp
 
     //////////
 
-    const PointIndexTree& mIndexTree;
+    const PointIndexTreeT& mIndexTree;
     const MembershipArray& mMembership;
     const GroupIndex& mIndex;
 }; // struct SetGroupFromIndexOp
 
 
-template <typename PointDataTree, typename FilterT, typename IterT = typename PointDataTree::LeafNodeType::ValueAllCIter>
+template <typename PointDataTreeT, typename FilterT, typename IterT = typename PointDataTreeT::LeafNodeType::ValueAllCIter>
 struct SetGroupByFilterOp
 {
-    using LeafManagerT  = typename tree::LeafManager<PointDataTree>;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeT>;
     using LeafRangeT    = typename LeafManagerT::LeafRange;
-    using LeafNodeT     = typename PointDataTree::LeafNodeType;
+    using LeafNodeT     = typename PointDataTreeT::LeafNodeType;
     using GroupIndex    = AttributeSet::Descriptor::GroupIndex;
 
     SetGroupByFilterOp( const GroupIndex& index, const FilterT& filter)
@@ -384,8 +384,8 @@ inline void appendGroup(PointDataTreeT& tree, const Name& group)
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void appendGroups(PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void appendGroups(PointDataTreeT& tree,
                          const std::vector<Name>& groups)
 {
     // TODO: could be more efficient by appending multiple groups at once
@@ -400,8 +400,8 @@ inline void appendGroups(PointDataTree& tree,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void dropGroup(PointDataTree& tree, const Name& group, const bool compact)
+template <typename PointDataTreeT>
+inline void dropGroup(PointDataTreeT& tree, const Name& group, const bool compact)
 {
     using Descriptor = AttributeSet::Descriptor;
 
@@ -433,8 +433,8 @@ inline void dropGroup(PointDataTree& tree, const Name& group, const bool compact
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void dropGroups( PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void dropGroups( PointDataTreeT& tree,
                         const std::vector<Name>& groups)
 {
     for (const Name& name : groups) {
@@ -450,8 +450,8 @@ inline void dropGroups( PointDataTree& tree,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void dropGroups( PointDataTree& tree)
+template <typename PointDataTreeT>
+inline void dropGroups( PointDataTreeT& tree)
 {
     using Descriptor = AttributeSet::Descriptor;
 
@@ -481,12 +481,12 @@ inline void dropGroups( PointDataTree& tree)
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void compactGroups(PointDataTree& tree)
+template <typename PointDataTreeT>
+inline void compactGroups(PointDataTreeT& tree)
 {
     using Descriptor = AttributeSet::Descriptor;
     using GroupIndex = Descriptor::GroupIndex;
-    using LeafManagerT = typename tree::template LeafManager<PointDataTree>;
+    using LeafManagerT = typename tree::template LeafManager<PointDataTreeT>;
 
     using point_group_internal::CopyGroupOp;
 
@@ -517,7 +517,7 @@ inline void compactGroups(PointDataTree& tree)
         const GroupIndex sourceIndex = attributeSet.groupIndex(sourceOffset);
         const GroupIndex targetIndex = attributeSet.groupIndex(targetOffset);
 
-        CopyGroupOp<PointDataTree> copy(targetIndex, sourceIndex);
+        CopyGroupOp<PointDataTreeT> copy(targetIndex, sourceIndex);
         LeafManagerT leafManager(tree);
         tbb::parallel_for(leafManager.leafRange(), copy);
 
@@ -542,15 +542,15 @@ inline void compactGroups(PointDataTree& tree)
 ////////////////////////////////////////
 
 
-template <typename PointDataTree, typename PointIndexTree>
-inline void setGroup(   PointDataTree& tree,
-                        const PointIndexTree& indexTree,
+template <typename PointDataTreeT, typename PointIndexTreeT>
+inline void setGroup(   PointDataTreeT& tree,
+                        const PointIndexTreeT& indexTree,
                         const std::vector<short>& membership,
                         const Name& group,
                         const bool remove)
 {
     using Descriptor    = AttributeSet::Descriptor;
-    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeT>;
     using point_group_internal::SetGroupFromIndexOp;
 
     auto iter = tree.cbeginLeaf();
@@ -569,7 +569,7 @@ inline void setGroup(   PointDataTree& tree,
         // values. If the index tree was constructed with nan positions, this index will
         // differ from the PointDataTree count
 
-        using IndexTreeManager = tree::LeafManager<const PointIndexTree>;
+        using IndexTreeManager = tree::LeafManager<const PointIndexTreeT>;
         IndexTreeManager leafManager(indexTree);
 
         const int64_t max = tbb::parallel_reduce(leafManager.leafRange(), -1,
@@ -597,12 +597,12 @@ inline void setGroup(   PointDataTree& tree,
     // set membership
 
     if (remove) {
-        SetGroupFromIndexOp<PointDataTree, PointIndexTree, true>
+        SetGroupFromIndexOp<PointDataTreeT, PointIndexTreeT, true>
             set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
     else {
-        SetGroupFromIndexOp<PointDataTree, PointIndexTree, false>
+        SetGroupFromIndexOp<PointDataTreeT, PointIndexTreeT, false>
             set(indexTree, membership, index);
         tbb::parallel_for(leafManager.leafRange(), set);
     }
@@ -612,13 +612,13 @@ inline void setGroup(   PointDataTree& tree,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void setGroup(   PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void setGroup(   PointDataTreeT& tree,
                         const Name& group,
                         const bool member)
 {
     using Descriptor    = AttributeSet::Descriptor;
-    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeT>;
 
     using point_group_internal::SetGroupOp;
 
@@ -638,21 +638,21 @@ inline void setGroup(   PointDataTree& tree,
 
     // set membership based on member variable
 
-    if (member)     tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTree, true>(index));
-    else            tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTree, false>(index));
+    if (member)     tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, true>(index));
+    else            tbb::parallel_for(leafManager.leafRange(), SetGroupOp<PointDataTreeT, false>(index));
 }
 
 
 ////////////////////////////////////////
 
 
-template <typename PointDataTree, typename FilterT>
-inline void setGroupByFilter(   PointDataTree& tree,
+template <typename PointDataTreeT, typename FilterT>
+inline void setGroupByFilter(   PointDataTreeT& tree,
                                 const Name& group,
                                 const FilterT& filter)
 {
     using Descriptor    = AttributeSet::Descriptor;
-    using LeafManagerT  = typename tree::template LeafManager<PointDataTree>;
+    using LeafManagerT  = typename tree::LeafManager<PointDataTreeT>;
 
     using point_group_internal::SetGroupByFilterOp;
 
@@ -671,7 +671,7 @@ inline void setGroupByFilter(   PointDataTree& tree,
 
     // set membership using filter
 
-    SetGroupByFilterOp<PointDataTree, FilterT> set(index, filter);
+    SetGroupByFilterOp<PointDataTreeT, FilterT> set(index, filter);
     LeafManagerT leafManager(tree);
 
     tbb::parallel_for(leafManager.leafRange(), set);
@@ -681,37 +681,37 @@ inline void setGroupByFilter(   PointDataTree& tree,
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void setGroupByRandomTarget( PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void setGroupByRandomTarget( PointDataTreeT& tree,
                                     const Name& group,
                                     const Index64 targetPoints,
                                     const unsigned int seed = 0)
 {
-    using RandomFilter = RandomLeafFilter<PointDataTree, std::mt19937>;
+    using RandomFilter = RandomLeafFilter<PointDataTreeT, std::mt19937>;
 
     RandomFilter filter(tree, targetPoints, seed);
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
+    setGroupByFilter<PointDataTreeT, RandomFilter>(tree, group, filter);
 }
 
 
 ////////////////////////////////////////
 
 
-template <typename PointDataTree>
-inline void setGroupByRandomPercentage( PointDataTree& tree,
+template <typename PointDataTreeT>
+inline void setGroupByRandomPercentage( PointDataTreeT& tree,
                                         const Name& group,
                                         const float percentage = 10.0f,
                                         const unsigned int seed = 0)
 {
-    using RandomFilter =  RandomLeafFilter<PointDataTree, std::mt19937>;
+    using RandomFilter =  RandomLeafFilter<PointDataTreeT, std::mt19937>;
 
     const int currentPoints = static_cast<int>(pointCount(tree));
     const int targetPoints = int(math::Round((percentage * float(currentPoints))/100.0f));
 
     RandomFilter filter(tree, targetPoints, seed);
 
-    setGroupByFilter<PointDataTree, RandomFilter>(tree, group, filter);
+    setGroupByFilter<PointDataTreeT, RandomFilter>(tree, group, filter);
 }
 
 

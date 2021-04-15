@@ -141,6 +141,7 @@ else()
     TestPointDelete.cc
     TestPointGroup.cc
     TestPointIndexGrid.cc
+    TestPointInstantiate.cc
     TestPointMask.cc
     TestPointMove.cc
     TestPointPartitioner.cc
