@@ -934,35 +934,35 @@ public:
 #endif
 
     template<typename BBoxOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visitActiveBBox(BBoxOp& op) const { mRoot.visitActiveBBox(op); }
 
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit(VisitorOp& op);
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit(const VisitorOp& op);
 
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit(VisitorOp& op) const;
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit(const VisitorOp& op) const;
 
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit2(OtherTreeType& other, VisitorOp& op);
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit2(OtherTreeType& other, const VisitorOp& op);
 
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit2(OtherTreeType& other, VisitorOp& op) const;
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    [[deprecated("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")]]
     void visit2(OtherTreeType& other, const VisitorOp& op) const;
 
 

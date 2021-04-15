@@ -277,7 +277,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "Whether to ignore active tiles in the input volumes, otherwise active tiles will be densified before execution."
             " Only applies to volumes that are written to.\n\n"
-            "WARNING:\n"
+            ":warning:\n"
             "    Densifying a sparse VDB can significantly increase its memory footprint."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
@@ -301,7 +301,7 @@ newSopOperator(OP_OperatorTable* table)
             " where values are considered equal if they differ by less than"
             " the specified threshold."
             " Only applies to volumes that are written to.\n\n"
-            "NOTE:\n"
+            ":note:\n"
             "    Pruning affects only the memory usage of a grid.\n"
             "    It does not remove voxels, apart from inactive voxels\n"
             "    whose value is equal to the background."));
@@ -311,7 +311,7 @@ newSopOperator(OP_OperatorTable* table)
         .setHelpText("Whether to try to compact VDB Point Attributes after execution.")
         .setDocumentation(
             "Whether to try to compact VDB Point Attributes after execution\n\n"
-            "NOTE:\n"
+            ":note:\n"
             "    Compacting uniform values affects only the memory usage of the attributes.\n"));
 
     parms.endSwitcher();
@@ -345,383 +345,116 @@ newSopOperator(OP_OperatorTable* table)
     factory.addAliasVerbatim("DW_OpenVDBAX");
     factory.addAliasVerbatim("DN_OpenVDBAX");
     factory.setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_AX::Cache; });
-    factory.setDocumentation("\
-#icon: COMMON/openvdb\n\
-#tags: vdb\n\
-\n\
-\"\"\"Runs an AX snippet to modify point and volume values in VDBs\"\"\"\n\
-\n\
-@overview\n\
-\n\
-This is a very powerful, low-level node that lets those who are familiar with the AX language manipulate attributes on points and voxel values in VDBs.\n\
-\n\
-AX is a language created by the DNEG FX R&D team that closely matches VEX but operates natively on VDB point and volume grids.\n\
-Note that the language is not yet as extensive as Houdini VEX and only supports a subset of similar functionality.\n\
-\n\
-@examples\n\
-\n\
-{{{\n\
-#!vex\n\
-@density = 1.0f; // Set the float attribute density to 1.0f\n\
-}}}\n\
-{{{\n\
-#!vex\n\
-i@id = 5; // Set the integer attribute id to 5\n\
-}}}\n\
-{{{\n\
-#!vex\n\
-vec3f@v1 = { 5.0f, 5.0f, 10.3f }; // Create a new float vector attribute\n\
-vector@v2 = { 5.0f, 5.0f, 10.3f }; // Create a new float vector attribute using VEX syntax \n\
-}}}\n\
-{{{\n\
-#!vex\n\
-vec3i@vid = { 3, -1, 10 }; // Create a new integer vector attribute\n\
-}}}\n\
-@vexsyntax VEX Hooks\n\
-The OpenVDB AX Houdini SOP supports all features of AX and a variety of Houdini VEX syntax/features to help users transition into writing AX code.\n\
-The VEX feature set also gives users the ability to write typical Houdini specific functions within AX. The table below lists all VEX\n\
-features which can be used, as well as equivalent AX functionality. If no AX function is shown, the VEX function can still be used but will not be\n\
-available outside of a Houdini context.\n\
-:note: Allow Vex Symbols must be enabled to access these features.\n\
-:note: `$` AX syntax should always be used over the AX external() functions unless attempting to query unknown strings.\n\
-\n\
-VEX Syntax/Function ||\n\
-    AX Syntax/Function ||\n\
-        Description ||\n\
-\n\
-`ch(string_path)` |\n\
-    `$string_path, external(string_path)` |\n\
-        Finds a float channel value. \n\
-\n\
-`chv(string_path)` |\n\
-    `v$string_path, externalv(string_path)` |\n\
-        Finds a string channel value. \n\
-\n\\"
-/* @todo - support string externalstr
- `chs(string_path)` |
-     `s$string_path, externalstr(string_path)` |
+    factory.setDocumentation(R"(
+#icon: COMMON/openvdb
+#tags: vdb
+
+"""Runs an AX snippet to modify point and volume values in VDBs"""
+
+@overview
+
+This is a very powerful, low-level node that lets those who are familiar with the AX language manipulate attributes on points and voxel values in VDBs.
+
+AX is a language created by the DNEG FX R&D team that closely matches VEX but operates natively on VDB point and volume grids.
+Note that the language is not yet as extensive as Houdini VEX and only supports a subset of similar functionality.
+
+@examples
+
+{{{
+#!vex
+@density = 1.0f; // Set the float attribute density to 1.0f
+}}}
+{{{
+#!vex
+i@id = 5; // Set the integer attribute id to 5
+}}}
+{{{
+#!vex
+vec3f@v1 = { 5.0f, 5.0f, 10.3f }; // Create a new float vector attribute
+vector@v2 = { 5.0f, 5.0f, 10.3f }; // Create a new float vector attribute using VEX syntax
+}}}
+{{{
+#!vex
+vec3i@vid = { 3, -1, 10 }; // Create a new integer vector attribute
+}}}
+
+See the [ASWF OpenVDB AX documentation|https://academysoftwarefoundation.github.io/openvdb/openvdbax.html] for source code
+and usage examples.
+
+@vexsyntax VEX Hooks
+The OpenVDB AX Houdini SOP supports all features of AX and a variety of Houdini VEX syntax/features to help users transition into writing AX code.
+The VEX feature set also gives users the ability to write typical Houdini specific functions within AX. The table below lists all VEX
+features which can be used, as well as equivalent AX functionality. If no AX function is shown, the VEX function can still be used but will not be
+available outside of a Houdini context.
+:note: Allow Vex Symbols must be enabled to access these features.
+:note: `$` AX syntax should always be used over the AX external() functions unless attempting to query unknown strings.
+
+VEX Syntax/Function ||
+    AX Syntax/Function ||
+        Description ||
+
+`ch(string_path)` |
+    `$string_path, external(string_path)` |
+        Finds a float channel value.
+
+`chv(string_path)` |
+    `v$string_path, externalv(string_path)` |
+        Finds a string channel value.
+
+`chs(string_path)` |
+     `s$string_path` |
          Finds a string channel value.
-*/
-"`chramp(string_path)` |\n\
-    |\n\
-        Provides access to the chramp VEX function. \n\
-\n\
-`vector` |\n\
-    `vec3f` |\n\
-        Syntax for creating a vector 3 of floats. \n\
-\n\
-`@ix, @iy, @iz` |\n\
-    `getcoordx(), getcoordy(), getcoordz()` |\n\
-        When executing over volumes, returns the index X, Y, Z coordinate of the current voxel.\n\
-\n\
-@hscriptsyntax HScript Variables\n\
-HScript $ variables can also be accessed within AX. Note that the $ syntax in AX is equivalent to a Houdini channel function and is used to look-up\n\
-custom variables within AX. A different set of HScript variables will be available depending on the current Houdini Context. For a complete\n\
-list, [see here|/network/expressions#globals]\n\
-:note: Allow HScript Variables must be enabled to access HScript variables.\n\
-:tip: `@Frame` and `@Time` can be accessed with `$F` and `$T` respectively.\n\
-\n\
-@axverb AX as a Python Verb\n\
-The AX SOP can be used within compiled blocks and as a verb through Houdini's python interface. The latter however introduces some restrictions to\n\
-the code which can be used due to the lack of a connected Houdini network. Through Python, the following restriction are imposed:\n\
-* $ Syntax for paths cannot be used. `ch` and `external` should be used instead.\n\
-\n\
-* Relative channel paths with `ch` and `external` functions will produce an error. These must be converted to absolute paths.\n\
-\n\
-For more information on Compiled Blocks and Python verbs [see here|/model/compile].\n\
-\n\
-@functions Supported Functions\n\
-#filtered: no\n\
-\n\
-Function ||\n\
-    Description ||\n\
-`int abs(int)`\n\
-`long abs(long)`|\n\
-    Computes the absolute value of an integer number.\n\
-\n\
-`double acos(double)`\n\
-`float acos(float)`|\n\
-    Computes the principal value of the arc cosine of the input.\n\
-\n\
-`void addtogroup(string)`|\n\
-    Add the current point to the given group name, effectively setting its membership to true. If the group does not exist, it is implicitly created. This function has no effect if the point already belongs to the given group.\n\
-\n\
-`double asin(double)`\n\
-`float asin(float)`|\n\
-    Computes the principal value of the arc sine of the input.\n\
-\n\
-`double atan(double)`\n\
-`float atan(float)`|\n\
-    Computes the principal value of the arc tangent of the input.\n\
-\n\
-`double atan2(double; double)`\n\
-`float atan2(float; float)`|\n\
-    Computes the arc tangent of y/x using the signs of arguments to determine the correct quadrant.\n\
-\n\
-`double atof(string)`|\n\
-    Parses the string input, interpreting its content as a floating point number and returns its value as a double.\n\
-\n\
-`int atoi(string)`\n\
-`long atoi(string)`|\n\
-    Parses the string input interpreting its content as an integral number, which is returned as a value of type int.\n\
-\n\
-`double cbrt(double)`\n\
-`float cbrt(float)`|\n\
-    Computes the cubic root of the input.\n\
-\n\
-`double ceil(double)`\n\
-`float ceil(float)`|\n\
-    Computes the smallest integer value not less than arg.\n\
-\n\
-`double clamp(double; double; double)`\n\
-`float clamp(float; float; float)`\n\
-`int clamp(int; int; int)`|\n\
-    Clamps the first argument to the minimum second argument value and maximum third argument value\n\
-\n\
-`double cos(double)`\n\
-`float cos(float)`|\n\
-    Computes the cosine of arg (measured in radians).\n\
-\n\
-`double cosh(double)`\n\
-`float cosh(float)`|\n\
-    Computes the hyperbolic cosine of the input\n\
-\n\
-`vec3d cross(vec3d; vec3d)`\n\
-`vec3f cross(vec3f; vec3f)`\n\
-`vec3i cross(vec3i; vec3i)`|\n\
-    Computes the cross product of two vectors\n\
-\n\
-`vec3d curlsimplexnoise(vec3d)`\n\
-`vec3d curlsimplexnoise(double; double; double)`|\n\
-    Generates divergence-free 3D noise, computed using a curl function on Simplex Noise.\n\
-\n\
-`void deletepoint()`|\n\
-    Delete the current point from the point set. Note that this does not stop AX execution - any additional AX commands will be executed on the point and it will remain accessible until the end of execution.\n\
-\n\
-`float determinant(mat3f)`\n\
-`double determinant(mat3d)`\n\
-`float determinant(mat4f)`\n\
-`double determinant(mat4d)`|\n\
-    Returns the determinant of a matrix.\n\
-\n\
-`void diag(vec3f; mat3f)`\n\
-`void diag(vec4f; mat4f)`\n\
-`void diag(vec3d; mat3d)`\n\
-`void diag(vec4d; mat4d)`\n\
-`void diag(mat3f; vec3f)`\n\
-`void diag(mat4f; vec4f)`\n\
-`void diag(mat3d; vec3d)`\n\
-`void diag(mat4d; vec4d)`|\n\
-    Create a diagonal matrix from a vector, or return the diagonal components of a matrix as a vector.\n\
-\n\
-`double dot(vec3d; vec3d)`\n\
-`float dot(vec3f; vec3f)`\n\
-`int dot(vec3i; vec3i)`|\n\
-    Computes the dot product of two vectors\n\
-\n\
-`double exp(double)`\n\
-`float exp(float)`|\n\
-    Computes e (Euler's number, 2.7182818...) raised to the given power arg.\n\
-\n\
-`double exp2(double)`\n\
-`float exp2(float)`|\n\
-    Computes 2 raised to the given power arg.\n\
-\n\
-`float external(string)`|\n\
-    Find a custom user parameter with a given name of type 'float' in the Custom data provided to the AX compiler. If the data can not be found, or is not of the expected type 0.0f is returned.\n\
-\n\
-`vec3f externalv(string)`|\n\
-    Find a custom user parameter with a given name of type 'vector float' in the Custom data provided to the AX compiler. If the data can not be found, or is not of the expected type { 0.0f, 0.0f, 0.0f } is returned.\n\
-\n\
-`double fabs(double)`\n\
-`float fabs(float)`|\n\
-    Computes the absolute value of a floating point value arg.\n\
-\n\
-`double fit(double; double; double; double; double)`\n\
-`float fit(float; float; float; float; float)`\n\
-`double fit(int; int; int; int; int)`|\n\
-    Fit the first argument to the output range by first clamping the value between the second and third input range arguments and then remapping the result to the output range fourth and fifth arguments.\n\
-\n\
-`double floor(double)`\n\
-`float floor(float)`|\n\
-    Computes the largest integer value not greater than arg.\n\
-\n\
-`int getcoordx()`|\n\
-    Returns the current voxel's X index value in index space as an integer.\n\
-\n\
-`int getcoordy()`|\n\
-    Returns the current voxel's Y index value in index space as an integer.\n\
-\n\
-`int getcoordz()`|\n\
-    Returns the current voxel's Z index value in index space as an integer.\n\
-\n\
-`vec3f getvoxelpws()`|\n\
-    Returns the current voxel's position in world space as a vector float.\n\
-\n\
-`long hash(string)`|\n\
-    Return a hash of the provided string.\n\
-\n\
-`mat3f identity3()`|\n\
-    Returns the 3x3 identity matrix\n\
-\n\
-`mat4f identity4()`|\n\
-    Returns the 4x4 identity matrix\n\
-\n\
-`bool ingroup(string)`|\n\
-    Return whether or not the current point is a member of the given group name. This returns false if the group does not exist.\n\
-\n\
-`double length(vec3d)`\n\
-`float length(vec3f)`|\n\
-    Returns the length of the given vector\n\
-\n\
-`double lengthsq(vec3d)`\n\
-`float lengthsq(vec3f)`\n\
-`int lengthsq(vec3i)`|\n\
-    Returns the squared length of the given vector\n\
-\n\
-`float lerp(float; float; float)`\n\
-`double lerp(double; double; double)`\n\
-    Performs bilinear interpolation between the values. If the amount is outside the range 0 to 1, the values will be extrapolated linearly. If amount is 0, the first value is returned. If it is 1, the second value is returned.\n\
-\n\
-`double log(double)`\n\
-`float log(float)`|\n\
-    Computes the natural (base e) logarithm of arg.\n\
-\n\
-`double log10(double)`\n\
-`float log10(float)`|\n\
-    Computes the common (base-10) logarithm of arg.\n\
-\n\
-`double log2(double)`\n\
-`float log2(float)`|\n\
-    Computes the binary (base-2) logarithm of arg.\n\
-\n\
-`double max(double; double)`\n\
-`float max(float; float)`\n\
-`int max(int; int)`|\n\
-    Returns the larger of the given values.\n\
-\n\
-`double min(double; double)`\n\
-`float min(float; float)`\n\
-`int min(int; int)`|\n\
-    Returns the smaller of the given values.\n\
-\n\
-`vec3d normalize(vec3d)`\n\
-`vec3f normalize(vec3f)`|\n\
-    Returns the normalized result of the given vector.\n\
-\n\
-`bool polardecompose(mat3f; mat3f; mat3f)`\n\
-`bool polardecompose(mat3d; mat3d; mat3d)`|\n\
-    Decompose an invertible 3x3 matrix into its orthogonal matrix and symmetric matrix components.\n\
-\n\
-`void postscale(mat4f; vec3d)`\n\
-`void postscale(mat4d; vec3d)`|\n\
-    Post-scale a given matrix by the provided vector.\n\
-\n\
-`double pow(double; double)`\n\
-`float pow(float; float)`\n\
-`double pow(double; int)`\n\
-`float pow(float; int)`|\n\
-    Computes the value of the first argument raised to the power of the second argument.\n\
-\n\
-`void prescale(mat4f; vec3d)`\n\
-`void prescale(mat4d; vec3d)`|\n\
-    Pre-scale a given matrix by the provided vector.\n\
-\n\
-`vec3d pretransform(mat3d; vec3d)`\n\
-`vec3f pretransform(mat3f; vec3f)`\n\
-`vec3d pretransform(mat4d; vec3d)`\n\
-`vec3f pretransform(mat4f; vec3f)`\n\
-`vec4d pretransform(mat4d; vec4d)`\n\
-`vec4f pretransform(mat4f; vec4f)`|\n\
-    Return the transformed vector by transpose of this matrix. This function is equivalent to pre-multiplying the matrix.\n\
-\n\
-`void print(double)`\n\
-`void print(float)`\n\
-`void print(int)`\n\
-`void print(string)`\n\
-`void print(vec2i)`\n\
-`void print(vec2f)`\n\
-`void print(vec2d)`\n\
-`void print(vec3i)`\n\
-`void print(vec3f)`\n\
-`void print(vec3d)`\n\
-`void print(vec4i)`\n\
-`void print(vec4f)`\n\
-`void print(vec4d)`\n\
-`void print(mat3f)`\n\
-`void print(mat3d)`\n\
-`void print(mat4f)`\n\
-`void print(mat4d)`|\n\
-    Prints the input to the standard output stream. Warning: This will be run for every element.\n\
-\n\
-`double rand()`\n\
-`double rand(double)`\n\
-`double rand(int)`|\n\
-    Creates a random number based on the provided seed. The number will be in the range of 0 to 1. The same number is produced for the same seed. Note that if rand is called without a seed the previous state of the random number generator is advanced for the currently processing element. This state is determined by the last call to rand() with a given seed. If rand is not called with a seed, the generator advances continuously across different elements which can produce non-deterministic results. It is important that rand is always called with a seed at least once for deterministic results.\n\
-\n\
-`void removefromgroup(string)`|\n\
-    Remove the current point from the given group name, effectively setting its membership to false. This function has no effect if the group does not exist.\n\
-\n\
-`double round(double)`\n\
-`float round(float)`|\n\
-    Computes the nearest integer value to arg (in floating-point format), rounding halfway cases away from zero.\n\
-\n\
-`bool signbit(double)`\n\
-`bool signbit(float)`|\n\
-    Determines if the given floating point number input is negative.\n\
-\n\
-`double simplexnoise(double)`\n\
-`double simplexnoise(double; double)`\n\
-`double simplexnoise(double; double; double)`\n\
-`double simplexnoise(vec3d)`|\n\
-    Compute simplex noise at coordinates x, y and z. Coordinates which are not provided will be set to 0.\n\
-\n\
-`double sin(double)`\n\
-`float sin(float)`|\n\
-    Computes the sine of arg (measured in radians).\n\
-\n\
-`double sinh(double)`\n\
-`float sinh(float)`|\n\
-    Computes the hyperbolic sine of the input\n\
-\n\
-`double sqrt(double)`\n\
-`float sqrt(float)`|\n\
-    Computes the square root of arg.\n\
-\n\
-`double tan(double)`\n\
-`float tan(float)`\n\
-`double tan(int)`|\n\
-    Computes the tangent of arg (measured in radians).\n\
-\n\
-`double tanh(double)`\n\
-`float tanh(float)`|\n\
-    Computes the hyperbolic tangent of the input\n\
-\n\
-`float trace(mat3f)`\n\
-`double trace(mat3d)`\n\
-`float trace(mat4f)`\n\
-`double trace(mat4d)`|\n\
-    Return the trace of a matrix, the sum of the diagonal elements.\n\
-\n\
-`vec3d transform(vec3d; mat3d)`\n\
-`vec3f transform(vec3f; mat3f)`\n\
-`vec3d transform(vec3d; mat4d)`\n\
-`vec3f transform(vec3f; mat4f)`\n\
-`vec4d transform(vec4d; mat4d)`\n\
-`vec4f transform(vec4f; mat4f)`|\n\
-    Return the transformed vector by this matrix. This function is equivalent to post-multiplying the matrix.\n\
-\n\
-`mat3d transpose(mat3d)`\n\
-`mat3f transpose(mat3f)`\n\
-`mat4d transpose(mat4d)`\n\
-`mat4f transpose(mat4f)`|\n\
-    Transpose of a matrix\n\
-\n\
-\n\
-:note:\n\
-For an up-to-date list of available functions, see AX documentation or call `vdb_ax --list-functions` from the command line.\n\
-\n\
-");
+
+`chramp(string_path)` |
+    |
+        Provides access to the chramp VEX function.
+
+`vector2` |
+    `vec2f` |
+        Syntax for creating a vector 2 of floats.
+
+`vector` |
+    `vec3f` |
+        Syntax for creating a vector 3 of floats.
+
+`vector4` |
+    `vec4f` |
+        Syntax for creating a vector 4 of floats.
+
+`matrix3` |
+    `mat3f` |
+        Syntax for creating a 3x3 matrix of floats.
+
+`matrix` |
+    `mat4f` |
+        Syntax for creating a 4x4 matrix of floats.
+
+`@ix, @iy, @iz` |
+    `getcoordx(), getcoordy(), getcoordz()` |
+        When executing over volumes, returns the index X, Y, Z coordinate of the current voxel.
+
+@hscriptsyntax HScript Variables
+HScript $ variables can also be accessed within AX. Note that the $ syntax in AX is equivalent to a Houdini channel function and is used to look-up
+custom variables within AX. A different set of HScript variables will be available depending on the current Houdini Context. For a complete
+list, [see here|/network/expressions#globals]
+:note: Allow HScript Variables must be enabled to access HScript variables.
+:tip: `@Frame` and `@Time` can be accessed with `$F` and `$T` respectively.
+
+@axverb AX as a Python Verb
+The AX SOP can be used within compiled blocks and as a verb through Houdini's python interface. The latter however introduces some restrictions to
+the code which can be used due to the lack of a connected Houdini network. Through Python, the following restriction are imposed:
+* $ Syntax for paths cannot be used. `ch` and `external` should be used instead.
+
+* Relative channel paths with `ch` and `external` functions will produce an error. These must be converted to absolute paths.
+
+For more information on Compiled Blocks and Python verbs [see here|/model/compile].
+
+@functions Supported Functions
+#display: collapsible collapsed
+:note: For an up-to-date list of available functions, see the online AX documentation or run `vdb_ax functions --list` from the command line.
+
+[Include:/ax/functions]
+)");
 
     // Add backward compatible support if building against VDB 6.2
     // copy the implementation in vdb in regards to the vdb and houdini

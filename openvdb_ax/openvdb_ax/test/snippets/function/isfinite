@@ -1,0 +1,56 @@
+float finitef = 1.0f;
+double finited = 1.0;
+
+vec2d finite2d = {1.0,0.0};
+vec2f finite2f = {1.0f,0.0f};
+
+vec3d finite3d = {1.0,0.0,0.0};
+vec3f finite3f = {1.0f,0.0f,0.0f};
+
+vec4d finite4d = {1.0,0.0,0.0,1000000.0};
+vec4f finite4f = {1.0f,0.0f,0.0f,1000000.0f};
+
+mat3d finitemat3d = identity3();
+mat3f finitemat3f = identity3();
+
+mat4d finitemat4d = identity4();
+mat4f finitemat4f = identity4();
+
+bool@test1 =  isfinite(finited);
+bool@test2 =  isfinite(finitef);
+bool@test3 =  isfinite(finite2d);
+bool@test4 =  isfinite(finite2f);
+bool@test5 =  isfinite(finite3d);
+bool@test6 =  isfinite(finite3f);
+bool@test7 =  isfinite(finite4d);
+bool@test8 =  isfinite(finite4f);
+bool@test9 =  isfinite(finitemat3d);
+bool@test10 = isfinite(finitemat3f);
+bool@test11 = isfinite(finitemat4d);
+bool@test12 = isfinite(finitemat4f);
+
+finitef /= 0.0f;
+finited /= 0.0;
+finite2d[0] /= 0.0;
+finite2f[0] /= 0.0f;
+finite3d[0] /= 0.0;
+finite3f[0] /= 0.0f;
+finite4d[0] /= 0.0;
+finite4f[0] /= 0.0f;
+finitemat3d[0] /= 0.0;
+finitemat3f[0] /= 0.0f;
+finitemat4d[0] /= 0.0;
+finitemat4f[0] /= 0.0f;
+
+bool@test13 = isfinite(finited);
+bool@test14 = isfinite(finitef);
+bool@test15 = isfinite(finite2d);
+bool@test16 = isfinite(finite2f);
+bool@test17 = isfinite(finite3d);
+bool@test18 = isfinite(finite3f);
+bool@test19 = isfinite(finite4d);
+bool@test20 = isfinite(finite4f);
+bool@test21 = isfinite(finitemat3d);
+bool@test22 = isfinite(finitemat3f);
+bool@test23 = isfinite(finitemat4d);
+bool@test24 = isfinite(finitemat4f);

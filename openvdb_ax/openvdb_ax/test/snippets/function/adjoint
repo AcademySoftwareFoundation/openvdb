@@ -1,0 +1,21 @@
+
+mat3d inputd = {
+    1.0, -1.0, 0.0,
+    2.0, 2.0, 0.0,
+    0.0, 0.0, -1.0
+};
+
+mat3d add;
+add = adjoint(inputd);
+
+mat3f inputf = {
+    1.0f, -1.0f, 0.0f,
+    2.0f, 2.0f, 0.0f,
+    0.0f, 0.0f, -1.0f
+};
+
+mat3f adf;
+adf = adjoint(inputf);
+
+mat3d@test1 = add;
+mat3f@test2 = adf;

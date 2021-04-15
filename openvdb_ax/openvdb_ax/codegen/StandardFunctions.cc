@@ -6,7 +6,7 @@
 /// @authors Nick Avramoussis, Richard Jones, Francisco Gochez
 ///
 /// @brief  Definitions for all standard functions supported by AX. A
-///   standard function is one that is supported no matetr the input
+///   standard function is one that is supported no matter the input
 ///   primitive type and rely either solely on AX types or core AX
 ///   intrinsics.
 
@@ -431,8 +431,8 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
         std::vector<llvm::Value*> ptrs, elements;
         arrayUnpack(args[0], ptrs, B, /*load*/false);
         arrayUnpack(args[1], elements, B, /*load*/true);
-        assert(ptrs.size() == 3);
-        assert(elements.size() == 3);
+        assert(ptrs.size() == 3 || ptrs.size() == 4);
+        assert(elements.size() == 3 || elements.size() == 4);
 
         if (elements[0]->getType()->isIntegerTy()) {
            arithmeticConversion(elements, LLVMType<double>::get(B.getContext()), B);
@@ -445,10 +445,12 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
         elements[0] = B.CreateFMul(elements[0], oneDividedByLength);
         elements[1] = B.CreateFMul(elements[1], oneDividedByLength);
         elements[2] = B.CreateFMul(elements[2], oneDividedByLength);
+        if (elements.size() == 4) elements[3] = B.CreateFMul(elements[3], oneDividedByLength);
 
         B.CreateStore(elements[0], ptrs[0]);
         B.CreateStore(elements[1], ptrs[1]);
         B.CreateStore(elements[2], ptrs[2]);
+        if (elements.size() == 4)  B.CreateStore(elements[3], ptrs[3]);
 
         return nullptr;
     };
@@ -460,14 +462,20 @@ inline FunctionGroup::UniquePtr axnormalize(const FunctionOptions& op)
         out->normalize(ElementT(0.0));
     };
 
-    using NormalizeD = void(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
-    using NormalizeF = void(openvdb::math::Vec3<float>*,openvdb::math::Vec3<float>*);
-    using NormalizeI = void(openvdb::math::Vec3<double>*, openvdb::math::Vec3<int32_t>*);
+    using Normalize3D = void(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
+    using Normalize3F = void(openvdb::math::Vec3<float>*,openvdb::math::Vec3<float>*);
+    using Normalize3I = void(openvdb::math::Vec3<double>*, openvdb::math::Vec3<int32_t>*);
+    using Normalize4D = void(openvdb::math::Vec4<double>*,openvdb::math::Vec4<double>*);
+    using Normalize4F = void(openvdb::math::Vec4<float>*,openvdb::math::Vec4<float>*);
+    using Normalize4I = void(openvdb::math::Vec4<double>*, openvdb::math::Vec4<int32_t>*);
 
     return FunctionBuilder("normalize")
-        .addSignature<NormalizeD, true>(generate, (NormalizeD*)(norm))
-        .addSignature<NormalizeF, true>(generate, (NormalizeF*)(norm))
-        .addSignature<NormalizeI, true>(generate, (NormalizeI*)(norm))
+        .addSignature<Normalize3D, true>(generate, (Normalize3D*)(norm))
+        .addSignature<Normalize3F, true>(generate, (Normalize3F*)(norm))
+        .addSignature<Normalize3I, true>(generate, (Normalize3I*)(norm))
+        .addSignature<Normalize4D, true>(generate, (Normalize4D*)(norm))
+        .addSignature<Normalize4F, true>(generate, (Normalize4F*)(norm))
+        .addSignature<Normalize4I, true>(generate, (Normalize4I*)(norm))
         .addDependency("length")
         .setArgumentNames({"v"})
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
@@ -1005,7 +1013,6 @@ inline FunctionGroup::UniquePtr axtruncatemod(const FunctionOptions& op)
         .addSignature<float(float,float)>(generate)
         .addSignature<int64_t(int64_t,int64_t)>(generate)
         .addSignature<int32_t(int32_t,int32_t)>(generate)
-        .addSignature<int16_t(int16_t,int16_t)>(generate)
         .setArgumentNames({"dividend", "divisor"})
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
@@ -1065,7 +1072,6 @@ inline FunctionGroup::UniquePtr axfloormod(const FunctionOptions& op)
         .addSignature<float(float,float)>(generate, (float(*)(float,float))(ffmod))
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(ifmod))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(ifmod))
-        .addSignature<int16_t(int16_t,int16_t)>(generate, (int16_t(*)(int16_t,int16_t))(ifmod))
         .setArgumentNames({"dividend", "divisor"})
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
@@ -1126,7 +1132,6 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
         .addSignature<float(float,float)>(generate, (float(*)(float,float))(femod))
         .addSignature<int64_t(int64_t,int64_t)>(generate, (int64_t(*)(int64_t,int64_t))(iemod))
         .addSignature<int32_t(int32_t,int32_t)>(generate, (int32_t(*)(int32_t,int32_t))(iemod))
-        .addSignature<int16_t(int16_t,int16_t)>(generate, (int16_t(*)(int16_t,int16_t))(iemod))
         .setArgumentNames({"dividend", "divisor"})
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
         .addFunctionAttribute(llvm::Attribute::NoRecurse)
@@ -1139,6 +1144,214 @@ inline FunctionGroup::UniquePtr axeuclideanmod(const FunctionOptions& op)
             "that the return value is always positive. The remainder is thus calculated with "
             "D - d * (d < 0 ? ceil(D/d) : floor(D/d)). This is NOT equal to a%b in AX. See "
             "truncatemod(), floormod().")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axisfinite(const FunctionOptions& op)
+{
+    auto generate =
+        [op](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 1);
+        llvm::Value* arg = args[0];
+        llvm::Type* etype = arg->getType();
+        if (etype->isPointerTy()) {
+            etype = etype->getPointerElementType()->getArrayElementType();
+        }
+
+        llvm::Value* inf;
+        if (etype->isFloatTy()) {
+            const llvm::APFloat apinf =
+                llvm::APFloat::getInf(llvm::APFloatBase::IEEEsingle());
+            inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
+        }
+        else {
+            assert(etype->isDoubleTy());
+            const llvm::APFloat apinf =
+                llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
+            inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
+        }
+
+        if (!arg->getType()->isPointerTy()) {
+            arg = llvm_fabs(op)->execute({arg}, B);
+            return binaryOperator(inf, arg, ast::tokens::NOTEQUALS, B);
+        }
+
+        std::vector<llvm::Value*> array;
+        arrayUnpack(arg, array, B, /*load*/true);
+
+        // @todo short-circuit?
+        llvm::Value* result = B.getTrue();
+        for (auto& value : array) {
+            value = llvm_fabs(op)->execute({value}, B);
+            llvm::Value* comp = binaryOperator(inf, value, ast::tokens::NOTEQUALS, B);
+            result = binaryOperator(comp, result, ast::tokens::AND, B);
+        }
+        return result;
+    };
+
+    static auto isfinitearray = [](const auto input) -> bool
+    {
+        return input->isFinite();
+    };
+
+    return FunctionBuilder("isfinite")
+        .addSignature<bool(openvdb::Vec2d*)>(generate, (bool(*)(openvdb::Vec2d*))(isfinitearray))
+        .addSignature<bool(openvdb::Vec2f*)>(generate, (bool(*)(openvdb::Vec2f*))(isfinitearray))
+        .addSignature<bool(openvdb::Vec3d*)>(generate, (bool(*)(openvdb::Vec3d*))(isfinitearray))
+        .addSignature<bool(openvdb::Vec3f*)>(generate, (bool(*)(openvdb::Vec3f*))(isfinitearray))
+        .addSignature<bool(openvdb::Vec4d*)>(generate, (bool(*)(openvdb::Vec4d*))(isfinitearray))
+        .addSignature<bool(openvdb::Vec4f*)>(generate, (bool(*)(openvdb::Vec4f*))(isfinitearray))
+        .addSignature<bool(openvdb::math::Mat3<float>*)>(generate, (bool(*)(openvdb::math::Mat3<float>*))(isfinitearray))
+        .addSignature<bool(openvdb::math::Mat3<double>*)>(generate, (bool(*)(openvdb::math::Mat3<double>*))(isfinitearray))
+        .addSignature<bool(openvdb::math::Mat4<float>*)>(generate, (bool(*)(openvdb::math::Mat4<float>*))(isfinitearray))
+        .addSignature<bool(openvdb::math::Mat4<double>*)>(generate, (bool(*)(openvdb::math::Mat4<double>*))(isfinitearray))
+            .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+        .addSignature<bool(double)>(generate, (bool(*)(double))(std::isfinite))
+        .addSignature<bool(float)>(generate, (bool(*)(float))(std::isfinite))
+        .setArgumentNames({"arg"})
+        .addDependency("fabs")
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns whether the value is finite i.e. not infinite or NaN. "
+                          "For matrix and vector types will return false if any element is not finite.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axisinf(const FunctionOptions& op)
+{
+    auto generate =
+        [op](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 1);
+        llvm::Value* arg = args[0];
+        llvm::Type* etype = arg->getType();
+        if (etype->isPointerTy()) {
+            etype = etype->getPointerElementType()->getArrayElementType();
+        }
+
+        llvm::Value* inf;
+        if (etype->isFloatTy()) {
+            const llvm::APFloat apinf =
+                llvm::APFloat::getInf(llvm::APFloatBase::IEEEsingle());
+            inf = LLVMType<float>::get(B.getContext(), apinf.convertToFloat());
+        }
+        else {
+            assert(etype->isDoubleTy());
+            const llvm::APFloat apinf =
+                llvm::APFloat::getInf(llvm::APFloatBase::IEEEdouble());
+            inf = LLVMType<double>::get(B.getContext(), apinf.convertToDouble());
+        }
+
+        if (!arg->getType()->isPointerTy()) {
+            arg = llvm_fabs(op)->execute({arg}, B);
+            return binaryOperator(inf, arg, ast::tokens::EQUALSEQUALS, B);
+        }
+
+        std::vector<llvm::Value*> array;
+        arrayUnpack(arg, array, B, /*load*/true);
+
+        // @todo short-circuit?
+        llvm::Value* result = B.getFalse();
+        for (auto& value : array) {
+            value = llvm_fabs(op)->execute({value}, B);
+            llvm::Value* comp = binaryOperator(inf, value, ast::tokens::EQUALSEQUALS, B);
+            result = binaryOperator(comp, result, ast::tokens::OR, B);
+        }
+        return result;
+    };
+
+    static auto isinfarray = [](const auto input) -> bool
+    {
+        return input->isInfinite();
+    };
+
+    return FunctionBuilder("isinf")
+        .addSignature<bool(openvdb::Vec2d*)>(generate, (bool(*)(openvdb::Vec2d*))(isinfarray))
+        .addSignature<bool(openvdb::Vec2f*)>(generate, (bool(*)(openvdb::Vec2f*))(isinfarray))
+        .addSignature<bool(openvdb::Vec3d*)>(generate, (bool(*)(openvdb::Vec3d*))(isinfarray))
+        .addSignature<bool(openvdb::Vec3f*)>(generate, (bool(*)(openvdb::Vec3f*))(isinfarray))
+        .addSignature<bool(openvdb::Vec4d*)>(generate, (bool(*)(openvdb::Vec4d*))(isinfarray))
+        .addSignature<bool(openvdb::Vec4f*)>(generate, (bool(*)(openvdb::Vec4f*))(isinfarray))
+        .addSignature<bool(openvdb::math::Mat3<float>*)>(generate, (bool(*)(openvdb::math::Mat3<float>*))(isinfarray))
+        .addSignature<bool(openvdb::math::Mat3<double>*)>(generate, (bool(*)(openvdb::math::Mat3<double>*))(isinfarray))
+        .addSignature<bool(openvdb::math::Mat4<float>*)>(generate, (bool(*)(openvdb::math::Mat4<float>*))(isinfarray))
+        .addSignature<bool(openvdb::math::Mat4<double>*)>(generate, (bool(*)(openvdb::math::Mat4<double>*))(isinfarray))
+            .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+        .addSignature<bool(double)>(generate /*, (bool(*)(double))(std::isinf)*/) // @note: gcc needs _GLIBCXX_NO_OBSOLETE_ISINF_ISNAN_DYNAMIC defined
+        .addSignature<bool(float)>(generate, (bool(*)(float))(std::isinf))
+        .setArgumentNames({"arg"})
+        .addDependency("fabs")
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns whether the value is inf. "
+                          "For matrix and vector types will return true if any element is inf.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axisnan(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        // uno (unordered) comparison with self
+        // https://llvm.org/docs/LangRef.html#fcmp-instruction
+        assert(args.size() == 1);
+        llvm::Value* arg = args[0];
+        if (!arg->getType()->isPointerTy()) {
+            return B.CreateFCmpUNO(arg, arg);
+        }
+
+        std::vector<llvm::Value*> array;
+        arrayUnpack(arg, array, B, /*load*/true);
+
+        // @todo short-circuit?
+        llvm::Value* result = B.getFalse();
+        for (auto& value : array) {
+            llvm::Value* comp = B.CreateFCmpUNO(value, value);
+            result = binaryOperator(comp, result, ast::tokens::OR, B);
+        }
+        return result;
+    };
+
+    static auto isnanarray = [](const auto input) -> bool
+    {
+        return input->isNan();
+    };
+
+    return FunctionBuilder("isnan")
+        .addSignature<bool(openvdb::Vec2d*)>(generate, (bool(*)(openvdb::Vec2d*))(isnanarray))
+        .addSignature<bool(openvdb::Vec2f*)>(generate, (bool(*)(openvdb::Vec2f*))(isnanarray))
+        .addSignature<bool(openvdb::Vec3d*)>(generate, (bool(*)(openvdb::Vec3d*))(isnanarray))
+        .addSignature<bool(openvdb::Vec3f*)>(generate, (bool(*)(openvdb::Vec3f*))(isnanarray))
+        .addSignature<bool(openvdb::Vec4d*)>(generate, (bool(*)(openvdb::Vec4d*))(isnanarray))
+        .addSignature<bool(openvdb::Vec4f*)>(generate, (bool(*)(openvdb::Vec4f*))(isnanarray))
+        .addSignature<bool(openvdb::math::Mat3<float>*)>(generate, (bool(*)(openvdb::math::Mat3<float>*))(isnanarray))
+        .addSignature<bool(openvdb::math::Mat3<double>*)>(generate, (bool(*)(openvdb::math::Mat3<double>*))(isnanarray))
+        .addSignature<bool(openvdb::math::Mat4<float>*)>(generate, (bool(*)(openvdb::math::Mat4<float>*))(isnanarray))
+        .addSignature<bool(openvdb::math::Mat4<double>*)>(generate, (bool(*)(openvdb::math::Mat4<double>*))(isnanarray))
+            .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+        .addSignature<bool(double)>(generate/*, (bool(*)(double))(std::isnan)*/) // @note: gcc needs _GLIBCXX_NO_OBSOLETE_ISINF_ISNAN_DYNAMIC defined
+        .addSignature<bool(float)>(generate, (bool(*)(float))(std::isnan))
+        .setArgumentNames({"arg"})
+        .addFunctionAttribute(llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns whether the value is NaN (not-a-number).")
         .get();
 }
 
@@ -1838,6 +2051,206 @@ inline FunctionGroup::UniquePtr axtranspose(const FunctionOptions& op)
         .get();
 }
 
+inline FunctionGroup::UniquePtr axadjoint(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+        std::vector<llvm::Value*> m1, m2;
+        arrayUnpack(args[1], m1, B, /*load*/true);
+        arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
+        assert(m1.size() == 9 && m2.size() == 9);
+
+        auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
+            return binaryOperator(
+                    binaryOperator(m1[a], m1[b], ast::tokens::MULTIPLY, B),
+                    binaryOperator(m1[c], m1[d], ast::tokens::MULTIPLY, B),
+                ast::tokens::MINUS, B);
+        };
+
+        B.CreateStore(mul_sub(4,8, 5,7), m2[0]);
+        B.CreateStore(mul_sub(2,7, 1,8), m2[1]);
+        B.CreateStore(mul_sub(1,5, 2,4), m2[2]);
+        B.CreateStore(mul_sub(5,6, 3,8), m2[3]);
+        B.CreateStore(mul_sub(0,8, 2,6), m2[4]);
+        B.CreateStore(mul_sub(2,3, 0,5), m2[5]);
+        B.CreateStore(mul_sub(3,7, 4,6), m2[6]);
+        B.CreateStore(mul_sub(1,6, 0,7), m2[7]);
+        B.CreateStore(mul_sub(0,4, 1,3), m2[8]);
+        return nullptr;
+    };
+
+    static auto adjoint = [](auto out, const auto in) {
+        *out = in->adjoint();
+    };
+
+    using AdjointM3D =
+        void(openvdb::math::Mat3<double>*,
+             openvdb::math::Mat3<double>*);
+    using AjointM3F =
+        void(openvdb::math::Mat3<float>*,
+             openvdb::math::Mat3<float>*);
+
+    return FunctionBuilder("adjoint")
+        .addSignature<AdjointM3D, true>(generate, (AdjointM3D*)(adjoint))
+        .addSignature<AjointM3F, true>(generate, (AjointM3F*)(adjoint))
+        .setArgumentNames({"input"} )
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns the adjoint of a 3x3 matrix. That is, "
+            "the transpose of its cofactor matrix.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axcofactor(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+        std::vector<llvm::Value*> m1, m2;
+        arrayUnpack(args[1], m1, B, /*load*/true);
+        arrayUnpack(args[0], m2, B, /*load*/false); // args[0] is return type
+        assert(m1.size() == 9 && m2.size() == 9);
+
+        auto mul_sub = [&](const size_t a, const size_t b, const size_t c, const size_t d) {
+            return binaryOperator(
+                    binaryOperator(m1[a], m1[b], ast::tokens::MULTIPLY, B),
+                    binaryOperator(m1[c], m1[d], ast::tokens::MULTIPLY, B),
+                ast::tokens::MINUS, B);
+        };
+
+        B.CreateStore(mul_sub(4,8, 5,7), m2[0]);
+        B.CreateStore(mul_sub(5,6, 3,8), m2[1]);
+        B.CreateStore(mul_sub(3,7, 4,6), m2[2]);
+        B.CreateStore(mul_sub(2,7, 1,8), m2[3]);
+        B.CreateStore(mul_sub(0,8, 2,6), m2[4]);
+        B.CreateStore(mul_sub(1,6, 0,7), m2[5]);
+        B.CreateStore(mul_sub(1,5, 2,4), m2[6]);
+        B.CreateStore(mul_sub(2,3, 0,5), m2[7]);
+        B.CreateStore(mul_sub(0,4, 1,3), m2[8]);
+        return nullptr;
+    };
+
+    static auto cofactor = [](auto out, const auto in) {
+        *out = in->cofactor();
+    };
+
+    using CofactorM3D =
+        void(openvdb::math::Mat3<double>*,
+             openvdb::math::Mat3<double>*);
+    using CofactorM3F =
+        void(openvdb::math::Mat3<float>*,
+             openvdb::math::Mat3<float>*);
+
+    return FunctionBuilder("cofactor")
+        .addSignature<CofactorM3D, true>(generate, (CofactorM3D*)(cofactor))
+        .addSignature<CofactorM3F, true>(generate, (CofactorM3F*)(cofactor))
+        .setArgumentNames({"input"} )
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns the cofactor matrix of a 3x3 matrix. That is, "
+            "the matrix of its cofactors.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axinverse(const FunctionOptions& op)
+{
+    auto generate =
+        [op](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 2);
+
+        llvm::Value* adj = axadjoint(op)->execute({args[1]}, B);
+        std::vector<llvm::Value*> m1, madj;
+        arrayUnpack(adj, madj, B, /*load*/true);
+        arrayUnpack(args[0], m1, B, /*load*/false); // result
+        assert(madj.size() == 9 && m1.size() == 9);
+
+        // compute determinant of the input mat by reusing the adjoint's 0, 3 and 6 terms
+        llvm::Value* m20 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 0));
+        llvm::Value* m23 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 3));
+        llvm::Value* m26 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 6));
+
+        // compute det and store in c0
+        llvm::Value* c0 = binaryOperator(madj[0], m20, ast::tokens::MULTIPLY, B);
+        llvm::Value* c1 = binaryOperator(madj[1], m23, ast::tokens::MULTIPLY, B);
+        llvm::Value* c2 = binaryOperator(madj[2], m26, ast::tokens::MULTIPLY, B);
+        c0 = binaryOperator(c0, c1, ast::tokens::PLUS, B);
+        c0 = binaryOperator(c0, c2, ast::tokens::PLUS, B);
+
+        llvm::Value* zero = llvm::ConstantFP::get(c0->getType(), 0.0);
+        llvm::Value* detisnotzero = binaryOperator(c0, zero, ast::tokens::NOTEQUALS, B);
+
+        llvm::Function* base = B.GetInsertBlock()->getParent();
+        llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
+        llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
+        B.CreateCondBr(detisnotzero, then, post);
+
+        B.SetInsertPoint(then);
+        llvm::Value* one = llvm::ConstantFP::get(c0->getType(), 1.0);
+        c0 = B.CreateFDiv(one, c0);
+        for (size_t i = 0; i < 9; ++i) {
+            B.CreateStore(binaryOperator(madj[i], c0, ast::tokens::MULTIPLY, B), m1[i]);
+        }
+
+        B.CreateRetVoid();
+
+        B.SetInsertPoint(post);
+
+        madj.clear();
+        arrayUnpack(args[1], madj, B, /*load*/true);
+        for (size_t i = 0; i < 9; ++i) {
+            B.CreateStore(madj[i], m1[i]);
+        }
+
+        return nullptr;
+    };
+
+    static auto inverse = [](auto out, const auto in) {
+        try {
+            *out = in->inverse();
+        }
+        catch (const openvdb::ArithmeticError&) {
+            *out = *in;
+        }
+    };
+
+    using InverseM3D =
+        void(openvdb::math::Mat3<double>*,
+             openvdb::math::Mat3<double>*);
+    using InverseM3F =
+        void(openvdb::math::Mat3<float>*,
+             openvdb::math::Mat3<float>*);
+
+    return FunctionBuilder("inverse")
+        .addSignature<InverseM3D, true>(generate, (InverseM3D*)(inverse))
+        .addSignature<InverseM3F, true>(generate, (InverseM3F*)(inverse))
+        .setArgumentNames({"input"} )
+        .addDependency("adjoint")
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Return the inverse of a 3x3 matrix."
+            "If the matrix is singular, returns the input matrix.")
+        .get();
+}
+
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
@@ -1932,6 +2345,60 @@ DEFINE_AX_C_FP_BINDING(atanh, "Computes the inverse hyperbolic tangent of the in
 DEFINE_AX_C_FP_BINDING(cosh, "Computes the hyperbolic cosine of the input.")
 DEFINE_AX_C_FP_BINDING(sinh, "Computes the hyperbolic sine of the input.")
 DEFINE_AX_C_FP_BINDING(tanh, "Computes the hyperbolic tangent of the input.")
+
+inline FunctionGroup::UniquePtr axdegrees(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+             llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 1);
+        llvm::Value* arg = args.front();
+        llvm::Value* pi180 = arg->getType()->isFloatTy() ?
+            LLVMType<float>::get(B.getContext(), 180.f / openvdb::math::pi<float>()) :
+            LLVMType<double>::get(B.getContext(), 180.0 / openvdb::math::pi<double>());
+        return binaryOperator(arg, pi180, ast::tokens::MULTIPLY, B);
+    };
+
+    return FunctionBuilder("degrees")
+        .addSignature<double(double)>(generate)
+        .addSignature<float(float)>(generate)
+        .setArgumentNames({"radians"})
+        .setConstantFold(true)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Converts the number of radians to degrees.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axradians(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+             llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 1);
+        llvm::Value* arg = args.front();
+        llvm::Value* pi180 = arg->getType()->isFloatTy() ?
+            LLVMType<float>::get(B.getContext(), openvdb::math::pi<float>() / 180.f) :
+            LLVMType<double>::get(B.getContext(), openvdb::math::pi<double>() / 180.0);
+        return binaryOperator(arg, pi180, ast::tokens::MULTIPLY, B);
+    };
+
+    return FunctionBuilder("radians")
+        .addSignature<double(double)>(generate)
+        .addSignature<float(float)>(generate)
+        .setArgumentNames({"degrees"})
+        .setConstantFold(true)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::InlineHint)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Converts the number of degrees to radians.")
+        .get();
+}
 
 inline FunctionGroup::UniquePtr axtan(const FunctionOptions& op)
 {
@@ -2102,6 +2569,82 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
         .get();
 }
 
+inline FunctionGroup::UniquePtr axargsort(const FunctionOptions& op)
+{
+    static auto argsort = [](auto out, const auto in){
+        using VecType = typename std::remove_pointer<decltype(in)>::type;
+        // initialize original index locations
+        std::iota(out->asPointer(), out->asPointer() + VecType::size, 0);
+        // sort indexes based on comparing values in v
+        // using std::stable_sort instead of std::sort
+        // to avoid unnecessary index re-orderings
+        // when v contains elements of equal values
+        std::stable_sort(out->asPointer(), out->asPointer() + VecType::size,
+          [&in](int32_t i1, int32_t i2) {return (*in)[i1] < (*in)[i2];});
+    };
+
+    using Argsort3D = void(openvdb::math::Vec3<int>*, openvdb::math::Vec3<double>*);
+    using Argsort3F = void(openvdb::math::Vec3<int>*, openvdb::math::Vec3<float>*);
+    using Argsort3I = void(openvdb::math::Vec3<int>*, openvdb::math::Vec3<int32_t>*);
+    using Argsort4D = void(openvdb::math::Vec4<int>*, openvdb::math::Vec4<double>*);
+    using Argsort4F = void(openvdb::math::Vec4<int>*, openvdb::math::Vec4<float>*);
+    using Argsort4I = void(openvdb::math::Vec4<int>*, openvdb::math::Vec4<int32_t>*);
+
+    return FunctionBuilder("argsort")
+        .addSignature<Argsort3D, true>((Argsort3D*)(argsort))
+        .addSignature<Argsort3F, true>((Argsort3F*)(argsort))
+        .addSignature<Argsort3I, true>((Argsort3I*)(argsort))
+        .addSignature<Argsort4D, true>((Argsort4D*)(argsort))
+        .addSignature<Argsort4F, true>((Argsort4F*)(argsort))
+        .addSignature<Argsort4I, true>((Argsort4I*)(argsort))
+        .setArgumentNames({"v"})
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns a vector of the indexes that would sort the input vector.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axsort(const FunctionOptions& op)
+{
+    static auto sort3 = [](auto out, const auto in) {
+        *out = in->sorted();
+    };
+
+    static auto sort = [](auto out, const auto in) {
+        using VecType = typename std::remove_pointer<decltype(out)>::type;
+        *out = *in;
+        std::sort(out->asPointer(), out->asPointer() + VecType::size);
+    };
+
+    using Sort3D = void(openvdb::math::Vec3<double>*,openvdb::math::Vec3<double>*);
+    using Sort3F = void(openvdb::math::Vec3<float>*,openvdb::math::Vec3<float>*);
+    using Sort3I = void(openvdb::math::Vec3<int32_t>*, openvdb::math::Vec3<int32_t>*);
+    using Sort4D = void(openvdb::math::Vec4<double>*,openvdb::math::Vec4<double>*);
+    using Sort4F = void(openvdb::math::Vec4<float>*,openvdb::math::Vec4<float>*);
+    using Sort4I = void(openvdb::math::Vec4<int32_t>*, openvdb::math::Vec4<int32_t>*);
+
+    return FunctionBuilder("sort")
+        .addSignature<Sort3D, true>((Sort3D*)(sort3))
+        .addSignature<Sort3F, true>((Sort3F*)(sort3))
+        .addSignature<Sort3I, true>((Sort3I*)(sort3))
+        .addSignature<Sort4D, true>((Sort4D*)(sort))
+        .addSignature<Sort4F, true>((Sort4F*)(sort))
+        .addSignature<Sort4I, true>((Sort4I*)(sort))
+        .setArgumentNames({"v"})
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addFunctionAttribute(llvm::Attribute::NoUnwind)
+        .addFunctionAttribute(llvm::Attribute::AlwaysInline)
+        .setConstantFold(op.mConstantFoldCBindings)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Returns the sorted result of the given vector.")
+        .get();
+}
+
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
@@ -2256,6 +2799,9 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("euclideanmod", axeuclideanmod);
     add("fit", axfit);
     add("floormod", axfloormod);
+    add("isfinite", axisfinite);
+    add("isinf", axisinf);
+    add("isnan", axisnan);
     add("length", axlength);
     add("lengthsq", axlengthsq);
     add("lerp", axlerp);
@@ -2269,11 +2815,13 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("truncatemod", axtruncatemod);
 
     // matrix math
-
+    add("adjoint", axadjoint);
+    add("cofactor", axcofactor);
     add("determinant", axdeterminant);
     add("diag", axdiag);
     add("identity3", axidentity3);
     add("identity4", axidentity4);
+    add("inverse", axinverse);
     add("mmmult", axmmmult, true);
     add("polardecompose", axpolardecompose);
     add("postscale", axpostscale);
@@ -2290,6 +2838,8 @@ void insertStandardFunctions(FunctionRegistry& registry,
 
     // trig
 
+    add("degrees", axdegrees);
+    add("radians", axradians);
     add("acos", axacos);
     add("acosh", axacosh);
     add("asin", axasin);
@@ -2309,7 +2859,8 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("hash", axhash);
 
     // util
-
+    add("argsort", axargsort);
+    add("sort", axsort);
     add("print", axprint);
 
     // custom

@@ -1,0 +1,3 @@
+    New features:
+    - Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
+      visit nodes in a tree or sub-tree in single-threaded depth-first order.

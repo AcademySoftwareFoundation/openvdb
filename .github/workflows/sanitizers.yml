@@ -35,8 +35,8 @@ jobs:
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.8.0
     - name: build
-      run: ./ci/build.sh ${{ matrix.config.build }} 8 ON None "core,test" \
-        -DOPENVDB_CXX_STRICT=ON -DOPENVDB_CORE_STATIC=OFF \
+      run: ./ci/build.sh ${{ matrix.config.build }} 8 ON None "core,axcore,test,axtest" \
+        -DOPENVDB_CXX_STRICT=ON -DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF \
         -DCMAKE_VERBOSE_MAKEFILE=ON \
         ${{ matrix.config.cmake }}
     - name: test

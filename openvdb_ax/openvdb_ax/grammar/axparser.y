@@ -246,7 +246,8 @@ statement:
 
 expressions:
       expression      { $$ = $1; }
-    | comma_operator  { $$ = newNode<CommaOperator>(&@$, *static_cast<ExpList*>($1)); }
+    /// delete the ExpList after constructing a CommaOperator (ownership of the contents are taken, not the container)
+    | comma_operator  { $$ = newNode<CommaOperator>(&@$, *static_cast<ExpList*>($1)); delete $1; }
 ;
 
 /// @brief  Comma operator
@@ -296,6 +297,7 @@ declaration_list:
                                                               const tokens::CoreType type = static_cast<const DeclareLocal*>(firstNode)->type();
                                                               $$->addStatement(newNode<DeclareLocal>(&@1, type, newNode<Local>(&@3, $3), $5));
                                                               $$ = $1;
+                                                              free(const_cast<char*>($3));
                                                             }
     | declaration_list COMMA IDENTIFIER                     { const auto firstNode = $1->child(0);
                                                               assert(firstNode);
@@ -450,8 +452,10 @@ variable_reference:
 ///         For now, the entire non-terminal for arrays is defined up front.
 ///         This requires it to take in a comma_operator which is temporarily
 ///         represented as an vector of non-owned expressions.
+/// @note   delete the ExpList after constructing an ArrayPack (ownership of
+///         the contents are taken, not the container)
 array:
-      LCURLY comma_operator RCURLY { $$ = newNode<ArrayPack>(&@1, *$2); }
+      LCURLY comma_operator RCURLY { $$ = newNode<ArrayPack>(&@1, *$2); delete $2; }
 ;
 
 /// @brief  Objects which are assignable are considered variables. Importantly,

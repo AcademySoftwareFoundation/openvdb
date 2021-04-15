@@ -296,7 +296,7 @@ applications.
 @par
 Consider this trivial example:
 @par
-@code{.c}
+<!--- A --->@code{.c}
 f@density = f$my_value;
 // f$my_value = f@density; NOTE: writing to $ values is disallowed
 @endcode
@@ -457,7 +457,7 @@ requires both the AX compiler @b and the underlying geometry to support the
 given type. As mentioned above, there may be times where this isn't the case.
 Consider the following:
 @par
-@code{.c}
+<!--- A --->@code{.c}
 vec4i a = {1,2,3,4};
 vec4i@attr = a;
 @endcode

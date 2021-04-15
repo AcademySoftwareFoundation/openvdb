@@ -29,6 +29,16 @@
     #endif
 #endif
 
+// If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
+// This can be optionally suppressed by setting the CMake option
+// OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
+#ifndef OPENVDB_USE_FUTURE_ABI_9
+    #if OPENVDB_ABI_VERSION_NUMBER == 9
+        #error ABI = 9 is still in active development and has not been finalized, \
+CMake option OPENVDB_USE_FUTURE_ABI_9 suppresses this error
+    #endif
+#endif
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {

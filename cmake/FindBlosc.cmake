@@ -328,7 +328,7 @@ set(BLOSC_LIB_TYPE UNKNOWN)
 if(BLOSC_USE_STATIC_LIBS)
   set(BLOSC_LIB_TYPE STATIC)
 elseif(UNIX)
-  get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY} EXT)
+  get_filename_component(_BLOSC_EXT ${Blosc_LIBRARY_RELEASE} EXT)
   if(_BLOSC_EXT STREQUAL ".a")
     set(BLOSC_LIB_TYPE STATIC)
   elseif(_BLOSC_EXT STREQUAL ".so" OR
