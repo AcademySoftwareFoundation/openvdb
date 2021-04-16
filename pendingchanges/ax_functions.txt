@@ -1,9 +1,0 @@
-    Improvements:
-    - Added degree() and radians() AX helper functions for converting radians to degrees and vice versa, respectively.
-    - Added adjoint(), cofactor() and inverse() AX matrix functions.
-    - Added sort(), argsort(), isfinite(), isinf() and isnan() AX utility and math functions.
-    - Added Vec4 argument support to normalize() AX function.
-    - Removed unused int16 AX modulo function signatures.
-
-    Houdini:
-    - Improved the formatting and updated the OpenVDB AX SOPs help card.

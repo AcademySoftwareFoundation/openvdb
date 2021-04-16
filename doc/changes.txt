@@ -22,6 +22,8 @@ New features:
   by setting
   @vdblink::tools::Filter::setProcessTiles Filter::setProcessTiles@endlink.
   Active tiles are densified on demand, only when necessary.
+- Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
+  visit nodes in a tree or sub-tree in single-threaded depth-first order.
 
 @par
 Improvements:
@@ -46,6 +48,13 @@ Improvements:
   @vdblink::tools::activate() tools::activate@endlink and
   @vdblink::tools::deactivate() tools::deactivate@endlink through use of the
   DynamicNodeManager to parallelize tile processing.
+- Added degree() and radians() AX helper functions for converting radians to
+  degrees and vice versa, respectively.
+- Added adjoint(), cofactor() and inverse() AX matrix functions.
+- Added sort(), argsort(), isfinite(), isinf() and isnan() AX utility and math
+  functions.
+- Added Vec4 argument support to normalize() AX function.
+- Removed unused int16 AX modulo function signatures.
 
 @par
 Bug Fixes:
@@ -63,6 +72,9 @@ Bug Fixes:
   performance regression.
 - @vdblink::tools::deactivate() tools::deactivate@endlink now also works with
   a MaskTree.
+- Fixed a memory leak in the OpenVDB AX parser
+- Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
+- Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
 
 @par
 API changes:
@@ -93,6 +105,7 @@ Houdini:
 - VDB Activate SOP now uses the multi-threaded
   @vdblink::tools::deactivate() tools::deactivate@endlink for much faster
   performance.
+- Improved the formatting and updated the OpenVDB AX SOPs help card.
 
 @par
 Build:
@@ -114,6 +127,17 @@ Build:
   configures the static library with /MT(d) and the dynamic library
   with /MD(d).
   <I>[Reported&nbsp;by&nbsp;Jérémie&nbsp;Dumas]</I>
+- Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to use it
+  without errors.
+- The value of CONCURRENT_MALLOC is now respected when building the vdb_ax
+  command line binary.
+- Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the
+  uninstall build target.
+  <I>[Contributed by Jérémie Dumas]</I>
+- Improved the behaviour of locating static zlib libraries when
+  USE_STATIC_DEPENDENCIES is enabled.
+- Fixed an issue where extra hboost libraries could not be found when building
+  against Houdini 18.5 on Windows.
 
 
 @htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly

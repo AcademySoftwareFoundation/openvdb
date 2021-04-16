@@ -1,3 +1,0 @@
-Build:
-- Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to use it
-  without errors.
