@@ -425,6 +425,15 @@ TEST_F(TestPointCount, testOffsets)
 {
     using namespace openvdb::math;
 
+    // empty tree
+    {
+        PointDataTree tree;
+        std::vector<Index64> offsets{ 10 };
+        Index64 total = pointOffsets(offsets, tree);
+        EXPECT_EQ(total, Index64(0));
+        EXPECT_TRUE(offsets.empty());
+    }
+
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 

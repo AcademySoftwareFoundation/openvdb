@@ -131,6 +131,7 @@ Index64 pointOffsets(   std::vector<Index64>& pointOffsets,
     // allocate and zero values in point offsets array
 
     pointOffsets.assign(tree.leafCount(), Index64(0));
+    if (pointOffsets.empty()) return 0;
 
     // compute total points per-leaf
 
