@@ -176,11 +176,11 @@ public:
     ///        between active tiles in the tree and the specified bounding box.
     std::vector<TileDataT> activeTiles(const CoordBBox &bbox) const;
 
-    [[deprecated("Use anyActiveValues() instead")]] inline bool any(const CoordBBox &bbox, bool useAccessor = false) const
+    OPENVDB_DEPRECATED_MESSAGE("Use anyActiveValues() instead") inline bool any(const CoordBBox &bbox, bool useAccessor = false) const
     {
         return this->anyActiveValues(bbox, useAccessor);
     }
-    [[deprecated("Use noActiveValues() instead")]] inline bool none(const CoordBBox &bbox, bool useAccessor = false) const
+    OPENVDB_DEPRECATED_MESSAGE("Use noActiveValues() instead") inline bool none(const CoordBBox &bbox, bool useAccessor = false) const
     {
         return this->noActiveValues(bbox, useAccessor);
     }
