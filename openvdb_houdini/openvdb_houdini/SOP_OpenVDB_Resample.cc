@@ -440,16 +440,7 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 
         hvdb::GridCPtr refGrid;
-        if (mode == MODE_VOXEL_SIZE) {
-            // Create a dummy reference grid whose (linear) transform specifies
-            // the desired voxel size.
-            hvdb::GridPtr grid = openvdb::FloatGrid::create();
-            grid->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
-            refGrid = grid;
-        } else if (mode == MODE_VOXEL_SCALE) {
-            // Create a dummy reference grid with a default (linear) transform.
-            refGrid = openvdb::FloatGrid::create();
-        } else if (mode == MODE_REF_GRID) {
+        if (mode == MODE_REF_GRID) {
             // Get the user-specified reference grid from the second input,
             // if it is connected, or else from the first input.
             const GU_Detail* refGdp = inputGeo(1, context);
@@ -502,14 +493,22 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
             UT_AutoInterrupt scopedInterrupt(
                 ("Resampling " + it.getPrimitiveName().toStdString()).c_str());
 
-            if (refGrid) {
-                // If a reference grid was provided, then after resampling, the
-                // output grid's transform will be the same as the reference grid's.
-
-                openvdb::math::Transform::Ptr refXform = refGrid->transform().copy();
-                if (mode == MODE_VOXEL_SCALE) {
+            if (refGrid || mode == MODE_VOXEL_SIZE || mode == MODE_VOXEL_SCALE) {
+                openvdb::math::Transform::Ptr refXform;
+                if (mode == MODE_VOXEL_SIZE) {
+                    // copy the input grid transform and change the voxel size
+                    refXform = grid.transform().copy();
+                    refXform->preScale(voxelSize);
+                } else if (mode == MODE_VOXEL_SCALE) {
+                    // copy the input grid transform and scale the voxel size
+                    refXform = grid.transform().copy();
                     openvdb::Vec3d scaledVoxelSize = grid.voxelSize() * voxelScale;
                     refXform->preScale(scaledVoxelSize);
+                } else {
+                    // If a reference grid was provided, then after resampling, the
+                    // output grid's transform will be the same as the reference grid's.
+                    UT_ASSERT(refGrid);
+                    refXform = refGrid->transform().copy();
                 }
 
                 if (isLevelSet && rebuild) {
