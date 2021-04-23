@@ -1,9 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
-#include <limits>
 #include <openvdb/openvdb.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
@@ -12,6 +9,10 @@
 #include <openvdb/tools/Statistics.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetUtil.h>
+
+#include <gtest/gtest.h>
+
+#include <limits>
 
 class TestDiagnostics: public ::testing::Test
 {

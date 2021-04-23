@@ -1,8 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
 // this removes the PointDataGrid and PointDataTree aliases
 #define OPENVDB_DISABLE_POINT_DATA_TREE_ALIAS
 
@@ -20,6 +18,8 @@
 #include <openvdb/points/PointMove.h>
 #include <openvdb/points/PointSample.h>
 #include <openvdb/points/PointScatter.h>
+
+#include <gtest/gtest.h>
 
 
 class TestPointInstantiate: public ::testing::Test

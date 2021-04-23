@@ -8,15 +8,10 @@
 /// @note This is intended mainly as an example of how to ray-trace
 /// OpenVDB volumes.  It is not a production-quality renderer.
 
-#include <algorithm>
-#include <iomanip>
-#include <iostream>
-#include <limits>
-#include <memory>
-#include <sstream>
-#include <stdexcept>
-#include <string>
-#include <vector>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/RayTracer.h>
+
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
 #include <OpenEXR/ImfChannelList.h>
@@ -26,10 +21,16 @@
 #include <OpenEXR/ImfPixelType.h>
 #include <tbb/task_scheduler_init.h>
 #include <tbb/tick_count.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/RayIntersector.h>
-#include <openvdb/tools/RayTracer.h>
 
+#include <algorithm>
+#include <iomanip>
+#include <iostream>
+#include <limits>
+#include <memory>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace {
 

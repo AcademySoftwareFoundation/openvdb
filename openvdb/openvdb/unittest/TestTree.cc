@@ -1,10 +1,6 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <cstdio> // for remove()
-#include <fstream>
-#include <sstream>
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
@@ -19,6 +15,12 @@
 #include <openvdb/tools/ChangeBackground.h>
 #include <openvdb/tools/SignedFloodFill.h>
 #include "util.h" // for unittest_util::makeSphere()
+
+#include <gtest/gtest.h>
+
+#include <cstdio> // for remove()
+#include <fstream>
+#include <sstream>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);

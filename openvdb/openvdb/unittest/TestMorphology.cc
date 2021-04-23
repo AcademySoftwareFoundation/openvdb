@@ -1,13 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/Util.h>
+
+#include <gtest/gtest.h>
 
 
 template<typename TreeT, openvdb::tools::NearestNeighbors NN>

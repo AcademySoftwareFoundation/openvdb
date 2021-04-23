@@ -1,11 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <unordered_map>
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
-#include <sstream>
+
+#include <gtest/gtest.h>
 #include <tbb/tbb_stddef.h> // for tbb::split
+
+#include <unordered_map>
+#include <sstream>
 
 
 class TestCoord: public ::testing::Test

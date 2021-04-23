@@ -1,12 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <sstream>
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/math/Stencils.h> // for old GradientStencil
+
+#include <gtest/gtest.h>
+
+#include <sstream>
+
 #include "util.h" // for unittest_util::makeSphere()
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \

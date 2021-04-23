@@ -1,13 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Composite.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
+
+#include <gtest/gtest.h>
+
 #include <algorithm> // for std::max() and std::min()
 #include <cmath> // for std::isnan() and std::isinf()
 #include <limits> // for std::numeric_limits

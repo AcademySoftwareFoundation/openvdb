@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/util/CpuTimer.h>
-
 #include <openvdb/openvdb.h>
+
+#include <gtest/gtest.h>
 
 #include <iostream>
 

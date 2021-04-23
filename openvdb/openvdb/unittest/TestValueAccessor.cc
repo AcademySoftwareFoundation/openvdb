@@ -1,10 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-#include <tbb/task.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Prune.h>
+
+#include <gtest/gtest.h>
+#include <tbb/task.h>
+
 #include <type_traits>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \

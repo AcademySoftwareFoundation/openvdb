@@ -3,10 +3,11 @@
 
 /// @file unittest/TestPotentialFlow.cc
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/PotentialFlow.h>
+
+#include <gtest/gtest.h>
 
 
 class TestPotentialFlow: public ::testing::Test

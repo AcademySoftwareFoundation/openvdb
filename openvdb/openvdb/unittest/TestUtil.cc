@@ -1,17 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
+#include <openvdb/Exceptions.h>
+#include <openvdb/util/CpuTimer.h>
+#include <openvdb/util/PagedArray.h>
+#include <openvdb/util/Formats.h>
+
+#include <gtest/gtest.h>
 
 #include <tbb/task_scheduler_init.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range.h>
-
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/CpuTimer.h>
-#include <openvdb/util/PagedArray.h>
-#include <openvdb/util/Formats.h>
 
 #include <chrono>
 #include <iostream>

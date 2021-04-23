@@ -1,8 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/tools/TopologyToLevelSet.h>
+
+#include <gtest/gtest.h>
 
 
 class TopologyToLevelSet: public ::testing::Test
