@@ -405,6 +405,18 @@ public:
     /// Return the bounding box of this RootNode, i.e., an infinite bounding box.
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transitive offset value.
+    Index64 transitiveOffset() const { return Index64(mTransitiveOffset); }
+    /// Set the transitive offset value.
+    void setTransitiveOffset(Index64 transitiveOffset)
+    {
+        // assert that offset does not exceed 32-bit limit
+        assert(transitiveOffset <= Index64(std::numeric_limits<Index32>::max()));
+        mTransitiveOffset = static_cast<Index32>(transitiveOffset);
+    }
+#endif
+
     /// @brief Change inactive tiles or voxels with a value equal to +/- the
     /// old background to the specified value (with the same sign). Active values
     /// are unchanged.
@@ -966,6 +978,10 @@ private:
 
     MapType mTable;
     ValueType mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transitive offset
+    Index32 mTransitiveOffset = 0;
+#endif
 }; // end of RootNode class
 
 
@@ -1046,8 +1062,11 @@ template<typename ChildT>
 template<typename OtherChildType>
 inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
-    const ValueType& backgd, const ValueType& foregd, TopologyCopy):
-    mBackground(backgd)
+    const ValueType& backgd, const ValueType& foregd, TopologyCopy)
+    : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1068,8 +1087,11 @@ template<typename ChildT>
 template<typename OtherChildType>
 inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
-    const ValueType& backgd, TopologyCopy):
-    mBackground(backgd)
+    const ValueType& backgd, TopologyCopy)
+    : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
     using OtherRootT = RootNode<OtherChildType>;
 
@@ -1128,6 +1150,9 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         };
 
         self.mBackground = Local::convertValue(other.mBackground);
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+        self.mTransitiveOffset = other.mTransitiveOffset;
+#endif
 
         self.clear();
         self.initTable();
@@ -1154,6 +1179,9 @@ RootNode<ChildT>::operator=(const RootNode& other)
 {
     if (&other != this) {
         mBackground = other.mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+        mTransitiveOffset = other.mTransitiveOffset;
+#endif
 
         this->clear();
         this->initTable();

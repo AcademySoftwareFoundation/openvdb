@@ -168,6 +168,18 @@ public:
     /// Return the global coordinates for a linear table offset.
     Coord offsetToGlobalCoord(Index n) const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transitive offset value.
+    Index64 transitiveOffset() const { return Index64(mTransitiveOffset); }
+    /// Set the transitive offset value.
+    void setTransitiveOffset(Index64 transitiveOffset)
+    {
+        // assert that offset does not exceed 32-bit limit
+        assert(transitiveOffset <= Index64(std::numeric_limits<Index32>::max()));
+        mTransitiveOffset = static_cast<Index32>(transitiveOffset);
+    }
+#endif
+
     /// Return a string representation of this node.
     std::string str() const;
 
@@ -731,9 +743,12 @@ protected:
 
     /// Bitmask representing the values AND state of voxels
     Buffer mBuffer;
-
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transitive offset
+    Index32 mTransitiveOffset = 0;
+#endif
 
 private:
     /// @brief During topology-only construction, access is needed
@@ -793,6 +808,9 @@ inline
 LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode &other)
     : mBuffer(other.mBuffer)
     , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
 }
 
@@ -804,6 +822,9 @@ inline
 LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other)
     : mBuffer(other.valueMask())
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
 }
 
@@ -815,6 +836,9 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
                                          bool, TopologyCopy)
     : mBuffer(other.valueMask())// value = active state
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
 }
 
@@ -825,6 +849,9 @@ inline
 LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, TopologyCopy)
     : mBuffer(other.valueMask())// value = active state
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
 }
 
@@ -836,6 +863,9 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
                                          bool offValue, bool onValue, TopologyCopy)
     : mBuffer(other.valueMask())
     , mOrigin(other.origin())
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransitiveOffset(other.mTransitiveOffset)
+#endif
 {
     if (offValue==true) {
         if (onValue==false) {

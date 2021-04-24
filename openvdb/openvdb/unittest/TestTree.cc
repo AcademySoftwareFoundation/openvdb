@@ -3047,6 +3047,17 @@ TEST_F(TestTree, testRootNode)
             EXPECT_EQ(c1, rootIter.getCoord());
         }
     }
+
+    { // test transitive offset
+        RootNodeType rootNode(0.0f);
+        EXPECT_EQ(openvdb::Index64(0), rootNode.transitiveOffset());
+        rootNode.setTransitiveOffset(openvdb::Index64(5));
+        EXPECT_EQ(openvdb::Index64(5), rootNode.transitiveOffset());
+        RootNodeType rootNode2(rootNode);
+        EXPECT_EQ(openvdb::Index64(5), rootNode2.transitiveOffset());
+        RootNodeType rootNode3 = rootNode;
+        EXPECT_EQ(openvdb::Index64(5), rootNode3.transitiveOffset());
+    }
 }
 
 TEST_F(TestTree, testInternalNode)
@@ -3140,6 +3151,17 @@ TEST_F(TestTree, testInternalNode)
         auto* child = new ChildType(c0.offsetBy(8000,0,0));
         EXPECT_TRUE(!internalNode.addChild(child));
         delete child;
+    }
+
+    { // test transitive offset
+        InternalNodeType internalNode(c1, 0.0f);
+        EXPECT_EQ(openvdb::Index64(0), internalNode.transitiveOffset());
+        internalNode.setTransitiveOffset(openvdb::Index64(5));
+        EXPECT_EQ(openvdb::Index64(5), internalNode.transitiveOffset());
+        InternalNodeType internalNode2(internalNode);
+        EXPECT_EQ(openvdb::Index64(5), internalNode2.transitiveOffset());
+        InternalNodeType internalNode3 = internalNode;
+        EXPECT_EQ(openvdb::Index64(5), internalNode3.transitiveOffset());
     }
 }
 

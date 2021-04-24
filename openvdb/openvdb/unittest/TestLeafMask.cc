@@ -562,3 +562,16 @@ TEST_F(TestLeafMask, testMedian)
 //     // since the active voxels were all true to begin with.
 //     EXPECT_TRUE(tree->hasSameTopology(*copyOfTree));
 // }
+
+TEST_F(TestLeafMask, testTransitiveOffset)
+{
+    LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
+
+    EXPECT_EQ(openvdb::Index64(0), leaf.transitiveOffset());
+    leaf.setTransitiveOffset(openvdb::Index64(5));
+    EXPECT_EQ(openvdb::Index64(5), leaf.transitiveOffset());
+    LeafType leaf2(leaf);
+    EXPECT_EQ(openvdb::Index64(5), leaf2.transitiveOffset());
+    LeafType leaf3 = leaf;
+    EXPECT_EQ(openvdb::Index64(5), leaf3.transitiveOffset());
+}

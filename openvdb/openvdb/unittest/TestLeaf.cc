@@ -517,3 +517,19 @@ TEST_F(TestLeaf, testCount)
     EXPECT_EQ(size_t(1), dims.size());
     EXPECT_EQ(Index(3), dims[0]);
 }
+
+TEST_F(TestLeaf, testTransitiveOffset)
+{
+    using namespace openvdb;
+    using LeafT = tree::LeafNode<float, 3>;
+    const Coord origin(-9, -2, -8);
+    LeafT leaf(origin, 1.0f, false);
+
+    EXPECT_EQ(Index64(0), leaf.transitiveOffset());
+    leaf.setTransitiveOffset(Index64(5));
+    EXPECT_EQ(Index64(5), leaf.transitiveOffset());
+    LeafT leaf2(leaf);
+    EXPECT_EQ(Index64(5), leaf2.transitiveOffset());
+    LeafT leaf3 = leaf;
+    EXPECT_EQ(Index64(5), leaf3.transitiveOffset());
+}
