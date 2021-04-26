@@ -7,6 +7,7 @@
 #include <openvdb_ax/compiler/CompilerOptions.h>
 #include <openvdb_ax/compiler/Logger.h>
 #include <openvdb_ax/codegen/FunctionRegistry.h>
+#include <openvdb_ax/codegen/Functions.h>
 #include <openvdb_ax/codegen/ComputeGenerator.h>
 #include <openvdb_ax/ast/AST.h>
 
@@ -350,7 +351,8 @@ void
 TestComputeGeneratorFailures::testFailures()
 {
     openvdb::ax::FunctionOptions opts;
-    openvdb::ax::codegen::FunctionRegistry reg;
+    openvdb::ax::codegen::FunctionRegistry::UniquePtr reg =
+        openvdb::ax::codegen::createDefaultRegistry(&opts);
 
     // create logger that suppresses all messages, but still logs number of errors/warnings
     openvdb::ax::Logger logger([](const std::string&) {});
@@ -363,7 +365,7 @@ TestComputeGeneratorFailures::testFailures()
         CPPUNIT_ASSERT(!logger.hasError());
 
         unittest_util::LLVMState state;
-        openvdb::ax::codegen::codegen_internal::ComputeGenerator gen(state.module(), opts, reg, logger);
+        openvdb::ax::codegen::codegen_internal::ComputeGenerator gen(state.module(), opts, *reg, logger);
         gen.generate(*ast);
 
         CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected Compiler Error", code), logger.hasError());

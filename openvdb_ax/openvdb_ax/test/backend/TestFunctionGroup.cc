@@ -168,7 +168,7 @@ TestFunctionGroup::testMatch()
     llvm::LLVMContext& C = state.context();
     std::vector<llvm::Type*> types;
     Function::SignatureMatch match;
-    Function::Ptr result;
+    const Function* result;
 
     //
 
@@ -182,7 +182,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[5], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[5].get()), result);
 
     //
 
@@ -190,7 +190,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[4], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[4].get()), result);
 
     //
 
@@ -198,7 +198,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[3], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[3].get()), result);
 
     //
 
@@ -206,7 +206,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     //
 
@@ -214,7 +214,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[1], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[1].get()), result);
 
     //
 
@@ -222,7 +222,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[0], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[0].get()), result);
 
     // test unsigned integers automatic type creation - these are not supported in the
     // language however can be constructed from the API. The function framework does
@@ -232,7 +232,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     // test implicit matching - types should match to the first available castable signature
     // which is always the void(double) "tsfd" function for all provided scalars
@@ -241,7 +241,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Implicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[0], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[0].get()), result);
 
     types.clear();
 
@@ -290,7 +290,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     //
 
@@ -299,7 +299,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[1], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[1].get()), result);
 
     //
 
@@ -307,7 +307,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[0], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[0].get()), result);
 
     // Test implicit matching
 
@@ -318,7 +318,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Implicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     // Test non matching
 
@@ -344,7 +344,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[0], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[0].get()), result);
 
     //
 
@@ -354,7 +354,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     //
 
@@ -363,7 +363,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[3], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[3].get()), result);
 
     //
 
@@ -372,7 +372,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Implicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[2], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[2].get()), result);
 
     //
 
@@ -382,7 +382,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[5], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[5].get()), result);
 
     //
 
@@ -390,7 +390,7 @@ TestFunctionGroup::testMatch()
     result = group->match(types, C, &match);
     CPPUNIT_ASSERT(Function::SignatureMatch::Explicit == match);
     CPPUNIT_ASSERT(result);
-    CPPUNIT_ASSERT_EQUAL((*list)[6], result);
+    CPPUNIT_ASSERT_EQUAL(const_cast<const Function*>((*list)[6].get()), result);
 }
 
 void
@@ -412,16 +412,16 @@ TestFunctionGroup::testExecute()
     // test invalid arguments throws
 
     FunctionGroup::Ptr group(new FunctionGroup("empty", "", {}));
-    CPPUNIT_ASSERT(!group->execute(/*args*/{}, B));
+    CPPUNIT_ASSERT(!group->execute(/*args*/{}, B, result));
 
     group = axtestscalar(C);
     const std::vector<Function::Ptr>* list = &group->list();
 
-    CPPUNIT_ASSERT(!group->execute({}, B));
+    CPPUNIT_ASSERT(!group->execute({}, B, result));
     CPPUNIT_ASSERT(!group->execute({
             B.getTrue(),
             B.getTrue()
-        }, B));
+        }, B, result));
 
     args.resize(1);
 

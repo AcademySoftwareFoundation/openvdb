@@ -6,6 +6,7 @@
 
 #include "../util.h"
 
+#include <openvdb_ax/codegen/String.h>
 #include <openvdb_ax/compiler/CustomData.h>
 #include <openvdb_ax/Exceptions.h>
 
@@ -196,7 +197,7 @@ _T1_@test1 = _T1_$ext1;)";
             [&](){
                 mHarness.addAttribute<std::string>("test1", "foo");
                 mHarness.mCustomData.reset(new openvdb::ax::CustomData());
-                mHarness.mCustomData->insertData("ext1", openvdb::ax::AXStringMetadata("foo").copy());
+                mHarness.mCustomData->insertData("ext1", openvdb::TypedMetadata<openvdb::ax::codegen::String>("foo").copy());
              },
         }
     };

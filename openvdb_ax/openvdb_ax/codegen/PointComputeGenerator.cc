@@ -170,17 +170,17 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
 
     // run allocations and update the symbol table
 
-    for (const AttributeRegistry::AccessData& data : registry->data()) {
-        llvm::Value* value = mBuilder.CreateAlloca(llvmTypeFromToken(data.type(), mContext));
+    for (const AttributeRegistry::AccessData& access : registry->data()) {
+        llvm::Value* value = insertStaticAlloca(mBuilder, llvmTypeFromToken(access.type(), mContext));
         assert(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
-        localTable->insert(data.tokenname(), value);
+        localTable->insert(access.tokenname(), value);
     }
 
     // insert getters for read variables
 
-    for (const AttributeRegistry::AccessData& data : registry->data()) {
-        if (!data.reads()) continue;
-        const std::string token = data.tokenname();
+    for (const AttributeRegistry::AccessData& access : registry->data()) {
+        if (!access.reads()) continue;
+        const std::string token = access.tokenname();
         this->getAttributeValue(token, localTable->get(token));
     }
 
@@ -189,15 +189,12 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
 
     if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
 
-    // insert set code
+    // insert set code and deallocations
 
     std::vector<const AttributeRegistry::AccessData*> write;
     for (const AttributeRegistry::AccessData& access : registry->data()) {
         if (access.writes()) write.emplace_back(&access);
     }
-    // if it doesn't write to any externally accessible data (i.e attributes)
-    // then early exit
-    if (write.empty()) return registry;
 
     for (auto block = mFunction->begin(); block != mFunction->end(); ++block) {
 
@@ -228,7 +225,7 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
             }
 
             llvm::Type* type = value->getType()->getPointerElementType();
-            llvm::Type* strType = LLVMType<AXString>::get(mContext);
+            llvm::Type* strType = LLVMType<codegen::String>::get(mContext);
             const bool usingString = type == strType;
 
             llvm::Value* handlePtr = this->attributeHandleFromToken(token);
@@ -258,6 +255,9 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
             function->execute(args, mBuilder);
         }
     }
+
+    this->createFreeSymbolStrings(mBuilder);
+
     return registry;
 }
 
@@ -290,24 +290,6 @@ void PointComputeGenerator::getAttributeValue(const std::string& globalName, llv
     const bool usingString = type == "string";
 
     if (usingString) {
-        const FunctionGroup* const function = this->getFunction("strattribsize", true);
-
-        llvm::Value* size =
-            function->execute({handlePtr, pointidx, leafdata}, mBuilder);
-
-        // add room for the null terminator
-        llvm::Value* one = LLVMType<AXString::SizeType>::get(mContext, 1);
-        llvm::Value* sizeTerm = binaryOperator(size, one, ast::tokens::PLUS, mBuilder);
-
-        // re-allocate the string array and store the size. The copying will be performed by
-        // the getattribute function
-        llvm::Type* strType = LLVMType<AXString>::get(mContext);
-        llvm::Value* string = mBuilder.CreateAlloca(LLVMType<char>::get(mContext), sizeTerm);
-        llvm::Value* lstrptr = mBuilder.CreateStructGEP(strType, location, 0); // char**
-        llvm::Value* lsize = mBuilder.CreateStructGEP(strType, location, 1); // AXString::SizeType*
-        mBuilder.CreateStore(string, lstrptr);
-        mBuilder.CreateStore(size, lsize);
-
         args.reserve(4);
     }
     else {

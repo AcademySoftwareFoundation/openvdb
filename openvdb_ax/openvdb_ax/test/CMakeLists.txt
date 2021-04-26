@@ -36,6 +36,7 @@ set(TEST_SOURCE_FILES
   backend/TestFunctionRegistry.cc
   backend/TestFunctionTypes.cc
   backend/TestLogger.cc
+  backend/TestString.cc
   backend/TestSymbolTable.cc
   backend/TestTypes.cc
   compiler/TestAXRun.cc

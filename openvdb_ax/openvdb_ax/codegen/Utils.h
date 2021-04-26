@@ -124,6 +124,7 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
                    llvm::Type* type,
                    llvm::Value* size = nullptr)
 {
+    llvm::Type* strtype = LLVMType<codegen::String>::get(B.getContext());
     // Create the allocation at the start of the function block
     llvm::Function* parent = B.GetInsertBlock()->getParent();
     assert(parent && !parent->empty());
@@ -132,6 +133,20 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
     if (block.empty()) B.SetInsertPoint(&block);
     else B.SetInsertPoint(&(block.front()));
     llvm::Value* result = B.CreateAlloca(type, size);
+
+    /// @note  Strings need to be initialised correctly when they are
+    ///   created. We alloc them at the start of the function but
+    ///   strings in branches may not ever be set to anything. If
+    ///   we don't init these correctly, the clearup frees will
+    ///   try and free uninitialised memory
+    if (type == strtype) {
+        llvm::Value* cptr = B.CreateStructGEP(strtype, result, 0); // char**
+        llvm::Value* sso = B.CreateStructGEP(strtype, result, 1); // char[]*
+        llvm::Value* sso_load = B.CreateConstGEP2_64(sso, 0 ,0); // char*
+        llvm::Value* len = B.CreateStructGEP(strtype, result, 2);
+        B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
+        B.CreateStore(B.getInt64(0), len);
+    }
     B.restoreIP(IP);
     return result;
 }
@@ -553,7 +568,9 @@ binaryOperator(llvm::Value* lhs, llvm::Value* rhs,
                llvm::IRBuilder<>& builder)
 {
     llvm::Type* lhsType = lhs->getType();
-    assert(lhsType == rhs->getType());
+    assert(lhsType == rhs->getType() ||
+        (token == ast::tokens::SHIFTLEFT ||
+         token == ast::tokens::SHIFTRIGHT));
 
     const ast::tokens::OperatorType opType = ast::tokens::operatorType(token);
 

@@ -11,9 +11,9 @@
 #ifndef OPENVDB_AX_CODEGEN_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_CODEGEN_TYPES_HAS_BEEN_INCLUDED
 
-#include "../ast/Tokens.h"
-#include "../Exceptions.h"
-#include "../compiler/CustomData.h" // for AXString
+#include "openvdb_ax/ast/Tokens.h"
+#include "openvdb_ax/Exceptions.h"
+#include "String.h"
 
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
@@ -169,39 +169,19 @@ struct LLVMType<char> : public LLVMType<uint8_t>
 };
 
 template <>
-struct LLVMType<AXString>
+struct LLVMType<codegen::String>
 {
     static inline llvm::StructType*
     get(llvm::LLVMContext& C) {
         const std::vector<llvm::Type*> types {
-            LLVMType<char*>::get(C),  // array
-            LLVMType<AXString::SizeType>::get(C) // size
+            LLVMType<char*>::get(C),  // ptr
+            LLVMType<char[codegen::String::SSO_LENGTH]>::get(C),  // SSO
+            LLVMType<int64_t>::get(C) // size
         };
         return llvm::StructType::get(C, types);
     }
-    static inline llvm::Value*
-    get(llvm::LLVMContext& C, llvm::Constant* string, llvm::Constant* size) {
-        return llvm::ConstantStruct::get(LLVMType<AXString>::get(C), {string, size});
-    }
-    /// @note Creating strings from a literal requires a GEP instruction to
-    ///   store the string ptr on the struct.
-    /// @note Usually you should be using s = builder.CreateGlobalStringPtr()
-    ///   followed by LLVMType<AXString>::get(C, s) rather than allocating
-    ///   a non global string
-    static inline llvm::Value*
-    get(llvm::LLVMContext& C, const std::string& string, llvm::IRBuilder<>& builder) {
-        llvm::Constant* constant =
-            llvm::ConstantDataArray::getString(C, string, /*terminator*/true);
-        llvm::Constant* size = llvm::cast<llvm::Constant>
-            (LLVMType<AXString::SizeType>::get(C, static_cast<AXString::SizeType>(string.size())));
-        llvm::Value* zero = LLVMType<int32_t>::get(C, 0);
-        llvm::Value* args[] = { zero, zero };
-        constant = llvm::cast<llvm::Constant>
-            (builder.CreateInBoundsGEP(constant->getType(), constant, args));
-        return LLVMType<AXString>::get(C, constant, size);
-    }
     static inline llvm::Constant*
-    get(llvm::LLVMContext& C, const AXString* const string)
+    get(llvm::LLVMContext& C, const codegen::String* const string)
     {
         return LLVMType<uintptr_t>::get(C,
             reinterpret_cast<uintptr_t>(string));

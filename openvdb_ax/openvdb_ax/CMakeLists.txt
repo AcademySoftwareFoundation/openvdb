@@ -111,6 +111,7 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   codegen/PointComputeGenerator.cc
   codegen/PointFunctions.cc
   codegen/StandardFunctions.cc
+  codegen/StringFunctions.cc
   codegen/Types.cc
   codegen/VolumeComputeGenerator.cc
   codegen/VolumeFunctions.cc
@@ -148,6 +149,7 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
   codegen/FunctionTypes.h
   codegen/PointComputeGenerator.h
   codegen/PointLeafLocalData.h
+  codegen/String.h
   codegen/SymbolTable.h
   codegen/Types.h
   codegen/Utils.h
@@ -201,6 +203,7 @@ set(OPENVDB_AX_CORE_DEPENDENT_LIBS
 )
 
 set(OPENVDB_AX_PUBLIC_DEFINES ${LLVM_DEFINITIONS})
+set(OPENVDB_AX_PRIVATE_DEFINES "")
 set(OPENVDB_AX_PUBLIC_OPTIONS "")
 
 if(NOT LLVM_ENABLE_ASSERTIONS)
@@ -216,12 +219,29 @@ if(NOT LLVM_ENABLE_RTTI)
     "$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-sanitize=vptr>")
 endif()
 
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+  # TBB can't determine libstdc++ version if Clang is in use. This causes issues
+  # with any TBB container using features from C++11 and greater (such as
+  # tbb::concurrent_vector::emplace_back, used in the VolumeExecutable)
+  # https://github.com/01org/tbb/issues/22
+  # https://www.threadingbuildingblocks.org/docs/help/reference/appendices/known_issues/linux_os.html
+  # https://www.threadingbuildingblocks.org/docs/help/reference/environment/feature_macros.html
+  string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
+  list(APPEND OPENVDB_AX_PUBLIC_DEFINES
+    -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
+endif()
+
+if(USE_NEW_PASS_MANAGER)
+  list(APPEND OPENVDB_AX_PRIVATE_DEFINES -DUSE_NEW_PASS_MANAGER)
+endif()
+
 ##########################################################################
 
 # Configure static build
 
 if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_ax_static PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_static PUBLIC ../)
   target_include_directories(openvdb_ax_static
@@ -241,18 +261,14 @@ if(OPENVDB_AX_STATIC)
     PROPERTIES OUTPUT_NAME openvdb_ax
   )
 
-  target_link_libraries(openvdb_ax_static
-    PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS}
-    )
-  if(USE_NEW_PASS_MANAGER)
-    target_compile_definitions(openvdb_ax_static PRIVATE -DUSE_NEW_PASS_MANAGER)
-  endif()
+  target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 endif()
 
 # Configure shared build
 
 if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_shared PUBLIC ../)
   target_include_directories(openvdb_ax_shared
@@ -292,12 +308,7 @@ if(OPENVDB_AX_SHARED)
     )
   endif()
 
-  target_link_libraries(openvdb_ax_shared
-    PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS}
-    )
-  if(USE_NEW_PASS_MANAGER)
-    target_compile_definitions(openvdb_ax_shared PRIVATE -DUSE_NEW_PASS_MANAGER)
-  endif()
+  target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 endif()
 
 install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)

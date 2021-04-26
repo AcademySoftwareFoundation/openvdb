@@ -23,11 +23,13 @@
 #include <tbb/enumerable_thread_specific.h>
 
 #include <llvm/IR/Intrinsics.h>
+#include <llvm/IR/Instructions.h>
 
 #include <unordered_map>
 #include <functional>
 #include <random>
 #include <cmath>
+#include <cstdlib>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -103,7 +105,7 @@ struct SimplexNoise
     }                                                                                       \
 
 #define DEFINE_AX_C_FP_BINDING(Identifier, Doc)                                             \
-    inline FunctionGroup::UniquePtr ax##Identifier(const FunctionOptions& op)                     \
+    inline FunctionGroup::UniquePtr ax##Identifier(const FunctionOptions& op)               \
     {                                                                                       \
         return FunctionBuilder(#Identifier)                                                 \
             .addSignature<double(double)>((double(*)(double))(std::Identifier))             \
@@ -121,6 +123,74 @@ struct SimplexNoise
 
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
+
+// Memory
+
+inline FunctionGroup::UniquePtr axmalloc(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        llvm::BasicBlock* BB = B.GetInsertBlock();
+        /// @note The return type is i8* as the void* type is aliased to
+        ///  i8* in Types.h.
+        /// @todo should probably remove this alias and use i8* explicitly
+        llvm::Instruction* inst =
+            llvm::CallInst::CreateMalloc(BB, // location
+                B.getInt64Ty(), // int ptr type
+                B.getInt8Ty(),  // return type
+                args[0], // size
+                nullptr,
+                nullptr);
+        assert(inst);
+        B.Insert(inst);
+        return inst;
+    };
+
+    return FunctionBuilder("axmalloc")
+        .addSignature<void*(size_t)>(generate, std::malloc, "malloc") // symbol is malloc, not ax.malloc
+        .setArgumentNames({"size"})
+        .setEmbedIR(true) // Embed the call to CreateMalloc, otherwise we gen a function "malloc" which calls "malloc"!
+        .setConstantFold(false)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Allocate memory.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axfree(const FunctionOptions& op)
+{
+    static auto generate =
+        [](const std::vector<llvm::Value*>& args,
+           llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        llvm::BasicBlock* BB = B.GetInsertBlock();
+        llvm::Instruction* inst = llvm::CallInst::CreateFree(args[0], BB);
+        assert(inst);
+        B.Insert(inst);
+        return nullptr;
+    };
+
+    return FunctionBuilder("axfree")
+        .addSignature<void(void*)>(generate, std::free, "free") // symbol is free, not ax.free
+        .setArgumentNames({"ptr"})
+        .setEmbedIR(true) // Embed the call to CreateFree, otherwise we gen a function "free" which calls "free"!
+        .setConstantFold(false)
+        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
+        .setDocumentation("Free memory.")
+        .get();
+}
+
+inline FunctionGroup::UniquePtr axrealloc(const FunctionOptions&)
+{
+    return FunctionBuilder("axrealloc")
+        .addSignature<void*(void*,size_t)>(std::realloc, "realloc")
+        .setArgumentNames({"ptr", "size"})
+        .setConstantFold(false)
+        .setPreferredImpl(FunctionBuilder::C)
+        .setDocumentation("Reallocate memory.")
+        .get();
+}
 
 // Intrinsics
 
@@ -2500,13 +2570,12 @@ inline FunctionGroup::UniquePtr axatof(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr axhash(const FunctionOptions& op)
 {
-    static auto hash = [](const AXString* axstr) -> int64_t {
-        const std::string str(axstr->ptr, axstr->size);
-        return static_cast<int64_t>(std::hash<std::string>{}(str));
+    static auto hash = [](const codegen::String* str) -> int64_t {
+        return static_cast<int64_t>(std::hash<std::string>{}(str->str()));
     };
 
     return FunctionBuilder("hash")
-        .addSignature<int64_t(const AXString*)>((int64_t(*)(const AXString*))(hash))
+        .addSignature<int64_t(const codegen::String*)>((int64_t(*)(const codegen::String*))(hash))
         .setArgumentNames({"str"})
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
         .addFunctionAttribute(llvm::Attribute::ReadOnly)
@@ -2528,9 +2597,8 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
 {
     static auto print = [](auto v) { std::cout << v << std::endl; };
     static auto printv = [](auto* v) { std::cout << *v << std::endl; };
-    static auto printstr = [](const AXString* axstr) {
-        const std::string str(axstr->ptr, axstr->size);
-        std::cout << str << std::endl;
+    static auto printstr = [](const codegen::String* axstr) {
+        std::cout << axstr->c_str() << std::endl;
     };
 
     return FunctionBuilder("print")
@@ -2543,7 +2611,7 @@ inline FunctionGroup::UniquePtr axprint(const FunctionOptions& op)
             .addFunctionAttribute(llvm::Attribute::NoRecurse)
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)
             .setConstantFold(false /*never cf*/)
-        .addSignature<void(const AXString*)>((void(*)(const AXString*))(printstr))
+        .addSignature<void(const codegen::String*)>((void(*)(const codegen::String*))(printstr))
         .addSignature<void(openvdb::math::Vec2<int32_t>*)>((void(*)(openvdb::math::Vec2<int32_t>*))(printv))
         .addSignature<void(openvdb::math::Vec2<float>*)>((void(*)(openvdb::math::Vec2<float>*))(printv))
         .addSignature<void(openvdb::math::Vec2<double>*)>((void(*)(openvdb::math::Vec2<double>*))(printv))
@@ -2652,20 +2720,19 @@ inline FunctionGroup::UniquePtr axsort(const FunctionOptions& op)
 
 inline FunctionGroup::UniquePtr ax_external(const FunctionOptions& op)
 {
-    static auto find = [](auto out, const void* const data,  const AXString* const name)
+    static auto find = [](auto out, const void* const data, const codegen::String* const name)
     {
         using ValueType = typename std::remove_pointer<decltype(out)>::type;
         const ax::CustomData* const customData =
             static_cast<const ax::CustomData*>(data);
-        const std::string nameStr(name->ptr, name->size);
         const TypedMetadata<ValueType>* const metaData =
-            customData->getData<TypedMetadata<ValueType>>(nameStr);
+            customData->getData<TypedMetadata<ValueType>>(name->str());
         *out = (metaData ? metaData->value() : zeroVal<ValueType>());
     };
 
 
-    using FindF = void(float*, const void* const, const AXString* const);
-    using FindV3F = void(openvdb::math::Vec3<float>*, const void* const, const AXString* const);
+    using FindF = void(float*, const void* const, const codegen::String* const);
+    using FindV3F = void(openvdb::math::Vec3<float>*, const void* const, const codegen::String* const);
 
     return FunctionBuilder("_external")
         .addSignature<FindF>((FindF*)(find))
@@ -2705,7 +2772,7 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
     };
 
     return FunctionBuilder("external")
-        .addSignature<float(const AXString*)>(generate)
+        .addSignature<float(const codegen::String*)>(generate)
         .setArgumentNames({"str"})
         .addDependency("_external")
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
@@ -2744,7 +2811,7 @@ inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
     };
 
     return FunctionBuilder("externalv")
-        .addSignature<openvdb::math::Vec3<float>*(const AXString*)>(generate)
+        .addSignature<openvdb::math::Vec3<float>*(const codegen::String*)>(generate)
         .setArgumentNames({"str"})
         .addDependency("_external")
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
@@ -2761,6 +2828,8 @@ inline FunctionGroup::UniquePtr axexternalv(const FunctionOptions& op)
 ///////////////////////////////////////////////////////////////////////////
 
 
+void insertStringFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
+
 void insertStandardFunctions(FunctionRegistry& registry,
     const FunctionOptions* options)
 {
@@ -2772,6 +2841,12 @@ void insertStandardFunctions(FunctionRegistry& registry,
         if (create) registry.insertAndCreate(name, creator, *options, internal);
         else        registry.insert(name, creator, internal);
     };
+
+    // memory
+
+    add("axmalloc", axmalloc, true);
+    add("axfree", axfree, true);
+    add("axrealloc", axrealloc, true);
 
     // llvm instrinsics
 
@@ -2868,6 +2943,8 @@ void insertStandardFunctions(FunctionRegistry& registry,
     add("_external", ax_external, true);
     add("external", axexternal);
     add("externalv", axexternalv);
+
+    insertStringFunctions(registry, options);
 }
 
 
