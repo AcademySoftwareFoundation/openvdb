@@ -533,6 +533,32 @@ TEST_F(TestAttributeArray, testAttributeArray)
             EXPECT_TRUE(!attr.valueTypeIsQuaternion());
             EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
+        {
+            TypedAttributeArray<float, FixedPointCodec<false, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt16"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, FixedPointCodec<true, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt8"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(1), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
     }
 
     {
