@@ -1,0 +1,4 @@
+Houdini:
+- VDB Activate SOP dilation will affect tiles, changing its behaviour
+  from previous versions, but producing a more expected result.
+- VDB Activate SOP has a world space dilation option.
