@@ -48,6 +48,7 @@ public:
     class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
 
 protected:
+    void syncNodeVersion(const char*, const char*, bool*) override;
     void resolveObsoleteParms(PRM_ParmList*) override;
     bool updateParmsFlags() override;
 };
@@ -123,11 +124,13 @@ To Match Reference VDB:\n\
     The resulting volume is a copy of the input VDB,\n\
     aligned to the reference VDB.\n\
 Using Voxel Size Only:\n\
-    Keep the transform of the input VDB but set a new voxel size,\n\
-    increasing or decreasing the resolution.\n\
+    Set a new voxel size, increasing or decreasing the resolution.\n\
+    This can be applied to the transform of the input VDB or\n\
+    an axis-aligned linear transform.\n\
 Using Voxel Scale Only:\n\
-    Keep the transform of the input VDB but scale the voxel size,\n\
-    increasing or decreasing the resolution.\n"));
+    Scale the new voxel size, increasing or decreasing the resolution.\n\
+    This can be applied to the transform of the input VDB or\n\
+    an axis-aligned linear transform.\n"));
 
     parms.add(hutil::ParmFactory(PRM_ORD, "xOrd", "Transform Order")
         .setDefault(0, "tsr")
@@ -190,6 +193,13 @@ Using Voxel Scale Only:\n\
         .setTooltip(
             "The amount by which to scale the voxel size for each output VDB\n\n"
             "Larger voxels correspond to lower resolution.\n"));
+
+    // Toggle to use the input grid transform
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "linearxform", "Axis-aligned Linear Transform")
+        .setDefault(PRMzeroDefaults)
+        .setTooltip(
+            "Apply the input VDB voxel size or scale to an axis-aligned linear transform.\n\n"
+            "Disable this toggle to use the transform from the input VDB.\n"));
 
     // Toggle to apply transform to vector values
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "xformvectors", "Transform Vectors")
@@ -283,6 +293,38 @@ and usage examples.\n");
 
 
 void
+SOP_OpenVDB_Resample::syncNodeVersion(const char* oldVersion, const char*, bool*)
+{
+    // Since VDB 8.1.0, the axis-aligned linear transform toggle is now set to
+    // off by default. Detect if the VDB version that this node was created with
+    // was earlier than 8.1.0 and revert back to enabling this mode if so to
+    // prevent potentially breaking older scenes.
+
+    // VDB version string prior to 6.2.0 - "17.5.204"
+    // VDB version string since 6.2.0 - "vdb6.2.0 houdini17.5.204"
+
+    openvdb::Name oldVersionStr(oldVersion);
+
+    bool enableAxisAlignedLinearTransform = false;
+    size_t spacePos = oldVersionStr.find_first_of(' ');
+    if (spacePos == std::string::npos) {
+        // enable axis-aligned linear transform in VDB versions prior to 6.2.0
+        enableAxisAlignedLinearTransform = true;
+    } else if (oldVersionStr.size() > 3 && oldVersionStr.substr(0,3) == "vdb") {
+        std::string vdbVersion = oldVersionStr.substr(3,spacePos-3);
+        // enable axis-aligned linear transform in VDB versions prior to 8.1.0
+        if (UT_String::compareVersionString(vdbVersion.c_str(), "8.1.0") < 0) {
+            enableAxisAlignedLinearTransform = true;
+        }
+    }
+
+    if (enableAxisAlignedLinearTransform) {
+        setInt("linearxform", 0, 0, 1);
+    }
+}
+
+
+void
 SOP_OpenVDB_Resample::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 {
     if (!obsoleteParms) return;
@@ -316,6 +358,7 @@ SOP_OpenVDB_Resample::updateParmsFlags()
     changed |= enableParm("reference", mode == MODE_REF_GRID);
     changed |= enableParm("voxelsize", mode == MODE_VOXEL_SIZE);
     changed |= enableParm("voxelscale", mode == MODE_VOXEL_SCALE);
+    changed |= enableParm("linearxform", mode == MODE_VOXEL_SCALE || mode == MODE_VOXEL_SIZE);
     // Show either the voxel size or the voxel scale parm, but not both.
     changed |= setVisibleState("voxelsize", mode != MODE_VOXEL_SCALE);
     changed |= setVisibleState("voxelscale", mode == MODE_VOXEL_SCALE);
@@ -433,7 +476,8 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
         const bool
             prune = evalInt("prune", 0, time),
             rebuild = evalInt("rebuild", 0, time),
-            xformVec = evalInt("xformvectors", 0, time);
+            xformVec = evalInt("xformvectors", 0, time),
+            linearXform = evalInt("linearxform", 0, time);
         const float tolerance = static_cast<float>(evalFloat("tolerance", 0, time));
 
         // Get the group of grids to be resampled.
@@ -496,14 +540,26 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
             if (refGrid || mode == MODE_VOXEL_SIZE || mode == MODE_VOXEL_SCALE) {
                 openvdb::math::Transform::Ptr refXform;
                 if (mode == MODE_VOXEL_SIZE) {
-                    // copy the input grid transform and change the voxel size
-                    refXform = grid.transform().copy();
-                    refXform->preScale(voxelSize);
+                    if (linearXform) {
+                        // create a new linear transform with requested voxel size
+                        refXform = openvdb::math::Transform::createLinearTransform(voxelSize);
+                    } else {
+                        // copy the input grid transform and change the voxel size
+                        refXform = grid.transform().copy();
+                        // reset the voxel size back to 1.0 before applying the new voxel size
+                        openvdb::Vec3d revertVoxelSize(1.0 / refXform->voxelSize());
+                        refXform->preScale(revertVoxelSize * voxelSize);
+                    }
                 } else if (mode == MODE_VOXEL_SCALE) {
-                    // copy the input grid transform and scale the voxel size
-                    refXform = grid.transform().copy();
-                    openvdb::Vec3d scaledVoxelSize = grid.voxelSize() * voxelScale;
-                    refXform->preScale(scaledVoxelSize);
+                    if (linearXform) {
+                        // create a new linear transform scaling input grid voxel size by voxel scale
+                        refXform = openvdb::math::Transform::createLinearTransform();
+                        refXform->preScale(grid.voxelSize() * voxelScale);
+                    } else {
+                        // copy the input grid transform and scale the voxel size
+                        refXform = grid.transform().copy();
+                        refXform->preScale(voxelScale);
+                    }
                 } else {
                     // If a reference grid was provided, then after resampling, the
                     // output grid's transform will be the same as the reference grid's.
