@@ -1430,15 +1430,17 @@ private:
 
 // Active value render module
 
-VoxelModule::VoxelModule(const openvdb::GridBase::ConstPtr& grid):
-    mGrid(grid),
-    mIsInitialized(false)
+VoxelModule::VoxelModule(const openvdb::GridBase::ConstPtr& grid)
+    : mGrid(grid)
+    , mIsInitialized(false)
+    , mDrawingPointGrid(false)
 {
     mFlatShader.setVertShader(
         "#version 120\n"
         "void main() {\n"
+        "gl_PointSize = 1.0;\n" // only used for PointDataGrid shading, ignored otherwise
         "gl_FrontColor = gl_Color;\n"
-        "gl_Position =  ftransform();\n"
+        "gl_Position = ftransform();\n"
         "gl_ClipVertex = gl_ModelViewMatrix * gl_Vertex;\n"
         "}\n");
 
@@ -1480,10 +1482,12 @@ VoxelModule::init()
     mIsInitialized = true;
 
     if (mGrid->isType<openvdb::points::PointDataGrid>()) {
+        mDrawingPointGrid = true;
         mSurfaceBuffer.clear();
         PointDataOp drawPoints(mInteriorBuffer);
         util::doProcessTypedGrid<openvdb::points::PointDataGrid>(mGrid, drawPoints);
     } else {
+        mDrawingPointGrid = false;
         ActiveScalarValuesOp drawScalars(mInteriorBuffer, mSurfaceBuffer);
         if (!util::processTypedScalarOrPointDataGrid(mGrid, drawScalars)) {
             ActiveVectorValuesOp drawVectors(mVectorBuffer);
@@ -1502,14 +1506,25 @@ VoxelModule::render()
     if (!mIsVisible) return;
     if (!mIsInitialized) init();
 
-    mFlatShader.startShading();
-        mInteriorBuffer.render();
-        mVectorBuffer.render();
-    mFlatShader.stopShading();
+    if (mDrawingPointGrid) {
+        glEnable(GL_POINT_SMOOTH);
+        glEnable(GL_PROGRAM_POINT_SIZE);
+        mFlatShader.startShading();
+            mInteriorBuffer.render();
+        mFlatShader.stopShading();
+        glDisable(GL_POINT_SMOOTH);
+        glDisable(GL_PROGRAM_POINT_SIZE);
+    }
+    else {
+        mFlatShader.startShading();
+            mInteriorBuffer.render();
+            mVectorBuffer.render();
+        mFlatShader.stopShading();
 
-    mSurfaceShader.startShading();
-        mSurfaceBuffer.render();
-    mSurfaceShader.stopShading();
+        mSurfaceShader.startShading();
+            mSurfaceBuffer.render();
+        mSurfaceShader.stopShading();
+    }
 }
 
 
