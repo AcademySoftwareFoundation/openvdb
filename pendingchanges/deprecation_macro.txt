@@ -1,0 +1,3 @@
+Build:
+- Re-introduced the OPENVDB_DEPRECATED macro with an additional option that takes a message.
+  Added support to disable deprecations throughout OpenVDB by defining OPENVDB_NO_DEPRECATION_WARNINGS
