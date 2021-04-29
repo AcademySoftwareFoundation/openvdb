@@ -41,6 +41,7 @@ Index64 memUsage(const TreeT& tree, bool threaded = true);
 
 namespace count_internal {
 
+/// @brief A DynamicNodeManager operator to count active voxels in a tree
 template<typename TreeType>
 struct ActiveVoxelCountOp
 {
@@ -49,6 +50,7 @@ struct ActiveVoxelCountOp
     ActiveVoxelCountOp() = default;
     ActiveVoxelCountOp(const ActiveVoxelCountOp&, tbb::split) { }
 
+    //  accumulate all voxels in active tile children
     template<typename NodeT>
     bool operator()(const NodeT& node, size_t)
     {
@@ -58,6 +60,7 @@ struct ActiveVoxelCountOp
         return true;
     }
 
+    // accumulate all active voxels in the leaf
     bool operator()(const LeafT& leaf, size_t)
     {
         count += leaf.onVoxelCount();
@@ -70,8 +73,10 @@ struct ActiveVoxelCountOp
     }
 
     openvdb::Index64 count{0};
-};
+}; // struct ActiveVoxelCountOp
 
+/// @brief A DynamicNodeManager operator to count active voxels in a tree
+/// that fall within a provided bounding box
 template<typename TreeType>
 struct ActiveVoxelCountBBoxOp
 {
@@ -82,6 +87,7 @@ struct ActiveVoxelCountBBoxOp
     ActiveVoxelCountBBoxOp(const ActiveVoxelCountBBoxOp& other, tbb::split)
         : mBBox(other.mBBox) { }
 
+    // accumulate all voxels in active tile children bounded by the bbox
     template<typename NodeT>
     bool operator()(const NodeT& node, size_t)
     {
@@ -116,6 +122,7 @@ struct ActiveVoxelCountBBoxOp
         return false;
     }
 
+    // accumulate all active voxels in the leaf bounded by the bbox
     inline bool operator()(const LeafT& leaf, size_t)
     {
         // note: the true/false return value does nothing
@@ -149,8 +156,9 @@ struct ActiveVoxelCountBBoxOp
     openvdb::Index64 count{0};
 private:
     CoordBBox mBBox;
-};
+}; // struct ActiveVoxelCountBBoxOp
 
+/// @brief A DynamicNodeManager operator to sum the number of bytes of memory used
 template<typename TreeType>
 struct MemUsageOp
 {
@@ -160,12 +168,14 @@ struct MemUsageOp
     MemUsageOp() = default;
     MemUsageOp(const MemUsageOp&, tbb::split) { }
 
+    // accumulate size of the root node in bytes
     bool operator()(const RootT& root, size_t)
     {
         count += sizeof(root);
         return true;
     }
 
+    // accumulate size of all child nodes in bytes
     template<typename NodeT>
     bool operator()(const NodeT& node, size_t)
     {
@@ -175,6 +185,7 @@ struct MemUsageOp
         return true;
     }
 
+    // accumulate size of leaf node in bytes
     bool operator()(const LeafT& leaf, size_t)
     {
         count += leaf.memUsage();
@@ -187,7 +198,7 @@ struct MemUsageOp
     }
 
     openvdb::Index64 count{0};
-};
+}; // struct MemUsageOp
 
 } // namespace count_internal
 
