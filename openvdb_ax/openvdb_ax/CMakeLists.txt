@@ -84,7 +84,7 @@ if(found_LLVM)
   set(LLVM_LIBS "LLVM")
 else()
   llvm_map_components_to_libnames(_llvm_libs
-    native core executionengine support mcjit passes objcarcopts)
+    native core executionengine support mcjit passes)
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
