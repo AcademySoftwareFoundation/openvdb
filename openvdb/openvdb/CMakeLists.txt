@@ -350,6 +350,7 @@ set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
   tools/ChangeBackground.h
   tools/Clip.h
   tools/Composite.h
+  tools/Count.h
   tools/Dense.h
   tools/DenseSparseTools.h
   tools/Diagnostics.h

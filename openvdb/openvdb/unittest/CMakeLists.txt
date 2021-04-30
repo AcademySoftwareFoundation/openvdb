@@ -79,6 +79,7 @@ else()
     TestClip.cc
     TestConjGradient.cc
     TestCoord.cc
+    TestCount.cc
     TestCpt.cc
     TestCurl.cc
     TestDelayedLoadMetadata.cc
