@@ -1524,12 +1524,12 @@ VoxelModule::render()
 
     if (mDrawingPointGrid) {
         glEnable(GL_POINT_SMOOTH);
-        glEnable(GL_PROGRAM_POINT_SIZE);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
         mFlatShader.startShading();
             mInteriorBuffer.render();
         mFlatShader.stopShading();
         glDisable(GL_POINT_SMOOTH);
-        glDisable(GL_PROGRAM_POINT_SIZE);
+        glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
     }
     else {
         mFlatShader.startShading();
