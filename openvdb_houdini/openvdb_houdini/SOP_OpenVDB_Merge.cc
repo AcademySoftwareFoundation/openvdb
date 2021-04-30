@@ -66,26 +66,33 @@ newSopOperator(OP_OperatorTable* table)
             " (see [specifying volumes|/model/volumes#group])"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "collation", "Collation")
-        .setDefault("nameclassandtype")
+        .setDefault("name")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
-            "nameclassandtype", "Name, VDB Class and Value Type",
-            "classandtype",     "VDB Class and Value Type"
+            "name",             "Name",
+            "primitive_number", "Primitive Number",
+            "none",             "None"
         })
         .setTooltip(
             "Criteria under which groups of grids are merged.")
         .setDocumentation(
-            "The criteria under which groups of grids are merged.\n\n"
-            "Grids with different names will be merged if name is not part"
-            " of the collation criteria"));
+            "The criteria under which groups of grids are merged. In addition to these collation"
+            " options, only grids with the same class (fog volume, level set, etc) and"
+            " value type (float, int, etc) are merged.\n\n"
+            "Name:\n"
+            "   Collate VDBs with the same grid name.\n\n"
+            "Primitive Number:\n"
+            "   Collate first primitives from each input, then second primitives from each input, etc.\n\n"
+            "None:\n"
+            "   Collate all VDBs (provided they have the same class and value type).\n\n"));
 
-    // Menu of resampling options
-    parms.add(hutil::ParmFactory(PRM_STRING, "resample", "Resample VDBs")
-        .setDefault("first")
-        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
-            "first",        "To Match First VDB"
-        })
-        .setTypeExtended(PRM_TYPE_JOIN_PAIR)
-        .setDocumentation("Specify which grid to use as reference when resampling."));
+    // // Menu of resampling options
+    // parms.add(hutil::ParmFactory(PRM_STRING, "resample", "Resample VDBs")
+    //     .setDefault("first")
+    //     .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+    //         "first",        "To Match First VDB"
+    //     })
+    //     .setTypeExtended(PRM_TYPE_JOIN_PAIR)
+    //     .setDocumentation("Specify which grid to use as reference when resampling."));
 
     // Menu of resampling interpolation order options
     parms.add(hutil::ParmFactory(PRM_ORD, "resampleinterp", "Interpolation")
@@ -119,9 +126,9 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "Merge operation for Fog VDBs.\n\n"
             "None:\n"
-            "   Add grids to the output of the SOP without merging them.\n\n"
+            "   Leaves input fog VDBs unchanged.\n\n"
             "Add:\n"
-            "    Generate the sum of all fog VDBs with same collation.\n\n"));
+            "   Generate the sum of all fog VDBs within the same collation.\n\n"));
 
     parms.add(hutil::ParmFactory(PRM_STRING, "op_sdf", "SDF VDBs")
         .setDefault("sdfunion")
@@ -134,19 +141,23 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "Merge operation for SDF VDBs.\n\n"
             "None:\n"
-            "   Add grids to the output of the SOP without merging them.\n\n"
+            "    Leaves input SDF VDBs unchanged.\n\n"
             "SDF Union:\n"
-            "    Generate the union of all signed distance fields with same collation.\n\n"
+            "    Generate the union of all signed distance fields within the same collation.\n\n"
             "SDF Intersection:\n"
-            "    Generate the intersection of all signed distance fields with same collation.\n\n"));
+            "    Generate the intersection of all signed distance fields within the same collation.\n\n"));
 
     parms.endSwitcher();
+
+    hutil::ParmList obsoleteParms;
+    obsoleteParms.add(hutil::ParmFactory(PRM_STRING, "resample", "Resample VDBs"));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Merge", SOP_OpenVDB_Merge::factory, parms, *table)
 #ifndef SESI_OPENVDB
         .setInternalName("DW_OpenVDBMerge")
 #endif
+        .setObsoleteParms(obsoleteParms)
         .addInput("VDBs To Merge")
         .setMaxInputs()
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Merge::Cache; })
@@ -162,7 +173,7 @@ Merges VDB SDF grids.\n\
 \n\
 Unlike the VDB Combine SOP, it provides a multi-input so can merge more than two grids without needing an \
 additional merge SOP. \n\
-Float and double VDB SDF grids can be merged, all other VDB grids are added to the output without merging. \n\
+Float and double SDF VDBs and fog volume VDBs can be merged, all other VDB grids are left unchanged. \n\
 \n\
 Grids with different transforms will be resampled to match the first VDB in the collation group. \n\
 \n\
@@ -196,6 +207,9 @@ SOP_OpenVDB_Merge::SOP_OpenVDB_Merge(OP_Network* net,
 namespace {
 
 
+using PrimitiveNumberMap = std::unordered_map<GEO_PrimVDB::UniqueId, int>;
+
+
 // The merge key stores the grid class and value type and optionally the grid name
 // depending on the requested collation and is an abstraction used to test whether
 // different grids should be merged together or not
@@ -203,13 +217,16 @@ struct MergeKey
 {
     enum Collation
     {
-        NameClassAndType = 0,
-        ClassAndType
+        NameClassType = 0,
+        NumberClassType,
+        ClassType
     };
 
-    explicit MergeKey(   const GU_PrimVDB& vdbPrim,
-                    const Collation collation = NameClassAndType)
-        : name(collation == NameClassAndType ? vdbPrim.getGridName() : "")
+    explicit MergeKey(  const GU_PrimVDB& vdbPrim,
+                        const Collation collation,
+                        const PrimitiveNumberMap& primitiveNumbers)
+        : name(collation == NameClassType ? vdbPrim.getGridName() : "")
+        , number(collation == NumberClassType ? primitiveNumbers.at(vdbPrim.getUniqueId()) : -1)
         , valueType(vdbPrim.getStorageType())
         , gridClass(vdbPrim.getGrid().getGridClass()) { }
 
@@ -217,22 +234,27 @@ struct MergeKey
     {
         return (name == rhs.name &&
                 valueType == rhs.valueType &&
-                gridClass == rhs.gridClass);
+                gridClass == rhs.gridClass &&
+                number == rhs.number);
     }
 
     inline bool operator!=(const MergeKey& rhs) const { return !this->operator==(rhs); }
 
     inline bool operator<(const MergeKey& rhs) const
     {
-        if (name < rhs.name)                                                return true;
-        if (name == rhs.name) {
-            if (valueType < rhs.valueType)                                  return true;
-            if (valueType == rhs.valueType && gridClass < rhs.gridClass)    return true;
+        if (number < rhs.number)                                                return true;
+        if (number == rhs.number) {
+            if (name < rhs.name)                                                return true;
+            if (name == rhs.name) {
+                if (valueType < rhs.valueType)                                  return true;
+                if (valueType == rhs.valueType && gridClass < rhs.gridClass)    return true;
+            }
         }
         return false;
     }
 
     std::string name = "";
+    int number = 0;
     UT_VDBType valueType = UT_VDB_INVALID;
     openvdb::GridClass gridClass = GRID_UNKNOWN;
 }; // struct MergeKey
@@ -272,6 +294,7 @@ struct MergeOp
     std::deque<GU_PrimVDB*> vdbPrims;
     std::deque<const GU_PrimVDB*> constVdbPrims;
     std::deque<GU_PrimVDB*> vdbPrimsToRemove;
+    PrimitiveNumberMap primNumbers;
 
     explicit MergeOp(hvdb::Interrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
 
@@ -390,7 +413,7 @@ struct MergeOp
         };
 
         for (GU_PrimVDB* vdbPrim : vdbPrims) {
-            MergeKey key(*vdbPrim, collationKey);
+            MergeKey key(*vdbPrim, collationKey, primNumbers);
             if (key != mergeKey)    continue;
 
             if (hasUniqueTree(vdbPrim)) {
@@ -403,7 +426,7 @@ struct MergeOp
         }
 
         for (const GU_PrimVDB* constVdbPrim : constVdbPrims) {
-            MergeKey key(*constVdbPrim, collationKey);
+            MergeKey key(*constVdbPrim, collationKey, primNumbers);
             if (key != mergeKey)    continue;
 
             GridBase::ConstPtr gridBase = constVdbPrim->getConstGridPtr();
@@ -500,7 +523,7 @@ struct MergeOp
         };
 
         for (GU_PrimVDB* vdbPrim : vdbPrims) {
-            MergeKey key(*vdbPrim, collationKey);
+            MergeKey key(*vdbPrim, collationKey, primNumbers);
             if (key != mergeKey)    continue;
 
             if (hasUniqueTree(vdbPrim)) {
@@ -515,7 +538,7 @@ struct MergeOp
         }
         // const GU_PrimVDBs cannot be stolen
         for (const GU_PrimVDB* constVdbPrim : constVdbPrims) {
-            MergeKey key(*constVdbPrim, collationKey);
+            MergeKey key(*constVdbPrim, collationKey, primNumbers);
             if (key != mergeKey)    continue;
 
             GridBase::ConstPtr gridBase = constVdbPrim->getConstGridPtr();
@@ -593,9 +616,10 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
 
         const std::string groupName = evalStdString("group", mTime);
 
-        MergeKey::Collation collationKey = MergeKey::NameClassAndType;
+        MergeKey::Collation collationKey = MergeKey::ClassType;
         const std::string collation = evalStdString("collation", mTime);
-        if (collation == "classandtype")    collationKey = MergeKey::ClassAndType;
+        if (collation == "name")                    collationKey = MergeKey::NameClassType;
+        else if (collation == "primitive_number")   collationKey = MergeKey::NumberClassType;
 
         hvdb::Interrupter boss("Merging VDBs");
 
@@ -607,19 +631,25 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
         // extract non-const VDB primitives from first input
 
         hvdb::VdbPrimIterator vdbIt(gdp, matchGroup(*gdp, groupName));
+        int number = 0;
         for (; vdbIt; ++vdbIt) {
             GU_PrimVDB* vdbPrim = *vdbIt;
             mergeOp.vdbPrims.push_back(vdbPrim);
+            // store primitive index for each primitive keyed by the unique id
+            mergeOp.primNumbers[vdbPrim->getUniqueId()] = number++;
         }
 
         // extract const VDB primitives from second or more input
 
         for (int i = 1; i < nInputs(); i++) {
             const GU_Detail* pointsGeo = inputGeo(i);
+            number = 0;
             hvdb::VdbPrimCIterator vdbIt(pointsGeo, matchGroup(*pointsGeo, groupName));
             for (; vdbIt; ++vdbIt) {
                 const GU_PrimVDB* constVdbPrim = *vdbIt;
                 mergeOp.constVdbPrims.push_back(constVdbPrim);
+                // store primitive index for each primitive keyed by the unique id
+                mergeOp.primNumbers[constVdbPrim->getUniqueId()] = number++;
             }
         }
 
@@ -628,11 +658,11 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
         std::set<MergeKey> uniqueKeys;
 
         for (GU_PrimVDB* vdbPrim : mergeOp.vdbPrims) {
-            MergeKey key(*vdbPrim, collationKey);
+            MergeKey key(*vdbPrim, collationKey, mergeOp.primNumbers);
             uniqueKeys.insert(key);
         }
         for (const GU_PrimVDB* constVdbPrim : mergeOp.constVdbPrims) {
-            MergeKey key(*constVdbPrim, collationKey);
+            MergeKey key(*constVdbPrim, collationKey, mergeOp.primNumbers);
             uniqueKeys.insert(key);
         }
 
