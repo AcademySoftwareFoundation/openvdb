@@ -309,6 +309,7 @@ set(OPENVDB_PYTHON_PATH_SUFFIXES
   ${CMAKE_INSTALL_LIBDIR}/python
   ${CMAKE_INSTALL_LIBDIR}/python2.7
   ${CMAKE_INSTALL_LIBDIR}/python3
+  ${CMAKE_INSTALL_LIBDIR}/python3.8/dist-packages/
   lib64/python
   lib64/python2.7
   lib64/python3
