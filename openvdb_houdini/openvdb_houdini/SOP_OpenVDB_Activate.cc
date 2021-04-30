@@ -217,7 +217,7 @@ an inclusive range, so includes the maximum voxel.)"));
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
-	      .setTooltip("Expand the active area by at least the specified number of voxels.")
+              .setTooltip("Expand the active area by at least the specified number of voxels.")
                 .setDocumentation(
 R"(Expand the active area by at least the specified number of voxels.  Does not support
 operation or setting of values.)"));
@@ -227,11 +227,11 @@ operation or setting of values.)"));
     operation or setting of values.
 */
     parms.add(hutil::ParmFactory(PRM_FLT, "expanddist", "Expand Distance")
-	      .setDefault(PRMzeroDefaults)
-	      .setRange(PRM_RANGE_UI, 0.0f, PRM_RANGE_UI, 2.0f)
-	      .setTooltip("Expand the active area by at least the specified distance.")
-	      .setDocumentation(
-				R"(Expand the active area by at least the specified distance. Does not support operation or setting of values.)"));
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, 0.0f, PRM_RANGE_UI, 2.0f)
+              .setTooltip("Expand the active area by at least the specified distance.")
+              .setDocumentation(
+                                R"(Expand the active area by at least the specified distance. Does not support operation or setting of values.)"));
 
     parms.addFolder("Reference");
 /*
@@ -490,16 +490,16 @@ sopFillSDF(GridType &grid, int dummy)
 
 template <typename GridType>
 static void
-sopDilateVoxels(GridType& grid, int count)
+sopDilateVoxels(GridType& grid, exint count)
 {
-    openvdb::tools::dilateActiveValues(grid.tree(), count);
+    openvdb::tools::dilateActiveValues(grid.tree(), static_cast<int>(count));
 }
 
 template <typename GridType>
 static void
-sopErodeVoxels(GridType& grid, int count)
+sopErodeVoxels(GridType& grid, exint count)
 {
-    openvdb::tools::erodeActiveValues(grid.tree(), count);
+    openvdb::tools::erodeActiveValues(grid.tree(), static_cast<int>(count));
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
         openvdb::tools::pruneLevelSet(grid.tree());
     }
@@ -682,7 +682,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                                          vdb->getGrid(), maxdilate);
                     }
 
-		    exint mindilate = SYSmin(dilatevoxels, dilatedist);
+                    exint mindilate = SYSmin(dilatevoxels, dilatedist);
                     if (mindilate < 0)
                     {
                         if (boss->opInterrupt())
