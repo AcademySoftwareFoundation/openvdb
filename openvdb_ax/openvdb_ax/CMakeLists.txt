@@ -94,6 +94,12 @@ if(MINIMUM_LLVM_VERSION)
       "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
   endif()
 endif()
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_LLVM_VERSION)
+  if(LLVM_PACKAGE_VERSION VERSION_LESS FUTURE_MINIMUM_LLVM_VERSION)
+    message(DEPRECATION "Support for LLVM versions < ${FUTURE_MINIMUM_LLVM_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
 
 message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE_VERSION}\", "
   "minimum required is \"${MINIMUM_LLVM_VERSION}\")")
