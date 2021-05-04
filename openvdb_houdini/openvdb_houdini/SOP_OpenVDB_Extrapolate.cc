@@ -783,10 +783,10 @@ SOP_OpenVDB_Extrapolate::Cache::cookVDBSop(OP_Context& context)
                 }
                 case UT_VDB_DOUBLE:
                 {
-                    float isoValue = (parms.mMode == "convert" || parms.mMode == "fogext") ?
-                                         static_cast<double>(evalFloat("fogisovalue", 0, time)) :
-                                         (parms.mMode == "renormalize" || parms.mMode == "sdfext") ?
-                                         static_cast<double>(evalFloat("sdfisovalue", 0, time)) : 0.;
+                    double isoValue = (parms.mMode == "convert" || parms.mMode == "fogext") ?
+                                        static_cast<double>(evalFloat("fogisovalue", 0, time)) :
+                                        (parms.mMode == "renormalize" || parms.mMode == "sdfext") ?
+                                        static_cast<double>(evalFloat("sdfisovalue", 0, time)) : 0.0;
                     processHelper<openvdb::DoubleGrid>(parms, *it /*lsPrim*/, isoValue, maskPrim);
                     parms.mExtFieldProcessed = true;
                     break;
