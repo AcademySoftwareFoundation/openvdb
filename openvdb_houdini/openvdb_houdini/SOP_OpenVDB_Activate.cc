@@ -212,7 +212,7 @@ an inclusive range, so includes the maximum voxel.)"));
     parms.addFolder("Expand");
 /*
     Expand the active area by at least the specified number of voxels.  Does not
-    operation or setting of values.
+    support operation or setting of values.
 */
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
                 .setDefault(PRMoneDefaults)
@@ -690,6 +690,10 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopErodeVoxels,
                                          vdb->getGrid(), -mindilate);
+                    }
+                    if (mindilate < 0 && maxdilate > 0)
+                    {
+                        addWarning(SOP_MESSAGE, "Conflicting signs in Voxel/Worldspace dilation request.  Applying both, which may not be expected.");
                     }
                     break;
                 }
