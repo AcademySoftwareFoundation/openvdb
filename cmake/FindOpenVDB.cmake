@@ -305,12 +305,16 @@ list(APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
 
 set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
-find_package(Python REQUIRED)
 set(OPENVDB_PYTHON_PATH_SUFFIXES
-  ${Python_SITELIB}
   ${CMAKE_INSTALL_LIBDIR}/python
+  ${CMAKE_INSTALL_LIBDIR}/python/site-packages
+  ${CMAKE_INSTALL_LIBDIR}/python/dist-packages
   ${CMAKE_INSTALL_LIBDIR}/python2.7
+  ${CMAKE_INSTALL_LIBDIR}/python2.7/site-pacakges
+  ${CMAKE_INSTALL_LIBDIR}/python2.7/dist-packages
   ${CMAKE_INSTALL_LIBDIR}/python3
+  ${CMAKE_INSTALL_LIBDIR}/python3/dist-packages
+  ${CMAKE_INSTALL_LIBDIR}/python3/site-packages
   lib64/python
   lib64/python2.7
   lib64/python3
@@ -463,6 +467,7 @@ find_package(Boost REQUIRED COMPONENTS iostreams system)
 # @todo track for numpy
 
 if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
+  find_package(PythonLibs REQUIRED)
   # Boost python handling - try and find both python and pythonXx (version suffixed).
   # Prioritize the version suffixed library, failing if neither exist.
 
