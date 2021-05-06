@@ -467,6 +467,7 @@ find_package(Boost REQUIRED COMPONENTS iostreams system)
 
 if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
   find_package(PythonLibs REQUIRED)
+
   # Boost python handling - try and find both python and pythonXx (version suffixed).
   # Prioritize the version suffixed library, failing if neither exist.
 
