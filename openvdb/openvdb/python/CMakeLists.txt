@@ -206,13 +206,10 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-  execute_process(COMMAND ${Python_EXECUTABLE} -c
-  "from distutils import sysconfig; print(sysconfig.get_python_lib(prefix=''))"
-  OUTPUT_VARIABLE PYTHON_PACKAGES_DIR
-  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  set(PYOPENVDB_INSTALL_DIRECTORY ${PYTHON_PACKAGES_DIR}
-    CACHE STRING "The directory to install the pyopenvdb.so module."
-  )
+  get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
+  set(PYOPENVDB_INSTALL_DIRECTORY
+      ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
+      CACHE STRING "The directory to install the pyopenvdb.so module.")
 endif()
 
 # @todo  pyopenvdb is currently advertised as "linkable" by extension libraries
