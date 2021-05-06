@@ -210,16 +210,7 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-  execute_process(COMMAND ${Python_EXECUTABLE} -c "from distutils.sysconfig import *; print(get_python_lib())"
-                  OUTPUT_VARIABLE python_packages_path
-                  OUTPUT_STRIP_TRAILING_WHITESPACE)
-  if("${python_packages_path}" MATCHES "site-packages")
-    set(PYTHON_PACKAGES_DIR "site-packages")
-  else()
-    set(PYTHON_PACKAGES_DIR "dist-packages")
-  endif()
-  set(PYOPENVDB_INSTALL_DIRECTORY
-    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${PYTHON_PACKAGES_DIR}
+  set(PYOPENVDB_INSTALL_DIRECTORY ${Python_SITELIB}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()
