@@ -210,7 +210,11 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-  set(PYOPENVDB_INSTALL_DIRECTORY ${Python_SITELIB}
+  execute_process(COMMAND ${Python_EXECUTABLE} -c
+  "from distutils import sysconfig; print(sysconfig.get_python_lib(prefix=''))"
+  OUTPUT_VARIABLE PYTHON_PACKAGES_DIR
+  OUTPUT_STRIP_TRAILING_WHITESPACE)
+  set(PYOPENVDB_INSTALL_DIRECTORY ${PYTHON_PACKAGES_DIR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()
