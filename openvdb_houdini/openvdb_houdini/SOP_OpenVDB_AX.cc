@@ -932,10 +932,13 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                     throw std::runtime_error("No point executable has been built");
                 }
 
+                const auto& leafIter = points->tree().cbeginLeaf();
+                if (!leafIter) continue; // empty
+
                 // check the attributes that are not being created already exist
 
                 std::vector<UT_String> missingAttributes;
-                const auto& desc = points->tree().cbeginLeaf()->attributeSet().descriptor();
+                const auto& desc = leafIter->attributeSet().descriptor();
 
                 for (const auto& attribute : mCompilerCache.mAttributeRegistry->data()) {
                     const auto& name = attribute.name();
