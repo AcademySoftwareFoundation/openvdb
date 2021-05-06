@@ -74,7 +74,11 @@ endfunction()
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development Interpreter)
+set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+
+if(OPENVDB_BUILD_PYTHON_UNITTESTS)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+endif()
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
   find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
