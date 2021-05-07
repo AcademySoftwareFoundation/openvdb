@@ -74,11 +74,7 @@ endfunction()
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
-
-if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
-endif()
+set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development Interpreter)
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
   find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
@@ -210,8 +206,9 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+  get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
   set(PYOPENVDB_INSTALL_DIRECTORY
-    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
+    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()
