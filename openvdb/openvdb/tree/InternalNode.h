@@ -269,14 +269,14 @@ public:
     void setOrigin(const Coord& origin) { mOrigin = origin; }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Return the transitive offset value.
-    Index64 transitiveOffset() const { return Index64(mTransitiveOffset); }
-    /// Set the transitive offset value.
-    void setTransitiveOffset(Index64 transitiveOffset)
+    /// Return the transient data value.
+    Index64 transientData() const { return Index64(mTransientData); }
+    /// Set the transient data value.
+    void setTransientData(Index64 transientData)
     {
         // assert that offset does not exceed 32-bit limit
-        assert(transitiveOffset <= Index64(std::numeric_limits<Index32>::max()));
-        mTransitiveOffset = static_cast<Index32>(transitiveOffset);
+        assert(transientData <= Index64(std::numeric_limits<Index32>::max()));
+        mTransientData = static_cast<Index32>(transientData);
     }
 #endif
 
@@ -831,8 +831,8 @@ protected:
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Transitive offset
-    Index32 mTransitiveOffset = 0;
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
 #endif
 }; // class InternalNode
 
@@ -918,7 +918,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode& other)
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     DeepCopy<InternalNode<ChildT, Log2Dim> > tmp(&other, this);
@@ -934,7 +934,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     DeepCopy<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this);
@@ -973,7 +973,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     TopologyCopy1<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, background);
@@ -1013,7 +1013,7 @@ InternalNode<ChildT, Log2Dim>::InternalNode(const InternalNode<OtherChildNodeTyp
     , mValueMask(other.mValueMask)
     , mOrigin(other.mOrigin)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     TopologyCopy2<InternalNode<OtherChildNodeType, Log2Dim> > tmp(&other, this, offValue, onValue);

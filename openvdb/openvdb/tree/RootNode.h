@@ -406,14 +406,14 @@ public:
     static CoordBBox getNodeBoundingBox() { return CoordBBox::inf(); }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Return the transitive offset value.
-    Index64 transitiveOffset() const { return Index64(mTransitiveOffset); }
-    /// Set the transitive offset value.
-    void setTransitiveOffset(Index64 transitiveOffset)
+    /// Return the transient data value.
+    Index64 transientData() const { return Index64(mTransientData); }
+    /// Set the transient data value.
+    void setTransientData(Index64 transientData)
     {
         // assert that offset does not exceed 32-bit limit
-        assert(transitiveOffset <= Index64(std::numeric_limits<Index32>::max()));
-        mTransitiveOffset = static_cast<Index32>(transitiveOffset);
+        assert(transientData <= Index64(std::numeric_limits<Index32>::max()));
+        mTransientData = static_cast<Index32>(transientData);
     }
 #endif
 
@@ -979,8 +979,8 @@ private:
     MapType mTable;
     ValueType mBackground;
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Transitive offset
-    Index32 mTransitiveOffset = 0;
+    /// Transient Data (not serialized)
+    Index32 mTransientData = 0;
 #endif
 }; // end of RootNode class
 
@@ -1065,7 +1065,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, const ValueType& foregd, TopologyCopy)
     : mBackground(backgd)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
@@ -1090,7 +1090,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, TopologyCopy)
     : mBackground(backgd)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
@@ -1151,7 +1151,7 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 
         self.mBackground = Local::convertValue(other.mBackground);
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-        self.mTransitiveOffset = other.mTransitiveOffset;
+        self.mTransientData = other.mTransientData;
 #endif
 
         self.clear();
@@ -1180,7 +1180,7 @@ RootNode<ChildT>::operator=(const RootNode& other)
     if (&other != this) {
         mBackground = other.mBackground;
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-        mTransitiveOffset = other.mTransitiveOffset;
+        mTransientData = other.mTransientData;
 #endif
 
         this->clear();

@@ -3048,16 +3048,18 @@ TEST_F(TestTree, testRootNode)
         }
     }
 
-    { // test transitive offset
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    { // test transient data
         RootNodeType rootNode(0.0f);
-        EXPECT_EQ(openvdb::Index64(0), rootNode.transitiveOffset());
-        rootNode.setTransitiveOffset(openvdb::Index64(5));
-        EXPECT_EQ(openvdb::Index64(5), rootNode.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(0), rootNode.transientData());
+        rootNode.setTransientData(openvdb::Index64(5));
+        EXPECT_EQ(openvdb::Index64(5), rootNode.transientData());
         RootNodeType rootNode2(rootNode);
-        EXPECT_EQ(openvdb::Index64(5), rootNode2.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(5), rootNode2.transientData());
         RootNodeType rootNode3 = rootNode;
-        EXPECT_EQ(openvdb::Index64(5), rootNode3.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(5), rootNode3.transientData());
     }
+#endif
 }
 
 TEST_F(TestTree, testInternalNode)
@@ -3153,16 +3155,18 @@ TEST_F(TestTree, testInternalNode)
         delete child;
     }
 
-    { // test transitive offset
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    { // test transient data
         InternalNodeType internalNode(c1, 0.0f);
-        EXPECT_EQ(openvdb::Index64(0), internalNode.transitiveOffset());
-        internalNode.setTransitiveOffset(openvdb::Index64(5));
-        EXPECT_EQ(openvdb::Index64(5), internalNode.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(0), internalNode.transientData());
+        internalNode.setTransientData(openvdb::Index64(5));
+        EXPECT_EQ(openvdb::Index64(5), internalNode.transientData());
         InternalNodeType internalNode2(internalNode);
-        EXPECT_EQ(openvdb::Index64(5), internalNode2.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(5), internalNode2.transientData());
         InternalNodeType internalNode3 = internalNode;
-        EXPECT_EQ(openvdb::Index64(5), internalNode3.transitiveOffset());
+        EXPECT_EQ(openvdb::Index64(5), internalNode3.transientData());
     }
+#endif
 }
 
 // Copyright (c) DreamWorks Animation LLC

@@ -169,14 +169,14 @@ public:
     Coord offsetToGlobalCoord(Index n) const;
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Return the transitive offset value.
-    Index64 transitiveOffset() const { return Index64(mTransitiveOffset); }
-    /// Set the transitive offset value.
-    void setTransitiveOffset(Index64 transitiveOffset)
+    /// Return the transient data value.
+    Index64 transientData() const { return Index64(mTransientData); }
+    /// Set the transient data value.
+    void setTransientData(Index64 transientData)
     {
         // assert that offset does not exceed 32-bit limit
-        assert(transitiveOffset <= Index64(std::numeric_limits<Index32>::max()));
-        mTransitiveOffset = static_cast<Index32>(transitiveOffset);
+        assert(transientData <= Index64(std::numeric_limits<Index32>::max()));
+        mTransientData = static_cast<Index32>(transientData);
     }
 #endif
 
@@ -746,8 +746,8 @@ protected:
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Transitive offset
-    Index32 mTransitiveOffset = 0;
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
 #endif
 
 private:
@@ -809,7 +809,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode &other)
     : mBuffer(other.mBuffer)
     , mOrigin(other.mOrigin)
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
 }
@@ -823,7 +823,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other)
     : mBuffer(other.valueMask())
     , mOrigin(other.origin())
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
 }
@@ -837,7 +837,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
     : mBuffer(other.valueMask())// value = active state
     , mOrigin(other.origin())
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
 }
@@ -850,7 +850,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other, T
     : mBuffer(other.valueMask())// value = active state
     , mOrigin(other.origin())
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
 }
@@ -864,7 +864,7 @@ LeafNode<ValueMask, Log2Dim>::LeafNode(const LeafNode<ValueT, Log2Dim>& other,
     : mBuffer(other.valueMask())
     , mOrigin(other.origin())
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    , mTransitiveOffset(other.mTransitiveOffset)
+    , mTransientData(other.mTransientData)
 #endif
 {
     if (offValue==true) {

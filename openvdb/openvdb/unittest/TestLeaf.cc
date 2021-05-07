@@ -518,18 +518,20 @@ TEST_F(TestLeaf, testCount)
     EXPECT_EQ(Index(3), dims[0]);
 }
 
-TEST_F(TestLeaf, testTransitiveOffset)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+TEST_F(TestLeaf, testTransientData)
 {
     using namespace openvdb;
     using LeafT = tree::LeafNode<float, 3>;
     const Coord origin(-9, -2, -8);
     LeafT leaf(origin, 1.0f, false);
 
-    EXPECT_EQ(Index64(0), leaf.transitiveOffset());
-    leaf.setTransitiveOffset(Index64(5));
-    EXPECT_EQ(Index64(5), leaf.transitiveOffset());
+    EXPECT_EQ(Index64(0), leaf.transientData());
+    leaf.setTransientData(Index64(5));
+    EXPECT_EQ(Index64(5), leaf.transientData());
     LeafT leaf2(leaf);
-    EXPECT_EQ(Index64(5), leaf2.transitiveOffset());
+    EXPECT_EQ(Index64(5), leaf2.transientData());
     LeafT leaf3 = leaf;
-    EXPECT_EQ(Index64(5), leaf3.transitiveOffset());
+    EXPECT_EQ(Index64(5), leaf3.transientData());
 }
+#endif

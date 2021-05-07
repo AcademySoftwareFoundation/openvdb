@@ -556,15 +556,17 @@ TEST_F(TestLeafBool, testMedian)
 //     EXPECT_TRUE(tree->hasSameTopology(*copyOfTree));
 // }
 
-TEST_F(TestLeafBool, testTransitiveOffset)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+TEST_F(TestLeafBool, testTransientData)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
 
-    EXPECT_EQ(openvdb::Index64(0), leaf.transitiveOffset());
-    leaf.setTransitiveOffset(openvdb::Index64(5));
-    EXPECT_EQ(openvdb::Index64(5), leaf.transitiveOffset());
+    EXPECT_EQ(openvdb::Index64(0), leaf.transientData());
+    leaf.setTransientData(openvdb::Index64(5));
+    EXPECT_EQ(openvdb::Index64(5), leaf.transientData());
     LeafType leaf2(leaf);
-    EXPECT_EQ(openvdb::Index64(5), leaf2.transitiveOffset());
+    EXPECT_EQ(openvdb::Index64(5), leaf2.transientData());
     LeafType leaf3 = leaf;
-    EXPECT_EQ(openvdb::Index64(5), leaf3.transitiveOffset());
+    EXPECT_EQ(openvdb::Index64(5), leaf3.transientData());
 }
+#endif
