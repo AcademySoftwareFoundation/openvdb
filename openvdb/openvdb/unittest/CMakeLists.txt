@@ -79,6 +79,7 @@ else()
     TestClip.cc
     TestConjGradient.cc
     TestCoord.cc
+    TestCount.cc
     TestCpt.cc
     TestCurl.cc
     TestDelayedLoadMetadata.cc
@@ -222,7 +223,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Gtest_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

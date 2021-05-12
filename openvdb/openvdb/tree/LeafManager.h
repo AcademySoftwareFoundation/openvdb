@@ -536,7 +536,7 @@ public:
     }
 
     template<typename ArrayT>
-    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array)
+    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array)
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");
@@ -554,7 +554,7 @@ public:
     }
 
     template<typename ArrayT>
-    [[deprecated("Use Tree::getNodes()")]] void getNodes(ArrayT& array) const
+    OPENVDB_DEPRECATED_MESSAGE("Use Tree::getNodes()") void getNodes(ArrayT& array) const
     {
         using T = typename ArrayT::value_type;
         static_assert(std::is_pointer<T>::value, "argument to getNodes() must be a pointer array");

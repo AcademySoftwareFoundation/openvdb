@@ -146,7 +146,7 @@ public:
 
     /// Return a copy of this attribute.
 #ifndef _MSC_VER
-    [[deprecated("In-memory compression no longer supported, use AttributeArray::copy() instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
 #endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
@@ -220,7 +220,7 @@ public:
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
     // Windows does not allow base classes to be easily deprecated.
 #ifndef _MSC_VER
-    [[deprecated("Use copyValues() with source-target index pairs")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
@@ -267,12 +267,12 @@ public:
 
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    [[deprecated("Previously this compressed the attribute array, now it does nothing")]]
+    OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
 #endif
     virtual bool compress() = 0;
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    [[deprecated("Previously this uncompressed the attribute array, now it does nothing")]]
+    OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
 #endif
     virtual bool decompress() = 0;
 
@@ -548,7 +548,7 @@ public:
     /// It is not thread-safe for write.
     TypedAttributeArray(const TypedAttributeArray&);
     /// Deep copy constructor.
-    [[deprecated("Use copy-constructor without unused bool parameter")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use copy-constructor without unused bool parameter")
     TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
 #else
     /// Deep copy constructor.
@@ -572,7 +572,7 @@ public:
 
     /// Return a copy of this attribute.
     /// @note This method is thread-safe.
-    [[deprecated("In-memory compression no longer supported, use AttributeArray::copy() instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
     AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
@@ -667,7 +667,7 @@ public:
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
-    [[deprecated("Use copyValues() with source-target index pairs")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
     /// Return @c true if this array is stored as a single uniform value.
@@ -693,10 +693,10 @@ public:
     static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
-    [[deprecated("Previously this compressed the attribute array, now it does nothing")]]
+    OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
     bool compress() override;
     /// Uncompress the attribute array.
-    [[deprecated("Previously this uncompressed the attribute array, now it does nothing")]]
+    OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
     bool decompress() override;
 
     /// Read attribute data from a stream.

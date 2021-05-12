@@ -110,13 +110,22 @@
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 #endif
 
+/// Deprecation macros. Define OPENVDB_NO_DEPRECATION_WARNINGS to disable all
+/// deprecation warnings in OpenVDB.
+#ifndef OPENVDB_NO_DEPRECATION_WARNINGS
+#define OPENVDB_DEPRECATED [[deprecated]]
+#define OPENVDB_DEPRECATED_MESSAGE(msg) [[deprecated(msg)]]
+#else
+#define OPENVDB_DEPRECATED
+#define OPENVDB_DEPRECATED_MESSAGE(msg)
+#endif
 
 /// @brief Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END,
 /// to inhibit warnings about deprecated code.
 /// @note Use this sparingly.  Remove references to deprecated code if at all possible.
 /// @details Example:
 /// @code
-/// [[deprecated]] void myDeprecatedFunction() {}
+/// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
 ///
 /// {
 ///     OPENVDB_NO_DEPRECATION_WARNING_BEGIN
