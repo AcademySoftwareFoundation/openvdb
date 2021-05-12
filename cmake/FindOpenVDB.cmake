@@ -285,13 +285,17 @@ OPENVDB_VERSION_FROM_HEADER("${_OPENVDB_VERSION_HEADER}"
   MAJOR   OpenVDB_MAJOR_VERSION
   MINOR   OpenVDB_MINOR_VERSION
   PATCH   OpenVDB_PATCH_VERSION
-  ABI     OpenVDB_ABI # Will be empty for the older version.h header
+  ABI     OpenVDB_ABI_FROM_HEADER # will be OpenVDB_MAJOR_VERSION prior to 8.1.0
 )
 
-set(_OPENVDB_HAS_NEW_VERSION_HEADER FALSE)
-if(OpenVDB_ABI)
+if(OpenVDB_VERSION VERSION_LESS 8.1.0)
+  set(_OPENVDB_HAS_NEW_VERSION_HEADER FALSE)
+  # ABI gets computed later
+else()
   set(_OPENVDB_HAS_NEW_VERSION_HEADER TRUE)
+  set(OpenVDB_ABI ${OpenVDB_ABI_FROM_HEADER})
 endif()
+unset(OpenVDB_ABI_FROM_HEADER)
 
 # ------------------------------------------------------------------------
 #  Search for OPENVDB lib DIR
