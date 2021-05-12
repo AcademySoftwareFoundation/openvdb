@@ -467,6 +467,15 @@ endif()
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
+if(WIN32)
+  if(USE_IMATH_HALF)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
+    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
+endif()
+
 if(USE_LOG4CPLUS)
   list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_USE_LOG4CPLUS)
 endif()

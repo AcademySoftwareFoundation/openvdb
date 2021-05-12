@@ -137,6 +137,14 @@ if(OPENVDB_BUILD_VDB_RENDER)
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 
+  if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
+    get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      target_compile_definitions(vdb_render  PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
+
   if(OPENVDB_ENABLE_RPATH)
     set(OPENVDB_RENDER_RPATHS)
     list(APPEND OPENVDB_RENDER_RPATHS

@@ -616,6 +616,12 @@ endif()
 
 if(OpenVDB_USES_IMATH_HALF)
   find_package(IlmBase REQUIRED COMPONENTS Half)
+  if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
+    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
+    endif()
+  endif()
 endif()
 
 if(UNIX)
