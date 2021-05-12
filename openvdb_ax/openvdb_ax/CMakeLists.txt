@@ -84,7 +84,7 @@ if(found_LLVM)
   set(LLVM_LIBS "LLVM")
 else()
   llvm_map_components_to_libnames(_llvm_libs
-    native core executionengine support mcjit passes objcarcopts)
+    native core executionengine support mcjit passes)
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
@@ -92,6 +92,12 @@ if(MINIMUM_LLVM_VERSION)
   if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
     message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
       "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
+  endif()
+endif()
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_LLVM_VERSION)
+  if(LLVM_PACKAGE_VERSION VERSION_LESS FUTURE_MINIMUM_LLVM_VERSION)
+    message(DEPRECATION "Support for LLVM versions < ${FUTURE_MINIMUM_LLVM_VERSION} "
+      "is deprecated and will be removed.")
   endif()
 endif()
 

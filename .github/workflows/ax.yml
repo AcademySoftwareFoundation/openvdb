@@ -103,7 +103,7 @@ jobs:
       matrix:
         compiler: ['clang++']
         build: ['Release']
-        llvm: ['7','8','9'] #@todo add back llvm 10 when the brew formula is fixed
+        llvm: ['7','8','9','11','12'] #@note llvm10 never got its own brew formula...
         # Extra builds
         include:
           - compiler: 'g++'

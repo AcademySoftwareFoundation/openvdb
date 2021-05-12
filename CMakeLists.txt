@@ -261,6 +261,7 @@ set(FUTURE_MINIMUM_TBB_VERSION 2019.0)
 set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
 set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
 set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
+set(FUTURE_MINIMUM_LLVM_VERSION 8.0.0)
 
 #########################################################################
 
