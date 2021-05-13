@@ -195,10 +195,11 @@ Using Voxel Scale Only:\n\
             "Larger voxels correspond to lower resolution.\n"));
 
     // Toggle to use the input grid transform
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "linearxform", "Axis-aligned Linear Transform")
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "linearxform", "Force Axis Aligned")
         .setDefault(PRMzeroDefaults)
         .setTooltip(
             "Apply the input VDB voxel size or scale to an axis-aligned linear transform.\n\n"
+            "An axis-aligned linear transform cannot have taper.\n\n"
             "Disable this toggle to use the transform from the input VDB.\n"));
 
     // Toggle to apply transform to vector values
