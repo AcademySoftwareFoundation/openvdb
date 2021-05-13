@@ -70,7 +70,7 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "name",             "Name",
             "primitive_number", "Primitive Number",
-            "none",             "None"
+            "all",              "All"
         })
         .setTooltip(
             "Criteria under which groups of grids are merged.")
