@@ -8,8 +8,6 @@
 //#define BENCHMARK_FAST_SWEEPING
 //#define TIMING_FAST_SWEEPING
 
-#include <sstream>
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
@@ -23,6 +21,10 @@
 #ifdef TIMING_FAST_SWEEPING
 #include <openvdb/util/CpuTimer.h>
 #endif
+
+#include <gtest/gtest.h>
+
+#include <sstream>
 
 // Uncomment to test on models from our web-site
 //#define TestFastSweeping_DATA_PATH "/Users/ken/dev/data/vdb/"

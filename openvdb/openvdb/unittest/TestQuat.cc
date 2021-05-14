@@ -1,11 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Quat.h>
 #include <openvdb/math/Mat4.h>
+
+#include <gtest/gtest.h>
+
 
 using namespace openvdb::math;
 

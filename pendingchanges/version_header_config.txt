@@ -1,0 +1,11 @@
+Build:
+  - The Windows defines NOMINMAX and _USE_MATH_DEFINES are now provided in Platform.h.
+  - Moved the logic from PlatformConfig.h into Platform.h.
+  - The version.h header is now an auto generated header (version.h.in) populated by CMake.
+    The OpenVDB Version and ABI defines are computed from the installation settings.
+    Importantly, the value of OPENVDB_ABI_VERSION_NUMBER now always matches the version
+    used at build time.
+  - Added OPENVDB_USE_HALF, OPENVDB_USE_BLOSC and OPENVDB_USE_ZLIB as publicly available
+    defines in version.h. These will be defined depending on the settings used to build
+    OpenVDB.
+

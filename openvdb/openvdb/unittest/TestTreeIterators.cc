@@ -1,11 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/tree/Tree.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
+
+#include <gtest/gtest.h>
 
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \

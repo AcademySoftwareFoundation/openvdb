@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tools/Clip.h>
 
+#include <gtest/gtest.h>
 
 // See also TestGrid::testClipping()
 class TestClip: public ::testing::Test

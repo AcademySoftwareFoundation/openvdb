@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/StreamCompression.h>
-
 #include <openvdb/io/Compression.h> // io::COMPRESS_BLOSC
+
+#include <gtest/gtest.h>
 
 #ifdef __clang__
 #pragma GCC diagnostic push

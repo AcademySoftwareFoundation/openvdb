@@ -5,9 +5,11 @@
 ///
 /// @author Peter Cucka
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tree/Tree.h>
+
+#include <gtest/gtest.h>
+
 #include <map>
 #include <set>
 #include <sstream>

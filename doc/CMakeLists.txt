@@ -53,7 +53,7 @@ set(DOXY_FILES
   doc/python.txt)
 
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
-set(DOXYGEN_PROJECT_NUMBER "8.1.0")
+set(DOXYGEN_PROJECT_NUMBER "${OpenVDB_VERSION}")
 set(DOXYGEN_PROJECT_BRIEF "")
 set(DOXYGEN_FILE_PATTERNS "*.h") # headers only
 set(DOXYGEN_IMAGE_PATH "doc/img")
@@ -88,7 +88,7 @@ set(DOXYGEN_ALIASES
   [[ijk="(<i>i</i>,&nbsp;<i>j</i>,&nbsp;<i>k</i>)"]]
   [[xyz="(<i>x</i>,&nbsp;<i>y</i>,&nbsp;<i>z</i>)"]]
   [[const="<tt>const</tt>"]]
-  [["vdbnamespace=openvdb::v8_0"]]
+  "\"vdbnamespace=openvdb::v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}\""
   [["hunamespace=houdini_utils"]]
   [["hvdbnamespace=openvdb_houdini"]]
   # Use this command to create a link to an OpenVDB class, function, etc.
@@ -111,8 +111,8 @@ set(DOXYGEN_ALIASES
   )
 
 set(DOXYGEN_PREDEFINED
-  "OPENVDB_VERSION_NAME=v8_0"
-  "OPENVDB_ABI_VERSION_NUMBER=8"
+  "OPENVDB_VERSION_NAME=v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}"
+  "OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_MAJOR_VERSION}"
   [[__declspec(x):= __attribute__(x):=]]
   "OPENVDB_USE_LOG4CPLUS=")
 

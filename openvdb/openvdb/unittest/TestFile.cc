@@ -13,7 +13,7 @@
 #include <openvdb/version.h>
 #include <openvdb/openvdb.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <tbb/tbb_thread.h> // for tbb::this_tbb_thread::sleep()
 #include <algorithm> // for std::sort()
 #include <cstdio> // for remove() and rename()

@@ -5,7 +5,7 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/math/Stats.h>
 #include <openvdb/tools/Statistics.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);

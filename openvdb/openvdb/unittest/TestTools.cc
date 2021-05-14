@@ -26,7 +26,7 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <algorithm> // for std::sort
 #include <atomic>
 #include <random>

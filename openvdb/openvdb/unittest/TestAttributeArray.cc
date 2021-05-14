@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/io/File.h>
+
+#include <gtest/gtest.h>
 
 #ifdef __clang__
 #pragma GCC diagnostic push
