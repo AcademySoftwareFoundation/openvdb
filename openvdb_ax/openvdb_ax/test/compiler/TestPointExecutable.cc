@@ -62,7 +62,7 @@ TestPointExecutable::testConstructionDestruction()
     openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
         openvdb::ax::AttributeRegistry::create(tree);
     openvdb::ax::PointExecutable::Ptr pointExecutable
-        (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}));
+        (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}, tree));
 
     CPPUNIT_ASSERT_EQUAL(2, int(wE.use_count()));
     CPPUNIT_ASSERT_EQUAL(2, int(wC.use_count()));
@@ -169,7 +169,7 @@ TestPointExecutable::testGroupExecution()
 
     // non existent group
     executable->setGroupExecution(group);
-    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
     checkValues(0);
 
     openvdb::points::appendGroup(grid->tree(), group);

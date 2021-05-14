@@ -692,7 +692,6 @@ TestFunctionTypes::testFunctionCall()
 {
     using openvdb::ax::codegen::Function;
     using openvdb::ax::codegen::LLVMType;
-    using openvdb::ax::AXString;
 
     //
 
@@ -1003,19 +1002,16 @@ TestFunctionTypes::testFunctionCall()
     //
     // Test strings
 
-    llvm::Type* axstr = LLVMType<AXString*>::get(C);  // str*
+    llvm::Type* axstr = LLVMType<openvdb::ax::codegen::String*>::get(C);  // str*
     llvm::Type* chars = LLVMType<char*>::get(C);  // char*
 
     // build values
 
     llvm::Value* chararray = B.CreateGlobalStringPtr("tmp"); // char*
-    llvm::Constant* constLoc = llvm::cast<llvm::Constant>(chararray);
-    llvm::Constant* size = LLVMType<AXString::SizeType>::get(C, static_cast<AXString::SizeType>(3));
-    llvm::Value* constStr = LLVMType<AXString>::get(C, constLoc, size);
-    llvm::Value* strptr = B.CreateAlloca(LLVMType<AXString>::get(C));
-    B.CreateStore(constStr, strptr);
+    // @note  non-safer initialization of strings
+    llvm::Value* strptr = B.CreateAlloca(LLVMType<openvdb::ax::codegen::String>::get(C)); // str*
 
-    // void ax.str.test(AXString*, char*)
+    // void ax.str.test(openvdb::ax::codegen::String*, char*)
     test.reset(new TestFunction({axstr, chars},
         llvm::Type::getVoidTy(C),
         "ax.str.test"));
@@ -1046,7 +1042,7 @@ TestFunctionTypes::testFunctionCall()
     CPPUNIT_ASSERT(stringArgs[0] == call->getArgOperand(0));
     CPPUNIT_ASSERT(stringArgs[1] == call->getArgOperand(1));
 
-    // Test AXString -> char*
+    // Test openvdb::ax::codegen::String -> char*
 
     stringArgs[0] = strptr;
     stringArgs[1] = strptr;
@@ -1063,7 +1059,7 @@ TestFunctionTypes::testFunctionCall()
 
     VERIFY_MODULE_IR(&M);
 
-    // Test char* does not catch to AXString
+    // Test char* does not catch to openvdb::ax::codegen::String
 
     stringArgs[0] = chararray;
     stringArgs[1] = chararray;
@@ -1265,7 +1261,7 @@ TestFunctionTypes::testFunctionMatch()
     types.insert(types.end(), array4.begin(), array4.end());
     types.insert(types.end(), array9.begin(), array9.end());
     types.insert(types.end(), array16.begin(), array16.end());
-    types.insert(types.end(), LLVMType<openvdb::ax::AXString*>::get(C));
+    types.insert(types.end(), LLVMType<openvdb::ax::codegen::String*>::get(C));
 
     // check types are unique
     CPPUNIT_ASSERT_EQUAL(std::set<llvm::Type*>(types.begin(), types.end()).size(), types.size());
@@ -1294,7 +1290,7 @@ TestFunctionTypes::testFunctionMatch()
             llvm::ArrayType::get(llvm::Type::getInt32Ty(C), 16)->getPointerTo(),   // ix16 (not supported by ax)
             llvm::ArrayType::get(llvm::Type::getFloatTy(C), 16)->getPointerTo(),   // mat4f
             llvm::ArrayType::get(llvm::Type::getDoubleTy(C), 16)->getPointerTo(),  // mat4d
-            LLVMType<openvdb::ax::AXString*>::get(C) // string
+            LLVMType<openvdb::ax::codegen::String*>::get(C) // string
         },
         llvm::Type::getVoidTy(C),
         "ax.test"));
@@ -1391,15 +1387,15 @@ TestFunctionTypes::testFunctionMatch()
     test.reset(new TestFunction({LLVMType<char*>::get(C)},
         llvm::Type::getVoidTy(C), "ax.test"));
     CPPUNIT_ASSERT_EQUAL(Function::Size,
-        test->match({LLVMType<openvdb::ax::AXString*>::get(C)}, C));
+        test->match({LLVMType<openvdb::ax::codegen::String*>::get(C)}, C));
     CPPUNIT_ASSERT_EQUAL(Function::Explicit,
         test->match({LLVMType<char*>::get(C)}, C));
 
     test->setParamAttributes(0, {llvm::Attribute::ReadOnly});
     CPPUNIT_ASSERT_EQUAL(Function::Implicit,
-        test->match({LLVMType<openvdb::ax::AXString*>::get(C)}, C));
+        test->match({LLVMType<openvdb::ax::codegen::String*>::get(C)}, C));
 
-    test.reset(new TestFunction({LLVMType<openvdb::ax::AXString*>::get(C)},
+    test.reset(new TestFunction({LLVMType<openvdb::ax::codegen::String*>::get(C)},
         llvm::Type::getVoidTy(C), "ax.test"));
     CPPUNIT_ASSERT_EQUAL(Function::Size,
         test->match({LLVMType<char*>::get(C)}, C));

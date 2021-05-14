@@ -120,13 +120,48 @@ void checkAttributesAgainstList(const std::string& list,
     UT_String msg;
     // attributes are in reverse order as they appear in snippet
     for (auto iter = newAttributes.rbegin(); iter != newAttributes.rend(); ++iter) {
-        if (!iter->multiMatch(list.c_str())) msg += " " + iter->toStdString();
+        if (!iter->multiMatch(list.c_str())) {
+            msg += " @";
+            msg += *iter;
+        }
     }
 
     if (msg.length() != 0) {
-        msg.prepend("Missing attributes:");
+        msg.prepend("The following attributes are missing and do not appear in the \"Attributes To Create\" list:");
         throw std::runtime_error(msg.c_str());
     }
+}
+
+/// @brief  If the provided logger has warnings or errors, add an explicit
+///   warning or error message to the SOP. Returns true if ERRORS existed.
+bool appendLoggerMessage(SOP_VDBCacheOptions& sop,
+    const ax::Logger& logger,
+    const char* type)
+{
+    const size_t errs = logger.errors();
+    const size_t warns = logger.warnings();
+
+    if (warns) {
+        std::stringstream os;
+        const bool multi = warns > 1;
+        if (multi) os << warns << ' ';
+        os <<"AX " << type << " warning";
+        if (multi) os << 's';
+        os <<"!\n";
+        sop.addWarning(SOP_MESSAGE, os.str().c_str());
+    }
+
+    if (errs) {
+        std::stringstream os;
+        const bool multi = errs > 1;
+        if (multi) os << errs << ' ';
+        os <<"AX " << type << " error";
+        if (multi) os << 's';
+        os <<"!\n";
+        sop.addError(SOP_MESSAGE, os.str().c_str());
+    }
+
+    return errs;
 }
 
 ////////////////////////////////////////
@@ -272,13 +307,8 @@ newSopOperator(OP_OperatorTable* table)
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "ignoretiles", "Ignore Active Tiles")
         .setDefault(PRMzeroDefaults)
         .setTooltip(
-            "Whether to ignore active tiles in the input volumes, otherwise active tiles will be densified before execution."
-            " Only applies to volumes that are written to.")
-        .setDocumentation(
-            "Whether to ignore active tiles in the input volumes, otherwise active tiles will be densified before execution."
-            " Only applies to volumes that are written to.\n\n"
-            ":warning:\n"
-            "    Densifying a sparse VDB can significantly increase its memory footprint."));
+            "Whether to ignore active tiles in the input volumes, otherwise active tiles are converted "
+            "into dense voxels (only where necessary). Only applies to volumes that are written to."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
         .setDefault(PRMoneDefaults)
@@ -499,7 +529,7 @@ SOP_OpenVDB_AX::Cache::Cache()
     mCompilerCache.mCompiler = ax::Compiler::create();
     mCompilerCache.mCustomData.reset(new ax::CustomData);
 
-    auto locFromStr = [&] (const std::string& str) -> UT_SourceLocation {
+    static auto locFromStr = [&] (const std::string& str) -> UT_SourceLocation {
         // find error location at end of message
         size_t locColon = str.rfind(":");
         size_t locLine = str.rfind(" ", locColon);
@@ -510,15 +540,16 @@ SOP_OpenVDB_AX::Cache::Cache()
     };
 
     mCompilerCache.mLogger.reset(new ax::Logger(
-        [this, &locFromStr](const std::string& str) {
+        [this](const std::string& str) {
             UT_SourceLocation loc = locFromStr(str);
             this->cookparms()->sopAddError(SOP_MESSAGE, str.c_str(), &loc);
         },
-        [this,  &locFromStr](const std::string& str) {
+        [this](const std::string& str) {
             UT_SourceLocation loc = locFromStr(str);
             this->cookparms()->sopAddWarning(SOP_MESSAGE, str.c_str(), &loc);
         })
     );
+
     mCompilerCache.mLogger->setErrorPrefix("");
     mCompilerCache.mLogger->setWarningPrefix("");
 
@@ -680,16 +711,6 @@ void SOP_OpenVDB_AX::syncNodeVersion(const char* old_version,
 ////////////////////////////////////////
 
 namespace {
-struct DensifyOp {
-    DensifyOp() {}
-
-    template<typename GridT>
-    void operator()(GridT& grid) const
-    {
-        grid.tree().voxelizeActiveTiles(/*threaded=*/true);
-    }
-};
-
 struct PruneOp {
     PruneOp(const fpreal tol)
         : mTol(tol) {}
@@ -790,23 +811,21 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
             // build the AST from the provided snippet
 
-            openvdb::ax::ast::Tree::ConstPtr tree = ax::ast::parse(snippet.nonNullBuffer(), *mCompilerCache.mLogger);
-            // current only catches single syntax error but could be updated to catch multiple
-            // further still can be updated to encounter syntax errors AND output a valid tree
+            openvdb::ax::ast::Tree::ConstPtr tree =
+                ax::ast::parse(snippet.nonNullBuffer(), *mCompilerCache.mLogger);
+
+            // currently only catches single syntax error but could be updated
+            // to catch multiple. Further still can be updated to encounter
+            // syntax errors AND output a valid tree
             // @todo: update to catch multiple errors and output tree when possible
 
             if (!tree) {
-                const size_t numSyntaxErrors = mCompilerCache.mLogger->errors();
-                std::stringstream os;
-               const bool multi = numSyntaxErrors > 1;
-                if (multi) os << numSyntaxErrors << " ";
-                os <<"AX syntax error";
-                if (multi) os <<"s";
-                os <<"!"<<"\n";
-                addError(SOP_MESSAGE, os.str().c_str());
+                appendLoggerMessage(*this, *mCompilerCache.mLogger, "syntax");
                 return error();
             }
+
             // store a copy of the AST to modify, the logger will store the original for error printing
+
             mCompilerCache.mSyntaxTree.reset(tree->copy());
 
             // find all externally accessed data - do this before conversion from VEX
@@ -849,9 +868,6 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
             evaluateExternalExpressions(time, mDollarExpressionSet, parmCache.mHScriptSupport, evaluationNode);
 
             if (parmCache.mTargetType == hax::TargetType::POINTS) {
-                mCompilerCache.mRequiresDeletion =
-                    openvdb::ax::ast::callsFunction(*mCompilerCache.mSyntaxTree, "deletepoint");
-
                 mCompilerCache.mPointExecutable =
                     mCompilerCache.mCompiler->compile<ax::PointExecutable>
                         (*mCompilerCache.mSyntaxTree, *mCompilerCache.mLogger, mCompilerCache.mCustomData);
@@ -868,26 +884,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
             // add compilation warnings/errors
 
-            if (mCompilerCache.mLogger->hasWarning()) {
-                const size_t numWarnings = mCompilerCache.mLogger->warnings();
-                std::stringstream os;
-                 const bool multi = numWarnings > 1;
-                if (multi) os << numWarnings << " ";
-                os <<"AX syntax warning";
-                if (multi) os <<"s";
-                os <<"! "<<"\n";
-                addWarning(SOP_MESSAGE, os.str().c_str());
-            }
-
-            if (mCompilerCache.mLogger->hasError()) {
-                const size_t numErrors = mCompilerCache.mLogger->errors();
-                std::stringstream os;
-                const bool multi = numErrors > 1;
-                if (multi) os << numErrors << " ";
-                os <<"AX syntax error";
-                if (multi) os <<"s";
-                os <<"!"<<"\n";
-                addError(SOP_MESSAGE, os.str().c_str());
+            if (appendLoggerMessage(*this, *mCompilerCache.mLogger, "compiler")) {
                 return error();
             }
 
@@ -951,10 +948,6 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 mCompilerCache.mPointExecutable->setGroupExecution(pointsGroup);
                 mCompilerCache.mPointExecutable->setCreateMissing(true);
                 mCompilerCache.mPointExecutable->execute(*points);
-
-                if (mCompilerCache.mRequiresDeletion) {
-                    openvdb::points::deleteFromGroup(points->tree(), "dead", false, false);
-                }
 
                 if (evalInt("compact", 0, time)) {
                     openvdb::points::compactAttributes(points->tree());
@@ -1027,10 +1020,13 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 }
             };
 
-            if (!evalInt("ignoretiles", 0, time)) {
-                const DensifyOp op;
-                applyOpToWriteGrids(op);
-            }
+            // if not processing tiles, only run this executable on the lowest,
+            // (leaf) level, otherwise process the entire tree.
+            const openvdb::Index maxLevel =
+                evalInt("ignoretiles", 0, time) ?
+                    0 : openvdb::FloatTree::DEPTH-1; // 0=leaf
+
+            mCompilerCache.mVolumeExecutable->setTreeExecutionLevel(/*leaf=*/0, maxLevel);
 
 #ifdef DNEG_OPENVDB_AX
             mCompilerCache.mVolumeExecutable->setValueIterator(iterType);
@@ -1201,7 +1197,7 @@ SOP_OpenVDB_AX::Cache::evaluateExternalExpressions(const double time,
 {
     using VectorData = TypedMetadata<math::Vec3<float>>;
     using FloatData = TypedMetadata<float>;
-    using StringData = openvdb::ax::AXStringMetadata;
+    using StringData = TypedMetadata<openvdb::ax::codegen::String>;
 
     ax::CustomData& data = *(mCompilerCache.mCustomData);
 

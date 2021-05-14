@@ -1,0 +1,23 @@
+New Features:
+ - Significant performance improvements to AX volume kernels, primarily due to
+ improved vectorisation. Performance scales depending on the available host CPU
+ instruction set and scalability of the AX kernel. Trivial assignments profile
+ upwards of 3x faster on AVX.
+ - Introduced Active Tile Streaming for volumes kernels. AX can now dynamically
+ expand and collapse active nodes at all levels of a VDB tree on demand, switching
+ on or off by checking the spatial access pattern of AX programs.
+
+Improvements:
+  - Refactored the backend AX representation of strings with SSO support and heap allocation.
+  - Added new methods on the VolumeExecutable to control active tile streaming and node execution levels
+  - The deletepoint() AX function is now natively supported by the PointExecutable
+
+Houdini:
+  - The AX SOP utilises the new Active Tile Streaming feature for Volumes. Grids
+  will only be densified in areas where unique values are created.
+
+Bug Fix:
+  - Fixed a bug which could cause string allocations in loops to overflow the stack
+  - Fixed a bug where the ValueOff iterator for the VolumeExecutable could remove
+  child branches of a VDB tree.
+

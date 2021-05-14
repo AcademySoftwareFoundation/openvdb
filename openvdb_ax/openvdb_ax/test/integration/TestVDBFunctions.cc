@@ -149,21 +149,19 @@ TestVDBFunctions::addremovefromgroup()
 void
 TestVDBFunctions::deletepoint()
 {
-    // NOTE: the "deletepoint" function doesn't actually directly delete points - it adds them
-    // to the "dead" group which marks them for deletion afterwards
+    // run first, should not modify grid as attribute doesn't exist
+    // @todo - need to massively improve this test
+
     mHarness.testVolumes(false);
-
-    mHarness.addInputGroups({"dead"}, {false});
-    mHarness.addExpectedGroups({"dead"}, {true});
-
+    mHarness.addAttribute<int>("delete", 0, 0);
     mHarness.executeCode("test/snippets/vdb_functions/deletepoint");
     AXTESTS_STANDARD_ASSERT();
 
-    // test without existing dead group
-
     mHarness.reset();
-    mHarness.addExpectedGroups({"dead"}, {true});
-
+    mHarness.addInputAttribute<int>("delete", 1);
+    for (auto& grid : mHarness.mOutputPointGrids) {
+        grid->clear();
+    }
     mHarness.executeCode("test/snippets/vdb_functions/deletepoint");
     AXTESTS_STANDARD_ASSERT();
 }
@@ -238,6 +236,8 @@ void
 TestVDBFunctions::getvoxelpws()
 {
     mHarness.testPoints(false);
+    mHarness.testSparseVolumes(false); // disable as getvoxelpws will densify
+    mHarness.testDenseVolumes(true);
 
     mHarness.addAttribute<openvdb::Vec3f>("a", openvdb::Vec3f(10.0f), openvdb::Vec3f(0.0f));
     mHarness.executeCode("test/snippets/vdb_functions/getvoxelpws");
@@ -412,7 +412,11 @@ TestVDBFunctions::testValidContext()
             const auto& signatures = ptr->list();
             CPPUNIT_ASSERT(!signatures.empty());
 
-            const std::string code = generate(signatures.front(), func.first);
+            // Don't check C bindings
+            const auto F = signatures.front();
+            if (dynamic_cast<const openvdb::ax::codegen::CFunctionBase*>(F.get())) continue;
+
+            const std::string code = generate(F, func.first);
 
             CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
                 compiler.compile<openvdb::ax::VolumeExecutable>(code),
@@ -435,7 +439,11 @@ TestVDBFunctions::testValidContext()
             const auto& signatures = ptr->list();
             CPPUNIT_ASSERT(!signatures.empty());
 
-            const std::string code = generate(signatures.front(), func.first);
+            // Don't check C bindings
+            const auto F = signatures.front();
+            if (dynamic_cast<const openvdb::ax::codegen::CFunctionBase*>(F.get())) continue;
+
+            const std::string code = generate(F, func.first);
 
             CPPUNIT_ASSERT_THROW_MESSAGE(ERROR_MSG("Expected Compiler Error", code),
                 compiler.compile<openvdb::ax::PointExecutable>(code),
@@ -443,4 +451,3 @@ TestVDBFunctions::testValidContext()
         }
     }
 }
-

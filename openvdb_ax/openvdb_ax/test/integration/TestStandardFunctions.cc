@@ -224,7 +224,9 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;
-    harness.executeCode(file);
+    bool success = harness.executeCode(file);
+    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
+        success);
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 
@@ -238,7 +240,9 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;
-    harness.executeCode(file);
+    success = harness.executeCode(file);
+    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
+        success);
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 
@@ -252,7 +256,9 @@ inline void testFunctionOptions(unittest_util::AXTestHarness& harness,
 #else
     harness.mOpts = opts;
     harness.mCustomData = data;
-    harness.executeCode(file);
+    success = harness.executeCode(file);
+    CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + file + "\n" + harness.errors(),
+        success);
     AXTESTS_STANDARD_ASSERT_HARNESS(harness);
 #endif
 }
@@ -592,7 +598,8 @@ TestStandardFunctions::external()
         pointExecutable->execute(*grid);
     }
 
-    volumeExecutable->execute(mHarness.mInputVolumeGrids);
+    volumeExecutable->execute(mHarness.mInputSparseVolumeGrids);
+    volumeExecutable->execute(mHarness.mInputDenseVolumeGrids);
 
     AXTESTS_STANDARD_ASSERT()
 }

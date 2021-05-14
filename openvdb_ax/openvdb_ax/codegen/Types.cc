@@ -79,7 +79,7 @@ llvmTypeFromToken(const ast::tokens::CoreType& type,
         case ast::tokens::MAT3D   : return LLVMType<double[9]>::get(C);
         case ast::tokens::MAT4F   : return LLVMType<float[16]>::get(C);
         case ast::tokens::MAT4D   : return LLVMType<double[16]>::get(C);
-        case ast::tokens::STRING  : return LLVMType<AXString>::get(C);
+        case ast::tokens::STRING  : return LLVMType<codegen::String>::get(C);
         case ast::tokens::UNKNOWN :
         default      :
             OPENVDB_THROW(AXCodeGenError,
@@ -127,7 +127,7 @@ tokenFromLLVMType(const llvm::Type* type)
             if (elementType == ast::tokens::DOUBLE)  return ast::tokens::MAT4D;
         }
     }
-    if (type == LLVMType<AXString>::get(type->getContext())) {
+    if (type == LLVMType<codegen::String>::get(type->getContext())) {
         return ast::tokens::STRING;
     }
     return ast::tokens::UNKNOWN;

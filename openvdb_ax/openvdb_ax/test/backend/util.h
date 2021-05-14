@@ -9,6 +9,7 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
+#include <llvm/ExecutionEngine/ExecutionEngine.h>
 
 #include <memory>
 #include <string>
@@ -34,6 +35,30 @@ struct LLVMState
         llvm::Function* dummyFunction =
             llvm::Function::Create(type, llvm::Function::ExternalLinkage, functionName, &this->module());
         return llvm::BasicBlock::Create(this->context(), blockName, dummyFunction);
+    }
+
+    inline std::unique_ptr<llvm::ExecutionEngine> EE()
+    {
+        mModule->setTargetTriple(llvm::sys::getDefaultTargetTriple());
+        llvm::StringMap<bool> HostFeatures;
+        llvm::sys::getHostCPUFeatures(HostFeatures);
+        std::vector<llvm::StringRef> features;
+        for (auto& feature : HostFeatures) {
+            if (feature.second) features.emplace_back(feature.first());
+        }
+
+        auto M = std::move(mModule);
+        mModule.reset(new llvm::Module(M->getName(), *mCtx));
+        std::unique_ptr<llvm::ExecutionEngine>
+            EE(llvm::EngineBuilder(std::move(M))
+                .setEngineKind(llvm::EngineKind::JIT)
+                .setOptLevel(llvm::CodeGenOpt::Level::Default)
+                .setMCPU(llvm::sys::getHostCPUName())
+                .setMAttrs(features)
+                .create());
+
+        assert(EE.get());
+        return EE;
     }
 
 private:
