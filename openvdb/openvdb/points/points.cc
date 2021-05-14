@@ -42,6 +42,8 @@ internal::initialize()
     TypedAttributeArray<math::Vec3<float>, TruncateCodec>::registerType();
 
     // Register attribute arrays with fixed point compression
+    TypedAttributeArray<float, FixedPointCodec<true, UnitRange>>::registerType();
+    TypedAttributeArray<float, FixedPointCodec<false, UnitRange>>::registerType();
     TypedAttributeArray<math::Vec3<float>, FixedPointCodec<true>>::registerType();
     TypedAttributeArray<math::Vec3<float>, FixedPointCodec<false>>::registerType();
     TypedAttributeArray<math::Vec3<float>, FixedPointCodec<true, PositionRange>>::registerType();
