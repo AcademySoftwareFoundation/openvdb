@@ -10,6 +10,7 @@
 #include <llvm/IR/Module.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/ExecutionEngine/ExecutionEngine.h>
+#include <llvm/Support/Host.h>
 
 #include <memory>
 #include <string>
