@@ -1,7 +1,0 @@
-Improvements:
-    - vdb_view: Fixed a bug which wouldn't reset the camera speed on focus
-    - vdb_view: Improved the drawing of PointDataGrids
-    - vdb_view: Improved the exception handling of BufferObjects and added support for drawing an array without index values
-
-Build:
-    - Removed some unnecessary CMake for vdb_view

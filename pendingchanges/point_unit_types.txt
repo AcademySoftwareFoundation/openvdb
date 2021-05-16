@@ -1,2 +1,0 @@
-Bug Fixes:
-- Add missing 8-bit and 16-bit attribute type registration.

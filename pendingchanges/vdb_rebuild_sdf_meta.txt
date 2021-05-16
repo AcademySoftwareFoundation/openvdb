@@ -1,3 +1,0 @@
-    Houdini:
-    - Fix a bug where the VDB Rebuild SDF was not preserving metadata from the
-      input grid.

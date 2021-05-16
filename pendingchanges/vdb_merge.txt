@@ -1,7 +1,0 @@
-New features:
-- Added tools::SumMergeOp that uses a parallel breadth-first algorithm to
-  accelerate summing grids.
-
-Houdini:
-- Introduced the VDB Merge SOP that merges multiple grids in parallel and is
-  faster and more convenient to use than the VDB Combine SOP.
