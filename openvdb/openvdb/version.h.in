@@ -51,20 +51,26 @@
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-/// @brief  Auto generated build configurations from CMake
+// Auto generated build configurations from CMake
 
-/* Library major, minor and patch version numbers */
+///@{
+/// @brief Library major, minor and patch version numbers
+/// @hideinitializer
 #define OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER ${OpenVDB_MAJOR_VERSION}
+/// @hideinitializer
 #define OPENVDB_LIBRARY_MINOR_VERSION_NUMBER ${OpenVDB_MINOR_VERSION}
+/// @hideinitializer
 #define OPENVDB_LIBRARY_PATCH_VERSION_NUMBER ${OpenVDB_PATCH_VERSION}
+///@}
 
-/* The ABI version that OpenVDB was built with */
 /// @note  This ifndef exists for compatibility with older versions of OpenVDB.
 ///   This value should never be different from the value configured when
 ///   OpenVDB was built, but this previously needed to be defined by downstream
 ///   software. Redefining it here would cause build failures, so this allows
 ///   users to transition and remove the define in their build systems.
 #ifndef OPENVDB_ABI_VERSION_NUMBER
+/// @brief The ABI version that OpenVDB was built with
+/// @hideinitializer
 #define OPENVDB_ABI_VERSION_NUMBER ${OPENVDB_ABI_VERSION_NUMBER}
 #endif
 
@@ -82,31 +88,31 @@
 /// @hideinitializer
 #define OPENVDB_LIBRARY_ABI_VERSION_STRING "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}abi${OPENVDB_ABI_VERSION_NUMBER}"
 
-/// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
+/// @brief Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
+/// @hideinitializer
 #define OPENVDB_LIBRARY_VERSION_NUMBER ${OPENVDB_PACKED_VERSION}
 
+/// @brief The version namespace name for this library version
+/// @hideinitializer
+///
+/// When the ABI version number matches the library major version number,
+/// symbols are named as in the following examples:
+/// - @b openvdb::vX_Y::Vec3i
+/// - @b openvdb::vX_Y::io::File
+/// - @b openvdb::vX_Y::tree::Tree
+///
+/// where X and Y are the major and minor version numbers.
+///
+/// When the ABI version number does not match the library major version number,
+/// symbol names include the ABI version:
+/// - @b openvdb::vX_YabiN::Vec3i
+/// - @b openvdb::vX_YabiN::io::File
+/// - @b openvdb::vX_YabiN::tree::Tree
+///
+/// where X, Y and N are the major, minor and ABI version numbers, respectively.
 #if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
-    /// @brief The version namespace name for this library version
-    /// @hideinitializer
-    ///
-    /// When the ABI version number matches the library major version number,
-    /// symbols are named as in the following examples:
-    /// - @b openvdb::vX_Y::Vec3i
-    /// - @b openvdb::vX_Y::io::File
-    /// - @b openvdb::vX_Y::tree::Tree
-    ///
-    /// where X and Y are the major and minor version numbers.
-    ///
-    /// When the ABI version number does not match the library major version number,
-    /// symbol names include the ABI version:
-    /// - @b openvdb::vX_YabiN::Vec3i
-    /// - @b openvdb::vX_YabiN::io::File
-    /// - @b openvdb::vX_YabiN::tree::Tree
-    ///
-    /// where X, Y and N are the major, minor and ABI version numbers, respectively.
     #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}
 #else
-    // This duplication of code is necessary to avoid issues with recursive macro expansion.
     #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}abi${OPENVDB_ABI_VERSION_NUMBER}
 #endif
 
@@ -177,14 +183,17 @@ namespace OPENVDB_VERSION_NAME {
 /// @details This can be used to quickly test whether we have a valid file or not.
 const int32_t OPENVDB_MAGIC = 0x56444220;
 
-// Library major, minor and patch version numbers
+/// Library major, minor and patch version numbers
+/// @hideinitializer
 const uint32_t
     OPENVDB_LIBRARY_MAJOR_VERSION = OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER,
     OPENVDB_LIBRARY_MINOR_VERSION = OPENVDB_LIBRARY_MINOR_VERSION_NUMBER,
     OPENVDB_LIBRARY_PATCH_VERSION = OPENVDB_LIBRARY_PATCH_VERSION_NUMBER;
 /// Library version number as a packed integer ("%02x%02x%04x", major, minor, patch)
+/// @hideinitializer
 const uint32_t OPENVDB_LIBRARY_VERSION = OPENVDB_LIBRARY_VERSION_NUMBER;
-// ABI version number
+/// ABI version number
+/// @hideinitializer
 const uint32_t OPENVDB_ABI_VERSION = OPENVDB_ABI_VERSION_NUMBER;
 
 /// @brief The current version number of the VDB file format

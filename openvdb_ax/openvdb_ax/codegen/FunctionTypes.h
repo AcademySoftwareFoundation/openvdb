@@ -823,7 +823,7 @@ struct FunctionGroup
     ///         signature, generate and execute the function body. Returns the
     ///         return value of the function (nullptr if void). The behaviour
     ///         is undefined if a valid match does not exist. For such cases,
-    ///         call the second version of ::execute.
+    ///         call the second version of FunctionGroup::execute.
     /// @note   This function will throw if no valid return is provided by the
     ///         matched declaration implementation.
     ///
