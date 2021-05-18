@@ -43,7 +43,8 @@ class Compiler;
 ///   executable object; immutable except for execution settings and implements
 ///   'execute' functions which can be called multiple times for arbitrary sets
 ///   of inputs. The intended usage of these executables is to configure their
-///   runtime arguments and then call ::execute with your VDBs. For example:
+///   runtime arguments and then call PointExecutable::execute with your VDBs.
+///   For example:
 /// @code
 ///   PointExecutable::Ptr exe = compiler.compile<PointExecutable>("@a += 1");
 ///   exe->setCreateMissing(false); // fail on missing attributes
@@ -62,6 +63,8 @@ class Compiler;
 ///   - Grain size: 1
 ///       The default grain sizes passed to the tbb partitioner for leaf level
 ///       processing.
+///       @sa setGrainSize
+///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
 class PointExecutable
 {

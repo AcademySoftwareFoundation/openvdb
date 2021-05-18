@@ -42,7 +42,8 @@ class Compiler;
 ///   executable object; immutable except for execution settings and implements
 ///   'execute' functions which can be called multiple times for arbitrary sets
 ///   of inputs. The intended usage of these executables is to configure their
-///   runtime arguments and then call ::execute with your VDBs. For example:
+///   runtime arguments and then call VolumeExecutable::execute with your VDBs.
+///   For example:
 /// @code
 ///   VolumeExecutable::Ptr exe = compiler.compile<VolumeExecutable>("@a += 1");
 ///   exe->setTreeExecutionLevel(0); // only process leaf nodes
@@ -58,15 +59,18 @@ class Compiler;
 ///   - Iteration Type: ON
 ///       By default, processes ACTIVE values.
 ///       @sa setValueIterator
-///   - Active Tile Streaming: ON or OFF depending on AX code.
+///   - Active Tile Streaming: ON, OFF or AUTO depending on AX code.
 ///       By default, if AX detects that the AX program may produce unique
 ///       values for leaf level voxels that would otherwise comprise a
-///       given active tile, this setting is set to ON. Otherwise it is set to
-///       OFF.
+///       given active tile, this setting is set to ON or AUTO. Otherwise it is
+///       set to OFF.
 ///       @sa setActiveTileStreaming
 ///   - Grain sizes: 1:32
 ///       The default grain sizes passed to the tbb partitioner for leaf level
 ///       processing and active tile processing.
+///       @sa setGrainSize
+///       @sa setActiveTileStreamingGrainSize
+///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
 class VolumeExecutable
 {
@@ -93,7 +97,7 @@ public:
     ///
     /// @param grids  The VDB Volumes to process
     void execute(openvdb::GridPtrVec& grids) const;
-    void execute(openvdb::GridBase& grid) const;
+    void execute(openvdb::GridBase& grids) const;
     ///@}
 
     ////////////////////////////////////////////////////////
@@ -117,30 +121,34 @@ public:
     ///   than the root node's level) will cause this method to throw a runtime
     ///   error.
     /// @param min The minimum tree execution level to set
-    /// @param min The maximum tree execution level to set
+    /// @param max The maximum tree execution level to set
     void setTreeExecutionLevel(const Index min, const Index max);
     /// @param level The tree execution level to set. Calls setTreeExecutionLevel
     ///   with min and max arguments as level.
     void setTreeExecutionLevel(const Index level);
-    /// @return  Get the tree execution levels.
+    /// @brief  Get the tree execution levels.
+    /// @param min The minimum tree execution level
+    /// @param max The maximum tree execution level
     void getTreeExecutionLevel(Index& min, Index& max) const;
 
     /// @brief  The streaming type of active tiles during execution.
-    ///   ON: active tiles are temporarily densified (converted to leaf level
-    ///     voxels) on an "as needed" basis and the subsequent voxel values are
-    ///     processed. The temporarily densified node is added to the tree only
-    ///     if a non constant voxel buffer is produced. Otherwise a child tile
-    ///     may be created or the original tile's value may simply be modified.
-    ///  OFF: tile topologies are left unchanged and their single value is
+    /// @param  ON active tiles are temporarily densified (converted to leaf
+    ///     level voxels) on an "as needed" basis and the subsequent voxel
+    ///     values are processed. The temporarily densified node is added to the
+    ///     tree only if a non constant voxel buffer is produced. Otherwise a
+    ///     child tile may be created or the original tile's value may simply be
+    ///     modified.
+    /// @param  OFF tile topologies are left unchanged and their single value is
     ///     processed.
-    ///  AUTO: the volume executable analyzes the compiled kernel and attempts
-    ///     to determine if expansion of active tiles would lead to different,
-    ///     non-constant values in the respective voxels. This is done on a per
-    ///     grid basis; ultimately each execution will be set to ON or OFF.
-    ///     This option will always fall back to ON if there is any chance the
-    ///     kernel may produce child nodes
-    ///   The volume executable always runs an AUTO check on creation and will
-    ///   set itself to ON (if all grids always need child nodes), OFF (if
+    /// @param  AUTO the volume executable analyzes the compiled kernel and
+    ///     attempts to determine if expansion of active tiles would lead to
+    ///     different, non-constant values in the respective voxels. This is
+    ///     done on a per grid basis; ultimately each execution will be set to
+    ///     ON or OFF. This option will always fall back to ON if there is any
+    ///     chance the kernel may produce child nodes
+    ///
+    /// @note The volume executable always runs an AUTO check on creation and
+    ///   will set itself to ON (if all grids always need child nodes), OFF (if
     ///   grids never need child nodes) or remains as AUTO (if this depends on
     ///   which grid is being processed).
     ///
@@ -149,8 +157,9 @@ public:
     ///   unique voxels such that they can each receive a unique value. For
     ///   example, consider the following AX code which assigns a vector volume
     ///   to the world space position of each voxel:
+    /// @code
     ///      v@v = getvoxelpws();
-    ///
+    /// @endcode
     ///   Active tiles hold a single value but comprise an area greater than
     ///   that of a single voxel. As the above kernel varies with respect to
     ///   a nodes position, we'd need to replace these tiles with leaf voxels
@@ -158,24 +167,26 @@ public:
     ///   in this case.
     ///
     ///   This behaviour, however, is not always desirable .i.e:
+    /// @code
     ///      v@v = {1,2,3};
-    ///
+    /// @endcode
     ///   In this instance, all values within a volume receive the same value
     ///   and are not dependent on any spatially or iteratively varying
     ///   metrics. The stream flag is set to OFF.
     ///
     ///   The AUTO flag is set in cases where the runtime access pattern of the
     ///   inputs determines streaming:
+    /// @code
     ///     f@density = f@mask;
     ///     f@mask = 0;
-    ///
-    ///   In this instance, the runtime topology and values of @mask determines
-    ///   whether child topology needs to be created in @density, but @mask
+    /// @endcode
+    ///   In this instance, the runtime topology and values of \@mask determines
+    ///   whether child topology needs to be created in \@density, but \@mask
     ///   itself does not need streaming. Streaming will be set to ON for
     ///   density but OFF for mask.
     ///
     /// @note This behaviour is only applied to active tiles. If the value
-    ///   iterator is set to OFF (@sa setValueIterator), this option is ignored.
+    ///   iterator is set to OFF, this option is ignored.
     /// @warning  This option can generate large amounts of leaf level voxels.
     ///   It is recommended to use a good concurrent memory allocator (such as
     ///   jemalloc) for the best performance.
@@ -217,15 +228,15 @@ public:
     /// @note Setting g1 or g2 to zero has the effect of disabling
     ///  multi-threading for the respective node executions. Setting both to
     ///  zero will disable all multi-threading performed by the execute method.
-    /// @param g1  The grain size used for non streamed nodes (leafs or tiles)
-    /// @param g2  The grain size used for streamed execution (active tiles)
     void setGrainSize(const size_t g1);
     void setActiveTileStreamingGrainSize(const size_t g2);
     /// @return  The current g1 grain size
+    /// @sa setGrainSize
     size_t getGrainSize() const;
     /// @return  The current g2 grain size
+    /// @sa setActiveTileStreamingGrainSize
     size_t getActiveTileStreamingGrainSize() const;
-    ///}@
+    ///@}
 
 
 

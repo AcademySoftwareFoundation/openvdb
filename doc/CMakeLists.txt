@@ -55,7 +55,8 @@ set(DOXY_FILES
 set(DOXYGEN_PROJECT_NAME "OpenVDB")
 set(DOXYGEN_PROJECT_NUMBER "${OpenVDB_VERSION}")
 set(DOXYGEN_PROJECT_BRIEF "")
-set(DOXYGEN_FILE_PATTERNS "*.h") # headers only
+set(DOXYGEN_FILE_PATTERNS *.h *h.in) # headers only
+set(DOXYGEN_EXTENSION_MAPPING .in=C) # parse CMake config headers as C
 set(DOXYGEN_IMAGE_PATH "doc/img")
 set(DOXYGEN_RECURSIVE NO)
 

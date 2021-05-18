@@ -32,7 +32,7 @@ Improvements:
   Performance gains will improve relative to increases in the inputs size
   and dilation scheme.
 - Added an optional argument to
-  @vdblink::Tree::topologyUnion() Tree::topologyUnion@endlink which preserves
+  @vdblink::tree::Tree::topologyUnion() Tree::topologyUnion@endlink which preserves
   active tiles on the destination tree should they overlap leaf nodes from the
   source tree.
 - Reduced the time spent in the hot path of @vdblink::initialize() initialize@endlink
