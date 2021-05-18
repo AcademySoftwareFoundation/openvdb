@@ -14,6 +14,19 @@ Version 8.1.0 - In development
       on demand, only when necessary.
     - Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
       visit nodes in a tree or sub-tree in single-threaded depth-first order.
+    - Significant performance improvements to AX volume kernels, primarily due
+      to improved vectorisation. Performance scales depending on the available
+      host CPU instruction set and scalability of the AX kernel. Trivial
+      assignments profile upwards of 3x faster on AVX.
+    - Introduced Active Tile Streaming for volumes kernels. AX can now
+      dynamically expand and collapse active nodes at all levels of a VDB tree
+      on demand, switching on or off by checking the spatial access pattern of
+      AX programs.
+    - Added tools::countActiveVoxels() for multi-threaded counting of active
+      voxels, optionally by bounding box. The Tree::activeVoxelCount() method
+      now uses this implementation.
+    - Added tools::memUsage() for multi-threaded counting of bytes of memory
+      used. The Tree::memUsage() method now uses this implementation.
 
     Improvements:
     - Significant performance improvements to large dilations with
@@ -39,6 +52,18 @@ Version 8.1.0 - In development
       math functions.
     - Added Vec4 argument support to normalize() AX function.
     - Removed unused int16 AX modulo function signatures.
+    - Refactored the backend AX representation of strings with SSO support and
+      heap allocation.
+    - Added new methods on the VolumeExecutable to control active tile
+      streaming and node execution levels
+    - The deletepoint() AX function is now natively supported by the
+      PointExecutable
+    - Added tools::SumMergeOp that uses a parallel breadth-first algorithm to
+      accelerate summing grids.
+    - vdb_view: Fixed a bug which wouldn't reset the camera speed on focus
+    - vdb_view: Improved the drawing of PointDataGrids
+    - vdb_view: Improved the exception handling of BufferObjects and added
+      support for drawing an array without index values
 
     Bug Fixes:
     - Fix a memory leak in AttributeArray when delayed-loading is disabled.
@@ -56,6 +81,16 @@ Version 8.1.0 - In development
     - Fixed a memory leak in the OpenVDB AX parser
     - Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
     - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
+    - Fixed a bug which could cause string allocations in loops to overflow the
+      stack
+    - Fixed a bug where the ValueOff iterator for the VolumeExecutable could
+      remove child branches of a VDB tree.
+    - Fixed a crash in the AX Houdini SOP with an empty PointDataGrid input.
+    - Fixed all cases where PointIndex and PointData aliases were used instead
+      of a templated type.  [Reported by Karl Marrett]
+    - Fixed a crash when calling openvdb::points::pointOffsets with an empty
+      PointDataGrid input.
+    - Add missing 8-bit and 16-bit attribute type registration.
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
@@ -81,6 +116,17 @@ Version 8.1.0 - In development
     - VDB Activate SOP now uses the multi-threaded tools::deactivate for much
       faster performance.
     - Improved the formatting and updated the OpenVDB AX SOPs help card.
+    - The AX SOP utilises the new Active Tile Streaming feature for Volumes.
+      Grids will only be densified in areas where unique values are created.
+    - VDB Activate SOP dilation will affect tiles, changing its behaviour
+      from previous versions, but producing a more expected result.
+    - VDB Activate SOP has a world space dilation option.
+    - Introduced the VDB Merge SOP that merges multiple grids in parallel and
+      is faster and more convenient to use than the VDB Combine SOP.
+    - Fix a bug where the VDB Rebuild SDF was not preserving metadata from the
+      input grid.
+    - Fix a bug in VDB Resample SOP where input transform was not being used for
+      voxel size and voxel scale transform modes.
 
     Build:
     - Dependency on OpenEXR's Half implementation has been removed from the
@@ -112,6 +158,28 @@ Version 8.1.0 - In development
       USE_STATIC_DEPENDENCIES is enabled.
     - Fixed an issue where extra hboost libraries could not be found when
       building against Houdini 18.5 on Windows.
+    - Build fixes to OpenVDB AX for LLVM 12.
+    - Re-introduced the OPENVDB_DEPRECATED macro with an additional option that
+      takes a message.  Added support to disable deprecations throughout
+      OpenVDB by defining OPENVDB_NO_DEPRECATION_WARNINGS
+    - Added an optional OPENVDB_TESTS variable to easily build a subset of the
+      unit tests.
+    - Fixed various incorrect RPATH directory paths in CMake (introduced in
+      8.0.1)
+      [Contributed by Ignacio Vizzo].
+    - Removed some unnecessary CMake for vdb_view
+    - The Windows defines NOMINMAX and _USE_MATH_DEFINES are now provided in
+      Platform.h.
+    - Moved the logic from PlatformConfig.h into Platform.h.
+    - The version.h header is now an auto generated header (version.h.in)
+      populated by CMake.  The OpenVDB Version and ABI defines are computed
+      from the installation settings.  Importantly, the value of
+      OPENVDB_ABI_VERSION_NUMBER now always matches the version used at build
+      time.
+    - Added OPENVDB_USE_HALF, OPENVDB_USE_BLOSC and OPENVDB_USE_ZLIB as
+      publicly available defines in version.h. These will be defined depending
+      on the settings used to build OpenVDB.
+
 
 Version 8.0.1 - February 5, 2021
 

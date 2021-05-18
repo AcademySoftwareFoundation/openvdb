@@ -1,4 +1,0 @@
-Bug Fixes:
-- Fixed all cases where PointIndex and PointData aliases were used instead of
-  a templated type.
-  [Reported by Karl Marrett]

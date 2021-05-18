@@ -1,3 +1,0 @@
-Build:
-- Added an optional OPENVDB_TESTS variable to easily build a subset of the
-  unit tests.

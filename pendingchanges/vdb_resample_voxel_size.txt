@@ -1,3 +1,0 @@
-Houdini:
-- Fix a bug in VDB Resample SOP where input transform was not being used for
-  voxel size and voxel scale transform modes.

@@ -1,3 +1,0 @@
-    New features:
-    - Added tools::countActiveVoxels() for multi-threaded counting of active voxels, optionally by bounding box. The Tree::activeVoxelCount() method now uses this implementation.
-    - Added tools::memUsage() for multi-threaded counting of bytes of memory used. The Tree::memUsage() method now uses this implementation.

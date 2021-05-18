@@ -1,2 +1,0 @@
-Bug Fix:
- - Fixed a crash when calling openvdb::points::pointOffsets with an empty PointDataGrid input.

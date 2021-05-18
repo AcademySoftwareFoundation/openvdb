@@ -1,4 +1,0 @@
-Build:
-    - Fixed various incorrect RPATH directory paths in CMake (introduced in 8.0.1)
-      [Contributed by Ignacio Vizzo].
-
