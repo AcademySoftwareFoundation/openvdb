@@ -125,7 +125,7 @@ TestVolumeExecutable::testTreeExecutionLevel()
     openvdb::ax::VolumeExecutable::Ptr executable =
         compiler->compile<openvdb::ax::VolumeExecutable>("f@test = $value;", data);
     CPPUNIT_ASSERT(executable);
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
         executable->getActiveTileStreaming());
 
     using NodeT0 = openvdb::FloatGrid::Accessor::NodeT0;
@@ -335,11 +335,11 @@ TestVolumeExecutable::testActiveTileStreaming()
         leaf->fill(-1.0f, true);
 
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = 2.0f;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
 
         executable->getTreeExecutionLevel(min,max);
@@ -377,11 +377,11 @@ TestVolumeExecutable::testActiveTileStreaming()
         tree.addTile(1, openvdb::Coord(NodeT1::DIM), -1.0f, /*active*/true); // NodeT0 tile
 
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("vec3d p = getvoxelpws(); f@test = p.x;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
 
         executable->getTreeExecutionLevel(min,max);
@@ -422,11 +422,11 @@ TestVolumeExecutable::testActiveTileStreaming()
 
         // sets all x == 0 coordinates to 2.0f. These all reside in the NodeT2 tile
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("int x = getcoordx(); if (x == 0) f@test = 2.0f;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
 
         executable->getTreeExecutionLevel(min,max);
@@ -480,20 +480,20 @@ TestVolumeExecutable::testActiveTileStreaming()
         tree.addTile(1, openvdb::Coord(NodeT2::DIM), -1.0f, /*active*/true); // NodeT0 tile
 
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = 2.0f;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
 
         // force stream
         executable->setActiveTileStreaming(openvdb::ax::VolumeExecutable::Streaming::ON);
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
 
         executable->getTreeExecutionLevel(min,max);
@@ -532,11 +532,11 @@ TestVolumeExecutable::testActiveTileStreaming()
 
         // sets all x == 0 coordinates to 2.0f. These all reside in the NodeT2 tile
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("int x = getcoordx(); if (x == 0) bool@test = false;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::BOOL));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
         executable->getTreeExecutionLevel(min,max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), min);
@@ -586,11 +586,11 @@ TestVolumeExecutable::testActiveTileStreaming()
 
         // sets all x == 0 coordinates to 2.0f. These all reside in the NodeT2 tile
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("int x = getcoordx(); if (x == 0) s@test = \"bar\";");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::STRING));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
         executable->getTreeExecutionLevel(min,max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), min);
@@ -643,11 +643,11 @@ TestVolumeExecutable::testActiveTileStreaming()
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = float(getcoordx());");
         executable->setValueIterator(openvdb::ax::VolumeExecutable::IterType::OFF);
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::STRING));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
         executable->getTreeExecutionLevel(min,max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), min);
@@ -686,11 +686,11 @@ TestVolumeExecutable::testActiveTileStreaming()
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = float(getcoordy());");
         executable->setValueIterator(openvdb::ax::VolumeExecutable::IterType::ALL);
 
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::STRING));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
         executable->getTreeExecutionLevel(min,max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), min);
@@ -716,41 +716,41 @@ TestVolumeExecutable::testActiveTileStreaming()
     // test auto streaming
     {
         executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = f@other; v@test2 = 1; v@test3 = v@test2;");
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::AUTO,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::AUTO ==
             executable->getActiveTileStreaming());
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("other", openvdb::ax::ast::tokens::CoreType::FLOAT));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::OFF,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::OFF ==
             executable->getActiveTileStreaming("test2", openvdb::ax::ast::tokens::CoreType::VEC3F));
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
             executable->getActiveTileStreaming("test3", openvdb::ax::ast::tokens::CoreType::VEC3F));
         //
-        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::AUTO,
+        CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::AUTO ==
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
     }
 
     // test that some particular functions cause streaming to turn on
 
     executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = rand();");
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
         executable->getActiveTileStreaming());
 
     executable = compiler->compile<openvdb::ax::VolumeExecutable>("v@test = getcoord();");
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
         executable->getActiveTileStreaming());
 
     executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = getcoordx();");
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
         executable->getActiveTileStreaming());
 
     executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = getcoordy();");
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
         executable->getActiveTileStreaming());
 
     executable = compiler->compile<openvdb::ax::VolumeExecutable>("f@test = getcoordz();");
-    CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON,
+    CPPUNIT_ASSERT(openvdb::ax::VolumeExecutable::Streaming::ON ==
         executable->getActiveTileStreaming());
 }
 
