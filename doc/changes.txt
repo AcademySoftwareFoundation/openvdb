@@ -99,9 +99,9 @@ Bug Fixes:
 - Fixed a memory leak in the OpenVDB AX parser
 - Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
 - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
-- Fixed a bug which could cause string allocations in loops to overflow the
-  stack
-- Fixed a bug where the ValueOff iterator for the VolumeExecutable could remove
+- Fixed a bug in AX which could cause string allocations in loops to overflow
+  the stack
+- Fixed a bug where the ValueOff iterator for the AX VolumeExecutable could remove
   child branches of a VDB tree.
 - Fixed a crash in the AX Houdini SOP with an empty PointDataGrid input.
 - Fixed all cases where PointIndex and PointData aliases were used instead
