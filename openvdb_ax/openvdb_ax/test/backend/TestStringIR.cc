@@ -12,11 +12,11 @@
 
 using String = openvdb::ax::codegen::String;
 
-class TestString : public CppUnit::TestCase
+class TestStringIR : public CppUnit::TestCase
 {
 public:
 
-    CPPUNIT_TEST_SUITE(TestString);
+    CPPUNIT_TEST_SUITE(TestStringIR);
     CPPUNIT_TEST(testStringImpl);
     CPPUNIT_TEST(testStringStringIR);
     CPPUNIT_TEST(testStringAssignIR);
@@ -31,10 +31,10 @@ public:
     void testStringClearIR();
 };
 
-CPPUNIT_TEST_SUITE_REGISTRATION(TestString);
+CPPUNIT_TEST_SUITE_REGISTRATION(TestStringIR);
 
 void
-TestString::testStringImpl()
+TestStringIR::testStringImpl()
 {
     // Test the C++ implementation
 
@@ -269,7 +269,7 @@ TestString::testStringImpl()
 }
 
 void
-TestString::testStringStringIR()
+TestStringIR::testStringStringIR()
 {
     static auto setInvalidString = [](String& S) {
 #if defined(__GNUC__) && !defined(__clang__)
@@ -403,7 +403,7 @@ TestString::testStringStringIR()
 
 
 void
-TestString::testStringAssignIR()
+TestStringIR::testStringAssignIR()
 {
     // Test the String IR in StringFunctions.cc
 
@@ -514,7 +514,7 @@ TestString::testStringAssignIR()
 }
 
 
-void TestString::testStringAddIR()
+void TestStringIR::testStringAddIR()
 {
     // Test the String IR in StringFunctions.cc
 
@@ -674,7 +674,7 @@ void TestString::testStringAddIR()
 }
 
 
-void TestString::testStringClearIR()
+void TestStringIR::testStringClearIR()
 {
     // Test the String IR in StringFunctions.cc
 
