@@ -40,7 +40,7 @@ a @b vec3f float attribute @b velocity and a @b vec3f float attribute @b colour.
 This snippet uses the functions @ref axlength "length" and @ref axfit "fit" to
 give points a colour between black and white based on their speed.
 @par
-<!--- P --->@code{.c}
+<!-- P -->@code{.c}
 // This statement writes to a new float attribute called speed and reads from a
 // vector float attribute called velocity. The length function is used here to
 // return the length of the point's velocity vector.
@@ -71,7 +71,7 @@ This example demonstrates a simple way of removing points from a VDB points grid
 It uses a combination of @ref axrand and @ref axdeletepoint to randomly delete
 roughly half of the points in the input VDB points grid.
 @par
-<!--- P --->@code{.c}
+<!-- P -->@code{.c}
 float threshold = 0.5f;
 
 // The rand function takes a seed and produces a random value between 0 and 1.
@@ -91,7 +91,7 @@ different seed value per point producing a good distribution of random values.
 This example shows something a bit more complex: modifying a point's velocity
 with a drag force and then moving the point with the modified velocity.
 @par
-<!--- P --->@code{.c}
+<!-- P -->@code{.c}
 float dt = 1.0f / (4.0f * 24.0f); // timestep
 vec3f gravity = {0.0f, -9.81f, 0.0f}; // gravity
 vec3f dV = {2.0f, 0.0f, 0.0f} - v@v; // drag
@@ -123,7 +123,7 @@ The following example demonstrates using various native AX functions to
 calculate a position based curl noise on points in a particular group, and to
 use that calculation to update point velocities.
 @par
-<!--- P --->@code{.c}
+<!-- P -->@code{.c}
 // Only calcualte noise and apply it to points if the current point is NOT in
 // a group called "escaped". Note that the PointExecutable also has native
 // support for group based execution.
@@ -158,7 +158,7 @@ accessed via row, column operators or as a flat array and have defined
 operators (such as matrix multiplication etc.). The following demonstrates
 some trivial matrix math on VDB Point positions.
 @par
-<!--- P --->@code{.c}
+<!-- P -->@code{.c}
 // get the 4x4 identity matrix. note that scalar->matrix promotion handles
 // this, so writing 'mat4f transform = 1;' has the same effect.
 mat4f transform = identity4();
@@ -205,7 +205,7 @@ example: `float@density` would imply a @b float volume called @b density.
 This snippet uses @ref axclamp function to constrain the @b density attribute
 between zero and one.
 @par
-<!--- V --->@code{.c}
+<!-- V -->@code{.c}
 float@density = clamp(float@density, 0.f, 1.f);
 @endcode
 
@@ -215,7 +215,7 @@ AX can be used to read and write to multiple volumes. Here we have a typical
 example of a eulerian velocity update which takes into account an updated
 vector force and scalar mass.
 @par
-<!--- V --->@code{.c}
+<!-- V -->@code{.c}
 // Access the current timestep - this could instead be provided by the AX
 // integration and made accessible with custom data (i/e: float$timestep)
 float dt = 1.0f / 24.0f;
@@ -239,7 +239,7 @@ stored in `surface_a`, will only be updated in `surface_a`'s topology. Should
 we want a combined blend of @b non @b overlapping areas of both surface a and b,
 we would need to activate a's topology with respect to b first.
 @par
-<!--- V --->@code{.c}
+<!-- V -->@code{.c}
 // time constants for each run.
 float time = float$time;
 float maxDuration = 100.0f;
