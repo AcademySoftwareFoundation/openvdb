@@ -1779,6 +1779,7 @@ createLevelSet(Real voxelSize, Real halfWidth)
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -1803,6 +1804,7 @@ struct GridApplyImpl<OpT, GridBaseT, TypeList<GridT, GridTs...>>
 
 } // namespace internal
 
+/// @endcond
 
 template<typename GridTypeListT, typename OpT>
 inline bool

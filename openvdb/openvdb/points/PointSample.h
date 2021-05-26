@@ -124,6 +124,7 @@ inline void sampleGrid( size_t order,
 
 ///////////////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_sample_internal {
 
@@ -398,6 +399,7 @@ struct AppendAttributeOp<PointDataGridT, DummySampleType>
 
 } // namespace point_sample_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

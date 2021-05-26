@@ -363,6 +363,7 @@ inline Vec3d findFeaturePoint(
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace volume_to_mesh_internal {
 
@@ -4640,6 +4641,7 @@ relaxDisorientedTriangles(
 
 } // volume_to_mesh_internal namespace
 
+/// @endcond
 
 ////////////////////////////////////////
 
@@ -5151,7 +5153,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
 
 //{
-/// @cond OPENVDB_VOLUME_TO_MESH_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 /// @internal This overload is enabled only for grids with a scalar ValueType.
 template<typename GridType>

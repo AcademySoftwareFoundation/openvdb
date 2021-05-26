@@ -317,7 +317,7 @@ template<typename FromType, typename ToType> struct CopyConstness {
     using Type = typename std::remove_const<ToType>::type;
 };
 
-/// @cond OPENVDB_TYPES_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
     using Type = const ToType;
 };

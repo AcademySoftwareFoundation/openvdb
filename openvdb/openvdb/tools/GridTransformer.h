@@ -81,6 +81,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -133,6 +134,8 @@ public:
 };
 
 } // namespace internal
+
+/// @endcond
 
 
 ////////////////////////////////////////

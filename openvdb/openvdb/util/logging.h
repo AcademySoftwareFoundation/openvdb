@@ -36,6 +36,7 @@ enum class Level {
     Fatal = log4cplus::FATAL_LOG_LEVEL
 };
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -131,6 +132,8 @@ getAppender()
 }
 
 } // namespace internal
+
+/// @endcond
 
 
 /// @brief Return the current logging level.

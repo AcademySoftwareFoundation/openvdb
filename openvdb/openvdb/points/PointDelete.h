@@ -72,6 +72,7 @@ inline void deleteFromGroup(PointDataTreeT& pointTree,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_delete_internal {
 
@@ -186,6 +187,7 @@ private:
 
 } // namespace point_delete_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

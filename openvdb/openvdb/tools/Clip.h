@@ -68,6 +68,7 @@ clip(const GridType& grid, const Grid<MaskTreeType>& mask, bool keepInterior = t
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace clip_internal {
 
@@ -337,6 +338,8 @@ doClip(
 }
 
 } // namespace clip_internal
+
+/// @endcond
 
 
 ////////////////////////////////////////

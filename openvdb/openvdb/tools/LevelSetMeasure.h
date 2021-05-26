@@ -400,7 +400,7 @@ MeasureCurvatures::operator()(const LeafRange& range) const
 ////////////////////////////////////////
 
 //{
-/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<class GridT>
 inline
@@ -433,7 +433,7 @@ levelSetArea(const GridT& grid, bool useWorldUnits)
 ////////////////////////////////////////
 
 //{
-/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<class GridT>
 inline
@@ -466,7 +466,7 @@ levelSetVolume(const GridT& grid, bool useWorldUnits)
 ////////////////////////////////////////
 
 //{
-/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<class GridT>
 inline
@@ -500,7 +500,7 @@ levelSetEulerCharacteristic(const GridT& grid)
 ////////////////////////////////////////
 
 //{
-/// @cond OPENVDB_LEVEL_SET_MEASURE_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<class GridT>
 inline

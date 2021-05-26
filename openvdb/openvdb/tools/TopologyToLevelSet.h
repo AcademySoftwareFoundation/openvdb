@@ -70,6 +70,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace ttls_internal {
 
@@ -184,7 +185,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
 
 } // namespace ttls_internal
 
-
+/// @endcond
 
 template<typename GridT, typename InterrupterT>
 inline typename GridT::template ValueConverter<float>::Type::Ptr

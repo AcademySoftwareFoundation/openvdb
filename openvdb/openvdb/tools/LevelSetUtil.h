@@ -176,6 +176,7 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace level_set_util_internal {
 
@@ -2145,6 +2146,8 @@ struct GridOrTreeConstructor<Grid<TreeType> >
 
 } // namespace level_set_util_internal
 
+
+/// @endcond OPENVDB_DOCS_INTERNAL
 
 ////////////////////////////////////////
 

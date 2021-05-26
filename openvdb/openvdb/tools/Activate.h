@@ -47,6 +47,8 @@ inline void deactivate(
 ////////////////////////////////////////
 
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace activate_internal {
 
 template<typename TreeT, bool IgnoreTolerance = false>
@@ -160,6 +162,8 @@ private:
 };// DeactivateOp
 
 } // namespace activate_internal
+
+/// @endcond
 
 
 ////////////////////////////////////////

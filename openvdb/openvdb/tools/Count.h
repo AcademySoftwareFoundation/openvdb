@@ -38,6 +38,7 @@ Index64 memUsage(const TreeT& tree, bool threaded = true);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace count_internal {
 
@@ -201,6 +202,8 @@ struct MemUsageOp
 }; // struct MemUsageOp
 
 } // namespace count_internal
+
+/// @endcond
 
 
 ////////////////////////////////////////

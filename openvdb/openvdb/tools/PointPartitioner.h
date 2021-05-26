@@ -221,6 +221,7 @@ private:
 
 // Implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_partitioner_internal {
 
@@ -934,6 +935,7 @@ inline void partition(
 
 } // namespace point_partitioner_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

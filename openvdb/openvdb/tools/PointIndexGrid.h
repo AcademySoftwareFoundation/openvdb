@@ -337,6 +337,7 @@ private:
 
 // Internal operators and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_index_grid_internal {
 
@@ -911,6 +912,7 @@ pointIndexSearch(RangeDeque& rangeList, ConstAccessor& acc, const CoordBBox& bbo
 
 } // namespace point_index_grid_internal
 
+/// @endcond
 
 // PointIndexIterator implementation
 

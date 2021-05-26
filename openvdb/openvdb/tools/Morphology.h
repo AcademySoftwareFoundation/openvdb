@@ -1031,6 +1031,8 @@ Morphology<TreeType>::NodeMaskOp::gatherEdgesXY(int x, int y, int i1, int n, int
 /////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace morph_internal {
 template <typename T> struct Adapter {
     using TreeType = T;
@@ -1044,6 +1046,8 @@ struct Adapter<openvdb::tree::LeafManager<T>> {
     static void sync(openvdb::tree::LeafManager<T>& M) { M.rebuild(); }
 };
 }
+
+/// @endcond
 
 template<typename TreeOrLeafManagerT>
 inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
