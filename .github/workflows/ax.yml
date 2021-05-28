@@ -122,8 +122,7 @@ jobs:
       - name: build
         run: |
           ./ci/build.sh ${{ matrix.build }} None ON None "core,axcore,axbin,axtest" \
-            -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm \
-            -DOPENVDB_ROOT=$HOME/openvdb-7.0.0-${{ matrix.compiler }}
+            -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm
       # Tests
       - name: test
         run: cd build && ctest -V
