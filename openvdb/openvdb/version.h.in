@@ -117,13 +117,19 @@
 #endif
 
 /* Denotes whether VDB was built with IMath Half support */
+#ifndef OPENVDB_USE_IMATH_HALF
 #cmakedefine OPENVDB_USE_IMATH_HALF
+#endif
 
 /* Denotes whether VDB was built with Blosc support */
+#ifndef OPENVDB_USE_BLOSC
 #cmakedefine OPENVDB_USE_BLOSC
+#endif
 
 /* Denotes whether VDB was built with ZLIB support */
+#ifndef OPENVDB_USE_ZLIB
 #cmakedefine OPENVDB_USE_ZLIB
+#endif
 
 
 ///////////////////////////////////////////////////////////////////////////////
