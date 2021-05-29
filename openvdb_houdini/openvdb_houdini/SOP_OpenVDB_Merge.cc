@@ -44,7 +44,7 @@ public:
     public:
         fpreal getTime() const { return mTime; }
     protected:
-        OP_ERROR cookVDBSop(OP_Context&) final;
+        OP_ERROR cookVDBSop(OP_Context&) override final;
     private:
         fpreal mTime = 0.0;
     };
