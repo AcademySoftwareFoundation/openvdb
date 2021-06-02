@@ -127,6 +127,10 @@ Version 8.1.0 - In development
       input grid.
     - Fix a bug in VDB Resample SOP where input transform was not being used for
       voxel size and voxel scale transform modes.
+    - Added Extrapolate SOP, which wraps the tools leveraging the Fast Sweeping
+      algorithm (tools::dilateSdf, tools::maskSdf, tools::fogToSdf,
+      tools::sdfToSdf, tools::sdfToExt, tools::fogToExt, tools::sdfToSdfAndExt,
+      tools::fogToSdfAndExt).
 
     Build:
     - Dependency on OpenEXR's Half implementation has been removed from the
