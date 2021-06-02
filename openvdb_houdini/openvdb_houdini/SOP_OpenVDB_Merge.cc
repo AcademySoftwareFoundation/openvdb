@@ -277,11 +277,15 @@ struct MergeOp
 
     struct OutputGrid
     {
-        explicit OutputGrid(GridBase::Ptr _grid, GEO_PrimVDB* _primitive = nullptr)
-            : grid(_grid), primitive(_primitive) { }
+        explicit OutputGrid(GridBase::Ptr _grid, GEO_PrimVDB* _primitive = nullptr,
+            const GEO_PrimVDB* _referencePrimitive = nullptr)
+            : grid(_grid)
+            , primitive(_primitive)
+            , referencePrimitive(_referencePrimitive) { }
 
         GridBase::Ptr grid;
         GEO_PrimVDB* primitive = nullptr;
+        const GEO_PrimVDB* referencePrimitive = nullptr;
     };
 
     using OutputGrids = std::deque<OutputGrid>;
@@ -399,11 +403,12 @@ struct MergeOp
             result.emplace_back(gridBase, vdbPrim);
         };
 
-        auto copyTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)
+        auto copyTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr,
+            const GU_PrimVDB* constVdbPrim = nullptr)
         {
             auto grid = GridBase::grid<GridT>(gridBase);
             // insert an empty shared pointer and asynchronously replace with a deep copy
-            result.emplace_back(GridBase::Ptr(), vdbPrim);
+            result.emplace_back(GridBase::Ptr(), vdbPrim, constVdbPrim);
             OutputGrid& output = result.back();
             tasks.run(
                 [&, grid] {
@@ -430,7 +435,7 @@ struct MergeOp
             if (key != mergeKey)    continue;
 
             GridBase::ConstPtr gridBase = constVdbPrim->getConstGridPtr();
-            copyTree(gridBase);
+            copyTree(gridBase, nullptr, constVdbPrim);
         }
 
         if (interrupt.wasInterrupted())
@@ -488,12 +493,12 @@ struct MergeOp
             if (!reference)  reference = gridBase;
         };
 
-        auto copyTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr)
+        auto copyTree = [&](auto& gridBase, GU_PrimVDB* vdbPrim = nullptr, const GU_PrimVDB* constVdbPrim = nullptr)
         {
             auto grid = GridBase::grid<GridT>(gridBase);
             if (!reference)  reference = grid->copyWithNewTree();
             // insert a reference and asynchronously replace with a deep copy
-            result.emplace_back(reference, vdbPrim);
+            result.emplace_back(reference, vdbPrim, constVdbPrim);
             OutputGrid& output = result.back();
             tasks.run(
                 [&, grid] {
@@ -542,7 +547,7 @@ struct MergeOp
             if (key != mergeKey)    continue;
 
             GridBase::ConstPtr gridBase = constVdbPrim->getConstGridPtr();
-            if ((!reference) || op.empty())     copyTree(gridBase);
+            if ((!reference) || op.empty())     copyTree(gridBase, nullptr, constVdbPrim);
             else                                addConstTree(gridBase);
         }
 
@@ -691,7 +696,12 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
                 if (!grid)  continue;
                 GEO_PrimVDB* primitive = outputGrid.primitive;
                 if (primitive)  hvdb::replaceVdbPrimitive(*gdp, grid, *primitive);
-                else            hvdb::createVdbPrimitive(*gdp, grid);
+                else {
+                    const GEO_PrimVDB* referencePrimitive = outputGrid.referencePrimitive;
+                    GU_PrimVDB::buildFromGrid(*gdp, grid,
+                        /*copyAttrsFrom=*/bool(referencePrimitive) ? referencePrimitive : nullptr,
+                        /*gridName=*/bool(referencePrimitive) ? referencePrimitive->getGridName() : nullptr);
+                }
             }
         }
 
