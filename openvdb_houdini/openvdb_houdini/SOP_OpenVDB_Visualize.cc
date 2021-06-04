@@ -8,20 +8,20 @@
 /// @brief Visualize VDB grids and their tree topology
 
 #include <houdini_utils/ParmFactory.h>
-#include <houdini_utils/geometry.h>
-#include <openvdb_houdini/GeometryUtil.h>
+#include <openvdb_houdini/GeometryUtil.h> // hvdb::drawFrustum
 #include <openvdb_houdini/Utils.h>
 #include <openvdb_houdini/SOP_NodeVDB.h>
-#include <openvdb/tools/PointIndexGrid.h>
-#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/tools/NodeVisitor.h> // visitNodesDepthFirst
 
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
+#include <GEO/GEO_PolyCounts.h>
 #include <GU/GU_Detail.h>
+#include <GU/GU_PrimPoly.h>
 #include <PRM/PRM_Parm.h>
+#include <UT/UT_Color.h> // for UT_ColorRamp
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
-#include <UT/UT_UniquePtr.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -60,6 +60,8 @@ namespace hutil = houdini_utils;
 
 
 enum RenderStyle { STYLE_NONE = 0, STYLE_POINTS, STYLE_WIRE_BOX, STYLE_SOLID_BOX };
+enum SliceStyle { NO_SLICE = 0, SLICE_VOXEL_FLATTEN, SLICE_VOXEL, SLICE_LEAF };
+enum SlicePlane { SLICE_XY = 0, SLICE_YZ, SLICE_ZX };
 
 
 class SOP_OpenVDB_Visualize: public hvdb::SOP_NodeVDB
@@ -72,10 +74,33 @@ public:
 
     int isRefInput(unsigned i) const override { return (i == 1); }
 
+    int storeOffsets();
+
+    static int storeOffsetsCB(void* data, int /*idx*/, float /*time*/, const PRM_Template*)
+    {
+        if (auto* sop = static_cast<SOP_OpenVDB_Visualize*>(data)) {
+            return sop->storeOffsets();
+        }
+        return 0;
+    }
+
     static UT_Vector3 colorLevel(int level) { return sColors[std::max(3-level,0)]; }
     static const UT_Vector3& colorSign(bool negative) { return sColors[negative ? 5 : 4]; }
 
-    class Cache: public SOP_VDBCacheOptions { OP_ERROR cookVDBSop(OP_Context&) override; };
+    class Cache: public SOP_VDBCacheOptions
+    {
+    public:
+        double offset() const { return mOffset; }
+        double offsetWS() const { return mOffsetWS; }
+
+    protected:
+        OP_ERROR cookVDBSop(OP_Context&) override;
+
+    private:
+        // cache offsets for use when switching between index-space and world-space
+        double mOffset = 0.0;
+        double mOffsetWS = 0.0;
+    };
 
 protected:
     bool updateParmsFlags() override;
@@ -221,6 +246,88 @@ newSopOperator(OP_OperatorTable* table)
             "If enabled, name the attribute added by __Points with Values__ after"
             " the VDB primitive.  If disabled or if a VDB has no name, name the point"
             " attribute according to its type: `vdb_int`, `vdb_float`, `vdb_vec3f`, etc."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "slice", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
+    {   // Slice by leaf or voxel
+        char const * const items[] = {
+            "voxelflatten",  "By Voxel (Flatten)",
+            "voxel",  "By Voxel",
+            "leaf",  "By Leaf",
+            nullptr
+        };
+        parms.add(hutil::ParmFactory(PRM_STRING, "slicemethod", "Slice")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("voxelflatten")
+            .setDocumentation(
+                "Slice by voxel renders only geometry that intersects with the slice "
+                "(and optionally flattens this geometry to the slice plane). "
+                "Slice by leaf can render all voxels in the leaf that intersects with the slice. "));
+    }
+
+    {   // Slice plane
+        char const * const items[] = {
+            "xy",  "XY Plane",
+            "yz",  "YZ Plane",
+            "zx",  "ZX Plane",
+            nullptr
+        };
+        parms.add(hutil::ParmFactory(PRM_STRING, "plane", "Plane")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("xy")
+            .setDocumentation(
+                "What axis to extract from the VDB. This is local to the VDB's space. "
+                "Rotated or transformed VDBs will have a corresponding rotated or transformed plane."));
+    }
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "useworldspace", "Use World Space for Offset")
+        .setCallbackFunc(&SOP_OpenVDB_Visualize::storeOffsetsCB)
+        .setDefault(PRMzeroDefaults)
+        .setDocumentation(
+            "Sets whether offsets are specified in Houdini units. "
+            "When this option is off, the offset is relative to the VDB in the range -1..1. "
+            "After first cook of this SOP, the offset of the first VDB will be converted."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "relativeoffset", "Relative Offset")
+        .setRange(PRM_RANGE_UI, -1.0, PRM_RANGE_UI, 1.0)
+        .setDocumentation(
+            "Where the plane should be positioned inside the VDB. "
+            "This is a relative coordinate with -1..1 being the total range, "
+            "so 0 means the center of the VDB."));
+
+    parms.add(hutil::ParmFactory(PRM_FLT_J, "offset", "Offset")
+        .setRange(PRM_RANGE_FREE, -10.0, PRM_RANGE_FREE, 10.0)
+        .setDocumentation(
+            "Where the plane should be positioned inside the VDB in Houdini units."));
+
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "visualize", "")
+        .setDefault(PRMzeroDefaults)
+        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
+
+    {   // Color remap
+        char const * const items[] = {
+            "none", "No Mapping",
+            "false", UT_Color::getRampColorName(UT_COLORRAMP_FALSE),
+            "pink", UT_Color::getRampColorName(UT_COLORRAMP_PINK),
+            "mono", UT_Color::getRampColorName(UT_COLORRAMP_MONO),
+            "blackbody", UT_Color::getRampColorName(UT_COLORRAMP_BLACKBODY),
+            "bipartite", UT_Color::getRampColorName(UT_COLORRAMP_BIPARTITE),
+            nullptr
+        };
+        parms.add(hutil::ParmFactory(PRM_STRING, "vismode", "Visualization Ramp")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
+            .setDefault("false")
+            .setDocumentation("The color scheme for visualizing the attribute values."));
+    }
+
+    std::vector<fpreal> visDefaults{0, 1};
+    parms.add(hutil::ParmFactory(PRM_FLT_E, "visrange", "Visualization Range")
+        .setVectorSize(2)
+        .setDefault(visDefaults)
+        .setDocumentation(
+            "The VDB values that correspond to the beginning and end of the visualization ramp."));
 
     // Obsolete parameters
     hutil::ParmList obsoleteParms;
@@ -483,7 +590,47 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
     changed |= enableParm("addindexcoord", drawPoints || (drawLeafNodes && leafMode == "points"));
     changed |= enableParm("usegridname", drawPoints);
 
+    const bool volumeSlice = bool(evalInt("slice", 0, time));
+
+    changed |= enableParm("slicemethod", volumeSlice);
+    changed |= enableParm("plane", volumeSlice);
+    changed |= enableParm("useworldspace", volumeSlice);
+
+    const bool worldSpaceUnits = bool(evalInt("useworldspace", 0, time));
+
+    changed |= enableParm("relativeoffset", volumeSlice);
+    changed |= setVisibleState("relativeoffset", !worldSpaceUnits);
+    changed |= enableParm("offset", volumeSlice);
+    changed |= setVisibleState("offset", worldSpaceUnits);
+
+    const bool addcolor = bool(evalInt("addcolor", 0, time));
+    const bool visualize = bool(evalInt("visualize", 0, time));
+
+    changed |= enableParm("visualize", addcolor && (drawTiles || drawVoxels));
+    changed |= enableParm("vismode", addcolor && visualize && (drawTiles || drawVoxels));
+    changed |= enableParm("visrange", addcolor && visualize && (drawTiles || drawVoxels));
+
     return changed;
+}
+
+
+// Callback to convert from voxel to world-space units
+int
+SOP_OpenVDB_Visualize::storeOffsets()
+{
+    const fpreal time = CHgetEvalTime();
+
+    // Attempt to extract the offsets from our cache.
+    if (const auto* cache = dynamic_cast<SOP_OpenVDB_Visualize::Cache*>(myNodeVerbCache)) {
+
+        if (bool(evalInt("useworldspace", 0, time))) {
+            setFloat("offset", 0, time, cache->offsetWS());
+        } else {
+            setFloat("relativeoffset", 0, time, cache->offset());
+        }
+    }
+
+    return 1;
 }
 
 
@@ -512,65 +659,6 @@ evalRenderStyle(OpType& op, const char* toggleName, const char* modeName, fpreal
 ////////////////////////////////////////
 
 
-inline void
-createBox(GU_Detail& geo, const openvdb::math::Transform& xform,
-    const openvdb::CoordBBox& bbox, const UT_Vector3* color = nullptr, bool solid = false)
-{
-    struct Local {
-        static inline UT_Vector3 Vec3dToUTV3(const openvdb::Vec3d& v) {
-            return UT_Vector3(float(v.x()), float(v.y()), float(v.z()));
-        }
-    };
-
-    UT_Vector3 corners[8];
-
-#if 1
-    // Nodes are rendered as cell-centered (0.5 voxel dilated) AABBox in world space
-    const openvdb::Vec3d min(bbox.min().x()-0.5, bbox.min().y()-0.5, bbox.min().z()-0.5);
-    const openvdb::Vec3d max(bbox.max().x()+0.5, bbox.max().y()+0.5, bbox.max().z()+0.5);
-#else
-    // Render as node-centered (used for debugging)
-    const openvdb::Vec3d min(bbox.min().x(), bbox.min().y(), bbox.min().z());
-    const openvdb::Vec3d max(bbox.max().x()+1.0, bbox.max().y()+1.0, bbox.max().z()+1.0);
-#endif
-
-    openvdb::Vec3d ptn = xform.indexToWorld(min);
-    corners[0] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(min.x(), min.y(), max.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[1] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(max.x(), min.y(), max.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[2] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(max.x(), min.y(), min.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[3] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(min.x(), max.y(), min.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[4] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(min.x(), max.y(), max.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[5] = Local::Vec3dToUTV3(ptn);
-
-    ptn = xform.indexToWorld(max);
-    corners[6] = Local::Vec3dToUTV3(ptn);
-
-    ptn = openvdb::Vec3d(max.x(), max.y(), min.z());
-    ptn = xform.indexToWorld(ptn);
-    corners[7] = Local::Vec3dToUTV3(ptn);
-
-    hutil::createBox(geo, corners, color, solid);
-}
-
-
-////////////////////////////////////////
-
-
 struct TreeParms
 {
     RenderStyle internalStyle = STYLE_NONE;
@@ -582,6 +670,16 @@ struct TreeParms
     bool addValue = false;
     bool addIndexCoord = false;
     bool useGridName = false;
+    SliceStyle sliceStyle = NO_SLICE;
+    SlicePlane slicePlane = SLICE_XY;
+    bool useWorldSpace = false;
+    double sliceOffset = 0;
+    bool visualize = false;
+    UT_ColorRamp colorRamp = UT_COLORRAMP_NUMMODES;
+    double colorMin = 0.0f;
+    double colorRange = 1.0f;
+    double* cachedOffset = nullptr;
+    double* cachedOffsetWS = nullptr;
 };
 
 
@@ -590,37 +688,50 @@ class TreeVisualizer
 public:
     TreeVisualizer(GU_Detail&, const TreeParms&, hvdb::Interrupter* = nullptr);
 
+    // create all the point attributes
+    template<typename GridType>
+    void createPointAttributes(const GridType&);
+
+    // compute the index-space value corresponding to the desired slice
+    template<typename GridType>
+    openvdb::Int32 computeIndexSlice(const GridType&);
+
+    // allocate the point, polygon and vertex offset arrays
+    template<typename GridType>
+    void allocateOffsetArrays(const GridType&);
+
+    // render nodes, tiles or voxels
+    template<typename GridType>
+    void render(bool node, const GridType& grid, openvdb::Int32 sliceIndex,
+        const RenderStyle& style1, const RenderStyle& style2);
+
     template<typename GridType>
     void operator()(const GridType&);
 
 private:
-    /// @param pos position in index coordinates
-    GA_Offset createPoint(const openvdb::Vec3d& pos);
+    // count the number of points, polygons and vertices per node
+    template <typename TreeT>
+    struct CountOp;
 
-    GA_Offset createPoint(const openvdb::CoordBBox&, const UT_Vector3& color);
+    // turn per-node counts into cumulative offsets
+    struct ComputeOffsetsOp;
 
-    template<typename ValType>
-    typename std::enable_if<IsGridTypeIntegral<ValType>::value>::type
-    addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
+    // render points and write point attributes
+    template <typename TreeT>
+    struct RenderPointsOp;
 
-    template<typename ValType>
-    typename std::enable_if<std::is_floating_point<ValType>::value>::type
-    addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType s, bool);
+    // render vertices for wireframe or solid boxes
+    template <typename TreeT>
+    struct RenderVerticesOp;
 
-    template<typename ValType>
-    typename std::enable_if<!IsGridTypeArithmetic<ValType>::value>::type
-    addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, ValType v, bool staggered);
-
-    void addPoint(const openvdb::CoordBBox&, const UT_Vector3& color, bool staggered);
-
-    void addBox(const openvdb::CoordBBox&, const UT_Vector3& color, bool solid);
-
-    bool wasInterrupted(int percent = -1) const {
-        return mInterrupter && mInterrupter->wasInterrupted(percent);
-    }
-
+    // render wireframe or solid boxes sequentially
+    template <typename TreeT>
+    struct RenderGeometrySingleThreadedOp;
 
     TreeParms mParms;
+    std::vector<std::unique_ptr<size_t[]>> mPointOffsets;
+    std::vector<std::unique_ptr<size_t[]>> mVertexOffsets;
+    std::vector<std::unique_ptr<size_t[]>> mPolygonOffsets;
     GU_Detail* mGeo;
     hvdb::Interrupter* mInterrupter;
     const openvdb::math::Transform* mXform;
@@ -635,6 +746,67 @@ private:
 ////////////////////////////////////////
 
 
+// return true if slice index intersects with the coord bbox with the given slice plane
+inline
+bool isCoordBBoxValid(const openvdb::CoordBBox& bbox, const SlicePlane& slicePlane, openvdb::Int32 sliceIndex)
+{
+    openvdb::Int32 start(0);
+    openvdb::Int32 end(0);
+
+    if (slicePlane == SLICE_XY) {
+        start = bbox.min().z();
+        end = bbox.max().z();
+    } else if (slicePlane == SLICE_YZ) {
+        start = bbox.min().x();
+        end = bbox.max().x();
+    } else if (slicePlane == SLICE_ZX) {
+        start = bbox.min().y();
+        end = bbox.max().y();
+    }
+
+    return (sliceIndex >= start) && (sliceIndex <= end);
+}
+
+
+// return true if slice index intersects with the node with the given slice plane
+template <typename NodeT>
+bool isNodeValid(const NodeT& node, const SlicePlane& slicePlane, openvdb::Int32 sliceIndex)
+{
+    return isCoordBBoxValid(node.getNodeBoundingBox(), slicePlane, sliceIndex);
+}
+
+
+// return true if slice index intersects with the iterator with the given slice plane
+// note that for performance reasons, this method does not do leaf slice intersection testing
+template <typename IterT>
+bool isIterValid(const IterT& iter, const SlicePlane& slicePlane, openvdb::Int32 sliceIndex)
+{
+    const auto& parent = iter.parent();
+
+    if (parent.getLevel() == 0) {
+        // voxels - direct coord comparison
+        if (slicePlane == SLICE_XY) {
+            return iter.getCoord().z() == sliceIndex;
+        } else if (slicePlane == SLICE_YZ) {
+            return iter.getCoord().x() == sliceIndex;
+        } else if (slicePlane == SLICE_ZX) {
+            return iter.getCoord().y() == sliceIndex;
+        }
+    } else {
+        // tiles - bbox comparison
+
+        // compute tile bounding box
+        const openvdb::Coord origin = iter.getCoord();
+        const openvdb::Index dim = parent.getChildDim();
+        const openvdb::CoordBBox bbox = openvdb::CoordBBox::createCube(origin, dim);
+
+        return isCoordBBoxValid(bbox, slicePlane, sliceIndex);
+    }
+
+    return false;
+}
+
+
 TreeVisualizer::TreeVisualizer(GU_Detail& geo, const TreeParms& parms,
     hvdb::Interrupter* interrupter)
     : mParms(parms)
@@ -645,20 +817,840 @@ TreeVisualizer::TreeVisualizer(GU_Detail& geo, const TreeParms& parms,
 }
 
 
-template<typename GridType>
-void
-TreeVisualizer::operator()(const GridType& grid)
+template <typename TreeT>
+struct TreeVisualizer::CountOp
 {
-    using TreeType = typename GridType::TreeType;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
 
-    mXform = &grid.transform();
+    CountOp(bool node, openvdb::Int32 sliceIndex, bool staggered, TreeVisualizer& parent)
+        : mNode(node)
+        , mSliceIndex(sliceIndex)
+        , mStaggered(staggered)
+        , mParent(parent) { }
 
-    const bool staggered = !mParms.ignoreStaggeredVectors &&
-        (grid.getGridClass() == openvdb::GRID_STAGGERED);
+    template<typename NodeT>
+    void countNodes(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        const bool valid = mParent.mParms.sliceStyle == NO_SLICE ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex);
 
-    //{
-    // Create point attributes.
+        if (valid && style == STYLE_SOLID_BOX) {
+            if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                mParent.mPointOffsets[NodeT::LEVEL][idx] = 4;
+                mParent.mVertexOffsets[NodeT::LEVEL][idx] = 4;
+                mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 1;
+            } else {
+                mParent.mPointOffsets[NodeT::LEVEL][idx] = 8;
+                mParent.mVertexOffsets[NodeT::LEVEL][idx] = 4*6; // each polygon has 4 vertices
+                mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 6;
+            }
+        } else if (valid && style == STYLE_WIRE_BOX) {
+            if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                mParent.mPointOffsets[NodeT::LEVEL][idx] = 4;
+                mParent.mVertexOffsets[NodeT::LEVEL][idx] = 5;
+                mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 1;
+            } else {
+                mParent.mPointOffsets[NodeT::LEVEL][idx] = 8;
+                mParent.mVertexOffsets[NodeT::LEVEL][idx] = 16;
+                mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 1;
+            }
+        } else if (valid && style == STYLE_POINTS) {
+            mParent.mPointOffsets[NodeT::LEVEL][idx] = 1;
+            mParent.mVertexOffsets[NodeT::LEVEL][idx] = 0;
+            mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 0;
+        } else {
+            mParent.mPointOffsets[NodeT::LEVEL][idx] = 0;
+            mParent.mVertexOffsets[NodeT::LEVEL][idx] = 0;
+            mParent.mPolygonOffsets[NodeT::LEVEL][idx] = 0;
+        }
+    }
 
+    void countNodes(const RootT& root, size_t idx, const RenderStyle& style) const
+    {
+        mParent.mPointOffsets[RootT::LEVEL][idx] = 0;
+        mParent.mVertexOffsets[RootT::LEVEL][idx] = 0;
+        mParent.mPolygonOffsets[RootT::LEVEL][idx] = 0;
+    }
+
+    template<typename NodeT>
+    size_t activeChildrenByIter(const NodeT& node) const
+    {
+        // iterate over each active child and count valid nodes
+        size_t onValues = 0;
+        for (auto iter = node.cbeginValueOn(); iter; ++iter) {
+            if (mParent.mParms.sliceStyle == NO_SLICE ||
+                isIterValid(iter, mParent.mParms.slicePlane, mSliceIndex)) {
+                onValues++;
+            }
+        }
+        return onValues;
+    }
+
+    size_t activeChildren(const RootT& root) const
+    {
+        // no fast option for counting node children for root nodes
+        return activeChildrenByIter(root);
+    }
+
+    template<typename NodeT>
+    size_t activeChildren(const NodeT& node) const
+    {
+        // when not slicing, count active children using the node value mask for performance
+        if (mParent.mParms.sliceStyle == NO_SLICE) {
+            return node.getValueMask().countOn();
+        } else if (isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+            // this is an optimization - if a valid leaf and using slice by leaf,
+            // counting active children is faster than using a value iterator
+            const bool leaf = NodeT::LEVEL == 0;
+            if (leaf && mParent.mParms.sliceStyle == SLICE_LEAF) {
+                return node.getValueMask().countOn();
+            }
+            // otherwise count by iterator
+            return activeChildrenByIter(node);
+        }
+        return size_t(0);
+    }
+
+    template<typename NodeT>
+    void countVoxels(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        size_t pointsPerValue = 0;
+        size_t verticesPerValue = 0;
+        size_t polygonsPerValue = 0;
+
+        if (style == STYLE_SOLID_BOX) {
+            if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                pointsPerValue = 4;
+                verticesPerValue = 4;
+                polygonsPerValue = 1;
+            } else {
+                pointsPerValue = 8;
+                verticesPerValue = 4*6; // each polygon has 4 vertices
+                polygonsPerValue = 6;
+            }
+        } else if (style == STYLE_WIRE_BOX) {
+            if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                pointsPerValue = 4;
+                verticesPerValue = 5;
+                polygonsPerValue = 1;
+            } else {
+                pointsPerValue = 8;
+                verticesPerValue = 16;
+                polygonsPerValue = 1;
+            }
+        } else if (style == STYLE_POINTS) {
+            // in staggered mode, visualize three points - one component per face
+            pointsPerValue = (mStaggered && NodeT::LEVEL == 0) ? 3 : 1;
+        }
+
+        size_t onValues = activeChildren(node);
+
+        mParent.mPointOffsets[NodeT::LEVEL][idx] = pointsPerValue * onValues;
+        mParent.mVertexOffsets[NodeT::LEVEL][idx] = verticesPerValue * onValues;
+        mParent.mPolygonOffsets[NodeT::LEVEL][idx] = polygonsPerValue * onValues;
+    }
+
+    bool operator()(const RootT& root, size_t idx) const
+    {
+        if (mNode)  countNodes(root, idx, STYLE_NONE);
+        else        countVoxels(root, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    template<typename NodeT>
+    bool operator()(const NodeT& node, size_t idx) const
+    {
+        if (mNode)  countNodes(node, idx, mParent.mParms.internalStyle);
+        else        countVoxels(node, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    bool operator()(const LeafT& leaf, size_t idx) const
+    {
+        if (mNode)  countNodes(leaf, idx, mParent.mParms.leafStyle);
+        else        countVoxels(leaf, idx, mParent.mParms.voxelStyle);
+        return false;
+    }
+
+    const bool mNode;
+    const openvdb::Int32 mSliceIndex;
+    const bool mStaggered;
+    TreeVisualizer& mParent;
+}; // struct TreeVisualizer::CountOp
+
+
+struct TreeVisualizer::ComputeOffsetsOp
+{
+    explicit ComputeOffsetsOp(TreeVisualizer& parent)
+        : mParent(parent)
+        , mNodeIndices(4) { }
+
+    template<typename NodeT>
+    void operator()(NodeT& node, size_t)
+    {
+        size_t idx = mNodeIndices[NodeT::LEVEL]++;
+
+        // points
+        size_t count = mParent.mPointOffsets[NodeT::LEVEL][idx];
+        mParent.mPointOffsets[NodeT::LEVEL][idx] = mPointOffset;
+        mPointOffset += count;
+        // vertices
+        count = mParent.mVertexOffsets[NodeT::LEVEL][idx];
+        mParent.mVertexOffsets[NodeT::LEVEL][idx] = mVertexOffset;
+        mVertexOffset += count;
+        // polygons
+        count = mParent.mPolygonOffsets[NodeT::LEVEL][idx];
+        mParent.mPolygonOffsets[NodeT::LEVEL][idx] = mPolygonOffset;
+        mPolygonOffset += count;
+    }
+
+    size_t pointOffset() const { return mPointOffset; }
+    size_t vertexOffset() const { return mVertexOffset; }
+    size_t polygonOffset() const { return mPolygonOffset; }
+
+    TreeVisualizer& mParent;
+    size_t mPointOffset{0};
+    size_t mVertexOffset{0};
+    size_t mPolygonOffset{0};
+    std::vector<size_t> mNodeIndices;
+}; // struct TreeVisualizer::ComputeOffsetsOp
+
+
+template <typename TreeT>
+struct TreeVisualizer::RenderPointsOp
+{
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    RenderPointsOp(bool node, GA_Offset offset, openvdb::Int32 sliceIndex, bool staggered, TreeVisualizer& parent)
+        : mNode(node)
+        , mOffset(offset)
+        , mSliceIndex(sliceIndex)
+        , mStaggered(staggered)
+        , mParent(parent) { }
+
+    openvdb::Vec3d bboxToVec3d(const openvdb::CoordBBox& bbox) const
+    {
+        return openvdb::Vec3d(  0.5*(bbox.min().x()+bbox.max().x()),
+                                0.5*(bbox.min().y()+bbox.max().y()),
+                                0.5*(bbox.min().z()+bbox.max().z()));
+
+    }
+
+    UT_Vector3i vec3dToUTV3i(const openvdb::Vec3d& pos) const
+    {
+        openvdb::Coord idxPos = openvdb::Coord::floor(pos);
+        return UT_Vector3i(idxPos[0], idxPos[1], idxPos[2]);
+    }
+
+    UT_Vector3 indexToWorldUTV3(const openvdb::Vec3d& pos) const
+    {
+        const openvdb::Vec3d posWS = mParent.mXform->indexToWorld(pos);
+        return UT_Vector3(float(posWS.x()), float(posWS.y()), float(posWS.z()));
+    }
+
+    void setPos(size_t pointIndex, const openvdb::Vec3d& pos) const
+    {
+        mParent.mGeo->setPos3(pointIndex, indexToWorldUTV3(pos));
+    }
+
+    void setStaggeredPos(size_t pointIndex, const openvdb::Vec3d& pos) const
+    {
+        openvdb::Vec3d pos0 = pos - openvdb::Vec3d(0.5, 0, 0);
+        openvdb::Vec3d pos1 = pos - openvdb::Vec3d(0, 0.5, 0);
+        openvdb::Vec3d pos2 = pos - openvdb::Vec3d(0, 0, 0.5);
+
+        mParent.mGeo->setPos3(pointIndex,   indexToWorldUTV3(pos0));
+        mParent.mGeo->setPos3(pointIndex+1, indexToWorldUTV3(pos1));
+        mParent.mGeo->setPos3(pointIndex+2, indexToWorldUTV3(pos2));
+    }
+
+    void setBoxPos(size_t pointIndex, const openvdb::CoordBBox& bbox) const
+    {
+        const openvdb::Vec3d min(bbox.min().x()-0.5, bbox.min().y()-0.5, bbox.min().z()-0.5);
+        const openvdb::Vec3d max(bbox.max().x()+0.5, bbox.max().y()+0.5, bbox.max().z()+0.5);
+
+        // set the box corners
+
+        mParent.mGeo->setPos3(pointIndex, indexToWorldUTV3(openvdb::Vec3d(min.x(), min.y(), min.z())));
+        mParent.mGeo->setPos3(pointIndex+1, indexToWorldUTV3(openvdb::Vec3d(min.x(), min.y(), max.z())));
+        mParent.mGeo->setPos3(pointIndex+2, indexToWorldUTV3(openvdb::Vec3d(max.x(), min.y(), max.z())));
+        mParent.mGeo->setPos3(pointIndex+3, indexToWorldUTV3(openvdb::Vec3d(max.x(), min.y(), min.z())));
+        mParent.mGeo->setPos3(pointIndex+4, indexToWorldUTV3(openvdb::Vec3d(min.x(), max.y(), min.z())));
+        mParent.mGeo->setPos3(pointIndex+5, indexToWorldUTV3(openvdb::Vec3d(min.x(), max.y(), max.z())));
+        mParent.mGeo->setPos3(pointIndex+6, indexToWorldUTV3(openvdb::Vec3d(max.x(), max.y(), max.z())));
+        mParent.mGeo->setPos3(pointIndex+7, indexToWorldUTV3(openvdb::Vec3d(max.x(), max.y(), min.z())));
+    }
+
+    void setPlanePos(size_t pointIndex, const openvdb::CoordBBox& bbox) const
+    {
+        const openvdb::Vec3d min(bbox.min().x()-0.5, bbox.min().y()-0.5, bbox.min().z()-0.5);
+        const openvdb::Vec3d max(bbox.max().x()+0.5, bbox.max().y()+0.5, bbox.max().z()+0.5);
+
+        // set the plane corners
+
+        if (mParent.mParms.slicePlane == SLICE_XY) {
+            mParent.mGeo->setPos3(pointIndex, indexToWorldUTV3(openvdb::Vec3d(min.x(), min.y(), mSliceIndex)));
+            mParent.mGeo->setPos3(pointIndex+1, indexToWorldUTV3(openvdb::Vec3d(min.x(), max.y(), mSliceIndex)));
+            mParent.mGeo->setPos3(pointIndex+2, indexToWorldUTV3(openvdb::Vec3d(max.x(), max.y(), mSliceIndex)));
+            mParent.mGeo->setPos3(pointIndex+3, indexToWorldUTV3(openvdb::Vec3d(max.x(), min.y(), mSliceIndex)));
+        } else if (mParent.mParms.slicePlane == SLICE_YZ) {
+            mParent.mGeo->setPos3(pointIndex, indexToWorldUTV3(openvdb::Vec3d(mSliceIndex, min.y(), min.z())));
+            mParent.mGeo->setPos3(pointIndex+1, indexToWorldUTV3(openvdb::Vec3d(mSliceIndex, min.y(), max.z())));
+            mParent.mGeo->setPos3(pointIndex+2, indexToWorldUTV3(openvdb::Vec3d(mSliceIndex, max.y(), max.z())));
+            mParent.mGeo->setPos3(pointIndex+3, indexToWorldUTV3(openvdb::Vec3d(mSliceIndex, max.y(), min.z())));
+        } else if (mParent.mParms.slicePlane == SLICE_ZX) {
+            mParent.mGeo->setPos3(pointIndex, indexToWorldUTV3(openvdb::Vec3d(min.x(), mSliceIndex, min.z())));
+            mParent.mGeo->setPos3(pointIndex+1, indexToWorldUTV3(openvdb::Vec3d(max.x(), mSliceIndex, min.z())));
+            mParent.mGeo->setPos3(pointIndex+2, indexToWorldUTV3(openvdb::Vec3d(max.x(), mSliceIndex, max.z())));
+            mParent.mGeo->setPos3(pointIndex+3, indexToWorldUTV3(openvdb::Vec3d(min.x(), mSliceIndex, max.z())));
+        }
+    }
+
+    void setIndex(size_t pointIndex, const openvdb::Vec3d& pos) const
+    {
+        if (!mParent.mIndexCoordHandle.isValid())   return;
+        // Attach the (integer) index coordinates of the voxel at the given pos.
+        mParent.mIndexCoordHandle.set(pointIndex, vec3dToUTV3i(pos));
+    }
+
+    void setStaggeredIndex(size_t pointIndex, const openvdb::Vec3d& pos) const
+    {
+        if (!mParent.mIndexCoordHandle.isValid())   return;
+
+        // Attach the (integer) index coordinates of the voxel at the given pos.
+        openvdb::Vec3d pos0 = pos - openvdb::Vec3d(0.5, 0, 0);
+        openvdb::Vec3d pos1 = pos - openvdb::Vec3d(0, 0.5, 0);
+        openvdb::Vec3d pos2 = pos - openvdb::Vec3d(0, 0, 0.5);
+
+        mParent.mIndexCoordHandle.set(pointIndex,   vec3dToUTV3i(pos0));
+        mParent.mIndexCoordHandle.set(pointIndex+1, vec3dToUTV3i(pos1));
+        mParent.mIndexCoordHandle.set(pointIndex+2, vec3dToUTV3i(pos2));
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<IsGridTypeIntegral<ValueT>::value>::type
+    setValue(GA_Offset offset, ValueT s) const
+    {
+        if (!mParent.mInt32Handle.isValid())    return;
+        mParent.mInt32Handle.set(offset, int(s));
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<std::is_floating_point<ValueT>::value>::type
+    setValue(GA_Offset offset, ValueT s) const
+    {
+        if (!mParent.mFloatHandle.isValid())    return;
+        mParent.mFloatHandle.set(offset, float(s));
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<!IsGridTypeArithmetic<ValueT>::value>::type
+    setValue(GA_Offset offset, ValueT v) const
+    {
+        if (!mParent.mVec3fHandle.isValid())    return;
+        mParent.mVec3fHandle.set(offset, UT_Vector3(float(v[0]), float(v[1]), float(v[2])));
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<IsGridTypeArithmetic<ValueT>::value>::type
+    setStaggeredValue(GA_Offset offset, ValueT v) const { }
+
+    template<typename ValueT>
+    typename std::enable_if<!IsGridTypeArithmetic<ValueT>::value>::type
+    setStaggeredValue(GA_Offset offset, ValueT v) const
+    {
+        if (!mParent.mVec3fHandle.isValid())    return;
+        mParent.mVec3fHandle.set(offset, UT_Vector3(float(v[0]), 0.0, 0.0));
+        mParent.mVec3fHandle.set(offset+1, UT_Vector3(0.0, float(v[1]), 0.0));
+        mParent.mVec3fHandle.set(offset+2, UT_Vector3(0.0, 0.0, float(v[2])));
+    }
+
+    template<typename ValueT>
+    void setColorBySign(size_t idx, const ValueT& value, size_t count = 1) const
+    {
+        const bool negative = openvdb::math::isNegative(value);
+        const auto color = SOP_OpenVDB_Visualize::colorSign(negative);
+        for (size_t i = 0; i < count; i++) {
+            mParent.mCdHandle.set(idx+i, color);
+        }
+    }
+
+    template<typename ValueT>
+    void setColorByRamp(size_t idx, const ValueT& value, size_t count = 1) const
+    {
+        const double min = mParent.mParms.colorMin;
+        const double range = mParent.mParms.colorRange;
+        const double remap = (value - min) * range;
+
+        UT_Vector3 color;
+        UT_Color::getRampColor(mParent.mParms.colorRamp, remap, &color.r(), &color.g(), &color.b());
+        for (size_t i = 0; i < count; i++) {
+            mParent.mCdHandle.set(idx+i, color);
+        }
+    }
+
+    void setColorByLevel(size_t idx, const openvdb::Index level, size_t count = 1) const
+    {
+        if (mParent.mCdHandle.isValid()) {
+            const auto color = SOP_OpenVDB_Visualize::colorLevel(level);
+            for (size_t i = 0; i < count; i++) {
+                mParent.mCdHandle.set(idx+i, color);
+            }
+        }
+    }
+
+    void setColorByComponent(size_t idx) const
+    {
+        if (mParent.mCdHandle.isValid()) {
+            mParent.mCdHandle.set(idx+0, /*red*/UT_Vector3(1.0, 0.0, 0.0));
+            mParent.mCdHandle.set(idx+1, /*green*/UT_Vector3(0.0, 1.0, 0.0));
+            mParent.mCdHandle.set(idx+2, /*blue*/UT_Vector3(0.0, 0.0, 1.0));
+        }
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<std::is_floating_point<ValueT>::value>::type
+    setColorByValue(size_t idx, const ValueT& value, size_t count = 1) const
+    {
+        if (mParent.mCdHandle.isValid()) {
+            if (mParent.mParms.visualize) {
+                setColorByRamp(idx, value, count);
+            } else {
+                setColorBySign(idx, value, count);
+            }
+        }
+    }
+
+    template<typename ValueT>
+    typename std::enable_if<!std::is_floating_point<ValueT>::value>::type
+    setColorByValue(size_t idx, const ValueT& value, size_t count = 1) const
+    {
+        if (mParent.mCdHandle.isValid()) {
+            setColorBySign(idx, value, count);
+        }
+    }
+
+    template<typename NodeT>
+    void renderNodes(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        if (!style)     return;
+        if (mParent.mParms.sliceStyle == NO_SLICE ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+            const openvdb::CoordBBox bbox = node.getNodeBoundingBox();
+            const size_t pointIndex = mOffset + mParent.mPointOffsets[NodeT::LEVEL][idx];
+
+            if (style == STYLE_POINTS) {
+                openvdb::Vec3d pos = bboxToVec3d(bbox);
+                setPos(pointIndex, pos);
+                setIndex(pointIndex, pos);
+                setColorByLevel(pointIndex, node.getLevel(), 1);
+            } else if (style == STYLE_WIRE_BOX || style == STYLE_SOLID_BOX) {
+                if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    setPlanePos(pointIndex, bbox);
+                    setColorByLevel(pointIndex, node.getLevel(), 4);
+                } else {
+                    setBoxPos(pointIndex, bbox);
+                    setColorByLevel(pointIndex, node.getLevel(), 8);
+                }
+            }
+        }
+    }
+
+    template<typename NodeT>
+    void renderVoxels(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        if (!style)  return;
+
+        bool allValid = mParent.mParms.sliceStyle == NO_SLICE;
+
+        if (allValid ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+
+            size_t pointIndex = mOffset + mParent.mPointOffsets[NodeT::LEVEL][idx];
+
+            // if node is a leaf node, optionally render all voxels in the leaf
+            if (NodeT::LEVEL == 0) {
+                allValid = allValid || mParent.mParms.sliceStyle == SLICE_LEAF;
+            }
+
+            for (auto iter = node.cbeginValueOn(); iter; ++iter) {
+
+                if (allValid || isIterValid(iter, mParent.mParms.slicePlane, mSliceIndex)) {
+
+                    openvdb::CoordBBox bbox;
+                    bbox.expand(iter.getCoord(), node.getChildDim());
+
+                    if (style == STYLE_POINTS) {
+                        openvdb::Vec3d pos = bboxToVec3d(bbox);
+                        if (mStaggered && NodeT::LEVEL == 0) {
+                            setStaggeredPos(pointIndex, pos);
+                            setStaggeredIndex(pointIndex, pos);
+                            setStaggeredValue(pointIndex, iter.getValue());
+                            setColorByComponent(pointIndex);
+                            pointIndex += 3;
+                        } else {
+                            setPos(pointIndex, pos);
+                            setIndex(pointIndex, pos);
+                            setColorByValue(pointIndex, iter.getValue());
+                            setValue(pointIndex, iter.getValue());
+                            pointIndex++;
+                        }
+                    } else if (style == STYLE_WIRE_BOX || style == STYLE_SOLID_BOX) {
+                        if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                            setPlanePos(pointIndex, bbox);
+                            setColorByValue(pointIndex, iter.getValue(), 4);
+                            pointIndex += 4;
+                        } else {
+                            setBoxPos(pointIndex, bbox);
+                            setColorByValue(pointIndex, iter.getValue(), 8);
+                            pointIndex += 8;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool operator()(const RootT& root, size_t idx) const
+    {
+        // don't render root nodes
+        if (!mNode)     renderVoxels(root, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    template<typename NodeT>
+    bool operator()(const NodeT& node, size_t idx) const
+    {
+        if (mNode)      renderNodes(node, idx, mParent.mParms.internalStyle);
+        else            renderVoxels(node, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    bool operator()(const LeafT& leaf, size_t idx) const
+    {
+        if (mNode)      renderNodes(leaf, idx, mParent.mParms.leafStyle);
+        else            renderVoxels(leaf, idx, mParent.mParms.voxelStyle);
+        return false;
+    }
+
+    const bool mNode;
+    const GA_Offset mOffset;
+    const openvdb::Int32 mSliceIndex;
+    const bool mStaggered;
+    TreeVisualizer& mParent;
+}; // struct TreeVisualizer::RenderPointsOp
+
+
+template <typename TreeT>
+struct TreeVisualizer::RenderVerticesOp
+{
+    using ArrayT = std::vector<std::unique_ptr<size_t[]>>;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    RenderVerticesOp(bool node, std::unique_ptr<int[]>& vertices,
+        openvdb::Int32 sliceIndex, TreeVisualizer& parent)
+        : mNode(node)
+        , mVertices(vertices)
+        , mSliceIndex(sliceIndex)
+        , mParent(parent) { }
+
+    void renderWirePlane(int& pointIndex, size_t& vertexIndex) const
+    {
+        // 4 edges as one line
+        mVertices[vertexIndex] = pointIndex;
+        mVertices[vertexIndex+1] = pointIndex+1;
+        mVertices[vertexIndex+2] = pointIndex+2;
+        mVertices[vertexIndex+3] = pointIndex+3;
+        mVertices[vertexIndex+4] = pointIndex;
+
+        vertexIndex += 5;
+        pointIndex += 4;
+    }
+
+    void renderWireBox(int& pointIndex, size_t& vertexIndex) const
+    {
+        // 12 edges as one line
+        mVertices[vertexIndex] = pointIndex+0;
+        mVertices[vertexIndex+1] = pointIndex+1;
+        mVertices[vertexIndex+2] = pointIndex+2;
+        mVertices[vertexIndex+3] = pointIndex+3;
+        mVertices[vertexIndex+4] = pointIndex+0;
+        mVertices[vertexIndex+5] = pointIndex+4;
+        mVertices[vertexIndex+6] = pointIndex+5;
+        mVertices[vertexIndex+7] = pointIndex+6;
+        mVertices[vertexIndex+8] = pointIndex+7;
+        mVertices[vertexIndex+9] = pointIndex+4;
+        mVertices[vertexIndex+10] = pointIndex+5;
+        mVertices[vertexIndex+11] = pointIndex+1;
+        mVertices[vertexIndex+12] = pointIndex+2;
+        mVertices[vertexIndex+13] = pointIndex+6;
+        mVertices[vertexIndex+14] = pointIndex+7;
+        mVertices[vertexIndex+15] = pointIndex+3;
+
+        vertexIndex += 16;
+        pointIndex += 8;
+    }
+
+    void renderSolidPlane(int& pointIndex, size_t& vertexIndex) const
+    {
+        // 1 polygon with 4 edges
+        mVertices[vertexIndex] = pointIndex;
+        mVertices[vertexIndex+1] = pointIndex+1;
+        mVertices[vertexIndex+2] = pointIndex+2;
+        mVertices[vertexIndex+3] = pointIndex+3;
+
+        vertexIndex += 4;
+        pointIndex += 4;
+    }
+
+    void renderSolidBox(int& pointIndex, size_t& vertexIndex) const
+    {
+        // 6 polygons with 4 edges each
+        mVertices[vertexIndex] = pointIndex;
+        mVertices[vertexIndex+1] = pointIndex+1;
+        mVertices[vertexIndex+2] = pointIndex+2;
+        mVertices[vertexIndex+3] = pointIndex+3;
+
+        mVertices[vertexIndex+4] = pointIndex+7;
+        mVertices[vertexIndex+5] = pointIndex+6;
+        mVertices[vertexIndex+6] = pointIndex+5;
+        mVertices[vertexIndex+7] = pointIndex+4;
+
+        mVertices[vertexIndex+8] = pointIndex+4;
+        mVertices[vertexIndex+9] = pointIndex+5;
+        mVertices[vertexIndex+10] = pointIndex+1;
+        mVertices[vertexIndex+11] = pointIndex;
+
+        mVertices[vertexIndex+12] = pointIndex+6;
+        mVertices[vertexIndex+13] = pointIndex+7;
+        mVertices[vertexIndex+14] = pointIndex+3;
+        mVertices[vertexIndex+15] = pointIndex+2;
+
+        mVertices[vertexIndex+16] = pointIndex;
+        mVertices[vertexIndex+17] = pointIndex+3;
+        mVertices[vertexIndex+18] = pointIndex+7;
+        mVertices[vertexIndex+19] = pointIndex+4;
+
+        mVertices[vertexIndex+20] = pointIndex+1;
+        mVertices[vertexIndex+21] = pointIndex+5;
+        mVertices[vertexIndex+22] = pointIndex+6;
+        mVertices[vertexIndex+23] = pointIndex+2;
+
+        vertexIndex += 24;
+        pointIndex += 8;
+    }
+
+    template<typename NodeT>
+    void renderNodes(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        if (mParent.mParms.sliceStyle == NO_SLICE ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+
+            int pointIndex = static_cast<int>(mParent.mPointOffsets[NodeT::LEVEL][idx]);
+            size_t vertexIndex = mParent.mVertexOffsets[NodeT::LEVEL][idx];
+
+            if (style == STYLE_WIRE_BOX) {
+                if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    renderWirePlane(pointIndex, vertexIndex);
+                } else {
+                    renderWireBox(pointIndex, vertexIndex);
+                }
+            } else if (style == STYLE_SOLID_BOX) {
+                if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    renderSolidPlane(pointIndex, vertexIndex);
+                } else {
+                    renderSolidBox(pointIndex, vertexIndex);
+                }
+            }
+        }
+    }
+
+    template<typename NodeT>
+    void renderVoxels(const NodeT& node, size_t idx, const RenderStyle& style) const
+    {
+        bool allValid = mParent.mParms.sliceStyle == NO_SLICE;
+
+        if (allValid || isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+
+            // if node is a leaf node, optionally render all voxels in the leaf
+            if (NodeT::LEVEL == 0) {
+                allValid = allValid || mParent.mParms.sliceStyle == SLICE_LEAF;
+            }
+
+            int pointIndex = static_cast<int>(mParent.mPointOffsets[NodeT::LEVEL][idx]);
+            size_t vertexIndex = mParent.mVertexOffsets[NodeT::LEVEL][idx];
+
+            for (auto iter = node.cbeginValueOn(); iter; ++iter) {
+                if (allValid || isIterValid(iter, mParent.mParms.slicePlane, mSliceIndex)) {
+                    if (style == STYLE_WIRE_BOX) {
+                        if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                            renderWirePlane(pointIndex, vertexIndex);
+                        } else {
+                            renderWireBox(pointIndex, vertexIndex);
+                        }
+                    } else if (style == STYLE_SOLID_BOX) {
+                        if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                            renderSolidPlane(pointIndex, vertexIndex);
+                        } else {
+                            renderSolidBox(pointIndex, vertexIndex);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    bool operator()(const RootT& root, size_t idx) const
+    {
+        // don't render root nodes
+        if (!mNode)     renderVoxels(root, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    template<typename NodeT>
+    bool operator()(const NodeT& node, size_t idx) const
+    {
+        if (mNode)      renderNodes(node, idx, mParent.mParms.internalStyle);
+        else            renderVoxels(node, idx, mParent.mParms.tileStyle);
+        return true;
+    }
+
+    bool operator()(const LeafT& leaf, size_t idx) const
+    {
+        if (mNode)      renderNodes(leaf, idx, mParent.mParms.leafStyle);
+        else            renderVoxels(leaf, idx, mParent.mParms.voxelStyle);
+        return false;
+    }
+
+    const bool mNode;
+    std::unique_ptr<int[]>& mVertices;
+    const openvdb::Int32 mSliceIndex;
+    TreeVisualizer& mParent;
+}; // struct TreeVisualizer::RenderVerticesOp
+
+
+template <typename TreeT>
+struct TreeVisualizer::RenderGeometrySingleThreadedOp
+{
+    using ArrayT = std::vector<std::unique_ptr<size_t[]>>;
+    using RootT = typename TreeT::RootNodeType;
+    using LeafT = typename TreeT::LeafNodeType;
+
+    RenderGeometrySingleThreadedOp(bool node, GA_Offset offset, std::unique_ptr<int[]>& vertices,
+        openvdb::Int32 sliceIndex, TreeVisualizer& parent)
+        : mNode(node)
+        , mOffset(offset)
+        , mVertices(vertices.get())
+        , mSliceIndex(sliceIndex)
+        , mParent(parent) { }
+
+    void renderWire(int count)
+    {
+        GU_PrimPoly* poly = GU_PrimPoly::build(mParent.mGeo, 0, GU_POLY_OPEN);
+        for (int i = 0; i < count; i++) {
+            poly->appendVertex(mOffset + *mVertices++);
+        }
+    }
+
+    void renderSolid(int count)
+    {
+        for (int i = 0; i < count; i++) {
+            GU_PrimPoly* poly = GU_PrimPoly::build(mParent.mGeo, 0);
+            for (int j = 0; j < 4; j++) {
+                poly->appendVertex(mOffset + *mVertices++);
+            }
+            poly->close();
+        }
+    }
+
+    template <typename NodeT>
+    void renderNodes(const NodeT& node, const RenderStyle& style)
+    {
+        if (mParent.mParms.sliceStyle == NO_SLICE ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+            if (style == STYLE_WIRE_BOX) {
+                if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    renderWire(5);
+                } else {
+                    renderWire(16);
+                }
+            } else if (style == STYLE_SOLID_BOX) {
+                if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    renderSolid(1);
+                } else {
+                    renderSolid(6);
+                }
+            }
+        }
+    }
+
+    template <typename NodeT>
+    void renderVoxels(const NodeT& node, const RenderStyle& style)
+    {
+        bool allValid = mParent.mParms.sliceStyle == NO_SLICE;
+
+        if (allValid ||
+            isNodeValid(node, mParent.mParms.slicePlane, mSliceIndex)) {
+
+            // if node is a leaf node, optionally render all voxels in the leaf
+            if (NodeT::LEVEL == 0) {
+                allValid = allValid || mParent.mParms.sliceStyle == SLICE_LEAF;
+            }
+
+            for (auto iter = node.cbeginValueOn(); iter; ++iter) {
+                if (allValid || isIterValid(iter, mParent.mParms.slicePlane, mSliceIndex)) {
+                    if (style == STYLE_WIRE_BOX) {
+                        if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                            renderWire(5);
+                        } else {
+                            renderWire(16);
+                        }
+                    } else if (style == STYLE_SOLID_BOX) {
+                        if (mParent.mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                            renderSolid(1);
+                        } else {
+                            renderSolid(6);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    void operator()(const RootT& root, size_t)
+    {
+        // don't render root nodes
+        if (!mNode)     renderVoxels(root, mParent.mParms.tileStyle);
+    }
+
+    template<typename NodeT>
+    void operator()(const NodeT& node, size_t)
+    {
+        if (mNode)      renderNodes(node, mParent.mParms.internalStyle);
+        else            renderVoxels(node, mParent.mParms.tileStyle);
+    }
+
+    void operator()(const LeafT& leaf, size_t)
+    {
+        if (mNode)      renderNodes(leaf, mParent.mParms.leafStyle);
+        else            renderVoxels(leaf, mParent.mParms.voxelStyle);
+    }
+
+    const bool mNode;
+    const GA_Offset mOffset;
+    int* mVertices;
+    const openvdb::Int32 mSliceIndex;
+    TreeVisualizer& mParent;
+}; // struct TreeVisualizer::RenderGeometrySingleThreadedOp
+
+
+template <typename GridT>
+void
+TreeVisualizer::createPointAttributes(const GridT& grid)
+{
     if (mParms.addColor) {
         mCdHandle.bind(mGeo->findDiffuseAttribute(GA_ATTRIB_POINT));
         if (!mCdHandle.isValid()) {
@@ -756,171 +1748,239 @@ TreeVisualizer::operator()(const GridType& grid)
                 "value attributes are not supported for values of type " + valueType);
         }
     }
+}
 
-    //}
+template<typename GridType>
+openvdb::Int32 TreeVisualizer::computeIndexSlice(const GridType& grid)
+{
+    openvdb::Int32 slice(std::numeric_limits<openvdb::Int32>::max());
 
-    // Render nodes.
-    if (mParms.internalStyle || mParms.leafStyle) {
-        openvdb::CoordBBox bbox;
+    if (mParms.sliceStyle == NO_SLICE)  return slice;
 
-        for (typename TreeType::NodeCIter iter(grid.tree()); iter; ++iter) {
-            if (iter.getDepth() == 0) continue; // don't draw the root node
+    // set axis index
 
-            const bool isLeaf = (iter.getLevel() == 0);
-            if (isLeaf && !mParms.leafStyle) continue;
-            if (!isLeaf && !mParms.internalStyle) continue;
+    int axis = -1;
+    if (mParms.slicePlane == SLICE_XY) {
+        axis = 2; // z
+    } else if (mParms.slicePlane == SLICE_YZ) {
+        axis = 0; // x
+    } else if (mParms.slicePlane == SLICE_ZX) {
+        axis = 1; // y
+    }
 
-            const bool solid = (isLeaf ? mParms.leafStyle == STYLE_SOLID_BOX
-                : mParms.internalStyle == STYLE_SOLID_BOX);
+    // compute min and max index space bounds
 
-            const auto color = SOP_OpenVDB_Visualize::colorLevel(iter.getLevel());
+    openvdb::CoordBBox activeVoxelBbox;
+    if (!grid.tree().evalActiveVoxelBoundingBox(activeVoxelBbox)) {
+        return slice;
+    }
 
-            iter.getBoundingBox(bbox);
-            if (isLeaf && mParms.leafStyle == STYLE_POINTS) {
-                addPoint(bbox, color, staggered);
-            } else {
-                addBox(bbox, color, solid);
-            }
+    const openvdb::Int32 min = activeVoxelBbox.min()[axis];
+    const openvdb::Int32 max = activeVoxelBbox.max()[axis];
+
+    if (mParms.useWorldSpace) {
+        // convert world space offset to index space
+
+        openvdb::Vec3d posWS(0);
+        posWS(axis) = mParms.sliceOffset;
+        const openvdb::Vec3d pos = grid.worldToIndex(posWS);
+        double offsetIndexSpace = pos(axis);
+
+        // now round to nearest index-space integer
+
+        slice = openvdb::Int32(openvdb::math::Round(offsetIndexSpace));
+
+        // store the offsets in the node cache so that they can be seamlessly converted if desired
+
+        if (mParms.cachedOffsetWS) {
+            *mParms.cachedOffsetWS = slice;
+            mParms.cachedOffsetWS = nullptr; // reset pointer so only the offset from the first grid is stored
+        }
+        if (mParms.cachedOffset) {
+            // remap index space value from (min,max) to (-1,1)
+
+            const double gridOffset = (offsetIndexSpace - min + 0.5) / (max - min + 1);
+            const double sliceOffset = (gridOffset * 2.0) - 1.0;
+
+            *mParms.cachedOffset = sliceOffset;
+            mParms.cachedOffset = nullptr; // reset pointer so only the offset from the first grid is stored
+        }
+    } else {
+
+        // remap offset from (-1,1) => (min, max)
+
+        const double gridOffset = (mParms.sliceOffset + 1.0) * 0.5;;
+        const double offsetIndexSpace = (gridOffset * (max - min + 1)) + min - 0.5;
+
+        // now round to nearest index-space integer
+
+        slice = openvdb::Int32(openvdb::math::Round(offsetIndexSpace));
+
+        // store the offsets in the node cache so that they can be seamlessly converted if desired
+
+        if (mParms.cachedOffset) {
+            *mParms.cachedOffset = slice;
+            mParms.cachedOffset = nullptr; // reset pointer so only the offset from the first grid is stored
+        }
+        if (mParms.cachedOffsetWS) {
+            // convert index space offset to world space
+
+            openvdb::Vec3d pos(0);
+            pos(axis) = offsetIndexSpace;
+            const openvdb::Vec3d posWS = grid.indexToWorld(pos);
+
+            *mParms.cachedOffsetWS = posWS(axis);
+            mParms.cachedOffsetWS = nullptr; // reset pointer so only the offset from the first grid is stored
         }
     }
 
-    if (!mParms.tileStyle && !mParms.voxelStyle) return;
+    return slice;
+}
 
-    // Render tiles and voxels.
-    openvdb::CoordBBox bbox;
-    for (auto iter = grid.cbeginValueOn(); iter; ++iter) {
-        if (wasInterrupted()) break;
+template<typename GridType>
+void
+TreeVisualizer::allocateOffsetArrays(const GridType& grid)
+{
+    // allocate offsets per node arrays - no zero value initialization
 
-        const int style = iter.isVoxelValue() ? mParms.voxelStyle : mParms.tileStyle;
-        if (style == STYLE_NONE) continue;
+    auto nodeCounts = grid.tree().nodeCount();
+    for (const auto& count : nodeCounts) {
+        mPointOffsets.emplace_back(new size_t[count]);
+        mVertexOffsets.emplace_back(new size_t[count]);
+        mPolygonOffsets.emplace_back(new size_t[count]);
+    }
+}
 
-        const bool negative = openvdb::math::isNegative(iter.getValue());
-        const UT_Vector3& color = SOP_OpenVDB_Visualize::colorSign(negative);
-        iter.getBoundingBox(bbox);
+template<typename GridType>
+void
+TreeVisualizer::render(bool node, const GridType& grid, openvdb::Int32 sliceIndex,
+    const RenderStyle& style1, const RenderStyle& style2)
+{
+    using TreeType = typename GridType::TreeType;
 
-        if (style == STYLE_POINTS) {
-            if (mParms.addValue) {
-                addPoint(bbox, color, iter.getValue(), staggered);
+    const bool staggered = !mParms.ignoreStaggeredVectors &&
+        (grid.getGridClass() == openvdb::GRID_STAGGERED);
+
+    // define the number of points and polygons to generate per node
+
+    CountOp<TreeType> countOp(node, sliceIndex, staggered, *this);
+    openvdb::tree::DynamicNodeManager<const TreeType> nodeManager(grid.constTree());
+    nodeManager.foreachTopDown(countOp, /*threaded=*/true);
+
+    // make points per node cumulative - note that to preserve existing behavior,
+    // the depth-first node visitor is used to ensure the same point order
+
+    ComputeOffsetsOp offsetsOp(*this);
+    openvdb::tools::visitNodesDepthFirst(grid.tree(), offsetsOp);
+
+    GA_Size pointCount = offsetsOp.pointOffset();
+    GA_Size vertexCount = offsetsOp.vertexOffset();
+    GA_Size polygonCount = offsetsOp.polygonOffset();
+
+    if (pointCount > GA_Size(0)) {
+
+        // allocate points
+
+        GA_Offset pointOffset = mGeo->appendPointBlock(pointCount);
+
+        // use nested parallelism to render the points and geometry concurrently
+        // and to harden the point attributes
+
+        tbb::task_group task_group;
+        task_group.run([&]{
+            // auto harden attributes for threading
+            using HardenPtr = std::unique_ptr<GA_AutoHardenForThreading>;
+            HardenPtr hardenP;
+            HardenPtr hardenIndexCoord;
+            HardenPtr hardenCd;
+            HardenPtr hardenInt32;
+            HardenPtr hardenFloat;
+            HardenPtr hardenVec3f;
+
+            auto getAutoHarden = [](GA_Attribute* attribute, bool harden = true)
+            {
+                if (harden && attribute) {
+                    return std::make_unique<GA_AutoHardenForThreading>(*attribute);
+                }
+                return HardenPtr();
+            };
+
+            tbb::task_group task_group2;
+            task_group2.run([&]{ hardenP = getAutoHarden(mGeo->getP()); });
+            task_group2.run([&]{ hardenIndexCoord = getAutoHarden(mIndexCoordHandle.getAttribute()); });
+            task_group2.run([&]{ hardenCd = getAutoHarden(mCdHandle.getAttribute()); });
+            task_group2.run([&]{ hardenInt32 = getAutoHarden(mInt32Handle.getAttribute(), !node); });
+            task_group2.run([&]{ hardenFloat = getAutoHarden(mFloatHandle.getAttribute(), !node); });
+            task_group2.run([&]{ hardenVec3f = getAutoHarden(mVec3fHandle.getAttribute(), !node); });
+            task_group2.wait();
+
+            RenderPointsOp<TreeType> renderPointsOp(node, pointOffset, sliceIndex, staggered, *this);
+            nodeManager.foreachTopDown(renderPointsOp, /*threaded=*/true);
+
+        });
+        task_group.run([&]{
+            // no zero value initialization
+            std::unique_ptr<int[]> vertices(new int[vertexCount]);
+
+            // note that vertex indices have range [0 - pointCount) so no need to increment by pointOffset
+            RenderVerticesOp<TreeType> renderVerticesOp(node, vertices, sliceIndex, *this);
+            nodeManager.foreachTopDown(renderVerticesOp, /*threaded=*/true);
+
+            if ((style1 == STYLE_WIRE_BOX && (style2 != STYLE_SOLID_BOX)) ||
+                 style2 == STYLE_WIRE_BOX && (style1 != STYLE_SOLID_BOX)) {
+                if (mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
+                    GEO_PolyCounts sizelist;
+                    sizelist.append(5, polygonCount);
+                    GU_PrimPoly::buildBlock(mGeo, pointOffset, pointCount, sizelist, vertices.get(), /*closed=*/false);
+                } else {
+                    GEO_PolyCounts sizelist;
+                    sizelist.append(16, polygonCount);
+                    GU_PrimPoly::buildBlock(mGeo, pointOffset, pointCount, sizelist, vertices.get(), /*closed=*/false);
+                }
+            } else if ((style1 == STYLE_SOLID_BOX && (style2 != STYLE_WIRE_BOX)) ||
+                        style2 == STYLE_SOLID_BOX && (style1 != STYLE_WIRE_BOX)) {
+                GEO_PolyCounts sizelist;
+                sizelist.append(4, polygonCount);
+                GU_PrimPoly::buildBlock(mGeo, pointOffset, pointCount, sizelist, vertices.get(), /*closed=*/true);
             } else {
-                addPoint(bbox, color, staggered);
+                // when rendering a mixture of solid and wire boxes, generate geometry single-threaded
+                RenderGeometrySingleThreadedOp<TreeType> renderGeometryOp(node, pointOffset, vertices, sliceIndex, *this);
+                openvdb::tools::visitNodesDepthFirst(grid.tree(), renderGeometryOp);
             }
-        } else {
-            addBox(bbox, color, style == STYLE_SOLID_BOX);
-        }
+        });
+        task_group.wait();
     }
 }
 
 
-inline GA_Offset
-TreeVisualizer::createPoint(const openvdb::Vec3d& pos)
-{
-    openvdb::Vec3d wpos = mXform->indexToWorld(pos);
-    GA_Offset offset = mGeo->appendPointOffset();
-    mGeo->setPos3(offset, wpos[0], wpos[1], wpos[2]);
-    if (mIndexCoordHandle.isValid()) {
-        // Attach the (integer) index coordinates of the voxel at the given pos.
-        openvdb::Coord idxPos = openvdb::Coord::floor(pos);
-        mIndexCoordHandle.set(offset, UT_Vector3i(idxPos[0], idxPos[1], idxPos[2]));
-    }
-    return offset;
-}
-
-
-inline GA_Offset
-TreeVisualizer::createPoint(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color)
-{
-    openvdb::Vec3d pos = openvdb::Vec3d(0.5*(bbox.min().x()+bbox.max().x()),
-                                        0.5*(bbox.min().y()+bbox.max().y()),
-                                        0.5*(bbox.min().z()+bbox.max().z()));
-    GA_Offset offset = createPoint(pos);
-    if (mCdHandle.isValid()) mCdHandle.set(offset, color);
-    return offset;
-}
-
-
-template<typename ValType>
-typename std::enable_if<IsGridTypeIntegral<ValType>::value>::type
-TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color, ValType s, bool)
-{
-    mInt32Handle.set(createPoint(bbox, color), int(s));
-}
-
-
-template<typename ValType>
-typename std::enable_if<std::is_floating_point<ValType>::value>::type
-TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color, ValType s, bool)
-{
-    mFloatHandle.set(createPoint(bbox, color), float(s));
-}
-
-
-template<typename ValType>
-typename std::enable_if<!IsGridTypeArithmetic<ValType>::value>::type
-TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color, ValType v, bool staggered)
-{
-    if (!staggered) {
-        mVec3fHandle.set(createPoint(bbox, color),
-            UT_Vector3(float(v[0]), float(v[1]), float(v[2])));
-    } else {
-        openvdb::Vec3d pos = openvdb::Vec3d(0.5*(bbox.min().x()+bbox.max().x()),
-                                            0.5*(bbox.min().y()+bbox.max().y()),
-                                            0.5*(bbox.min().z()+bbox.max().z()));
-        pos[0] -= 0.5; // -x
-        GA_Offset offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, UT_Vector3(1.0, 0.0, 0.0)); // r
-        mVec3fHandle.set(offset, UT_Vector3(float(v[0]), 0.0, 0.0));
-
-        pos[0] += 0.5;
-        pos[1] -= 0.5; // -y
-        offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, UT_Vector3(0.0, 1.0, 0.0)); // g
-        mVec3fHandle.set(offset, UT_Vector3(0.0, float(v[1]), 0.0));
-
-        pos[1] += 0.5;
-        pos[2] -= 0.5; // -z
-        offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, UT_Vector3(0.0, 0.0, 1.0)); // b
-        mVec3fHandle.set(offset, UT_Vector3(0.0, 0.0, float(v[2])));
-    }
-}
-
-
+template<typename GridType>
 void
-TreeVisualizer::addPoint(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color, bool staggered)
+TreeVisualizer::operator()(const GridType& grid)
 {
-    if (!staggered) {
-        createPoint(bbox, color);
-    } else {
-        openvdb::Vec3d pos = openvdb::Vec3d(0.5*(bbox.min().x()+bbox.max().x()),
-                                            0.5*(bbox.min().y()+bbox.max().y()),
-                                            0.5*(bbox.min().z()+bbox.max().z()));
-        pos[0] -= 0.5; // -x
-        GA_Offset offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, color);
+    using TreeType = typename GridType::TreeType;
 
-        pos[0] += 0.5;
-        pos[1] -= 0.5; // -y
-        offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, color);
+    bool renderNodes = mParms.internalStyle || mParms.leafStyle;
+    bool renderVoxels = mParms.tileStyle || mParms.voxelStyle;
 
-        pos[1] += 0.5;
-        pos[2] -= 0.5; // -z
-        offset = createPoint(pos);
-        if (mCdHandle.isValid()) mCdHandle.set(offset, color);
+    if (!renderNodes && !renderVoxels)      return;
+
+    mXform = &grid.transform();
+
+    createPointAttributes(grid);
+
+    openvdb::Int32 indexSlice = computeIndexSlice(grid);
+
+    allocateOffsetArrays(grid);
+
+    if (renderNodes) {
+        render(/*node=*/true, grid, indexSlice, mParms.internalStyle, mParms.leafStyle);
     }
-}
 
+    if (mInterrupter && mInterrupter->wasInterrupted(-1))   return;
 
-void
-TreeVisualizer::addBox(const openvdb::CoordBBox& bbox,
-    const UT_Vector3& color, bool solid)
-{
-    createBox(*mGeo, *mXform, bbox, mParms.addColor ? &color : nullptr, solid);
+    if (renderVoxels) {
+        render(/*node=*/false, grid, indexSlice, mParms.tileStyle, mParms.voxelStyle);
+    }
 }
 
 
@@ -954,6 +2014,45 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
         treeParms.useGridName = bool(evalInt("usegridname", 0, time));
         treeParms.ignoreStaggeredVectors = bool(evalInt("ignorestaggered", 0, time));
 
+        if (bool(evalInt("slice", 0, time))) {
+            const std::string method = evalStdString("slicemethod", time);
+            const std::string plane = evalStdString("plane", time);
+            if (method == "voxelflatten") {
+                treeParms.sliceStyle = SLICE_VOXEL_FLATTEN;
+            } else if (method == "voxel") {
+                treeParms.sliceStyle = SLICE_VOXEL;
+            } else if (method == "leaf") {
+                treeParms.sliceStyle = SLICE_LEAF;
+            }
+            if (plane == "xy")      treeParms.slicePlane = SLICE_XY;
+            else if (plane == "yz") treeParms.slicePlane = SLICE_YZ;
+            else if (plane == "zx") treeParms.slicePlane = SLICE_ZX;
+            treeParms.useWorldSpace = bool(evalInt("useworldspace", 0, time));
+            if (treeParms.useWorldSpace) {
+                treeParms.sliceOffset = evalFloat("offset", 0, time);
+            } else {
+                treeParms.sliceOffset = evalFloat("relativeoffset", 0, time);
+            }
+            // cache the offsets
+            treeParms.cachedOffset = &mOffset;
+            treeParms.cachedOffsetWS = &mOffsetWS;
+        }
+
+        treeParms.visualize = bool(evalInt("visualize", 0, time));
+        if (treeParms.visualize) {
+
+            std::string colorRamp = evalStdString("vismode", time);
+            if (colorRamp == "false")           treeParms.colorRamp = UT_COLORRAMP_FALSE;
+            else if (colorRamp == "pink")       treeParms.colorRamp = UT_COLORRAMP_PINK;
+            else if (colorRamp == "mono")       treeParms.colorRamp = UT_COLORRAMP_MONO;
+            else if (colorRamp == "blackbody")   treeParms.colorRamp = UT_COLORRAMP_BLACKBODY;
+            else if (colorRamp == "bipartite")   treeParms.colorRamp = UT_COLORRAMP_BIPARTITE;
+
+            treeParms.colorMin = evalFloat("visrange", 0, time);
+            double colorMax = evalFloat("visrange", 1, time);
+            treeParms.colorRange = 1.0 / (colorMax - treeParms.colorMin);
+        }
+
         const bool drawTree = (treeParms.internalStyle || treeParms.tileStyle
             || treeParms.leafStyle || treeParms.voxelStyle);
         const bool showFrustum = bool(evalInt("previewfrustum", 0, time));
@@ -985,6 +2084,14 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 
         if (boss.wasInterrupted()) {
             addWarning(SOP_MESSAGE, "Process was interrupted");
+        }
+
+        // create and set a gl_lit detail attribute to zero to disable gl lighting
+
+        GA_RWAttributeRef attributeRef = gdp->addTuple(GA_STORE_INT32, GA_ATTRIB_DETAIL, "gl_lit", 1);
+        if (attributeRef.isValid()) {
+            GA_RWHandleI handle = attributeRef.getAttribute();
+            handle.set(0, 0);
         }
 
         boss.end();
