@@ -1484,6 +1484,48 @@ protected:
 
 
 /// @private
+/// Template specialization of the DynamicNodeManager with no caching of nodes
+template<typename TreeOrLeafManagerT>
+class DynamicNodeManager<TreeOrLeafManagerT, 0>
+{
+public:
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
+    static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
+    static const Index LEVELS = 0;
+
+    explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
+
+    DynamicNodeManager(const DynamicNodeManager&) = delete;
+
+    /// @brief Return a reference to the root node.
+    const RootNodeType& root() const { return mRoot; }
+
+    template<typename NodeOp>
+    void foreachTopDown(const NodeOp& op, bool /*threaded*/=true, size_t /*grainSize*/=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+    }
+
+    template<typename NodeOp>
+    void reduceTopDown(NodeOp& op, bool /*threaded*/=true, size_t /*grainSize*/=1)
+    {
+        // root
+        if (!op(mRoot, /*index=*/0))                                return;
+    }
+
+protected:
+    using NodeT1 = RootNodeType;
+
+    NodeT1& mRoot;
+};// DynamicNodeManager<0> class
+
+
+////////////////////////////////////////////
+
+
+/// @private
 /// Template specialization of the DynamicNodeManager with one level of nodes
 template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 1>
