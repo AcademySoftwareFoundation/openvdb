@@ -17,6 +17,7 @@
 
 #include "LevelSetTracker.h"
 #include "Interpolation.h"
+#include <openvdb/math/Stencils.h>
 #include <algorithm> // for std::max()
 #include <functional>
 #include <type_traits>
@@ -142,6 +143,14 @@ public:
         Filter f(this, mask); f.mean(width);
     }
 
+    /// @brief Apply one iteration of a sharpening filter to the level set.
+    /// @param width  width of the sharpening kernel in voxel units
+    /// @param mask   optional alpha mask
+    void sharpen(int width = 1, const MaskType* mask = nullptr)
+    {
+        Filter(this, mask).sharpen(width);
+    }
+
 private:
     // disallow copy construction and copy by assignment!
     LevelSetFilter(const LevelSetFilter&);// not implemented
@@ -169,6 +178,7 @@ private:
         void laplacian();
         void meanCurvature();
         void offset(ValueType value);
+        void sharpen(int width);
         void operator()(const LeafRange& r) const
         {
             if (mTask) mTask(const_cast<Filter*>(this), r);
@@ -212,6 +222,7 @@ private:
         void meanCurvatureImpl(const LeafRange&);
         void laplacianImpl(const LeafRange&);
         void offsetImpl(const LeafRange&, ValueType);
+        void sharpenImpl(const LeafRange&, const math::ConvolutionKernel<ValueType>&);
 
         LevelSetFilter* mParent;
         const MaskType* mMask;
@@ -338,6 +349,22 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::offset(ValueType value)
         mParent->track();
     }
 
+    mParent->endInterrupter();
+}
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::sharpen(int width)
+{
+    if (width == 0) return;
+    const auto kernel = math::sharpeningKernel<ValueType>(width);
+
+    mParent->startInterrupter("Sharpening SDF");
+    mParent->leafs().rebuildAuxBuffers(1, mParent->getGrainSize() == 0);
+    mTask = std::bind(&Filter::sharpenImpl,
+        std::placeholders::_1, std::placeholders::_2, std::cref(kernel));
+    this->cook(true);
+    mParent->track();
     mParent->endInterrupter();
 }
 
@@ -498,6 +525,41 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
             ValueType* buffer = leafIter.buffer(1).data();
             for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
                 buffer[iter.pos()] = avg(iter.getCoord());
+            }
+        }
+    }
+}
+
+
+template<typename GridT, typename MaskT, typename InterruptT>
+inline void
+LevelSetFilter<GridT, MaskT, InterruptT>::Filter::sharpenImpl(
+    const LeafRange& range, const math::ConvolutionKernel<ValueType>& kernel)
+{
+    mParent->checkInterrupter();
+
+    math::ConvolutionStencil<GridType> stencil(mParent->grid(), kernel);
+
+    if (mMask) {
+        typename AlphaMaskT::FloatType a, b;
+        AlphaMaskT alpha(mParent->grid(), *mMask, mParent->minMask(),
+            mParent->maxMask(), mParent->isMaskInverted());
+        for (LeafIterT leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                if (alpha(iter.getCoord(), a, b)) {
+                    stencil.moveTo(iter);
+                    const ValueType phi0 = *iter, phi1 = stencil.convolve();
+                    buffer[iter.pos()] = b * phi0 + a * phi1;
+                }
+            }
+        }
+    } else {
+        for (LeafIterT leafIter = range.begin(); leafIter; ++leafIter) {
+            ValueType* buffer = leafIter.buffer(1).data();
+            for (VoxelCIterT iter = leafIter->cbeginValueOn(); iter; ++iter) {
+                stencil.moveTo(iter);
+                buffer[iter.pos()] = stencil.convolve();
             }
         }
     }

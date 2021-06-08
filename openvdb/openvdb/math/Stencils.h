@@ -16,6 +16,9 @@
 #include <algorithm>
 #include <vector>                          // for std::vector
 #include <bitset>                          // for std::bitset
+#include <type_traits>
+#include <boost/container/vector.hpp>
+#include <boost/multi_array.hpp>
 #include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
 #include <openvdb/math/Coord.h>            // for Coord
@@ -34,12 +37,13 @@ template<typename DerivedType, typename GridT, bool IsSafe>
 class BaseStencil
 {
 public:
-    typedef GridT                                       GridType;
-    typedef typename GridT::TreeType                    TreeType;
-    typedef typename GridT::ValueType                   ValueType;
-    typedef tree::ValueAccessor<const TreeType, IsSafe> AccessorType;
-    typedef std::vector<ValueType>                      BufferType;
-    typedef typename BufferType::iterator               IterType;
+    using GridType = GridT;
+    using TreeType = typename GridT::TreeType;
+    using ValueType = typename GridT::ValueType;
+    using AccessorType = tree::ValueAccessor<const TreeType, IsSafe>;
+    // Use boost::container::vector instead of std::vector,
+    // because std::vector<bool> doesn't provide a data() method.
+    using BufferType = boost::container::vector<ValueType>;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -47,19 +51,19 @@ public:
     inline void moveTo(const Coord& ijk)
     {
         mCenter = ijk;
-        mValues[0] = mAcc.getValue(ijk);
+        mStencil[0] = mCache.getValue(ijk);
         static_cast<DerivedType&>(*this).init(mCenter);
     }
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
-    /// @param ijk Index coordinates of stnecil center
+    /// @param ijk Index coordinates of stencil center
     /// @param centerValue Value of the center element of the stencil
     inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {
         mCenter = ijk;
-        mValues[0] = centerValue;
+        mStencil[0] = centerValue;
         static_cast<DerivedType&>(*this).init(mCenter);
     }
 
@@ -72,7 +76,7 @@ public:
     inline void moveTo(const IterType& iter)
     {
         mCenter = iter.getCoord();
-        mValues[0] = *iter;
+        mStencil[0] = *iter;
         static_cast<DerivedType&>(*this).init(mCenter);
     }
 
@@ -85,7 +89,7 @@ public:
     template<typename RealType>
     inline void moveTo(const Vec3<RealType>& xyz)
     {
-        Coord ijk = Coord::floor(xyz);
+        Coord ijk = openvdb::Coord::floor(xyz);
         if (ijk != mCenter) this->moveTo(ijk);
     }
 
@@ -96,31 +100,31 @@ public:
     /// which is typically the center point of the stencil.
     inline const ValueType& getValue(unsigned int pos = 0) const
     {
-        assert(pos < mValues.size());
-        return mValues[pos];
+        assert(pos < mStencil.size());
+        return mStencil[pos];
     }
 
     /// @brief Return the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
     inline const ValueType& getValue() const
     {
-        return mValues[static_cast<const DerivedType&>(*this).template pos<i,j,k>()];
+        return mStencil[static_cast<const DerivedType&>(*this).template pos<i,j,k>()];
     }
 
     /// @brief Set the value at the specified location relative to the center of the stencil
     template<int i, int j, int k>
     inline void setValue(const ValueType& value)
     {
-        mValues[static_cast<const DerivedType&>(*this).template pos<i,j,k>()] = value;
+        mStencil[static_cast<const DerivedType&>(*this).template pos<i,j,k>()] = value;
     }
 
     /// @brief Return the size of the stencil buffer.
-    inline int size() { return mValues.size(); }
+    inline int size() { return mStencil.size(); }
 
     /// @brief Return the median value of the current stencil.
     inline ValueType median() const
     {
-        BufferType tmp(mValues);//local copy
+        BufferType tmp(mStencil);//local copy
         assert(!tmp.empty());
         size_t midpoint = (tmp.size() - 1) >> 1;
         // Partially sort the vector until the median value is at the midpoint.
@@ -138,21 +142,21 @@ public:
     inline ValueType mean() const
     {
         ValueType sum = 0.0;
-        for (int n = 0, s = int(mValues.size()); n < s; ++n) sum += mValues[n];
-        return sum / ValueType(mValues.size());
+        for (int n = 0, s = int(mStencil.size()); n < s; ++n) sum += mStencil[n];
+        return sum / ValueType(mStencil.size());
     }
 
     /// @brief Return the smallest value in the stencil buffer.
     inline ValueType min() const
     {
-        IterType iter = std::min_element(mValues.begin(), mValues.end());
+        const auto iter = std::min_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
     /// @brief Return the largest value in the stencil buffer.
     inline ValueType max() const
     {
-        IterType iter = std::max_element(mValues.begin(), mValues.end());
+        const auto iter = std::max_element(mStencil.begin(), mStencil.end());
         return *iter;
     }
 
@@ -160,7 +164,7 @@ public:
     inline const Coord& getCenterCoord() const { return mCenter; }
 
     /// @brief Return the value at the center of the stencil
-    inline const ValueType& getCenterValue() const { return mValues[0]; }
+    inline const ValueType& getCenterValue() const { return mStencil[0]; }
 
     /// @brief Return true if the center of the stencil intersects the
     /// iso-contour specified by the isoValue
@@ -204,21 +208,21 @@ public:
 
     /// @brief Return a const reference to the ValueAccessor
     /// associated with this Stencil.
-    inline const AccessorType& accessor() const { return mAcc; }
+    inline const AccessorType& accessor() const { return mCache; }
 
 protected:
     // Constructor is protected to prevent direct instantiation.
     BaseStencil(const GridType& grid, int size)
         : mGrid(&grid)
-        , mAcc(grid.tree())
-        , mValues(size)
+        , mCache(grid.tree())
+        , mStencil(size)
         , mCenter(Coord::max())
     {
     }
 
     const GridType* mGrid;
-    AccessorType    mAcc;
-    BufferType      mValues;
+    AccessorType    mCache;
+    BufferType      mStencil;
     Coord           mCenter;
 
 }; // BaseStencil class
@@ -263,19 +267,19 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        BaseType::template setValue<-1, 0, 0>(mAcc.getValue(ijk.offsetBy(-1, 0, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
+        BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
-        BaseType::template setValue< 0,-1, 0>(mAcc.getValue(ijk.offsetBy( 0,-1, 0)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 0,-1, 0>(mCache.getValue(ijk.offsetBy( 0,-1, 0)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
 
-        BaseType::template setValue< 0, 0,-1>(mAcc.getValue(ijk.offsetBy( 0, 0,-1)));
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// SevenPointStencil class
 
 
@@ -318,14 +322,14 @@ public:
     /// iso-contour specified by the isoValue
     inline bool intersects(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
-        const bool less = mValues[0] < isoValue;
-        return (less  ^  (mValues[1] < isoValue)) ||
-               (less  ^  (mValues[2] < isoValue)) ||
-               (less  ^  (mValues[3] < isoValue)) ||
-               (less  ^  (mValues[4] < isoValue)) ||
-               (less  ^  (mValues[5] < isoValue)) ||
-               (less  ^  (mValues[6] < isoValue)) ||
-               (less  ^  (mValues[7] < isoValue))  ;
+        const bool less = mStencil[0] < isoValue;
+        return (less  ^  (mStencil[1] < isoValue)) ||
+               (less  ^  (mStencil[2] < isoValue)) ||
+               (less  ^  (mStencil[3] < isoValue)) ||
+               (less  ^  (mStencil[4] < isoValue)) ||
+               (less  ^  (mStencil[5] < isoValue)) ||
+               (less  ^  (mStencil[6] < isoValue)) ||
+               (less  ^  (mStencil[7] < isoValue))  ;
     }
 
     /// @brief Return the trilinear interpolation at the normalized position.
@@ -416,18 +420,18 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
-        BaseType::template setValue< 0, 1, 1>(mAcc.getValue(ijk.offsetBy( 0, 1, 1)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
-        BaseType::template setValue< 1, 0, 1>(mAcc.getValue(ijk.offsetBy( 1, 0, 1)));
-        BaseType::template setValue< 1, 1, 1>(mAcc.getValue(ijk.offsetBy( 1, 1, 1)));
-        BaseType::template setValue< 1, 1, 0>(mAcc.getValue(ijk.offsetBy( 1, 1, 0)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 1, 1>(mCache.getValue(ijk.offsetBy( 0, 1, 1)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
+        BaseType::template setValue< 1, 0, 1>(mCache.getValue(ijk.offsetBy( 1, 0, 1)));
+        BaseType::template setValue< 1, 1, 1>(mCache.getValue(ijk.offsetBy( 1, 1, 1)));
+        BaseType::template setValue< 1, 1, 0>(mCache.getValue(ijk.offsetBy( 1, 1, 0)));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// BoxStencil class
 
 
@@ -488,33 +492,33 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[DensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[DensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[DensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
+        mStencil[DensePt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        mStencil[DensePt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        mStencil[DensePt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
 
-        mValues[DensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[DensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[DensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
+        mStencil[DensePt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
+        mStencil[DensePt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
+        mStencil[DensePt< 0, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
 
-        mValues[DensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, -1,  0));
-        mValues[DensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, -1,  0));
-        mValues[DensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  1,  0));
-        mValues[DensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  1,  0));
+        mStencil[DensePt<-1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, -1,  0));
+        mStencil[DensePt< 1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, -1,  0));
+        mStencil[DensePt<-1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,  1,  0));
+        mStencil[DensePt< 1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  1,  0));
 
-        mValues[DensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0, -1));
-        mValues[DensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0, -1));
-        mValues[DensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  1));
-        mValues[DensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  1));
+        mStencil[DensePt<-1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-1,  0, -1));
+        mStencil[DensePt< 1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 1,  0, -1));
+        mStencil[DensePt<-1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-1,  0,  1));
+        mStencil[DensePt< 1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  1));
 
-        mValues[DensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1, -1));
-        mValues[DensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1, -1));
-        mValues[DensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  1));
-        mValues[DensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
+        mStencil[DensePt< 0,-1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, -1, -1));
+        mStencil[DensePt< 0, 1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,  1, -1));
+        mStencil[DensePt< 0,-1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, -1,  1));
+        mStencil[DensePt< 0, 1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// SecondOrderDenseStencil class
 
 
@@ -568,25 +572,25 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[ThirteenPt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[ThirteenPt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[ThirteenPt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ThirteenPt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
+        mStencil[ThirteenPt< 2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,  0,  0));
+        mStencil[ThirteenPt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        mStencil[ThirteenPt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
+        mStencil[ThirteenPt<-2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,  0,  0));
 
-        mValues[ThirteenPt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[ThirteenPt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[ThirteenPt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[ThirteenPt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
+        mStencil[ThirteenPt< 0, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  2,  0));
+        mStencil[ThirteenPt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        mStencil[ThirteenPt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
+        mStencil[ThirteenPt< 0,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -2,  0));
 
-        mValues[ThirteenPt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[ThirteenPt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[ThirteenPt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[ThirteenPt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
+        mStencil[ThirteenPt< 0, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  2));
+        mStencil[ThirteenPt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        mStencil[ThirteenPt< 0, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
+        mStencil[ThirteenPt< 0, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -2));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// ThirteenPointStencil class
 
 
@@ -699,84 +703,84 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[FourthDensePt<-2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 2, 0));
-        mValues[FourthDensePt<-1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 2, 0));
-        mValues[FourthDensePt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 0));
-        mValues[FourthDensePt< 1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 2, 0));
-        mValues[FourthDensePt< 2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 2, 0));
+        mStencil[FourthDensePt<-2, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 2, 0));
+        mStencil[FourthDensePt<-1, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 2, 0));
+        mStencil[FourthDensePt< 0, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 0));
+        mStencil[FourthDensePt< 1, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 2, 0));
+        mStencil[FourthDensePt< 2, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 2, 0));
 
-        mValues[FourthDensePt<-2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 1, 0));
-        mValues[FourthDensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 1, 0));
-        mValues[FourthDensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 0));
-        mValues[FourthDensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 1, 0));
-        mValues[FourthDensePt< 2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 1, 0));
+        mStencil[FourthDensePt<-2, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 1, 0));
+        mStencil[FourthDensePt<-1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 1, 0));
+        mStencil[FourthDensePt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 0));
+        mStencil[FourthDensePt< 1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 1, 0));
+        mStencil[FourthDensePt< 2, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 1, 0));
 
-        mValues[FourthDensePt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 0));
-        mValues[FourthDensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 0));
-        mValues[FourthDensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 0));
-        mValues[FourthDensePt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 0));
+        mStencil[FourthDensePt<-2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 0));
+        mStencil[FourthDensePt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 0));
+        mStencil[FourthDensePt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 0));
+        mStencil[FourthDensePt< 2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 0));
 
-        mValues[FourthDensePt<-2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-1, 0));
-        mValues[FourthDensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-1, 0));
-        mValues[FourthDensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 0));
-        mValues[FourthDensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-1, 0));
-        mValues[FourthDensePt< 2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-1, 0));
+        mStencil[FourthDensePt<-2,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,-1, 0));
+        mStencil[FourthDensePt<-1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,-1, 0));
+        mStencil[FourthDensePt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 0));
+        mStencil[FourthDensePt< 1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,-1, 0));
+        mStencil[FourthDensePt< 2,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,-1, 0));
 
-        mValues[FourthDensePt<-2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-2, 0));
-        mValues[FourthDensePt<-1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-2, 0));
-        mValues[FourthDensePt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 0));
-        mValues[FourthDensePt< 1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-2, 0));
-        mValues[FourthDensePt< 2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-2, 0));
+        mStencil[FourthDensePt<-2,-2, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,-2, 0));
+        mStencil[FourthDensePt<-1,-2, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,-2, 0));
+        mStencil[FourthDensePt< 0,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 0));
+        mStencil[FourthDensePt< 1,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,-2, 0));
+        mStencil[FourthDensePt< 2,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,-2, 0));
 
-        mValues[FourthDensePt<-2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 2));
-        mValues[FourthDensePt<-1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 2));
-        mValues[FourthDensePt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 2));
-        mValues[FourthDensePt< 1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 2));
-        mValues[FourthDensePt< 2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 2));
+        mStencil[FourthDensePt<-2, 0, 2>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 2));
+        mStencil[FourthDensePt<-1, 0, 2>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 2));
+        mStencil[FourthDensePt< 0, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 0, 2));
+        mStencil[FourthDensePt< 1, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 2));
+        mStencil[FourthDensePt< 2, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 2));
 
-        mValues[FourthDensePt<-2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 1));
-        mValues[FourthDensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 1));
-        mValues[FourthDensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 1));
-        mValues[FourthDensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 1));
-        mValues[FourthDensePt< 2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 1));
+        mStencil[FourthDensePt<-2, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 1));
+        mStencil[FourthDensePt<-1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 1));
+        mStencil[FourthDensePt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 0, 1));
+        mStencil[FourthDensePt< 1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 1));
+        mStencil[FourthDensePt< 2, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 1));
 
-        mValues[FourthDensePt<-2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-1));
-        mValues[FourthDensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-1));
-        mValues[FourthDensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-1));
-        mValues[FourthDensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-1));
-        mValues[FourthDensePt< 2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-1));
+        mStencil[FourthDensePt<-2, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-2, 0,-1));
+        mStencil[FourthDensePt<-1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-1, 0,-1));
+        mStencil[FourthDensePt< 0, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 0,-1));
+        mStencil[FourthDensePt< 1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 1, 0,-1));
+        mStencil[FourthDensePt< 2, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 2, 0,-1));
 
-        mValues[FourthDensePt<-2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-2));
-        mValues[FourthDensePt<-1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-2));
-        mValues[FourthDensePt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-2));
-        mValues[FourthDensePt< 1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-2));
-        mValues[FourthDensePt< 2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-2));
+        mStencil[FourthDensePt<-2, 0,-2>::idx] = mCache.getValue(ijk.offsetBy(-2, 0,-2));
+        mStencil[FourthDensePt<-1, 0,-2>::idx] = mCache.getValue(ijk.offsetBy(-1, 0,-2));
+        mStencil[FourthDensePt< 0, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 0,-2));
+        mStencil[FourthDensePt< 1, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 1, 0,-2));
+        mStencil[FourthDensePt< 2, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 2, 0,-2));
 
 
-        mValues[FourthDensePt< 0,-2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 2));
-        mValues[FourthDensePt< 0,-1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 2));
-        mValues[FourthDensePt< 0, 1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 2));
-        mValues[FourthDensePt< 0, 2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 2));
+        mStencil[FourthDensePt< 0,-2, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 2));
+        mStencil[FourthDensePt< 0,-1, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 2));
+        mStencil[FourthDensePt< 0, 1, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 2));
+        mStencil[FourthDensePt< 0, 2, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 2));
 
-        mValues[FourthDensePt< 0,-2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 1));
-        mValues[FourthDensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 1));
-        mValues[FourthDensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 1));
-        mValues[FourthDensePt< 0, 2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 1));
+        mStencil[FourthDensePt< 0,-2, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 1));
+        mStencil[FourthDensePt< 0,-1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 1));
+        mStencil[FourthDensePt< 0, 1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 1));
+        mStencil[FourthDensePt< 0, 2, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 1));
 
-        mValues[FourthDensePt< 0,-2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-1));
-        mValues[FourthDensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-1));
-        mValues[FourthDensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-1));
-        mValues[FourthDensePt< 0, 2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-1));
+        mStencil[FourthDensePt< 0,-2,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,-2,-1));
+        mStencil[FourthDensePt< 0,-1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,-1,-1));
+        mStencil[FourthDensePt< 0, 1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 1,-1));
+        mStencil[FourthDensePt< 0, 2,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-1));
 
-        mValues[FourthDensePt< 0,-2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-2));
-        mValues[FourthDensePt< 0,-1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-2));
-        mValues[FourthDensePt< 0, 1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-2));
-        mValues[FourthDensePt< 0, 2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-2));
+        mStencil[FourthDensePt< 0,-2,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,-2,-2));
+        mStencil[FourthDensePt< 0,-1,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,-1,-2));
+        mStencil[FourthDensePt< 0, 1,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 1,-2));
+        mStencil[FourthDensePt< 0, 2,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-2));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// FourthOrderDenseStencil class
 
 
@@ -838,31 +842,31 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[NineteenPt< 3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,  0,  0));
-        mValues[NineteenPt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[NineteenPt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[NineteenPt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[NineteenPt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
-        mValues[NineteenPt<-3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,  0,  0));
+        mStencil[NineteenPt< 3, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 3,  0,  0));
+        mStencil[NineteenPt< 2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,  0,  0));
+        mStencil[NineteenPt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        mStencil[NineteenPt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
+        mStencil[NineteenPt<-2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,  0,  0));
+        mStencil[NineteenPt<-3, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-3,  0,  0));
 
-        mValues[NineteenPt< 0, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  3,  0));
-        mValues[NineteenPt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[NineteenPt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[NineteenPt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[NineteenPt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
-        mValues[NineteenPt< 0,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, -3,  0));
+        mStencil[NineteenPt< 0, 3, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  3,  0));
+        mStencil[NineteenPt< 0, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  2,  0));
+        mStencil[NineteenPt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        mStencil[NineteenPt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
+        mStencil[NineteenPt< 0,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -2,  0));
+        mStencil[NineteenPt< 0,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, -3,  0));
 
-        mValues[NineteenPt< 0, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  3));
-        mValues[NineteenPt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[NineteenPt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[NineteenPt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[NineteenPt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
-        mValues[NineteenPt< 0, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,  0, -3));
+        mStencil[NineteenPt< 0, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  3));
+        mStencil[NineteenPt< 0, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  2));
+        mStencil[NineteenPt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        mStencil[NineteenPt< 0, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
+        mStencil[NineteenPt< 0, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -2));
+        mStencil[NineteenPt< 0, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 0,  0, -3));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// NineteenPointStencil class
 
 
@@ -1054,155 +1058,155 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[SixthDensePt<-3, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 3, 0));
-        mValues[SixthDensePt<-2, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 3, 0));
-        mValues[SixthDensePt<-1, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 3, 0));
-        mValues[SixthDensePt< 0, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 0));
-        mValues[SixthDensePt< 1, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 3, 0));
-        mValues[SixthDensePt< 2, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 3, 0));
-        mValues[SixthDensePt< 3, 3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 3, 0));
+        mStencil[SixthDensePt<-3, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-3, 3, 0));
+        mStencil[SixthDensePt<-2, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 3, 0));
+        mStencil[SixthDensePt<-1, 3, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 3, 0));
+        mStencil[SixthDensePt< 0, 3, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 3, 0));
+        mStencil[SixthDensePt< 1, 3, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 3, 0));
+        mStencil[SixthDensePt< 2, 3, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 3, 0));
+        mStencil[SixthDensePt< 3, 3, 0>::idx] = mCache.getValue(ijk.offsetBy( 3, 3, 0));
 
-        mValues[SixthDensePt<-3, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 2, 0));
-        mValues[SixthDensePt<-2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 2, 0));
-        mValues[SixthDensePt<-1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 2, 0));
-        mValues[SixthDensePt< 0, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 0));
-        mValues[SixthDensePt< 1, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 2, 0));
-        mValues[SixthDensePt< 2, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 2, 0));
-        mValues[SixthDensePt< 3, 2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 2, 0));
+        mStencil[SixthDensePt<-3, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-3, 2, 0));
+        mStencil[SixthDensePt<-2, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 2, 0));
+        mStencil[SixthDensePt<-1, 2, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 2, 0));
+        mStencil[SixthDensePt< 0, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 0));
+        mStencil[SixthDensePt< 1, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 2, 0));
+        mStencil[SixthDensePt< 2, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 2, 0));
+        mStencil[SixthDensePt< 3, 2, 0>::idx] = mCache.getValue(ijk.offsetBy( 3, 2, 0));
 
-        mValues[SixthDensePt<-3, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 1, 0));
-        mValues[SixthDensePt<-2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 1, 0));
-        mValues[SixthDensePt<-1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 1, 0));
-        mValues[SixthDensePt< 0, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 0));
-        mValues[SixthDensePt< 1, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 1, 0));
-        mValues[SixthDensePt< 2, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 1, 0));
-        mValues[SixthDensePt< 3, 1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 1, 0));
+        mStencil[SixthDensePt<-3, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-3, 1, 0));
+        mStencil[SixthDensePt<-2, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 1, 0));
+        mStencil[SixthDensePt<-1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 1, 0));
+        mStencil[SixthDensePt< 0, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 0));
+        mStencil[SixthDensePt< 1, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 1, 0));
+        mStencil[SixthDensePt< 2, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 1, 0));
+        mStencil[SixthDensePt< 3, 1, 0>::idx] = mCache.getValue(ijk.offsetBy( 3, 1, 0));
 
-        mValues[SixthDensePt<-3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 0));
-        mValues[SixthDensePt<-2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 0));
-        mValues[SixthDensePt<-1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 0));
-        mValues[SixthDensePt< 1, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 0));
-        mValues[SixthDensePt< 2, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 0));
-        mValues[SixthDensePt< 3, 0, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 0));
+        mStencil[SixthDensePt<-3, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-3, 0, 0));
+        mStencil[SixthDensePt<-2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 0));
+        mStencil[SixthDensePt<-1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 0));
+        mStencil[SixthDensePt< 1, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 0));
+        mStencil[SixthDensePt< 2, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 0));
+        mStencil[SixthDensePt< 3, 0, 0>::idx] = mCache.getValue(ijk.offsetBy( 3, 0, 0));
 
-        mValues[SixthDensePt<-3,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-1, 0));
-        mValues[SixthDensePt<-2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-1, 0));
-        mValues[SixthDensePt<-1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-1, 0));
-        mValues[SixthDensePt< 0,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 0));
-        mValues[SixthDensePt< 1,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-1, 0));
-        mValues[SixthDensePt< 2,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-1, 0));
-        mValues[SixthDensePt< 3,-1, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-1, 0));
+        mStencil[SixthDensePt<-3,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-3,-1, 0));
+        mStencil[SixthDensePt<-2,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,-1, 0));
+        mStencil[SixthDensePt<-1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,-1, 0));
+        mStencil[SixthDensePt< 0,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 0));
+        mStencil[SixthDensePt< 1,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,-1, 0));
+        mStencil[SixthDensePt< 2,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,-1, 0));
+        mStencil[SixthDensePt< 3,-1, 0>::idx] = mCache.getValue(ijk.offsetBy( 3,-1, 0));
 
-        mValues[SixthDensePt<-3,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-2, 0));
-        mValues[SixthDensePt<-2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-2, 0));
-        mValues[SixthDensePt<-1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-2, 0));
-        mValues[SixthDensePt< 0,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 0));
-        mValues[SixthDensePt< 1,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-2, 0));
-        mValues[SixthDensePt< 2,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-2, 0));
-        mValues[SixthDensePt< 3,-2, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-2, 0));
+        mStencil[SixthDensePt<-3,-2, 0>::idx] = mCache.getValue(ijk.offsetBy(-3,-2, 0));
+        mStencil[SixthDensePt<-2,-2, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,-2, 0));
+        mStencil[SixthDensePt<-1,-2, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,-2, 0));
+        mStencil[SixthDensePt< 0,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 0));
+        mStencil[SixthDensePt< 1,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,-2, 0));
+        mStencil[SixthDensePt< 2,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,-2, 0));
+        mStencil[SixthDensePt< 3,-2, 0>::idx] = mCache.getValue(ijk.offsetBy( 3,-2, 0));
 
-        mValues[SixthDensePt<-3,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-3,-3, 0));
-        mValues[SixthDensePt<-2,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-2,-3, 0));
-        mValues[SixthDensePt<-1,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy(-1,-3, 0));
-        mValues[SixthDensePt< 0,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 0));
-        mValues[SixthDensePt< 1,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 1,-3, 0));
-        mValues[SixthDensePt< 2,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 2,-3, 0));
-        mValues[SixthDensePt< 3,-3, 0>::idx] = mAcc.getValue(ijk.offsetBy( 3,-3, 0));
+        mStencil[SixthDensePt<-3,-3, 0>::idx] = mCache.getValue(ijk.offsetBy(-3,-3, 0));
+        mStencil[SixthDensePt<-2,-3, 0>::idx] = mCache.getValue(ijk.offsetBy(-2,-3, 0));
+        mStencil[SixthDensePt<-1,-3, 0>::idx] = mCache.getValue(ijk.offsetBy(-1,-3, 0));
+        mStencil[SixthDensePt< 0,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 0,-3, 0));
+        mStencil[SixthDensePt< 1,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 1,-3, 0));
+        mStencil[SixthDensePt< 2,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 2,-3, 0));
+        mStencil[SixthDensePt< 3,-3, 0>::idx] = mCache.getValue(ijk.offsetBy( 3,-3, 0));
 
-        mValues[SixthDensePt<-3, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 3));
-        mValues[SixthDensePt<-2, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 3));
-        mValues[SixthDensePt<-1, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 3));
-        mValues[SixthDensePt< 0, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 3));
-        mValues[SixthDensePt< 1, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 3));
-        mValues[SixthDensePt< 2, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 3));
-        mValues[SixthDensePt< 3, 0, 3>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 3));
+        mStencil[SixthDensePt<-3, 0, 3>::idx] = mCache.getValue(ijk.offsetBy(-3, 0, 3));
+        mStencil[SixthDensePt<-2, 0, 3>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 3));
+        mStencil[SixthDensePt<-1, 0, 3>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 3));
+        mStencil[SixthDensePt< 0, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 0, 0, 3));
+        mStencil[SixthDensePt< 1, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 3));
+        mStencil[SixthDensePt< 2, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 3));
+        mStencil[SixthDensePt< 3, 0, 3>::idx] = mCache.getValue(ijk.offsetBy( 3, 0, 3));
 
-        mValues[SixthDensePt<-3, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 2));
-        mValues[SixthDensePt<-2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 2));
-        mValues[SixthDensePt<-1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 2));
-        mValues[SixthDensePt< 0, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 2));
-        mValues[SixthDensePt< 1, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 2));
-        mValues[SixthDensePt< 2, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 2));
-        mValues[SixthDensePt< 3, 0, 2>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 2));
+        mStencil[SixthDensePt<-3, 0, 2>::idx] = mCache.getValue(ijk.offsetBy(-3, 0, 2));
+        mStencil[SixthDensePt<-2, 0, 2>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 2));
+        mStencil[SixthDensePt<-1, 0, 2>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 2));
+        mStencil[SixthDensePt< 0, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 0, 2));
+        mStencil[SixthDensePt< 1, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 2));
+        mStencil[SixthDensePt< 2, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 2));
+        mStencil[SixthDensePt< 3, 0, 2>::idx] = mCache.getValue(ijk.offsetBy( 3, 0, 2));
 
-        mValues[SixthDensePt<-3, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0, 1));
-        mValues[SixthDensePt<-2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0, 1));
-        mValues[SixthDensePt<-1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0, 1));
-        mValues[SixthDensePt< 0, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0, 1));
-        mValues[SixthDensePt< 1, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0, 1));
-        mValues[SixthDensePt< 2, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0, 1));
-        mValues[SixthDensePt< 3, 0, 1>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0, 1));
+        mStencil[SixthDensePt<-3, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-3, 0, 1));
+        mStencil[SixthDensePt<-2, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-2, 0, 1));
+        mStencil[SixthDensePt<-1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy(-1, 0, 1));
+        mStencil[SixthDensePt< 0, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 0, 1));
+        mStencil[SixthDensePt< 1, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 1, 0, 1));
+        mStencil[SixthDensePt< 2, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 2, 0, 1));
+        mStencil[SixthDensePt< 3, 0, 1>::idx] = mCache.getValue(ijk.offsetBy( 3, 0, 1));
 
-        mValues[SixthDensePt<-3, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-1));
-        mValues[SixthDensePt<-2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-1));
-        mValues[SixthDensePt<-1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-1));
-        mValues[SixthDensePt< 0, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-1));
-        mValues[SixthDensePt< 1, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-1));
-        mValues[SixthDensePt< 2, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-1));
-        mValues[SixthDensePt< 3, 0,-1>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-1));
+        mStencil[SixthDensePt<-3, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-3, 0,-1));
+        mStencil[SixthDensePt<-2, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-2, 0,-1));
+        mStencil[SixthDensePt<-1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy(-1, 0,-1));
+        mStencil[SixthDensePt< 0, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 0,-1));
+        mStencil[SixthDensePt< 1, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 1, 0,-1));
+        mStencil[SixthDensePt< 2, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 2, 0,-1));
+        mStencil[SixthDensePt< 3, 0,-1>::idx] = mCache.getValue(ijk.offsetBy( 3, 0,-1));
 
-        mValues[SixthDensePt<-3, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-2));
-        mValues[SixthDensePt<-2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-2));
-        mValues[SixthDensePt<-1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-2));
-        mValues[SixthDensePt< 0, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-2));
-        mValues[SixthDensePt< 1, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-2));
-        mValues[SixthDensePt< 2, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-2));
-        mValues[SixthDensePt< 3, 0,-2>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-2));
+        mStencil[SixthDensePt<-3, 0,-2>::idx] = mCache.getValue(ijk.offsetBy(-3, 0,-2));
+        mStencil[SixthDensePt<-2, 0,-2>::idx] = mCache.getValue(ijk.offsetBy(-2, 0,-2));
+        mStencil[SixthDensePt<-1, 0,-2>::idx] = mCache.getValue(ijk.offsetBy(-1, 0,-2));
+        mStencil[SixthDensePt< 0, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 0,-2));
+        mStencil[SixthDensePt< 1, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 1, 0,-2));
+        mStencil[SixthDensePt< 2, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 2, 0,-2));
+        mStencil[SixthDensePt< 3, 0,-2>::idx] = mCache.getValue(ijk.offsetBy( 3, 0,-2));
 
-        mValues[SixthDensePt<-3, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-3, 0,-3));
-        mValues[SixthDensePt<-2, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-2, 0,-3));
-        mValues[SixthDensePt<-1, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy(-1, 0,-3));
-        mValues[SixthDensePt< 0, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 0,-3));
-        mValues[SixthDensePt< 1, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 1, 0,-3));
-        mValues[SixthDensePt< 2, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 2, 0,-3));
-        mValues[SixthDensePt< 3, 0,-3>::idx] = mAcc.getValue(ijk.offsetBy( 3, 0,-3));
+        mStencil[SixthDensePt<-3, 0,-3>::idx] = mCache.getValue(ijk.offsetBy(-3, 0,-3));
+        mStencil[SixthDensePt<-2, 0,-3>::idx] = mCache.getValue(ijk.offsetBy(-2, 0,-3));
+        mStencil[SixthDensePt<-1, 0,-3>::idx] = mCache.getValue(ijk.offsetBy(-1, 0,-3));
+        mStencil[SixthDensePt< 0, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 0, 0,-3));
+        mStencil[SixthDensePt< 1, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 1, 0,-3));
+        mStencil[SixthDensePt< 2, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 2, 0,-3));
+        mStencil[SixthDensePt< 3, 0,-3>::idx] = mCache.getValue(ijk.offsetBy( 3, 0,-3));
 
-        mValues[SixthDensePt< 0,-3, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 3));
-        mValues[SixthDensePt< 0,-2, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 3));
-        mValues[SixthDensePt< 0,-1, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 3));
-        mValues[SixthDensePt< 0, 1, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 3));
-        mValues[SixthDensePt< 0, 2, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 3));
-        mValues[SixthDensePt< 0, 3, 3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 3));
+        mStencil[SixthDensePt< 0,-3, 3>::idx] = mCache.getValue(ijk.offsetBy( 0,-3, 3));
+        mStencil[SixthDensePt< 0,-2, 3>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 3));
+        mStencil[SixthDensePt< 0,-1, 3>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 3));
+        mStencil[SixthDensePt< 0, 1, 3>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 3));
+        mStencil[SixthDensePt< 0, 2, 3>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 3));
+        mStencil[SixthDensePt< 0, 3, 3>::idx] = mCache.getValue(ijk.offsetBy( 0, 3, 3));
 
-        mValues[SixthDensePt< 0,-3, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 2));
-        mValues[SixthDensePt< 0,-2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 2));
-        mValues[SixthDensePt< 0,-1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 2));
-        mValues[SixthDensePt< 0, 1, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 2));
-        mValues[SixthDensePt< 0, 2, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 2));
-        mValues[SixthDensePt< 0, 3, 2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 2));
+        mStencil[SixthDensePt< 0,-3, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,-3, 2));
+        mStencil[SixthDensePt< 0,-2, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 2));
+        mStencil[SixthDensePt< 0,-1, 2>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 2));
+        mStencil[SixthDensePt< 0, 1, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 2));
+        mStencil[SixthDensePt< 0, 2, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 2));
+        mStencil[SixthDensePt< 0, 3, 2>::idx] = mCache.getValue(ijk.offsetBy( 0, 3, 2));
 
-        mValues[SixthDensePt< 0,-3, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3, 1));
-        mValues[SixthDensePt< 0,-2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2, 1));
-        mValues[SixthDensePt< 0,-1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1, 1));
-        mValues[SixthDensePt< 0, 1, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1, 1));
-        mValues[SixthDensePt< 0, 2, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2, 1));
-        mValues[SixthDensePt< 0, 3, 1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3, 1));
+        mStencil[SixthDensePt< 0,-3, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,-3, 1));
+        mStencil[SixthDensePt< 0,-2, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,-2, 1));
+        mStencil[SixthDensePt< 0,-1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0,-1, 1));
+        mStencil[SixthDensePt< 0, 1, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 1, 1));
+        mStencil[SixthDensePt< 0, 2, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 2, 1));
+        mStencil[SixthDensePt< 0, 3, 1>::idx] = mCache.getValue(ijk.offsetBy( 0, 3, 1));
 
-        mValues[SixthDensePt< 0,-3,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-1));
-        mValues[SixthDensePt< 0,-2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-1));
-        mValues[SixthDensePt< 0,-1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-1));
-        mValues[SixthDensePt< 0, 1,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-1));
-        mValues[SixthDensePt< 0, 2,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-1));
-        mValues[SixthDensePt< 0, 3,-1>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-1));
+        mStencil[SixthDensePt< 0,-3,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,-3,-1));
+        mStencil[SixthDensePt< 0,-2,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,-2,-1));
+        mStencil[SixthDensePt< 0,-1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0,-1,-1));
+        mStencil[SixthDensePt< 0, 1,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 1,-1));
+        mStencil[SixthDensePt< 0, 2,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-1));
+        mStencil[SixthDensePt< 0, 3,-1>::idx] = mCache.getValue(ijk.offsetBy( 0, 3,-1));
 
-        mValues[SixthDensePt< 0,-3,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-2));
-        mValues[SixthDensePt< 0,-2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-2));
-        mValues[SixthDensePt< 0,-1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-2));
-        mValues[SixthDensePt< 0, 1,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-2));
-        mValues[SixthDensePt< 0, 2,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-2));
-        mValues[SixthDensePt< 0, 3,-2>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-2));
+        mStencil[SixthDensePt< 0,-3,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,-3,-2));
+        mStencil[SixthDensePt< 0,-2,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,-2,-2));
+        mStencil[SixthDensePt< 0,-1,-2>::idx] = mCache.getValue(ijk.offsetBy( 0,-1,-2));
+        mStencil[SixthDensePt< 0, 1,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 1,-2));
+        mStencil[SixthDensePt< 0, 2,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-2));
+        mStencil[SixthDensePt< 0, 3,-2>::idx] = mCache.getValue(ijk.offsetBy( 0, 3,-2));
 
-        mValues[SixthDensePt< 0,-3,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-3,-3));
-        mValues[SixthDensePt< 0,-2,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-2,-3));
-        mValues[SixthDensePt< 0,-1,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0,-1,-3));
-        mValues[SixthDensePt< 0, 1,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 1,-3));
-        mValues[SixthDensePt< 0, 2,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 2,-3));
-        mValues[SixthDensePt< 0, 3,-3>::idx] = mAcc.getValue(ijk.offsetBy( 0, 3,-3));
+        mStencil[SixthDensePt< 0,-3,-3>::idx] = mCache.getValue(ijk.offsetBy( 0,-3,-3));
+        mStencil[SixthDensePt< 0,-2,-3>::idx] = mCache.getValue(ijk.offsetBy( 0,-2,-3));
+        mStencil[SixthDensePt< 0,-1,-3>::idx] = mCache.getValue(ijk.offsetBy( 0,-1,-3));
+        mStencil[SixthDensePt< 0, 1,-3>::idx] = mCache.getValue(ijk.offsetBy( 0, 1,-3));
+        mStencil[SixthDensePt< 0, 2,-3>::idx] = mCache.getValue(ijk.offsetBy( 0, 2,-3));
+        mStencil[SixthDensePt< 0, 3,-3>::idx] = mCache.getValue(ijk.offsetBy( 0, 3,-3));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
 };// SixthOrderDenseStencil class
 
 
@@ -1260,13 +1264,13 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad() const
     {
-        return mInvDx2 * math::GodunovsNormSqrd(mValues[0] > zeroVal<ValueType>(),
-                                                mValues[0] - mValues[1],
-                                                mValues[2] - mValues[0],
-                                                mValues[0] - mValues[3],
-                                                mValues[4] - mValues[0],
-                                                mValues[0] - mValues[5],
-                                                mValues[6] - mValues[0]);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > zeroVal<ValueType>(),
+                                                mStencil[0] - mStencil[1],
+                                                mStencil[2] - mStencil[0],
+                                                mStencil[0] - mStencil[3],
+                                                mStencil[4] - mStencil[0],
+                                                mStencil[0] - mStencil[5],
+                                                mStencil[6] - mStencil[0]);
     }
 
     /// @brief Return the gradient computed at the previously buffered
@@ -1276,9 +1280,9 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline math::Vec3<ValueType> gradient() const
     {
-        return math::Vec3<ValueType>(mValues[2] - mValues[1],
-                                     mValues[4] - mValues[3],
-                                     mValues[6] - mValues[5])*mInv2Dx;
+        return math::Vec3<ValueType>(mStencil[2] - mStencil[1],
+                                     mStencil[4] - mStencil[3],
+                                     mStencil[6] - mStencil[5])*mInv2Dx;
     }
     /// @brief Return the first-order upwind gradient corresponding to the direction V.
     ///
@@ -1287,25 +1291,25 @@ public:
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& V) const
     {
         return math::Vec3<ValueType>(
-               V[0]>0 ? mValues[0] - mValues[1] : mValues[2] - mValues[0],
-               V[1]>0 ? mValues[0] - mValues[3] : mValues[4] - mValues[0],
-               V[2]>0 ? mValues[0] - mValues[5] : mValues[6] - mValues[0])*2*mInv2Dx;
+               V[0]>0 ? mStencil[0] - mStencil[1] : mStencil[2] - mStencil[0],
+               V[1]>0 ? mStencil[0] - mStencil[3] : mStencil[4] - mStencil[0],
+               V[2]>0 ? mStencil[0] - mStencil[5] : mStencil[6] - mStencil[0])*2*mInv2Dx;
     }
 
     /// Return the Laplacian computed at the previously buffered
     /// location by second-order central differencing.
     inline ValueType laplacian() const
     {
-        return mInvDx2 * (mValues[1] + mValues[2] +
-                          mValues[3] + mValues[4] +
-                          mValues[5] + mValues[6] - 6*mValues[0]);
+        return mInvDx2 * (mStencil[1] + mStencil[2] +
+                          mStencil[3] + mStencil[4] +
+                          mStencil[5] + mStencil[6] - 6*mStencil[0]);
     }
 
     /// Return @c true if the sign of the value at the center point of the stencil
     /// is different from the signs of any of its six nearest neighbors.
     inline bool zeroCrossing() const
     {
-        const typename BaseType::BufferType& v = mValues;
+        const typename BaseType::BufferType& v = mStencil;
         return (v[0]>0 ? (v[1]<0 || v[2]<0 || v[3]<0 || v[4]<0 || v[5]<0 || v[6]<0)
                        : (v[1]>0 || v[2]>0 || v[3]>0 || v[4]>0 || v[5]>0 || v[6]>0));
     }
@@ -1320,11 +1324,11 @@ public:
     inline math::Vec3<ValueType> cpt()
     {
         const Coord& ijk = BaseType::getCenterCoord();
-        const ValueType d = ValueType(mValues[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
+        const ValueType d = ValueType(mStencil[0] * 0.5 * mInvDx2); // distance in voxels / (2dx^2)
         OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
-        const auto value = math::Vec3<ValueType>(   ijk[0] - d*(mValues[2] - mValues[1]),
-                                                    ijk[1] - d*(mValues[4] - mValues[3]),
-                                                    ijk[2] - d*(mValues[6] - mValues[5]));
+        const auto value = math::Vec3<ValueType>(   ijk[0] - d*(mStencil[2] - mStencil[1]),
+                                                    ijk[1] - d*(mStencil[4] - mStencil[3]),
+                                                    ijk[2] - d*(mStencil[6] - mStencil[5]));
         OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         return value;
     }
@@ -1337,19 +1341,19 @@ private:
 
     inline void init(const Coord& ijk)
     {
-        BaseType::template setValue<-1, 0, 0>(mAcc.getValue(ijk.offsetBy(-1, 0, 0)));
-        BaseType::template setValue< 1, 0, 0>(mAcc.getValue(ijk.offsetBy( 1, 0, 0)));
+        BaseType::template setValue<-1, 0, 0>(mCache.getValue(ijk.offsetBy(-1, 0, 0)));
+        BaseType::template setValue< 1, 0, 0>(mCache.getValue(ijk.offsetBy( 1, 0, 0)));
 
-        BaseType::template setValue< 0,-1, 0>(mAcc.getValue(ijk.offsetBy( 0,-1, 0)));
-        BaseType::template setValue< 0, 1, 0>(mAcc.getValue(ijk.offsetBy( 0, 1, 0)));
+        BaseType::template setValue< 0,-1, 0>(mCache.getValue(ijk.offsetBy( 0,-1, 0)));
+        BaseType::template setValue< 0, 1, 0>(mCache.getValue(ijk.offsetBy( 0, 1, 0)));
 
-        BaseType::template setValue< 0, 0,-1>(mAcc.getValue(ijk.offsetBy( 0, 0,-1)));
-        BaseType::template setValue< 0, 0, 1>(mAcc.getValue(ijk.offsetBy( 0, 0, 1)));
+        BaseType::template setValue< 0, 0,-1>(mCache.getValue(ijk.offsetBy( 0, 0,-1)));
+        BaseType::template setValue< 0, 0, 1>(mCache.getValue(ijk.offsetBy( 0, 0, 1)));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
     const ValueType mInv2Dx, mInvDx2;
 }; // GradStencil class
 
@@ -1396,7 +1400,7 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline ValueType normSqGrad(const ValueType &isoValue = zeroVal<ValueType>()) const
     {
-        const typename BaseType::BufferType& v = mValues;
+        const typename BaseType::BufferType& v = mStencil;
 #ifdef DWA_OPENVDB
         // SSE optimized
         const simd::Float4
@@ -1409,7 +1413,7 @@ public:
             dP_m = math::WENO5(v1, v2, v3, v4, v5, mDx2),
             dP_p = math::WENO5(v6, v5, v4, v3, v2, mDx2);
 
-        return mInvDx2 * math::GodunovsNormSqrd(mValues[0] > isoValue, dP_m, dP_p);
+        return mInvDx2 * math::GodunovsNormSqrd(mStencil[0] > isoValue, dP_m, dP_p);
 #else
         const Real
             dP_xm = math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3],v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2),
@@ -1430,7 +1434,7 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline math::Vec3<ValueType> gradient(const math::Vec3<ValueType>& V) const
     {
-        const typename BaseType::BufferType& v = mValues;
+        const typename BaseType::BufferType& v = mStencil;
         return 2*mInv2Dx * math::Vec3<ValueType>(
             V[0]>0 ? math::WENO5(v[ 2]-v[ 1],v[ 3]-v[ 2],v[ 0]-v[ 3], v[ 4]-v[ 0],v[ 5]-v[ 4],mDx2)
                 : math::WENO5(v[ 6]-v[ 5],v[ 5]-v[ 4],v[ 4]-v[ 0], v[ 0]-v[ 3],v[ 3]-v[ 2],mDx2),
@@ -1446,9 +1450,9 @@ public:
     /// buffer has been populated via a call to moveTo(ijk).
     inline math::Vec3<ValueType> gradient() const
     {
-        return mInv2Dx * math::Vec3<ValueType>(mValues[ 4] - mValues[ 3],
-                                               mValues[10] - mValues[ 9],
-                                               mValues[16] - mValues[15]);
+        return mInv2Dx * math::Vec3<ValueType>(mStencil[ 4] - mStencil[ 3],
+                                               mStencil[10] - mStencil[ 9],
+                                               mStencil[16] - mStencil[15]);
     }
 
     /// Return the Laplacian computed at the previously buffered
@@ -1459,16 +1463,16 @@ public:
     inline ValueType laplacian() const
     {
         return mInvDx2 * (
-            mValues[ 3] + mValues[ 4] +
-            mValues[ 9] + mValues[10] +
-            mValues[15] + mValues[16] - 6*mValues[0]);
+            mStencil[ 3] + mStencil[ 4] +
+            mStencil[ 9] + mStencil[10] +
+            mStencil[15] + mStencil[16] - 6*mStencil[0]);
     }
 
     /// Return @c true if the sign of the value at the center point of the stencil
     /// differs from the sign of any of its six nearest neighbors
     inline bool zeroCrossing() const
     {
-        const typename BaseType::BufferType& v = mValues;
+        const typename BaseType::BufferType& v = mStencil;
         return (v[ 0]>0 ? (v[ 3]<0 || v[ 4]<0 || v[ 9]<0 || v[10]<0 || v[15]<0 || v[16]<0)
                         : (v[ 3]>0 || v[ 4]>0 || v[ 9]>0 || v[10]>0 || v[15]>0 || v[16]>0));
     }
@@ -1476,31 +1480,31 @@ public:
 private:
     inline void init(const Coord& ijk)
     {
-        mValues[ 1] = mAcc.getValue(ijk.offsetBy(-3,  0,  0));
-        mValues[ 2] = mAcc.getValue(ijk.offsetBy(-2,  0,  0));
-        mValues[ 3] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ 4] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
-        mValues[ 5] = mAcc.getValue(ijk.offsetBy( 2,  0,  0));
-        mValues[ 6] = mAcc.getValue(ijk.offsetBy( 3,  0,  0));
+        mStencil[ 1] = mCache.getValue(ijk.offsetBy(-3,  0,  0));
+        mStencil[ 2] = mCache.getValue(ijk.offsetBy(-2,  0,  0));
+        mStencil[ 3] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
+        mStencil[ 4] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
+        mStencil[ 5] = mCache.getValue(ijk.offsetBy( 2,  0,  0));
+        mStencil[ 6] = mCache.getValue(ijk.offsetBy( 3,  0,  0));
 
-        mValues[ 7] = mAcc.getValue(ijk.offsetBy( 0, -3,  0));
-        mValues[ 8] = mAcc.getValue(ijk.offsetBy( 0, -2,  0));
-        mValues[ 9] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[10] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
-        mValues[11] = mAcc.getValue(ijk.offsetBy( 0,  2,  0));
-        mValues[12] = mAcc.getValue(ijk.offsetBy( 0,  3,  0));
+        mStencil[ 7] = mCache.getValue(ijk.offsetBy( 0, -3,  0));
+        mStencil[ 8] = mCache.getValue(ijk.offsetBy( 0, -2,  0));
+        mStencil[ 9] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
+        mStencil[10] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
+        mStencil[11] = mCache.getValue(ijk.offsetBy( 0,  2,  0));
+        mStencil[12] = mCache.getValue(ijk.offsetBy( 0,  3,  0));
 
-        mValues[13] = mAcc.getValue(ijk.offsetBy( 0,  0, -3));
-        mValues[14] = mAcc.getValue(ijk.offsetBy( 0,  0, -2));
-        mValues[15] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[16] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
-        mValues[17] = mAcc.getValue(ijk.offsetBy( 0,  0,  2));
-        mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  0,  3));
+        mStencil[13] = mCache.getValue(ijk.offsetBy( 0,  0, -3));
+        mStencil[14] = mCache.getValue(ijk.offsetBy( 0,  0, -2));
+        mStencil[15] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
+        mStencil[16] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
+        mStencil[17] = mCache.getValue(ijk.offsetBy( 0,  0,  2));
+        mStencil[18] = mCache.getValue(ijk.offsetBy( 0,  0,  3));
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
     const ValueType mDx2, mInv2Dx, mInvDx2;
 }; // WenoStencil class
 
@@ -1639,9 +1643,9 @@ public:
     inline ValueType laplacian() const
     {
         return mInvDx2 * (
-            mValues[1] + mValues[2] +
-            mValues[3] + mValues[4] +
-            mValues[5] + mValues[6] - 6*mValues[0]);
+            mStencil[1] + mStencil[2] +
+            mStencil[3] + mStencil[4] +
+            mStencil[5] + mStencil[6] - 6*mStencil[0]);
     }
 
     /// Return the gradient computed at the previously buffered
@@ -1649,51 +1653,51 @@ public:
     ///
     /// @note This method should not be called until the stencil
     /// buffer has been populated via a call to moveTo(ijk).
-    inline math::Vec3<ValueType> gradient() const
+    inline math::Vec3<ValueType> gradient()
     {
         return math::Vec3<ValueType>(
-            mValues[2] - mValues[1],
-            mValues[4] - mValues[3],
-            mValues[6] - mValues[5])*mInv2Dx;
+            mStencil[2] - mStencil[1],
+            mStencil[4] - mStencil[3],
+            mStencil[6] - mStencil[5])*mInv2Dx;
     }
 
 private:
     inline void init(const Coord &ijk)
     {
-        mValues[ 1] = mAcc.getValue(ijk.offsetBy(-1,  0,  0));
-        mValues[ 2] = mAcc.getValue(ijk.offsetBy( 1,  0,  0));
+        mStencil[ 1] = mCache.getValue(ijk.offsetBy(-1,  0,  0));
+        mStencil[ 2] = mCache.getValue(ijk.offsetBy( 1,  0,  0));
 
-        mValues[ 3] = mAcc.getValue(ijk.offsetBy( 0, -1,  0));
-        mValues[ 4] = mAcc.getValue(ijk.offsetBy( 0,  1,  0));
+        mStencil[ 3] = mCache.getValue(ijk.offsetBy( 0, -1,  0));
+        mStencil[ 4] = mCache.getValue(ijk.offsetBy( 0,  1,  0));
 
-        mValues[ 5] = mAcc.getValue(ijk.offsetBy( 0,  0, -1));
-        mValues[ 6] = mAcc.getValue(ijk.offsetBy( 0,  0,  1));
+        mStencil[ 5] = mCache.getValue(ijk.offsetBy( 0,  0, -1));
+        mStencil[ 6] = mCache.getValue(ijk.offsetBy( 0,  0,  1));
 
-        mValues[ 7] = mAcc.getValue(ijk.offsetBy(-1, -1,  0));
-        mValues[ 8] = mAcc.getValue(ijk.offsetBy( 1, -1,  0));
-        mValues[ 9] = mAcc.getValue(ijk.offsetBy(-1,  1,  0));
-        mValues[10] = mAcc.getValue(ijk.offsetBy( 1,  1,  0));
+        mStencil[ 7] = mCache.getValue(ijk.offsetBy(-1, -1,  0));
+        mStencil[ 8] = mCache.getValue(ijk.offsetBy( 1, -1,  0));
+        mStencil[ 9] = mCache.getValue(ijk.offsetBy(-1,  1,  0));
+        mStencil[10] = mCache.getValue(ijk.offsetBy( 1,  1,  0));
 
-        mValues[11] = mAcc.getValue(ijk.offsetBy(-1,  0, -1));
-        mValues[12] = mAcc.getValue(ijk.offsetBy( 1,  0, -1));
-        mValues[13] = mAcc.getValue(ijk.offsetBy(-1,  0,  1));
-        mValues[14] = mAcc.getValue(ijk.offsetBy( 1,  0,  1));
+        mStencil[11] = mCache.getValue(ijk.offsetBy(-1,  0, -1));
+        mStencil[12] = mCache.getValue(ijk.offsetBy( 1,  0, -1));
+        mStencil[13] = mCache.getValue(ijk.offsetBy(-1,  0,  1));
+        mStencil[14] = mCache.getValue(ijk.offsetBy( 1,  0,  1));
 
-        mValues[15] = mAcc.getValue(ijk.offsetBy( 0, -1, -1));
-        mValues[16] = mAcc.getValue(ijk.offsetBy( 0,  1, -1));
-        mValues[17] = mAcc.getValue(ijk.offsetBy( 0, -1,  1));
-        mValues[18] = mAcc.getValue(ijk.offsetBy( 0,  1,  1));
+        mStencil[15] = mCache.getValue(ijk.offsetBy( 0, -1, -1));
+        mStencil[16] = mCache.getValue(ijk.offsetBy( 0,  1, -1));
+        mStencil[17] = mCache.getValue(ijk.offsetBy( 0, -1,  1));
+        mStencil[18] = mCache.getValue(ijk.offsetBy( 0,  1,  1));
     }
 
-    inline Real Dx()  const { return 0.5*(mValues[2] - mValues[1]); }// * 1/dx
-    inline Real Dy()  const { return 0.5*(mValues[4] - mValues[3]); }// * 1/dx
-    inline Real Dz()  const { return 0.5*(mValues[6] - mValues[5]); }// * 1/dx
-    inline Real Dxx() const { return mValues[2] - 2 * mValues[0] + mValues[1]; }// * 1/dx2
-    inline Real Dyy() const { return mValues[4] - 2 * mValues[0] + mValues[3]; }// * 1/dx2}
-    inline Real Dzz() const { return mValues[6] - 2 * mValues[0] + mValues[5]; }// * 1/dx2
-    inline Real Dxy() const { return 0.25 * (mValues[10] - mValues[ 8] + mValues[ 7] - mValues[ 9]); }// * 1/dx2
-    inline Real Dxz() const { return 0.25 * (mValues[14] - mValues[12] + mValues[11] - mValues[13]); }// * 1/dx2
-    inline Real Dyz() const { return 0.25 * (mValues[18] - mValues[16] + mValues[15] - mValues[17]); }// * 1/dx2
+    inline Real Dx()  const { return 0.5*(mStencil[2] - mStencil[1]); }// * 1/dx
+    inline Real Dy()  const { return 0.5*(mStencil[4] - mStencil[3]); }// * 1/dx
+    inline Real Dz()  const { return 0.5*(mStencil[6] - mStencil[5]); }// * 1/dx
+    inline Real Dxx() const { return mStencil[2] - 2 * mStencil[0] + mStencil[1]; }// * 1/dx2
+    inline Real Dyy() const { return mStencil[4] - 2 * mStencil[0] + mStencil[3]; }// * 1/dx2}
+    inline Real Dzz() const { return mStencil[6] - 2 * mStencil[0] + mStencil[5]; }// * 1/dx2
+    inline Real Dxy() const { return 0.25 * (mStencil[10] - mStencil[ 8] + mStencil[ 7] - mStencil[ 9]); }// * 1/dx2
+    inline Real Dxz() const { return 0.25 * (mStencil[14] - mStencil[12] + mStencil[11] - mStencil[13]); }// * 1/dx2
+    inline Real Dyz() const { return 0.25 * (mStencil[18] - mStencil[16] + mStencil[15] - mStencil[17]); }// * 1/dx2
 
     inline bool meanCurvature(Real& alpha, Real& normGrad) const
     {
@@ -1747,8 +1751,8 @@ private:
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
     const ValueType mInv2Dx, mInvDx2;
 }; // CurvatureStencil class
 
@@ -1774,7 +1778,7 @@ public:
         assert(halfWidth>0);
     }
 
-    inline const ValueType& getCenterValue() const { return mValues[(mValues.size()-1)>>1]; }
+    inline const ValueType& getCenterValue() const { return mStencil[(mStencil.size()-1)>>1]; }
 
     /// @brief Initialize the stencil buffer with the values of voxel (x, y, z)
     /// and its neighbors.
@@ -1794,25 +1798,196 @@ public:
 
 private:
     /// Initialize the stencil buffer centered at (i, j, k).
-    /// @warning The center point is NOT at mValues[0] for this DenseStencil!
+    /// @warning The center point is NOT at mStencil[0] for this DenseStencil!
     inline void init(const Coord& ijk)
     {
         int n = 0;
         for (Coord p=ijk.offsetBy(-mHalfWidth), q=ijk.offsetBy(mHalfWidth); p[0] <= q[0]; ++p[0]) {
             for (p[1] = ijk[1]-mHalfWidth; p[1] <= q[1]; ++p[1]) {
                 for (p[2] = ijk[2]-mHalfWidth; p[2] <= q[2]; ++p[2]) {
-                    mValues[n++] = mAcc.getValue(p);
+                    mStencil[n++] = mCache.getValue(p);
                 }
             }
         }
     }
 
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
-    using BaseType::mAcc;
-    using BaseType::mValues;
+    using BaseType::mCache;
+    using BaseType::mStencil;
     const int mHalfWidth;
 };// DenseStencil class
 
+
+//////////////////////////////////////////////////////////////////////
+
+
+/// Three-dimensional array with which to specify the kernel for a ConvolutionStencil
+template<typename ValueT>
+using ConvolutionKernel = typename boost::multi_array<
+    typename std::conditional<std::is_floating_point<ValueT>::value, ValueT, double>::type, 3>;
+
+
+/// @brief Dense stencil representing a convolution kernel
+/// @note The source grid is assumed to be unchanging.
+template<typename GridT, bool IsSafe = true>
+class ConvolutionStencil: public BaseStencil<ConvolutionStencil<GridT, IsSafe>, GridT, IsSafe>
+{
+public:
+    using SelfT = ConvolutionStencil<GridT, IsSafe>;
+    using BaseType = BaseStencil<SelfT, GridT, IsSafe>;
+    using GridType = GridT;
+    using ValueType = typename GridType::ValueType;
+    using KernelType = ConvolutionKernel<ValueType>;
+    using KernelValueType = typename KernelType::element;
+    using KernelCRefType = boost::const_multi_array_ref<KernelValueType, 3>;
+    using StencilRefType = boost::multi_array_ref<ValueType, 3>;
+
+
+    ConvolutionStencil(const GridType& grid, const KernelCRefType& kernel)
+        : BaseType(grid, static_cast<int>(kernel.num_elements()))
+        , mKernel(kernel)
+        , mKernelShape(mKernel.shape(), mKernel.shape() + 3)
+    {
+    }
+
+    /// @brief Populate the stencil buffer with the values of voxel (i, j, k) and its neighbors.
+    void moveTo(const Coord& ijk) { this->init(ijk); }
+
+    /// @brief Populate the stencil buffer with the values of the voxel to which
+    /// the given iterator points and the values of that voxel's neighbors.
+    template<typename IterType>
+    void moveTo(const IterType& iter) { this->init(iter.getCoord()); }
+
+    ValueType convolve() const
+    {
+        auto* kernelPtr = mKernel.origin();
+        auto sum = zeroVal<ValueType>();
+        for (size_t n = 0; n < mStencil.size(); ++n) {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+            sum = static_cast<ValueType>(sum + (mStencil[n] * kernelPtr[n]));
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+        }
+        return sum;
+    }
+
+private:
+    void setCenter(const Coord& ijk) { BaseType::mCenter = ijk; mInitialized = true; }
+
+    void init(const Coord& ijk)
+    {
+        const Coord shape(
+            static_cast<Int32>(mKernelShape[0]),
+            static_cast<Int32>(mKernelShape[1]),
+            static_cast<Int32>(mKernelShape[2]));
+        const Coord offset = shape >> 1;
+
+        if (mInitialized && (ijk == this->getCenterCoord().offsetBy(0, 0, 1))) {
+            // If the stencil buffer has been initialized and its new position differs
+            // from the old by +1 along the z axis (the common case for convolution),
+            // preserve the contents of the buffer and sample only the new z slice.
+            // (Note that BaseStencil::moveTo() sets mCenter before calling init(),
+            // inhibiting this optimization.)
+            /// @todo This optimization could be applied for any offset that leaves some
+            /// overlap between the old and new stencils, but the bookkeeping gets messy.
+
+            typename BaseType::BufferType newStencil(mStencil.size());
+            const StencilRefType oldStencil(mStencil.data(), mKernelShape);
+
+            int n = 0;
+            Coord p = ijk - offset;
+            p[2] += shape[2] - 1;
+            for (Int32 i = 0; i < shape[0]; ++i, ++p[0]) {
+                p[1] = ijk[1] - offset[1];
+                for (Int32 j = 0; j < shape[1]; ++j, ++p[1]) {
+                    // Copy values from the old stencil to the new stencil,
+                    // shifting them by one voxel.
+                    for (Int32 k = 1; k < shape[2]; ++k) {
+                        newStencil[n++] = oldStencil[i][j][k];
+                    }
+                    // Sample one new voxel value from the grid.
+                    newStencil[n++] = mCache.getValue(p);
+                }
+            }
+
+            mStencil.swap(newStencil);
+
+        } else {
+            // Populate the stencil by sampling the grid at every voxel.
+            int n = 0;
+            Coord p = ijk - offset;
+            for (Int32 i = 0; i < shape[0]; ++i, ++p[0]) {
+                p[1] = ijk[1] - offset[1];
+                for (Int32 j = 0; j < shape[1]; ++j, ++p[1]) {
+                    p[2] = ijk[2] - offset[2];
+                    for (Int32 k = 0; k < shape[2]; ++k, ++p[2]) {
+                        mStencil[n++] = mCache.getValue(p);
+                    }
+                }
+            }
+        }
+
+        this->setCenter(ijk);
+    }
+
+    template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
+    using BaseType::mCache;
+    using BaseType::mStencil;
+    const KernelType mKernel;
+    const std::vector<size_t> mKernelShape;
+    bool mInitialized = false;
+}; // class ConvolutionStencil
+
+
+////////////////////////////////////////
+
+
+/// Return a 3D sharpening kernel of the given radius, for use with ConvolutionStencil.
+template<typename ValueType>
+ConvolutionKernel<ValueType>
+sharpeningKernel(int r)
+{
+    using KernelType = ConvolutionKernel<ValueType>;
+    using KernelValueType = typename KernelType::element;
+
+    r = Abs(r);
+    const size_t
+        halfWidth = static_cast<size_t>(r),
+        width = 2 * halfWidth + 1;
+
+    // A standard deviation of 0.75 times the radius gives a reasonable falloff.
+    const double
+        sigma = 0.75 * r,
+        twoSigmaSquared = 2.0 * sigma * sigma;
+
+    KernelType kernel(boost::extents[width][width][width]);
+    double sum = 0.0;
+    Vec3<int> ijk(0, 0, 0);
+    int &i = ijk[0], &j = ijk[1], &k = ijk[2];
+    for (i = 0; i < int(width); ++i) {
+        for (j = 0; j < int(width); ++j) {
+            for (k = 0; k < int(width); ++k) {
+                const double d = Exp(-double((ijk - r).lengthSqr()) / twoSigmaSquared)
+                    / (M_PI * twoSigmaSquared);
+                kernel[i][j][k] = static_cast<KernelValueType>(d);
+                sum += d;
+            }
+        }
+    }
+    auto central = kernel[halfWidth][halfWidth][halfWidth];
+    kernel[halfWidth][halfWidth][halfWidth] = static_cast<KernelValueType>(-2.0 * sum);
+    sum = central - sum;
+
+    // Normalize the kernel.
+    for (size_t i = 0; i < width; ++i) {
+        for (size_t j = 0; j < width; ++j) {
+            for (size_t k = 0; k < width; ++k) {
+                kernel[i][j][k] = static_cast<KernelValueType>(kernel[i][j][k] / sum);
+            }
+        }
+    }
+
+    return kernel;
+}
 
 } // end math namespace
 } // namespace OPENVDB_VERSION_NAME
