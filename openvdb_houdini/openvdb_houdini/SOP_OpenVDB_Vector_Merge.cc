@@ -192,8 +192,13 @@ Position:\n\
         .setDefault("@name=*.z"));
 
     // Register this operator.
-    hvdb::OpenVDBOpFactory("VDB Vector Merge",
+    hvdb::OpenVDBOpFactory("VDB Vector from Scalar",
         SOP_OpenVDB_Vector_Merge::factory, parms, *table)
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBVectorMerge")
+#else
+        .setInternalName("vdbvectormerge")
+#endif
         .addInput("Scalar VDBs to merge into vector")
         .setObsoleteParms(obsoleteParms)
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_OpenVDB_Vector_Merge::Cache; })

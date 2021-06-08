@@ -10,9 +10,6 @@ cmake --version
 ################################################
 
 BUILD_TYPE="$1"; shift
-ABI="$1"; shift
-BLOSC="$1"; shift
-SIMD="$1"; shift
 # Command seperated list of components i.e. "core,ax,bin"
 IN_COMPONENTS="$1"; shift
 CMAKE_EXTRA="$@"
@@ -58,10 +55,6 @@ for comp in "${!COMPONENTS[@]}"; do
     fi
 done
 
-if [ "$ABI" != "None" ]; then
-    CMAKE_EXTRA+=" -DOPENVDB_ABI_VERSION_NUMBER=${ABI} "
-fi
-
 #
 ################################################
 
@@ -69,24 +62,22 @@ fi
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=2
 
-# DebugNoInfo is a custom CMAKE_BUILD_TYPE - no optimizations, no symbols, asserts enabled
-
 mkdir -p build
 cd build
 
 # Note: all sub binary options are always on and can be toggles with
 # OPENVDB_BUILD_BINARIES=ON/OFF
+# Using CMAKE_VERBOSE_MAKEFILE rather than `cmake --verbose` to support older
+# versions of CMake. Always run verbose make to have the full logs available
 cmake \
-    -DCMAKE_CXX_FLAGS_DebugNoInfo="" \
     -DCMAKE_BUILD_TYPE=${BUILD_TYPE} \
     -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
     -DOPENVDB_USE_FUTURE_ABI_9=ON \
-    -DUSE_BLOSC=${BLOSC} \
-    -DOPENVDB_SIMD=${SIMD} \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_RENDER=ON \
     -DOPENVDB_BUILD_VDB_VIEW=ON \
+    -DCMAKE_VERBOSE_MAKEFILE=ON \
     ${CMAKE_EXTRA} \
     ..
 
