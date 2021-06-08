@@ -214,7 +214,7 @@ an inclusive range, so includes the maximum voxel.)"));
     Expand the active area by at least the specified number of voxels.  Does not
     support operation or setting of values.
 */
-    parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
+    parms.add(hutil::ParmFactory(PRM_INT, "expand", "Expand Voxels")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
               .setTooltip("Expand the active area by at least the specified number of voxels.")
@@ -232,6 +232,20 @@ operation or setting of values.)"));
               .setTooltip("Expand the active area by at least the specified distance.")
               .setDocumentation(
                                 R"(Expand the active area by at least the specified distance. Does not support operation or setting of values.)"));
+
+/*
+    Specifies which nearby voxels are considered neighbors for expansion.
+*/
+    parms.add(hutil::ParmFactory(PRM_STRING, "expansionpattern", "Expansion Pattern")
+	.setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+	    "face", "Plus",
+	    "faceedge", "Diamond",
+	    "faceedgevertex", "Box"
+	})
+	.setDefault("face")
+	.setTooltip("Set pattern used to identify neighbor voxels for expansion.")
+	.setDocumentation(
+R"(Specifies which nearby voxels are considered neighbors for expansion.)"));
 
     parms.addFolder("Reference");
 /*
@@ -490,9 +504,9 @@ sopFillSDF(GridType &grid, int dummy)
 
 template <typename GridType>
 static void
-sopDilateVoxels(GridType& grid, exint count)
+sopDilateVoxels(GridType& grid, exint count, openvdb::tools::NearestNeighbors nn)
 {
-    openvdb::tools::dilateActiveValues(grid.tree(), static_cast<int>(count));
+    openvdb::tools::dilateActiveValues(grid.tree(), static_cast<int>(count), nn);
 }
 
 template <typename GridType>
@@ -557,6 +571,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 {
     using namespace openvdb;
     using namespace openvdb::math;
+    using namespace openvdb::tools;
 
     try
     {
@@ -677,9 +692,15 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                     {
                         if (boss->opInterrupt())
                             break;
+			NearestNeighbors nn = NN_FACE;
+			const auto str = evalStdString("expansionpattern", t);
+			if (str == "faceedge")
+			    nn = NN_FACE_EDGE;
+			else if (str == "faceedgevertex")
+			    nn = NN_FACE_EDGE_VERTEX;
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopDilateVoxels,
-                                         vdb->getGrid(), maxdilate);
+                                         vdb->getGrid(), maxdilate, nn);
                     }
 
                     exint mindilate = SYSmin(dilatevoxels, dilatedist);

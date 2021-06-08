@@ -1,0 +1,4 @@
+Houdini:
+    * VDB Activate SOP now has an option for the expansion pattern to use
+      for dilation. 
+    * The label for Voxels to Expand is now Expand Voxels to match Houdini.
