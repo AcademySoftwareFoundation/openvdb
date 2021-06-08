@@ -1524,9 +1524,7 @@ SOP_OpenVDB_Combine::Cache::combineGrids(
     compOp.interrupt = hvdb::Interrupter();
 
     int success = false;
-    if (needA || UTvdbGetGridType(*aGrid) == UTvdbGetGridType(*bGrid)) {
-        success = aGrid->apply<hvdb::VolumeGridTypes>(compOp);
-    }
+    success = (needA ? aGrid : bGrid)->apply<hvdb::VolumeGridTypes>(compOp);
     if (!success || !compOp.outGrid) {
         std::ostringstream ostr;
         if (aGrid->type() == bGrid->type()) {
