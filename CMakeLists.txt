@@ -124,7 +124,7 @@ paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR var
 list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_USE_FUTURE_ABI_9 "Bypass future ABI check" OFF)
-option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
