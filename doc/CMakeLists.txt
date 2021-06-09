@@ -81,12 +81,16 @@ set(DOXYGEN_EXTRACT_LOCAL_CLASSES NO)
 # Rather than just the file names (e.g. File.h). This makes it far
 # easier to navigate the docs
 set(DOXYGEN_FULL_PATH_NAMES YES)
-# Should be the same as the WORKING_DIRECTORY argument to doxygen_add_docs
-set(DOXYGEN_STRIP_FROM_PATH "${CMAKE_SOURCE_DIR}")
+set(DOXYGEN_STRIP_FROM_PATH
+  "${CMAKE_SOURCE_DIR}/openvdb"
+  "${CMAKE_SOURCE_DIR}/openvdb_ax"
+  "${CMAKE_SOURCE_DIR}/openvdb_houdini"
+  "${CMAKE_SOURCE_DIR}")
 set(DOXYGEN_STRIP_FROM_INC_PATH
   "${CMAKE_SOURCE_DIR}/openvdb"
   "${CMAKE_SOURCE_DIR}/openvdb_ax"
   "${CMAKE_SOURCE_DIR}/openvdb_houdini")
+
 # Shows which source files generated the respected doxygen docs
 # at the bottom of each html page. Don't bother listing these.
 set(DOXYGEN_SHOW_USED_FILES NO)
@@ -134,6 +138,11 @@ set(DOXYGEN_PREDEFINED
   "OPENVDB_VERSION_NAME=v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}"
   "OPENVDB_ABI_VERSION_NUMBER=${OpenVDB_MAJOR_VERSION}"
   [[__declspec(x):= __attribute__(x):=]]
+  # Replace the deprecated macros with doxygen deprecated comments. This ensures
+  # that every bit of deprecated C++ is listed in the doxygen deprecated list,
+  # even if it was not properly tagged
+  [["OPENVDB_DEPRECATED=/** \deprecated */"]]
+  [["OPENVDB_DEPRECATED_MESSAGE(x)=/** \deprecated x */"]]
   "OPENVDB_USE_LOG4CPLUS=")
 
 set(DOXYGEN_ENABLED_SECTIONS "")
