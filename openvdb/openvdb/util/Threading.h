@@ -25,7 +25,9 @@ namespace util {
 
 inline bool cancelGroupExecution()
 {
-#if TBB_INTERFACE_VERSION_MAJOR >= 12
+    // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
+    //   introduced current_context().
+#if TBB_INTERFACE_VERSION >= 12002
 	auto ctx = tbb::task::current_context();
 	return ctx ? ctx->cancel_group_execution() : false;
 #else
@@ -35,7 +37,9 @@ inline bool cancelGroupExecution()
 
 inline bool isGroupExecutionCancelled()
 {
-#if TBB_INTERFACE_VERSION_MAJOR >= 12
+    // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
+    //   introduced current_context().
+#if TBB_INTERFACE_VERSION >= 12002
 	auto ctx = tbb::task::current_context();
 	return ctx ? ctx->is_group_execution_cancelled() : false;
 #else
