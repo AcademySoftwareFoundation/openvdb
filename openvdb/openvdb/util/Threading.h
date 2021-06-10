@@ -28,8 +28,8 @@ inline bool cancelGroupExecution()
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
 #if TBB_INTERFACE_VERSION >= 12002
-	auto ctx = tbb::task::current_context();
-	return ctx ? ctx->cancel_group_execution() : false;
+    auto ctx = tbb::task::current_context();
+    return ctx ? ctx->cancel_group_execution() : false;
 #else
     return tbb::task::self().cancel_group_execution();
 #endif
@@ -40,8 +40,8 @@ inline bool isGroupExecutionCancelled()
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
 #if TBB_INTERFACE_VERSION >= 12002
-	auto ctx = tbb::task::current_context();
-	return ctx ? ctx->is_group_execution_cancelled() : false;
+    auto ctx = tbb::task::current_context();
+    return ctx ? ctx->is_group_execution_cancelled() : false;
 #else
     return tbb::task::self().is_cancelled();
 #endif
