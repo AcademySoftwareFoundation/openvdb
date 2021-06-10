@@ -14,8 +14,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/util/Formats.h> // printBytes
-
-#include <tbb/tick_count.h>
+#include <openvdb/util/Threading.h>
 
 #include <maya/M3dView.h>
 #include <maya/MString.h>
@@ -40,6 +39,7 @@
 #include <string>
 #include <type_traits>
 #include <vector>
+#include <chrono>
 
 
 ////////////////////////////////////////
@@ -116,11 +116,15 @@ insertFrameNumber(std::string& str, const MTime& time, int numberingScheme = 0);
 
 struct Timer
 {
-    Timer() : mStamp(tbb::tick_count::now()) { }
+    Timer() : mStamp(std::chrono::steady_clock::now()) { }
 
-    void reset() { mStamp = tbb::tick_count::now(); }
+    void reset() { mStamp = std::chrono::steady_clock::now(); }
 
-    double seconds() const { return (tbb::tick_count::now() - mStamp).seconds(); }
+    double seconds() const {
+        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - mStamp);
+        return double(duration.count()) / 1000.0;
+    }
 
     std::string elapsedTime() const {
         double sec = seconds();
@@ -128,7 +132,7 @@ struct Timer
     }
 
 private:
-    tbb::tick_count mStamp;
+     std::chrono::time_point<std::chrono::steady_clock> mStamp;
 };
 
 
