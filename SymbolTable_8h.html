@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -97,31 +97,32 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <p>Contains the symbol table which holds mappings of variables names to llvm::Values.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &lt;<a class="el" href="version_8h_source.html">openvdb/version.h</a>&gt;</code><br />
+<div class="textblock"><code>#include &lt;openvdb/version.h&gt;</code><br />
 <code>#include &lt;llvm/IR/Value.h&gt;</code><br />
 <code>#include &lt;string&gt;</code><br />
+<code>#include &lt;map&gt;</code><br />
 <code>#include &lt;unordered_map&gt;</code><br />
 </div>
 <p><a href="SymbolTable_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1ax_1_1codegen_1_1SymbolTable.html">SymbolTable</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A symbol table which can be used to represent a single scoped set of a programs variables. This is simply an unordered map of strings to llvm::Values.  <a href="structopenvdb_1_1v8__0_1_1ax_1_1codegen_1_1SymbolTable.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1ax_1_1codegen_1_1SymbolTable.html">SymbolTable</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A symbol table which can be used to represent a single scoped set of a programs variables. This is simply an unordered map of strings to llvm::Values.  <a href="structopenvdb_1_1v8__1_1_1ax_1_1codegen_1_1SymbolTable.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1ax_1_1codegen_1_1SymbolTableBlocks.html">SymbolTableBlocks</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A map of unique ids to symbol tables which can be used to represent local variables within a program. New scopes can be added and erased where necessary and iterated through using <a class="el" href="structopenvdb_1_1v8__0_1_1ax_1_1codegen_1_1SymbolTableBlocks.html#a16cc8912b1b6547e53403c1a72ac9dea" title="Find a variable within the program starting at a given table index. If the given index does not exist...">find()</a>. Find assumes that tables are added through parented ascending ids.  <a href="structopenvdb_1_1v8__0_1_1ax_1_1codegen_1_1SymbolTableBlocks.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1ax_1_1codegen_1_1SymbolTableBlocks.html">SymbolTableBlocks</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A map of unique ids to symbol tables which can be used to represent local variables within a program. New scopes can be added and erased where necessary and iterated through using <a class="el" href="structopenvdb_1_1v8__1_1_1ax_1_1codegen_1_1SymbolTableBlocks.html#a16cc8912b1b6547e53403c1a72ac9dea" title="Find a variable within the program starting at a given table index. If the given index does not exist...">find()</a>. Find assumes that tables are added through parented ascending ids.  <a href="structopenvdb_1_1v8__1_1_1ax_1_1codegen_1_1SymbolTableBlocks.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1ax"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html">openvdb::v8_0::ax</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1ax"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html">openvdb::v8_1::ax</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1ax_1_1codegen"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax_1_1codegen.html">openvdb::v8_0::ax::codegen</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1ax_1_1codegen"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax_1_1codegen.html">openvdb::v8_1::ax::codegen</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

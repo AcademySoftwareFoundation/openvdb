@@ -1,0 +1,25 @@
+\form#0:$|\nabla \phi|^2 = 1$
+\form#1:$\nabla f\nabla \phi = 0$
+\form#2:$|\nabla \phi|^2 = 1 $
+\form#3:\[ A=\begin{bmatrix} a_{0}\quad a_{1}\quad a_{2} \end{bmatrix} \]
+\form#4:$ a_{0} $
+\form#5:$ a_{1} $
+\form#6:$ a_{2} $
+\form#7:\[ A=\begin{bmatrix} a_{00}\quad a_{01}\quad a_{02}\\ a_{10}\quad a_{11}\quad a_{12}\\ a_{20}\quad a_{21}\quad a_{22}\\ \end{bmatrix} \]
+\form#8:\[ A=\begin{bmatrix} a_{00}\quad a_{01}\quad a_{02}\quad a_{03}\\ a_{10}\quad a_{11}\quad a_{12}\quad a_{13}\\ a_{20}\quad a_{21}\quad a_{22}\quad a_{23}\\ a_{30}\quad a_{31}\quad a_{32}\quad a_{33}\\ \end{bmatrix} \]
+\form#9:$ a_{00} $
+\form#10:$ a_{01} $
+\form#11:$ a_{02} $
+\form#12:$ a_{10} $
+\form#13:$ a_{03} $
+\form#14:$ a_{12} $
+\form#15:$ a_{11} $
+\form#16:$ a_{20} $
+\form#17:$ a_{21} $
+\form#18:$ a_{13} $
+\form#19:$ a_{22} $
+\form#20:$ a_{23} $
+\form#21:$ a_{30} $
+\form#22:$ a_{31} $
+\form#23:$ a_{32} $
+\form#24:$ a_{33} $

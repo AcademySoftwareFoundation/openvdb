@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -98,10 +98,10 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">openvdb/Types.h File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &quot;<a class="el" href="version_8h_source.html">version.h</a>&quot;</code><br />
+<div class="textblock"><code>#include &quot;version.h&quot;</code><br />
 <code>#include &quot;<a class="el" href="Platform_8h_source.html">Platform.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="TypeList_8h_source.html">TypeList.h</a>&quot;</code><br />
-<code>#include &lt;OpenEXR/half.h&gt;</code><br />
+<code>#include &lt;<a class="el" href="Half_8h_source.html">openvdb/math/Half.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="BBox_8h_source.html">openvdb/math/BBox.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Quat_8h_source.html">openvdb/math/Quat.h</a>&gt;</code><br />
@@ -119,316 +119,320 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1ValueMask.html">ValueMask</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1ValueMask.html">ValueMask</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1PointIndex.html">PointIndex&lt; IntType_, Kind &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Integer wrapper, required to distinguish PointIndexGrid and PointDataGrid from Int32Grid and Int64Grid.  <a href="structopenvdb_1_1v8__0_1_1PointIndex.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1PointIndex.html">PointIndex&lt; IntType_, Kind &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Integer wrapper, required to distinguish PointIndexGrid and PointDataGrid from Int32Grid and Int64Grid.  <a href="structopenvdb_1_1v8__1_1_1PointIndex.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1IsSpecializationOf.html">IsSpecializationOf&lt; T, Template &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper metafunction used to determine if the first template parameter is a specialization of the class template given in the second template parameter.  <a href="structopenvdb_1_1v8__0_1_1IsSpecializationOf.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1IsSpecializationOf.html">IsSpecializationOf&lt; T, Template &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper metafunction used to determine if the first template parameter is a specialization of the class template given in the second template parameter.  <a href="structopenvdb_1_1v8__1_1_1IsSpecializationOf.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1IsSpecializationOf_3_01Template_3_01Args_8_8_8_01_4_00_01Template_01_4.html">IsSpecializationOf&lt; Template&lt; Args... &gt;, Template &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1IsSpecializationOf_3_01Template_3_01Args_8_8_8_01_4_00_01Template_01_4.html">IsSpecializationOf&lt; Template&lt; Args... &gt;, Template &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1VecTraits.html">VecTraits&lt; T, bool &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1VecTraits.html">VecTraits&lt; T, bool &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1VecTraits_3_01T_00_01false_01_4.html">VecTraits&lt; T, false &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1VecTraits_3_01T_00_01false_01_4.html">VecTraits&lt; T, false &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1QuatTraits.html">QuatTraits&lt; T, bool &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1QuatTraits.html">QuatTraits&lt; T, bool &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1QuatTraits_3_01T_00_01false_01_4.html">QuatTraits&lt; T, false &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1QuatTraits_3_01T_00_01false_01_4.html">QuatTraits&lt; T, false &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1MatTraits.html">MatTraits&lt; T, bool &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1MatTraits.html">MatTraits&lt; T, bool &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1MatTraits_3_01T_00_01false_01_4.html">MatTraits&lt; T, false &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1MatTraits_3_01T_00_01false_01_4.html">MatTraits&lt; T, false &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1ValueTraits.html">ValueTraits&lt; T, bool &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1ValueTraits.html">ValueTraits&lt; T, bool &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1ValueTraits_3_01T_00_01false_01_4.html">ValueTraits&lt; T, false &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1ValueTraits_3_01T_00_01false_01_4.html">ValueTraits&lt; T, false &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType.html">CanConvertType&lt; FromType, ToType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType.html#a99fb83031ce9923c84392b4e92f956b5a97de9ab6885342a574053b8f64a563a9">CanConvertType&lt;FromType, ToType&gt;::value</a> is <code>true</code> if a value of type <em>ToType</em> can be constructed from a value of type <em>FromType</em>.  <a href="structopenvdb_1_1v8__0_1_1CanConvertType.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType.html">CanConvertType&lt; FromType, ToType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType.html#a99fb83031ce9923c84392b4e92f956b5a97de9ab6885342a574053b8f64a563a9">CanConvertType&lt;FromType, ToType&gt;::value</a> is <code>true</code> if a value of type <em>ToType</em> can be constructed from a value of type <em>FromType</em>.  <a href="structopenvdb_1_1v8__1_1_1CanConvertType.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T_00_01math_1_1Vec2_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec2&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T_00_01math_1_1Vec2_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec2&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T_00_01math_1_1Vec3_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec3&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T_00_01math_1_1Vec3_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec3&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T_00_01math_1_1Vec4_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec4&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T_00_01math_1_1Vec4_3_01T_01_4_01_4.html">CanConvertType&lt; T, math::Vec4&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01math_1_1Vec2_3_01T_01_4_00_01math_1_1Vec2_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec2&lt; T &gt;, math::Vec2&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01math_1_1Vec2_3_01T_01_4_00_01math_1_1Vec2_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec2&lt; T &gt;, math::Vec2&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01math_1_1Vec3_3_01T_01_4_00_01math_1_1Vec3_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec3&lt; T &gt;, math::Vec3&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01math_1_1Vec3_3_01T_01_4_00_01math_1_1Vec3_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec3&lt; T &gt;, math::Vec3&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01math_1_1Vec4_3_01T_01_4_00_01math_1_1Vec4_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec4&lt; T &gt;, math::Vec4&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01math_1_1Vec4_3_01T_01_4_00_01math_1_1Vec4_3_01T_01_4_01_4.html">CanConvertType&lt; math::Vec4&lt; T &gt;, math::Vec4&lt; T &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T0_00_01math_1_1Vec2_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec2&lt; T1 &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T0_00_01math_1_1Vec2_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec2&lt; T1 &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T0_00_01math_1_1Vec3_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec3&lt; T1 &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T0_00_01math_1_1Vec3_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec3&lt; T1 &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T0_00_01math_1_1Vec4_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec4&lt; T1 &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T0_00_01math_1_1Vec4_3_01T1_01_4_01_4.html">CanConvertType&lt; T0, math::Vec4&lt; T1 &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01PointIndex32_00_01PointDataIndex32_01_4.html">CanConvertType&lt; PointIndex32, PointDataIndex32 &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01PointIndex32_00_01PointDataIndex32_01_4.html">CanConvertType&lt; PointIndex32, PointDataIndex32 &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01PointDataIndex32_00_01PointIndex32_01_4.html">CanConvertType&lt; PointDataIndex32, PointIndex32 &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01PointDataIndex32_00_01PointIndex32_01_4.html">CanConvertType&lt; PointDataIndex32, PointIndex32 &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01T_00_01ValueMask_01_4.html">CanConvertType&lt; T, ValueMask &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01T_00_01ValueMask_01_4.html">CanConvertType&lt; T, ValueMask &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CanConvertType_3_01ValueMask_00_01T_01_4.html">CanConvertType&lt; ValueMask, T &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CanConvertType_3_01ValueMask_00_01T_01_4.html">CanConvertType&lt; ValueMask, T &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1CopyConstness.html">CopyConstness&lt; FromType, ToType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structopenvdb_1_1v8__0_1_1CopyConstness.html#a8411cd6fbfd2f7b32648e9946c32409e">CopyConstness&lt;T1, T2&gt;::Type</a> is either <code>const T2</code> or <code>T2</code> with no <code>const</code> qualifier, depending on whether <code>T1</code> is <code>const</code>.  <a href="structopenvdb_1_1v8__0_1_1CopyConstness.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1CopyConstness.html">CopyConstness&lt; FromType, ToType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight"><a class="el" href="structopenvdb_1_1v8__1_1_1CopyConstness.html#a8411cd6fbfd2f7b32648e9946c32409e">CopyConstness&lt;T1, T2&gt;::Type</a> is either <code>const T2</code> or <code>T2</code> with no <code>const</code> qualifier, depending on whether <code>T1</code> is <code>const</code>.  <a href="structopenvdb_1_1v8__1_1_1CopyConstness.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1CombineArgs.html">CombineArgs&lt; AValueType, BValueType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">This struct collects both input and output arguments to "grid combiner" functors used with the tree::TypedGrid::combineExtended() and combine2Extended() methods. AValueType and BValueType are the value types of the two grids being combined.  <a href="classopenvdb_1_1v8__0_1_1CombineArgs.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1CombineArgs.html">CombineArgs&lt; AValueType, BValueType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">This struct collects both input and output arguments to "grid combiner" functors used with the tree::TypedGrid::combineExtended() and combine2Extended() methods. AValueType and BValueType are the value types of the two grids being combined.  <a href="classopenvdb_1_1v8__1_1_1CombineArgs.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1SwappedCombineOp.html">SwappedCombineOp&lt; ValueType, CombineOp &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1SwappedCombineOp.html">SwappedCombineOp&lt; ValueType, CombineOp &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1ShallowCopy.html">ShallowCopy</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes shallow copy constructors from deep copy constructors.  <a href="classopenvdb_1_1v8__0_1_1ShallowCopy.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1ShallowCopy.html">ShallowCopy</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes shallow copy constructors from deep copy constructors.  <a href="classopenvdb_1_1v8__1_1_1ShallowCopy.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1TopologyCopy.html">TopologyCopy</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes topology copy constructors from deep copy constructors.  <a href="classopenvdb_1_1v8__0_1_1TopologyCopy.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1TopologyCopy.html">TopologyCopy</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes topology copy constructors from deep copy constructors.  <a href="classopenvdb_1_1v8__1_1_1TopologyCopy.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1DeepCopy.html">DeepCopy</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors that deep copy.  <a href="classopenvdb_1_1v8__0_1_1DeepCopy.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1DeepCopy.html">DeepCopy</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors that deep copy.  <a href="classopenvdb_1_1v8__1_1_1DeepCopy.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1Steal.html">Steal</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors that steal.  <a href="classopenvdb_1_1v8__0_1_1Steal.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1Steal.html">Steal</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors that steal.  <a href="classopenvdb_1_1v8__1_1_1Steal.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1PartialCreate.html">PartialCreate</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors during file input.  <a href="classopenvdb_1_1v8__0_1_1PartialCreate.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1PartialCreate.html">PartialCreate</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Tag dispatch class that distinguishes constructors during file input.  <a href="classopenvdb_1_1v8__1_1_1PartialCreate.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1math"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1math.html">openvdb::v8_1::math</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
 Typedefs</h2></td></tr>
-<tr class="memitem:a917c2f1000852aa31ba9feba206c11ae"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a917c2f1000852aa31ba9feba206c11ae">Index32</a> = uint32_t</td></tr>
+<tr class="memitem:adbecaf426b26757a5fff5ec0464c9138"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1math.html#adbecaf426b26757a5fff5ec0464c9138">half</a> = internal::half</td></tr>
+<tr class="separator:adbecaf426b26757a5fff5ec0464c9138"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a917c2f1000852aa31ba9feba206c11ae"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a917c2f1000852aa31ba9feba206c11ae">Index32</a> = uint32_t</td></tr>
 <tr class="separator:a917c2f1000852aa31ba9feba206c11ae"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac69cfd22ec6d99378ea1e829dc42781e"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ac69cfd22ec6d99378ea1e829dc42781e">Index64</a> = uint64_t</td></tr>
+<tr class="memitem:ac69cfd22ec6d99378ea1e829dc42781e"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac69cfd22ec6d99378ea1e829dc42781e">Index64</a> = uint64_t</td></tr>
 <tr class="separator:ac69cfd22ec6d99378ea1e829dc42781e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1a68fb76e3d6897fa878760b6bcbda7a"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">Index</a> = Index32</td></tr>
+<tr class="memitem:a1a68fb76e3d6897fa878760b6bcbda7a"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">Index</a> = Index32</td></tr>
 <tr class="separator:a1a68fb76e3d6897fa878760b6bcbda7a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a34b6ab118920674a47e4b36db0fd1437"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a34b6ab118920674a47e4b36db0fd1437">Int16</a> = int16_t</td></tr>
+<tr class="memitem:a34b6ab118920674a47e4b36db0fd1437"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a34b6ab118920674a47e4b36db0fd1437">Int16</a> = int16_t</td></tr>
 <tr class="separator:a34b6ab118920674a47e4b36db0fd1437"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac524bdfeb5d781872485d9321c881920"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ac524bdfeb5d781872485d9321c881920">Int32</a> = int32_t</td></tr>
+<tr class="memitem:ac524bdfeb5d781872485d9321c881920"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">Int32</a> = int32_t</td></tr>
 <tr class="separator:ac524bdfeb5d781872485d9321c881920"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a51b4c1b67123dbb4903672fa753e6dd1"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a51b4c1b67123dbb4903672fa753e6dd1">Int64</a> = int64_t</td></tr>
+<tr class="memitem:a51b4c1b67123dbb4903672fa753e6dd1"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">Int64</a> = int64_t</td></tr>
 <tr class="separator:a51b4c1b67123dbb4903672fa753e6dd1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5a323f1dd48a014a0406dcf63c0e0bb9"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a5a323f1dd48a014a0406dcf63c0e0bb9">Int</a> = Int32</td></tr>
+<tr class="memitem:a5a323f1dd48a014a0406dcf63c0e0bb9"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a5a323f1dd48a014a0406dcf63c0e0bb9">Int</a> = Int32</td></tr>
 <tr class="separator:a5a323f1dd48a014a0406dcf63c0e0bb9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4598833cddd0ea684d351ebd793b5bb7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a4598833cddd0ea684d351ebd793b5bb7">Byte</a> = unsigned char</td></tr>
+<tr class="memitem:a4598833cddd0ea684d351ebd793b5bb7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a4598833cddd0ea684d351ebd793b5bb7">Byte</a> = unsigned char</td></tr>
 <tr class="separator:a4598833cddd0ea684d351ebd793b5bb7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b04262b81aa7d31eb5d2f607e2a35de"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a4b04262b81aa7d31eb5d2f607e2a35de">Real</a> = double</td></tr>
+<tr class="memitem:a4b04262b81aa7d31eb5d2f607e2a35de"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a4b04262b81aa7d31eb5d2f607e2a35de">Real</a> = double</td></tr>
 <tr class="separator:a4b04262b81aa7d31eb5d2f607e2a35de"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a32bf5f0cc41e0fe99dd57dad0c05496d"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a32bf5f0cc41e0fe99dd57dad0c05496d">Vec2R</a> = math::Vec2&lt; Real &gt;</td></tr>
+<tr class="memitem:a32bf5f0cc41e0fe99dd57dad0c05496d"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a32bf5f0cc41e0fe99dd57dad0c05496d">Vec2R</a> = math::Vec2&lt; Real &gt;</td></tr>
 <tr class="separator:a32bf5f0cc41e0fe99dd57dad0c05496d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5dcf138ef7ecb1aee6f424d6f38dfc16"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a5dcf138ef7ecb1aee6f424d6f38dfc16">Vec2I</a> = math::Vec2&lt; Index32 &gt;</td></tr>
+<tr class="memitem:a5dcf138ef7ecb1aee6f424d6f38dfc16"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a5dcf138ef7ecb1aee6f424d6f38dfc16">Vec2I</a> = math::Vec2&lt; Index32 &gt;</td></tr>
 <tr class="separator:a5dcf138ef7ecb1aee6f424d6f38dfc16"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acf1124e600cf3e4ad2c869262361b596"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#acf1124e600cf3e4ad2c869262361b596">Vec2f</a> = math::Vec2&lt; float &gt;</td></tr>
+<tr class="memitem:acf1124e600cf3e4ad2c869262361b596"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#acf1124e600cf3e4ad2c869262361b596">Vec2f</a> = math::Vec2&lt; float &gt;</td></tr>
 <tr class="separator:acf1124e600cf3e4ad2c869262361b596"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adeb19b99c3dd62b724addafd53fd1007"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#adeb19b99c3dd62b724addafd53fd1007">Vec2H</a> = math::Vec2&lt; half &gt;</td></tr>
-<tr class="separator:adeb19b99c3dd62b724addafd53fd1007"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab8753c49a176ce809a70ac12896682e3"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ab8753c49a176ce809a70ac12896682e3">Vec3R</a> = math::Vec3&lt; Real &gt;</td></tr>
+<tr class="memitem:a1153af87f4c78b40a562ad7a070f6edc"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a1153af87f4c78b40a562ad7a070f6edc">Vec2H</a> = math::Vec2&lt; math::half &gt;</td></tr>
+<tr class="separator:a1153af87f4c78b40a562ad7a070f6edc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab8753c49a176ce809a70ac12896682e3"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ab8753c49a176ce809a70ac12896682e3">Vec3R</a> = math::Vec3&lt; Real &gt;</td></tr>
 <tr class="separator:ab8753c49a176ce809a70ac12896682e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab407b3d357305019c37259d8f5d7f1a7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ab407b3d357305019c37259d8f5d7f1a7">Vec3I</a> = math::Vec3&lt; Index32 &gt;</td></tr>
+<tr class="memitem:ab407b3d357305019c37259d8f5d7f1a7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ab407b3d357305019c37259d8f5d7f1a7">Vec3I</a> = math::Vec3&lt; Index32 &gt;</td></tr>
 <tr class="separator:ab407b3d357305019c37259d8f5d7f1a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4873ae29d5d8d4f1cb7c7717af41a993"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a4873ae29d5d8d4f1cb7c7717af41a993">Vec3f</a> = math::Vec3&lt; float &gt;</td></tr>
+<tr class="memitem:a4873ae29d5d8d4f1cb7c7717af41a993"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a4873ae29d5d8d4f1cb7c7717af41a993">Vec3f</a> = math::Vec3&lt; float &gt;</td></tr>
 <tr class="separator:a4873ae29d5d8d4f1cb7c7717af41a993"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7f126f8d65c1173a41d6efed7e6d16f6"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a7f126f8d65c1173a41d6efed7e6d16f6">Vec3H</a> = math::Vec3&lt; half &gt;</td></tr>
-<tr class="separator:a7f126f8d65c1173a41d6efed7e6d16f6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae93a31f0b804e2599988acd268f3e07a"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93a31f0b804e2599988acd268f3e07a">Vec3U8</a> = math::Vec3&lt; uint8_t &gt;</td></tr>
+<tr class="memitem:a3ba1b4479738a4a9ca1286201ad62d40"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a3ba1b4479738a4a9ca1286201ad62d40">Vec3H</a> = math::Vec3&lt; math::half &gt;</td></tr>
+<tr class="separator:a3ba1b4479738a4a9ca1286201ad62d40"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae93a31f0b804e2599988acd268f3e07a"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93a31f0b804e2599988acd268f3e07a">Vec3U8</a> = math::Vec3&lt; uint8_t &gt;</td></tr>
 <tr class="separator:ae93a31f0b804e2599988acd268f3e07a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2877bf0aea8fc411b7f316dbfcd52776"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a2877bf0aea8fc411b7f316dbfcd52776">Vec3U16</a> = math::Vec3&lt; uint16_t &gt;</td></tr>
+<tr class="memitem:a2877bf0aea8fc411b7f316dbfcd52776"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a2877bf0aea8fc411b7f316dbfcd52776">Vec3U16</a> = math::Vec3&lt; uint16_t &gt;</td></tr>
 <tr class="separator:a2877bf0aea8fc411b7f316dbfcd52776"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa7e17f708810f66dc1d195abaf1e9dbf"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#aa7e17f708810f66dc1d195abaf1e9dbf">BBoxd</a> = math::BBox&lt; Vec3d &gt;</td></tr>
+<tr class="memitem:aa7e17f708810f66dc1d195abaf1e9dbf"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#aa7e17f708810f66dc1d195abaf1e9dbf">BBoxd</a> = math::BBox&lt; Vec3d &gt;</td></tr>
 <tr class="separator:aa7e17f708810f66dc1d195abaf1e9dbf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adffcc8b6c3d3dfb509da4bab6097e3d4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#adffcc8b6c3d3dfb509da4bab6097e3d4">Vec4R</a> = math::Vec4&lt; Real &gt;</td></tr>
+<tr class="memitem:adffcc8b6c3d3dfb509da4bab6097e3d4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#adffcc8b6c3d3dfb509da4bab6097e3d4">Vec4R</a> = math::Vec4&lt; Real &gt;</td></tr>
 <tr class="separator:adffcc8b6c3d3dfb509da4bab6097e3d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b3b3d39bd0af138296a8de32155eadb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a1b3b3d39bd0af138296a8de32155eadb">Vec4I</a> = math::Vec4&lt; Index32 &gt;</td></tr>
+<tr class="memitem:a1b3b3d39bd0af138296a8de32155eadb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a1b3b3d39bd0af138296a8de32155eadb">Vec4I</a> = math::Vec4&lt; Index32 &gt;</td></tr>
 <tr class="separator:a1b3b3d39bd0af138296a8de32155eadb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a090e2db04cce56b451f27bdb32885d44"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a090e2db04cce56b451f27bdb32885d44">Vec4f</a> = math::Vec4&lt; float &gt;</td></tr>
+<tr class="memitem:a090e2db04cce56b451f27bdb32885d44"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a090e2db04cce56b451f27bdb32885d44">Vec4f</a> = math::Vec4&lt; float &gt;</td></tr>
 <tr class="separator:a090e2db04cce56b451f27bdb32885d44"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aefc945dfa8549b0d01cf9568654b1d79"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#aefc945dfa8549b0d01cf9568654b1d79">Vec4H</a> = math::Vec4&lt; half &gt;</td></tr>
-<tr class="separator:aefc945dfa8549b0d01cf9568654b1d79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa8ba26e4afbc43158526a13e803c76c6"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#aa8ba26e4afbc43158526a13e803c76c6">Mat3R</a> = math::Mat3&lt; Real &gt;</td></tr>
+<tr class="memitem:abca3dbdb422284fd5dff4286de9faf48"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#abca3dbdb422284fd5dff4286de9faf48">Vec4H</a> = math::Vec4&lt; math::half &gt;</td></tr>
+<tr class="separator:abca3dbdb422284fd5dff4286de9faf48"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa8ba26e4afbc43158526a13e803c76c6"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#aa8ba26e4afbc43158526a13e803c76c6">Mat3R</a> = math::Mat3&lt; Real &gt;</td></tr>
 <tr class="separator:aa8ba26e4afbc43158526a13e803c76c6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7b60668ffc6ed25338c5ffbcb20b4220"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a7b60668ffc6ed25338c5ffbcb20b4220">Mat4R</a> = math::Mat4&lt; Real &gt;</td></tr>
+<tr class="memitem:a7b60668ffc6ed25338c5ffbcb20b4220"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a7b60668ffc6ed25338c5ffbcb20b4220">Mat4R</a> = math::Mat4&lt; Real &gt;</td></tr>
 <tr class="separator:a7b60668ffc6ed25338c5ffbcb20b4220"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af0a17c7cdf98a4f9ede1535576f7ac38"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#af0a17c7cdf98a4f9ede1535576f7ac38">QuatR</a> = math::Quat&lt; Real &gt;</td></tr>
+<tr class="memitem:af0a17c7cdf98a4f9ede1535576f7ac38"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#af0a17c7cdf98a4f9ede1535576f7ac38">QuatR</a> = math::Quat&lt; Real &gt;</td></tr>
 <tr class="separator:af0a17c7cdf98a4f9ede1535576f7ac38"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad71c1f3b8d46b57fd328d48cee283c1f"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:ad71c1f3b8d46b57fd328d48cee283c1f"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ad71c1f3b8d46b57fd328d48cee283c1f">SharedPtr</a> = std::shared_ptr&lt; T &gt;</td></tr>
+<tr class="memitem:ad71c1f3b8d46b57fd328d48cee283c1f"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ad71c1f3b8d46b57fd328d48cee283c1f">SharedPtr</a> = std::shared_ptr&lt; T &gt;</td></tr>
 <tr class="separator:ad71c1f3b8d46b57fd328d48cee283c1f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6c84f55d1bc02806bc3a87f393a3db52"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a6c84f55d1bc02806bc3a87f393a3db52"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a6c84f55d1bc02806bc3a87f393a3db52">WeakPtr</a> = std::weak_ptr&lt; T &gt;</td></tr>
+<tr class="memitem:a6c84f55d1bc02806bc3a87f393a3db52"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a6c84f55d1bc02806bc3a87f393a3db52">WeakPtr</a> = std::weak_ptr&lt; T &gt;</td></tr>
 <tr class="separator:a6c84f55d1bc02806bc3a87f393a3db52"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a58d2265df00dc40b96bfbdc675052994"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a58d2265df00dc40b96bfbdc675052994">PointIndex32</a> = PointIndex&lt; Index32, 0 &gt;</td></tr>
+<tr class="memitem:a58d2265df00dc40b96bfbdc675052994"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a58d2265df00dc40b96bfbdc675052994">PointIndex32</a> = PointIndex&lt; Index32, 0 &gt;</td></tr>
 <tr class="separator:a58d2265df00dc40b96bfbdc675052994"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3e1ff2ed9fe010ff5f231bc515823d08"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a3e1ff2ed9fe010ff5f231bc515823d08">PointIndex64</a> = PointIndex&lt; Index64, 0 &gt;</td></tr>
+<tr class="memitem:a3e1ff2ed9fe010ff5f231bc515823d08"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a3e1ff2ed9fe010ff5f231bc515823d08">PointIndex64</a> = PointIndex&lt; Index64, 0 &gt;</td></tr>
 <tr class="separator:a3e1ff2ed9fe010ff5f231bc515823d08"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afcdd46e3c391ea8febd5fa6017b9f19b"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#afcdd46e3c391ea8febd5fa6017b9f19b">PointDataIndex32</a> = PointIndex&lt; Index32, 1 &gt;</td></tr>
+<tr class="memitem:afcdd46e3c391ea8febd5fa6017b9f19b"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#afcdd46e3c391ea8febd5fa6017b9f19b">PointDataIndex32</a> = PointIndex&lt; Index32, 1 &gt;</td></tr>
 <tr class="separator:afcdd46e3c391ea8febd5fa6017b9f19b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3145a673dc4b53bb3f4dc04a1038150e"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a3145a673dc4b53bb3f4dc04a1038150e">PointDataIndex64</a> = PointIndex&lt; Index64, 1 &gt;</td></tr>
+<tr class="memitem:a3145a673dc4b53bb3f4dc04a1038150e"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a3145a673dc4b53bb3f4dc04a1038150e">PointDataIndex64</a> = PointIndex&lt; Index64, 1 &gt;</td></tr>
 <tr class="separator:a3145a673dc4b53bb3f4dc04a1038150e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
 Enumerations</h2></td></tr>
-<tr class="memitem:a511a7f5bd868162ec06bcc20b98e160e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a511a7f5bd868162ec06bcc20b98e160e">GridClass</a> { <a class="el" href="namespaceopenvdb_1_1v8__0.html#a511a7f5bd868162ec06bcc20b98e160eaf30a448e257803777038162b80e87343">GRID_UNKNOWN</a> = 0, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#a511a7f5bd868162ec06bcc20b98e160eac12b83a53c9998ec7823ba0ac9c1521d">GRID_LEVEL_SET</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#a511a7f5bd868162ec06bcc20b98e160ea4a2fa6a6ee2b5e2b2fcea1a6453cfce6">GRID_FOG_VOLUME</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#a511a7f5bd868162ec06bcc20b98e160ea95aec24941c3113a94a141564b794b0e">GRID_STAGGERED</a>
+<tr class="memitem:a511a7f5bd868162ec06bcc20b98e160e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a511a7f5bd868162ec06bcc20b98e160e">GridClass</a> { <a class="el" href="namespaceopenvdb_1_1v8__1.html#a511a7f5bd868162ec06bcc20b98e160eaf30a448e257803777038162b80e87343">GRID_UNKNOWN</a> = 0, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#a511a7f5bd868162ec06bcc20b98e160eac12b83a53c9998ec7823ba0ac9c1521d">GRID_LEVEL_SET</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#a511a7f5bd868162ec06bcc20b98e160ea4a2fa6a6ee2b5e2b2fcea1a6453cfce6">GRID_FOG_VOLUME</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#a511a7f5bd868162ec06bcc20b98e160ea95aec24941c3113a94a141564b794b0e">GRID_STAGGERED</a>
  }</td></tr>
 <tr class="separator:a511a7f5bd868162ec06bcc20b98e160e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a06fc87d81c62e9abb8790b6e5713c55b"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <a class="el" href="namespaceopenvdb_1_1v8__0.html#a06fc87d81c62e9abb8790b6e5713c55bad920626883d514328c461b4d2496e3b6">NUM_GRID_CLASSES</a> = GRID_STAGGERED + 1
+<tr class="memitem:a06fc87d81c62e9abb8790b6e5713c55b"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <a class="el" href="namespaceopenvdb_1_1v8__1.html#a06fc87d81c62e9abb8790b6e5713c55bad920626883d514328c461b4d2496e3b6">NUM_GRID_CLASSES</a> = GRID_STAGGERED + 1
  }</td></tr>
 <tr class="separator:a06fc87d81c62e9abb8790b6e5713c55b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae93f92d10730a52ed3b207d5811f6a6e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6e">VecType</a> { <br />
-&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6eae293a86a2c0fcf0596cd261654e870e2">VEC_INVARIANT</a> = 0, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6ea1fb13276c1e442e8682f27c216c32364">VEC_COVARIANT</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6eab65daaeb8abf83f0997fe73cb575df65">VEC_COVARIANT_NORMALIZE</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6ea0e7e7aa53b065235993b027a7dc2d49f">VEC_CONTRAVARIANT_RELATIVE</a>, 
+<tr class="memitem:ae93f92d10730a52ed3b207d5811f6a6e"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6e">VecType</a> { <br />
+&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6eae293a86a2c0fcf0596cd261654e870e2">VEC_INVARIANT</a> = 0, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6ea1fb13276c1e442e8682f27c216c32364">VEC_COVARIANT</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6eab65daaeb8abf83f0997fe73cb575df65">VEC_COVARIANT_NORMALIZE</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6ea0e7e7aa53b065235993b027a7dc2d49f">VEC_CONTRAVARIANT_RELATIVE</a>, 
 <br />
-&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__0.html#ae93f92d10730a52ed3b207d5811f6a6ea04e1b634fcd3b7c2e7034176792a5478">VEC_CONTRAVARIANT_ABSOLUTE</a>
+&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__1.html#ae93f92d10730a52ed3b207d5811f6a6ea04e1b634fcd3b7c2e7034176792a5478">VEC_CONTRAVARIANT_ABSOLUTE</a>
 <br />
  }</td></tr>
 <tr class="separator:ae93f92d10730a52ed3b207d5811f6a6e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adf764cbdea00d65edcd07bb9953ad2b7"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <a class="el" href="namespaceopenvdb_1_1v8__0.html#adf764cbdea00d65edcd07bb9953ad2b7aa69b32b4e2d9a25a84186edeff99d4f0">NUM_VEC_TYPES</a> = VEC_CONTRAVARIANT_ABSOLUTE + 1
+<tr class="memitem:adf764cbdea00d65edcd07bb9953ad2b7"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom">{ <a class="el" href="namespaceopenvdb_1_1v8__1.html#adf764cbdea00d65edcd07bb9953ad2b7aa69b32b4e2d9a25a84186edeff99d4f0">NUM_VEC_TYPES</a> = VEC_CONTRAVARIANT_ABSOLUTE + 1
  }</td></tr>
 <tr class="separator:adf764cbdea00d65edcd07bb9953ad2b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ade9c95ac55c647839e6f3e9b462c0575"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ade9c95ac55c647839e6f3e9b462c0575">MergePolicy</a> { <a class="el" href="namespaceopenvdb_1_1v8__0.html#ade9c95ac55c647839e6f3e9b462c0575a89c44945b26534bc1d5ede51c342400e">MERGE_ACTIVE_STATES</a> = 0, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#ade9c95ac55c647839e6f3e9b462c0575a92e4cb6fd9e78d9095b357d8a4b26ad0">MERGE_NODES</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0.html#ade9c95ac55c647839e6f3e9b462c0575acf1d5ce98de6a7d0d614438c13118193">MERGE_ACTIVE_STATES_AND_NODES</a>
+<tr class="memitem:ade9c95ac55c647839e6f3e9b462c0575"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ade9c95ac55c647839e6f3e9b462c0575">MergePolicy</a> { <a class="el" href="namespaceopenvdb_1_1v8__1.html#ade9c95ac55c647839e6f3e9b462c0575a89c44945b26534bc1d5ede51c342400e">MERGE_ACTIVE_STATES</a> = 0, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#ade9c95ac55c647839e6f3e9b462c0575a92e4cb6fd9e78d9095b357d8a4b26ad0">MERGE_NODES</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1.html#ade9c95ac55c647839e6f3e9b462c0575acf1d5ce98de6a7d0d614438c13118193">MERGE_ACTIVE_STATES_AND_NODES</a>
  }</td></tr>
 <tr class="separator:ade9c95ac55c647839e6f3e9b462c0575"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a568f74726b85a69e5e60efd0d3f82a13"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
-<tr class="memitem:a568f74726b85a69e5e60efd0d3f82a13"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a568f74726b85a69e5e60efd0d3f82a13">ConstPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
-<tr class="memdesc:a568f74726b85a69e5e60efd0d3f82a13"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that points to the same object as the given pointer but with possibly different <code>const</code>-ness.  <a href="namespaceopenvdb_1_1v8__0.html#a568f74726b85a69e5e60efd0d3f82a13">More...</a><br /></td></tr>
-<tr class="separator:a568f74726b85a69e5e60efd0d3f82a13"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adbe7d6fda7476b121ec43e14996d27b5"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
-<tr class="memitem:adbe7d6fda7476b121ec43e14996d27b5"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#adbe7d6fda7476b121ec43e14996d27b5">DynamicPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
-<tr class="memdesc:adbe7d6fda7476b121ec43e14996d27b5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that is either null or points to the same object as the given pointer after a <code>dynamic_cast</code>.  <a href="namespaceopenvdb_1_1v8__0.html#adbe7d6fda7476b121ec43e14996d27b5">More...</a><br /></td></tr>
-<tr class="separator:adbe7d6fda7476b121ec43e14996d27b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ddaee08e52cfda79991a6ff21fb9cac"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
-<tr class="memitem:a7ddaee08e52cfda79991a6ff21fb9cac"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a7ddaee08e52cfda79991a6ff21fb9cac">StaticPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
-<tr class="memdesc:a7ddaee08e52cfda79991a6ff21fb9cac"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that points to the same object as the given pointer after a <code>static_cast</code>.  <a href="namespaceopenvdb_1_1v8__0.html#a7ddaee08e52cfda79991a6ff21fb9cac">More...</a><br /></td></tr>
-<tr class="separator:a7ddaee08e52cfda79991a6ff21fb9cac"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8b2376c7f47ddc6f08aa3203d071d37e"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a8b2376c7f47ddc6f08aa3203d071d37e"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a8b2376c7f47ddc6f08aa3203d071d37e">typeNameAsString</a> ()</td></tr>
-<tr class="separator:a8b2376c7f47ddc6f08aa3203d071d37e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9fd73a94f851b596b7d14085f9eaf7c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:af9fd73a94f851b596b7d14085f9eaf7c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#af9fd73a94f851b596b7d14085f9eaf7c">typeNameAsString&lt; bool &gt;</a> ()</td></tr>
-<tr class="separator:af9fd73a94f851b596b7d14085f9eaf7c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9d69c369ccd540f89994ac920213c10"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:af9d69c369ccd540f89994ac920213c10"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#af9d69c369ccd540f89994ac920213c10">typeNameAsString&lt; ValueMask &gt;</a> ()</td></tr>
-<tr class="separator:af9d69c369ccd540f89994ac920213c10"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac510cf03bfbb01300ddc87c94b6242d0"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ac510cf03bfbb01300ddc87c94b6242d0"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ac510cf03bfbb01300ddc87c94b6242d0">typeNameAsString&lt; half &gt;</a> ()</td></tr>
-<tr class="separator:ac510cf03bfbb01300ddc87c94b6242d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a082713a7d4855411493e1d9cc2861d39"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a082713a7d4855411493e1d9cc2861d39"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a082713a7d4855411493e1d9cc2861d39">typeNameAsString&lt; float &gt;</a> ()</td></tr>
-<tr class="separator:a082713a7d4855411493e1d9cc2861d39"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad5b223b070359edd3a7f51f30145d180"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ad5b223b070359edd3a7f51f30145d180"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ad5b223b070359edd3a7f51f30145d180">typeNameAsString&lt; double &gt;</a> ()</td></tr>
-<tr class="separator:ad5b223b070359edd3a7f51f30145d180"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af28624899fbcd10293ba523f508a186c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:af28624899fbcd10293ba523f508a186c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#af28624899fbcd10293ba523f508a186c">typeNameAsString&lt; int8_t &gt;</a> ()</td></tr>
-<tr class="separator:af28624899fbcd10293ba523f508a186c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a755e0d7ddeefd4ae4dc66eddf48e4798"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a755e0d7ddeefd4ae4dc66eddf48e4798"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a755e0d7ddeefd4ae4dc66eddf48e4798">typeNameAsString&lt; uint8_t &gt;</a> ()</td></tr>
-<tr class="separator:a755e0d7ddeefd4ae4dc66eddf48e4798"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8e5fcf35790a88e957c38572d9632cce"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a8e5fcf35790a88e957c38572d9632cce"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a8e5fcf35790a88e957c38572d9632cce">typeNameAsString&lt; int16_t &gt;</a> ()</td></tr>
-<tr class="separator:a8e5fcf35790a88e957c38572d9632cce"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac6dc9fc578059a52fc7add5066b24fca"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ac6dc9fc578059a52fc7add5066b24fca"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ac6dc9fc578059a52fc7add5066b24fca">typeNameAsString&lt; uint16_t &gt;</a> ()</td></tr>
-<tr class="separator:ac6dc9fc578059a52fc7add5066b24fca"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af74c0b60c42ee38c177c84c11f3af130"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:af74c0b60c42ee38c177c84c11f3af130"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#af74c0b60c42ee38c177c84c11f3af130">typeNameAsString&lt; int32_t &gt;</a> ()</td></tr>
-<tr class="separator:af74c0b60c42ee38c177c84c11f3af130"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a273220e245d73335b7e62ab7af008567"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a273220e245d73335b7e62ab7af008567"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a273220e245d73335b7e62ab7af008567">typeNameAsString&lt; uint32_t &gt;</a> ()</td></tr>
-<tr class="separator:a273220e245d73335b7e62ab7af008567"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad0877850e4b5952c37f8c82d9f29131e"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ad0877850e4b5952c37f8c82d9f29131e"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#ad0877850e4b5952c37f8c82d9f29131e">typeNameAsString&lt; int64_t &gt;</a> ()</td></tr>
-<tr class="separator:ad0877850e4b5952c37f8c82d9f29131e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:addd0da2e67f15a14d17a3ef1e7f36771"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:addd0da2e67f15a14d17a3ef1e7f36771"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#addd0da2e67f15a14d17a3ef1e7f36771">typeNameAsString&lt; Vec2i &gt;</a> ()</td></tr>
-<tr class="separator:addd0da2e67f15a14d17a3ef1e7f36771"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2c33c5b3286aeef773b5f496bb6a18c1"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a2c33c5b3286aeef773b5f496bb6a18c1"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a2c33c5b3286aeef773b5f496bb6a18c1">typeNameAsString&lt; Vec2s &gt;</a> ()</td></tr>
-<tr class="separator:a2c33c5b3286aeef773b5f496bb6a18c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8313dc77c826f56b5bef39426c20de99"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a8313dc77c826f56b5bef39426c20de99"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a8313dc77c826f56b5bef39426c20de99">typeNameAsString&lt; Vec2d &gt;</a> ()</td></tr>
-<tr class="separator:a8313dc77c826f56b5bef39426c20de99"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3bea009eb3810ce4bc959ccfe4242277"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a3bea009eb3810ce4bc959ccfe4242277"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a3bea009eb3810ce4bc959ccfe4242277">typeNameAsString&lt; Vec3U8 &gt;</a> ()</td></tr>
-<tr class="separator:a3bea009eb3810ce4bc959ccfe4242277"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acbc4d6767f2606a68a43818d7d499806"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:acbc4d6767f2606a68a43818d7d499806"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#acbc4d6767f2606a68a43818d7d499806">typeNameAsString&lt; Vec3U16 &gt;</a> ()</td></tr>
-<tr class="separator:acbc4d6767f2606a68a43818d7d499806"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc0ac32150f9dfa67af12000a4c0e98f"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:acc0ac32150f9dfa67af12000a4c0e98f"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#acc0ac32150f9dfa67af12000a4c0e98f">typeNameAsString&lt; Vec3i &gt;</a> ()</td></tr>
-<tr class="separator:acc0ac32150f9dfa67af12000a4c0e98f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a92d5d2634dbb04988b12c67c1f70bca3"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a92d5d2634dbb04988b12c67c1f70bca3"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a92d5d2634dbb04988b12c67c1f70bca3">typeNameAsString&lt; Vec3f &gt;</a> ()</td></tr>
-<tr class="separator:a92d5d2634dbb04988b12c67c1f70bca3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7da128b591123fee80b5fc52e5f3e402"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a7da128b591123fee80b5fc52e5f3e402"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a7da128b591123fee80b5fc52e5f3e402">typeNameAsString&lt; Vec3d &gt;</a> ()</td></tr>
-<tr class="separator:a7da128b591123fee80b5fc52e5f3e402"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a53c62e41493cf79d624f9b17fef17723"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a53c62e41493cf79d624f9b17fef17723"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a53c62e41493cf79d624f9b17fef17723">typeNameAsString&lt; Vec4i &gt;</a> ()</td></tr>
-<tr class="separator:a53c62e41493cf79d624f9b17fef17723"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a21778210a6f17f75ed808ef91c6a716b"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a21778210a6f17f75ed808ef91c6a716b"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a21778210a6f17f75ed808ef91c6a716b">typeNameAsString&lt; Vec4f &gt;</a> ()</td></tr>
-<tr class="separator:a21778210a6f17f75ed808ef91c6a716b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1a5b81c381c88864cce1695c5435dad7"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a1a5b81c381c88864cce1695c5435dad7"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a1a5b81c381c88864cce1695c5435dad7">typeNameAsString&lt; Vec4d &gt;</a> ()</td></tr>
-<tr class="separator:a1a5b81c381c88864cce1695c5435dad7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5bce5d979ebec85c2d74007bba89339c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a5bce5d979ebec85c2d74007bba89339c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a5bce5d979ebec85c2d74007bba89339c">typeNameAsString&lt; std::string &gt;</a> ()</td></tr>
-<tr class="separator:a5bce5d979ebec85c2d74007bba89339c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a434a6edf5ed7a9200b9491c8432bd305"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a434a6edf5ed7a9200b9491c8432bd305"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a434a6edf5ed7a9200b9491c8432bd305">typeNameAsString&lt; Mat3s &gt;</a> ()</td></tr>
-<tr class="separator:a434a6edf5ed7a9200b9491c8432bd305"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5d260d9a2cf7077bdb343996ee39aaed"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a5d260d9a2cf7077bdb343996ee39aaed"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a5d260d9a2cf7077bdb343996ee39aaed">typeNameAsString&lt; Mat3d &gt;</a> ()</td></tr>
-<tr class="separator:a5d260d9a2cf7077bdb343996ee39aaed"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2c02053552cb6f230ec46fee782a69f8"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a2c02053552cb6f230ec46fee782a69f8"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a2c02053552cb6f230ec46fee782a69f8">typeNameAsString&lt; Mat4s &gt;</a> ()</td></tr>
-<tr class="separator:a2c02053552cb6f230ec46fee782a69f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb1f6f81c154a786cf85b12b0683a3f9"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:afb1f6f81c154a786cf85b12b0683a3f9"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#afb1f6f81c154a786cf85b12b0683a3f9">typeNameAsString&lt; Mat4d &gt;</a> ()</td></tr>
-<tr class="separator:afb1f6f81c154a786cf85b12b0683a3f9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a65f96f29d992701d27fe2bf51867accf"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a65f96f29d992701d27fe2bf51867accf"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a65f96f29d992701d27fe2bf51867accf">typeNameAsString&lt; math::Quats &gt;</a> ()</td></tr>
-<tr class="separator:a65f96f29d992701d27fe2bf51867accf"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa0eff4e1ec6c40d7d0b86b4ee336010e"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:aa0eff4e1ec6c40d7d0b86b4ee336010e"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#aa0eff4e1ec6c40d7d0b86b4ee336010e">typeNameAsString&lt; math::Quatd &gt;</a> ()</td></tr>
-<tr class="separator:aa0eff4e1ec6c40d7d0b86b4ee336010e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a46867238efcfa5fd429f7a1b34e7be4c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a46867238efcfa5fd429f7a1b34e7be4c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a46867238efcfa5fd429f7a1b34e7be4c">typeNameAsString&lt; PointIndex32 &gt;</a> ()</td></tr>
-<tr class="separator:a46867238efcfa5fd429f7a1b34e7be4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a666d13307bb87ef41a787ed15a63e369"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a666d13307bb87ef41a787ed15a63e369"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a666d13307bb87ef41a787ed15a63e369">typeNameAsString&lt; PointIndex64 &gt;</a> ()</td></tr>
-<tr class="separator:a666d13307bb87ef41a787ed15a63e369"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6421a6d00266c0fe8d6b854a7f37472e"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a6421a6d00266c0fe8d6b854a7f37472e"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a6421a6d00266c0fe8d6b854a7f37472e">typeNameAsString&lt; PointDataIndex32 &gt;</a> ()</td></tr>
-<tr class="separator:a6421a6d00266c0fe8d6b854a7f37472e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a761ec6a12c7e1d8da75805450a086a4d"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a761ec6a12c7e1d8da75805450a086a4d"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a761ec6a12c7e1d8da75805450a086a4d">typeNameAsString&lt; PointDataIndex64 &gt;</a> ()</td></tr>
-<tr class="separator:a761ec6a12c7e1d8da75805450a086a4d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5dbd8be7955d57217c2396cb4c537543"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
+<tr class="memitem:a5dbd8be7955d57217c2396cb4c537543"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a5dbd8be7955d57217c2396cb4c537543">ConstPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
+<tr class="memdesc:a5dbd8be7955d57217c2396cb4c537543"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that points to the same object as the given pointer but with possibly different <code>const</code>-ness.  <a href="namespaceopenvdb_1_1v8__1.html#a5dbd8be7955d57217c2396cb4c537543">More...</a><br /></td></tr>
+<tr class="separator:a5dbd8be7955d57217c2396cb4c537543"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8df41ca144b2d5e3fe175601bc4a62bf"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
+<tr class="memitem:a8df41ca144b2d5e3fe175601bc4a62bf"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a8df41ca144b2d5e3fe175601bc4a62bf">DynamicPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
+<tr class="memdesc:a8df41ca144b2d5e3fe175601bc4a62bf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that is either null or points to the same object as the given pointer after a <code>dynamic_cast</code>.  <a href="namespaceopenvdb_1_1v8__1.html#a8df41ca144b2d5e3fe175601bc4a62bf">More...</a><br /></td></tr>
+<tr class="separator:a8df41ca144b2d5e3fe175601bc4a62bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a66f2953731a7acff46f90a359328eb7a"><td class="memTemplParams" colspan="2">template&lt;typename T , typename U &gt; </td></tr>
+<tr class="memitem:a66f2953731a7acff46f90a359328eb7a"><td class="memTemplItemLeft" align="right" valign="top">SharedPtr&lt; T &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a66f2953731a7acff46f90a359328eb7a">StaticPtrCast</a> (const SharedPtr&lt; U &gt; &amp;ptr)</td></tr>
+<tr class="memdesc:a66f2953731a7acff46f90a359328eb7a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a new shared pointer that points to the same object as the given pointer after a <code>static_cast</code>.  <a href="namespaceopenvdb_1_1v8__1.html#a66f2953731a7acff46f90a359328eb7a">More...</a><br /></td></tr>
+<tr class="separator:a66f2953731a7acff46f90a359328eb7a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9596db0d7c713a6a7c54212c696482a9"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:a9596db0d7c713a6a7c54212c696482a9"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a9596db0d7c713a6a7c54212c696482a9">typeNameAsString</a> ()</td></tr>
+<tr class="separator:a9596db0d7c713a6a7c54212c696482a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aed83aeace847c61fd5ffe7c1b23d549d"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:aed83aeace847c61fd5ffe7c1b23d549d"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#aed83aeace847c61fd5ffe7c1b23d549d">typeNameAsString&lt; bool &gt;</a> ()</td></tr>
+<tr class="separator:aed83aeace847c61fd5ffe7c1b23d549d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a78503ab1f50cdc1470bb80f6018662ca"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a78503ab1f50cdc1470bb80f6018662ca"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a78503ab1f50cdc1470bb80f6018662ca">typeNameAsString&lt; ValueMask &gt;</a> ()</td></tr>
+<tr class="separator:a78503ab1f50cdc1470bb80f6018662ca"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4bf07b21229a3d28cc2352ca0b0e3047"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a4bf07b21229a3d28cc2352ca0b0e3047"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a4bf07b21229a3d28cc2352ca0b0e3047">typeNameAsString&lt; math::half &gt;</a> ()</td></tr>
+<tr class="separator:a4bf07b21229a3d28cc2352ca0b0e3047"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9103db9f19185b66b2d3f05c0953b300"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a9103db9f19185b66b2d3f05c0953b300"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a9103db9f19185b66b2d3f05c0953b300">typeNameAsString&lt; float &gt;</a> ()</td></tr>
+<tr class="separator:a9103db9f19185b66b2d3f05c0953b300"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a07cd5989402bea250418e09d1972d00a"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a07cd5989402bea250418e09d1972d00a"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a07cd5989402bea250418e09d1972d00a">typeNameAsString&lt; double &gt;</a> ()</td></tr>
+<tr class="separator:a07cd5989402bea250418e09d1972d00a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abb06d29aa14535bcbc4f82f28a29d000"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:abb06d29aa14535bcbc4f82f28a29d000"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#abb06d29aa14535bcbc4f82f28a29d000">typeNameAsString&lt; int8_t &gt;</a> ()</td></tr>
+<tr class="separator:abb06d29aa14535bcbc4f82f28a29d000"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8ee0b86ccd47ca7a0e4242404d5cba74"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a8ee0b86ccd47ca7a0e4242404d5cba74"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a8ee0b86ccd47ca7a0e4242404d5cba74">typeNameAsString&lt; uint8_t &gt;</a> ()</td></tr>
+<tr class="separator:a8ee0b86ccd47ca7a0e4242404d5cba74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7a9221cd770fb79d495bee72a6155341"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a7a9221cd770fb79d495bee72a6155341"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a7a9221cd770fb79d495bee72a6155341">typeNameAsString&lt; int16_t &gt;</a> ()</td></tr>
+<tr class="separator:a7a9221cd770fb79d495bee72a6155341"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2e0c15f25663b7f99daa0454c4ab2912"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a2e0c15f25663b7f99daa0454c4ab2912"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a2e0c15f25663b7f99daa0454c4ab2912">typeNameAsString&lt; uint16_t &gt;</a> ()</td></tr>
+<tr class="separator:a2e0c15f25663b7f99daa0454c4ab2912"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6801ba7bf896a235a53dea699d3b53dd"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a6801ba7bf896a235a53dea699d3b53dd"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a6801ba7bf896a235a53dea699d3b53dd">typeNameAsString&lt; int32_t &gt;</a> ()</td></tr>
+<tr class="separator:a6801ba7bf896a235a53dea699d3b53dd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a188783621e025aa8bf04331ca092dac7"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a188783621e025aa8bf04331ca092dac7"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a188783621e025aa8bf04331ca092dac7">typeNameAsString&lt; uint32_t &gt;</a> ()</td></tr>
+<tr class="separator:a188783621e025aa8bf04331ca092dac7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6dfeb09e9d12bbb57bb906e794b14974"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a6dfeb09e9d12bbb57bb906e794b14974"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a6dfeb09e9d12bbb57bb906e794b14974">typeNameAsString&lt; int64_t &gt;</a> ()</td></tr>
+<tr class="separator:a6dfeb09e9d12bbb57bb906e794b14974"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a276082389ddd24a98d926dd4bdc40ca7"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a276082389ddd24a98d926dd4bdc40ca7"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a276082389ddd24a98d926dd4bdc40ca7">typeNameAsString&lt; Vec2i &gt;</a> ()</td></tr>
+<tr class="separator:a276082389ddd24a98d926dd4bdc40ca7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a718f8c111f79b552a33f9324c9c3d0f0"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a718f8c111f79b552a33f9324c9c3d0f0"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a718f8c111f79b552a33f9324c9c3d0f0">typeNameAsString&lt; Vec2s &gt;</a> ()</td></tr>
+<tr class="separator:a718f8c111f79b552a33f9324c9c3d0f0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4bbaa283961b8ed937935c9e503b427d"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a4bbaa283961b8ed937935c9e503b427d"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a4bbaa283961b8ed937935c9e503b427d">typeNameAsString&lt; Vec2d &gt;</a> ()</td></tr>
+<tr class="separator:a4bbaa283961b8ed937935c9e503b427d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7f20bb2c014e20f80dba1c561f0686d3"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a7f20bb2c014e20f80dba1c561f0686d3"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a7f20bb2c014e20f80dba1c561f0686d3">typeNameAsString&lt; Vec3U8 &gt;</a> ()</td></tr>
+<tr class="separator:a7f20bb2c014e20f80dba1c561f0686d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac682c68a339d1b739057fe8bbf934d15"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:ac682c68a339d1b739057fe8bbf934d15"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac682c68a339d1b739057fe8bbf934d15">typeNameAsString&lt; Vec3U16 &gt;</a> ()</td></tr>
+<tr class="separator:ac682c68a339d1b739057fe8bbf934d15"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae07d59a9c86246aab3a1596367447610"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:ae07d59a9c86246aab3a1596367447610"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ae07d59a9c86246aab3a1596367447610">typeNameAsString&lt; Vec3i &gt;</a> ()</td></tr>
+<tr class="separator:ae07d59a9c86246aab3a1596367447610"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae9f4ad9a80a2b1d2ab4d51c3fe36488c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:ae9f4ad9a80a2b1d2ab4d51c3fe36488c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ae9f4ad9a80a2b1d2ab4d51c3fe36488c">typeNameAsString&lt; Vec3f &gt;</a> ()</td></tr>
+<tr class="separator:ae9f4ad9a80a2b1d2ab4d51c3fe36488c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a72cd525074d0839247589681bbb13374"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a72cd525074d0839247589681bbb13374"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a72cd525074d0839247589681bbb13374">typeNameAsString&lt; Vec3d &gt;</a> ()</td></tr>
+<tr class="separator:a72cd525074d0839247589681bbb13374"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab8e63642fe4a6ef7291843c69067a3da"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:ab8e63642fe4a6ef7291843c69067a3da"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ab8e63642fe4a6ef7291843c69067a3da">typeNameAsString&lt; Vec4i &gt;</a> ()</td></tr>
+<tr class="separator:ab8e63642fe4a6ef7291843c69067a3da"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a41bbe52922196386811eeca3351f4145"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a41bbe52922196386811eeca3351f4145"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a41bbe52922196386811eeca3351f4145">typeNameAsString&lt; Vec4f &gt;</a> ()</td></tr>
+<tr class="separator:a41bbe52922196386811eeca3351f4145"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a72b3a9d9370437a06d5931b13a5963b7"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a72b3a9d9370437a06d5931b13a5963b7"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a72b3a9d9370437a06d5931b13a5963b7">typeNameAsString&lt; Vec4d &gt;</a> ()</td></tr>
+<tr class="separator:a72b3a9d9370437a06d5931b13a5963b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3d2c2ebe3ff631287706bf3e261c09d2"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a3d2c2ebe3ff631287706bf3e261c09d2"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a3d2c2ebe3ff631287706bf3e261c09d2">typeNameAsString&lt; std::string &gt;</a> ()</td></tr>
+<tr class="separator:a3d2c2ebe3ff631287706bf3e261c09d2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3b9cd5e13ac3254b26012d143b05a70b"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a3b9cd5e13ac3254b26012d143b05a70b"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a3b9cd5e13ac3254b26012d143b05a70b">typeNameAsString&lt; Mat3s &gt;</a> ()</td></tr>
+<tr class="separator:a3b9cd5e13ac3254b26012d143b05a70b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a407975ce0711d4f569afb515d6d34bc2"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a407975ce0711d4f569afb515d6d34bc2"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a407975ce0711d4f569afb515d6d34bc2">typeNameAsString&lt; Mat3d &gt;</a> ()</td></tr>
+<tr class="separator:a407975ce0711d4f569afb515d6d34bc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a093de8bbd55241c9df81e9a44e998a4c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a093de8bbd55241c9df81e9a44e998a4c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a093de8bbd55241c9df81e9a44e998a4c">typeNameAsString&lt; Mat4s &gt;</a> ()</td></tr>
+<tr class="separator:a093de8bbd55241c9df81e9a44e998a4c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af9129e23008133f075021fd33c3d35e9"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:af9129e23008133f075021fd33c3d35e9"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#af9129e23008133f075021fd33c3d35e9">typeNameAsString&lt; Mat4d &gt;</a> ()</td></tr>
+<tr class="separator:af9129e23008133f075021fd33c3d35e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7f5192ebf9f9d358cd048cc0c49dff1c"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a7f5192ebf9f9d358cd048cc0c49dff1c"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a7f5192ebf9f9d358cd048cc0c49dff1c">typeNameAsString&lt; math::Quats &gt;</a> ()</td></tr>
+<tr class="separator:a7f5192ebf9f9d358cd048cc0c49dff1c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a17649e2b447236c7b61d16eb8f3fc4a3"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a17649e2b447236c7b61d16eb8f3fc4a3"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a17649e2b447236c7b61d16eb8f3fc4a3">typeNameAsString&lt; math::Quatd &gt;</a> ()</td></tr>
+<tr class="separator:a17649e2b447236c7b61d16eb8f3fc4a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0c9b60028a0f6fdda6df684a45cc0e47"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a0c9b60028a0f6fdda6df684a45cc0e47"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a0c9b60028a0f6fdda6df684a45cc0e47">typeNameAsString&lt; PointIndex32 &gt;</a> ()</td></tr>
+<tr class="separator:a0c9b60028a0f6fdda6df684a45cc0e47"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2986a92b718a3461b6951f321ca689c1"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a2986a92b718a3461b6951f321ca689c1"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a2986a92b718a3461b6951f321ca689c1">typeNameAsString&lt; PointIndex64 &gt;</a> ()</td></tr>
+<tr class="separator:a2986a92b718a3461b6951f321ca689c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6e9277426d25cef23cb185a3277d2343"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:a6e9277426d25cef23cb185a3277d2343"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a6e9277426d25cef23cb185a3277d2343">typeNameAsString&lt; PointDataIndex32 &gt;</a> ()</td></tr>
+<tr class="separator:a6e9277426d25cef23cb185a3277d2343"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aabc3e54068ce099a87d2bed8f1cfe185"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
+<tr class="memitem:aabc3e54068ce099a87d2bed8f1cfe185"><td class="memTemplItemLeft" align="right" valign="top">const char *&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#aabc3e54068ce099a87d2bed8f1cfe185">typeNameAsString&lt; PointDataIndex64 &gt;</a> ()</td></tr>
+<tr class="separator:aabc3e54068ce099a87d2bed8f1cfe185"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="var-members"></a>
 Variables</h2></td></tr>
-<tr class="memitem:a04f60dd7b4a065a54f873613ff8df50f"><td class="memItemLeft" align="right" valign="top">static const Real&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html#a04f60dd7b4a065a54f873613ff8df50f">LEVEL_SET_HALF_WIDTH</a> = 3</td></tr>
+<tr class="memitem:a04f60dd7b4a065a54f873613ff8df50f"><td class="memItemLeft" align="right" valign="top">static const Real&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a04f60dd7b4a065a54f873613ff8df50f">LEVEL_SET_HALF_WIDTH</a> = 3</td></tr>
 <tr class="separator:a04f60dd7b4a065a54f873613ff8df50f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 </div><!-- contents -->

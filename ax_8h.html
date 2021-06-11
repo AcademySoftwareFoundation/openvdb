@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -98,7 +98,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Single header include which provides methods for initializing AX and running a full AX pipeline (pasrsing, compiling and executing) across standard OpenVDB Grid types.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="version_8h_source.html">openvdb/version.h</a>&gt;</code><br />
+<code>#include &lt;openvdb/version.h&gt;</code><br />
 </div>
 <p><a href="ax_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
@@ -106,28 +106,28 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1ax"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html">openvdb::v8_0::ax</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1ax"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html">openvdb::v8_1::ax</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a5c0d1716356708c3775b38aefac8c93c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html#a5c0d1716356708c3775b38aefac8c93c">initialize</a> ()</td></tr>
-<tr class="memdesc:a5c0d1716356708c3775b38aefac8c93c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initializes OpenVDB AX and subsequent LLVM components.  <a href="namespaceopenvdb_1_1v8__0_1_1ax.html#a5c0d1716356708c3775b38aefac8c93c">More...</a><br /></td></tr>
-<tr class="separator:a5c0d1716356708c3775b38aefac8c93c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:affbfed10ade04898d98d6cc315f4c75f"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html#affbfed10ade04898d98d6cc315f4c75f">isInitialized</a> ()</td></tr>
-<tr class="memdesc:affbfed10ade04898d98d6cc315f4c75f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check to see if OpenVDB AX components have been initialized.  <a href="namespaceopenvdb_1_1v8__0_1_1ax.html#affbfed10ade04898d98d6cc315f4c75f">More...</a><br /></td></tr>
-<tr class="separator:affbfed10ade04898d98d6cc315f4c75f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb19a817afa53406c6fa3328c3c066a0"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html#afb19a817afa53406c6fa3328c3c066a0">uninitialize</a> ()</td></tr>
-<tr class="memdesc:afb19a817afa53406c6fa3328c3c066a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uninitialize and deregister OpenVDB AX.  <a href="namespaceopenvdb_1_1v8__0_1_1ax.html#afb19a817afa53406c6fa3328c3c066a0">More...</a><br /></td></tr>
-<tr class="separator:afb19a817afa53406c6fa3328c3c066a0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af9f2b681d3942ca6a953b9562448adfd"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html#af9f2b681d3942ca6a953b9562448adfd">run</a> (const char *ax, <a class="el" href="classopenvdb_1_1v8__0_1_1GridBase.html">openvdb::GridBase</a> &amp;grid)</td></tr>
-<tr class="memdesc:af9f2b681d3942ca6a953b9562448adfd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run a full AX pipeline (parse, compile and execute) on a single OpenVDB <a class="el" href="classopenvdb_1_1v8__0_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a>.  <a href="namespaceopenvdb_1_1v8__0_1_1ax.html#af9f2b681d3942ca6a953b9562448adfd">More...</a><br /></td></tr>
-<tr class="separator:af9f2b681d3942ca6a953b9562448adfd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab31d2b16b7dd53b26fb128c120825896"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1ax.html#ab31d2b16b7dd53b26fb128c120825896">run</a> (const char *ax, <a class="el" href="namespaceopenvdb_1_1v8__0.html#a0c9703e6ff5cc9deb6410c53412c22c3">openvdb::GridPtrVec</a> &amp;grids)</td></tr>
-<tr class="memdesc:ab31d2b16b7dd53b26fb128c120825896"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run a full AX pipeline (parse, compile and execute) on a vector of OpenVDB numerical grids OR a vector of OpenVDB Point Data grids.  <a href="namespaceopenvdb_1_1v8__0_1_1ax.html#ab31d2b16b7dd53b26fb128c120825896">More...</a><br /></td></tr>
-<tr class="separator:ab31d2b16b7dd53b26fb128c120825896"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1cf2ed58bc91cb54af9d2a0190dd3956"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html#a1cf2ed58bc91cb54af9d2a0190dd3956">initialize</a> ()</td></tr>
+<tr class="memdesc:a1cf2ed58bc91cb54af9d2a0190dd3956"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initializes OpenVDB AX and subsequent LLVM components.  <a href="namespaceopenvdb_1_1v8__1_1_1ax.html#a1cf2ed58bc91cb54af9d2a0190dd3956">More...</a><br /></td></tr>
+<tr class="separator:a1cf2ed58bc91cb54af9d2a0190dd3956"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a12301d5be3081ae9f5270b2820bf3139"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html#a12301d5be3081ae9f5270b2820bf3139">isInitialized</a> ()</td></tr>
+<tr class="memdesc:a12301d5be3081ae9f5270b2820bf3139"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check to see if OpenVDB AX components have been initialized.  <a href="namespaceopenvdb_1_1v8__1_1_1ax.html#a12301d5be3081ae9f5270b2820bf3139">More...</a><br /></td></tr>
+<tr class="separator:a12301d5be3081ae9f5270b2820bf3139"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa1d9d7a67b94e915c544c8a3043a8681"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html#aa1d9d7a67b94e915c544c8a3043a8681">uninitialize</a> ()</td></tr>
+<tr class="memdesc:aa1d9d7a67b94e915c544c8a3043a8681"><td class="mdescLeft">&#160;</td><td class="mdescRight">Uninitialize and deregister OpenVDB AX.  <a href="namespaceopenvdb_1_1v8__1_1_1ax.html#aa1d9d7a67b94e915c544c8a3043a8681">More...</a><br /></td></tr>
+<tr class="separator:aa1d9d7a67b94e915c544c8a3043a8681"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa46008a37cd7b1cc2c408541794b661b"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html#aa46008a37cd7b1cc2c408541794b661b">run</a> (const char *ax, <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;grid)</td></tr>
+<tr class="memdesc:aa46008a37cd7b1cc2c408541794b661b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run a full AX pipeline (parse, compile and execute) on a single OpenVDB <a class="el" href="classopenvdb_1_1v8__1_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a>.  <a href="namespaceopenvdb_1_1v8__1_1_1ax.html#aa46008a37cd7b1cc2c408541794b661b">More...</a><br /></td></tr>
+<tr class="separator:aa46008a37cd7b1cc2c408541794b661b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a157f4e3cb82ed3af9c23fd65c30e3483"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1ax.html#a157f4e3cb82ed3af9c23fd65c30e3483">run</a> (const char *ax, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a0c9703e6ff5cc9deb6410c53412c22c3">openvdb::GridPtrVec</a> &amp;grids)</td></tr>
+<tr class="memdesc:a157f4e3cb82ed3af9c23fd65c30e3483"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run a full AX pipeline (parse, compile and execute) on a vector of OpenVDB numerical grids OR a vector of OpenVDB Point Data grids.  <a href="namespaceopenvdb_1_1v8__1_1_1ax.html#a157f4e3cb82ed3af9c23fd65c30e3483">More...</a><br /></td></tr>
+<tr class="separator:a157f4e3cb82ed3af9c23fd65c30e3483"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Single header include which provides methods for initializing AX and running a full AX pipeline (pasrsing, compiling and executing) across standard OpenVDB Grid types. </p>

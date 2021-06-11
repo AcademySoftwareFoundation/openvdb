@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -110,76 +110,76 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1DSConverter.html">DSConverter&lt; DenseType, TreeType &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1DSConverter.html">DSConverter&lt; DenseType, TreeType &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tools_1_1SparseExtractor.html">SparseExtractor&lt; OpType, DenseType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functor-based class used to extract data that satisfies some criteria defined by the embedded <code>OpType</code> functor. The <code>extractSparseTree</code> function wraps this class.  <a href="classopenvdb_1_1v8__0_1_1tools_1_1SparseExtractor.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1SparseExtractor.html">SparseExtractor&lt; OpType, DenseType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functor-based class used to extract data that satisfies some criteria defined by the embedded <code>OpType</code> functor. The <code>extractSparseTree</code> function wraps this class.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1SparseExtractor.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tools_1_1SparseMaskedExtractor.html">SparseMaskedExtractor&lt; DenseType, MaskTreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functor-based class used to extract data from a dense grid, at the index-space intersection with a supplied mask in the form of a sparse tree. The <code>extractSparseTreeWithMask</code> function wraps this class.  <a href="classopenvdb_1_1v8__0_1_1tools_1_1SparseMaskedExtractor.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1SparseMaskedExtractor.html">SparseMaskedExtractor&lt; DenseType, MaskTreeType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functor-based class used to extract data from a dense grid, at the index-space intersection with a supplied mask in the form of a sparse tree. The <code>extractSparseTreeWithMask</code> function wraps this class.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1SparseMaskedExtractor.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ExtractAll.html">ExtractAll&lt; _ResultTreeType, DenseValueType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">a simple utility class used by <code>extractSparseTreeWithMask</code>  <a href="structopenvdb_1_1v8__0_1_1tools_1_1ExtractAll.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ExtractAll.html">ExtractAll&lt; _ResultTreeType, DenseValueType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">a simple utility class used by <code>extractSparseTreeWithMask</code>  <a href="structopenvdb_1_1v8__1_1_1tools_1_1ExtractAll.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tools_1_1DenseTransformer.html">DenseTransformer&lt; _ValueT, OpType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that applies a functor to the index space intersection of a prescribed bounding box and the dense grid. NB: This class only supports DenseGrids with ZYX memory layout.  <a href="classopenvdb_1_1v8__0_1_1tools_1_1DenseTransformer.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1DenseTransformer.html">DenseTransformer&lt; _ValueT, OpType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that applies a functor to the index space intersection of a prescribed bounding box and the dense grid. NB: This class only supports DenseGrids with ZYX memory layout.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1DenseTransformer.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ContiguousOp.html">ContiguousOp&lt; ValueT, PointWiseOp &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">a wrapper struct used to avoid unnecessary computation of memory access from <code>Coord</code> when all offsets are guaranteed to be within the dense grid.  <a href="structopenvdb_1_1v8__0_1_1tools_1_1ContiguousOp.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ContiguousOp.html">ContiguousOp&lt; ValueT, PointWiseOp &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">a wrapper struct used to avoid unnecessary computation of memory access from <code>Coord</code> when all offsets are guaranteed to be within the dense grid.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1ContiguousOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tools_1_1SparseToDenseCompositor.html">SparseToDenseCompositor&lt; CompositeMethod, _TreeT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1SparseToDenseCompositor.html">SparseToDenseCompositor&lt; CompositeMethod, _TreeT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpOver.html">OpOver&lt; ValueT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point wise methods used to apply various compositing operations.  <a href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpOver.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpOver.html">OpOver&lt; ValueT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point wise methods used to apply various compositing operations.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpOver.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpAdd.html">OpAdd&lt; ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpAdd.html">OpAdd&lt; ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpSub.html">OpSub&lt; ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpSub.html">OpSub&lt; ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpMin.html">OpMin&lt; ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpMin.html">OpMin&lt; ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpMax.html">OpMax&lt; ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpMax.html">OpMax&lt; ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1OpMult.html">OpMult&lt; ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1OpMult.html">OpMult&lt; ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator.html">CompositeFunctorTranslator&lt; OP, ValueT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Translator that converts an enum to compositing functor types.  <a href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator.html">CompositeFunctorTranslator&lt; OP, ValueT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Translator that converts an enum to compositing functor types.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__OVER_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_OVER, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__OVER_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_OVER, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__ADD_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_ADD, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__ADD_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_ADD, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__SUB_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_SUB, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__SUB_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_SUB, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MIN_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MIN, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MIN_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MIN, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MAX_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MAX, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MAX_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MAX, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MULT_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MULT, ValueT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1ds_1_1CompositeFunctorTranslator_3_01DS__MULT_00_01ValueT_01_4.html">CompositeFunctorTranslator&lt; DS_MULT, ValueT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html">openvdb::v8_0::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools_1_1ds"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1ds.html">openvdb::v8_0::tools::ds</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1ds"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1ds.html">openvdb::v8_1::tools::ds</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
 Enumerations</h2></td></tr>
-<tr class="memitem:a4af148611e5ef140a0121ee996fb8321"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321">DSCompositeOp</a> { <br />
-&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a812485f135c6cee2586b34b814cddc6a">DS_OVER</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a8d4beb09c71b751771158b53d1cf99c3">DS_ADD</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321afa18e1086c47d6d467d2ca6e708f739b">DS_SUB</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a85f583b7144fce0c85930f1a01c25a72">DS_MIN</a>, 
+<tr class="memitem:a4af148611e5ef140a0121ee996fb8321"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321">DSCompositeOp</a> { <br />
+&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a812485f135c6cee2586b34b814cddc6a">DS_OVER</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a8d4beb09c71b751771158b53d1cf99c3">DS_ADD</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321afa18e1086c47d6d467d2ca6e708f739b">DS_SUB</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a85f583b7144fce0c85930f1a01c25a72">DS_MIN</a>, 
 <br />
-&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321abab98682392bb93a93278797f8db5d75">DS_MAX</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a697b1fa695bcb46b82bc1f22ff61855a">DS_MULT</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a4af148611e5ef140a0121ee996fb8321ab5356cf273f92049213e30c3444f149b">DS_SET</a>
+&#160;&#160;<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321abab98682392bb93a93278797f8db5d75">DS_MAX</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321a697b1fa695bcb46b82bc1f22ff61855a">DS_MULT</a>, 
+<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a4af148611e5ef140a0121ee996fb8321ab5356cf273f92049213e30c3444f149b">DS_SET</a>
 <br />
  }</td></tr>
 <tr class="separator:a4af148611e5ef140a0121ee996fb8321"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -187,24 +187,24 @@ Enumerations</h2></td></tr>
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a586a786ed67c81b31e7bcc11c70df047"><td class="memTemplParams" colspan="2">template&lt;typename OpType , typename DenseType &gt; </td></tr>
-<tr class="memitem:a586a786ed67c81b31e7bcc11c70df047"><td class="memTemplItemLeft" align="right" valign="top">OpType::ResultTreeType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a586a786ed67c81b31e7bcc11c70df047">extractSparseTree</a> (const DenseType &amp;dense, const OpType &amp;functor, const typename OpType::ResultValueType &amp;background, bool threaded=true)</td></tr>
-<tr class="memdesc:a586a786ed67c81b31e7bcc11c70df047"><td class="mdescLeft">&#160;</td><td class="mdescRight">Selectively extract and transform data from a dense grid, producing a sparse tree with leaf nodes only (e.g. create a tree from the square of values greater than a cutoff.)  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#a586a786ed67c81b31e7bcc11c70df047">More...</a><br /></td></tr>
+<tr class="memitem:a586a786ed67c81b31e7bcc11c70df047"><td class="memTemplItemLeft" align="right" valign="top">OpType::ResultTreeType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a586a786ed67c81b31e7bcc11c70df047">extractSparseTree</a> (const DenseType &amp;dense, const OpType &amp;functor, const typename OpType::ResultValueType &amp;background, bool threaded=true)</td></tr>
+<tr class="memdesc:a586a786ed67c81b31e7bcc11c70df047"><td class="mdescLeft">&#160;</td><td class="mdescRight">Selectively extract and transform data from a dense grid, producing a sparse tree with leaf nodes only (e.g. create a tree from the square of values greater than a cutoff.)  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a586a786ed67c81b31e7bcc11c70df047">More...</a><br /></td></tr>
 <tr class="separator:a586a786ed67c81b31e7bcc11c70df047"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="memTemplParams" colspan="2">template&lt;typename DenseType , typename MaskTreeType &gt; </td></tr>
-<tr class="memitem:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="memTemplItemLeft" align="right" valign="top">DSConverter&lt; DenseType, MaskTreeType &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#ae1e62f3b18a1d40b3195c83b4d76c1e5">extractSparseTreeWithMask</a> (const DenseType &amp;dense, const MaskTreeType &amp;mask, const typename DenseType::ValueType &amp;background, bool threaded=true)</td></tr>
-<tr class="memdesc:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy data from the intersection of a sparse tree and a dense input grid. The resulting tree has the same configuration as the sparse tree, but holds the data type specified by the dense input.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#ae1e62f3b18a1d40b3195c83b4d76c1e5">More...</a><br /></td></tr>
+<tr class="memitem:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="memTemplItemLeft" align="right" valign="top">DSConverter&lt; DenseType, MaskTreeType &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae1e62f3b18a1d40b3195c83b4d76c1e5">extractSparseTreeWithMask</a> (const DenseType &amp;dense, const MaskTreeType &amp;mask, const typename DenseType::ValueType &amp;background, bool threaded=true)</td></tr>
+<tr class="memdesc:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy data from the intersection of a sparse tree and a dense input grid. The resulting tree has the same configuration as the sparse tree, but holds the data type specified by the dense input.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae1e62f3b18a1d40b3195c83b4d76c1e5">More...</a><br /></td></tr>
 <tr class="separator:ae1e62f3b18a1d40b3195c83b4d76c1e5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8fcc7df3409df7357565d418f7fb6e3a"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename OpType &gt; </td></tr>
-<tr class="memitem:a8fcc7df3409df7357565d418f7fb6e3a"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a8fcc7df3409df7357565d418f7fb6e3a">transformDense</a> (Dense&lt; ValueT, openvdb::tools::LayoutZYX &gt; &amp;dense, const openvdb::CoordBBox &amp;bbox, const OpType &amp;op, bool parallel=true)</td></tr>
-<tr class="separator:a8fcc7df3409df7357565d418f7fb6e3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abc8b60bac2b76837979a11b7a80720db"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename OpType &gt; </td></tr>
+<tr class="memitem:abc8b60bac2b76837979a11b7a80720db"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#abc8b60bac2b76837979a11b7a80720db">transformDense</a> (Dense&lt; ValueT, openvdb::tools::LayoutZYX &gt; &amp;dense, const openvdb::CoordBBox &amp;bbox, const OpType &amp;op, bool parallel=true)</td></tr>
+<tr class="separator:abc8b60bac2b76837979a11b7a80720db"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac53b377981f3baf29cef347335e3588b"><td class="memTemplParams" colspan="2">template&lt;DSCompositeOp , typename TreeT &gt; </td></tr>
-<tr class="memitem:ac53b377981f3baf29cef347335e3588b"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#ac53b377981f3baf29cef347335e3588b">compositeToDense</a> (Dense&lt; typename TreeT::ValueType, LayoutZYX &gt; &amp;dense, const TreeT &amp;source, const TreeT &amp;alpha, const typename TreeT::ValueType beta, const typename TreeT::ValueType strength, bool threaded=true)</td></tr>
-<tr class="memdesc:ac53b377981f3baf29cef347335e3588b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Composite data from a sparse tree into a dense array of the same value type.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#ac53b377981f3baf29cef347335e3588b">More...</a><br /></td></tr>
+<tr class="memitem:ac53b377981f3baf29cef347335e3588b"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac53b377981f3baf29cef347335e3588b">compositeToDense</a> (Dense&lt; typename TreeT::ValueType, LayoutZYX &gt; &amp;dense, const TreeT &amp;source, const TreeT &amp;alpha, const typename TreeT::ValueType beta, const typename TreeT::ValueType strength, bool threaded=true)</td></tr>
+<tr class="memdesc:ac53b377981f3baf29cef347335e3588b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Composite data from a sparse tree into a dense array of the same value type.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac53b377981f3baf29cef347335e3588b">More...</a><br /></td></tr>
 <tr class="separator:ac53b377981f3baf29cef347335e3588b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9ac976d1526021421d99c73e70d726fe"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename PointwiseOpT &gt; </td></tr>
-<tr class="memitem:a9ac976d1526021421d99c73e70d726fe"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a9ac976d1526021421d99c73e70d726fe">transformDense</a> (Dense&lt; ValueT, openvdb::tools::LayoutZYX &gt; &amp;dense, const openvdb::CoordBBox &amp;bbox, const PointwiseOpT &amp;functor, bool parallel)</td></tr>
-<tr class="memdesc:a9ac976d1526021421d99c73e70d726fe"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply a point-wise functor to the intersection of a dense grid and a given bounding box.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#a9ac976d1526021421d99c73e70d726fe">More...</a><br /></td></tr>
-<tr class="separator:a9ac976d1526021421d99c73e70d726fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a38d0b29c30691bd9234de8236b9cd33f"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename PointwiseOpT &gt; </td></tr>
+<tr class="memitem:a38d0b29c30691bd9234de8236b9cd33f"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a38d0b29c30691bd9234de8236b9cd33f">transformDense</a> (Dense&lt; ValueT, openvdb::tools::LayoutZYX &gt; &amp;dense, const openvdb::CoordBBox &amp;bbox, const PointwiseOpT &amp;functor, bool parallel)</td></tr>
+<tr class="memdesc:a38d0b29c30691bd9234de8236b9cd33f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply a point-wise functor to the intersection of a dense grid and a given bounding box.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a38d0b29c30691bd9234de8236b9cd33f">More...</a><br /></td></tr>
+<tr class="separator:a38d0b29c30691bd9234de8236b9cd33f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 </div><!-- contents -->
 <!-- start footer part -->

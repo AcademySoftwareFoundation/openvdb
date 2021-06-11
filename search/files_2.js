@@ -12,6 +12,7 @@ var searchData=
   ['conjgradient_2eh',['ConjGradient.h',['../ConjGradient_8h.html',1,'']]],
   ['constantfolding_2eh',['ConstantFolding.h',['../ConstantFolding_8h.html',1,'']]],
   ['coord_2eh',['Coord.h',['../Coord_8h.html',1,'']]],
+  ['count_2eh',['Count.h',['../Count_8h.html',1,'']]],
   ['cputimer_2eh',['CpuTimer.h',['../CpuTimer_8h.html',1,'']]],
   ['customdata_2eh',['CustomData.h',['../CustomData_8h.html',1,'']]]
 ];

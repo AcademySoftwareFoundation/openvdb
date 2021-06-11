@@ -9,5 +9,6 @@ var searchData=
   ['stencils_2eh',['Stencils.h',['../Stencils_8h.html',1,'']]],
   ['stream_2eh',['Stream.h',['../Stream_8h.html',1,'']]],
   ['streamcompression_2eh',['StreamCompression.h',['../StreamCompression_8h.html',1,'']]],
+  ['string_2eh',['String.h',['../String_8h.html',1,'']]],
   ['symboltable_2eh',['SymbolTable.h',['../SymbolTable_8h.html',1,'']]]
 ];

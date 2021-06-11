@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -101,7 +101,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Space-partitioning acceleration structure for points. Partitions the points into voxels to accelerate range and nearest neighbor searches.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &quot;<a class="el" href="PointPartitioner_8h_source.html">PointPartitioner.h</a>&quot;</code><br />
-<code>#include &lt;<a class="el" href="version_8h_source.html">openvdb/version.h</a>&gt;</code><br />
+<code>#include &lt;openvdb/version.h&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Exceptions_8h_source.html">openvdb/Exceptions.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
@@ -109,9 +109,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="LeafNode_8h_source.html">openvdb/tree/LeafNode.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Tree_8h_source.html">openvdb/tree/Tree.h</a>&gt;</code><br />
-<code>#include &lt;tbb/atomic.h&gt;</code><br />
 <code>#include &lt;tbb/blocked_range.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_for.h&gt;</code><br />
+<code>#include &lt;atomic&gt;</code><br />
 <code>#include &lt;algorithm&gt;</code><br />
 <code>#include &lt;cmath&gt;</code><br />
 <code>#include &lt;deque&gt;</code><br />
@@ -124,39 +124,39 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tree_1_1SameLeafConfig.html">SameLeafConfig&lt; Dim1, NodeT2 &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tree_1_1SameLeafConfig.html">SameLeafConfig&lt; Dim1, NodeT2 &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1PointIndexLeafNode.html">PointIndexLeafNode&lt; T, Log2Dim &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1PointIndexLeafNode.html">PointIndexLeafNode&lt; T, Log2Dim &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1PointIndexIterator.html">PointIndexIterator&lt; TreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Accelerated range and nearest-neighbor searches for point index grids.  <a href="structopenvdb_1_1v8__0_1_1tools_1_1PointIndexIterator.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1PointIndexIterator.html">PointIndexIterator&lt; TreeType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Accelerated range and nearest-neighbor searches for point index grids.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1PointIndexIterator.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1PointIndexFilter.html">PointIndexFilter&lt; PointArray, TreeType &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1PointIndexFilter.html">PointIndexFilter&lt; PointArray, TreeType &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal_1_1ValidPartitioningOp.html">ValidPartitioningOp&lt; PointArrayT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal_1_1ValidPartitioningOp.html">ValidPartitioningOp&lt; PointArrayT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal_1_1PopulateLeafNodesOp.html">PopulateLeafNodesOp&lt; LeafNodeT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal_1_1PopulateLeafNodesOp.html">PopulateLeafNodesOp&lt; LeafNodeT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal_1_1BBoxFilter.html">BBoxFilter&lt; PointArray, IndexT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal_1_1BBoxFilter.html">BBoxFilter&lt; PointArray, IndexT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal_1_1RadialRangeFilter.html">RadialRangeFilter&lt; PointArray, IndexT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal_1_1RadialRangeFilter.html">RadialRangeFilter&lt; PointArray, IndexT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tools_1_1PointIndexLeafNode.html">PointIndexLeafNode&lt; T, Log2Dim &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1PointIndexLeafNode.html">PointIndexLeafNode&lt; T, Log2Dim &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__0_1_1tree_1_1SameLeafConfig_3_01Dim1_00_01openvdb_1_1tools_1_1PointIndexLea6d17abc16efb1bb92ae8755219b7e07d.html">SameLeafConfig&lt; Dim1, openvdb::tools::PointIndexLeafNode&lt; T2, Dim1 &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tree_1_1SameLeafConfig_3_01Dim1_00_01openvdb_1_1tools_1_1PointIndexLea41fd531545ac5e3e9d19b03ab813ccc5.html">SameLeafConfig&lt; Dim1, openvdb::tools::PointIndexLeafNode&lt; T2, Dim1 &gt; &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tree"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tree.html">openvdb::v8_0::tree</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tree"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tree.html">openvdb::v8_1::tree</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html">openvdb::v8_0::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html">openvdb::v8_0::tools::point_index_grid_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html">openvdb::v8_1::tools::point_index_grid_internal</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="define-members"></a>
@@ -166,56 +166,56 @@ Macros</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
 Typedefs</h2></td></tr>
-<tr class="memitem:af59b06fbf7e8c0f817695e92b0a86db1"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#af59b06fbf7e8c0f817695e92b0a86db1">PointIndexTree</a> = tree::Tree&lt; tree::RootNode&lt; tree::InternalNode&lt; tree::InternalNode&lt; PointIndexLeafNode&lt; PointIndex32, 3 &gt;, 4 &gt;, 5 &gt;&gt;&gt;</td></tr>
-<tr class="memdesc:af59b06fbf7e8c0f817695e92b0a86db1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point index tree configured to match the default OpenVDB tree configuration.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#af59b06fbf7e8c0f817695e92b0a86db1">More...</a><br /></td></tr>
+<tr class="memitem:af59b06fbf7e8c0f817695e92b0a86db1"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#af59b06fbf7e8c0f817695e92b0a86db1">PointIndexTree</a> = tree::Tree&lt; tree::RootNode&lt; tree::InternalNode&lt; tree::InternalNode&lt; PointIndexLeafNode&lt; PointIndex32, 3 &gt;, 4 &gt;, 5 &gt;&gt;&gt;</td></tr>
+<tr class="memdesc:af59b06fbf7e8c0f817695e92b0a86db1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point index tree configured to match the default OpenVDB tree configuration.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#af59b06fbf7e8c0f817695e92b0a86db1">More...</a><br /></td></tr>
 <tr class="separator:af59b06fbf7e8c0f817695e92b0a86db1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acfb828103bf471f9c51ea65d156e4498"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#acfb828103bf471f9c51ea65d156e4498">PointIndexGrid</a> = Grid&lt; PointIndexTree &gt;</td></tr>
-<tr class="memdesc:acfb828103bf471f9c51ea65d156e4498"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point index grid.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#acfb828103bf471f9c51ea65d156e4498">More...</a><br /></td></tr>
+<tr class="memitem:acfb828103bf471f9c51ea65d156e4498"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#acfb828103bf471f9c51ea65d156e4498">PointIndexGrid</a> = Grid&lt; PointIndexTree &gt;</td></tr>
+<tr class="memdesc:acfb828103bf471f9c51ea65d156e4498"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point index grid.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#acfb828103bf471f9c51ea65d156e4498">More...</a><br /></td></tr>
 <tr class="separator:acfb828103bf471f9c51ea65d156e4498"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointArrayT &gt; </td></tr>
-<tr class="memitem:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#aec6960746cc5165cf6ac1252ad7bc5d4">createPointIndexGrid</a> (const PointArrayT &amp;points, double voxelSize)</td></tr>
-<tr class="memdesc:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition points into a point index grid to accelerate range and nearest-neighbor searches.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#aec6960746cc5165cf6ac1252ad7bc5d4">More...</a><br /></td></tr>
+<tr class="memitem:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aec6960746cc5165cf6ac1252ad7bc5d4">createPointIndexGrid</a> (const PointArrayT &amp;points, double voxelSize)</td></tr>
+<tr class="memdesc:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition points into a point index grid to accelerate range and nearest-neighbor searches.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aec6960746cc5165cf6ac1252ad7bc5d4">More...</a><br /></td></tr>
 <tr class="separator:aec6960746cc5165cf6ac1252ad7bc5d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a271fec55592c87ddf1f04a02207cfb34"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointArrayT &gt; </td></tr>
-<tr class="memitem:a271fec55592c87ddf1f04a02207cfb34"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#a271fec55592c87ddf1f04a02207cfb34">createPointIndexGrid</a> (const PointArrayT &amp;points, const math::Transform &amp;xform)</td></tr>
-<tr class="memdesc:a271fec55592c87ddf1f04a02207cfb34"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition points into a point index grid to accelerate range and nearest-neighbor searches.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#a271fec55592c87ddf1f04a02207cfb34">More...</a><br /></td></tr>
+<tr class="memitem:a271fec55592c87ddf1f04a02207cfb34"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a271fec55592c87ddf1f04a02207cfb34">createPointIndexGrid</a> (const PointArrayT &amp;points, const math::Transform &amp;xform)</td></tr>
+<tr class="memdesc:a271fec55592c87ddf1f04a02207cfb34"><td class="mdescLeft">&#160;</td><td class="mdescRight">Partition points into a point index grid to accelerate range and nearest-neighbor searches.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a271fec55592c87ddf1f04a02207cfb34">More...</a><br /></td></tr>
 <tr class="separator:a271fec55592c87ddf1f04a02207cfb34"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af2c25ce7b65fe2e22209dce0b5eae646"><td class="memTemplParams" colspan="2">template&lt;typename PointArrayT , typename GridT &gt; </td></tr>
-<tr class="memitem:af2c25ce7b65fe2e22209dce0b5eae646"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#af2c25ce7b65fe2e22209dce0b5eae646">isValidPartition</a> (const PointArrayT &amp;points, const GridT &amp;grid)</td></tr>
-<tr class="memdesc:af2c25ce7b65fe2e22209dce0b5eae646"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return <code>true</code> if the given point index grid represents a valid partitioning of the given point array.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#af2c25ce7b65fe2e22209dce0b5eae646">More...</a><br /></td></tr>
+<tr class="memitem:af2c25ce7b65fe2e22209dce0b5eae646"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#af2c25ce7b65fe2e22209dce0b5eae646">isValidPartition</a> (const PointArrayT &amp;points, const GridT &amp;grid)</td></tr>
+<tr class="memdesc:af2c25ce7b65fe2e22209dce0b5eae646"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return <code>true</code> if the given point index grid represents a valid partitioning of the given point array.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#af2c25ce7b65fe2e22209dce0b5eae646">More...</a><br /></td></tr>
 <tr class="separator:af2c25ce7b65fe2e22209dce0b5eae646"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointArrayT &gt; </td></tr>
-<tr class="memitem:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="memTemplItemLeft" align="right" valign="top">GridT::ConstPtr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#ab2dc20cbb018eddb5d26c53bf8cf83ab">getValidPointIndexGrid</a> (const PointArrayT &amp;points, const typename GridT::ConstPtr &amp;grid)</td></tr>
-<tr class="memdesc:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repartition the <em>points</em> if needed, otherwise return the input <em>grid</em>.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#ab2dc20cbb018eddb5d26c53bf8cf83ab">More...</a><br /></td></tr>
+<tr class="memitem:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="memTemplItemLeft" align="right" valign="top">GridT::ConstPtr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab2dc20cbb018eddb5d26c53bf8cf83ab">getValidPointIndexGrid</a> (const PointArrayT &amp;points, const typename GridT::ConstPtr &amp;grid)</td></tr>
+<tr class="memdesc:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repartition the <em>points</em> if needed, otherwise return the input <em>grid</em>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab2dc20cbb018eddb5d26c53bf8cf83ab">More...</a><br /></td></tr>
 <tr class="separator:ab2dc20cbb018eddb5d26c53bf8cf83ab"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afb27ad923a88ee58220750ffc3914c03"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointArrayT &gt; </td></tr>
-<tr class="memitem:afb27ad923a88ee58220750ffc3914c03"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html#afb27ad923a88ee58220750ffc3914c03">getValidPointIndexGrid</a> (const PointArrayT &amp;points, const typename GridT::Ptr &amp;grid)</td></tr>
-<tr class="memdesc:afb27ad923a88ee58220750ffc3914c03"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repartition the <em>points</em> if needed, otherwise return the input <em>grid</em>.  <a href="namespaceopenvdb_1_1v8__0_1_1tools.html#afb27ad923a88ee58220750ffc3914c03">More...</a><br /></td></tr>
+<tr class="memitem:afb27ad923a88ee58220750ffc3914c03"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#afb27ad923a88ee58220750ffc3914c03">getValidPointIndexGrid</a> (const PointArrayT &amp;points, const typename GridT::Ptr &amp;grid)</td></tr>
+<tr class="memdesc:afb27ad923a88ee58220750ffc3914c03"><td class="mdescLeft">&#160;</td><td class="mdescRight">Repartition the <em>points</em> if needed, otherwise return the input <em>grid</em>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#afb27ad923a88ee58220750ffc3914c03">More...</a><br /></td></tr>
 <tr class="separator:afb27ad923a88ee58220750ffc3914c03"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a94ac266854c4d17545f1bef249502910"><td class="memTemplParams" colspan="2">template&lt;typename TreeType , typename PointArray &gt; </td></tr>
-<tr class="memitem:a94ac266854c4d17545f1bef249502910"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a94ac266854c4d17545f1bef249502910">constructPointTree</a> (TreeType &amp;tree, const math::Transform &amp;xform, const <a class="el" href="interfacePointArray.html">PointArray</a> &amp;points)</td></tr>
-<tr class="memdesc:a94ac266854c4d17545f1bef249502910"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a <code>PointIndexTree</code>.  <a href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a94ac266854c4d17545f1bef249502910">More...</a><br /></td></tr>
-<tr class="separator:a94ac266854c4d17545f1bef249502910"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8c257a680627d89bf158661615d34cda"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a8c257a680627d89bf158661615d34cda"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a8c257a680627d89bf158661615d34cda">dequeToArray</a> (const std::deque&lt; T &gt; &amp;d, std::unique_ptr&lt; T[]&gt; &amp;a, size_t &amp;size)</td></tr>
-<tr class="separator:a8c257a680627d89bf158661615d34cda"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a59d0c04d09e542725e3d4c272254fce6"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a59d0c04d09e542725e3d4c272254fce6">constructExclusiveRegions</a> (std::vector&lt; CoordBBox &gt; &amp;regions, const CoordBBox &amp;bbox, const CoordBBox &amp;ibox)</td></tr>
-<tr class="separator:a59d0c04d09e542725e3d4c272254fce6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9051b81b7591a2982970fef468621a68"><td class="memTemplParams" colspan="2">template&lt;typename RangeFilterType , typename LeafNodeType &gt; </td></tr>
-<tr class="memitem:a9051b81b7591a2982970fef468621a68"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a9051b81b7591a2982970fef468621a68">filteredPointIndexSearchVoxels</a> (RangeFilterType &amp;filter, const LeafNodeType &amp;leaf, const Coord &amp;min, const Coord &amp;max)</td></tr>
-<tr class="separator:a9051b81b7591a2982970fef468621a68"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae3fb2d2b14c2286586b9de585d7e4442"><td class="memTemplParams" colspan="2">template&lt;typename RangeFilterType , typename ConstAccessor &gt; </td></tr>
-<tr class="memitem:ae3fb2d2b14c2286586b9de585d7e4442"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#ae3fb2d2b14c2286586b9de585d7e4442">filteredPointIndexSearch</a> (RangeFilterType &amp;filter, ConstAccessor &amp;acc, const CoordBBox &amp;bbox)</td></tr>
-<tr class="separator:ae3fb2d2b14c2286586b9de585d7e4442"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a14e931474128291e05c269703a8910af"><td class="memTemplParams" colspan="2">template&lt;typename RangeDeque , typename LeafNodeType &gt; </td></tr>
-<tr class="memitem:a14e931474128291e05c269703a8910af"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#a14e931474128291e05c269703a8910af">pointIndexSearchVoxels</a> (RangeDeque &amp;rangeList, const LeafNodeType &amp;leaf, const Coord &amp;min, const Coord &amp;max)</td></tr>
-<tr class="separator:a14e931474128291e05c269703a8910af"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aee35588cafbac3c17c8aeab551d4fd64"><td class="memTemplParams" colspan="2">template&lt;typename RangeDeque , typename ConstAccessor &gt; </td></tr>
-<tr class="memitem:aee35588cafbac3c17c8aeab551d4fd64"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1point__index__grid__internal.html#aee35588cafbac3c17c8aeab551d4fd64">pointIndexSearch</a> (RangeDeque &amp;rangeList, ConstAccessor &amp;acc, const CoordBBox &amp;bbox)</td></tr>
-<tr class="separator:aee35588cafbac3c17c8aeab551d4fd64"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aee731fd1b12ca40b5f9cc1d36d8ad9d0"><td class="memTemplParams" colspan="2">template&lt;typename TreeType , typename PointArray &gt; </td></tr>
+<tr class="memitem:aee731fd1b12ca40b5f9cc1d36d8ad9d0"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#aee731fd1b12ca40b5f9cc1d36d8ad9d0">constructPointTree</a> (TreeType &amp;tree, const math::Transform &amp;xform, const <a class="el" href="interfacePointArray.html">PointArray</a> &amp;points)</td></tr>
+<tr class="memdesc:aee731fd1b12ca40b5f9cc1d36d8ad9d0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Construct a <code>PointIndexTree</code>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#aee731fd1b12ca40b5f9cc1d36d8ad9d0">More...</a><br /></td></tr>
+<tr class="separator:aee731fd1b12ca40b5f9cc1d36d8ad9d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae0134a00a2c87928b1ea88e63303a201"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:ae0134a00a2c87928b1ea88e63303a201"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#ae0134a00a2c87928b1ea88e63303a201">dequeToArray</a> (const std::deque&lt; T &gt; &amp;d, std::unique_ptr&lt; T[]&gt; &amp;a, size_t &amp;size)</td></tr>
+<tr class="separator:ae0134a00a2c87928b1ea88e63303a201"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af5345923994a02e874e1a6cb36ce677a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#af5345923994a02e874e1a6cb36ce677a">constructExclusiveRegions</a> (std::vector&lt; CoordBBox &gt; &amp;regions, const CoordBBox &amp;bbox, const CoordBBox &amp;ibox)</td></tr>
+<tr class="separator:af5345923994a02e874e1a6cb36ce677a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1b62b6f15e840f116a20ae6937fbe87d"><td class="memTemplParams" colspan="2">template&lt;typename RangeFilterType , typename LeafNodeType &gt; </td></tr>
+<tr class="memitem:a1b62b6f15e840f116a20ae6937fbe87d"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#a1b62b6f15e840f116a20ae6937fbe87d">filteredPointIndexSearchVoxels</a> (RangeFilterType &amp;filter, const LeafNodeType &amp;leaf, const Coord &amp;min, const Coord &amp;max)</td></tr>
+<tr class="separator:a1b62b6f15e840f116a20ae6937fbe87d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa9141dfa34100dd1942b65b742ace5d4"><td class="memTemplParams" colspan="2">template&lt;typename RangeFilterType , typename ConstAccessor &gt; </td></tr>
+<tr class="memitem:aa9141dfa34100dd1942b65b742ace5d4"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#aa9141dfa34100dd1942b65b742ace5d4">filteredPointIndexSearch</a> (RangeFilterType &amp;filter, ConstAccessor &amp;acc, const CoordBBox &amp;bbox)</td></tr>
+<tr class="separator:aa9141dfa34100dd1942b65b742ace5d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5a59df5f5e5a5f80576fc4919751e730"><td class="memTemplParams" colspan="2">template&lt;typename RangeDeque , typename LeafNodeType &gt; </td></tr>
+<tr class="memitem:a5a59df5f5e5a5f80576fc4919751e730"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#a5a59df5f5e5a5f80576fc4919751e730">pointIndexSearchVoxels</a> (RangeDeque &amp;rangeList, const LeafNodeType &amp;leaf, const Coord &amp;min, const Coord &amp;max)</td></tr>
+<tr class="separator:a5a59df5f5e5a5f80576fc4919751e730"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac81677aad11db56f7af5ffd97e22d55a"><td class="memTemplParams" colspan="2">template&lt;typename RangeDeque , typename ConstAccessor &gt; </td></tr>
+<tr class="memitem:ac81677aad11db56f7af5ffd97e22d55a"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__index__grid__internal.html#ac81677aad11db56f7af5ffd97e22d55a">pointIndexSearch</a> (RangeDeque &amp;rangeList, ConstAccessor &amp;acc, const CoordBBox &amp;bbox)</td></tr>
+<tr class="separator:ac81677aad11db56f7af5ffd97e22d55a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Space-partitioning acceleration structure for points. Partitions the points into voxels to accelerate range and nearest neighbor searches. </p>

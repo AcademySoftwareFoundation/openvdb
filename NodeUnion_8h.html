@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -94,7 +94,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">NodeUnion.h File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &lt;<a class="el" href="version_8h_source.html">openvdb/version.h</a>&gt;</code><br />
+<div class="textblock"><code>#include &lt;openvdb/version.h&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;cstring&gt;</code><br />
 <code>#include &lt;type_traits&gt;</code><br />
@@ -103,20 +103,20 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion.html">NodeUnion&lt; ValueT, ChildT, Enable &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default implementation of a <a class="el" href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion.html" title="Default implementation of a NodeUnion that stores the child pointer and the value separately (i...">NodeUnion</a> that stores the child pointer and the value separately (i.e., not in a union). Types which select this specialization usually do not conform to the requirements of a union member, that is that the type ValueT is not trivially copyable. This implementation is thus NOT used for POD, math::Vec, <a class="el" href="classopenvdb_1_1v8__0_1_1math_1_1Mat.html">math::Mat</a>, <a class="el" href="classopenvdb_1_1v8__0_1_1math_1_1Quat.html">math::Quat</a> or <a class="el" href="classopenvdb_1_1v8__0_1_1math_1_1Coord.html" title="Signed (x, y, z) 32-bit integer coordinates. ">math::Coord</a> types, but is used (for example) with std::string.  <a href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion.html">NodeUnion&lt; ValueT, ChildT, Enable &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Default implementation of a <a class="el" href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion.html" title="Default implementation of a NodeUnion that stores the child pointer and the value separately (i...">NodeUnion</a> that stores the child pointer and the value separately (i.e., not in a union). Types which select this specialization usually do not conform to the requirements of a union member, that is that the type ValueT is not trivially copyable. This implementation is thus NOT used for POD, math::Vec, <a class="el" href="classopenvdb_1_1v8__1_1_1math_1_1Mat.html">math::Mat</a>, <a class="el" href="classopenvdb_1_1v8__1_1_1math_1_1Quat.html">math::Quat</a> or <a class="el" href="classopenvdb_1_1v8__1_1_1math_1_1Coord.html" title="Signed (x, y, z) 32-bit integer coordinates. ">math::Coord</a> types, but is used (for example) with std::string.  <a href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion_3_01ValueT_00_01ChildT_00_01_01_01_01_01_01_01_01_01_1b61075f8f13f9f4d64d7111d12ab5f1.html">NodeUnion&lt; ValueT, ChildT,           typename std::enable_if&lt; std::is_trivially_copyable&lt; ValueT &gt;::value &gt;::type &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Template specialization of a <a class="el" href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion.html" title="Default implementation of a NodeUnion that stores the child pointer and the value separately (i...">NodeUnion</a> that stores the child pointer and the value together (int, float, pointer, etc.)  <a href="classopenvdb_1_1v8__0_1_1tree_1_1NodeUnion_3_01ValueT_00_01ChildT_00_01_01_01_01_01_01_01_01_01_1b61075f8f13f9f4d64d7111d12ab5f1.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion_3_01ValueT_00_01ChildT_00_01_01_01_01_01_01_01_01_01_c6a606833e89fb7eda7bcd0b48c3d484.html">NodeUnion&lt; ValueT, ChildT,           typename std::enable_if&lt; std::is_trivially_copyable&lt; ValueT &gt;::value &gt;::type &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Template specialization of a <a class="el" href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion.html" title="Default implementation of a NodeUnion that stores the child pointer and the value separately (i...">NodeUnion</a> that stores the child pointer and the value together (int, float, pointer, etc.)  <a href="classopenvdb_1_1v8__1_1_1tree_1_1NodeUnion_3_01ValueT_00_01ChildT_00_01_01_01_01_01_01_01_01_01_c6a606833e89fb7eda7bcd0b48c3d484.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tree"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tree.html">openvdb::v8_0::tree</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tree"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tree.html">openvdb::v8_1::tree</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

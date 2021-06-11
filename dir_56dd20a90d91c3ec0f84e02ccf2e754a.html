@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -94,6 +94,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="files"></a>
 Files</h2></td></tr>
+<tr class="memitem:Activate_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Activate_8h.html">Activate.h</a> <a href="Activate_8h_source.html">[code]</a></td></tr>
+<tr class="memdesc:Activate_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Implementation of topological activation/deactivation. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ChangeBackground_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ChangeBackground_8h.html">ChangeBackground.h</a> <a href="ChangeBackground_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:ChangeBackground_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Efficient multi-threaded replacement of the background values in tree. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -102,6 +105,9 @@ Files</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:Composite_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Composite_8h.html">Composite.h</a> <a href="Composite_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:Composite_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functions to efficiently perform various compositing operations on grids. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:Count_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Count_8h.html">Count.h</a> <a href="Count_8h_source.html">[code]</a></td></tr>
+<tr class="memdesc:Count_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Functions to count tiles, nodes or voxels in a grid. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:Dense_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Dense_8h.html">Dense.h</a> <a href="Dense_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:Dense_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">This file defines a simple dense grid and efficient converters to and from VDB grids. <br /></td></tr>
@@ -115,7 +121,7 @@ Files</h2></td></tr>
 <tr class="memdesc:FastSweeping_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Defined the six functions {fog,sdf}To{Sdf,Ext,SdfAndExt} in addition to the two functions maskSdf and dilateSdf. Sdf denotes a signed-distance field (i.e. negative values are inside), fog is a scalar fog volume (i.e. higher values are inside), and Ext is a field (of arbitrary type) that is extended off the iso-surface. All these functions are implemented with the methods in the class named FastSweeping. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:Filter_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Filter_8h.html">Filter.h</a> <a href="Filter_8h_source.html">[code]</a></td></tr>
-<tr class="memdesc:Filter_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Filtering of VDB volumes. Note that only the values in the grid are changed, not its topology! All operations can optionally be masked with another grid that acts as an alpha-mask. <br /></td></tr>
+<tr class="memdesc:Filter_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Filtering of VDB volumes. All operations can optionally be masked with another grid that acts as an alpha-mask. By default, filtering operations do not modify the topology of the input tree and thus do not process active tiles. However Filter::setProcessTiles can be used to process active tiles, densifying them on demand when necessary. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:FindActiveValues_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="FindActiveValues_8h.html">FindActiveValues.h</a> <a href="FindActiveValues_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:FindActiveValues_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Finds the active values and tiles in a tree that intersects a bounding box. Methods are provided that count the number of active values and tiles, test for the existence of active values and tiles, and return a list of the active tiles that intersect a bbox. <br /></td></tr>
@@ -169,6 +175,9 @@ Files</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:MultiResGrid_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="MultiResGrid_8h.html">MultiResGrid.h</a> <a href="MultiResGrid_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:MultiResGrid_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Multi-resolution grid that contains LoD sequences of trees with powers of two refinements. <br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:NodeVisitor_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="NodeVisitor_8h.html">NodeVisitor.h</a> <a href="NodeVisitor_8h_source.html">[code]</a></td></tr>
+<tr class="memdesc:NodeVisitor_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Implementation of a depth-first node visitor. <br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ParticleAtlas_8h"><td class="memItemLeft" align="right" valign="top">file &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="ParticleAtlas_8h.html">ParticleAtlas.h</a> <a href="ParticleAtlas_8h_source.html">[code]</a></td></tr>
 <tr class="memdesc:ParticleAtlas_8h"><td class="mdescLeft">&#160;</td><td class="mdescRight">Space-partitioning acceleration structure for particles, points with radius. Partitions particle indices into voxels to accelerate range and nearest neighbor searches. <br /></td></tr>

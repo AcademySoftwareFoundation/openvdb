@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -96,50 +96,55 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 
-<p>Filtering of VDB volumes. Note that only the values in the grid are changed, not its topology! All operations can optionally be masked with another grid that acts as an alpha-mask.  
+<p>Filtering of VDB volumes. All operations can optionally be masked with another grid that acts as an alpha-mask. By default, filtering operations do not modify the topology of the input tree and thus do not process active tiles. However Filter::setProcessTiles can be used to process active tiles, densifying them on demand when necessary.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;tbb/parallel_for.h&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Stencils_8h_source.html">openvdb/math/Stencils.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Transform_8h_source.html">openvdb/math/Transform.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="NodeManager_8h_source.html">openvdb/tree/NodeManager.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="NullInterrupter_8h_source.html">openvdb/util/NullInterrupter.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="Util_8h_source.html">openvdb/util/Util.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
 <code>#include &quot;<a class="el" href="Interpolation_8h_source.html">Interpolation.h</a>&quot;</code><br />
 <code>#include &lt;algorithm&gt;</code><br />
 <code>#include &lt;functional&gt;</code><br />
 <code>#include &lt;type_traits&gt;</code><br />
+<code>#include &lt;tbb/concurrent_vector.h&gt;</code><br />
 </div>
 <p><a href="Filter_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__0_1_1tools_1_1Filter.html">Filter&lt; GridT, MaskT, InterruptT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Volume filtering (e.g., diffusion) with optional alpha masking.  <a href="classopenvdb_1_1v8__0_1_1tools_1_1Filter.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1Filter.html">Filter&lt; GridT, MaskT, InterruptT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Volume filtering (e.g., diffusion) with optional alpha masking.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1Filter.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1filter__internal_1_1Voxelizer.html">Voxelizer&lt; TreeT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0.html">openvdb::v8_0</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools.html">openvdb::v8_0::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__0_1_1tools_1_1filter__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1filter__internal.html">openvdb::v8_0::tools::filter_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1filter__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1filter__internal.html">openvdb::v8_1::tools::filter_internal</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a92cf811ce654d253f77080073d41c30b"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a92cf811ce654d253f77080073d41c30b"><td class="memTemplItemLeft" align="right" valign="top">static void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1filter__internal.html#a92cf811ce654d253f77080073d41c30b">accum</a> (T &amp;sum, T addend)</td></tr>
-<tr class="separator:a92cf811ce654d253f77080073d41c30b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9dd61f87c05650ebfb19024f7f7f904c"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__0_1_1tools_1_1filter__internal.html#a9dd61f87c05650ebfb19024f7f7f904c">accum</a> (bool &amp;sum, bool addend)</td></tr>
-<tr class="separator:a9dd61f87c05650ebfb19024f7f7f904c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac06f5b0071a850bab5462a0211a5606d"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:ac06f5b0071a850bab5462a0211a5606d"><td class="memTemplItemLeft" align="right" valign="top">static void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1filter__internal.html#ac06f5b0071a850bab5462a0211a5606d">accum</a> (T &amp;sum, T addend)</td></tr>
+<tr class="separator:ac06f5b0071a850bab5462a0211a5606d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a33b3d6952a7d335faa027780b3c9689a"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1filter__internal.html#a33b3d6952a7d335faa027780b3c9689a">accum</a> (bool &amp;sum, bool addend)</td></tr>
+<tr class="separator:a33b3d6952a7d335faa027780b3c9689a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>Filtering of VDB volumes. Note that only the values in the grid are changed, not its topology! All operations can optionally be masked with another grid that acts as an alpha-mask. </p>
+<div class="textblock"><p>Filtering of VDB volumes. All operations can optionally be masked with another grid that acts as an alpha-mask. By default, filtering operations do not modify the topology of the input tree and thus do not process active tiles. However Filter::setProcessTiles can be used to process active tiles, densifying them on demand when necessary. </p>
 <dl class="section author"><dt>Author</dt><dd>Ken Museth </dd></dl>
 </div></div><!-- contents -->
 <!-- start footer part -->

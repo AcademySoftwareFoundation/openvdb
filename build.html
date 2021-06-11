@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -146,8 +146,10 @@ Locating Dependencies</h2>
 <li><b>Xxx_FOUND</b> - True if the headers and library was found and exists</li>
 <li><b>Xxx_VERSION</b> - The library version</li>
 <li><b>Xxx_INCLUDE_DIRS</b> - A list of paths to all required include directories</li>
-<li><b>Xxx_LIBRARY_DIRS</b> - A list of paths to all required library directories</li>
-<li><b>Xxx_LIBRARIES</b> - A list of libraries needed to use Xxx</li>
+<li><b>Xxx_RELEASSE_LIBRARY_DIRS</b> - A list of paths to all required release library directories</li>
+<li><b>Xxx_DEBUG_LIBRARY_DIRS</b> - A list of paths to all required debug library directories</li>
+<li><b>Xxx_RELEASE_LIBRARIES</b> - A list of libraries needed to use the release version of Xxx</li>
+<li><b>Xxx_DEBUG_LIBRARIES</b> - A list of libraries needed to use the debug version of Xxx</li>
 </ul>
 </li>
 <li>Each module produces an <a href="https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries">imported target</a> in the form <b>Xxx::xxx</b>, and may generate multiple imported targets if multiple components are found.</li>
@@ -285,7 +287,7 @@ Building Against Houdini</h2>
 <li><b>BOOST_ROOT</b> =<code>/path/to/boost/install</code> # Path to boost. May not be required, CMake may find it automatically</li>
 </ul>
 <p>For example on MacOS and where the build folder has been created inside the OpenVDB source root:</p>
-<div class="fragment"><div class="line">cmake -D BOOST_ROOT=/path/to/boost/install \</div><div class="line">      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \</div><div class="line">      -D USE_HOUDINI=ON \</div><div class="line">      ../</div></div><!-- fragment --><p>After the CMake build files have been successfully generated, run make within the build directory to compile the project, where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">make install</div></div><!-- fragment --><p>See the <a class="el" href="build.html#buildTroubleshooting">troubleshooting</a> section for help with CMake and Make errors.</p>
+<div class="fragment"><div class="line">cmake -D BOOST_ROOT=/path/to/boost/install \</div><div class="line">      -D Houdini_ROOT=/Applications/Houdini/Houdini17.0.506/ \</div><div class="line">      -D USE_HOUDINI=ON \</div><div class="line">      ../</div></div><!-- fragment --><p>After the CMake build files have been successfully generated, run the build tool within the build directory to compile the project. On UNIX, you can typically incoke <code>make</code> directly: </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. On Windows, you can leverage CMake's build tool to invoke the selected builder (usually msbuild): </p><div class="fragment"><div class="line">cmake --build .</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">cmake --build . --target install   # or simply `make install`</div></div><!-- fragment --><p>See the <a class="el" href="build.html#buildTroubleshooting">troubleshooting</a> section for help with CMake and Make errors.</p>
 <h2><a class="anchor" id="buildBuildMaya"></a>
 Building Against Maya</h2>
 <p>Supported versions of maya only ship with TBB.</p>
@@ -299,8 +301,6 @@ Building Against Maya</h2>
 <tr>
 <td>Boost </td><td>Components: system, iostreams, python, thread </td><td>All </td></tr>
 <tr>
-<td>IlmBase </td><td>Used half precision floating points and EXR serialization support </td><td>All </td></tr>
-<tr>
 <td>ZLIB </td><td>Compression library for disk serialization compression </td><td>All </td></tr>
 <tr>
 <td>Blosc </td><td>Recommended dependency for improved disk compression </td><td>All* </td></tr>
@@ -313,7 +313,9 @@ Building Against Maya</h2>
 <tr>
 <td>Doxygen </td><td>Documentation generation from C++ </td><td>Documentation </td></tr>
 <tr>
-<td>OpenEXR </td><td>EXR serialization support </td><td>Optional (Core) / OpenVDB Render </td></tr>
+<td>OpenEXR </td><td>EXR serialization support </td><td>OpenVDB Render </td></tr>
+<tr>
+<td>IlmBase </td><td>Used half precision floating points and EXR serialization support </td><td>Optional (All) </td></tr>
 <tr>
 <td>Log4cplus </td><td>An optional dependency for improved OpenVDB Logging </td><td>Optional (All) </td></tr>
 <tr>
@@ -322,7 +324,7 @@ Building Against Maya</h2>
 <td>LLVM </td><td>Target-independent code generation </td><td>OpenVDB AX </td></tr>
 </table>
 <p>See <a class="el" href="build.html#buildBloscSupport">blosc support</a></p>
-<p>At a minimum, boost, a matching C++14 compiler, IlmBase, ZLIB, blosc and CMake will be required. See the full <a class="el" href="dependencies.html">dependency list</a> for help with downloading and installing the above software.</p>
+<p>At a minimum, boost, a matching C++14 compiler, ZLIB, blosc and CMake will be required. See the full <a class="el" href="dependencies.html">dependency list</a> for help with downloading and installing the above software.</p>
 <p>With the necessary dependencies installed, create and enter a directory for cmake to write to. It's generally useful to create this in the location you've extracted the OpenVDB repository. It will house CMake's generated build files.</p>
 <div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;mkdir build</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;cd build</div></div><!-- fragment --><p>Now you can call CMake by providing the absolute or relative path to the root of the OpenVDB source tree along with the following options:</p>
 <p>Required:</p>
@@ -339,7 +341,7 @@ Building Against Maya</h2>
 </ul>
 <p>For example on MacOS and where the build folder has been created inside the OpenVDB source root:</p>
 <div class="fragment"><div class="line">cmake -D BOOST_ROOT=/path/to/boost/install \</div><div class="line">      -D IlmBase_ROOT=/path/to/ilmbase/install \</div><div class="line">      -D Maya_ROOT=/Applications/Autodesk/maya2019/ \</div><div class="line">      -D USE_MAYA=ON \</div><div class="line">      ../</div></div><!-- fragment --><p>As the Maya plugin is disabled by default, you may also want to add <code>-D OPENVDB_BUILD_MAYA_PLUGIN=ON</code> to the command. The <a class="el" href="build.html#buildComponents">components</a> section shows which targets are enabled by default.</p>
-<p>After the CMake build files have been successfully generated, run make within the build directory to compile the project, where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">make install</div></div><!-- fragment --><p><b>Note:</b> The Maya OpenVDB Visualize Node is <b>only</b> compatible with Legacy OpenGL support. You can enable this in Maya by navigating to <code>Windows-&gt;Settings/Preferences-&gt;Preferences-&gt;Display</code> and changing <code>Rendering Engine</code> to OpenGL - Legacy.</p>
+<p>After the CMake build files have been successfully generated, run the build tool within the build directory to compile the project. On UNIX, you can typically incoke <code>make</code> directly: </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. On Windows, you can leverage CMake's build tool to invoke the selected builder (usually msbuild): </p><div class="fragment"><div class="line">cmake --build .</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">cmake --build . --target install   # or simply `make install`</div></div><!-- fragment --><p><b>Note:</b> The Maya OpenVDB Visualize Node is <b>only</b> compatible with Legacy OpenGL support. You can enable this in Maya by navigating to <code>Windows-&gt;Settings/Preferences-&gt;Preferences-&gt;Display</code> and changing <code>Rendering Engine</code> to OpenGL - Legacy.</p>
 <p>See the <a class="el" href="build.html#buildTroubleshooting">troubleshooting</a> section for help with CMake and Make errors.</p>
 <h2><a class="anchor" id="buildBuildStandalone"></a>
 Building Standalone</h2>
@@ -351,7 +353,7 @@ Building Standalone</h2>
 </ul>
 <p>For example, a typical first attempt at generating the build files may look as follows:</p>
 <div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb ../</div></div><!-- fragment --><p>See the <a class="el" href="build.html#buildComponents">components</a> section to find which targets are available, their corresponding CMake flags and their default values.</p>
-<p>After the CMake build files have been successfully generated, run make within the build directory to compile the project, where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">make install</div></div><!-- fragment --><p>See the <a class="el" href="build.html#buildTroubleshooting">troubleshooting</a> section for help with CMake and Make errors.</p>
+<p>After the CMake build files have been successfully generated, run the build tool within the build directory to compile the project. On UNIX, you can typically incoke <code>make</code> directly: </p><div class="fragment"><div class="line">make -j4</div></div><!-- fragment --><p>Where the value of the <code>j</code> argument is the number of CPU threads to use for a multi-threaded build. On Windows, you can leverage CMake's build tool to invoke the selected builder (usually msbuild): </p><div class="fragment"><div class="line">cmake --build .</div></div><!-- fragment --><p>Finally, once a successful build has completed, you can install all files. </p><div class="fragment"><div class="line">cmake --build . --target install   # or simply `make install`</div></div><!-- fragment --><p>See the <a class="el" href="build.html#buildTroubleshooting">troubleshooting</a> section for help with CMake and Make errors.</p>
 <h1><a class="anchor" id="buildUsingOpenVDB"></a>
 Building With OpenVDB</h1>
 <p>This section is for users wishing to use a build of OpenVDB in their own applications with CMake.</p>
@@ -362,7 +364,7 @@ Building With OpenVDB</h1>
 <p>Note that the <code>FindOpenVDB.cmake</code> module relies on the other <code>FindModules</code> provided in the OpenVDB installation to find it's own dependencies. This may require you to provide additional dependency locations for OpenVDB's dependencies. See <a class="el" href="build.html#buildDependencies">Locating Dependencies</a> or the below troubleshooting for more information. </p><hr/>
 <h1><a class="anchor" id="buildTroubleshooting"></a>
 Troubleshooting</h1>
-<p>If after reading this guide you're unable to find your specific issue below, please get in touch with the OpenVDB TSC.</p>
+<p>If after reading this guide you're unable to find your specific issue below, please get in touch or <a href="https://github.com/AcademySoftwareFoundation/openvdb/issues">file an issue</a> with the OpenVDB TSC.</p>
 <p><b>Note:</b> If running into issues when changing CMake settings/dependency paths, try clearing the designated CMake build directory and running your <code>cmake</code> command again.</p>
 <h2><a class="anchor" id="troubleshoot1"></a>
 CMake Error ... Could NOT find XXX (missing: ... )</h2>
@@ -381,7 +383,22 @@ CMake warnings/errors in FindBoost.cmake</h2>
 <li>Boost 1.68, 1.69 require CMake 3.13 or newer.</li>
 <li>Boost 1.70 requires CMake 3.14 or newer.</li>
 </ul>
-<p>Use the above list to identify the version of CMake you require for your version of Boost. Note that this may be implemented into the OpenVDB CMake in the future. </p>
+<p>Use the above list to identify the version of CMake you require for your version of Boost. Note that this may be implemented into the OpenVDB CMake in the future.</p>
+<h2><a class="anchor" id="troubleshoot4"></a>
+Detected VCPKG toolchain is using a mismatching triplet for OpenVDB build artifacts</h2>
+<p>If you are on Windows and using vcpkg, builds of OpenVDB should usually only build the static OR shared library depending on your vcpkg triplet. This is related to how libraries link against the Windows CRT. In vcpkg, static triplets, such as <b>x64-windows-static</b>, will use the <b>MultiThreaded</b> (/MT) flag and dynamic triplets, such as <b>x64-windows</b>, will use the <b>MultiThreadedDLL</b> (/MD) flag. These flags <b>must</b> match throughout all software artifacts in your toolchain (regardless if you are using vcpkg or not).</p>
+<p>This warning is shown when OpenVDB detects you using either a dynamic or static VCPKG toolchain on Windows, but have the opposite core library variant enabled. By default, the static build of OpenVDB links against the <b>MultiThreaded</b> (/MT) CRT and the dynamic library links against the <b>MultiThreadedDLL</b> (/MD) CRT. As OpenVDB configures both by default, it is typical that you may want to disable one or the other depending on your needs.</p>
+<p>Note that you can provide a value for <code>CMAKE_MSVC_RUNTIME_LIBRARY</code> which is a native CMake variable to override any CRT selection done by OpenVDB.</p>
+<p>For more information, see the following articles: Description of CRT selection: <a href="https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library">https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library</a> In depth descriptopn of the CRT on Windows: <a href="https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features">https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features</a> Related errors: <a href="https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038">https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038</a> <code>CMAKE_MSVC_RUNTIME_LIBRARY</code> docs: <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html">https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html</a></p>
+<h2><a class="anchor" id="troubleshoot5"></a>
+Unexpected value for the Windows CRT with target build artifacts.</h2>
+<p>On Windows, it is typical for static builds to link to static libraries and dynamic builds to link to dynamic library variants. This is not related to the libraries themselves, rather it is due to the way that all libraries used within a specific toolchain must use the same version of the CRT. The rule of thumb is to configure static builds against the static CRT and dynamic builds against the dynamic CRT.</p>
+<p>This warning is shown if you have provided a value for the CMake variable <code>CMAKE_MSVC_RUNTIME_LIBRARY</code>, but this value is the opposite of what's expected for a target library.</p>
+<p>Note that there are some cases where it makes sense to link static builds of OpenVDB against the dynamic (/MD) CRT. However, unless you are confident in your usage, it is strongly encouraged to match the selection against your desired build type.</p>
+<p>For more information, see the following articles: Description of CRT selection: <a href="https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library">https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library</a> In depth descriptopn of the CRT on Windows: <a href="https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features">https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features</a> Related errors: <a href="https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038">https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038</a> <code>CMAKE_MSVC_RUNTIME_LIBRARY</code> docs: <a href="https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html">https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html</a></p>
+<h2><a class="anchor" id="troubleshoot6"></a>
+error LNK2038: mismatch detected for 'RuntimeLibrary'</h2>
+<p>A build artifact of OpenVDB has been linked against a dependency which uses a different version of the Window CRT. See the <a class="el" href="build.html#troubleshoot5">above section</a> on dealing with CRT selection for static and dynamic library builds on Windows. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

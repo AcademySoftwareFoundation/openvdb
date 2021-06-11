@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.0.1</span>
+   &#160;<span id="projectnumber">8.1.1</span>
    </div>
   </td>
  </tr>
@@ -93,8 +93,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="title">Platform.h File Reference</div>  </div>
 </div><!--header-->
 <div class="contents">
-<div class="textblock"><code>#include &quot;<a class="el" href="PlatformConfig_8h_source.html">PlatformConfig.h</a>&quot;</code><br />
-</div>
+
 <p><a href="Platform_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="define-members"></a>
@@ -112,6 +111,10 @@ Macros</h2></td></tr>
 <tr class="separator:ac8dadf7b858eb1987194e570f80bff79"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa4a2916120921a779c15e6182c8d8118"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#aa4a2916120921a779c15e6182c8d8118">OPENVDB_NO_UNREACHABLE_CODE_WARNING_END</a></td></tr>
 <tr class="separator:aa4a2916120921a779c15e6182c8d8118"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acad6915d4aac81665b540218e8b1e06c"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#acad6915d4aac81665b540218e8b1e06c">OPENVDB_DEPRECATED</a>&#160;&#160;&#160;[[deprecated]]</td></tr>
+<tr class="separator:acad6915d4aac81665b540218e8b1e06c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad1f8203a6a066b0312fd16e529bddd22"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#ad1f8203a6a066b0312fd16e529bddd22">OPENVDB_DEPRECATED_MESSAGE</a>(msg)&#160;&#160;&#160;[[deprecated(msg)]]</td></tr>
+<tr class="separator:ad1f8203a6a066b0312fd16e529bddd22"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6cc94924e47acd6586e2f5e6c3330768"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#a6cc94924e47acd6586e2f5e6c3330768">OPENVDB_NO_DEPRECATION_WARNING_BEGIN</a></td></tr>
 <tr class="memdesc:a6cc94924e47acd6586e2f5e6c3330768"><td class="mdescLeft">&#160;</td><td class="mdescRight">Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END, to inhibit warnings about deprecated code.  <a href="#a6cc94924e47acd6586e2f5e6c3330768">More...</a><br /></td></tr>
 <tr class="separator:a6cc94924e47acd6586e2f5e6c3330768"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -206,6 +209,35 @@ Macros</h2></td></tr>
 </div><div class="memdoc">
 
 <p>Macro for determining if GCC version is &gt;= than X.Y. </p>
+
+</div>
+</div>
+<a class="anchor" id="acad6915d4aac81665b540218e8b1e06c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define OPENVDB_DEPRECATED&#160;&#160;&#160;[[deprecated]]</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<p>Deprecation macros. Define OPENVDB_NO_DEPRECATION_WARNINGS to disable all deprecation warnings in OpenVDB. </p>
+
+</div>
+</div>
+<a class="anchor" id="ad1f8203a6a066b0312fd16e529bddd22"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define OPENVDB_DEPRECATED_MESSAGE</td>
+          <td>(</td>
+          <td class="paramtype">&#160;</td>
+          <td class="paramname">msg</td><td>)</td>
+          <td>&#160;&#160;&#160;[[deprecated(msg)]]</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
 
 </div>
 </div>
@@ -319,7 +351,7 @@ Macros</h2></td></tr>
 
 <p>Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END, to inhibit warnings about deprecated code. </p>
 <dl class="section note"><dt>Note</dt><dd>Use this sparingly. Remove references to deprecated code if at all possible.</dd></dl>
-<p>Example: </p><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;[[deprecated]] void myDeprecatedFunction() {}</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;{</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;    OPENVDB_NO_DEPRECATION_WARNING_BEGIN</div><div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;    myDeprecatedFunction();</div><div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;    OPENVDB_NO_DEPRECATION_WARNING_END</div><div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;}</div></div><!-- fragment --> 
+<p>Example: </p><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;OPENVDB_DEPRECATED void myDeprecatedFunction() {}</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;{</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;    OPENVDB_NO_DEPRECATION_WARNING_BEGIN</div><div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;    myDeprecatedFunction();</div><div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;    OPENVDB_NO_DEPRECATION_WARNING_END</div><div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;}</div></div><!-- fragment --> 
 </div>
 </div>
 <a class="anchor" id="a0c70c8f354f37e782bf75458027eaeca"></a>
@@ -372,7 +404,7 @@ Macros</h2></td></tr>
 </div><div class="memdoc">
 
 <p>SIMD Intrinsic Headers. </p>
-<p>Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END, as in the following example, to inhibit ICC remarks about unreachable code: </p><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;template&lt;typename NodeType&gt;</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;void processNode(NodeType&amp; node)</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;{</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN</div><div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;    if (NodeType::LEVEL == 0) return; // ignore leaf nodes</div><div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;    int i = 0;</div><div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;    ...</div><div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END</div><div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;}</div></div><!-- fragment --><p> In the above, <code>NodeType::LEVEL == 0</code> is a compile-time constant expression, so for some template instantiations, the line below it is unreachable. </p>
+<p>Windows defines Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END, as in the following example, to inhibit ICC remarks about unreachable code: </p><div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;template&lt;typename NodeType&gt;</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;void processNode(NodeType&amp; node)</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;{</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;    OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN</div><div class="line"><a name="l00005"></a><span class="lineno">    5</span>&#160;    if (NodeType::LEVEL == 0) return; // ignore leaf nodes</div><div class="line"><a name="l00006"></a><span class="lineno">    6</span>&#160;    int i = 0;</div><div class="line"><a name="l00007"></a><span class="lineno">    7</span>&#160;    ...</div><div class="line"><a name="l00008"></a><span class="lineno">    8</span>&#160;    OPENVDB_NO_UNREACHABLE_CODE_WARNING_END</div><div class="line"><a name="l00009"></a><span class="lineno">    9</span>&#160;}</div></div><!-- fragment --><p> In the above, <code>NodeType::LEVEL == 0</code> is a compile-time constant expression, so for some template instantiations, the line below it is unreachable. </p>
 
 </div>
 </div>
