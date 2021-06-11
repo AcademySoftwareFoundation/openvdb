@@ -1,0 +1,3 @@
+Houdini:
+    Fix crash in VDB Combine in Copy B mode if the second input has
+    more VDBs than the first.
