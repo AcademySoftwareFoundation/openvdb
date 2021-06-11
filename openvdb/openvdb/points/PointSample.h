@@ -11,7 +11,7 @@
 #define OPENVDB_POINTS_POINT_SAMPLE_HAS_BEEN_INCLUDED
 
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "openvdb/tools/Interpolation.h"
 
 #include "PointDataGrid.h"
@@ -299,7 +299,7 @@ private:
             using TargetHandleT = AttributeWriteHandle<typename SamplerWrapperT::ValueType>;
 
             if (util::wasInterrupted(interrupter)) {
-                util::cancelGroupExecution();
+                thread::cancelGroupExecution();
                 return;
             }
 

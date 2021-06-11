@@ -16,7 +16,7 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
 #include <openvdb/version.h>
@@ -356,7 +356,7 @@ struct ValidPartitioningOp
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const
     {
         if ((*mHasChanged)) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
             return;
         }
 

@@ -17,7 +17,7 @@
 #include "openvdb/math/Operators.h"
 #include "openvdb/math/Stencils.h"
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
@@ -332,7 +332,7 @@ inline bool
 LevelSetMeasure<GridT, InterruptT>::checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
-        util::cancelGroupExecution();
+        thread::cancelGroupExecution();
         return false;
     }
     return true;

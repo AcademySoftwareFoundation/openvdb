@@ -3,8 +3,8 @@
 //
 /// @file Threading.h
 
-#ifndef OPENVDB_UTIL_THREADING_HAS_BEEN_INCLUDED
-#define OPENVDB_UTIL_THREADING_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
+#define OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
 
 #include "openvdb/version.h"
 
@@ -21,7 +21,7 @@
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
-namespace util {
+namespace thread {
 
 inline bool cancelGroupExecution()
 {
@@ -47,8 +47,8 @@ inline bool isGroupExecutionCancelled()
 #endif
 }
 
-} // namespace util
+} // namespace thread
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_UTIL_THREADING_HAS_BEEN_INCLUDED
+#endif // OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED

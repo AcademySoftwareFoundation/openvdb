@@ -16,7 +16,7 @@
 #include <openvdb_houdini/SOP_NodeVDB.h>
 
 #include <openvdb/tools/Interpolation.h>  // for box sampler
-#include <openvdb/util/Threading.h>
+#include <openvdb/thread/Threading.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointSample.h>
 #include <openvdb/points/IndexFilter.h>   // for MultiGroupFilter
@@ -326,7 +326,7 @@ public:
     {
 
         if (mInterrupter->wasInterrupted()) {
-            openvdb::util::cancelGroupExecution();
+            openvdb::thread::cancelGroupExecution();
         }
         const GridType& grid = UTvdbGridCast<GridType>(mGrid);
         // task local grid accessor

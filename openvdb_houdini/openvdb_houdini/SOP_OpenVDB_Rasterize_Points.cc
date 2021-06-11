@@ -20,7 +20,7 @@
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/Prune.h>
-#include <openvdb/util/Threading.h>
+#include <openvdb/thread/Threading.h>
 
 #include <CH/CH_Manager.h>
 #include <CVEX/CVEX_Context.h>
@@ -787,7 +787,7 @@ struct ConstructCandidateVoxelMask
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             if (this->wasInterrupted()) {
-                openvdb::util::cancelGroupExecution();
+                openvdb::thread::cancelGroupExecution();
                 break;
             }
 
@@ -2093,7 +2093,7 @@ struct RasterizePoints
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             if (this->wasInterrupted()) {
-                openvdb::util::cancelGroupExecution();
+                openvdb::thread::cancelGroupExecution();
                 break;
             }
 

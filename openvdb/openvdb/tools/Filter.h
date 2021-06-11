@@ -23,7 +23,7 @@
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/util/NullInterrupter.h"
 #include "openvdb/util/Util.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "Interpolation.h"
 
 #include <tbb/parallel_for.h>
@@ -836,7 +836,7 @@ inline bool
 Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 {
     if (util::wasInterrupted(mInterrupter)) {
-        util::cancelGroupExecution();
+        thread::cancelGroupExecution();
         return true;
     }
     return false;

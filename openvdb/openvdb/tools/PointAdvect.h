@@ -15,7 +15,7 @@
 #include "openvdb/Grid.h"                  // grid
 #include "openvdb/math/Math.h"             // min
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "Interpolation.h"                 // sampling
 #include "VelocityFields.h"                // VelocityIntegrator
 
@@ -170,7 +170,7 @@ public:
     void operator() (const tbb::blocked_range<size_t> &range) const
     {
         if (mInterrupter && mInterrupter->wasInterrupted()) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
         }
 
         VelocityFieldIntegrator  velField(*mVelGrid);
@@ -310,7 +310,7 @@ public:
     void operator() (const tbb::blocked_range<size_t> &range) const
     {
         if (mInterrupter && mInterrupter->wasInterrupted()) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
         }
 
         VelocityIntegratorType velField(*mVelGrid);

@@ -22,7 +22,7 @@
 #include "openvdb/math/Proximity.h" // for closestPointOnTriangleToPoint
 #include "openvdb/util/NullInterrupter.h"
 #include "openvdb/util/Util.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 
 #include "ChangeBackground.h"
 #include "Prune.h" // for pruneInactive and pruneLevelSet
@@ -1990,7 +1990,7 @@ public:
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             if (this->wasInterrupted()) {
-                util::cancelGroupExecution();
+                thread::cancelGroupExecution();
                 break;
             }
 
@@ -2144,7 +2144,7 @@ private:
 
         while (!coordList.empty()) {
             if (interrupter && interrupter->wasInterrupted()) {
-                util::cancelGroupExecution();
+                thread::cancelGroupExecution();
                 break;
             }
             for (Int32 pass = 0; pass < 1048576 && !coordList.empty(); ++pass) {

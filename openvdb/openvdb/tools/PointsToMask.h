@@ -51,7 +51,7 @@
 #include "openvdb/Grid.h"
 #include "openvdb/Types.h"
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -154,7 +154,7 @@ private:
     bool interrupt() const
     {
         if (mInterrupter && util::wasInterrupted(mInterrupter)) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
             return true;
         }
         return false;

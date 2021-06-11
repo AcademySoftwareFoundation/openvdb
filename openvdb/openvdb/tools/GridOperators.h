@@ -12,7 +12,7 @@
 #include "openvdb/Grid.h"
 #include "openvdb/math/Operators.h"
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "ValueTransformer.h" // for tools::foreach()
@@ -385,7 +385,7 @@ public:
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
         if (util::wasInterrupted(mInterrupt)) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
         }
 
         for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {

@@ -16,7 +16,7 @@
 #include "openvdb/Types.h"
 #include "openvdb/math/Math.h"
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "Interpolation.h"// for Sampler
 #include "VelocityFields.h" // for VelocityIntegrator
 #include "Morphology.h"//for dilateActiveValues
@@ -297,7 +297,7 @@ private:
     bool interrupt() const
     {
         if (mInterrupter && util::wasInterrupted(mInterrupter)) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
             return true;
         }
         return false;

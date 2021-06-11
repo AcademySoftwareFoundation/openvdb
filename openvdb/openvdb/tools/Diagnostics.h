@@ -17,7 +17,7 @@
 #include "openvdb/math/Stencils.h"
 #include "openvdb/math/Operators.h"
 #include "openvdb/tree/LeafManager.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
@@ -1162,13 +1162,13 @@ InactiveVoxelValues<TreeType>::operator()(const tbb::blocked_range<size_t>& rang
 {
     typename TreeType::LeafNodeType::ValueOffCIter iter;
 
-    for (size_t n = range.begin(); n < range.end() && !util::isGroupExecutionCancelled(); ++n) {
+    for (size_t n = range.begin(); n < range.end() && !thread::isGroupExecutionCancelled(); ++n) {
         for (iter = mLeafArray.leaf(n).cbeginValueOff(); iter; ++iter) {
             mInactiveValues.insert(iter.getValue());
         }
 
         if (mInactiveValues.size() > mNumValues) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
         }
     }
 }
@@ -1252,14 +1252,14 @@ template<typename TreeType>
 inline void
 InactiveTileValues<TreeType>::operator()(IterRange& range)
 {
-    for (; range && !util::isGroupExecutionCancelled(); ++range) {
+    for (; range && !thread::isGroupExecutionCancelled(); ++range) {
         typename TreeType::ValueOffCIter iter = range.iterator();
         for (; iter; ++iter) {
             mInactiveValues.insert(iter.getValue());
         }
 
         if (mInactiveValues.size() > mNumValues) {
-            util::cancelGroupExecution();
+            thread::cancelGroupExecution();
         }
     }
 }

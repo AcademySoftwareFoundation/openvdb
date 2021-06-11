@@ -14,7 +14,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tools/VolumeToMesh.h>
 #include <openvdb/util/Formats.h> // printBytes
-#include <openvdb/util/Threading.h>
+#include <openvdb/thread/Threading.h>
 
 #include <maya/M3dView.h>
 #include <maya/MString.h>

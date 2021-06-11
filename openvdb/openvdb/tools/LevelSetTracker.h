@@ -20,7 +20,7 @@
 #include "openvdb/math/Stencils.h"
 #include "openvdb/math/Transform.h"
 #include "openvdb/util/NullInterrupter.h"
-#include "openvdb/util/Threading.h"
+#include "openvdb/thread/Threading.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/tree/LeafManager.h"
 #include "ChangeBackground.h"// for changeLevelSetBackground
@@ -385,7 +385,7 @@ LevelSetTracker<GridT, InterruptT>::
 checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
-        util::cancelGroupExecution();
+        thread::cancelGroupExecution();
         return false;
     }
     return true;
