@@ -705,12 +705,11 @@ SOP_OpenVDB_Sample_Points::Cache::cookVDBSop(OP_Context& context)
             }
         }
 
-        // timing: end time
-        auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
-            std::chrono::steady_clock::now() - time_start);
-        const double seconds = double(duration.count()) / 1000.0;
-
         if (verbose) {
+            // timing: end time
+            auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - time_start);
+            const double seconds = double(duration.count()) / 1000.0;
             std::cout << "Sampling " << nPoints + nVDBPoints << " points in "
                       << numVectorGrids << " vector grid" << (numVectorGrids == 1 ? "" : "s")
                       << " and " << numScalarGrids << " scalar grid"
