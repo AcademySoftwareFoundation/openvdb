@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">8.1.0</span>
    </div>
   </td>
  </tr>
@@ -86,16 +86,16 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><p> <a name="v8_1_1_changes"></a> </p><dl class="section user"><dt></dt><dd><b>Version 8.1.1</b> - <em>In development</em></dd></dl>
-<p> <a name="v8_1_0_changes"></a> </p><dl class="section user"><dt></dt><dd><b>Version 8.1.0</b> - <em>In development</em></dd></dl>
+<p> <a name="v8_1_0_changes"></a> </p><dl class="section user"><dt></dt><dd><b>Version 8.1.0</b> - <em>June 11, 2021</em></dd></dl>
 <dl class="section user"><dt></dt><dd><blockquote class="doxtable">
 <p>As of this release, support for grid ABI=5 has been removed. </p>
 </blockquote>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>New features:<ul>
-<li>Added <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">tools::erodeActiveValues</a>, to match the existing <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">tools::dilateActiveValues</a>. New erosion tools support all tile policies and edge/vertex neighbour patterns.</li>
+<li>Added <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">tools::erodeActiveValues</a>, to match the existing <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">tools::dilateActiveValues</a>. New erosion tools support all tile policies and edge/vertex neighbor patterns.</li>
 <li>Added support for automatic filtering of active tiles in <a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1Filter.html">Filter</a> by setting <a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1Filter.html#a6037b38e315e77db2e8a7aba5f38b7c4">Filter::setProcessTiles</a>. Active tiles are densified on demand, only when necessary.</li>
 <li>Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which visit nodes in a tree or sub-tree in single-threaded depth-first order.</li>
-<li>Significant performance improvements to AX volume kernels, primarily due to improved vectorisation. Performance scales depending on the available host CPU instruction set and scalability of the AX kernel. Trivial assignments profile upwards of 3x faster on AVX.</li>
+<li>Significant performance improvements to AX volume kernels, primarily due to improved vectorization. Performance scales depending on the available host CPU instruction set and scalability of the AX kernel. Trivial assignments profile upwards of 3x faster on AVX.</li>
 <li>Introduced Active Tile Streaming for volumes kernels. AX can now dynamically expand and collapse active nodes at all levels of a VDB tree on demand, switching on or off by checking the spatial access pattern of AX programs.</li>
 <li>Added <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a9cbb0a8d7e0521cc4165bb7e2d1081d3" title="Return the total number of active voxels in the tree. ">tools::countActiveVoxels()</a> for multi-threaded counting of active voxels, optionally by bounding box. The Tree::activeVoxelCount() method now uses this implementation.</li>
 <li>Added <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad03704a13261822b75a2d5385bffbf41" title="Return the total amount of memory in bytes occupied by this tree. ">tools::memUsage()</a> for multi-threaded counting of bytes of memory used. The <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad03704a13261822b75a2d5385bffbf41" title="Return the total amount of memory in bytes occupied by this tree. ">Tree::memUsage()</a> method now uses this implementation.</li>
@@ -131,7 +131,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li>Use copy-by-reference for the operator in a <a class="el" href="classopenvdb_1_1v8__1_1_1tree_1_1DynamicNodeManager.html">DynamicNodeManager</a> to fix a performance regression.</li>
 <li><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a95818e0902bf2d721182aea060c98a39">tools::deactivate</a> now also works with a MaskTree.</li>
 <li>Fixed a memory leak in the OpenVDB AX parser</li>
-<li>Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor</li>
+<li>Fixed an occurrence of undefined behavior in the OpenVDB AX visitor</li>
 <li>Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests</li>
 <li>Fixed a bug in AX which could cause string allocations in loops to overflow the stack</li>
 <li>Fixed a bug where the ValueOff iterator for the AX VolumeExecutable could remove child branches of a VDB tree.</li>
@@ -153,11 +153,11 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li>Introduced the VDB AX SOP which provides an interface for running OpenVDB AX code in Houdini on VDB grids.</li>
 <li>Updated the VDB Smooth SOP to support the filtering of active tiles.</li>
 <li>Fixed a parameter warning in VDB AX SOP.</li>
-<li>Transfer Surface Attributes in Convert VDB SOP could use uninitialised memory.</li>
+<li>Transfer Surface Attributes in Convert VDB SOP could use uninitialized memory.</li>
 <li>VDB Activate SOP now uses the multi-threaded <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a95818e0902bf2d721182aea060c98a39">tools::deactivate</a> for much faster performance.</li>
 <li>Improved the formatting and updated the OpenVDB AX SOPs help card.</li>
-<li>The AX SOP utilises the new Active Tile Streaming feature for Volumes. Grids will only be densified in areas where unique values are created.</li>
-<li>VDB Activate SOP dilation will affect tiles, changing its behaviour from previous versions, but producing a more expected result.</li>
+<li>The AX SOP utilizes the new Active Tile Streaming feature for Volumes. Grids will only be densified in areas where unique values are created.</li>
+<li>VDB Activate SOP dilation will affect tiles, changing its behavior from previous versions, but producing a more expected result.</li>
 <li>VDB Activate SOP has a world space dilation option.</li>
 <li>Introduced the VDB Merge SOP that merges multiple grids in parallel and is faster and more convenient to use than the VDB Combine SOP.</li>
 <li>Fix a bug where the VDB Rebuild SDF was not preserving metadata from the input grid.</li>
@@ -174,7 +174,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li>Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to use it without errors.</li>
 <li>The value of CONCURRENT_MALLOC is now respected when building the vdb_ax command line binary.</li>
 <li>Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the uninstall build target. <em>[Contributed by Jérémie Dumas]</em></li>
-<li>Improved the behaviour of locating static zlib libraries when USE_STATIC_DEPENDENCIES is enabled.</li>
+<li>Improved the behavior of locating static zlib libraries when USE_STATIC_DEPENDENCIES is enabled.</li>
 <li>Fixed an issue where extra hboost libraries could not be found when building against Houdini 18.5 on Windows.</li>
 <li>Build fixes to OpenVDB AX for LLVM 12.</li>
 <li>Re-introduced the OPENVDB_DEPRECATED macro with an additional option that takes a message. Added support to disable deprecations throughout OpenVDB by defining OPENVDB_NO_DEPRECATION_WARNINGS</li>
