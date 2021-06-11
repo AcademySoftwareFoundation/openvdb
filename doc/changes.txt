@@ -2,9 +2,13 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v8_1_1_changes"></a>@endhtmlonly
+@par
+<B>Version 8.1.1</B> - <I>In development</I>
+
 @htmlonly <a name="v8_1_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.1.0</B> - <I>In development</I>
+<B>Version 8.1.0</B> - <I>June 11, 2021</I>
 
 @par
 <BLOCKQUOTE>
@@ -16,7 +20,7 @@ New features:
 - Added @vdblink::tools::erodeActiveValues() tools::erodeActiveValues@endlink,
   to match the existing
   @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink. New
-  erosion tools support all tile policies and edge/vertex neighbour patterns.
+  erosion tools support all tile policies and edge/vertex neighbor patterns.
 - Added support for automatic filtering of active tiles in
   @vdblink::tools::Filter Filter@endlink
   by setting
@@ -25,7 +29,7 @@ New features:
 - Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
   visit nodes in a tree or sub-tree in single-threaded depth-first order.
 - Significant performance improvements to AX volume kernels, primarily due to
-  improved vectorisation. Performance scales depending on the available host
+  improved vectorization. Performance scales depending on the available host
   CPU instruction set and scalability of the AX kernel. Trivial assignments
   profile upwards of 3x faster on AVX.
 - Introduced Active Tile Streaming for volumes kernels. AX can now dynamically
@@ -97,7 +101,7 @@ Bug Fixes:
 - @vdblink::tools::deactivate() tools::deactivate@endlink now also works with
   a MaskTree.
 - Fixed a memory leak in the OpenVDB AX parser
-- Fixed an occurrence of undefined behaviour in the OpenVDB AX visitor
+- Fixed an occurrence of undefined behavior in the OpenVDB AX visitor
 - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
 - Fixed a bug in AX which could cause string allocations in loops to overflow
   the stack
@@ -134,15 +138,15 @@ Houdini:
   OpenVDB AX code in Houdini on VDB grids.
 - Updated the VDB Smooth SOP to support the filtering of active tiles.
 - Fixed a parameter warning in VDB AX SOP.
-- Transfer Surface Attributes in Convert VDB SOP could use uninitialised
+- Transfer Surface Attributes in Convert VDB SOP could use uninitialized
   memory.
 - VDB Activate SOP now uses the multi-threaded
   @vdblink::tools::deactivate() tools::deactivate@endlink for much faster
   performance.
 - Improved the formatting and updated the OpenVDB AX SOPs help card.
-- The AX SOP utilises the new Active Tile Streaming feature for Volumes. Grids
+- The AX SOP utilizes the new Active Tile Streaming feature for Volumes. Grids
   will only be densified in areas where unique values are created.
-- VDB Activate SOP dilation will affect tiles, changing its behaviour
+- VDB Activate SOP dilation will affect tiles, changing its behavior
   from previous versions, but producing a more expected result.
 - VDB Activate SOP has a world space dilation option.
 - Introduced the VDB Merge SOP that merges multiple grids in parallel and is
@@ -179,7 +183,7 @@ Build:
 - Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the
   uninstall build target.
   <I>[Contributed by Jérémie Dumas]</I>
-- Improved the behaviour of locating static zlib libraries when
+- Improved the behavior of locating static zlib libraries when
   USE_STATIC_DEPENDENCIES is enabled.
 - Fixed an issue where extra hboost libraries could not be found when building
   against Houdini 18.5 on Windows.
