@@ -783,11 +783,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
         //timer.restart("Dilating and updating mgr (serial)");
 #endif
 
-        const int delta = 5;
-        for (int i=0, d = dilation/delta; i<d; ++i) dilateActiveValues(mgr, delta, nn, IGNORE_TILES);
-        dilateActiveValues(mgr, dilation % delta, nn, IGNORE_TILES);
-        //for (int i=0, n=5, d=dilation/n; i<d; ++i) dilateActiveValues(mgr, n, nn, IGNORE_TILES);
-        //dilateVoxels(mgr, dilation, nn);
+        dilateActiveValues(mgr, dilation, nn, IGNORE_TILES);
 
 #ifdef BENCHMARK_FAST_SWEEPING
         timer.restart("Initializing grid and sweep mask");

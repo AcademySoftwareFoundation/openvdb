@@ -1,0 +1,4 @@
+Houdini:
+    VDB Vector Merge SOP is now VDB Vector From Scalar SOP to distinguish
+    it from the VDB Merge SOP.   It keeps the same internal name so this
+    is merely a label change.

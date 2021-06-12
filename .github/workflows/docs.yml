@@ -8,6 +8,7 @@ on:
     paths-ignore:
       - 'CHANGES'
       - 'openvdb_maya/**'
+      - 'pendingchanges/**'
       - '**.md'
   pull_request:
     branches:
@@ -15,6 +16,7 @@ on:
     paths-ignore:
       - 'CHANGES'
       - 'openvdb_maya/**'
+      - 'pendingchanges/**'
       - '**.md'
   workflow_dispatch:
 
@@ -34,7 +36,11 @@ jobs:
     - name: install_latex
       run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
     - name: build
-      run: ./ci/build.sh Release None OFF None "core,python,doc" -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
+      run: ./ci/build.sh Release "core,python,doc" \
+        -DUSE_BLOSC=OFF \
+        -DOPENVDB_CORE_STATIC=OFF \
+        -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON \
+        -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
     - name: epydoc
       run: |
         export LD_LIBRARY_PATH=/usr/local/lib64

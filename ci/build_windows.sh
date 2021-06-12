@@ -32,4 +32,6 @@ cmake \
 # However it does not seem to for our project.
 # https://gitlab.kitware.com/cmake/cmake/-/issues/20564
 
-cmake --build . --parallel 4 --config $BUILD_TYPE --target install
+# cmake 3.14 and later required for --verbose
+
+cmake --build . --parallel 4 --config $BUILD_TYPE --target install --verbose

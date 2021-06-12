@@ -14,7 +14,7 @@ on:
 
 jobs:
   linux-vfx:
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     name: linux-clang-sanitizer:${{ matrix.config.build }}
     container:
       image: aswf/ci-openvdb:2021
@@ -31,13 +31,12 @@ jobs:
           #- { build: 'coverage', cmake: '' } # todo
       fail-fast: false
     steps:
-    - uses: actions/checkout@v1
+    - uses: actions/checkout@v2
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.8.0
     - name: build
-      run: ./ci/build.sh ${{ matrix.config.build }} 8 ON None "core,axcore,test,axtest" \
+      run: ./ci/build.sh ${{ matrix.config.build }} "core,axcore,test,axtest" \
         -DOPENVDB_CXX_STRICT=ON -DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF \
-        -DCMAKE_VERBOSE_MAKEFILE=ON \
         ${{ matrix.config.cmake }}
     - name: test
-      run: ./ci/test.sh
+      run: cd build && ctest -V
