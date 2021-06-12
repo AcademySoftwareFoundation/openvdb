@@ -502,7 +502,7 @@ if(OPENVDB_CORE_STATIC)
   set_target_properties(openvdb_static
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
 
-  if(WIN32)
+  if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
@@ -553,7 +553,7 @@ if(OPENVDB_CORE_SHARED)
     )
   endif()
 
-  if(WIN32)
+  if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
