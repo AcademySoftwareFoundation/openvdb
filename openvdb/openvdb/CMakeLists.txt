@@ -503,6 +503,7 @@ if(OPENVDB_CORE_STATIC)
     PROPERTIES OUTPUT_NAME ${OPENVDB_STATIC_LIBRARY_NAME})
 
   if(MSVC)
+    # on Windows, but only for MSVC, not for MinGW
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
@@ -554,6 +555,7 @@ if(OPENVDB_CORE_SHARED)
   endif()
 
   if(MSVC)
+    # on Windows, but only for MSVC, not for MinGW
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
       # NOTE: MSVC_RUNTIME_LIBRARY does not propagate to targets, so
       # also add it explicitly as a compile option
