@@ -70,7 +70,7 @@ struct TempFile::TempFileImpl
     {
         if (const char* dir = std::getenv("OPENVDB_TEMP_DIR")) {
             if (0 != ::access(dir, F_OK)) {
-#ifdef _WIN32
+#ifdef __MINGW32__
                 ::mkdir(dir);
 #else
                 ::mkdir(dir, S_IRUSR | S_IWUSR | S_IXUSR);
