@@ -69,12 +69,14 @@ endfunction()
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
 # FindPython.
-# @note  the Interpreter component is only required for the python test.
 # @note  the Python::Module target should be used over the Python::Python
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development Interpreter)
+set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+    list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+endif()
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
   find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
