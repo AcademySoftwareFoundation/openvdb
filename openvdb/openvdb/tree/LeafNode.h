@@ -1265,9 +1265,9 @@ LeafNode<T, Log2Dim>::copyFromDense(const CoordBBox& bbox, const DenseT& dense,
             const DenseValueType* s2 = s1 + yStride * (y - min[1]);
             Int32 n2 = n1 + ((y & (DIM-1u)) << LOG2DIM);
             for (Int32 z = bbox.min()[2], ez = bbox.max()[2]+1; z < ez; ++z, ++n2, s2 += zStride) {
-                if (math::isApproxEqual(background, ValueType(*s2), tolerance)) {
+                if (math::isApproxEqual(background, math::Abs(ValueType(*s2)), tolerance)) {
                     mValueMask.setOff(n2);
-                    mBuffer[n2] = background;
+                    mBuffer[n2] = math::Sign(ValueType(*s2)) * background;
                 } else {
                     mValueMask.setOn(n2);
                     mBuffer[n2] = ValueType(*s2);
