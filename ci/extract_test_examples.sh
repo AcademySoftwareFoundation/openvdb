@@ -52,13 +52,13 @@ for DOC in "${DOCS[@]}"; do
         elif [[ $line == @code* ]]; then
             str=""
             compile="none"
-        elif [[ $line == "<!--- V --->@code"* ]]; then
+        elif [[ $line == "<!-- V -->@code"* ]]; then
             str=""
             compile="volumes"
-        elif [[ $line == "<!--- P --->@code"* ]]; then
+        elif [[ $line == "<!-- P -->@code"* ]]; then
             str=""
             compile="points"
-        elif [[ $line == "<!--- A --->@code"* ]]; then
+        elif [[ $line == "<!-- A -->@code"* ]]; then
             str=""
             compile=""
         elif [[ $line == @endcode ]]; then

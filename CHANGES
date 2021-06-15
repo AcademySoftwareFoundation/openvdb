@@ -1548,8 +1548,7 @@ Version 3.2.0 - August 10, 2016
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
       [Reported by Joshua Olson]
     - Fixed bugs in tree::NodeUnion that could cause crashes.
-    - Fixed memory leak in
-      tools::mesh_to_volume_internal::ExpandNarrowband
+    - Fixed memory leak in a tools::meshToVolume sub-tool (expandNarrowband).
       [Reported by Kévin Dietrich]
     - Fixed parameter type inconsistencies in math/Stencils.h and
       tools/RayIntersector.h.

@@ -124,6 +124,7 @@ inline void setGroupByFilter(   PointDataTreeT& tree,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_group_internal {
 
@@ -296,6 +297,7 @@ struct SetGroupByFilterOp
 
 } // namespace point_group_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

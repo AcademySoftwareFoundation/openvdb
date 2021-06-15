@@ -49,6 +49,7 @@ inline void advectPoints(PointDataGridT& points, const VelGridT& velocity,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_advect_internal {
 
@@ -208,6 +209,7 @@ private:
 
 } // namespace point_advect_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

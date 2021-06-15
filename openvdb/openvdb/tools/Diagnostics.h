@@ -1091,6 +1091,7 @@ checkFogVolume(const GridType& grid, size_t n)
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace diagnostics_internal {
 
@@ -1278,6 +1279,7 @@ InactiveTileValues<TreeType>::getInactiveValues(SetType& values) const
 
 } // namespace diagnostics_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

@@ -211,6 +211,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_conversion_internal {
 
@@ -607,6 +608,7 @@ private:
 
 } // namespace point_conversion_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

@@ -1960,9 +1960,8 @@ Bug fixes:
   <I>[Reported by Joshua&nbsp;Olson]</I>
 - Fixed bugs in @vdblink::tree::NodeUnion NodeUnion@endlink that could cause
   crashes.
-- Fixed memory leak in
-  @vdblink::tools::mesh_to_volume_internal::ExpandNarrowband
-  tools::mesh_to_volume_internal::ExpandNarrowband@endlink
+- Fixed memory leak in a @vdblink::tools::meshToVolume tools::meshToVolume@endlink
+  sub-tool (expandNarrowband).
   <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
 - Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
   @link tools/RayIntersector.h@endlink.

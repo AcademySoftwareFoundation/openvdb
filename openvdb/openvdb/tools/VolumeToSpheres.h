@@ -140,6 +140,8 @@ private:
 
 // Internal utility methods
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace v2s_internal {
 
 struct PointAccessor
@@ -622,6 +624,7 @@ UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
 
 } // namespace v2s_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

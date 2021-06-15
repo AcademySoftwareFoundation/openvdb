@@ -137,6 +137,7 @@ inline void particleTrailsToMask(const ParticleListT&, GridT&,Real delta=1,Inter
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace p2ls_internal {
 // This is a simple type that combines a distance value and a particle
@@ -146,6 +147,7 @@ namespace p2ls_internal {
 template<typename VisibleT, typename BlindT> class BlindData;
 }
 
+/// @endcond
 
 template<typename SdfGridT,
          typename AttributeT = void,
@@ -857,6 +859,7 @@ private:
 
 ///////////////////// YOU CAN SAFELY IGNORE THIS SECTION /////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace p2ls_internal {
 
@@ -921,6 +924,7 @@ operator+(const BlindData<VisibleT, BlindT>& x, const T& rhs)
 
 } // namespace p2ls_internal
 
+/// @endcond
 
 //////////////////////////////////////////////////////////////////////////////
 

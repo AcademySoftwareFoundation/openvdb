@@ -87,6 +87,7 @@ levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float i
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 // Internal utility objects and implementation details
 
@@ -185,12 +186,13 @@ private:
 
 } // namespace internal
 
+/// @endcond
 
 ////////////////////////////////////////
 
 
 //{
-/// @cond OPENVDB_LEVEL_SET_REBUILD_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 /// The normal entry points for level set rebuild are the levelSetRebuild() functions.
 /// doLevelSetRebuild() is mainly for internal use, but when the isovalue and half band

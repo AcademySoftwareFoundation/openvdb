@@ -205,6 +205,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace filter_internal {
 
@@ -487,8 +488,10 @@ private:
 template<typename T> static inline void accum(T& sum, T addend) { sum += addend; }
 // Overload for bool ValueType
 inline void accum(bool& sum, bool addend) { sum = sum || addend; }
-}
 
+} // namespace filter_internal
+
+/// @endcond
 
 ////////////////////////////////////////
 

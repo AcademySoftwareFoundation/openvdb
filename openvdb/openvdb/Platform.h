@@ -10,7 +10,7 @@
 
 /// @name Utilities
 /// @{
-/// @cond OPENVDB_VERSION_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 #define OPENVDB_PREPROC_STRINGIFY_(x) #x
 /// @endcond
 /// @brief Return @a x as a string literal.  If @a x is a macro,
@@ -18,7 +18,7 @@
 /// @hideinitializer
 #define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
 
-/// @cond OPENVDB_VERSION_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 #define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
 /// @endcond
 /// @brief Form a new token by concatenating two existing tokens.

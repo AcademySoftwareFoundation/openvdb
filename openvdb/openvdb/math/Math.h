@@ -558,7 +558,7 @@ inline Type Pow3(Type x) { return x*x*x; }
 template<typename Type>
 inline Type Pow4(Type x) { return Pow2(Pow2(x)); }
 
-/// Return @a x<sup>@a n</sup>.
+/// Return @a x<sup>n</sup>.
 template<typename Type>
 Type
 Pow(Type x, int n)
@@ -573,7 +573,7 @@ Pow(Type x, int n)
 }
 
 //@{
-/// Return @a b<sup>@a e</sup>.
+/// Return @a b<sup>e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -708,7 +708,7 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 // ============> Exp <==================
 
-/// Return @a e<sup>@a x</sup>.
+/// Return @a e<sup>x</sup>.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
 

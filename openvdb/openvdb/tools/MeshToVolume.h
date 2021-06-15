@@ -504,6 +504,8 @@ private:
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace mesh_to_volume_internal {
 
 template<typename PointType>
@@ -3008,6 +3010,8 @@ private:
 
 } // mesh_to_volume_internal namespace
 
+/// @endcond
+
 
 ////////////////////////////////////////
 
@@ -3435,7 +3439,7 @@ meshToVolume(
 
 
 //{
-/// @cond OPENVDB_MESH_TO_VOLUME_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 /// @internal This overload is enabled only for grids with a scalar, floating-point ValueType.
 template<typename GridType, typename Interrupter>

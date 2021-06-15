@@ -533,6 +533,7 @@ bool TreeToMerge<TreeT>::MaskUnionOp::operator()(NodeT& node, size_t /*idx*/) co
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace merge_internal {
 
@@ -665,6 +666,8 @@ private:
 
 } // namespace merge_internal
 
+
+/// @endcond
 
 ////////////////////////////////////////
 

@@ -156,6 +156,7 @@ inline void compactAttributes(PointDataTreeT& tree);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_attribute_internal {
 
@@ -233,6 +234,8 @@ struct MetadataStorage<PointDataTreeT, Name>
 
 
 } // namespace point_attribute_internal
+
+/// @endcond
 
 
 ////////////////////////////////////////
