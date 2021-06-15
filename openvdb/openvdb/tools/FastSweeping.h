@@ -735,7 +735,7 @@ void FastSweeping<SdfGridT, ExtValueT>::computeSweepMaskLeafOrigins()
     LeafManagerT leafManager(mSweepMask);
 
     mSweepMaskLeafOrigins.resize(leafManager.leafCount());
-    tbb::atomic<size_t> sweepingVoxelCount = 0;
+    std::atomic<size_t> sweepingVoxelCount{0};
     auto kernel = [&](const LeafT& leaf, size_t leafIdx) {
         mSweepMaskLeafOrigins[leafIdx] = leaf.origin();
         sweepingVoxelCount += leaf.onVoxelCount();
