@@ -1,0 +1,11 @@
+This directory stores pending changes to our CHANGES and changes.txt
+files.  The idea is that PRs can have their proposed changes audited
+without triggering false merges.  We periodically collapse these into
+the CHANGES and changes.txt.
+
+Release versions should have this directory empty, but if you
+checkout the latest version you may see changes reflected here that
+haven't been merged into the CHANGES file yet.
+
+This README must be maintained or git removes the directory and we
+won't remember what directory to put changes into.
