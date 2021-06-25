@@ -47,11 +47,8 @@ struct NodeInfo {
 
 typedef std::vector<NodeInfo> NodeList;
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
-
 // Declare this at file scope to ensure thread-safe initialization.
-Mutex sRegistryMutex;
+std::mutex sRegistryMutex;
 
 NodeList * gNodes = NULL;
 
@@ -70,7 +67,7 @@ NodeRegistry::NodeRegistry(const MString& typeName, const MTypeId& typeId,
     node.type               = type;
     node.classification     = classification;
 
-    Lock lock(sRegistryMutex);
+    std::lock_guard<std::mutex> lock(sRegistryMutex);
 
     if (!gNodes) {
         OPENVDB_START_THREADSAFE_STATIC_WRITE
@@ -85,7 +82,7 @@ NodeRegistry::NodeRegistry(const MString& typeName, const MTypeId& typeId,
 void
 NodeRegistry::registerNodes(MFnPlugin& plugin, MStatus& status)
 {
-    Lock lock(sRegistryMutex);
+    std::lock_guard<std::mutex> lock(sRegistryMutex);
 
     if (gNodes) {
         for (size_t n = 0, N = gNodes->size(); n < N; ++n) {
@@ -109,7 +106,7 @@ NodeRegistry::registerNodes(MFnPlugin& plugin, MStatus& status)
 void
 NodeRegistry::deregisterNodes(MFnPlugin& plugin, MStatus& status)
 {
-    Lock lock(sRegistryMutex);
+    std::lock_guard<std::mutex> lock(sRegistryMutex);
 
     if (gNodes) {
         for (size_t n = 0, N = gNodes->size(); n < N; ++n) {

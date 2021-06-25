@@ -62,19 +62,23 @@
 #ifndef OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PARTICLES_TO_LEVELSET_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_reduce.h>
-#include <tbb/blocked_range.h>
-#include <openvdb/Types.h>
-#include <openvdb/Grid.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/util/logging.h>
-#include <openvdb/util/NullInterrupter.h>
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/math/Transform.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/util/logging.h"
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/thread/Threading.h"
+
 #include "Composite.h" // for csgUnion()
 #include "PointPartitioner.h"
 #include "Prune.h"
 #include "SignedFloodFill.h"
+
+#include <tbb/parallel_reduce.h>
+#include <tbb/blocked_range.h>
+
 #include <functional>
 #include <iostream>
 #include <type_traits>
@@ -740,7 +744,7 @@ private:
         for (Coord c = lo; c.x() <= hi.x(); ++c.x()) {
             //only check interrupter every 32'th scan in x
             if (!(count++ & ((1<<5)-1)) && util::wasInterrupted(mParent.mInterrupter)) {
-                tbb::task::self().cancel_group_execution();
+                thread::cancelGroupExecution();
                 return false;
             }
             const Real x2 = math::Pow2(c.x() - P[0]);
@@ -806,7 +810,7 @@ private:
         // Densely fill the remaining regions.
         for (const auto& bbox: padding) {
             if (util::wasInterrupted(mParent.mInterrupter)) {
-                tbb::task::self().cancel_group_execution();
+                thread::cancelGroupExecution();
                 return false;
             }
             const Coord &bmin = bbox.min(), &bmax = bbox.max();
