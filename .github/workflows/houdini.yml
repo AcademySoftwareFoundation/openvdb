@@ -4,7 +4,8 @@ name: Houdini
 on:
   push:
     branches:
-      - '**'
+      - 'master'
+      - 'feature/**'
     paths-ignore:
       - 'CHANGES'
       - 'doc/**'
@@ -23,9 +24,11 @@ on:
   schedule:
     # run this workflow every day at 7am UTC
     - cron:  '0 7 * * *'
+  workflow_dispatch:
 
 jobs:
   linux-vfx-houdini:
+    if: github.repository_owner == 'AcademySoftwareFoundation'
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
@@ -36,11 +39,11 @@ jobs:
       matrix:
         config:
           # build against VFX Ref 2018 even though it's unsupported, just to make sure that we test Boost 1.61
-          - { cxx: clang++, image: '2018', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'ON' }
-          - { cxx: clang++, image: '2019', hou: '18_0', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Release', extras: 'ON', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', build: 'Debug',   extras: 'OFF', disable_checks: 'OFF' }
-          - { cxx: g++,     image: '2020', hou: '18_5', build: 'Release', extras: 'OFF', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2018', hou: '18_0', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'ON' }
+          - { cxx: clang++, image: '2019', hou: '18_0', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Debug', components: 'core,hou', disable_checks: 'OFF' }
+          - { cxx: g++,     image: '2020', hou: '18_5', j: '1', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -55,11 +58,17 @@ jobs:
         key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
         restore-keys: vdb1-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
-      if: github.repository_owner == 'AcademySoftwareFoundation'
       run: test -f "hou/hou.tar.gz"
-    - name: houdini
-      run: ./ci/install_houdini.sh
+    - name: install_houdini
+      run: mv hou/hou.tar.gz . && tar -vxzf hou.tar.gz
     - name: build
-      run: ./ci/build_houdini.sh ${{ matrix.config.build }} ${{ matrix.config.extras }} -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}
+      shell: bash
+      run: >
+        cd hou && source houdini_setup_bash && cd - &&
+        ./ci/build.sh -v
+        -j=${{ matrix.config.j }}
+        --build-type=${{ matrix.config.build }}
+        --components="${{ matrix.config.components }}"
+        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
     - name: test
-      run: ./ci/test.sh
+      run: cd build && ctest -V

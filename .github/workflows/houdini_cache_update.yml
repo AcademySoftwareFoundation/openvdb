@@ -12,6 +12,7 @@ on:
 
 jobs:
   houdini18_5:
+    if: github.repository_owner == 'AcademySoftwareFoundation'
     runs-on: ubuntu-latest
     env:
       CXX: clang++
@@ -22,11 +23,13 @@ jobs:
     - name: download_houdini
       run: ./ci/download_houdini.sh 18.5 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
-      run: ./ci/install_houdini.sh
+      run: mv hou/hou.tar.gz . && tar -xzf hou.tar.gz
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build_houdini.sh Release ON
+      run: |
+        cd hou && source houdini_setup_bash && cd -
+        ./ci/build.sh -v --build-type=Release --components="core,hou,bin,python,test,axcore,axbin,axtest"
     - name: test
       run: ./ci/test.sh
     - name: write_houdini_cache
@@ -36,6 +39,7 @@ jobs:
         key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
   houdini18_0:
+    if: github.repository_owner == 'AcademySoftwareFoundation'
     runs-on: ubuntu-latest
     env:
       CXX: clang++
@@ -46,11 +50,13 @@ jobs:
     - name: download_houdini
       run: ./ci/download_houdini.sh 18.0 ON ON ${{ secrets.HOUDINI_CLIENT_ID }} ${{ secrets.HOUDINI_SECRET_KEY }}
     - name: install_houdini
-      run: ./ci/install_houdini.sh
+      run: mv hou/hou.tar.gz . && tar -xzf hou.tar.gz
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build_houdini.sh Release ON
+      run: |
+        cd hou && source houdini_setup_bash && cd -
+        ./ci/build.sh -v --build-type=Release --components="core,hou,bin,python,test,axcore,axbin,axtest"
     - name: test
       run: ./ci/test.sh
     - name: write_houdini_cache
