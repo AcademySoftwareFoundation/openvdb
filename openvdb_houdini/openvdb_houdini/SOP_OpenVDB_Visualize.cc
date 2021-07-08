@@ -15,16 +15,9 @@
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/points/PointDataGrid.h>
 
-#ifdef DWA_OPENVDB
-#include <openvdb_houdini/DW_VDBUtils.h>
-#endif
-
 #include <GA/GA_Handle.h>
 #include <GA/GA_Types.h>
-#include <GU/GU_ConvertParms.h>
 #include <GU/GU_Detail.h>
-#include <GU/GU_PolyReduce.h>
-#include <GU/GU_Surfacer.h>
 #include <PRM/PRM_Parm.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
@@ -65,17 +58,8 @@ struct IsGridTypeArithmetic
 namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
-// HAVE_SURFACING_PARM is disabled in H12.5
-#ifdef SESI_OPENVDB
-#define HAVE_SURFACING_PARM 0
-#else
-#define HAVE_SURFACING_PARM 1
-#endif
-
 
 enum RenderStyle { STYLE_NONE = 0, STYLE_POINTS, STYLE_WIRE_BOX, STYLE_SOLID_BOX };
-
-enum MeshMode { MESH_NONE = 0, MESH_OPENVDB, MESH_HOUDINI };
 
 
 class SOP_OpenVDB_Visualize: public hvdb::SOP_NodeVDB
@@ -130,47 +114,6 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "The VDBs to be visualized (see [specifying volumes|/model/volumes#group])"));
 
-#if HAVE_SURFACING_PARM
-    // Surfacing
-    parms.add(hutil::ParmFactory(PRM_HEADING, "surfacing", "Surfacing"));
-
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "drawsurface", "")
-        .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
-
-    {   // Meshing scheme
-        char const * const items[] = {
-            "openvdb",  "OpenVDB Mesher",
-            "houdini",  "Houdini Surfacer",
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_ORD, "mesher", "Mesher")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setTooltip("Select a meshing scheme.")
-            .setDocumentation("The meshing scheme to be used to visualize scalar volumes"));
-    }
-
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity")
-        .setRange(PRM_RANGE_RESTRICTED, 0.0, PRM_RANGE_RESTRICTED, 1.0)
-        .setDocumentation(
-            "How closely to match the surface\n\n"
-            "Higher adaptivity allows for more variation in polygon size,"
-            " so that fewer polygons are used to represent the surface."));
-
-    //parms.add(hutil::ParmFactory(PRM_TOGGLE, "computeNormals", "Compute Point Normals"));
-
-    parms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue")
-        .setRange(PRM_RANGE_FREE, -2.0, PRM_RANGE_FREE, 2.0)
-        .setDocumentation("The isovalue of the surface to be meshed"));
-    parms.add(
-        hutil::ParmFactory(PRM_RGB_J, "surfaceColor", "Surface Color")
-        .setDefault(std::vector<PRM_Default>(3, PRM_Default(0.84))) // RGB = (0.84, 0.84, 0.84)
-        .setVectorSize(3)
-        .setDocumentation("The color of the surface mesh"));
-
-    // Tree Topology
-    parms.add(hutil::ParmFactory(PRM_HEADING,"treeTopology", "Tree Topology"));
-#endif // HAVE_SURFACING_PARM
-
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addcolor", "Color")
         .setDefault(PRMoneDefaults)
         .setTooltip("Specify whether to draw in color.")
@@ -185,13 +128,6 @@ newSopOperator(OP_OperatorTable* table)
             "For VDBs with [frustum transforms|https://academysoftwarefoundation.github.io/openvdb/"
             "transformsAndMaps.html#sFrustumTransforms],"
             " generate geometry representing the frustum bounding box."));
-
-#ifdef DWA_OPENVDB
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", "Region of Interest")
-        .setDocumentation(
-            "If enabled, generate geometry representing the region of interest"
-            " (for VDBs with ROI metadata)."));
-#endif
 
     char const * const boxItems[] = {
         "wirebox",  "Wireframe Boxes",
@@ -291,6 +227,7 @@ newSopOperator(OP_OperatorTable* table)
     obsoleteParms.beginSwitcher("tabMenu");
     obsoleteParms.addFolder("Tree Topology");
     obsoleteParms.endSwitcher();
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING,"treeTopology", "Tree Topology"));
     obsoleteParms.add(hutil::ParmFactory(PRM_HEADING,"renderOptions", "Render Options"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "extractMesh", "Extract Mesh"));
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "computeNormals", "Compute Point Normals"));
@@ -343,11 +280,22 @@ newSopOperator(OP_OperatorTable* table)
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
     obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "voxelmode", "Active Voxels")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, pointAndBoxItems));
-
-#ifndef DWA_OPENVDB
-    // We probably need this to share hip files.
     obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "previewroi", ""));
-#endif
+    obsoleteParms.add(hutil::ParmFactory(PRM_HEADING, "surfacing", "Surfacing"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_TOGGLE, "drawsurface", ""));
+    {   // Meshing scheme
+        char const * const items[] = {
+            "openvdb",  "OpenVDB Mesher",
+            "houdini",  "Houdini Surfacer",
+            nullptr
+        };
+        obsoleteParms.add(hutil::ParmFactory(PRM_ORD, "mesher", "Mesher")
+            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items));
+    }
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "adaptivity", "Adaptivity"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_FLT_J, "isoValue", "Isovalue"));
+    obsoleteParms.add(hutil::ParmFactory(PRM_RGB_J, "surfaceColor", "Surface Color")
+        .setVectorSize(3));
 
     // Register this operator.
     hvdb::OpenVDBOpFactory("VDB Visualize Tree",
@@ -411,33 +359,13 @@ SOP_OpenVDB_Visualize::resolveObsoleteParms(PRM_ParmList* obsoleteParms)
 
     const fpreal time = 0.0;
 
-    // The "extractMesh" toggle switched Houdini surfacing on or off.
-    PRM_Parm* parm = obsoleteParms->getParmPtr("extractMesh");
-    if (parm && !parm->isFactoryDefault()) {
-        const bool extractMesh = obsoleteParms->evalInt("extractMesh", 0, time);
-        setInt("drawsurface", 0, time, extractMesh);
-        if (extractMesh) setString(UT_String("houdini"), CH_STRING_LITERAL, "mesher", 0, time);
-    }
-
-    // The "meshing" menu included a "Disabled" option, which is now handled with a toggle.
-    parm = obsoleteParms->getParmPtr("meshing");
-    if (parm && !parm->isFactoryDefault()) {
-        // 0: disabled, 1: OpenVDB mesher, 2: Houdini surfacer
-        const int meshing = obsoleteParms->evalInt("meshing", 0, time);
-        setInt("drawsurface", 0, time, meshing > 0);
-        if (meshing) {
-            setString(UT_String(meshing == 2 ? "houdini" : "openvdb"),
-                CH_STRING_LITERAL, "mesher", 0, time);
-        }
-    }
-
     // The "nodes", "tiles" and "voxels" menus all included "Disabled" options,
     // which are now handled with toggles.  The old scheme also had two conflicting
     // ways to enable display of tiles, which the following attempts to reconcile.
 
     const UT_String pointStr("points"), boxStr("box"), wireStr("wirebox");
 
-    parm = obsoleteParms->getParmPtr("nodes");
+    PRM_Parm* parm = obsoleteParms->getParmPtr("nodes");
     if (parm && !parm->isFactoryDefault()) {
         // 0: disabled, 1: leaf nodes and active tiles, 2: leaf and internal nodes
         const int mode = obsoleteParms->evalInt("nodes", 0, time);
@@ -535,15 +463,6 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
     bool changed = false;
 
     const fpreal time = 0.0;
-
-#if HAVE_SURFACING_PARM
-    const bool extractMesh = bool(evalInt("drawsurface", 0, time));
-    changed |= enableParm("mesher", extractMesh);
-    //changed += enableParm("computeNormals", extractMesh);
-    changed |= enableParm("adaptivity", extractMesh);
-    changed |= enableParm("surfaceColor", extractMesh);
-    changed |= enableParm("isoValue", extractMesh);
-#endif
 
     const std::string
         leafMode = evalStdString("leafstyle", time),
@@ -1008,135 +927,6 @@ TreeVisualizer::addBox(const openvdb::CoordBBox& bbox,
 ////////////////////////////////////////
 
 
-#if HAVE_SURFACING_PARM
-
-class GridSurfacer
-{
-public:
-    GridSurfacer(GU_Detail& geo, float iso = 0.0, float adaptivityThreshold = 0.0,
-        bool generateNormals = false, hvdb::Interrupter* interrupter = nullptr);
-
-    template<typename GridType>
-    void operator()(const GridType&);
-
-private:
-    bool wasInterrupted(int percent = -1) const {
-        return mInterrupter && mInterrupter->wasInterrupted(percent);
-    }
-
-    GU_Detail* mGeo;
-    const float mIso, mAdaptivityThreshold;
-    const bool mGenerateNormals;
-    hvdb::Interrupter* mInterrupter;
-};
-
-
-GridSurfacer::GridSurfacer(GU_Detail& geo, float iso,
-    float adaptivityThreshold, bool generateNormals, hvdb::Interrupter* interrupter)
-    : mGeo(&geo)
-    , mIso(iso)
-    , mAdaptivityThreshold(adaptivityThreshold)
-    , mGenerateNormals(generateNormals)
-    , mInterrupter(interrupter)
-{
-}
-
-
-template<typename GridType>
-void
-GridSurfacer::operator()(const GridType& grid)
-{
-    using TreeType = typename GridType::TreeType;
-    using LeafNodeType = typename TreeType::LeafNodeType;
-    openvdb::CoordBBox bbox;
-
-    // Gets min & max and checks if the grid is empty
-    if (grid.tree().evalLeafBoundingBox(bbox)) {
-
-        openvdb::Coord dim(bbox.max() - bbox.min());
-
-        GU_Detail tmpGeo;
-
-        GU_Surfacer surfacer(tmpGeo,
-            UT_Vector3(float(bbox.min().x()), float(bbox.min().y()), float(bbox.min().z())),
-            UT_Vector3(float(dim[0]), float(dim[1]), float(dim[2])),
-            dim[0], dim[1], dim[2], mGenerateNormals);
-
-        typename GridType::ConstAccessor accessor = grid.getConstAccessor();
-
-        openvdb::Coord xyz;
-        fpreal density[8];
-
-        // for each leaf..
-        for (typename TreeType::LeafCIter iter = grid.tree().cbeginLeaf(); iter; iter.next()) {
-
-            if (wasInterrupted()) break;
-
-            bool isLess = false, isMore = false;
-
-            // for each active voxel..
-            typename LeafNodeType::ValueOnCIter it = iter.getLeaf()->cbeginValueOn();
-            for ( ; it; ++it) {
-                xyz = it.getCoord();
-
-                // Sample values at each corner of the voxel
-                for (unsigned int d = 0; d < 8; ++d) {
-
-                    openvdb::Coord valueCoord(
-                        xyz.x() +  (d & 1),
-                        xyz.y() + ((d & 2) >> 1),
-                        xyz.z() + ((d & 4) >> 2));
-
-                    // Houdini uses the inverse sign convention for level sets!
-                    density[d] = mIso - float(accessor.getValue(valueCoord));
-                    density[d] <= 0.0f ? isLess = true : isMore = true;
-                }
-
-                // If there is a crossing, surface this voxel
-                if (isLess && isMore) {
-                    surfacer.addCell(
-                        xyz.x() - bbox.min().x(),
-                        xyz.y() - bbox.min().y(),
-                        xyz.z() - bbox.min().z(),
-                        density, 0);
-                }
-            } // end active voxel traversal
-        } // end leaf traversal
-
-        if (wasInterrupted()) return;
-
-        if (mAdaptivityThreshold > 1e-6) {
-            GU_PolyReduceParms parms;
-            parms.percentage =
-                static_cast<float>(100.0 * (1.0 - std::min(mAdaptivityThreshold, 0.99f)));
-            parms.usepercent = 1;
-            tmpGeo.polyReduce(parms);
-        }
-
-        // world space transform
-        for (GA_Iterator it(tmpGeo.getPointRange()); !it.atEnd(); it.advance()) {
-            GA_Offset ptOffset = it.getOffset();
-
-            UT_Vector3 pos = tmpGeo.getPos3(ptOffset);
-            openvdb::Vec3d vPos(pos.x(), pos.y(), pos.z());
-            openvdb::Vec3d wPos = grid.indexToWorld(vPos);
-
-            tmpGeo.setPos3(ptOffset, UT_Vector3(
-                static_cast<float>(wPos.x()),
-                static_cast<float>(wPos.y()),
-                static_cast<float>(wPos.z())));
-        }
-
-        mGeo->merge(tmpGeo);
-    }
-}
-
-#endif // HAVE_SURFACING_PARM
-
-
-////////////////////////////////////////
-
-
 OP_ERROR
 SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 {
@@ -1152,16 +942,6 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
         const GA_PrimitiveGroup* group = matchGroup(*refGdp, evalStdString("group", time));
 
         // Evaluate the UI parameters.
-        MeshMode meshing = MESH_NONE;
-#if HAVE_SURFACING_PARM
-        if (evalInt("drawsurface", 0, time)) {
-            std::string s = evalStdString("mesher", time);
-            meshing = (s == "houdini") ? MESH_HOUDINI : MESH_OPENVDB;
-        }
-        const double adaptivity = evalFloat("adaptivity", 0, time);
-        const double iso = double(evalFloat("isoValue", 0, time));
-#endif
-
         TreeParms treeParms;
         treeParms.internalStyle =
             evalRenderStyle(*this, "drawinternalnodes", "internalstyle", time);
@@ -1177,45 +957,9 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
         const bool drawTree = (treeParms.internalStyle || treeParms.tileStyle
             || treeParms.leafStyle || treeParms.voxelStyle);
         const bool showFrustum = bool(evalInt("previewfrustum", 0, time));
-#ifdef DWA_OPENVDB
-        const bool showROI = bool(evalInt("previewroi", 0, time));
-#else
-        const bool showROI = false;
-#endif
-
-#if HAVE_SURFACING_PARM
-        if (meshing != MESH_NONE) {
-            fpreal values[3] = {
-                evalFloat("surfaceColor", 0, time),
-                evalFloat("surfaceColor", 1, time),
-                evalFloat("surfaceColor", 2, time)};
-
-            GA_Defaults color;
-            color.set(values, 3);
-            gdp->addFloatTuple(GA_ATTRIB_POINT, "Cd", 3, color);
-        }
-
-        // mesh using OpenVDB mesher
-        if (meshing == MESH_OPENVDB) {
-            GU_ConvertParms parms;
-            parms.setToType(GEO_PrimTypeCompat::GEOPRIMPOLY);
-            parms.myOffset = static_cast<float>(iso);
-            parms.preserveGroups = false;
-            UT_UniquePtr<GA_PrimitiveGroup> groupDeleter;
-            if (!group) {
-                parms.primGroup = nullptr;
-            } else {
-                // parms.primGroup might be modified, so make a copy.
-                parms.primGroup = new GA_PrimitiveGroup(*refGdp);
-                groupDeleter.reset(parms.primGroup);
-                parms.primGroup->copyMembership(*group);
-            }
-            GU_PrimVDB::convertVDBs(*gdp, *refGdp, parms, adaptivity, /*keep_original*/true);
-        }
-#endif // HAVE_SURFACING_PARM
 
         if (!boss.wasInterrupted()
-            && (meshing == MESH_HOUDINI || drawTree || showFrustum || showROI))
+            && (drawTree || showFrustum))
         {
             // for each VDB primitive...
             for (hvdb::VdbPrimCIterator it(refGdp, group); it; ++it) {
@@ -1223,15 +967,6 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                 if (boss.wasInterrupted()) break;
 
                 const GU_PrimVDB *vdb = *it;
-
-#if HAVE_SURFACING_PARM
-                // mesh using houdini surfacer
-                if (meshing == MESH_HOUDINI) {
-                    GridSurfacer surfacer(*gdp, static_cast<float>(iso),
-                        static_cast<float>(adaptivity), false, &boss);
-                    hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, surfacer);
-                }
-#endif
 
                 // draw tree topology
                 if (drawTree) {
@@ -1245,25 +980,6 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                     hvdb::drawFrustum(*gdp, vdb->getGrid().transform(),
                         &box_color, &tick_color, /*shaded*/true);
                 }
-
-#ifdef DWA_OPENVDB
-                if (showROI) {
-                    const openvdb::GridBase& grid = vdb->getConstGrid();
-                    openvdb::Vec3IMetadata::ConstPtr metaMin =
-                        grid.getMetadata<openvdb::Vec3IMetadata>(
-                            openvdb::Name(openvdb_houdini::METADATA_ROI_MIN));
-                    openvdb::Vec3IMetadata::ConstPtr metaMax =
-                        grid.getMetadata<openvdb::Vec3IMetadata>(
-                            openvdb::Name(openvdb_houdini::METADATA_ROI_MAX));
-
-                    if (metaMin && metaMax) {
-                        const UT_Vector3 roiColor(1.0, 0.0, 0.0);
-                        openvdb::CoordBBox roi(
-                            openvdb::Coord(metaMin->value()), openvdb::Coord(metaMax->value()));
-                        createBox(*gdp, grid.transform(), roi, &roiColor);
-                    }
-                }
-#endif
             }
         }
 
