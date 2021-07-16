@@ -69,15 +69,13 @@ endfunction()
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
 # FindPython.
-# @note  the Interpreter component is only required for the python test.
 # @note  the Python::Module target should be used over the Python::Python
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
-
-if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+    list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
 if(${CMAKE_VERSION} VERSION_LESS 3.14)
@@ -210,8 +208,9 @@ set(OPENVDB_PYTHON_MODULE_SOURCE_FILES
 )
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
+  get_filename_component(Python_PACKAGES_DIR ${Python_SITELIB} NAME)
   set(PYOPENVDB_INSTALL_DIRECTORY
-    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}
+    ${CMAKE_INSTALL_LIBDIR}/python${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}/${Python_PACKAGES_DIR}
     CACHE STRING "The directory to install the pyopenvdb.so module."
   )
 endif()

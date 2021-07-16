@@ -317,9 +317,6 @@ list(APPEND _OPENVDB_LIBRARYDIR_SEARCH_DIRS
 set(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
 
 set(OPENVDB_PYTHON_PATH_SUFFIXES
-  ${CMAKE_INSTALL_LIBDIR}/python
-  ${CMAKE_INSTALL_LIBDIR}/python2.7
-  ${CMAKE_INSTALL_LIBDIR}/python3
   lib64/python
   lib64/python2.7
   lib64/python3
@@ -327,6 +324,14 @@ set(OPENVDB_PYTHON_PATH_SUFFIXES
   lib/python2.7
   lib/python3
 )
+
+# Recurse through all the site-packages and dist-packages on the file system
+file(GLOB PYTHON_SITE_PACKAGES ${CMAKE_INSTALL_FULL_LIBDIR}/python**/*)
+foreach(_site_package_full_dir ${PYTHON_SITE_PACKAGES})
+  string(REPLACE ${CMAKE_INSTALL_FULL_LIBDIR} "${CMAKE_INSTALL_LIBDIR}"
+                 _site_package_dir ${_site_package_full_dir})
+  list(APPEND OPENVDB_PYTHON_PATH_SUFFIXES ${_site_package_dir})
+endforeach()
 
 set(OPENVDB_LIB_PATH_SUFFIXES
   ${CMAKE_INSTALL_LIBDIR}
