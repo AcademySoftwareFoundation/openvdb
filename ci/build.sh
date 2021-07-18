@@ -60,7 +60,11 @@ done
 
 # github actions runners have 2 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-export CMAKE_BUILD_PARALLEL_LEVEL=2
+if [ -z $CMAKE_BUILD_PARALLEL_LEVEL ]; then
+    export CMAKE_BUILD_PARALLEL_LEVEL=2
+fi
+
+echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
 
 mkdir -p build
 cd build
