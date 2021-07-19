@@ -1,13 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/Prune.h>
+
+#include <gtest/gtest.h>
+
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);
@@ -277,6 +279,9 @@ TEST_F(TestGridTransformer, testDecomposition)
                                     outM.setTranslation(outT);
                                     EXPECT_TRUE(outM.eq(m));
                                 }
+                                tools::GridTransformer transformer(m);
+                                const bool transformUnchanged = transformer.getTransform().eq(m);
+                                EXPECT_TRUE(transformUnchanged);
                             }
                         }
                     }

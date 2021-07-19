@@ -35,7 +35,37 @@ namespace ax {
 
 class Compiler;
 
-/// @brief Object that encapsulates compiled AX code which can be executed on a target point grid
+/// @brief Object that encapsulates compiled AX code which can be executed on a
+///   collection of VDB Point Data grids. Executables are created by the
+///   compiler and hold the final immutable JIT compiled function and context.
+/// @details  The PointExecutable is returned from the ax::Compiler when
+///   compiling AX code for point execution. The class represents a typical AX
+///   executable object; immutable except for execution settings and implements
+///   'execute' functions which can be called multiple times for arbitrary sets
+///   of inputs. The intended usage of these executables is to configure their
+///   runtime arguments and then call PointExecutable::execute with your VDBs.
+///   For example:
+/// @code
+///   PointExecutable::Ptr exe = compiler.compile<PointExecutable>("@a += 1");
+///   exe->setCreateMissing(false); // fail on missing attributes
+///   exe->setGroupExecution("group1"); // only process points in group1
+///   exe->execute(vdbs); // run on a set of vdb point data grids
+///   exe->execute(points); // run on a single point data grid
+/// @endcode
+///
+///   The setCreateMissing is initialised with specific configurable settings:
+///   - Create Missing: True
+///       By default, create any missing attributes that were accessed
+///       @sa setCreateMissing
+///   - Group Execution: All
+///       By default, process all points regardless of their group membership
+///       @sa setGroupExecution
+///   - Grain size: 1
+///       The default grain sizes passed to the tbb partitioner for leaf level
+///       processing.
+///       @sa setGrainSize
+///
+///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
 class PointExecutable
 {
 public:
@@ -49,7 +79,17 @@ public:
 
     ////////////////////////////////////////////////////////
 
-    /// @brief executes compiled AX code on target grid
+    /// @brief  Run this point executable binary on a target PointDataGrid.
+    /// @details  This method reads from the stored settings on the executable
+    ///   to determine certain behaviour and runs the JIT compiled function
+    ///   across every valid point. Point attributes may be created, deleted
+    ///   collapsed or expanded, and points themselves may be added, deleted
+    ///   or moved.
+    ///
+    ///   This method is thread safe; it can be run concurrently from the same
+    ///   PointExecutable instance on different inputs.
+    ///
+    /// @param grid  The PointDataGrid to process
     void execute(points::PointDataGrid& grid) const;
 
     ////////////////////////////////////////////////////////
@@ -83,29 +123,6 @@ public:
 
     ////////////////////////////////////////////////////////
 
-    // @brief deprecated methods
-    OPENVDB_DEPRECATED void
-    execute(points::PointDataGrid& grid,
-        const std::string* const group,
-        const bool create) const
-    {
-        PointExecutable copy(*this);
-        if (group) copy.setGroupExecution(*group);
-        copy.setCreateMissing(create);
-        copy.execute(grid);
-    }
-
-    OPENVDB_DEPRECATED void
-    execute(points::PointDataGrid& grid,
-        const std::string* const group) const
-    {
-        PointExecutable copy(*this);
-        if (group) copy.setGroupExecution(*group);
-        copy.execute(grid);
-    }
-
-    ////////////////////////////////////////////////////////
-
     // foward declaration of settings for this executable
     struct Settings;
 
@@ -124,11 +141,15 @@ private:
     ///   It can be used to retrieve external data from within the AX code
     /// @param functions A map of function names to physical memory addresses
     ///   which were built by llvm using engine
+    /// @param tree The AST linked to this executable. The AST is not stored
+    ///   after compilation, but can be used during construction of the exe to
+    ///   infer some pre/post processing optimisations.
     PointExecutable(const std::shared_ptr<const llvm::LLVMContext>& context,
                     const std::shared_ptr<const llvm::ExecutionEngine>& engine,
                     const AttributeRegistry::ConstPtr& attributeRegistry,
                     const CustomData::ConstPtr& customData,
-                    const std::unordered_map<std::string, uint64_t>& functions);
+                    const std::unordered_map<std::string, uint64_t>& functions,
+                    const ast::Tree& tree);
 
 private:
     // The Context and ExecutionEngine must exist _only_ for object lifetime

@@ -13,7 +13,7 @@
 #define OPENVDB_TOOLS_TOPOLOGY_TO_LEVELSET_HAS_BEEN_INCLUDED
 
 #include "LevelSetFilter.h"
-#include "Morphology.h" // for erodeVoxels and dilateActiveValues
+#include "Morphology.h" // for erodeActiveValues and dilateActiveValues
 #include "SignedFloodFill.h"
 
 #include <openvdb/Grid.h>
@@ -70,6 +70,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace ttls_internal {
 
@@ -90,7 +91,10 @@ template<typename TreeT>
 struct ErodeOp
 {
     ErodeOp(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const { erodeVoxels( *tree, size); }
+    void operator()() const {
+        tools::erodeActiveValues(*tree, /*iterations=*/size, tools::NN_FACE, tools::IGNORE_TILES);
+        tools::pruneInactive(*tree);
+    }
     TreeT* tree;
     const int size;
 };
@@ -181,7 +185,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
 
 } // namespace ttls_internal
 
-
+/// @endcond
 
 template<typename GridT, typename InterrupterT>
 inline typename GridT::template ValueConverter<float>::Type::Ptr
@@ -206,8 +210,9 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
     MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
 
     // Morphological closing operation.
-    dilateActiveValues( maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES );
-    erodeVoxels( maskTree, closingSteps );
+    tools::dilateActiveValues(maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES);
+    tools::erodeActiveValues(maskTree, /*iterations=*/closingSteps, tools::NN_FACE, tools::IGNORE_TILES);
+    tools::pruneInactive(maskTree);
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.

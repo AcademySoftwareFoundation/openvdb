@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "test/util.h"
-
 #include <openvdb_ax/compiler/Compiler.h>
 #include <openvdb_ax/Exceptions.h>
+
+#include "../util.h"
 
 #include <string>
 #include <vector>

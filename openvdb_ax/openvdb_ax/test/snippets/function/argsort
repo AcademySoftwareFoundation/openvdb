@@ -1,0 +1,33 @@
+
+vec3d input3d = {1.0, -1.0, 0.0};
+vec3f input3f = {1.0f, -1.0f, 0.0f};
+vec3i input3i = {1, -1, 0};
+
+vec4d input4d = {1.0, -1.0, 0.0, 5.0};
+vec4f input4f = {1.0f, -1.0f, 0.0f, 5.0f};
+vec4i input4i = {1, -1, 0, 5};
+
+vec3i sorted3d;
+sorted3d = argsort(input3d);
+
+vec3i sorted3f;
+sorted3f = argsort(input3f);
+
+vec3i sorted3i;
+sorted3i = argsort(input3i);
+
+vec4i sorted4d;
+sorted4d = argsort(input4d);
+
+vec4i sorted4f;
+sorted4f = argsort(input4f);
+
+vec4i sorted4i;
+sorted4i = argsort(input4i);
+
+vec3i@test1 = sorted3d;
+vec3i@test2 = sorted3f;
+vec3i@test3 = sorted3i;
+vec4i@test4 = sorted4d;
+vec4i@test5 = sorted4f;
+vec4i@test6 = sorted4i;

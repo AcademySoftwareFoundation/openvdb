@@ -1,5 +1,5 @@
 
-name: Houdini
+name: Houdini Cache
 
 on:
   schedule:
@@ -12,7 +12,7 @@ on:
 
 jobs:
   houdini18_5:
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     env:
       CXX: clang++
     container:
@@ -36,7 +36,7 @@ jobs:
         key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
   houdini18_0:
-    runs-on: ubuntu-16.04
+    runs-on: ubuntu-latest
     env:
       CXX: clang++
     container:
@@ -50,7 +50,7 @@ jobs:
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
-      run: ./ci/build_houdini.sh Release ON -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
+      run: ./ci/build_houdini.sh Release ON
     - name: test
       run: ./ci/test.sh
     - name: write_houdini_cache

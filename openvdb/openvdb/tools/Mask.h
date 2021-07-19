@@ -31,10 +31,9 @@ interiorMask(const GridType& grid, const double isovalue = 0.0);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace mask_internal {
-
-/// @private
 template<typename GridType>
 struct Traits {
     static const bool isBool = std::is_same<typename GridType::ValueType, bool>::value;
@@ -42,8 +41,6 @@ struct Traits {
     using BoolGridPtrType = typename BoolGridType::Ptr;
 };
 
-
-/// @private
 template<typename GridType>
 inline typename std::enable_if<std::is_floating_point<typename GridType::ValueType>::value,
     typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
@@ -59,8 +56,6 @@ doLevelSetInteriorMask(const GridType& grid, const double isovalue)
     return MaskGridPtrT{};
 }
 
-
-/// @private
 // No-op specialization for non-floating-point grids
 template<typename GridType>
 inline typename std::enable_if<!std::is_floating_point<typename GridType::ValueType>::value,
@@ -71,8 +66,6 @@ doLevelSetInteriorMask(const GridType&, const double /*isovalue*/)
     return MaskGridPtrT{};
 }
 
-
-/// @private
 template<typename GridType>
 inline typename std::enable_if<mask_internal::Traits<GridType>::isBool,
     typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
@@ -82,8 +75,6 @@ doInteriorMask(const GridType& grid, const double /*isovalue*/)
     return grid.deepCopy();
 }
 
-
-/// @private
 template<typename GridType>
 inline typename std::enable_if<!(mask_internal::Traits<GridType>::isBool),
     typename mask_internal::Traits<GridType>::BoolGridPtrType>::type
@@ -104,6 +95,8 @@ doInteriorMask(const GridType& grid, const double isovalue)
 }
 
 } // namespace mask_internal
+
+/// @endcond
 
 
 template<typename GridType>

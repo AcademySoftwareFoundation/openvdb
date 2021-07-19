@@ -72,6 +72,7 @@ inline void deleteFromGroup(PointDataTreeT& pointTree,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_delete_internal {
 
@@ -158,7 +159,6 @@ struct DeleteByFilterOp
 
             // now construct new attribute arrays which exclude data from deleted points
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
             std::vector<std::pair<Index, Index>> indexMapping;
             indexMapping.reserve(newSize);
 
@@ -174,19 +174,6 @@ struct DeleteByFilterOp
                 VectorWrapper indexMappingWrapper(indexMapping);
                 newAttributeArrays[i]->copyValues(*(existingAttributeArrays[i]), indexMappingWrapper);
             }
-#else
-            for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
-                for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter);
-                     iter; ++iter) {
-                    for (size_t i = 0; i < attributeSetSize; i++) {
-                        newAttributeArrays[i]->set(attributeIndex, *(existingAttributeArrays[i]),
-                            *iter);
-                    }
-                    ++attributeIndex;
-                }
-                endOffsets.push_back(static_cast<ValueType>(attributeIndex));
-            }
-#endif
 
             leaf->replaceAttributeSet(newAttributeSet);
             leaf->setOffsets(endOffsets);
@@ -200,6 +187,7 @@ private:
 
 } // namespace point_delete_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

@@ -4,7 +4,9 @@
 /// @file compiler/PointExecutable.cc
 
 #include "PointExecutable.h"
+#include "Logger.h"
 
+#include "../ast/Scanners.h"
 #include "../Exceptions.h"
 // @TODO refactor so we don't have to include PointComputeGenerator.h,
 // but still have the functions defined in one place
@@ -20,6 +22,7 @@
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointMask.h>
 #include <openvdb/points/PointMove.h>
+#include <openvdb/points/PointDelete.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -32,6 +35,7 @@ struct PointExecutable::Settings
     bool mCreateMissing = true;
     size_t mGrainSize = 1;
     std::string mGroup = "";
+    bool mPostDelete = false;
 };
 
 namespace {
@@ -156,13 +160,7 @@ private:
     std::vector<void*> mVoidAttributeHandles;
     std::vector<Handles::UniquePtr> mAttributeHandles;
     std::vector<void*> mVoidGroupHandles;
-#if (OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER > 7 ||  \
-    (OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER >= 7 && \
-     OPENVDB_LIBRARY_MINOR_VERSION_NUMBER >= 1))
     std::vector<points::GroupHandle::UniquePtr> mGroupHandles;
-#else
-    std::vector<std::unique_ptr<points::GroupHandle>> mGroupHandles;
-#endif
     PointLeafLocalData* const mLeafLocalData;
 };
 
@@ -435,8 +433,10 @@ private:
     const std::pair<bool,bool>& mPositionAccess;
 };
 
-void appendMissingAttributes(points::PointDataGrid& grid,
-                             const AttributeRegistry& registry)
+void processAttributes(points::PointDataGrid& grid,
+                       const AttributeRegistry& registry,
+                       const bool createMissing,
+                       Logger& logger)
 {
     auto typePairFromToken =
         [](const ast::tokens::CoreType type) -> NamePair {
@@ -480,16 +480,30 @@ void appendMissingAttributes(points::PointDataGrid& grid,
         const points::AttributeSet::Descriptor& desc = leafIter->attributeSet().descriptor();
         const size_t pos = desc.find(name);
 
+        if (!createMissing && pos == points::AttributeSet::INVALID_POS) {
+            logger.error("Attribute \"" + name + "\" does not exist on grid \"" + grid.getName() + "\"");
+            continue;
+        }
+
         if (pos != points::AttributeSet::INVALID_POS) {
+            const points::AttributeArray* const array = leafIter->attributeSet().getConst(pos);
+            assert(array);
+            if (array->stride() > 1) {
+                logger.warning("Attribute \"" + name + "\" on grid \"" + grid.getName() + "\" "
+                    "is a strided (array) attribute. Reading or writing to this attribute with @" +
+                    name + " will only access the first element.");
+            }
+
             const NamePair& type = desc.type(pos);
             const ast::tokens::CoreType typetoken =
                 ast::tokens::tokenFromTypeString(type.first);
 
             if (typetoken != iter.type() &&
                 !(type.second == "str" && iter.type() == ast::tokens::STRING)) {
-                OPENVDB_THROW(AXExecutionError, "Mismatching attributes types. \"" + name +
-                    "\" exists of type \"" + type.first + "\" but has been "
-                    "accessed with type \"" + ast::tokens::typeStringFromToken(iter.type()) + "\"");
+                logger.error("Mismatching attributes types. Attribute \"" + name +
+                    "\" on grid \"" + grid.getName() + "\" exists of type \"" + type.first +
+                    "\" but has been accessed with type \"" +
+                    ast::tokens::typeStringFromToken(iter.type()) + "\"");
             }
             continue;
         }
@@ -500,31 +514,14 @@ void appendMissingAttributes(points::PointDataGrid& grid,
     }
 }
 
-void checkAttributesExist(const points::PointDataGrid& grid,
-                          const AttributeRegistry& registry)
-{
-    const auto leafIter = grid.tree().cbeginLeaf();
-    assert(leafIter);
-
-    const points::AttributeSet::Descriptor& desc = leafIter->attributeSet().descriptor();
-
-    for (const auto& iter : registry.data()) {
-        const std::string& name = iter.name();
-        const size_t pos = desc.find(name);
-        if (pos == points::AttributeSet::INVALID_POS) {
-            OPENVDB_THROW(AXExecutionError, "Attribute \"" + name +
-                "\" does not exist on grid \"" + grid.getName() + "\"");
-        }
-    }
-}
-
 } // anonymous namespace
 
 PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>& context,
                 const std::shared_ptr<const llvm::ExecutionEngine>& engine,
                 const AttributeRegistry::ConstPtr& attributeRegistry,
                 const CustomData::ConstPtr& customData,
-                const std::unordered_map<std::string, uint64_t>& functions)
+                const std::unordered_map<std::string, uint64_t>& functions,
+                const ast::Tree& ast)
     : mContext(context)
     , mExecutionEngine(engine)
     , mAttributeRegistry(attributeRegistry)
@@ -535,6 +532,9 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
     assert(mContext);
     assert(mExecutionEngine);
     assert(mAttributeRegistry);
+
+    // parse the AST for known functions which require pre/post processing
+    mSettings->mPostDelete = ast::callsFunction(ast, "deletepoint");
 }
 
 PointExecutable::PointExecutable(const PointExecutable& other)
@@ -551,12 +551,25 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
 {
     using LeafManagerT = openvdb::tree::LeafManager<openvdb::points::PointDataTree>;
 
+    Logger* logger;
+    std::unique_ptr<Logger> log;
+    if (true) {
+        /// @note  This branch exists for forwards compatibility with upcoming
+        ///   changes to allow a logger to be provided to the executables
+        log.reset(new Logger([](const std::string& error) {
+            OPENVDB_THROW(AXExecutionError, error);
+        }));
+        logger = log.get();
+    }
+
     const auto leafIter = grid.tree().cbeginLeaf();
-    if (!leafIter) return;
+    if (!leafIter) {
+        logger->warning("PointDataGrid \"" + grid.getName() + "\" is empty.");
+        return;
+    }
 
     // create any missing attributes
-    if (mSettings->mCreateMissing) appendMissingAttributes(grid, *mAttributeRegistry);
-    else                           checkAttributesExist(grid, *mAttributeRegistry);
+    processAttributes(grid, *mAttributeRegistry, mSettings->mCreateMissing, *logger);
 
     const std::pair<bool,bool> positionAccess =
         mAttributeRegistry->accessPattern("P", ast::tokens::VEC3F);
@@ -573,10 +586,34 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         points::appendAttribute<openvdb::Vec3f>(grid.tree(), positionAttribute);
     }
 
-    const bool usingGroup = !mSettings->mGroup.empty();
+    // init the internal dead group if necessary
+
+    if (mSettings->mPostDelete) {
+        // @todo  This group is hard coded in the deletepoint function call - we
+        //  should perhaps instead pass in a unique group string to the point kernel
+        if (leafIter->attributeSet().descriptor().hasGroup("__ax_dead")) {
+            logger->warning("Input points grid \"" + grid.getName() + "\" contains the "
+                "internal point group \"__ax_dead\" which is used for deleting points. "
+                "points in this group may also be removed.");
+        }
+        else {
+            points::appendGroup(grid.tree(), "__ax_dead");
+        }
+    }
+
     openvdb::points::AttributeSet::Descriptor::GroupIndex groupIndex;
-    if (usingGroup) groupIndex = leafIter->attributeSet().groupIndex(mSettings->mGroup);
-    else            groupIndex.first = openvdb::points::AttributeSet::INVALID_POS;
+    groupIndex.first = openvdb::points::AttributeSet::INVALID_POS;
+
+    const bool usingGroup = !mSettings->mGroup.empty();
+    if (usingGroup) {
+        if (!leafIter->attributeSet().descriptor().hasGroup(mSettings->mGroup)) {
+            logger->error("Requested point group \"" + mSettings->mGroup +
+                "\" on grid \"" + grid.getName() + "\" does not exist.");
+        }
+        else {
+            groupIndex = leafIter->attributeSet().groupIndex(mSettings->mGroup);
+        }
+    }
 
     // extract appropriate function pointer
     KernelFunctionPtr compute = nullptr;
@@ -587,9 +624,9 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         compute = reinterpret_cast<KernelFunctionPtr>(iter->second);
     }
     if (!compute) {
-        OPENVDB_THROW(AXCompilerError,
-            "No code has been successfully compiled for execution.");
+        logger->error("No AX kernel found for execution.");
     }
+    if (logger->hasError()) return;
 
     const math::Transform& transform = grid.transform();
     LeafManagerT leafManager(grid.tree());
@@ -683,6 +720,10 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     if (usingPosition) {
         // remove temporary world space storage
         points::dropAttribute(grid.tree(), positionAttribute);
+    }
+
+    if (mSettings->mPostDelete) {
+        points::deleteFromGroup(grid.tree(), "__ax_dead", false, /*drop=*/true);
     }
 }
 

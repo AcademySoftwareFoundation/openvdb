@@ -3,10 +3,12 @@
 //
 /// @file TestQuadraticInterp.cc
 
-#include <sstream>
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Interpolation.h>
+
+#include <gtest/gtest.h>
+
+#include <sstream>
 
 
 namespace {

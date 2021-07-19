@@ -132,8 +132,9 @@ run(int argc, char* argv[])
         const std::string arg = argv[i];
         if (arg == "-l") {
             StringVec allTests;
-            getTestNames(allTests,
-                CppUnit::TestFactoryRegistry::getRegistry().makeTest());
+            const CppUnit::Test* tests = CppUnit::TestFactoryRegistry::getRegistry().makeTest();
+            getTestNames(allTests, tests);
+            delete tests;
             for (const auto& name: allTests) { std::cout << name << "\n"; }
             return EXIT_SUCCESS;
         } else if (arg == "-shuffle") {

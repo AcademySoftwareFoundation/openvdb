@@ -1,0 +1,72 @@
+#!/bin/bash
+
+BINARY=$1
+if [ -z $BINARY ]; then
+    BINARY=vdb_ax
+fi
+echo $BINARY
+
+# Generates a doxygen function.txt file using the available vdb_ax binary
+
+# Add the doxygen header for the functions file
+echo -n "/**
+<div style=\"width:800px;text-align:justify;\">
+
+@page axfunctionlist AX Supported Functions
+
+This page holds the full list of functions currently supported by AX. It is
+usually automatically updated from the most recent output of the @ref vdbaxbinary
+\"vdb_ax binary's\" function option.
+
+@section axfunccontents Functions
+<ul style=\"height: 500px; display:flex; flex-direction:column; flex-wrap:wrap;\">
+" > functions.txt
+
+# 1) Create the contents list (reference links to each function)
+# Get all the function names
+$BINARY functions --list-names > tmp.txt
+# Remove commans
+tr -d , < tmp.txt > tmp2.txt
+# Add new lines between names
+tr ' ' '\n' < tmp2.txt > tmp.txt
+# Remove empty lines (created by the vdb_ax binary wrapping output)
+sed  '/^$/d' tmp.txt > tmp2.txt
+# Append doxygen references to each funciton
+sed -e 's/^\(.*\)/\t<li> @ref ax\1 \"\1\"<\/li>/' tmp2.txt >> functions.txt
+
+# End the function list and add a line break
+echo -n "</ul><hr>
+
+" >> functions.txt
+
+# 2) Add all function descriptions and signatures from the binary
+# First add a new line - this is for the next sed call which looks for a new
+# line followed by the function name
+echo "" > tmp.txt
+$BINARY functions --list >> tmp.txt
+echo "" >> tmp.txt
+
+# look for functions such:
+# \n
+# functionname
+# |
+# and wrap the name in anchors and paragraphs
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/\n\([a-z0-9]\+\)\n|/\n@anchor ax\1\n@par \1/g' tmp.txt
+# Remove all "| -" which exist before the function help
+sed -i 's/| - //g' tmp.txt
+# Replace |\n with @code{.c}
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/|\n/@code{.c}\n/g' tmp.txt
+# Append semicolons to functions
+sed -i 's/|  - \(.*\)/\1;/g' tmp.txt
+# Replace ;\n\n with ;\n:@endcode\n\n
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/;\n\n/;\n@endcode\n\n/g' tmp.txt
+# Remove left over pipes
+sed -i -e ':a' -e 'N' -e '$!ba' -e 's/|   //g' tmp.txt
+
+# Combine
+cat tmp.txt >> functions.txt
+echo -n "</div>
+*/" >> functions.txt
+
+# cleanup
+rm tmp.txt tmp2.txt

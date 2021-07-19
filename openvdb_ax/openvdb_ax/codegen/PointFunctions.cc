@@ -37,15 +37,16 @@ namespace codegen {
 namespace
 {
 
-/// @todo  Provide more framework for functions such that they can only
-///        be registered against compatible code generators.
-inline void verifyContext(const llvm::Function* const F, const std::string& name)
-{
-    if (!F || F->getName() != "ax.compute.point") {
-        OPENVDB_THROW(AXCompilerError, "Function \"" << name << "\" cannot be called for "
-            "the current target. This function only runs on OpenVDB Point Grids.");
+#define OPENVDB_AX_CHECK_MODULE_CONTEXT(B) \
+    { \
+        const llvm::Function* F = B.GetInsertBlock()->getParent(); \
+        const llvm::Module* M = F ? F->getParent() : nullptr; \
+        if (!M || M->getName() != "ax.point.module") { \
+            OPENVDB_THROW(AXCompilerError, "Function \"" << (F ? F->getName().str() : "unknown") << \
+                "\" cannot be called for the current target:\"" << (M ? M->getName().str() : "unknown") << \
+                "\". This function only runs on OpenVDB Point Grids."); \
+        } \
     }
-}
 
 /// @brief  Retrieve a group handle from an expected vector of handles using the offset
 ///         pointed to by the engine data. Note that HandleT should only ever be a GroupHandle
@@ -68,7 +69,7 @@ groupHandle(const std::string& name, void** groupHandles, const void* const data
 inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
 {
     static auto ingroup =
-        [](const AXString* const name,
+        [](const codegen::String* const name,
            const uint64_t index,
            void** groupHandles,
            const void* const leafDataPtr,
@@ -77,10 +78,10 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
         assert(name);
         assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
-        if (name->size == 0) return false;
+        if (name->size() == 0) return false;
         if (!groupHandles) return false;
 
-        const std::string nameStr(name->ptr, name->size);
+        const std::string nameStr = name->str();
         const openvdb::points::GroupHandle* handle =
             groupHandle<openvdb::points::GroupHandle>(nameStr, groupHandles, data);
         if (handle) return handle->get(static_cast<openvdb::Index>(index));
@@ -93,7 +94,7 @@ inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
         return handle ? handle->get(static_cast<openvdb::Index>(index)) : false;
     };
 
-    using InGroup = bool(const AXString* const,
+    using InGroup = bool(const codegen::String* const,
        const uint64_t,
        void**,
        const void* const,
@@ -123,9 +124,9 @@ inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
+        OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        verifyContext(compute, "ingroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
@@ -144,7 +145,7 @@ inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
     };
 
     return FunctionBuilder("ingroup")
-        .addSignature<bool(const AXString* const)>(generate)
+        .addSignature<bool(const codegen::String* const)>(generate)
         .addDependency("_ingroup")
         .setEmbedIR(true)
         .setConstantFold(false)
@@ -158,7 +159,7 @@ inline FunctionGroup::UniquePtr axingroup(const FunctionOptions& op)
 inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
 {
     static auto editgroup =
-        [](const AXString* const name,
+        [](const codegen::String* const name,
            const uint64_t index,
            void** groupHandles,
            void* const leafDataPtr,
@@ -166,12 +167,12 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
            const bool flag)
     {
         assert(name);
-        if (name->size == 0) return;
+        if (name->size() == 0) return;
 
         // Get the group handle out of the pre-existing container of handles if they
         // exist
 
-        const std::string nameStr(name->ptr, name->size);
+        const std::string nameStr = name->str();
         openvdb::points::GroupWriteHandle* handle = nullptr;
         if (groupHandles) {
             handle = groupHandle<openvdb::points::GroupWriteHandle>(nameStr, groupHandles, data);
@@ -192,7 +193,26 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
         handle->set(static_cast<openvdb::Index>(index), flag);
     };
 
-    using EditGroup = void(const AXString* const,
+    static auto editgroupcstar =
+        [](const char* const name,
+           const uint64_t index,
+           void** groupHandles,
+           void* const leafDataPtr,
+           const void* const data,
+           const bool flag)
+    {
+        const codegen::String str(name);
+        editgroup(&str, index, groupHandles, leafDataPtr, data, flag);
+    };
+
+    using EditGroup = void(const codegen::String* const,
+           const uint64_t,
+           void**,
+           void* const,
+           const void* const,
+           const bool);
+
+    using EditGroupCstar = void(const char* const,
            const uint64_t,
            void**,
            void* const,
@@ -201,6 +221,7 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
 
     return FunctionBuilder("editgroup")
         .addSignature<EditGroup>(editgroup)
+        .addSignature<EditGroupCstar>(editgroupcstar)
         .addParameterAttribute(0, llvm::Attribute::ReadOnly)
         .addParameterAttribute(2, llvm::Attribute::ReadOnly)
         .addParameterAttribute(3, llvm::Attribute::ReadOnly)
@@ -217,9 +238,9 @@ inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
         [op](const std::vector<llvm::Value*>& args,
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
+        OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         // Pull out parent function arguments
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        verifyContext(compute, "addtogroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
@@ -239,7 +260,8 @@ inline FunctionGroup::UniquePtr axaddtogroup(const FunctionOptions& op)
     };
 
     return FunctionBuilder("addtogroup")
-        .addSignature<void(const AXString* const)>(generate)
+        .addSignature<void(const codegen::String* const)>(generate)
+        .addSignature<void(const char* const)>(generate) // to support axdeletepoint() @todo fix
         .addDependency("editgroup")
         .setEmbedIR(true)
         .setConstantFold(false)
@@ -258,8 +280,8 @@ inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
         // Pull out parent function arguments
+        OPENVDB_AX_CHECK_MODULE_CONTEXT(B);
         llvm::Function* compute = B.GetInsertBlock()->getParent();
-        verifyContext(compute, "removefromgroup");
         llvm::Value* point_index = extractArgument(compute, "point_index");
         llvm::Value* group_handles = extractArgument(compute, "group_handles");
         llvm::Value* leaf_data = extractArgument(compute, "leaf_data");
@@ -279,7 +301,7 @@ inline FunctionGroup::UniquePtr axremovefromgroup(const FunctionOptions& op)
     };
 
     return FunctionBuilder("removefromgroup")
-        .addSignature<void(const AXString* const)>(generate)
+        .addSignature<void(const codegen::String* const)>(generate)
         .addDependency("editgroup")
         .setEmbedIR(true)
         .setConstantFold(false)
@@ -297,15 +319,9 @@ inline FunctionGroup::UniquePtr axdeletepoint(const FunctionOptions& op)
              llvm::IRBuilder<>& B) -> llvm::Value*
     {
         // args guaranteed to be empty
-        llvm::Constant* loc = llvm::cast<llvm::Constant>(B.CreateGlobalStringPtr("dead")); // char*
-        llvm::Constant* size = LLVMType<AXString::SizeType>::get(B.getContext(), 4);
-        llvm::Value* str = LLVMType<AXString>::get(B.getContext(), loc, size);
-        // Always allocate an AXString here for easier passing to functions
-        // @todo shouldn't need an AXString for char* literals
-        llvm::Value* alloc =
-            B.CreateAlloca(LLVMType<AXString>::get(B.getContext()));
-        B.CreateStore(str, alloc);
-        return axaddtogroup(op)->execute({alloc}, B);
+        const std::string deadGroup = "__ax_dead";
+        llvm::Constant* loc = llvm::cast<llvm::Constant>(B.CreateGlobalStringPtr(deadGroup.c_str())); // char*
+        return axaddtogroup(op)->execute({loc}, B);
     };
 
     return FunctionBuilder("deletepoint")
@@ -342,7 +358,7 @@ inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
     static auto setattribstr =
         [](void* attributeHandle,
            const uint64_t index,
-           const AXString* value,
+           const codegen::String* value,
            void* const leafDataPtr)
     {
         using AttributeHandleType = openvdb::points::StringAttributeWriteHandle;
@@ -352,7 +368,7 @@ inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
         assert(leafDataPtr);
         assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
 
-        const std::string s(value->ptr, value->size);
+        const std::string s = value->str();
         AttributeHandleType* const handle =
             static_cast<AttributeHandleType*>(attributeHandle);
         codegen_internal::PointLeafLocalData* const leafData =
@@ -396,7 +412,7 @@ inline FunctionGroup::UniquePtr axsetattribute(const FunctionOptions& op)
     using SetAttribM3F = void(void*, uint64_t, const openvdb::math::Mat3<float>*);
     using SetAttribM4D = void(void*, uint64_t, const openvdb::math::Mat4<double>*);
     using SetAttribM4F = void(void*, uint64_t, const openvdb::math::Mat4<float>*);
-    using SetAttribStr = void(void*, uint64_t, const AXString*, void* const);
+    using SetAttribStr = void(void*, uint64_t, const codegen::String*, void* const);
 
     return FunctionBuilder("setattribute")
         .addSignature<SetAttribD>((SetAttribD*)(setattrib))
@@ -460,7 +476,7 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
     static auto getattribstr =
         [](void* attributeHandle,
            uint64_t index,
-           AXString* value,
+           codegen::String* value,
            const void* const leafDataPtr)
     {
         using AttributeHandleType = openvdb::points::StringAttributeHandle;
@@ -480,8 +496,7 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
             handle->get(data, static_cast<openvdb::Index>(index));
         }
 
-        assert(value->size == static_cast<AXString::SizeType>(data.size()));
-        strcpy(const_cast<char*>(value->ptr), data.c_str());
+        *value = data;
     };
 
     using GetAttribD = void(void*, uint64_t, double*);
@@ -503,7 +518,7 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
     using GetAttribM3F = void(void*, uint64_t, openvdb::math::Mat3<float>*);
     using GetAttribM4D = void(void*, uint64_t, openvdb::math::Mat4<double>*);
     using GetAttribM4F = void(void*, uint64_t, openvdb::math::Mat4<float>*);
-    using GetAttribStr = void(void*, uint64_t, AXString*, const void* const);
+    using GetAttribStr = void(void*, uint64_t, codegen::String*, const void* const);
 
     return FunctionBuilder("getattribute")
         .addSignature<GetAttribD>((GetAttribD*)(getattrib))
@@ -538,41 +553,6 @@ inline FunctionGroup::UniquePtr axgetattribute(const FunctionOptions& op)
         .get();
 }
 
-inline FunctionGroup::UniquePtr axstrattribsize(const FunctionOptions& op)
-{
-    static auto strattribsize =
-        [](void* attributeHandle,
-           uint64_t index,
-           const void* const leafDataPtr) -> AXString::SizeType
-    {
-        using AttributeHandleType = openvdb::points::StringAttributeHandle;
-
-        assert(attributeHandle);
-        assert(leafDataPtr);
-        assert(index < static_cast<uint64_t>(std::numeric_limits<openvdb::Index>::max()));
-
-        const AttributeHandleType* const handle =
-            static_cast<AttributeHandleType*>(attributeHandle);
-        const codegen_internal::PointLeafLocalData* const leafData =
-            static_cast<const codegen_internal::PointLeafLocalData*>(leafDataPtr);
-
-        std::string data;
-        if (!leafData->getNewStringData(&(handle->array()), index, data)) {
-            handle->get(data, static_cast<openvdb::Index>(index));
-        }
-
-        return static_cast<AXString::SizeType>(data.size());
-    };
-
-    using StrAttribSize = AXString::SizeType(void*, uint64_t, const void* const);
-
-    return FunctionBuilder("strattribsize")
-        .addSignature<StrAttribSize>((StrAttribSize*)(strattribsize))
-        .setConstantFold(false)
-        .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Internal function for querying the size of a points string attribute")
-        .get();
-}
 
 ////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////////////////////////////////////
@@ -600,7 +580,6 @@ void insertVDBPointFunctions(FunctionRegistry& registry,
     add("editgroup", axeditgroup, true);
     add("getattribute", axgetattribute, true);
     add("setattribute", axsetattribute, true);
-    add("strattribsize", axstrattribsize, true);
 }
 
 } // namespace codegen

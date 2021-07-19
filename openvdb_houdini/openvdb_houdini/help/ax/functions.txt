@@ -1,0 +1,577 @@
+
+<style>
+
+.axsignature {
+  position: relative;
+  color: #888; }
+.axname {
+  color: black; }
+.axstring {
+  color: #c39c79; }
+.axvec {
+  color: #8d31ae; }
+.axmat {
+  color: #60bc8f; }
+.axint {
+  color: #91a835; }
+.axfloat {
+  color: #06C; }
+.axdouble {
+  color: #06C; }
+.axvoid {
+  color: #ccc; }
+
+</style>
+
+Function ||
+    Description ||
+        Signatures ||
+
+<p><code>abs</code></p>  |
+    Computes the absolute value of an integer number. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">abs</span>(<span class="axint">int64</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">abs</span>(<span class="axint">int32</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">abs</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">abs</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>acos</code></p>  |
+    Computes the principal value of the arc cosine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">acos</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">acos</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>acosh</code></p>  |
+    Computes the inverse hyperbolic cosine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">acosh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">acosh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>addtogroup</code></p>  |
+    Add the current point to the given group name, effectively setting its membership to true. If the
+    group does not exist, it is implicitly created. This function has no effect if the point
+    already belongs to the given group. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">addtogroup</span>(<span class="axstring">string</span>)</code></div>
+
+<p><code>adjoint</code></p>  |
+    Returns the adjoint of a 3x3 matrix. That is, the transpose of its cofactor matrix. |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3d</span> <span class="axname">adjoint</span>(<span class="axmat">mat3d</span> input)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> <span class="axname">adjoint</span>(<span class="axmat">mat3f</span> input)</code></div>
+
+<p><code>argsort</code></p>  |
+    Returns a vector of the indexes that would sort the input vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3i</span> <span class="axname">argsort</span>(<span class="axvec">vec3d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3i</span> <span class="axname">argsort</span>(<span class="axvec">vec3f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3i</span> <span class="axname">argsort</span>(<span class="axvec">vec3i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4i</span> <span class="axname">argsort</span>(<span class="axvec">vec4d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4i</span> <span class="axname">argsort</span>(<span class="axvec">vec4f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4i</span> <span class="axname">argsort</span>(<span class="axvec">vec4i</span> v)</code></div>
+
+<p><code>asin</code></p>  |
+    Computes the principal value of the arc sine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">asin</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">asin</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>asinh</code></p>  |
+    Computes the inverse hyperbolic sine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">asinh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">asinh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>atan</code></p>  |
+    Computes the principal value of the arc tangent of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">atan</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">atan</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>atan2</code></p>  |
+    Computes the arc tangent of y/x using the signs of arguments to determine the correct quadrant. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> atan2(<span class="axdouble">double</span> y; <span class="axdouble">double</span> x)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> atan2(<span class="axfloat">float</span> y; <span class="axfloat">float</span> x)</code></div>
+
+<p><code>atanh</code></p>  |
+    Computes the inverse hyperbolic tangent of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">atanh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">atanh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>atof</code></p>  |
+    Parses the <span class="axstring">string</span> input, interpreting its content as a <span class="axfloat">float</span>ing point number and returns its value
+    as a <span class="axdouble">double</span>. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">atof</span>(i8* str)</code></div>
+
+<p><code>atoi</code></p>  |
+    Parses the <span class="axstring">string</span> input interpreting its content as an integral number, which is returned as a value
+    of type int. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">atoi</span>(i8* str)</code></div>
+
+<p><code>cbrt</code></p>  |
+    Computes the cubic root of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">cbrt</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">cbrt</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>ceil</code></p>  |
+    Computes the smallest integer value not less than arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">ceil</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">ceil</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>clamp</code></p>  |
+    Clamps the first argument to the minimum second argument value and maximum third argument value |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">clamp</span>(<span class="axdouble">double</span> in; <span class="axdouble">double</span> min; <span class="axdouble">double</span> max)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">clamp</span>(<span class="axfloat">float</span> in; <span class="axfloat">float</span> min; <span class="axfloat">float</span> max)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">clamp</span>(<span class="axint">int64</span> in; <span class="axint">int64</span> min; <span class="axint">int64</span> max)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">clamp</span>(<span class="axint">int32</span> in; <span class="axint">int32</span> min; <span class="axint">int32</span> max)</code></div>
+
+<p><code>cofactor</code></p>  |
+    Returns the cofactor matrix of a 3x3 matrix. That is, the matrix of its cofactors. |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3d</span> <span class="axname">cofactor</span>(<span class="axmat">mat3d</span> input)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> <span class="axname">cofactor</span>(<span class="axmat">mat3f</span> input)</code></div>
+
+<p><code>cos</code></p>  |
+    Computes the cosine of arg (measured in radians). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">cos</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">cos</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>cosh</code></p>  |
+    Computes the hyperbolic cosine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">cosh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">cosh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>cross</code></p>  |
+    Returns the length of the given vector |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">cross</span>(<span class="axvec">vec3d</span> a; <span class="axvec">vec3d</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">cross</span>(<span class="axvec">vec3f</span> a; <span class="axvec">vec3f</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3i</span> <span class="axname">cross</span>(<span class="axvec">vec3i</span> a; <span class="axvec">vec3i</span> b)</code></div>
+
+<p><code>curlsimplexnoise</code></p>  |
+    Generates divergence-free 3D noise, computed using a curl function on Simplex Noise. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">curlsimplexnoise</span>(<span class="axvec">vec3d</span> pos)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">curlsimplexnoise</span>(<span class="axdouble">double</span> pos; <span class="axdouble">double</span>; <span class="axdouble">double</span>)</code></div>
+
+<p><code>degrees</code></p>  |
+    Converts the number of radians to degrees. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">degrees</span>(<span class="axdouble">double</span> radians)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">degrees</span>(<span class="axfloat">float</span> radians)</code></div>
+
+<p><code>deletepoint</code></p>  |
+    Delete the current point from the point set. Note that this does not stop AX execution - any
+    additional AX commands will be executed on the point and it will remain accessible until the
+    end of execution. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">deletepoint</span>()</code></div>
+
+<p><code>determinant</code></p>  |
+    Returns the determinant of a matrix. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">determinant</span>(<span class="axmat">mat3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">determinant</span>(<span class="axmat">mat3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">determinant</span>(<span class="axmat">mat4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">determinant</span>(<span class="axmat">mat4f</span> mat)</code></div>
+
+<p><code>diag</code></p>  |
+    Create a diagonal matrix from a vector, or return the diagonal components of a matrix as a vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">diag</span>(<span class="axmat">mat3d</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">diag</span>(<span class="axmat">mat3f</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">diag</span>(<span class="axmat">mat4d</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4f</span> <span class="axname">diag</span>(<span class="axmat">mat4f</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3d</span> <span class="axname">diag</span>(<span class="axvec">vec3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> <span class="axname">diag</span>(<span class="axvec">vec3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat4d</span> <span class="axname">diag</span>(<span class="axvec">vec4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat4f</span> <span class="axname">diag</span>(<span class="axvec">vec4f</span> mat)</code></div>
+
+<p><code>dot</code></p>  |
+    Computes the dot product of two vectors. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">dot</span>(<span class="axvec">vec3d</span> a; <span class="axvec">vec3d</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">dot</span>(<span class="axvec">vec3f</span> a; <span class="axvec">vec3f</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">dot</span>(<span class="axvec">vec3i</span> a; <span class="axvec">vec3i</span> b)</code></div>
+
+<p><code>euclideanmod</code></p>  |
+    Euclidean modulo, where by the result of the division operator on (dividend / divisor) is floored or
+    ceiled depending on its sign, guaranteeing that the return value is always positive. The
+    remainder is thus calculated with D - d * (d < 0 ? <span class="axname">ceil</span>(D/d) : <span class="axname">floor</span>(D/d)). This is NOT equal
+    to a%b in AX. See <span class="axname">truncatemod</span>(), <span class="axname">floormod</span>(). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">euclideanmod</span>(<span class="axdouble">double</span> dividend; <span class="axdouble">double</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">euclideanmod</span>(<span class="axfloat">float</span> dividend; <span class="axfloat">float</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">euclideanmod</span>(<span class="axint">int64</span> dividend; <span class="axint">int64</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">euclideanmod</span>(<span class="axint">int32</span> dividend; <span class="axint">int32</span> divisor)</code></div>
+
+<p><code>exp</code></p>  |
+    Computes e (Euler's number, 2.7182818...) raised to the given power arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">exp</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">exp</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>exp2</code></p>  |
+    Computes 2 raised to the given power arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> exp2(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> exp2(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>external</code></p>  |
+    Find a custom user parameter with a given name of type '<span class="axfloat">float</span>' in the Custom data provided to the AX
+    compiler. If the data can not be found, or is not of the expected type 0.0f is returned. |
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">external</span>(<span class="axstring">string</span> str)</code></div>
+
+<p><code>externalv</code></p>  |
+    Find a custom user parameter with a given name of type 'vector <span class="axfloat">float</span>' in the Custom data provided to
+    the AX compiler. If the data can not be found, or is not of the expected type { 0.0f, 0.0f,
+    0.0f } is returned. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">externalv</span>(<span class="axstring">string</span> str)</code></div>
+
+<p><code>fabs</code></p>  |
+    Computes the absolute value of a <span class="axfloat">float</span>ing point value arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">fabs</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">fabs</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>fit</code></p>  |
+    Fit the first argument to the output range by first clamping the value between the second and third
+    input range arguments and then remapping the result to the output range fourth and fifth
+    arguments |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">fit</span>(<span class="axdouble">double</span> value; <span class="axdouble">double</span> omin; <span class="axdouble">double</span> omax; <span class="axdouble">double</span> nmin; <span class="axdouble">double</span> nmax)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">fit</span>(<span class="axfloat">float</span> value; <span class="axfloat">float</span> omin; <span class="axfloat">float</span> omax; <span class="axfloat">float</span> nmin; <span class="axfloat">float</span> nmax)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">fit</span>(<span class="axint">int64</span> value; <span class="axint">int64</span> omin; <span class="axint">int64</span> omax; <span class="axint">int64</span> nmin; <span class="axint">int64</span> nmax)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">fit</span>(<span class="axint">int32</span> value; <span class="axint">int32</span> omin; <span class="axint">int32</span> omax; <span class="axint">int32</span> nmin; <span class="axint">int32</span> nmax)</code></div>
+
+<p><code>floor</code></p>  |
+    Computes the largest integer value not greater than arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">floor</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">floor</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>floormod</code></p>  |
+    Floored modulo, where the result of the division operator on (dividend / divisor) is floored. The
+    remainder is thus calculated with D - d * <span class="axname">floor</span>(D/d). This is the implemented modulo % operator
+    of AX. This is equal to the python % implementation. See <span class="axname">trucnatemod</span>(), <span class="axname">euclideanmod</span>(). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">floormod</span>(<span class="axdouble">double</span> dividend; <span class="axdouble">double</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">floormod</span>(<span class="axfloat">float</span> dividend; <span class="axfloat">float</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">floormod</span>(<span class="axint">int64</span> dividend; <span class="axint">int64</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">floormod</span>(<span class="axint">int32</span> dividend; <span class="axint">int32</span> divisor)</code></div>
+
+<p><code>getcoordx</code></p>  |
+    Returns the current voxel's X index value in index space as an integer. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">getcoordx</span>()</code></div>
+
+<p><code>getcoordy</code></p>  |
+    Returns the current voxel's Y index value in index space as an integer. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">getcoordy</span>()</code></div>
+
+<p><code>getcoordz</code></p>  |
+    Returns the current voxel's Z index value in index space as an integer. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">getcoordz</span>()</code></div>
+
+<p><code>getvoxelpws</code></p>  |
+    Returns the current voxel's position in world space as a vector <span class="axfloat">float</span>. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">getvoxelpws</span>()</code></div>
+
+<p><code>hash</code></p>  |
+    Return a hash of the provided <span class="axstring">string</span>. |
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">hash</span>(<span class="axstring">string</span> str)</code></div>
+
+<p><code>identity3</code></p>  |
+    Returns the 3x3 identity matrix |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> identity3()</code></div>
+
+<p><code>identity4</code></p>  |
+    Returns the 4x4 identity matrix |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat4f</span> identity4()</code></div>
+
+<p><code>ingroup</code></p>  |
+    Return whether or not the current point is a member of the given group name. This returns false if
+    the group does not exist. |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">ingroup</span>(<span class="axstring">string</span>)</code></div>
+
+<p><code>inverse</code></p>  |
+    Return the inverse of a 3x3 matrix.If the matrix is singular, returns the input matrix. |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3d</span> <span class="axname">inverse</span>(<span class="axmat">mat3d</span> input)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> <span class="axname">inverse</span>(<span class="axmat">mat3f</span> input)</code></div>
+
+<p><code>isfinite</code></p>  |
+    Returns whether the value is finite i.e. not infinite or NaN. For matrix and vector types will
+    return false if any element is not finite. |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec2d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec2f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axvec">vec4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axmat">mat3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axmat">mat3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axmat">mat4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axmat">mat4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isfinite</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>isinf</code></p>  |
+    Returns whether the value is inf. For matrix and vector types will return true if any element is
+    inf. |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec2d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec2f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axvec">vec4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axmat">mat3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axmat">mat3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axmat">mat4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axmat">mat4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isinf</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>isnan</code></p>  |
+    Returns whether the value is NaN (not-a-number). |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec2d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec2f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axvec">vec4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axmat">mat3f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axmat">mat3d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axmat">mat4f</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axmat">mat4d</span>)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">isnan</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>length</code></p>  |
+    Returns the length of the given vector |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec2d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">length</span>(<span class="axvec">vec2f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec2i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec3d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">length</span>(<span class="axvec">vec3f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec3i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec4d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">length</span>(<span class="axvec">vec4f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">length</span>(<span class="axvec">vec4i</span> v)</code></div>
+
+<p><code>lengthsq</code></p>  |
+    Returns the squared length of the given vector |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">lengthsq</span>(<span class="axvec">vec2d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">lengthsq</span>(<span class="axvec">vec2f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">lengthsq</span>(<span class="axvec">vec2i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">lengthsq</span>(<span class="axvec">vec3d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">lengthsq</span>(<span class="axvec">vec3f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">lengthsq</span>(<span class="axvec">vec3i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">lengthsq</span>(<span class="axvec">vec4d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">lengthsq</span>(<span class="axvec">vec4f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">lengthsq</span>(<span class="axvec">vec4i</span> v)</code></div>
+
+<p><code>lerp</code></p>  |
+    Performs bilinear interpolation between the values. If the amount is outside the range 0 to 1, the
+    values will be extrapolated linearly. If amount is 0, the first value is returned. If it is 1,
+    the second value is returned. This implementation is guaranteed to be monotonic. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">lerp</span>(<span class="axdouble">double</span> a; <span class="axdouble">double</span> b; <span class="axdouble">double</span> amount)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">lerp</span>(<span class="axfloat">float</span> a; <span class="axfloat">float</span> b; <span class="axfloat">float</span> amount)</code></div>
+
+<p><code>log</code></p>  |
+    Computes the natural (base e) logarithm of arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">log</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">log</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>log10</code></p>  |
+    Computes the common (base-10) logarithm of arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> log10(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> log10(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>log2</code></p>  |
+    Computes the binary (base-2) logarithm of arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> log2(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> log2(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>max</code></p>  |
+    Returns the larger of the given values. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">max</span>(<span class="axdouble">double</span> a; <span class="axdouble">double</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">max</span>(<span class="axfloat">float</span> a; <span class="axfloat">float</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">max</span>(<span class="axint">int64</span> a; <span class="axint">int64</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">max</span>(<span class="axint">int32</span> a; <span class="axint">int32</span> b)</code></div>
+
+<p><code>min</code></p>  |
+    Returns the smaller of the given values. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">min</span>(<span class="axdouble">double</span> a; <span class="axdouble">double</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">min</span>(<span class="axfloat">float</span> a; <span class="axfloat">float</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">min</span>(<span class="axint">int64</span> a; <span class="axint">int64</span> b)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">min</span>(<span class="axint">int32</span> a; <span class="axint">int32</span> b)</code></div>
+
+<p><code>normalize</code></p>  |
+    Returns the normalized result of the given vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">normalize</span>(<span class="axvec">vec3d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">normalize</span>(<span class="axvec">vec3f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">normalize</span>(<span class="axvec">vec3i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">normalize</span>(<span class="axvec">vec4d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4f</span> <span class="axname">normalize</span>(<span class="axvec">vec4f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">normalize</span>(<span class="axvec">vec4i</span> v)</code></div>
+
+<p><code>polardecompose</code></p>  |
+    Decompose an invertible 3x3 matrix into its orthogonal (unitary) matrix and symmetric matrix
+    components. If the determinant of the unitary matrix is 1 it is a rotation, otherwise if it is
+    -1 there is some part reflection. |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">polardecompose</span>(<span class="axmat">mat3d</span> input; <span class="axmat">mat3d</span> unitary; <span class="axmat">mat3d</span> symmetric)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">polardecompose</span>(<span class="axmat">mat3f</span> input; <span class="axmat">mat3f</span> unitary; <span class="axmat">mat3f</span> symmetric)</code></div>
+
+<p><code>postscale</code></p>  |
+    Post-scale a given matrix by the provided vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">postscale</span>(<span class="axmat">mat4d</span> transform; <span class="axvec">vec3d</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">postscale</span>(<span class="axmat">mat4f</span> transform; <span class="axvec">vec3f</span> vec)</code></div>
+
+<p><code>pow</code></p>  |
+    Computes the value of the first argument raised to the power of the second argument. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">pow</span>(<span class="axdouble">double</span> base; <span class="axdouble">double</span> exp)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">pow</span>(<span class="axfloat">float</span> base; <span class="axfloat">float</span> exp)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">pow</span>(<span class="axdouble">double</span> base; <span class="axint">int32</span> exp)</code></div>
+
+<p><code>prescale</code></p>  |
+    Pre-scale a given matrix by the provided vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">prescale</span>(<span class="axmat">mat4d</span> transform; <span class="axvec">vec3d</span> vec)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">prescale</span>(<span class="axmat">mat4f</span> transform; <span class="axvec">vec3f</span> vec)</code></div>
+
+<p><code>pretransform</code></p>  |
+    Return the transformed vector by transpose of this matrix. This function is equivalent to
+    pre-multiplying the matrix. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">pretransform</span>(<span class="axmat">mat3d</span> vec; <span class="axvec">vec3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">pretransform</span>(<span class="axmat">mat3f</span> vec; <span class="axvec">vec3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">pretransform</span>(<span class="axmat">mat4d</span> vec; <span class="axvec">vec3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">pretransform</span>(<span class="axmat">mat4f</span> vec; <span class="axvec">vec3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">pretransform</span>(<span class="axmat">mat4d</span> vec; <span class="axvec">vec4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4f</span> <span class="axname">pretransform</span>(<span class="axmat">mat4f</span> vec; <span class="axvec">vec4f</span> mat)</code></div>
+
+<p><code>print</code></p>  |
+    Prints the input to the standard output stream. Warning: This will be run for every element. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axfloat">float</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axint">int64</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axint">int32</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axstring">string</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec2i</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec2f</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec2d</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec3i</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec3f</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec3d</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec4i</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec4f</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axvec">vec4d</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axmat">mat3f</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axmat">mat3d</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axmat">mat4f</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">print</span>(<span class="axmat">mat4d</span> n)</code></div>
+
+<p><code>radians</code></p>  |
+    Converts the number of degrees to radians. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">radians</span>(<span class="axdouble">double</span> degrees)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">radians</span>(<span class="axfloat">float</span> degrees)</code></div>
+
+<p><code>rand</code></p>  |
+    Creates a random number based on the provided seed. The number will be in the range of 0 to 1. The
+    same number is produced for the same seed. Note that if rand is called without a seed the
+    previous state of the random number generator is advanced for the currently processing element.
+    This state is determined by the last call to <span class="axname">rand</span>() with a given seed. If rand is not called
+    with a seed, the generator advances continuously across different elements which can produce
+    non-deterministic results. It is important that rand is always called with a seed at least once
+    for deterministic results. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">rand</span>()</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">rand</span>(<span class="axdouble">double</span> seed)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">rand</span>(<span class="axint">int64</span> seed)</code></div>
+
+<p><code>rand32</code></p>  |
+    Creates a random number based on the provided 32 bit seed. The number will be in the range of 0 to
+    1. The same number is produced for the same seed. NOTE: This function does not share the same
+    random number generator as <span class="axname">rand</span>(). rand32() may provide a higher throughput on some
+    architectures, but will produce different results to <span class="axname">rand</span>(). NOTE: If rand32 is called without
+    a seed the previous state of the random number generator is advanced for the currently
+    processing element. This state is determined by the last call to rand32() with a given seed. If
+    rand32 is not called with a seed, the generator advances continuously across different elements
+    which can produce non-deterministic results. It is important that rand32 is always called with
+    a seed at least once for deterministic results. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> rand32()</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> rand32(<span class="axdouble">double</span> seed)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> rand32(<span class="axint">int32</span> seed)</code></div>
+
+<p><code>removefromgroup</code></p>  |
+    Remove the current point from the given group name, effectively setting its membership to false.
+    This function has no effect if the group does not exist. |
+        <div class="usage item"><code class="axsignature"><span class="axvoid">void</span> <span class="axname">removefromgroup</span>(<span class="axstring">string</span>)</code></div>
+
+<p><code>round</code></p>  |
+    Computes the nearest integer value to arg (in <span class="axfloat">float</span>ing-point format), rounding halfway cases away
+    from zero. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">round</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">round</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>sign</code></p>  |
+    Implements signum, determining if the input is negative, zero or positive. Returns -1 for a negative
+    number, 0 for the number zero, and +1 for a positive number. Note that this function does not
+    check the sign of <span class="axfloat">float</span>ing point +/-0.0 values. See <span class="axname">signbit</span>(). |
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">sign</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">sign</span>(<span class="axfloat">float</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">sign</span>(<span class="axint">int64</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">sign</span>(<span class="axint">int32</span> n)</code></div>
+
+<p><code>signbit</code></p>  |
+    Determines if the given <span class="axfloat">float</span>ing point number input is negative. Returns true if arg is negative,
+    false otherwise. Will return true for -0.0, false for +0.0 |
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">signbit</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axbool">bool</span> <span class="axname">signbit</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>simplexnoise</code></p>  |
+    Compute simplex noise at coordinates x, y and z. Coordinates which are not provided will be set to
+    0. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">simplexnoise</span>(<span class="axdouble">double</span> x)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">simplexnoise</span>(<span class="axdouble">double</span> x; <span class="axdouble">double</span> y)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">simplexnoise</span>(<span class="axdouble">double</span> x; <span class="axdouble">double</span> y; <span class="axdouble">double</span> z)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">simplexnoise</span>(<span class="axvec">vec3d</span> pos)</code></div>
+
+<p><code>sin</code></p>  |
+    Computes the sine of arg (measured in radians). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">sin</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">sin</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>sinh</code></p>  |
+    Computes the hyperbolic sine of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">sinh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">sinh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>sort</code></p>  |
+    Returns the sorted result of the given vector. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">sort</span>(<span class="axvec">vec3d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">sort</span>(<span class="axvec">vec3f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3i</span> <span class="axname">sort</span>(<span class="axvec">vec3i</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">sort</span>(<span class="axvec">vec4d</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4f</span> <span class="axname">sort</span>(<span class="axvec">vec4f</span> v)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4i</span> <span class="axname">sort</span>(<span class="axvec">vec4i</span> v)</code></div>
+
+<p><code>sqrt</code></p>  |
+    Computes the square root of arg. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">sqrt</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">sqrt</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>tan</code></p>  |
+    Computes the tangent of arg (measured in radians). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">tan</span>(<span class="axdouble">double</span> n)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">tan</span>(<span class="axfloat">float</span> n)</code></div>
+
+<p><code>tanh</code></p>  |
+    Computes the hyperbolic tangent of the input. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">tanh</span>(<span class="axdouble">double</span> arg)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">tanh</span>(<span class="axfloat">float</span> arg)</code></div>
+
+<p><code>trace</code></p>  |
+    Return the trace of a matrix, the sum of the diagonal elements. |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">trace</span>(<span class="axmat">mat3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">trace</span>(<span class="axmat">mat3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">trace</span>(<span class="axmat">mat4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">trace</span>(<span class="axmat">mat4f</span> mat)</code></div>
+
+<p><code>transform</code></p>  |
+    Return the transformed vector by the provided matrix. This function is equivalent to
+    post-multiplying the matrix, i.e. vec * mult. |
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">transform</span>(<span class="axvec">vec3d</span> vec; <span class="axmat">mat3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">transform</span>(<span class="axvec">vec3f</span> vec; <span class="axmat">mat3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3d</span> <span class="axname">transform</span>(<span class="axvec">vec3d</span> vec; <span class="axmat">mat4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec3f</span> <span class="axname">transform</span>(<span class="axvec">vec3f</span> vec; <span class="axmat">mat4f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4d</span> <span class="axname">transform</span>(<span class="axvec">vec4d</span> vec; <span class="axmat">mat4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axvec">vec4f</span> <span class="axname">transform</span>(<span class="axvec">vec4f</span> vec; <span class="axmat">mat4f</span> mat)</code></div>
+
+<p><code>transpose</code></p>  |
+    Returns the transpose of a matrix |
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3d</span> <span class="axname">transpose</span>(<span class="axmat">mat3d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat3f</span> <span class="axname">transpose</span>(<span class="axmat">mat3f</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat4d</span> <span class="axname">transpose</span>(<span class="axmat">mat4d</span> mat)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axmat">mat4f</span> <span class="axname">transpose</span>(<span class="axmat">mat4f</span> mat)</code></div>
+
+<p><code>truncatemod</code></p>  |
+    Truncated modulo, where the result of the division operator on (dividend / divisor) is truncated.
+    The remainder is thus calculated with D - d * <span class="axname">trunc</span>(D/d). This is equal to the C/C++ %
+    implementation. This is NOT equal to a%b in AX. See <span class="axname">floormod</span>(), <span class="axname">euclideanmod</span>(). |
+        <div class="usage item"><code class="axsignature"><span class="axdouble">double</span> <span class="axname">truncatemod</span>(<span class="axdouble">double</span> dividend; <span class="axdouble">double</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axfloat">float</span> <span class="axname">truncatemod</span>(<span class="axfloat">float</span> dividend; <span class="axfloat">float</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int64</span> <span class="axname">truncatemod</span>(<span class="axint">int64</span> dividend; <span class="axint">int64</span> divisor)</code></div>
+        <div class="usage item"><code class="axsignature"><span class="axint">int32</span> <span class="axname">truncatemod</span>(<span class="axint">int32</span> dividend; <span class="axint">int32</span> divisor)</code></div>

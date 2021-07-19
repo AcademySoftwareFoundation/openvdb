@@ -81,6 +81,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -133,6 +134,8 @@ public:
 };
 
 } // namespace internal
+
+/// @endcond
 
 
 ////////////////////////////////////////
@@ -546,7 +549,7 @@ GridTransformer::GridTransformer(const Mat4R& xform):
     if (local_util::decompose(mTransform, scale, rotate, translate)) {
         // If the transform can be decomposed into affine components,
         // use them to set up a mipmapping-like scheme for downsampling.
-        init(mPivot, scale, rotate, translate, "srt", "zyx");
+        init(mPivot, scale, rotate, translate, "rst", "zyx");
     }
 }
 

@@ -1,17 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
+#include <openvdb/io/TempFile.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointAttribute.h>
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointGroup.h>
 
-#ifdef _MSC_VER
-#include <windows.h>
-#endif
+#include <gtest/gtest.h>
+
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -256,20 +254,8 @@ TEST_F(TestPointConversion, testPointConversion)
 
     // read/write grid to a temp file
 
-    std::string tempDir;
-    if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
-    if (tempDir.empty()) {
-        char tempDirBuffer[MAX_PATH+1];
-        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
-        EXPECT_TRUE(tempDirLen > 0 && tempDirLen <= MAX_PATH);
-        tempDir = tempDirBuffer;
-    }
-#else
-    if (tempDir.empty()) tempDir = P_tmpdir;
-#endif
-
-    std::string filename = tempDir + "/openvdb_test_point_conversion";
+    io::TempFile file;
+    const std::string filename = file.filename();
 
     io::File fileOut(filename);
 
@@ -422,6 +408,7 @@ TEST_F(TestPointConversion, testPointConversion)
         EXPECT_NEAR(position.buffer()[i*2].z(), pointData[i].position.z(), /*tolerance=*/1e-6);
     }
 
+    file.close();
     std::remove(filename.c_str());
 }
 

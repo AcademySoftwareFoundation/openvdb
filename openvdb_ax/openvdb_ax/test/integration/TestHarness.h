@@ -49,17 +49,27 @@ bool wrapExecution(openvdb::GridPtrVec& grids,
 ///        tests with a simple interface
 struct AXTestHarness
 {
+
     AXTestHarness() :
         mInputPointGrids()
-      , mOutputPointGrids()
-      , mInputVolumeGrids()
-      , mOutputVolumeGrids()
-      , mUseVolumes(true)
-      , mUsePoints(true)
-      , mVolumeBounds({0,0,0},{0,0,0})
+        , mOutputPointGrids()
+        , mInputSparseVolumeGrids()
+        , mInputDenseVolumeGrids()
+        , mOutputSparseVolumeGrids()
+        , mOutputDenseVolumeGrids()
+        , mUseVolumes(true)
+        , mUseSparseVolumes(true)
+        , mUseDenseVolumes(true)
+        , mUsePoints(true)
+        , mVolumeBounds({0,0,0},{7,7,7})
+        , mSparseVolumeConfig({
+            {1, { openvdb::Coord(-7), openvdb::Coord(-15)}}, // 2 leaf level tiles
+            {2, { openvdb::Coord(0)  }} // 1 leaf parent tiles (4k leaf level tiles)
+      })
       , mOpts(openvdb::ax::CompilerOptions())
       , mCustomData(openvdb::ax::CustomData::create())
-      , mLogger([](const std::string&) {})
+      , mErrors()
+      , mLogger([this](const std::string& msg) { this->mErrors += msg; } )
     {
         reset();
     }
@@ -73,9 +83,8 @@ struct AXTestHarness
                             const std::vector<T>& values)
     {
         if (mUsePoints)  addInputPtAttributes<T>(names, values);
-        if (mUseVolumes) addInputVolumes(names, values);
+        if (mUseSparseVolumes || mUseDenseVolumes) addInputVolumes(names, values);
     }
-
 
     template <typename T>
     void addInputAttribute(const std::string& name, const T& inputVal)
@@ -89,7 +98,7 @@ struct AXTestHarness
                                const std::vector<T>& values)
     {
         if (mUsePoints)  addExpectedPtAttributes<T>(names, values);
-        if (mUseVolumes) addExpectedVolumes<T>(names, values);
+        if (mUseSparseVolumes || mUseDenseVolumes)  addExpectedVolumes<T>(names, values);
     }
 
     /// @brief adds attributes to both input and expected data
@@ -157,8 +166,19 @@ struct AXTestHarness
     /// the provided stream
     bool checkAgainstExpected(std::ostream& sstream);
 
+    /// @brief clears the errors and logger
+    void clear() {
+        mErrors.clear();
+        mLogger.clear();
+    }
+
+    const std::string& errors() const {
+        return mErrors;
+    }
     /// @brief Toggle whether to execute tests for points or volumes
     void testVolumes(const bool);
+    void testSparseVolumes(const bool);
+    void testDenseVolumes(const bool);
     void testPoints(const bool);
 
     template <typename T>
@@ -176,16 +196,22 @@ struct AXTestHarness
     std::vector<openvdb::points::PointDataGrid::Ptr> mInputPointGrids;
     std::vector<openvdb::points::PointDataGrid::Ptr> mOutputPointGrids;
 
-    openvdb::GridPtrVec mInputVolumeGrids;
-    openvdb::GridPtrVec mOutputVolumeGrids;
+    openvdb::GridPtrVec mInputSparseVolumeGrids;
+    openvdb::GridPtrVec mInputDenseVolumeGrids;
+    openvdb::GridPtrVec mOutputSparseVolumeGrids;
+    openvdb::GridPtrVec mOutputDenseVolumeGrids;
 
     bool mUseVolumes;
+    bool mUseSparseVolumes;
+    bool mUseDenseVolumes;
     bool mUsePoints;
     openvdb::CoordBBox mVolumeBounds;
+    std::map<openvdb::Index, std::vector<openvdb::Coord>> mSparseVolumeConfig;
 
     openvdb::ax::CompilerOptions mOpts;
     openvdb::ax::CustomData::Ptr mCustomData;
-    openvdb::ax::Logger mLogger;
+    std::string              mErrors;
+    openvdb::ax::Logger      mLogger;
 };
 
 class AXTestCase : public CppUnit::TestCase
@@ -241,12 +267,13 @@ public:
 
           // execute
         const bool success = mHarness.executeCode(this->dir() + "/" + filename, args...);
-        CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + filename, success);
-        //@todo: print error message here
+        CPPUNIT_ASSERT_MESSAGE("error thrown during test: " + filename + "\n" + mHarness.errors(),
+                success);
 
         // check
         std::stringstream out;
         const bool correct = mHarness.checkAgainstExpected(out);
+        //CPPUNIT_ASSERT(correct);
         CPPUNIT_ASSERT_MESSAGE(out.str(), correct);
     }
 

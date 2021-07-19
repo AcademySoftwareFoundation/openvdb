@@ -77,10 +77,6 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.12)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
 if(DISABLE_CMAKE_SEARCH_PATHS)
@@ -141,10 +137,12 @@ find_package(Houdini
 # Note that passing MINIMUM_HOUDINI_VERSION into find_package(Houdini) doesn't work
 if(NOT Houdini_FOUND)
   message(FATAL_ERROR "Unable to locate Houdini Installation.")
-elseif(Houdini_VERSION VERSION_LESS MINIMUM_HOUDINI_VERSION)
-  message(FATAL_ERROR "Unsupported Houdini Version ${Houdini_VERSION}. Minimum "
-    "supported is ${MINIMUM_HOUDINI_VERSION}."
-  )
+elseif(MINIMUM_HOUDINI_VERSION)
+  if(Houdini_VERSION VERSION_LESS MINIMUM_HOUDINI_VERSION)
+    message(FATAL_ERROR "Unsupported Houdini Version ${Houdini_VERSION}. Minimum "
+      "supported is ${MINIMUM_HOUDINI_VERSION}."
+    )
+  endif()
 endif()
 
 find_package(PackageHandleStandardArgs)
@@ -208,10 +206,17 @@ elseif(UNIX)
   )
 elseif(WIN32)
   #libRAY is already included by houdini for windows builds
-  list(APPEND _HOUDINI_EXTRA_LIBRARIES
-    ${HOUDINI_DSOLIB_DIR}/hboost_regex-mt.lib
-    ${HOUDINI_DSOLIB_DIR}/hboost_thread-mt.lib
-  )
+  if(Houdini_VERSION VERSION_LESS 18.5)
+    list(APPEND _HOUDINI_EXTRA_LIBRARIES
+      ${HOUDINI_DSOLIB_DIR}/hboost_regex-mt.lib
+      ${HOUDINI_DSOLIB_DIR}/hboost_thread-mt.lib
+    )
+  else()
+    list(APPEND _HOUDINI_EXTRA_LIBRARIES
+      ${HOUDINI_DSOLIB_DIR}/hboost_regex-mt-x64.lib
+      ${HOUDINI_DSOLIB_DIR}/hboost_thread-mt-x64.lib
+    )
+  endif()
   list(APPEND _HOUDINI_EXTRA_LIBRARY_NAMES
     hboost_regex
     hboost_thread

@@ -1,13 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Dense.h>
 #include <openvdb/tools/DenseSparseTools.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
+
+#include <gtest/gtest.h>
+
 #include "util.h"
 
 class TestDenseSparseTools: public ::testing::Test

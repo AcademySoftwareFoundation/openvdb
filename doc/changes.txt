@@ -2,9 +2,238 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v8_1_1_changes"></a>@endhtmlonly
+@par
+<B>Version 8.1.1</B> - <I>In development</I>
+
+@htmlonly <a name="v8_1_0_changes"></a>@endhtmlonly
+@par
+<B>Version 8.1.0</B> - <I>June 11, 2021</I>
+
+@par
+<BLOCKQUOTE>
+As of this release, support for grid ABI=5 has been removed.
+</BLOCKQUOTE>
+
+@par
+New features:
+- Added @vdblink::tools::erodeActiveValues() tools::erodeActiveValues@endlink,
+  to match the existing
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink. New
+  erosion tools support all tile policies and edge/vertex neighbor patterns.
+- Added support for automatic filtering of active tiles in
+  @vdblink::tools::Filter Filter@endlink
+  by setting
+  @vdblink::tools::Filter::setProcessTiles Filter::setProcessTiles@endlink.
+  Active tiles are densified on demand, only when necessary.
+- Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
+  visit nodes in a tree or sub-tree in single-threaded depth-first order.
+- Significant performance improvements to AX volume kernels, primarily due to
+  improved vectorization. Performance scales depending on the available host
+  CPU instruction set and scalability of the AX kernel. Trivial assignments
+  profile upwards of 3x faster on AVX.
+- Introduced Active Tile Streaming for volumes kernels. AX can now dynamically
+  expand and collapse active nodes at all levels of a VDB tree on demand,
+  switching on or off by checking the spatial access pattern of AX programs.
+- Added tools::countActiveVoxels() for multi-threaded counting of active
+  voxels, optionally by bounding box. The Tree::activeVoxelCount() method now
+  uses this implementation.
+- Added tools::memUsage() for multi-threaded counting of bytes of memory used.
+  The Tree::memUsage() method now uses this implementation.
+- Added tools::SumMergeOp that uses a parallel breadth-first algorithm to
+  accelerate summing grids.
+
+@par
+Improvements:
+- Significant performance improvements to large dilations with
+  @vdblink::tools::dilateActiveValues() tools::dilateActiveValues@endlink.
+  Performance gains will improve relative to increases in the inputs size
+  and dilation scheme.
+- Added an optional argument to
+  @vdblink::tree::Tree::topologyUnion() Tree::topologyUnion@endlink which preserves
+  active tiles on the destination tree should they overlap leaf nodes from the
+  source tree.
+- Reduced the time spent in the hot path of @vdblink::initialize() initialize@endlink
+  and @vdblink::uninitialize() uninitialize@endlink by leveraging atomics with
+  double-checked locks.
+  <I>[Contributed&nbsp;by&nbsp;Ben&nbsp;FrantzDale]</I>
+- Extended @vdblink::tree::DynamicNodeManager DynamicNodeManager@endlink to
+  allow for use with a const tree.
+- Replace tbb::mutex with std::mutex and tbb::atomic with std::atomic as
+  these have now been removed in TBB 2021.
+  [Contributed by Ben FrantzDale].
+- Significant performance improvements to
+  @vdblink::tools::activate() tools::activate@endlink and
+  @vdblink::tools::deactivate() tools::deactivate@endlink through use of the
+  DynamicNodeManager to parallelize tile processing.
+- Added degree() and radians() AX helper functions for converting radians to
+  degrees and vice versa, respectively.
+- Added adjoint(), cofactor() and inverse() AX matrix functions.
+- Added sort(), argsort(), isfinite(), isinf() and isnan() AX utility and math
+  functions.
+- Added Vec4 argument support to normalize() AX function.
+- Removed unused int16 AX modulo function signatures.
+- Refactored the backend AX representation of strings with SSO support and heap
+  allocation.
+- Added new methods on the VolumeExecutable to control active tile streaming
+  and node execution levels
+- The deletepoint() AX function is now natively supported by the
+  PointExecutable
+- vdb_view: Fixed a bug which wouldn't reset the camera speed on focus
+- vdb_view: Improved the drawing of PointDataGrids
+- vdb_view: Improved the exception handling of BufferObjects and added support
+  for drawing an array without index values
+
+@par
+Bug Fixes:
+- Fix a memory leak in AttributeArray when delayed-loading is disabled.
+- Fixed a crash in OpenVDB AX when declaring arrays with non-scalar
+  elements (unsupported) i.e. {"foo", 1, 2}, {1, {1,2}, 3} etc.
+- Fixed a bug in OpenVDB AX which would cause an error when multiplying a
+  vec3 by a mat4.
+- In OpenVDB AX, improved the error message produced when attempting to use
+  a matrix literal (i.e. {1,2,3...}) in a binary expression (this is
+  invalid but would previously print out bad IR).
+- Fixed a non-deterministic failure in the TestStreamCompression unit test.
+- Use copy-by-reference for the operator in a
+  @vdblink::tree::DynamicNodeManager DynamicNodeManager@endlink to fix a
+  performance regression.
+- @vdblink::tools::deactivate() tools::deactivate@endlink now also works with
+  a MaskTree.
+- Fixed a memory leak in the OpenVDB AX parser
+- Fixed an occurrence of undefined behavior in the OpenVDB AX visitor
+- Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
+- Fixed a bug in AX which could cause string allocations in loops to overflow
+  the stack
+- Fixed a bug where the ValueOff iterator for the AX VolumeExecutable could remove
+  child branches of a VDB tree.
+- Fixed a crash in the AX Houdini SOP with an empty PointDataGrid input.
+- Fixed all cases where PointIndex and PointData aliases were used instead
+  of a templated type.  [Reported by Karl Marrett]
+- Fixed a crash when calling openvdb::points::pointOffsets with an empty
+  PointDataGrid input.
+- Add missing 8-bit and 16-bit attribute type registration.
+
+@par
+API changes:
+- Restructured the internals of Morphology.h and moved
+  @vdblink::tools::activate() tools::activate@endlink and
+  @vdblink::tools::deactivate() tools::deactivate@endlink to a new header,
+  Activate.h.
+- Deprecated @vdblink::tools::dilateVoxels() tools::dilateVoxels@endlink
+  and @vdblink::tools::erodeVoxels() tools::erodeVoxels@endlink in favour of
+  new morphology methods.
+- The @vdblink::tools::Film tools::Film@endlink class no longer has a
+  saveExr method in any build configuration. Sample code for saving exrs
+  from this object can be found in the command line render tool.
+- Added ability to run @vdblink::tools::activate() tools::activate@endlink
+  and @vdblink::tools::deactivate() tools::deactivate@endlink single-threaded.
+
+@par
+Houdini:
+- Updated the VDB Activate SOP and others to use the multi-threaded
+  implementation for voxel dilation, providing a significant performance
+  increase.
+- Introduced the VDB AX SOP which provides an interface for running
+  OpenVDB AX code in Houdini on VDB grids.
+- Updated the VDB Smooth SOP to support the filtering of active tiles.
+- Fixed a parameter warning in VDB AX SOP.
+- Transfer Surface Attributes in Convert VDB SOP could use uninitialized
+  memory.
+- VDB Activate SOP now uses the multi-threaded
+  @vdblink::tools::deactivate() tools::deactivate@endlink for much faster
+  performance.
+- Improved the formatting and updated the OpenVDB AX SOPs help card.
+- The AX SOP utilizes the new Active Tile Streaming feature for Volumes. Grids
+  will only be densified in areas where unique values are created.
+- VDB Activate SOP dilation will affect tiles, changing its behavior
+  from previous versions, but producing a more expected result.
+- VDB Activate SOP has a world space dilation option.
+- Introduced the VDB Merge SOP that merges multiple grids in parallel and is
+  faster and more convenient to use than the VDB Combine SOP.
+- Fix a bug where the VDB Rebuild SDF was not preserving metadata from the
+  input grid.
+- Fix a bug in VDB Resample SOP where input transform was not being used for
+  voxel size and voxel scale transform modes.
+
+@par
+Build:
+- Dependency on OpenEXR's Half implementation has been removed from the
+  core library by naturalizing the implementation into openvdb::math.
+  This is fully bitwise compatible, but may require switching Half
+  references to math::Half. The USE_IMATH_HALF build configuration can
+  be used to switch back to OpenEXR based half.
+- Blosc, Log4cplus, IlmBase, OpenEXR and TBB find modules now configure
+  release and debug library variants.
+  <I>[Reported&nbsp;by&nbsp;Matthew&nbsp;Cong]</I>
+- Fixed an issue where FindBlosc wouldn't add zstd as a dep in non static
+  builds BLOSC_USE_EXTERNAL_SOURCES.
+- Fixed Log4cplus interface language and missing interface libraries on
+  Win32.
+- Removed Jemalloc and Tbbmalloc logic from the core library builds.
+- The variable CMAKE_MSVC_RUNTIME_LIBRARY is no longer set by the OpenVDB
+  CMake. If CMAKE_MSVC_RUNTIME_LIBRARY is not explicitly provided, OpenVDB
+  configures the static library with /MT(d) and the dynamic library
+  with /MD(d).
+  <I>[Reported&nbsp;by&nbsp;Jérémie&nbsp;Dumas]</I>
+- Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to use it
+  without errors.
+- The value of CONCURRENT_MALLOC is now respected when building the vdb_ax
+  command line binary.
+- Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the
+  uninstall build target.
+  <I>[Contributed by Jérémie Dumas]</I>
+- Improved the behavior of locating static zlib libraries when
+  USE_STATIC_DEPENDENCIES is enabled.
+- Fixed an issue where extra hboost libraries could not be found when building
+  against Houdini 18.5 on Windows.
+- Build fixes to OpenVDB AX for LLVM 12.
+- Re-introduced the OPENVDB_DEPRECATED macro with an additional option that
+  takes a message.  Added support to disable deprecations throughout OpenVDB by
+  defining OPENVDB_NO_DEPRECATION_WARNINGS
+- Added an optional OPENVDB_TESTS variable to easily build a subset of the
+  unit tests.
+- Fixed various incorrect RPATH directory paths in CMake (introduced in 8.0.1)
+  [Contributed by Ignacio Vizzo].
+- Removed some unnecessary CMake for vdb_view
+- The Windows defines NOMINMAX and _USE_MATH_DEFINES are now provided in
+  Platform.h.
+- Moved the logic from PlatformConfig.h into Platform.h.
+- The version.h header is now an auto generated header (version.h.in) populated
+  by CMake.  The OpenVDB Version and ABI defines are computed from the
+  installation settings.  Importantly, the value of OPENVDB_ABI_VERSION_NUMBER
+  now always matches the version used at build time.
+- Added OPENVDB_USE_HALF, OPENVDB_USE_BLOSC and OPENVDB_USE_ZLIB as publicly
+  available defines in version.h. These will be defined depending on the
+  settings used to build OpenVDB.
+
+
+
+@htmlonly <a name="v8_0_1_changes"></a>@endhtmlonly
+@par
+<B>Version 8.0.1</B> - <I>February 5, 2021</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data
+  outside of the intersection region was not being removed.
+
+@par
+Build:
+- Fixed various incorrect RPATH directory paths in CMake
+- Dropped the minimum boost requirement back to 1.61.
+- Documentation installed by the doc target is now installed to the
+  share/doc/OpenVDB prefix
+
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+
+
 @htmlonly <a name="v8_0_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.0.0</B> - <I>In development</I>
+<B>Version 8.0.0</B> - <I>December 23, 2020</I>
 
 @par
 <BLOCKQUOTE>
@@ -14,24 +243,16 @@ preserve ABI compatibility it might be necessary to define the macro
 <I>N</I> is 6 for Houdini&nbsp;18.0 and 7 for Houdini&nbsp;18.5.
 </BLOCKQUOTE>
 
-@anchor v8_0_0_ABI_changes
 @par
-ABI changes:
-- @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
-  of ABI=8 so that it can be accessed from the GridBase.
-- Private method
-  @vdblink::RootNode::getChildCount() RootNode::getChildCount@endlink has been
-  removed as of ABI=8.
-- Mark map classes and functions as final for ABI=8 where beneficial to allow
-  devirtualization optimization.
-
-@par
-Build:
-- As of this release, VFX Reference Platform 2018 is no longer supported.
-  CMake now issues deprecation warnings for 2019 VFX Reference Platform
-  version dependencies.
-- Added a missing header include to resolve an undefined size_t build error
-  on GCC10.
+<BLOCKQUOTE>
+Official release of OpenVDB AX, a new C++ library that implements
+a domain specific JIT (just-in-time) compiled expression language,
+providing users with a new way of interacting with OpenVDB data. AX is
+tailored towards writing highly parallelizable and customizable OpenVDB
+volume and point kernel operations. See the
+<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
+for more.
+</BLOCKQUOTE>
 
 @par
 New features:
@@ -46,6 +267,106 @@ New features:
 @par
 Improvements:
 - Made LeafManager class non-virtual.
+
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+- OpenVDB AX: Fixed a potential code generation crash in binary, ternary
+  or comma operators when errors occurred in first operand.
+
+@anchor v8_0_0_ABI_changes
+@par
+ABI changes:
+- @vdblink::Grid::isTreeUnique() Grid::isTreeUnique@endlink is now virtual as
+  of ABI=8 so that it can be accessed from the GridBase.
+- Private method RootNode::getChildCount() has been removed as of ABI=8.
+- Mark map classes and functions as final for ABI=8 where beneficial to allow
+  devirtualization optimization.
+- As of ABI 8, Vector, Matrix and Quaternion types now satisfy the Trivial
+  Type requirement. Their empty constructors and copy constructors have
+  been removed (and are left to the compiler to define).
+- As of ABI 8, removed an unnecessary specialization of NodeUnion and
+  CopyTraits from NodeUnion.h. Replaced std::is_pod usage with
+  std::is_trivially_copyable which allows more types to benefit from the
+  union storage.
+- As of ABI 8, PointDataGrids use the union NodeUnion specialization,
+  reducing the memory footprint of their topology by 50%.
+
+@par
+API changes:
+- Removed a number of deprecated point, volume and AX methods.
+
+@par
+Houdini:
+- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
+
+@par
+Build:
+- As of this release, VFX Reference Platform 2018 is no longer supported.
+  CMake now issues deprecation warnings for 2019 VFX Reference Platform
+  version dependencies, with the exception that OpenEXR/IlmBase 2.2 is still
+  supported.
+- Added a missing header include to resolve an undefined size_t build error
+  on GCC10.
+- Improved the python module's linkage with the CMake 3.15 Python::Module
+  target. Explicitly linking with the Development target could result in
+  crashes, particularly on macOS.
+  [Reported&nbsp;by&nbsp;Alexander&nbsp;Hagen]
+- Removed OPENVDB_DEPRECATED macro in favor of C++14 <TT>[[deprecated]]</TT>
+  attribute.
+
+
+@htmlonly <a name="v7_2_3_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.3</B> - <I><March 16, 2021</I>
+
+@par
+Bug fixes:
+- Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+  performance regression.
+
+
+@htmlonly <a name="v7_2_2_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.2</B> - <I>February 4, 2021</I>
+
+@par
+Bug fixes:
+- Fixed a bug in the new CSG intersection merge algorithm where data outside of
+  the intersection region was not being removed.
+- Fix @vdblink::tools::GridTransformer grid transformer tool@endlink
+  construction to use correct rotate-scale-translate order when recomposing
+  matrix components.
+  <I>[Contributed&nbsp;by&nbsp;Tom&nbsp;Cnops]</I>
+
+@par
+Houdini:
+- VDB Combine SOP no longer attempts to invoke SDF CSG operations on bool grids
+  because unary negation is undefined on bools in the template expansion.
+- VDB to Spheres SOP doesn't reset the radius when in worldspace mode.
+  VDB Write SOP should likewise not reset the compression values.
+
+
+@htmlonly <a name="v7_2_1_changes"></a>@endhtmlonly
+@par
+<B>Version 7.2.1</B> - <I>December 23, 2020</I>
+
+@par
+Bug fixes:
+- Fixed a determinism bug in @vdblink::tree::NodeManager NodeManager@endlink
+  when using non-thread-safe functor members.
+
+@par
+Build:
+- Added a missing header include to resolve an undefined size_t build error
+  on GCC10.
+
 
 @htmlonly <a name="v7_2_0_changes"></a>@endhtmlonly
 @par
@@ -1068,8 +1389,8 @@ API changes:
 - Removed methods that were deprecated in version&nbsp;4.0.0 or earlier,
   including @b io::File::readGridPartial, @b points::initialize,
   @b points::uninitialize and @b util::PagedArray::pop_back.
-- Deprecated @vdblink::IllegalValueException IllegalValueException@endlink
-  in favor of @vdblink::ValueError ValueError@endlink.
+- Deprecated IllegalValueException in favor of
+  @vdblink::ValueError ValueError@endlink.
 - Changed the naming scheme for the
   @link OPENVDB_VERSION_NAME library namespace@endlink
   from <B>openvdb::v</B><I>X</I><B>_</B><I>Y</I><B>_</B><I>Z</I>
@@ -1637,9 +1958,8 @@ Bug fixes:
   <I>[Reported by Joshua&nbsp;Olson]</I>
 - Fixed bugs in @vdblink::tree::NodeUnion NodeUnion@endlink that could cause
   crashes.
-- Fixed memory leak in
-  @vdblink::tools::mesh_to_volume_internal::ExpandNarrowband
-  tools::mesh_to_volume_internal::ExpandNarrowband@endlink
+- Fixed memory leak in a @vdblink::tools::meshToVolume tools::meshToVolume@endlink
+  sub-tool (expandNarrowband).
   <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
 - Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
   @link tools/RayIntersector.h@endlink.
@@ -1941,7 +2261,7 @@ Houdini:
   for large numbers (tens to hundreds of millions) of particles.
 - Added edge-adjacent (6+12=18 neighbors) and vertex-adjacent (6+12+8=26
   neighbors) dilation algorithms to
-  @vdblink::tools::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
+  @vdblink::tools::morphology::Morphology::dilateVoxels Morphology::dilateVoxels@endlink.
   The default dilation pattern is still face-adjacent (6&nbsp;neighbors).
 - Added @vdblink::tree::Tree::getNodes() Tree::getNodes@endlink, which allows
   for fast construction of linear arrays of tree nodes for use in multithreaded

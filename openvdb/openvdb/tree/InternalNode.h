@@ -515,7 +515,7 @@ public:
     /// tiles or voxels that were inactive in this branch but active in the other branch
     /// are marked as active in this branch but left with their original values.
     template<typename OtherChildNodeType>
-    void topologyUnion(const InternalNode<OtherChildNodeType, Log2Dim>& other);
+    void topologyUnion(const InternalNode<OtherChildNodeType, Log2Dim>& other, const bool preserveTiles = false);
 
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -2502,12 +2502,15 @@ struct InternalNode<ChildT, Log2Dim>::TopologyUnion
     struct A { inline void operator()(W &tV, const W& sV, const W& tC) const
         { tV = (tV | sV) & ~tC; }
     };
-    TopologyUnion(const OtherInternalNode* source, InternalNode* target) : s(source), t(target) {
+    TopologyUnion(const OtherInternalNode* source, InternalNode* target, const bool preserveTiles)
+        : s(source), t(target), mPreserveTiles(preserveTiles) {
         //(*this)(tbb::blocked_range<Index>(0, NUM_VALUES));//single thread for debugging
         tbb::parallel_for(tbb::blocked_range<Index>(0, NUM_VALUES), *this);
 
         // Bit processing is done in a single thread!
-        t->mChildMask |= s->mChildMask;//serial but very fast bitwise post-process
+        if (!mPreserveTiles) t->mChildMask |= s->mChildMask;//serial but very fast bitwise post-process
+        else                 t->mChildMask |= (s->mChildMask & !t->mValueMask);
+
         A op;
         t->mValueMask.foreach(s->mValueMask, t->mChildMask, op);
         assert((t->mValueMask & t->mChildMask).isOff());//no overlapping active tiles or child nodes
@@ -2517,11 +2520,13 @@ struct InternalNode<ChildT, Log2Dim>::TopologyUnion
             if (s->mChildMask.isOn(i)) {// Loop over other node's child nodes
                 const typename OtherInternalNode::ChildNodeType& other = *(s->mNodes[i].getChild());
                 if (t->mChildMask.isOn(i)) {//this has a child node
-                    t->mNodes[i].getChild()->topologyUnion(other);
+                    t->mNodes[i].getChild()->topologyUnion(other, mPreserveTiles);
                 } else {// this is a tile so replace it with a child branch with identical topology
-                    ChildT* child = new ChildT(other, t->mNodes[i].getValue(), TopologyCopy());
-                    if (t->mValueMask.isOn(i)) child->setValuesOn();//activate all values
-                    t->mNodes[i].setChild(child);
+                    if (!mPreserveTiles || t->mValueMask.isOff(i)) { // force child topology
+                        ChildT* child = new ChildT(other, t->mNodes[i].getValue(), TopologyCopy());
+                        if (t->mValueMask.isOn(i)) child->setValuesOn();//activate all values
+                        t->mNodes[i].setChild(child);
+                    }
                 }
             } else if (s->mValueMask.isOn(i) && t->mChildMask.isOn(i)) {
                 t->mNodes[i].getChild()->setValuesOn();
@@ -2530,14 +2535,15 @@ struct InternalNode<ChildT, Log2Dim>::TopologyUnion
     }
     const OtherInternalNode* s;
     InternalNode* t;
+    const bool mPreserveTiles;
 };// TopologyUnion
 
 template<typename ChildT, Index Log2Dim>
 template<typename OtherChildT>
 inline void
-InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log2Dim>& other)
+InternalNode<ChildT, Log2Dim>::topologyUnion(const InternalNode<OtherChildT, Log2Dim>& other, const bool preserveTiles)
 {
-    TopologyUnion<InternalNode<OtherChildT, Log2Dim> > tmp(&other, this);
+    TopologyUnion<InternalNode<OtherChildT, Log2Dim> > tmp(&other, this, preserveTiles);
 }
 
 template<typename ChildT, Index Log2Dim>

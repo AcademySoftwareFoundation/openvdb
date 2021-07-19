@@ -17,6 +17,9 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
+
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace internal {
 
 /// @brief LegacyFrustum class used at DreamWorks for converting old vdb files.
@@ -158,6 +161,9 @@ private:
 };
 
 } // namespace internal
+
+/// @endcond
+
 } // namespace math
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

@@ -10,6 +10,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
+#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Platform.h>
@@ -353,7 +354,7 @@ public:
     /// Return the number of inactive voxels stored in leaf nodes.
     Index64 inactiveLeafVoxelCount() const override { return mRoot.offLeafVoxelCount(); }
     /// Return the total number of active voxels.
-    Index64 activeVoxelCount() const override { return mRoot.onVoxelCount(); }
+    Index64 activeVoxelCount() const override { return tools::countActiveVoxels(*this); }
     /// Return the number of inactive voxels within the bounding box of all active voxels.
     Index64 inactiveVoxelCount() const override;
     /// Return the total number of active tiles.
@@ -362,7 +363,7 @@ public:
     /// Return the minimum and maximum active values in this tree.
     void evalMinMax(ValueType &min, ValueType &max) const;
 
-    Index64 memUsage() const override { return sizeof(*this) + mRoot.memUsage(); }
+    Index64 memUsage() const override { return tools::memUsage(*this); }
 
 
     //
@@ -684,8 +685,11 @@ public:
     /// Specifically, active tiles and voxels in this tree are not changed, and
     /// tiles or voxels that were inactive in this tree but active in the other tree
     /// are marked as active in this tree but left with their original values.
+    ///
+    /// @note If preserveTiles is true, any active tile in this topology
+    /// will not be densified by overlapping child topology.
     template<typename OtherRootNodeType>
-    void topologyUnion(const Tree<OtherRootNodeType>& other);
+    void topologyUnion(const Tree<OtherRootNodeType>& other, const bool preserveTiles = false);
 
     /// @brief Intersects this tree's set of active values with the active values
     /// of the other tree, whose @c ValueType may be different.
@@ -930,35 +934,35 @@ public:
 #endif
 
     template<typename BBoxOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visitActiveBBox(BBoxOp& op) const { mRoot.visitActiveBBox(op); }
 
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit(VisitorOp& op);
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit(const VisitorOp& op);
 
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit(VisitorOp& op) const;
     template<typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit(const VisitorOp& op) const;
 
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit2(OtherTreeType& other, VisitorOp& op);
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit2(OtherTreeType& other, const VisitorOp& op);
 
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit2(OtherTreeType& other, VisitorOp& op) const;
     template<typename OtherTreeType, typename VisitorOp>
-    [[deprecated("Use DynamicNodeManager instead")]]
+    OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
     void visit2(OtherTreeType& other, const VisitorOp& op) const;
 
 
@@ -1701,10 +1705,10 @@ Tree<RootNodeType>::merge(Tree& other, MergePolicy policy)
 template<typename RootNodeType>
 template<typename OtherRootNodeType>
 inline void
-Tree<RootNodeType>::topologyUnion(const Tree<OtherRootNodeType>& other)
+Tree<RootNodeType>::topologyUnion(const Tree<OtherRootNodeType>& other, const bool preserveTiles)
 {
     this->clearAllAccessors();
-    mRoot.topologyUnion(other.root());
+    mRoot.topologyUnion(other.root(), preserveTiles);
 }
 
 template<typename RootNodeType>

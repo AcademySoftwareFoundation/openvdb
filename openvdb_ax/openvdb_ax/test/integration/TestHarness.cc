@@ -2,12 +2,13 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "TestHarness.h"
-#include "util.h"
+#include "../util.h"
 
 #include <openvdb_ax/compiler/PointExecutable.h>
 #include <openvdb_ax/compiler/VolumeExecutable.h>
 
 #include <openvdb/points/PointConversion.h>
+#include <openvdb/tools/ValueTransformer.h>
 
 namespace unittest_util
 {
@@ -93,20 +94,28 @@ bool AXTestHarness::executeCode(const std::string& codeFile,
                                 const std::string* const group,
                                 const bool createMissing)
 {
-    bool success = false;
     if (mUsePoints) {
         for (auto& grid : mInputPointGrids) {
-            mLogger.clear();
-            success = wrapExecution(*grid, codeFile, group, mLogger, mCustomData, mOpts, createMissing);
-            if (!success) break;
+            this->clear();
+            if (!wrapExecution(*grid, codeFile, group, mLogger, mCustomData, mOpts, createMissing)) {
+                return false;
+            }
         }
     }
 
-    if (mUseVolumes) {
-        mLogger.clear();
-        success = wrapExecution(mInputVolumeGrids, codeFile, mLogger, mCustomData, mOpts, createMissing);
+    if (mUseDenseVolumes) {
+        this->clear();
+        if (!wrapExecution(mInputDenseVolumeGrids, codeFile, mLogger, mCustomData, mOpts, createMissing)) {
+            return false;
+        }
     }
-    return success;
+    if (mUseSparseVolumes) {
+        this->clear();
+        if (!wrapExecution(mInputSparseVolumeGrids, codeFile, mLogger, mCustomData, mOpts, createMissing)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 template <typename T>
@@ -130,7 +139,18 @@ void AXTestHarness::addInputVolumes(const std::vector<std::string>& names,
         typename GridType::Ptr grid = GridType::create();
         grid->denseFill(mVolumeBounds, values[i], true/*active*/);
         grid->setName(names[i]);
-        mInputVolumeGrids.emplace_back(grid);
+        mInputDenseVolumeGrids.emplace_back(grid);
+    }
+
+    for (size_t i = 0; i < names.size(); i++) {
+        typename GridType::Ptr grid = GridType::create();
+        for (const auto& config : mSparseVolumeConfig) {
+            for (const auto& coord : config.second) {
+                grid->tree().addTile(config.first, coord, values[i], true);
+            }
+        }
+        grid->setName(names[i]);
+        mInputSparseVolumeGrids.emplace_back(grid);
     }
 }
 
@@ -155,7 +175,18 @@ void AXTestHarness::addExpectedVolumes(const std::vector<std::string>& names,
         typename GridType::Ptr grid = GridType::create();
         grid->denseFill(mVolumeBounds, values[i], true/*active*/);
         grid->setName(names[i] + "_expected");
-        mOutputVolumeGrids.emplace_back(grid);
+        mOutputDenseVolumeGrids.emplace_back(grid);
+    }
+
+    for (size_t i = 0; i < names.size(); i++) {
+        typename GridType::Ptr grid = GridType::create();
+        for (const auto& config : mSparseVolumeConfig) {
+            for (const auto& coord : config.second) {
+                grid->tree().addTile(config.first, coord, values[i], true);
+            }
+        }
+        grid->setName(names[i]);
+        mOutputSparseVolumeGrids.emplace_back(grid);
     }
 }
 
@@ -179,13 +210,25 @@ bool AXTestHarness::checkAgainstExpected(std::ostream& sstream)
         }
     }
 
-    if (mUseVolumes) {
-        for (size_t i = 0; i < mInputVolumeGrids.size(); i++) {
+    if (mUseDenseVolumes) {
+        for (size_t i = 0; i < mInputDenseVolumeGrids.size(); i++) {
             std::stringstream resultStream;
             unittest_util::ComparisonResult result(resultStream);
             const bool volumeSuccess =
-                unittest_util::compareUntypedGrids(result, *mOutputVolumeGrids[i],
-                    *mInputVolumeGrids[i], settings, nullptr);
+                unittest_util::compareUntypedGrids(result, *mOutputDenseVolumeGrids[i],
+                    *mInputDenseVolumeGrids[i], settings, nullptr);
+            success &= volumeSuccess;
+            if (!volumeSuccess)  sstream << resultStream.str() << std::endl;
+        }
+    }
+
+    if (mUseSparseVolumes) {
+        for (size_t i = 0; i < mInputSparseVolumeGrids.size(); i++) {
+            std::stringstream resultStream;
+            unittest_util::ComparisonResult result(resultStream);
+            const bool volumeSuccess =
+                unittest_util::compareUntypedGrids(result, *mOutputSparseVolumeGrids[i],
+                    *mInputSparseVolumeGrids[i], settings, nullptr);
             success &= volumeSuccess;
             if (!volumeSuccess)  sstream << resultStream.str() << std::endl;
         }
@@ -196,7 +239,18 @@ bool AXTestHarness::checkAgainstExpected(std::ostream& sstream)
 
 void AXTestHarness::testVolumes(const bool enable)
 {
-    mUseVolumes = enable;
+    mUseSparseVolumes = enable;
+    mUseDenseVolumes = enable;
+}
+
+void AXTestHarness::testSparseVolumes(const bool enable)
+{
+    mUseSparseVolumes = enable;
+}
+
+void AXTestHarness::testDenseVolumes(const bool enable)
+{
+    mUseDenseVolumes = enable;
 }
 
 void AXTestHarness::testPoints(const bool enable)
@@ -211,8 +265,10 @@ void AXTestHarness::reset(const openvdb::Index64 ppv, const openvdb::CoordBBox& 
 
     mInputPointGrids.clear();
     mOutputPointGrids.clear();
-    mInputVolumeGrids.clear();
-    mOutputVolumeGrids.clear();
+    mInputSparseVolumeGrids.clear();
+    mInputDenseVolumeGrids.clear();
+    mOutputSparseVolumeGrids.clear();
+    mOutputDenseVolumeGrids.clear();
 
     openvdb::math::Transform::Ptr transform =
         openvdb::math::Transform::createLinearTransform(1.0);
@@ -229,7 +285,7 @@ void AXTestHarness::reset(const openvdb::Index64 ppv, const openvdb::CoordBBox& 
 
     mVolumeBounds = bounds;
 
-    mLogger.clear();
+    this->clear();
 }
 
 void AXTestHarness::reset()
@@ -239,8 +295,10 @@ void AXTestHarness::reset()
 
     mInputPointGrids.clear();
     mOutputPointGrids.clear();
-    mInputVolumeGrids.clear();
-    mOutputVolumeGrids.clear();
+    mInputSparseVolumeGrids.clear();
+    mInputDenseVolumeGrids.clear();
+    mOutputSparseVolumeGrids.clear();
+    mOutputDenseVolumeGrids.clear();
 
     std::vector<openvdb::Vec3d> coordinates =
         {openvdb::Vec3d(0.0, 0.0, 0.0),
@@ -274,7 +332,7 @@ void AXTestHarness::reset()
 
     mVolumeBounds = openvdb::CoordBBox({0,0,0}, {0,0,0});
 
-    mLogger.clear();
+    this->clear();
 }
 
 template <typename ValueT>
@@ -318,12 +376,23 @@ void AXTestHarness::resetInputsToZero()
         ConverterT<openvdb::math::Mat4<float>>,
         ConverterT<std::string>>;
 
-    for (auto& grid : mInputVolumeGrids) {
+    for (auto& grid : mInputSparseVolumeGrids) {
         const bool success = grid->apply<SupportedTypeList>([](auto& typed) {
             using GridType = typename std::decay<decltype(typed)>::type;
-            openvdb::tree::LeafManager<typename GridType::TreeType> manager(typed.tree());
-            manager.foreach([](typename GridType::TreeType::LeafNodeType& leaf, size_t) {
-                leaf.fill(openvdb::zeroVal<typename GridType::ValueType>());
+            openvdb::tools::foreach(typed.beginValueAll(), [](auto it) {
+                it.setValue(openvdb::zeroVal<typename GridType::ValueType>());
+            });
+        });
+        if (!success) {
+            throw std::runtime_error("Unable to reset input grid of an unsupported type");
+        }
+    }
+
+    for (auto& grid : mInputDenseVolumeGrids) {
+        const bool success = grid->apply<SupportedTypeList>([](auto& typed) {
+            using GridType = typename std::decay<decltype(typed)>::type;
+            openvdb::tools::foreach(typed.beginValueAll(), [](auto it) {
+                it.setValue(openvdb::zeroVal<typename GridType::ValueType>());
             });
         });
         if (!success) {

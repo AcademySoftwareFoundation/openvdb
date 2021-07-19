@@ -85,7 +85,7 @@ TestSymbolTable::testTableBlocks()
     openvdb::ax::codegen::SymbolTable* table2 = tables.getOrInsert(0);
     CPPUNIT_ASSERT_EQUAL(table1, table2);
 
-    table2 = &(tables.get(0));
+    table2 = tables.get(0);
     CPPUNIT_ASSERT_EQUAL(table1, table2);
 
     CPPUNIT_ASSERT_THROW(tables.erase(0), std::runtime_error);
@@ -94,7 +94,7 @@ TestSymbolTable::testTableBlocks()
     tables.getOrInsert(2);
     tables.getOrInsert(4);
 
-    CPPUNIT_ASSERT_THROW(tables.get(3), std::runtime_error);
+    CPPUNIT_ASSERT(tables.get(3) == nullptr);
     CPPUNIT_ASSERT(tables.erase(4));
     CPPUNIT_ASSERT(tables.erase(2));
     CPPUNIT_ASSERT(tables.erase(1));

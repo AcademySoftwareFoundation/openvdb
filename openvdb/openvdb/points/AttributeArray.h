@@ -21,7 +21,7 @@
 #include "StreamCompression.h"
 
 #include <tbb/spin_mutex.h>
-#include <tbb/atomic.h>
+#include <atomic>
 
 #include <memory>
 #include <mutex>
@@ -136,13 +136,8 @@ public:
         // so the page handle won't attempt to clean up invalid memory
         if (mFlags & PARTIALREAD)       mCompressedBytes = 0;
     }
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     AttributeArray(const AttributeArray& rhs);
     AttributeArray& operator=(const AttributeArray& rhs);
-#else
-    AttributeArray(const AttributeArray&) = default;
-    AttributeArray& operator=(const AttributeArray&) = default;
-#endif
     AttributeArray(AttributeArray&&) = delete;
     AttributeArray& operator=(AttributeArray&&) = delete;
 
@@ -150,9 +145,8 @@ public:
     virtual AttributeArray::Ptr copy() const = 0;
 
     /// Return a copy of this attribute.
-    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
 #endif
     virtual AttributeArray::Ptr copyUncompressed() const = 0;
 
@@ -168,7 +162,6 @@ public:
     /// @note This counts each data element in a strided array
     virtual Index dataSize() const = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Return the name of the value type of a single element in this array (e.g., "float" or "vec3d").
     virtual Name valueType() const = 0;
 
@@ -197,7 +190,6 @@ public:
 
     /// Return @c true if the value type is a matrix
     virtual bool valueTypeIsMatrix() const = 0;
-#endif
 
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
@@ -209,9 +201,6 @@ public:
         bool constantStride = true,
         const Metadata* metadata = nullptr,
         const ScopedRegistryLock* lock = nullptr);
-
-    static OPENVDB_DEPRECATED Ptr create(const NamePair& type, Index length,
-        Index stride, bool constantStride, const ScopedRegistryLock* lock);
 
     /// Return @c true if the given attribute type name is registered.
     static bool isRegistered(const NamePair& type, const ScopedRegistryLock* lock = nullptr);
@@ -229,16 +218,12 @@ public:
     bool hasValueType() const { return this->type().first == typeNameAsString<ValueType>(); }
 
     /// @brief Set value at given index @a n from @a sourceIndex of another @a sourceArray.
-    /// @deprecated From ABI 6 on, use copyValues() with source-target index pairs.
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     // Windows does not allow base classes to be easily deprecated.
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
-#endif
+    OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
 #endif
     virtual void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// @brief Copy values into this array from a source array to a target array
     /// as referenced by an iterator.
     /// @details Iterators must adhere to the ForwardIterator interface described
@@ -269,7 +254,6 @@ public:
     /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValues(const AttributeArray& sourceArray, const IterT& iter, bool compact = true);
-#endif
 
     /// Return @c true if this array is stored as a single uniform value.
     virtual bool isUniform() const = 0;
@@ -281,16 +265,14 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     virtual bool compact() = 0;
 
-    /// @deprecated Previously this compressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
 #endif
     virtual bool compress() = 0;
-    /// @deprecated Previously this uncompressed the attribute array, now it does nothing.
     // Windows does not allow base classes to be deprecated
 #ifndef _MSC_VER
-    OPENVDB_DEPRECATED
+    OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
 #endif
     virtual bool decompress() = 0;
 
@@ -353,10 +335,8 @@ public:
     /// Ensures all data is in-core
     virtual void loadData() const = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Return @c true if all data has been loaded
     virtual bool isDataLoaded() const = 0;
-#endif
 
     /// Check the compressed bytes and flags. If they are equal, perform a deeper
     /// comparison check necessary on the inherited types (TypedAttributeArray)
@@ -371,7 +351,6 @@ private:
     /// comparisons on inherited types
     virtual bool isEqual(const AttributeArray& other) const = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Virtual function to retrieve the data buffer cast to a char byte array
     virtual char* dataAsByteArray() = 0;
     virtual const char* dataAsByteArray() const = 0;
@@ -380,7 +359,6 @@ private:
     template <typename IterT>
     void doCopyValues(const AttributeArray& sourceArray, const IterT& iter,
         bool rangeChecking = true);
-#endif
 
 protected:
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
@@ -400,28 +378,16 @@ protected:
     static void unregisterType(const NamePair& type,
         const ScopedRegistryLock* lock = nullptr);
 
-#if OPENVDB_ABI_VERSION_NUMBER < 6
-
-    size_t mCompressedBytes = 0;
-    uint8_t mFlags = 0;
-    uint8_t mUsePagedRead = 0;
-    tbb::atomic<Index32> mOutOfCore; // interpreted as bool
-    compression::PageHandle::Ptr mPageHandle;
-
-#else // #if OPENVDB_ABI_VERSION_NUMBER < 6
-
     bool mIsUniform = true;
     mutable tbb::spin_mutex mMutex;
     uint8_t mFlags = 0;
     uint8_t mUsePagedRead = 0;
-    tbb::atomic<Index32> mOutOfCore; // interpreted as bool
+    std::atomic<Index32> mOutOfCore; // interpreted as bool
     /// used for out-of-core, paged reading
     union {
         compression::PageHandle::Ptr mPageHandle;
-        size_t mCompressedBytes; // as of ABI=6, this data is packed together to save memory
+        size_t mCompressedBytes;
     };
-
-#endif
 }; // class AttributeArray
 
 
@@ -456,7 +422,7 @@ struct AttributeArray::Accessor : public AttributeArray::AccessorBase
 namespace attribute_traits
 {
     template <typename T> struct TruncateTrait { };
-    template <> struct TruncateTrait<float> { using Type = half; };
+    template <> struct TruncateTrait<float> { using Type = math::half; };
     template <> struct TruncateTrait<int> { using Type = short; };
 
     template <typename T> struct TruncateTrait<math::Vec3<T>> {
@@ -558,11 +524,7 @@ struct UnitVecCodec
 /// Typed class for storing attribute data
 
 template<typename ValueType_, typename Codec_ = NullCodec>
-#if OPENVDB_ABI_VERSION_NUMBER >= 6 // for ABI=6, class is final to allow for de-virtualization
 class TypedAttributeArray final: public AttributeArray
-#else
-class TypedAttributeArray: public AttributeArray
-#endif
 {
 public:
     using Ptr           = std::shared_ptr<TypedAttributeArray>;
@@ -586,8 +548,8 @@ public:
     /// It is not thread-safe for write.
     TypedAttributeArray(const TypedAttributeArray&);
     /// Deep copy constructor.
-    /// @deprecated Use copy-constructor without unused bool parameter
-    OPENVDB_DEPRECATED TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
+    OPENVDB_DEPRECATED_MESSAGE("Use copy-constructor without unused bool parameter")
+    TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
 #else
     /// Deep copy constructor.
     /// @note This method is not thread-safe for reading or writing, use
@@ -610,8 +572,8 @@ public:
 
     /// Return a copy of this attribute.
     /// @note This method is thread-safe.
-    /// @deprecated In-memory compression no longer supported, use AttributeArray::copy() instead.
-    OPENVDB_DEPRECATED AttributeArray::Ptr copyUncompressed() const override;
+    OPENVDB_DEPRECATED_MESSAGE("In-memory compression no longer supported, use AttributeArray::copy() instead")
+    AttributeArray::Ptr copyUncompressed() const override;
 
     /// Return a new attribute array of the given length @a n and @a stride with uniform value zero.
     static Ptr create(Index n, Index strideOrTotalSize = 1, bool constantStride = true,
@@ -647,7 +609,6 @@ public:
         return hasConstantStride() ? mSize * mStrideOrTotalSize : mStrideOrTotalSize;
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Return the name of the value type of a single element in this array (e.g., "float" or "vec3d").
     Name valueType() const override { return typeNameAsString<ValueType>(); }
 
@@ -675,7 +636,6 @@ public:
 
     /// Return @c true if the value type is a matrix
     bool valueTypeIsMatrix() const override;
-#endif
 
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
@@ -707,9 +667,7 @@ public:
     static void setUnsafe(AttributeArray* array, const Index n, const ValueType& value);
 
     /// Set value at given index @a n from @a sourceIndex of another @a sourceArray
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-    OPENVDB_DEPRECATED
-#endif
+    OPENVDB_DEPRECATED_MESSAGE("Use copyValues() with source-target index pairs")
     void set(const Index n, const AttributeArray& sourceArray, const Index sourceIndex) override;
 
     /// Return @c true if this array is stored as a single uniform value.
@@ -735,9 +693,11 @@ public:
     static void fill(AttributeArray* array, const ValueType& value);
 
     /// Compress the attribute array.
-    OPENVDB_DEPRECATED bool compress() override;
+    OPENVDB_DEPRECATED_MESSAGE("Previously this compressed the attribute array, now it does nothing")
+    bool compress() override;
     /// Uncompress the attribute array.
-    OPENVDB_DEPRECATED bool decompress() override;
+    OPENVDB_DEPRECATED_MESSAGE("Previously this uncompressed the attribute array, now it does nothing")
+    bool decompress() override;
 
     /// Read attribute data from a stream.
     void read(std::istream&) override;
@@ -776,10 +736,8 @@ public:
     /// Ensures all data is in-core
     void loadData() const override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Return @c true if all data has been loaded
     bool isDataLoaded() const override;
-#endif
 
 protected:
     AccessorBasePtr getAccessor() const override;
@@ -812,11 +770,9 @@ private:
     /// Compare the this data to another attribute array. Used by the base class comparison operator
     bool isEqual(const AttributeArray& other) const override;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     /// Virtual function to retrieve the data buffer from the derived class cast to a char byte array
     char* dataAsByteArray() override;
     const char* dataAsByteArray() const override;
-#endif
 
     size_t arrayMemUsage() const;
     void allocate();
@@ -832,10 +788,6 @@ private:
     std::unique_ptr<StorageType[]>      mData;
     Index                               mSize;
     Index                               mStrideOrTotalSize;
-#if OPENVDB_ABI_VERSION_NUMBER < 6 // as of ABI=6, this data lives in the base class to reduce memory
-    bool                                mIsUniform = true;
-    mutable tbb::spin_mutex             mMutex;
-#endif
 }; // class TypedAttributeArray
 
 
@@ -1044,8 +996,6 @@ UnitVecCodec::encode(const math::Vec3<T>& val, StorageType& data)
 
 // AttributeArray implementation
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-
 template <typename IterT>
 void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT& iter,
     bool rangeChecking/*=true*/)
@@ -1134,7 +1084,6 @@ void AttributeArray::copyValues(const AttributeArray& sourceArray, const IterT& 
         this->compact();
     }
 }
-#endif
 
 
 ////////////////////////////////////////
@@ -1192,9 +1141,6 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttribut
 #endif
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
-#if OPENVDB_ABI_VERSION_NUMBER < 6
-    , mIsUniform(rhs.mIsUniform)
-#endif
 {
     if (this->validData()) {
         this->allocate();
@@ -1357,7 +1303,6 @@ TypedAttributeArray<ValueType_, Codec_>::deallocate()
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
 template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
@@ -1374,7 +1319,7 @@ TypedAttributeArray<ValueType_, Codec_>::valueTypeIsFloatingPoint() const
     using ElementT = typename VecTraits<ValueType>::ElementType;
 
     // half is not defined as float point as expected, so explicitly handle it
-    return std::is_floating_point<ElementT>::value || std::is_same<half, ElementT>::value;
+    return std::is_floating_point<ElementT>::value || std::is_same<math::half, ElementT>::value;
 }
 
 
@@ -1383,7 +1328,7 @@ bool
 TypedAttributeArray<ValueType_, Codec_>::valueTypeIsClass() const
 {
     // half is not defined as a non-class type as expected, so explicitly exclude it
-    return std::is_class<ValueType>::value && !std::is_same<half, ValueType>::value;
+    return std::is_class<ValueType>::value && !std::is_same<math::half, ValueType>::value;
 }
 
 
@@ -1411,7 +1356,6 @@ TypedAttributeArray<ValueType_, Codec_>::valueTypeIsMatrix() const
     // TODO: improve performance by making this a compile-time check using type traits
     return !this->valueType().compare(0, 3, "mat");
 }
-#endif
 
 
 template<typename ValueType_, typename Codec_>
@@ -1694,14 +1638,12 @@ TypedAttributeArray<ValueType_, Codec_>::loadData() const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
 template<typename ValueType_, typename Codec_>
 bool
 TypedAttributeArray<ValueType_, Codec_>::isDataLoaded() const
 {
     return !this->isOutOfCore();
 }
-#endif
 
 
 template<typename ValueType_, typename Codec_>
@@ -1839,6 +1781,7 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
     if (!delayLoad) {
         std::unique_ptr<char[]> buffer = mPageHandle->read();
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
+        mPageHandle.reset();
     }
 
     // clear page state
@@ -2051,7 +1994,6 @@ TypedAttributeArray<ValueType_, Codec_>::isEqual(const AttributeArray& other) co
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
 template<typename ValueType_, typename Codec_>
 char*
 TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray()
@@ -2066,7 +2008,6 @@ TypedAttributeArray<ValueType_, Codec_>::dataAsByteArray() const
 {
     return reinterpret_cast<const char*>(this->data());
 }
-#endif
 
 
 ////////////////////////////////////////

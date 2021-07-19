@@ -11,8 +11,8 @@ functionality (including OpenVDB specific methods) execution structure and
 control flow. See the @subpage axcplusplus documentation for the C++ developer
 documentation.
 @note
-These documents are currently in @b BETA and are subject to change. Please
-contact us for more information.
+Some sections of this document are still to be completed. Please get in touch
+should you have any questions!
 
 @section axcontents Contents
 - @ref axintro
@@ -119,7 +119,7 @@ observe a small but complete AX program which could be compiled and executed.
 To begin with, here is a very simple example of a program that reads and writes
 to a particular attribute:
 @par
-@code{.c}
+<!-- A -->@code{.c}
 // read a floating point attribute from the value of "myattribute"
 float temp = float@myattribute;
 // if the value is less than 0, clamp it to 0
@@ -134,7 +134,7 @@ points and OpenVDB volumes. The example demonstrates reading from a value on
 some input, either a point attribute or a voxel value, and storing the
 result in a @ref axdecls "local variable". Importantly, the attribute being
 accessed has the name @b `myattribute` and the type @b `float`. The first statement:
-@code{.c}
+<!-- A -->@code{.c}
 float temp = float@myattribute;
 @endcode
 Invokes a @b read from this attribute (see @ref axattribaccess), retrieving the
@@ -405,7 +405,7 @@ rankings are defined as follows:
 @par
 For example:
 @par
-@code{.c}
+<!-- A -->@code{.c}
 int a = 0;
 float b = 0.0f;
 // In the following, the arithmetic a + b chooses floating point precision as
@@ -578,12 +578,12 @@ element type of vector, the scalar is copied and @ref axtypeprecedence
 <td style="text-align:left">Component wise assignment i.e.
 <br/> `a[0]&nbsp;=&nbsp;b;&nbsp;...&nbsp;a[n-1]&nbsp;=&nbsp;b;` <br/>
 where `n` is the size of the vector.
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 0, b = 1;
 a = b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 0, b = 1;
 for (int i = 0; i < 3; ++i) a[i] = b[i];
 @endcode
@@ -600,7 +600,7 @@ element type.
 Diagonal matrix construction. Each diagonal component of the left hand side
 matrix is set to to the right hand side scalar. All other components are zero
 initialized i.e.
-@code{.c}
+<!-- A -->@code{.c}
 mat3f a;
 int dim = 3, b = 1;
 for (int i = 0; i < dim; ++i)
@@ -614,12 +614,12 @@ that type.</td>
 <td style="text-align:left">Component wise assignment i.e.
 <br/> `a[0]&nbsp;=&nbsp;b[0];&nbsp;...&nbsp;a[n-1]&nbsp;=&nbsp;b[n-1];` <br/>
 where `n` is the @b total size of the matrix.
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 0, b = 1;
 a = b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 0, b = 1;
 for (int i = 0; i < 16; ++i) a[i] = b[i];
 @endcode
@@ -638,7 +638,7 @@ left hand side string with a copy of the contents in the right hand side string.
 </tr>
 </table>
 @par
-@code{.c}
+<!-- A -->@code{.c}
 float b;
 vec3f c = 0.0f; // assign components of c (x/y/z) to an floating point literal of value 0.0f
 int a = 1; // assign a from an integer literal of value 1
@@ -675,7 +675,7 @@ important when assigning to an expression which is not an attribute or local
 value. The best example of this is assigning to a @ref axopunincdec "pre-crement"
 operation:
 @par
-@code{.c}
+<!-- A -->@code{.c}
 int a = 1;
 ++a += 1; // equal to a = ++a + 1 which is equal to 3
 @endcode
@@ -687,7 +687,7 @@ written to. Note that the arithmetic operation may cast either @b `lhs` or @b
 "arithmetic operations" section for more information on arithmetic type
 precedence and explanations on the above compound operators.
 @par
-@code{.c}
+<!-- A -->@code{.c}
 int a = 3;
 a += a; // the same as a = a + a; a will be set to 6
 float b = 0;
@@ -701,7 +701,7 @@ type of the left hand side. For example:
 @par
 Given
 @par
-@code{.c}
+<!-- A -->@code{.c}
 float a;
 int b, c;
 @endcode
@@ -782,13 +782,13 @@ additive operations (if an operation is not listed, it is not supported):
 (after @ref axtypeprecedence "implicit conversion") with the left hand side
 scalar to every element of the right hand side vector or matrix, returning a
 vector or matrix.
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 vec3f c = b + a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 vec3f c;
@@ -808,12 +808,12 @@ for (int i = 0; i < 3; ++i) c[i] = b + a[i];
 <td style="text-align:left">Performs per component binary operations (after
 @ref axtypeprecedence "implicit conversion"), returning a new vector with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2, b = 1;
 vec3f c = a - b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2, b = 1;
 vec3f c;
 for (int i = 0; i < 3; ++i) c[i] = a[i] - b[i];
@@ -830,12 +830,12 @@ for (int i = 0; i < 3; ++i) c[i] = a[i] - b[i];
 <td style="text-align:left">Performs per component binary operations (after
 @ref axtypeprecedence "implicit conversion"), returning a new matrix with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 0, b = 1;
 mat4f c = a - b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 0, b = 1;
 mat4f c;
 for (int i = 0; i < 16; ++i) c[i] = a[i] - b[i];
@@ -913,13 +913,13 @@ Performs per component binary operations (after
 @ref axtypeprecedence "implicit conversion") with the left hand side scalar to
 every element of the right hand side vector. The scalar is effectively treated
 as a vector of the same size as the right hand side type.
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 vec3f c = b * a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 vec3f c;
@@ -931,13 +931,13 @@ for (int i = 0; i < 3; ++i) c[i] = b * a[i];
 <td style="text-align:left" rowspan="1">
 Performs matrix multiplication after diagonal matrix construction from the left
 hand side scalar.
-@code{.c}
+<!-- A -->@code{.c}
 mat3f a = 1;
 float b = 1;
 mat3f c = a * b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat3f a = 1;
 float b = 1;
 mat3f tmp = b; // diagonal matrix
@@ -957,12 +957,12 @@ with the operands reversed (importantly for division and modulus)</td>
 <td style="text-align:left">Performs per component binary operations (after
 @ref axtypeprecedence "implicit conversion"), returning a new vector with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2, b = 1;
 vec3f c = a * b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2, b = 1;
 vec3f c;
 for (int i = 0; i < 3; ++i) c[i] = a[i] * b[i];
@@ -974,13 +974,13 @@ for (int i = 0; i < 3; ++i) c[i] = a[i] * b[i];
 Transforms the left hand side vector by the right hand side matrix using matrix
 multiplication. This is the same as calling the @ref axtransform "transform"
 function. e.g:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 b = b * a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 b = transform(b, a);
@@ -992,7 +992,7 @@ to positions being represented as `vec3`. `vec3 * mat4` multiplication is
 supported, where by the `vec3` is extended with a `1` component and the
 resulting last last component is dropped from the return
 value:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 // b * a is equal to:
@@ -1024,13 +1024,13 @@ b[2] = tmp[2];
 Transforms the right hand side vector by the left hand side matrix using matrix
 multiplication. This is the same as calling the @ref axpretransform "pretransform"
 function. e.g:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 b = a * b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 b = pretransform(a, b);
@@ -1042,7 +1042,7 @@ to positions being represented as `vec3`. `mat4 * vec3` multiplication is
 supported, where by the `vec3` is extended with a `1` component and the
 resulting last last component is dropped from the return
 value:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = identity4();
 vec3f b = { 1, 2, 3 };
 // a * b is equal to:
@@ -1067,17 +1067,17 @@ b[2] = tmp[2];
 <td style="text-align:left">
 Performs matrix multiplication and returns the matrix product, which is matrix
 of matchign size and type. <b>Operand sizes must match.</b> e.g:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 1, b = 2;
 mat4f c = a * b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 1, b = 2;
 mat4f c;
-for(i = 0; i < 4; ++i) {
-    for(j = 0; j < 4; ++j) {
-        for(k = 0; k < 4; ++k) {
+for(int i = 0; i < 4; ++i) {
+    for(int j = 0; j < 4; ++j) {
+        for(int k = 0; k < 4; ++k) {
             c[i,j] += a[i,k] * b[k,j];
         }
     }
@@ -1097,7 +1097,7 @@ Binary bitwise operations have the following forms:
 @par
 <table>
 <tr><td bgcolor="#ffc4c4"> @a `lhs` @b `&` @a `rhs` </td></tr>
-<tr><td bgcolor="#ffc4c4"> @a `lhs` @b `|` @a `rhs` </td></tr>
+<tr><td bgcolor="#ffc4c4"> @a `lhs` <b> `|` </b> @a `rhs` </td></tr>
 <tr><td bgcolor="#ffc4c4"> @a `lhs` @b `^` @a `rhs` </td></tr>
 <tr><td bgcolor="#ffc4c4"> @a `lhs` @b `<<` @a `rhs` </td></tr>
 <tr><td bgcolor="#ffc4c4"> @a `lhs` @b `>>` @a `rhs` </td></tr>
@@ -1108,7 +1108,7 @@ These operations only run on @b integral operands. After @ref axtypeprecedence
  - with the @b `&` (@ref axtokens "ampersand token") is the result of the
   logical AND operation on each pair of the corresponding bits of the input
   operands.
- - with the @b `|` (@ref axtokens "pipe token") is the result of the
+ - with the <b> `|` </b> (@ref axtokens "pipe token") is the result of the
   logical OR operation on each pair of the corresponding bits of the input
   operands.
  - with the @b `^` (@ref axtokens "hat token") is the result of the
@@ -1176,13 +1176,13 @@ Performs per component comparisons (after
 every element of the right hand side vector or matrix and perform a logical AND
 combination on the results of these comparisons. This effectively returns true
 if every element of the vector or matrix is equal to the scalar.
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 bool c = b == a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2.0f;
 int b = 1;
 bool c = a[0] == b;
@@ -1206,12 +1206,12 @@ Performs binary comparison operations (after
 @ref axtypeprecedence "implicit conversion") on each pair corresponding
 components in the vector operands and returns true if all component pairs are
 equal. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 1, b = 2;
 bool c = a == b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 1, b = 2;
 bool c = a[0] == b[0];
 for (int i = 1; i < 3; ++i) c &= a[i] == b[i];
@@ -1230,12 +1230,12 @@ Performs binary comparison operations (after
 @ref axtypeprecedence "implicit conversion") on each pair corresponding
 components in the matrix operands and returns true if all component pairs are
 equal. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 1, b = 2;
 bool c = a == b;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 mat4f a = 1, b = 2;
 bool c = a[0] == b[0];
 for (int i = 1; i < 16; ++i) c &= a[i] == b[i];
@@ -1322,12 +1322,12 @@ arithmetic operations (if an operation is not listed, it is not supported):
 <td style="text-align:left">
 Performs per component unary operations, returning a new vector with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2;
 vec3f b = -a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2;
 vec3f b;
 for (int i = 0; i < 3; ++i) b[i] = -a[i];
@@ -1340,12 +1340,12 @@ for (int i = 0; i < 3; ++i) b[i] = -a[i];
 <td style="text-align:left">
 Performs per component unary operations, returning a new matrix with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2;
 vec3f b = -a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = 2;
 vec3f b;
 for (int i = 0; i < 3; ++i) b[i] = -a[i];
@@ -1381,12 +1381,12 @@ The scalar operand is converted to a bool if it is not already.</td>
 <td style="text-align:left">
 Performs per component unary operations, returning a new vector with each
 element holding the corresponding result. <b>Operand sizes must match.</b>
-@code{.c}
+<!-- A -->@code{.c}
 vec3i a = 2;
 vec3i b = !a;
 @endcode
 is equal to:
-@code{.c}
+<!-- A -->@code{.c}
 vec3i a = 2;
 vec3i b;
 for (int i = 0; i < 3; ++i) b[i] = !a[i];
@@ -1440,19 +1440,19 @@ the following forms:
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
 <tr style="text-align:left">
 <td>Dot&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4"> @a `vector`&nbsp;<b>.</b>&nbsp;@a `component` </td>
+<td bgcolor="#ffc4c4"> <em>`vector`</em>&nbsp;<b>.</b>&nbsp;@a `component` </td>
 <td>Reference to component @a `component` of @a `vector`</td>
 </tr>
 <tr style="text-align:left">
 <td>Container&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4"> @a `container`&nbsp;<b>[</b>&nbsp;@a `exp` <b>]</b> </td>
+<td bgcolor="#ffc4c4"> <em>`container`</em>&nbsp;<b>[</b>&nbsp;@a `exp` <b>]</b> </td>
 <td>Reference to component at index @a `exp` of @a `container`</td>
 </tr>
 <tr style="text-align:left">
 <td>Matrix&nbsp;Component&nbsp;Access</td>
-<td bgcolor="#ffc4c4">  @a `matrix`&nbsp;<b>[</b>&nbsp;@a `exp1`,&nbsp;@a `exp2`&nbsp;<b>]</b> </td>
-<td>Reference to component in row <b>@a `exp1`</b>, column <b>@a `exp2`</b>.
-Also equal to returning a reference to component at index: <b> @a `[exp1&nbsp;*&nbsp;dimension&nbsp;+&nbsp;exp2]` </b>
+<td bgcolor="#ffc4c4"> <em>`matrix`</em>&nbsp;<b>[</b>&nbsp;@a `exp1`,&nbsp;<em>`exp2`</em>&nbsp;<b>]</b> </td>
+<td>Reference to component in row <b><em>`exp1`</em></b>, column <b><em>`exp2`</em></b>.
+Also equal to returning a reference to component at index: <b><em> `[exp1&nbsp;*&nbsp;dimension&nbsp;+&nbsp;exp2]` </em></b>
 of @a `matrix` where @a `dimension` is the the size of the matrix</td>
 </tr>
 </table>
@@ -1473,10 +1473,10 @@ The dot operator <b>.</b> is only valid for vector types. It has the form:
 Where component is one of the below supported component letters. It only provides
 access for the first three elements of any vector (for @b `vec2` types, only the
 first 2 components are accessible). Accessing a vector using the dot operator is
-fundamentally the same as using the @b `[]` operator with the corresponding
+fundamentally the same as using the <b>`[]`</b> operator with the corresponding
 integer index.
 @par
-@code{.c}
+<!-- A -->@code{.c}
 vec4i a = { 6, 7, 8, 9 };
 int b = a.z; // get the the third elements value (8)
 @endcode
@@ -1500,10 +1500,10 @@ This operator can provide more immediately readability when working with
 expressions that focus on colour or Cartesian coordinate systems.
 @anchor axvecaccessop
 @par [] operator
-The @b `[]` operator is valid for both vectors and matrices. It has the form:
+The <b>`[]`</b> operator is valid for both vectors and matrices. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `container` <b>[</b>  @a `exp` <b>]</b> </td>
+<td bgcolor="#ffc4c4"> @a `container` <b>[</b><em>`exp`</em><b>]</b> </td>
 </tr></table>
 @par
 @a `exp` is expected to evaluate to a value which is castable to an integer
@@ -1526,10 +1526,10 @@ for (int i = 0; i < 16; ++i) b[i] = i;
 @endcode
 @anchor axmataccessop
 @par [,] operator
-The @b `[,]` operator is only valid for matrices. It has the form:
+The <b>`[,]`</b> operator is only valid for matrices. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `matrix` <b>[</b> @a `exp1`, @a `exp2` <b>]</b> </td>
+<td bgcolor="#ffc4c4"> @a `matrix` <b>[</b><em>`exp1`</em>, <em>`exp2`</em><b>]</b> </td>
 </tr></table>
 @par
 @a `exp1` and @a `exp2` are expected to evaluate to a value which is castable to
@@ -1540,7 +1540,7 @@ accessing specific elements, where @b `exp1` is the row index and @b `exp2` is
 the column index. The tables below show the different access patterns for
 @b `3x3` and @b `4x4` matrices.
 @par
-@code{.c}
+<!-- A -->@code{.c}
 mat3f a;
 for (int i = 0; i < 3; ++i)
     for (int j = 0; j < 3; ++j)
@@ -1699,22 +1699,22 @@ section. They have the following forms:
 <tr><th>Operator Name</th><th>Operator Syntax</th><th>Returns</th></tr>
 <tr style="text-align:left">
 <td>Call / Explicit Cast</td>
-<td bgcolor="#ffc4c4"> @a `a`<b>`(...)`</b></td>
+<td bgcolor="#ffc4c4"> <em>`a`</em><b>`(...)`</b></td>
 <td>Returns the result of a function call or inbuilt explicit cast</td>
 </tr>
 <tr style="text-align:left">
 <td>Comma</td>
-<td bgcolor="#ffc4c4"> @a `a`<b>,</b>&nbsp; @a `b` </td>
+<td bgcolor="#ffc4c4"> <em>`a`</em><b>,</b>&nbsp; <em>`b`</em></td>
 <td>Returns the value of @b `b` after chained evaluation</td>
 </tr>
 <tr style="text-align:left">
 <td>Ternary Conditional</td>
-<td bgcolor="#ffc4c4"> @a `a`&nbsp;<b>`?`</b>&nbsp;@a `b`&nbsp;<b>`:`</b> @a `c` </td>
+<td bgcolor="#ffc4c4"> <em>`a`</em>&nbsp;<b>`?`</b>&nbsp;<em>`b`</em>&nbsp;<b>`:`</b><em>`c`</em></td>
 <td>@b `b` if @b `a` is @b true, @b `c` otherwise.</td>
 </tr>
 <tr>
 <td>Vector/Matrix Initializer</td>
-<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp;@a `a,&nbsp; `@a `b&nbsp; `<b>`...&nbsp;}`</b> </td>
+<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp;<em> `a,&nbsp; `</em> `b&nbsp; `<b>`...&nbsp;}`</b> </td>
 <td>Returns a temporary vector or matrix</td>
 </tr>
 </table>
@@ -1724,12 +1724,12 @@ The function call operator provides the ability to invoke functions @b or invoke
 a supported explicit cast. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> @a `func(`@a `a`, @a `b`, @a `c` `...)`</td>
+<td bgcolor="#ffc4c4"> <em> `func(a, b, c, ...)` </em></td>
 </tr></table>
 @par
 Where @b `func` is a function name @b or a valid explicit cast typename. Explicit
 casts are only supported for @ref axscalars "scalar types". For example:
-@code{.c}
+<!-- A -->@code{.c}
 int a = int(1.1f);
 vec3f b = 1.0f;
 a = int(b.x);
@@ -1749,7 +1749,7 @@ functions.
 The Comma operator has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4">@a `a`<b>`,` </b>@a `b`</td>
+<td bgcolor="#ffc4c4"><em>`a`</em><b>`,` </b><em>`b`</em></td>
 </tr></table>
 @par
 Where @b `a` and @b `b` are expressions. Chained expressions evaluate each
@@ -1758,7 +1758,7 @@ except for the last expression, which is returned from the entire list. Note tha
 although return values for any expression but the last are discarded, their side
 effects are still applied before subsequent expression are evaluated. For
 example:
-@code{.c}
+<!-- A -->@code{.c}
 int a = 5;
 a-=1, a+=2; // a = 6
 a = a--, ++a; // exp1: a = a--, exp2: ++a. a = 7
@@ -1776,7 +1776,7 @@ The ternary conditional operator can be thought of as an in-line @ref axbranchin
 a single expression that will be returned. It has the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4">@a `a`&nbsp;<b>`?`</b>&nbsp;@a `b`&nbsp;<b>`:`</b> @a `c`</td>
+<td bgcolor="#ffc4c4"><em>`a`</em>&nbsp;<b>`?`</b>&nbsp;<em>`b`</em>&nbsp;<b>`:`</b><em>`c`</em></td>
 </tr></table>
 Where @b `a` is the condition, evaluated and converted to @b bool, and @b `b` and @b
 `c` are expressions of the same or implicit-castable types. @b `b` is evaluated and
@@ -1785,7 +1785,7 @@ condition is @b false. Only the expression out of @b `b` and @b `c` that is
 returned will be evaluated. Expressions with no return value (a.k.a @b `void`)
 are supported as long as @b `b` and @b `c` are both of this type.
 @par
-Also supported is the 'Elvis' operator, @b `a` @b `?` @b `:` @b `c` (or `?:`).
+Also supported is the 'Elvis' operator, <b>`a` `?` `:` `c`</b> (or `?:`).
 Here, @b `a` is evaluated once, and if when converted to @b bool is @b true, @b `a` is
 returned, otherwise @b `c` is evaluated and returned. In this case, @b `a` and @b
 `c` must be the same or implicit-castable types, and both implicit-castable to @b bool.
@@ -1798,7 +1798,7 @@ temporary values using the vector/matrix initializer syntax. This operator has
 the form:
 @par
 <table><tr>
-<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp;@a `a,&nbsp; `@a `b&nbsp; `<b>`...&nbsp;}`</b> </td>
+<td bgcolor="#ffc4c4"> <b>`{`</b>&nbsp; <em>`a,&nbsp; b&nbsp; `</em><b>`...&nbsp;}`</b> </td>
 </tr></table>
 @par
 Where @b `a` and @b `b` are expressions returning a scalar value. When this
@@ -1808,16 +1808,16 @@ existing container of matching size. Expression in the operator are evaluated
 from first to last. This operator is only valid with argument lists of sizes
 2, 3, 4, 9 and 16, which implicitly represent <b>vec2, vec3, vec4, mat3,</b> and
 @b mat4 types respectively. For example:
-@code{.c}
+<!-- A -->@code{.c}
 vec3f a = { 1.0f, 2.0f, 3.0f }; // right hand side of assignment creates a vec3f
 vec3f b = dot(a, { a[0], 5.0, 6.0 }); // second argument creates a vec3d
 @endcode
 @note
-In the above examples, the value of @b `a[0]` is copied into the initializer
+In the above examples, the value of <b>`a[0]`</b> is copied into the initializer
 operator.
 @par Initialization Type
 A mixture of arbitrary scalar types can be used in the initializer operator e.g:
-@code{.c}
+<!-- A -->@code{.c}
 mat3f a = {
     true, 0s, 0,
     0l, 0.0f, 0.0,
@@ -2027,7 +2027,7 @@ OpenVDB voxels change which voxels AX will process. The defined behavior for all
 cases is shown below.
 @par
 Consider a simple assignment example:
-@code{.c}
+<!-- A -->@code{.c}
 float@surface = float@density;
 @endcode
 @par
@@ -2096,8 +2096,7 @@ failure of an AX program if an attempt is made it use them.
 @subsection axuserfunctions User Functions
 @par
 User function declarations are not currently supported, but exist on the
-<a href="https://github.com/dneg/openvdb_ax/blob/master/ROADMAP.md">AX Roadmap</a>
-as a near future feature.
+AX Roadmap as a near future feature.
 
 
 <br/><hr>

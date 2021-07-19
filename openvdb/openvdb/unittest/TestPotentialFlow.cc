@@ -3,10 +3,11 @@
 
 /// @file unittest/TestPotentialFlow.cc
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/PotentialFlow.h>
+
+#include <gtest/gtest.h>
 
 
 class TestPotentialFlow: public ::testing::Test
@@ -96,7 +97,7 @@ TEST_F(TestPotentialFlow, testNeumannVelocities)
         Vec3d windVelocityValue(0, 0, 10);
 
         Vec3dTree::Ptr windTree(new Vec3dTree(sphere->tree(), zeroVal<Vec3d>(), TopologyCopy()));
-        dilateVoxels(*windTree, 2, tools::NN_FACE_EDGE_VERTEX);
+        dilateActiveValues(*windTree, 2, tools::NN_FACE_EDGE_VERTEX, tools::IGNORE_TILES);
         windTree->voxelizeActiveTiles();
 
         for (auto leaf = windTree->beginLeaf(); leaf; ++leaf) {
@@ -331,7 +332,7 @@ TEST_F(TestPotentialFlow, testFlowAroundSphere)
         // (excluding neumann voxels and exterior voxels)
         // and ensure it evaluates to zero
 
-        tools::erodeVoxels(mask->tree(), 2, tools::NN_FACE);
+        tools::erodeActiveValues(mask->tree(), 2, tools::NN_FACE, tools::IGNORE_TILES);
 
         FloatGrid::Ptr divergence = tools::divergence(*flowVel, *mask);
 

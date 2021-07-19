@@ -8,8 +8,6 @@
 //#define BENCHMARK_FAST_SWEEPING
 //#define TIMING_FAST_SWEEPING
 
-#include <sstream>
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/ChangeBackground.h>
@@ -23,6 +21,10 @@
 #ifdef TIMING_FAST_SWEEPING
 #include <openvdb/util/CpuTimer.h>
 #endif
+
+#include <gtest/gtest.h>
+
+#include <sstream>
 
 // Uncomment to test on models from our web-site
 //#define TestFastSweeping_DATA_PATH "/Users/ken/dev/data/vdb/"
@@ -50,10 +52,10 @@ TEST_F(TestFastSweeping, dilateSignedDistance)
 {
     using namespace openvdb;
     // Define parameters for the level set sphere to be re-normalized
-    const float radius = 200.0f;
+    const float radius = 60.0f;
     const Vec3f center(0.0f, 0.0f, 0.0f);
     const float voxelSize = 1.0f;//half width
-    const int width = 3, new_width = 50;//half width
+    const int width = 3, new_width = 12;
 
     FloatGrid::Ptr grid = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, float(width));
     const size_t oldVoxelCount = grid->activeVoxelCount();
@@ -116,16 +118,16 @@ TEST_F(TestFastSweeping, dilateSignedDistance)
 TEST_F(TestFastSweeping, testMaskSdf)
 {
     using namespace openvdb;
-    // Define parameterS FOR the level set sphere to be re-normalized
-    const float radius = 200.0f;
+    // Define parameters for the level set sphere to be re-normalized
+    const float radius = 60.0f;
     const Vec3f center(0.0f, 0.0f, 0.0f);
     const float voxelSize = 1.0f, width = 3.0f;//half width
-    const float new_width = 50;
+    const float new_width = 12;
 
     {// Use box as a mask
         //std::cerr << "\nUse box as a mask" << std::endl;
         FloatGrid::Ptr grid = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, width);
-        CoordBBox bbox(Coord(150,-50,-50), Coord(250,50,50));
+        CoordBBox bbox(Coord(60,-25,-25), Coord(100,25,25));
         MaskGrid mask;
         mask.sparseFill(bbox, true);
 
@@ -293,7 +295,7 @@ TEST_F(TestFastSweeping, testSdfToFogVolume)
 {
     using namespace openvdb;
     // Define parameterS FOR the level set sphere to be re-normalized
-    const float radius = 200.0f;
+    const float radius = 50.0f;
     const Vec3f center(0.0f, 0.0f, 0.0f);
     const float voxelSize = 1.0f, width = 3.0f;//half width
 
@@ -331,7 +333,7 @@ TEST_F(TestFastSweeping, testSdfToFogVolume)
         //std::cerr << "Failures = " << percent << "%" << std::endl;
         //std::cerr << "Failure count = " << diagnose.failureCount() << std::endl;
         //std::cerr << "Total active voxel count = " << grid2->activeVoxelCount() << std::endl;
-        EXPECT_TRUE(percent < 3.0);
+        EXPECT_TRUE(percent < 10.0);
     }
 }// testSdfToFogVolume
 
@@ -449,7 +451,7 @@ TEST_F(TestFastSweeping, fogToSdfAndExt)
 {
   using namespace openvdb;
   const float isoValue = 0.5f;
-  const float radius = 100.0f;
+  const float radius = 50.0f;
   const float background = 0.0f;
   const float tolerance = 0.00001f;
   const Vec3f center(0.0f, 0.0f, 0.0f);
@@ -457,11 +459,11 @@ TEST_F(TestFastSweeping, fogToSdfAndExt)
   FloatGrid::Ptr grid = tools::createLevelSetSphere<FloatGrid>(radius, center, voxelSize, float(width));
   tools::sdfToFogVolume(*grid);
   EXPECT_TRUE(grid);
-  const float fog[] = {grid->tree().getValue( Coord(102, 0, 0) ),
-                       grid->tree().getValue( Coord(101, 0, 0) ),
-                       grid->tree().getValue( Coord(100, 0, 0) ),
-                       grid->tree().getValue( Coord( 99, 0, 0) ),
-                       grid->tree().getValue( Coord( 98, 0, 0) )};
+  const float fog[] = {grid->tree().getValue( Coord(52, 0, 0) ),
+                       grid->tree().getValue( Coord(51, 0, 0) ),
+                       grid->tree().getValue( Coord(50, 0, 0) ),
+                       grid->tree().getValue( Coord(49, 0, 0) ),
+                       grid->tree().getValue( Coord(48, 0, 0) )};
   //for (auto v : fog) std::cerr << v << std::endl;
   EXPECT_TRUE( math::isApproxEqual(fog[0], 0.0f, tolerance) );
   EXPECT_TRUE( math::isApproxEqual(fog[1], 0.0f, tolerance) );
@@ -473,17 +475,17 @@ TEST_F(TestFastSweeping, fogToSdfAndExt)
   auto op = [radius](const Vec3R &xyz) {return math::Sin(2*3.14*(xyz[0]+xyz[1]+xyz[2])/radius);};
   auto grids = tools::fogToSdfAndExt(*grid, op, background, isoValue);
 
-  const auto sdf1 = grids.first->tree().getValue( Coord(100, 0, 0) );
-  const auto sdf2 = grids.first->tree().getValue( Coord( 99, 0, 0) );
-  const auto sdf3 = grids.first->tree().getValue( Coord( 98, 0, 0) );
+  const auto sdf1 = grids.first->tree().getValue( Coord(50, 0, 0) );
+  const auto sdf2 = grids.first->tree().getValue( Coord(49, 0, 0) );
+  const auto sdf3 = grids.first->tree().getValue( Coord(48, 0, 0) );
   //std::cerr << "\nsdf1 = " << sdf1 << ", sdf2 = " << sdf2 << ", sdf3 = " << sdf3 << std::endl;
   EXPECT_TRUE( sdf1 > sdf2 );
   EXPECT_TRUE( math::isApproxEqual( sdf2, 0.5f, tolerance) );
   EXPECT_TRUE( math::isApproxEqual( sdf3,-0.5f, tolerance) );
 
-  const auto ext1 = grids.second->tree().getValue( Coord(100, 0, 0) );
-  const auto ext2 = grids.second->tree().getValue( Coord( 99, 0, 0) );
-  const auto ext3 = grids.second->tree().getValue( Coord( 98, 0, 0) );
+  const auto ext1 = grids.second->tree().getValue( Coord(50, 0, 0) );
+  const auto ext2 = grids.second->tree().getValue( Coord(49, 0, 0) );
+  const auto ext3 = grids.second->tree().getValue( Coord(48, 0, 0) );
   //std::cerr << "\next1 = " << ext1 << ", ext2 = " << ext2 << ", ext3 = " << ext3 << std::endl;
   EXPECT_TRUE( math::isApproxEqual(ext1, background, tolerance) );
   EXPECT_TRUE( math::isApproxEqual(ext2, ext3, tolerance) );

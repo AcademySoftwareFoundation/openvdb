@@ -27,6 +27,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
+#include <openvdb/tools/Activate.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/Prune.h>
 
@@ -210,17 +211,27 @@ an inclusive range, so includes the maximum voxel.)"));
 
     parms.addFolder("Expand");
 /*
-    Expand the active area by the specified number of voxels.  Does not support
-    operation or setting of values.
+    Expand the active area by at least the specified number of voxels.  Does not
+    support operation or setting of values.
 */
     parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
-                .setTooltip("Expand the active area by the specified number of voxels.")
+              .setTooltip("Expand the active area by at least the specified number of voxels.")
                 .setDocumentation(
-R"(Expand the active area by the specified number of voxels.  Does not support
+R"(Expand the active area by at least the specified number of voxels.  Does not support
 operation or setting of values.)"));
 
+/*
+    Expand the active area by at least the specified distance. Does not support
+    operation or setting of values.
+*/
+    parms.add(hutil::ParmFactory(PRM_FLT, "expanddist", "Expand Distance")
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, 0.0f, PRM_RANGE_UI, 2.0f)
+              .setTooltip("Expand the active area by at least the specified distance.")
+              .setDocumentation(
+                                R"(Expand the active area by at least the specified distance. Does not support operation or setting of values.)"));
 
     parms.addFolder("Reference");
 /*
@@ -256,6 +267,20 @@ instead and activated as if they were specified as World Positions.)"));
     Then when you are done, you can use one with Deactivate to free
     up the voxels you didn't need to use.
 */
+
+    // Deactivation tolerance slider
+    parms.add(hutil::ParmFactory(PRM_FLT, "bgtolerance", "Deactivate Tolerance")
+        .setDefault(PRMzeroDefaults)
+        .setRange(PRM_RANGE_RESTRICTED, 0, PRM_RANGE_UI, 1)
+        .setTooltip(
+            "Deactivate active output voxels whose values\n"
+            "equal the output VDB's background value.\n"
+            "Voxel values are considered equal if they differ\n"
+            "by less than the specified tolerance.")
+        .setDocumentation(
+            "When deactivation of background voxels is enabled,"
+            " voxel values are considered equal to the background"
+            " if they differ by less than this tolerance."));
 
     parms.addFolder("Fill SDF");
 /*
@@ -415,45 +440,19 @@ sopDoPrune(GridType &grid, bool doprune, double tolerance)
     }
 }
 
-// The result of the union of active regions goes into grid_a
+
 template <typename GridType>
 static void
-sopDeactivate(GridType &grid, int dummy)
+sopDeactivate(GridType &grid, double tolerance)
 {
-    typename GridType::Accessor         access = grid.getAccessor();
-    typedef typename GridType::ValueType ValueT;
+    using ValueT = typename GridType::ValueType;
 
-    ValueT              background = grid.background();
-    ValueT              value;
-    UT_Interrupt        *boss = UTgetInterrupt();
-
-    for (typename GridType::ValueOnCIter
-         iter = grid.cbeginValueOn(); iter; ++iter)
-    {
-        if (boss->opInterrupt())
-            break;
-        openvdb::CoordBBox bbox = iter.getBoundingBox();
-        for (int k=bbox.min().z(); k<=bbox.max().z(); k++)
-        {
-            for (int j=bbox.min().y(); j<=bbox.max().y(); j++)
-            {
-                for (int i=bbox.min().x(); i<=bbox.max().x(); i++)
-                {
-                    openvdb::Coord coord(i, j, k);
-
-                    // If it is on...
-                    if (access.probeValue(coord, value))
-                    {
-                        if (value == background)
-                        {
-                            access.setValueOff(coord);
-                        }
-                    }
-                }
-            }
-        }
-    }
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
+    const auto value = openvdb::zeroVal<ValueT>() + tolerance;
+    OPENVDB_NO_TYPE_CONVERSION_WARNING_END
+    openvdb::tools::deactivate(grid.tree(), grid.background(), static_cast<ValueT>(value));
 }
+
 
 template <typename GridType>
 static void
@@ -491,16 +490,22 @@ sopFillSDF(GridType &grid, int dummy)
 
 template <typename GridType>
 static void
-sopDilateVoxels(GridType& grid, int count)
+sopDilateVoxels(GridType& grid, exint count)
 {
-    openvdb::tools::dilateVoxels(grid.tree(), count);
+    openvdb::tools::dilateActiveValues(grid.tree(), static_cast<int>(count));
 }
 
 template <typename GridType>
 static void
-sopErodeVoxels(GridType& grid, int count)
+sopErodeVoxels(GridType& grid, exint count)
 {
-    openvdb::tools::erodeVoxels(grid.tree(), count);
+    openvdb::tools::erodeActiveValues(grid.tree(), static_cast<int>(count));
+    if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
+        openvdb::tools::pruneLevelSet(grid.tree());
+    }
+    else {
+        openvdb::tools::pruneInactive(grid.tree());
+    }
 }
 
 // Based on mode the parameters imply, get an index space bounds for this vdb
@@ -660,24 +665,35 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 
                 case REGIONTYPE_EXPAND:         // Dilate
                 {
-                    int         dilation = static_cast<int>(evalInt("expand", 0, t));
+                    exint dilatevoxels = evalInt("expand", 0, t);
+                    exint dilatedist = static_cast<exint>(
+                            SYSceil(sqrt(3.0)
+                                    * SYSsafediv(
+                                            evalFloat("expanddist", 0, t),
+                                            vdb->getVoxelDiameter())));
 
-                    if (dilation > 0)
+                    exint maxdilate = SYSmax(dilatevoxels, dilatedist);
+                    if (maxdilate > 0)
                     {
                         if (boss->opInterrupt())
                             break;
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopDilateVoxels,
-                                         vdb->getGrid(), dilation);
+                                         vdb->getGrid(), maxdilate);
                     }
 
-                    if (dilation < 0)
+                    exint mindilate = SYSmin(dilatevoxels, dilatedist);
+                    if (mindilate < 0)
                     {
                         if (boss->opInterrupt())
                             break;
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopErodeVoxels,
-                                         vdb->getGrid(), -dilation);
+                                         vdb->getGrid(), -mindilate);
+                    }
+                    if (mindilate < 0 && maxdilate > 0)
+                    {
+                        addWarning(SOP_MESSAGE, "Conflicting signs in Voxel/Worldspace dilation request.  Applying both, which may not be expected.");
                     }
                     break;
                 }
@@ -688,7 +704,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
                         break;
                     UTvdbCallAllTopology(vdb->getStorageType(),
                                      sopDeactivate,
-                                     vdb->getGrid(), 1);
+                                     vdb->getGrid(), evalFloat("bgtolerance", 0, t));
                     break;
                 }
 

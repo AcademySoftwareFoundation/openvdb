@@ -47,6 +47,7 @@ Camera::lookAt(const openvdb::Vec3d& p, double dist)
 {
     mLookAt = p;
     mDistance = dist;
+    this->setSpeed();
     mNeedsDisplay = true;
 }
 
@@ -56,6 +57,7 @@ Camera::lookAtTarget()
 {
     mLookAt = mTarget;
     mDistance = mTargetDistance;
+    this->setSpeed();
     mNeedsDisplay = true;
 }
 

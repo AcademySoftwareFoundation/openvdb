@@ -1,9 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/Metadata.h>
+
+#include <gtest/gtest.h>
+
 
 class TestVec3Metadata : public ::testing::Test
 {

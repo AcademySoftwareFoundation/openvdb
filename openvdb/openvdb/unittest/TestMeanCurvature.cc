@@ -7,8 +7,10 @@
 #include <openvdb/math/Operators.h>
 #include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
 #include <openvdb/tools/LevelSetSphere.h>
+
+#include <gtest/gtest.h>
+
 
 class TestMeanCurvature: public ::testing::Test
 {

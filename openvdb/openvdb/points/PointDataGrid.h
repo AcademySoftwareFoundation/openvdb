@@ -180,6 +180,11 @@ namespace points {
 // forward declaration
 template<typename T, Index Log2Dim> class PointDataLeafNode;
 
+// these aliases are disabled in one of the unit tests to ensure that
+// they are not used by the Point headers
+
+#ifndef OPENVDB_DISABLE_POINT_DATA_TREE_ALIAS
+
 /// @brief Point index tree configured to match the default VDB configurations.
 using PointDataTree = tree::Tree<tree::RootNode<tree::InternalNode<tree::InternalNode
     <PointDataLeafNode<PointDataIndex32, 3>, 4>, 5>>>;
@@ -188,6 +193,7 @@ using PointDataTree = tree::Tree<tree::RootNode<tree::InternalNode<tree::Interna
 /// @brief Point data grid.
 using PointDataGrid = Grid<PointDataTree>;
 
+#endif
 
 /// @brief  Deep copy the descriptor across all leaf nodes.
 ///
@@ -345,12 +351,6 @@ public:
                                         const bool constantStride = true,
                                         const Metadata* metadata = nullptr,
                                         const AttributeArray::ScopedRegistryLock* lock = nullptr);
-
-    OPENVDB_DEPRECATED
-    AttributeArray::Ptr appendAttribute(const Descriptor& expected, Descriptor::Ptr& replacement,
-                                        const size_t pos, const Index strideOrTotalSize,
-                                        const bool constantStride,
-                                        const AttributeArray::ScopedRegistryLock* lock);
 
     /// @brief Drop list of attributes.
     /// @param pos vector of attribute indices to drop
@@ -809,18 +809,6 @@ PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Desc
 {
     return mAttributeSet->appendAttribute(
         expected, replacement, pos, strideOrTotalSize, constantStride, metadata, lock);
-}
-
-// deprecated
-template<typename T, Index Log2Dim>
-inline AttributeArray::Ptr
-PointDataLeafNode<T, Log2Dim>::appendAttribute( const Descriptor& expected, Descriptor::Ptr& replacement,
-                                                const size_t pos, const Index strideOrTotalSize,
-                                                const bool constantStride,
-                                                const AttributeArray::ScopedRegistryLock* lock)
-{
-    return this->appendAttribute(expected, replacement, pos,
-        strideOrTotalSize, constantStride, nullptr, lock);
 }
 
 template<typename T, Index Log2Dim>

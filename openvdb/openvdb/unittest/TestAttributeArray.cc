@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/io/File.h>
+
+#include <gtest/gtest.h>
 
 #ifdef __clang__
 #pragma GCC diagnostic push
@@ -20,8 +21,8 @@
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <tbb/tick_count.h>
-#include <tbb/atomic.h>
 
+#include <atomic>
 #include <cstdio> // for std::remove()
 #include <fstream>
 #include <sstream>
@@ -349,7 +350,6 @@ TEST_F(TestAttributeArray, testAttributeArray)
     }
 
     { // lots of type checking
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         Index size(50);
         {
             TypedAttributeArray<bool> typedAttr(size);
@@ -418,7 +418,7 @@ TEST_F(TestAttributeArray, testAttributeArray)
         }
         {
             // half is not registered by default, but for complete-ness
-            TypedAttributeArray<half> typedAttr(size);
+            TypedAttributeArray<math::half> typedAttr(size);
             AttributeArray& attr(typedAttr);
             EXPECT_EQ(Name("half"), attr.valueType());
             EXPECT_EQ(Name("null"), attr.codecType());
@@ -534,7 +534,32 @@ TEST_F(TestAttributeArray, testAttributeArray)
             EXPECT_TRUE(!attr.valueTypeIsQuaternion());
             EXPECT_TRUE(!attr.valueTypeIsMatrix());
         }
-#endif
+        {
+            TypedAttributeArray<float, FixedPointCodec<false, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt16"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, FixedPointCodec<true, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt8"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(1), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
     }
 
     {
@@ -700,8 +725,8 @@ TEST_F(TestAttributeArray, testAttributeArray)
         }
 
         { // Equality using an unregistered attribute type
-            TypedAttributeArray<half> attr1(50);
-            TypedAttributeArray<half> attr2(50);
+            TypedAttributeArray<math::half> attr1(50);
+            TypedAttributeArray<math::half> attr2(50);
 
             EXPECT_TRUE(attr1 == attr2);
         }
@@ -906,18 +931,6 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
         targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER < 6
-    { // verify behaviour with slow virtual function (ABI<6)
-        AttributeArrayD typedAttr(size);
-        AttributeArray& attr(typedAttr);
-
-        for (const auto& pair : indexPairs) {
-            attr.set(pair.second, sourceAttr, pair.first);
-        }
-
-        EXPECT_TRUE(targetAttr == attr);
-    }
-#else
     using AttributeArrayF = TypedAttributeArray<float>;
 
     { // use std::vector<std::pair<Index, Index>>::begin() as iterator to AttributeArray::copy()
@@ -945,7 +958,7 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
 
     { // copy values between attribute arrays with different value types, but the same storage type
         // target half array
-        TypedAttributeArray<half> targetTypedAttr1(size);
+        TypedAttributeArray<math::half> targetTypedAttr1(size);
         AttributeArray& targetAttr1(targetTypedAttr1);
         for (Index i = 0; i < size; i++) {
             targetTypedAttr1.set(i,
@@ -1057,7 +1070,6 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
         EXPECT_TRUE(uniformAttr.isUniform());
         EXPECT_TRUE(uniformTypedAttr.get(0) == typedAttr.get(5));
     }
-#endif
 }
 
 
@@ -1342,12 +1354,7 @@ TEST_F(TestAttributeArray, testStrided)
         EXPECT_EQ(Index(3), handle.stride());
         EXPECT_EQ(Index(2), handle.size());
 
-// as of ABI=6, the base memory requirements of an AttributeArray have been lowered
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         size_t arrayMem = 40;
-#else
-        size_t arrayMem = 64;
-#endif
         EXPECT_EQ(sizeof(int) * /*size*/3 * /*stride*/2 + arrayMem, array->memUsage());
     }
 
@@ -1497,11 +1504,9 @@ TestAttributeArray::testDelayedLoad()
             EXPECT_TRUE(attrBcopy.isOutOfCore());
             EXPECT_TRUE(attrBequal.isOutOfCore());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrB).isDataLoaded());
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
             EXPECT_TRUE(!static_cast<AttributeArray&>(attrBequal).isDataLoaded());
-#endif
 
             attrB.loadData();
             attrBcopy.loadData();
@@ -1511,11 +1516,9 @@ TestAttributeArray::testDelayedLoad()
             EXPECT_TRUE(!attrBcopy.isOutOfCore());
             EXPECT_TRUE(!attrBequal.isOutOfCore());
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
             EXPECT_TRUE(static_cast<AttributeArray&>(attrB).isDataLoaded());
             EXPECT_TRUE(static_cast<AttributeArray&>(attrBcopy).isDataLoaded());
             EXPECT_TRUE(static_cast<AttributeArray&>(attrBequal).isDataLoaded());
-#endif
 
             EXPECT_EQ(attrA.memUsage(), attrB.memUsage());
             EXPECT_EQ(attrA.memUsage(), attrBcopy.memUsage());

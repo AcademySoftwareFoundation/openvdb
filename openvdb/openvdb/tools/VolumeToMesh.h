@@ -18,7 +18,7 @@
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-#include <tbb/task_scheduler_init.h>
+#include <tbb/task_arena.h>
 
 #include <cmath> // for std::isfinite()
 #include <map>
@@ -363,6 +363,7 @@ inline Vec3d findFeaturePoint(
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace volume_to_mesh_internal {
 
@@ -388,7 +389,7 @@ inline void
 fillArray(ValueType* array, const ValueType& val, const size_t length)
 {
     const auto grainSize = std::max<size_t>(
-        length / tbb::task_scheduler_init::default_num_threads(), 1024);
+        length / tbb::this_task_arena::max_concurrency(), 1024);
     const tbb::blocked_range<size_t> range(0, length, grainSize);
     tbb::parallel_for(range, FillArray<ValueType>(array, val), tbb::simple_partitioner());
 }
@@ -1500,8 +1501,8 @@ ComputePoints<InputTreeType>::ComputePoints(
     double iso)
     : mPoints(pointArray)
     , mInputTree(&inputTree)
-    , mPointIndexNodes(pointIndexLeafNodes.empty() ? nullptr : &pointIndexLeafNodes.front())
-    , mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+    , mPointIndexNodes(pointIndexLeafNodes.data())
+    , mSignFlagsNodes(signFlagsLeafNodes.data())
     , mNodeOffsets(leafNodeOffsets.get())
     , mTransform(xform)
     , mIsovalue(iso)
@@ -1751,7 +1752,7 @@ struct SeamLineWeights
         const Int16TreeType& refSignFlagsTree,
         uint32_t * quantizedPoints,
         InputValueType iso)
-        : mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+        : mSignFlagsNodes(signFlagsLeafNodes.data())
         , mInputTree(&inputTree)
         , mRefPointIndexTree(&refPointIndexTree)
         , mRefSignFlagsTree(&refSignFlagsTree)
@@ -1857,7 +1858,7 @@ struct SetSeamLineFlags
 
     SetSeamLineFlags(const std::vector<LeafNodeType*>& signFlagsLeafNodes,
         const TreeType& refSignFlagsTree)
-        : mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+        : mSignFlagsNodes(signFlagsLeafNodes.data())
         , mRefSignFlagsTree(&refSignFlagsTree)
     {
     }
@@ -1910,7 +1911,7 @@ struct TransferSeamLineFlags
 
     TransferSeamLineFlags(const std::vector<SignDataLeafNodeType*>& signFlagsLeafNodes,
         const BoolTreeType& maskTree)
-        : mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+        : mSignFlagsNodes(signFlagsLeafNodes.data())
         , mMaskTree(&maskTree)
     {
     }
@@ -1956,7 +1957,7 @@ struct MaskSeamLineVoxels
     MaskSeamLineVoxels(const std::vector<LeafNodeType*>& signFlagsLeafNodes,
         const TreeType& signFlagsTree,
         BoolTreeType& mask)
-        : mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+        : mSignFlagsNodes(signFlagsLeafNodes.data())
         , mSignFlagsTree(&signFlagsTree)
         , mTempMask(false)
         , mMask(&mask)
@@ -2153,8 +2154,8 @@ MergeVoxelRegions<InputGridType>::MergeVoxelRegions(
     : mInputTree(&inputGrid.tree())
     , mInputTransform(&inputGrid.transform())
     , mPointIndexTree(&pointIndexTree)
-    , mPointIndexNodes(pointIndexLeafNodes.empty() ? nullptr : &pointIndexLeafNodes.front())
-    , mSignFlagsNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+    , mPointIndexNodes(pointIndexLeafNodes.data())
+    , mSignFlagsNodes(signFlagsLeafNodes.data())
     , mIsovalue(iso)
     , mSurfaceAdaptivity(adaptivity)
     , mInternalAdaptivity(adaptivity)
@@ -3253,7 +3254,7 @@ IdentifyIntersectingVoxels<InputTreeType>::IdentifyIntersectingVoxels(
     BoolTreeType& intersectionTree,
     InputValueType iso)
     : mInputAccessor(inputTree)
-    , mInputNodes(inputLeafNodes.empty() ? nullptr : &inputLeafNodes.front())
+    , mInputNodes(inputLeafNodes.data())
     , mIntersectionTree(false)
     , mIntersectionAccessor(intersectionTree)
     , mOffsetData()
@@ -3380,7 +3381,7 @@ MaskIntersectingVoxels<InputTreeType>::MaskIntersectingVoxels(
     BoolTreeType& intersectionTree,
     InputValueType iso)
     : mInputAccessor(inputTree)
-    , mNodes(nodes.empty() ? nullptr : &nodes.front())
+    , mNodes(nodes.data())
     , mIntersectionTree(false)
     , mIntersectionAccessor(intersectionTree)
     , mIsovalue(iso)
@@ -3449,7 +3450,7 @@ struct MaskBorderVoxels
         const std::vector<BoolLeafNodeType*>& maskNodes,
         BoolTreeType& borderTree)
         : mMaskTree(&maskTree)
-        , mMaskNodes(maskNodes.empty() ? nullptr : &maskNodes.front())
+        , mMaskNodes(maskNodes.data())
         , mTmpBorderTree(false)
         , mBorderTree(&borderTree)
     {
@@ -3529,7 +3530,7 @@ struct SyncMaskValues
     using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
 
     SyncMaskValues(const std::vector<BoolLeafNodeType*>& nodes, const BoolTreeType& mask)
-        : mNodes(nodes.empty() ? nullptr : &nodes.front())
+        : mNodes(nodes.data())
         , mMaskTree(&mask)
     {
     }
@@ -3573,7 +3574,7 @@ struct MaskSurface
 
     MaskSurface(const std::vector<BoolLeafNodeType*>& nodes, const BoolTreeType& mask,
         const math::Transform& inputTransform, const math::Transform& maskTransform, bool invert)
-        : mNodes(nodes.empty() ? nullptr : &nodes.front())
+        : mNodes(nodes.data())
         , mMaskTree(&mask)
         , mInputTransform(inputTransform)
         , mMaskTransform(maskTransform)
@@ -3757,7 +3758,7 @@ ComputeAuxiliaryData<InputTreeType>::ComputeAuxiliaryData(
     Index32TreeType& pointIndexTree,
     InputValueType iso)
     : mInputAccessor(inputTree)
-    , mIntersectionNodes(&intersectionLeafNodes.front())
+    , mIntersectionNodes(intersectionLeafNodes.data())
     , mSignFlagsTree(0)
     , mSignFlagsAccessor(signFlagsTree)
     , mPointIndexTree(std::numeric_limits<Index32>::max())
@@ -3891,7 +3892,7 @@ struct LeafNodePointCount
 
     LeafNodePointCount(const std::vector<Int16LeafNodeType*>& leafNodes,
         std::unique_ptr<Index32[]>& leafNodeCount)
-        : mLeafNodes(leafNodes.empty() ? nullptr : &leafNodes.front())
+        : mLeafNodes(leafNodes.data())
         , mData(leafNodeCount.get())
     {
     }
@@ -3928,8 +3929,8 @@ struct AdaptiveLeafNodePointCount
     AdaptiveLeafNodePointCount(const std::vector<PointIndexLeafNode*>& pointIndexNodes,
         const std::vector<Int16LeafNodeType*>& signDataNodes,
         std::unique_ptr<Index32[]>& leafNodeCount)
-        : mPointIndexNodes(pointIndexNodes.empty() ? nullptr : &pointIndexNodes.front())
-        , mSignDataNodes(signDataNodes.empty() ? nullptr : &signDataNodes.front())
+        : mPointIndexNodes(pointIndexNodes.data())
+        , mSignDataNodes(signDataNodes.data())
         , mData(leafNodeCount.get())
     {
     }
@@ -3977,8 +3978,8 @@ struct MapPoints
     MapPoints(const std::vector<PointIndexLeafNode*>& pointIndexNodes,
         const std::vector<Int16LeafNodeType*>& signDataNodes,
         std::unique_ptr<Index32[]>& leafNodeCount)
-        : mPointIndexNodes(pointIndexNodes.empty() ? nullptr : &pointIndexNodes.front())
-        , mSignDataNodes(signDataNodes.empty() ? nullptr : &signDataNodes.front())
+        : mPointIndexNodes(pointIndexNodes.data())
+        , mSignDataNodes(signDataNodes.data())
         , mData(leafNodeCount.get())
     {
     }
@@ -4048,7 +4049,7 @@ ComputePolygons<TreeType, PrimBuilder>::ComputePolygons(
     const Index32TreeType& idxTree,
     PolygonPoolList& polygons,
     bool invertSurfaceOrientation)
-    : mSignFlagsLeafNodes(signFlagsLeafNodes.empty() ? nullptr : &signFlagsLeafNodes.front())
+    : mSignFlagsLeafNodes(signFlagsLeafNodes.data())
     , mSignFlagsTree(&signFlagsTree)
     , mRefSignFlagsTree(nullptr)
     , mIndexTree(&idxTree)
@@ -4177,7 +4178,7 @@ struct FlagAndCountQuadsToSubdivide
         std::unique_ptr<openvdb::Vec3s[]>& points,
         std::unique_ptr<unsigned[]>& numQuadsToDivide)
         : mPolygonPoolList(&polygons)
-        , mPointFlags(pointFlags.empty() ? nullptr : &pointFlags.front())
+        , mPointFlags(pointFlags.data())
         , mPoints(points.get())
         , mNumQuadsToDivide(numQuadsToDivide.get())
     {
@@ -4421,7 +4422,7 @@ struct ReviseSeamLineFlags
     ReviseSeamLineFlags(PolygonPoolList& polygons,
         const std::vector<uint8_t>& pointFlags)
         : mPolygonPoolList(&polygons)
-        , mPointFlags(pointFlags.empty() ? nullptr : &pointFlags.front())
+        , mPointFlags(pointFlags.data())
     {
     }
 
@@ -4640,6 +4641,7 @@ relaxDisorientedTriangles(
 
 } // volume_to_mesh_internal namespace
 
+/// @endcond
 
 ////////////////////////////////////////
 
@@ -5085,7 +5087,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
         if (referenceMeshing) {
             mPointFlags.resize(mPointListSize);
             op.setRefData(*refInputTree, *refPointIndexTree, *refSignFlagsTree,
-                mQuantizedSeamPoints.get(), &mPointFlags.front());
+                mQuantizedSeamPoints.get(), mPointFlags.data());
         }
 
         tbb::parallel_for(auxiliaryLeafNodeRange, op);
@@ -5151,7 +5153,7 @@ VolumeToMesh::operator()(const InputGridType& inputGrid)
 
 
 //{
-/// @cond OPENVDB_VOLUME_TO_MESH_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 /// @internal This overload is enabled only for grids with a scalar ValueType.
 template<typename GridType>
