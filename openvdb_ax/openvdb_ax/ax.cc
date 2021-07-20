@@ -15,7 +15,7 @@
 #include <llvm/Support/ManagedStatic.h> // llvm_shutdown
 #include <llvm/ExecutionEngine/MCJIT.h> // LLVMLinkInMCJIT
 
-#include <tbb/mutex.h>
+#include <mutex>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -107,20 +107,20 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
 
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
-tbb::mutex sInitMutex;
+std::mutex sInitMutex;
 bool sIsInitialized = false;
 bool sShutdown = false;
 }
 
 bool isInitialized()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     return sIsInitialized;
 }
 
 void initialize()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     if (sIsInitialized) return;
 
     if (sShutdown) {
@@ -141,10 +141,22 @@ void initialize()
     LLVMLinkInMCJIT();
 
     // Initialize passes
+    /// @note This is not strictly necessary as LLVM passes are initialized
+    ///   thread-safe on-demand into a static registry. ax::initialise should
+    ///   perform as much static set-up as possible so that the first run of
+    ///   Compiler::compiler has no extra overhead. The default pass pipeline
+    ///   is constantly changing and, as a result, explicitly registering certain
+    ///   passes here can cause annoying compiler failures between LLVM versions.
+    ///   The below passes are wrappers around pass categories whose API should
+    ///   change less frequently and include 99% of used passed.
+    ///
+    ///   Note that, as well as the llvm::PassManagerBuilder, the majority of
+    ///   passes are initialized through llvm::TargetMachine::adjustPassManager
+    ///   and llvm::TargetMachine::addPassesToEmitMC (called through the EE).
+    ///   To track passes, use llvm::PassRegistry::addRegistrationListener.
     llvm::PassRegistry& registry = *llvm::PassRegistry::getPassRegistry();
     llvm::initializeCore(registry);
     llvm::initializeScalarOpts(registry);
-    llvm::initializeObjCARCOpts(registry);
     llvm::initializeVectorization(registry);
     llvm::initializeIPO(registry);
     llvm::initializeAnalysis(registry);
@@ -154,42 +166,16 @@ void initialize()
     llvm::initializeAggressiveInstCombine(registry);
 #endif
     llvm::initializeInstrumentation(registry);
+    llvm::initializeGlobalISel(registry);
     llvm::initializeTarget(registry);
-    // For codegen passes, only passes that do IR to IR transformation are
-    // supported.
-    llvm::initializeExpandMemCmpPassPass(registry);
-    llvm::initializeScalarizeMaskedMemIntrinPass(registry);
-    llvm::initializeCodeGenPreparePass(registry);
-    llvm::initializeAtomicExpandPass(registry);
-    llvm::initializeRewriteSymbolsLegacyPassPass(registry);
-    llvm::initializeWinEHPreparePass(registry);
-    llvm::initializeDwarfEHPreparePass(registry);
-    llvm::initializeSafeStackLegacyPassPass(registry);
-    llvm::initializeSjLjEHPreparePass(registry);
-    llvm::initializePreISelIntrinsicLoweringLegacyPassPass(registry);
-    llvm::initializeGlobalMergePass(registry);
-#if LLVM_VERSION_MAJOR > 6
-    llvm::initializeIndirectBrExpandPassPass(registry);
-#endif
-#if LLVM_VERSION_MAJOR > 7
-    llvm::initializeInterleavedLoadCombinePass(registry);
-#endif
-    llvm::initializeInterleavedAccessPass(registry);
-    llvm::initializeEntryExitInstrumenterPass(registry);
-    llvm::initializePostInlineEntryExitInstrumenterPass(registry);
-    llvm::initializeUnreachableBlockElimLegacyPassPass(registry);
-    llvm::initializeExpandReductionsPass(registry);
-#if LLVM_VERSION_MAJOR > 6
-    llvm::initializeWasmEHPreparePass(registry);
-#endif
-    llvm::initializeWriteBitcodePassPass(registry);
+    llvm::initializeCodeGen(registry);
 
     sIsInitialized = true;
 }
 
 void uninitialize()
 {
-    tbb::mutex::scoped_lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
     if (!sIsInitialized) return;
 
     // @todo consider replacing with storage to Support/InitLLVM

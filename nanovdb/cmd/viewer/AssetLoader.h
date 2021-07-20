@@ -3,11 +3,6 @@
 
 /*!
 	\file AssetLoader.h
-
-	\author Wil Braithwaite
-
-	\date October 9, 2020
-
 	\brief Classes for asynchronous asset loading.
 */
 

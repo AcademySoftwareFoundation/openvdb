@@ -119,7 +119,7 @@ int main(int argc, char* argv[])
                     test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<nanovdb::ValueMask>()) {
                     test = isValid(*grid, detailed, verbose);
-                } else if (auto* grid = handle.grid<nanovdb::PackedRGBA8>()) {
+                } else if (auto* grid = handle.grid<nanovdb::Rgba8>()) {
                     test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<bool>()) {
                     test = isValid(*grid, detailed, verbose);

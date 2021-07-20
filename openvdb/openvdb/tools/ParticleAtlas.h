@@ -239,6 +239,7 @@ private:
 
 // Internal operators and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace particle_atlas_internal {
 
@@ -678,6 +679,7 @@ private:
 
 } // namespace particle_atlas_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

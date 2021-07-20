@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Maps.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/MapsUtil.h>
+
+#include <gtest/gtest.h>
 
 
 class TestPrePostAPI: public ::testing::Test

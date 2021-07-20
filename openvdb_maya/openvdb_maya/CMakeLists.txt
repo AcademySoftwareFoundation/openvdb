@@ -10,10 +10,6 @@
 cmake_minimum_required(VERSION 3.12)
 project(OpenVDBMaya  LANGUAGES CXX)
 
-# Monitoring <PackageName>_ROOT variables
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
 
 ###### OpenVDB Maya Options
 
@@ -140,7 +136,7 @@ set_target_properties(openvdb_maya
 if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

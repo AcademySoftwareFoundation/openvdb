@@ -8,11 +8,11 @@
 #include "PointExecutable.h"
 #include "VolumeExecutable.h"
 
-#include "../ast/Scanners.h"
-#include "../codegen/Functions.h"
-#include "../codegen/PointComputeGenerator.h"
-#include "../codegen/VolumeComputeGenerator.h"
-#include "../Exceptions.h"
+#include "openvdb_ax/ast/Scanners.h"
+#include "openvdb_ax/codegen/Functions.h"
+#include "openvdb_ax/codegen/PointComputeGenerator.h"
+#include "openvdb_ax/codegen/VolumeComputeGenerator.h"
+#include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/Exceptions.h>
 
@@ -69,35 +69,47 @@ namespace
 /// @note   This logic is based off the Kaleidoscope tutorial below with extensions
 ///         for CPU and CPU featrue set targetting
 ///         https://llvm.org/docs/tutorial/MyFirstLanguageFrontend/LangImpl08.html
-inline std::unique_ptr<llvm::TargetMachine> initializeTargetMachine()
+inline std::unique_ptr<llvm::ExecutionEngine>
+initializeExecutionEngine(std::unique_ptr<llvm::Module> M, Logger& logger)
 {
-    const std::string TargetTriple = llvm::sys::getDefaultTargetTriple();
-    std::string Error;
-    const llvm::Target* Target = llvm::TargetRegistry::lookupTarget(TargetTriple, Error);
-    if (!Target) {
-        OPENVDB_LOG_DEBUG_RUNTIME("Unable to retrieve target machine information. "
-            "No target specific optimization will be performed: " << Error);
+    // This handles MARCH (i.e. we don't need to set it on the EngineBuilder)
+    M->setTargetTriple(llvm::sys::getDefaultTargetTriple());
+    llvm::Module* module = M.get();
+
+    // stringref->bool map of features->enabled
+    llvm::StringMap<bool> HostFeatures;
+    if (!llvm::sys::getHostCPUFeatures(HostFeatures)) {
+        logger.warning("Unable to determine CPU host features");
+    }
+
+    std::vector<llvm::StringRef> features;
+    for (auto& feature : HostFeatures) {
+        if (feature.second) features.emplace_back(feature.first());
+    }
+
+    std::string error;
+    std::unique_ptr<llvm::ExecutionEngine>
+        EE(llvm::EngineBuilder(std::move(M))
+            .setErrorStr(&error)
+            .setEngineKind(llvm::EngineKind::JIT)
+            .setOptLevel(llvm::CodeGenOpt::Level::Default)
+            .setMCPU(llvm::sys::getHostCPUName())
+            .setMAttrs(features)
+            .create());
+
+    if (!EE) {
+        logger.error("Fatal AX Compiler error; the LLVM Execution engine could "
+            "not be initialized:\n" + error);
         return nullptr;
     }
 
-    // default cpu with no additional features = "generic"
-    const llvm::StringRef& CPU = llvm::sys::getHostCPUName();
+    // Data layout is also handled in the MCJIT from the generated target machine
+    // but we set it on the module in case opt passes request it
+    if (auto* TM = EE->getTargetMachine()) {
+        module->setDataLayout(TM->createDataLayout());
+    }
 
-    llvm::SubtargetFeatures Features;
-    llvm::StringMap<bool> HostFeatures;
-    if (llvm::sys::getHostCPUFeatures(HostFeatures))
-      for (auto &F : HostFeatures)
-        Features.AddFeature(F.first(), F.second);
-
-    // default options
-    llvm::TargetOptions opt;
-    const llvm::Optional<llvm::Reloc::Model> RM =
-        llvm::Optional<llvm::Reloc::Model>();
-
-    std::unique_ptr<llvm::TargetMachine> TargetMachine(
-        Target->createTargetMachine(TargetTriple, CPU, Features.getString(), opt, RM));
-
-    return TargetMachine;
+    return EE;
 }
 
 #ifndef USE_NEW_PASS_MANAGER
@@ -151,7 +163,6 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
 
     // See the following link for more info on vectorizers
     // http://llvm.org/docs/Vectorizers.html
-
     // (-vectorize-loops, -loop-vectorize)
     builder.LoopVectorize =
         disableLoopVectorization ? false : optLevel > 1 && sizeLevel < 2;
@@ -168,45 +179,40 @@ void addOptimizationPasses(llvm::legacy::PassManagerBase& passes,
     builder.populateModulePassManager(passes);
 }
 
-void LLVMoptimise(llvm::Module* module,
+void LLVMoptimise(llvm::Module& module,
                   const unsigned optLevel,
                   const unsigned sizeLevel,
-                  const bool verify,
                   llvm::TargetMachine* TM)
 {
-    // Pass manager setup and IR optimisations - Do target independent optimisations
-    // only - i.e. the following do not require an llvm TargetMachine analysis pass
+    // Pass manager setup and IR optimisations
 
     llvm::legacy::PassManager passes;
-    llvm::TargetLibraryInfoImpl TLII(llvm::Triple(module->getTargetTriple()));
+    llvm::TargetLibraryInfoImpl TLII(llvm::Triple(module.getTargetTriple()));
     passes.add(new llvm::TargetLibraryInfoWrapperPass(TLII));
 
     // Add internal analysis passes from the target machine.
     if (TM) passes.add(llvm::createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis()));
     else    passes.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
 
-    llvm::legacy::FunctionPassManager functionPasses(module);
+    llvm::legacy::FunctionPassManager functionPasses(&module);
     if (TM) functionPasses.add(llvm::createTargetTransformInfoWrapperPass(TM->getTargetIRAnalysis()));
     else    functionPasses.add(llvm::createTargetTransformInfoWrapperPass(llvm::TargetIRAnalysis()));
 
-    if (verify) functionPasses.add(llvm::createVerifierPass());
 
     addStandardLinkPasses(passes);
     addOptimizationPasses(passes, functionPasses, TM, optLevel, sizeLevel);
 
     functionPasses.doInitialization();
-    for (llvm::Function& function : *module) {
+    for (llvm::Function& function : module) {
       functionPasses.run(function);
     }
     functionPasses.doFinalization();
 
-    if (verify) passes.add(llvm::createVerifierPass());
-    passes.run(*module);
+    passes.run(module);
 }
 
-void LLVMoptimise(llvm::Module* module,
+void LLVMoptimise(llvm::Module& module,
                   const llvm::PassBuilder::OptimizationLevel opt,
-                  const bool verify,
                   llvm::TargetMachine* TM)
 {
     unsigned optLevel = 0, sizeLevel = 0;
@@ -247,14 +253,13 @@ void LLVMoptimise(llvm::Module* module,
     sizeLevel = opt.getSizeLevel();
 #endif
 
-    LLVMoptimise(module, optLevel, sizeLevel, verify, TM);
+    LLVMoptimise(module, optLevel, sizeLevel, TM);
 }
 
 #else
 
-void LLVMoptimise(llvm::Module* module,
+void LLVMoptimise(llvm::Module& module,
                   const llvm::PassBuilder::OptimizationLevel optLevel,
-                  const bool verify,
                   llvm::TargetMachine* TM)
 {
     // use the PassBuilder for optimisation pass management
@@ -283,54 +288,56 @@ void LLVMoptimise(llvm::Module* module,
         // ref: clang CodeGen/BackEndUtil.cpp EmitAssemblyWithNewPassManager
         llvm::ModulePassManager MPM;
         MPM.addPass(llvm::AlwaysInlinerPass());
-        if (verify) MPM.addPass(llvm::VerifierPass());
-        MPM.run(*module, MAM);
+        MPM.run(module, MAM);
     }
     else {
         // create a clang-like optimisation pipeline for -O1, 2,  s, z, 3
         llvm::ModulePassManager MPM =
             PB.buildPerModuleDefaultPipeline(optLevel);
-        if (verify) MPM.addPass(llvm::VerifierPass());
         MPM.run(*module, MAM);
     }
 }
 #endif
 
-void optimiseAndVerify(llvm::Module* module,
-        const bool verify,
+bool verify(const llvm::Module& module, Logger& logger)
+{
+    std::ostringstream os;
+    llvm::raw_os_ostream out(os);
+    if (llvm::verifyModule(module, &out)) {
+        out.flush();
+        logger.error("Fatal AX Compiler error; the generated IR was invalid:\n" + os.str());
+        return false;
+    }
+    return true;
+}
+
+void optimise(llvm::Module& module,
         const CompilerOptions::OptLevel optLevel,
         llvm::TargetMachine* TM)
 {
-    if (verify) {
-        llvm::raw_os_ostream out(std::cout);
-        if (llvm::verifyModule(*module, &out)) {
-            OPENVDB_THROW(AXCompilerError, "Generated LLVM IR is not valid.");
-        }
-    }
-
     switch (optLevel) {
         case CompilerOptions::OptLevel::O0 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O0, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O0, TM);
             break;
         }
         case CompilerOptions::OptLevel::O1 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O1, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O1, TM);
             break;
         }
         case CompilerOptions::OptLevel::O2 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O2, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O2, TM);
             break;
         }
         case CompilerOptions::OptLevel::Os : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Os, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Os, TM);
             break;
         }
         case CompilerOptions::OptLevel::Oz : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Oz, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Oz, TM);
             break;
         }
         case CompilerOptions::OptLevel::O3 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O3, verify, TM);
+            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O3, TM);
             break;
         }
         case CompilerOptions::OptLevel::NONE :
@@ -338,10 +345,13 @@ void optimiseAndVerify(llvm::Module* module,
     }
 }
 
-void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
+bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
                                llvm::ExecutionEngine& engine,
-                               llvm::Module& module)
+                               llvm::Module& module,
+                               Logger& logger)
 {
+    const size_t count = logger.errors();
+
     /// @note  This is a copy of ExecutionEngine::getMangledName. LLVM's ExecutionEngine
     ///   provides two signatures for updating global mappings, one which takes a void* and
     ///   another which takes a uint64_t address. When providing function mappings,
@@ -393,15 +403,22 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
             const codegen::CFunctionBase* binding =
                 dynamic_cast<const codegen::CFunctionBase*>(decl.get());
             if (!binding) {
-                OPENVDB_LOG_WARN("Function with symbol \"" << decl->symbol() << "\" has "
-                    "no function body and is not a C binding.");
+#ifndef NDEBUG
+                // some internally supported LLVm symbols (malloc, free, etc) are
+                // not prefixed with ax. and we don't generated a function body
+                if (llvmFunction->getName().startswith("ax.")) {
+                    OPENVDB_LOG_WARN("Function with symbol \"" << decl->symbol() << "\" has "
+                        "no function body and is not a C binding.");
+                }
+#endif
                 continue;
             }
 
             const uint64_t address = binding->address();
             if (address == 0) {
-                OPENVDB_THROW(AXCompilerError, "No available mapping for C Binding "
-                    "with symbol \"" << decl->symbol() << "\"");
+                logger.error("Fatal AX Compiler error; No available mapping for C Binding "
+                    "with symbol \"" + std::string(decl->symbol()) + "\"");
+                continue;
             }
             const std::string mangled =
                 getMangledName(llvm::cast<llvm::GlobalValue>(llvmFunction), engine);
@@ -410,9 +427,8 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
             // we've overwritten something
             const uint64_t oldAddress = engine.updateGlobalMapping(mangled, address);
             if (oldAddress != 0 && oldAddress != address) {
-                OPENVDB_THROW(AXCompilerError, "Function registry mapping error - "
-                    "multiple functions are using the same symbol \"" << decl->symbol()
-                    << "\".");
+                logger.error("Fatal AX Compiler error; multiple functions are using the "
+                    "same symbol \"" + std::string(decl->symbol()) + "\".");
             }
         }
     }
@@ -428,7 +444,7 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
     for (const auto& F : list) {
         if (F.size() > 0) continue;
         // Some LLVM functions may also not be defined at this stage which is expected
-        if (!F.getName().startswith("ax")) continue;
+        if (!F.getName().startswith("ax.")) continue;
         const std::string mangled =
             getMangledName(llvm::cast<llvm::GlobalValue>(&F), engine);
         const uint64_t address =
@@ -436,6 +452,8 @@ void initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
         assert(address != 0 && "Unbound function!");
     }
 #endif
+
+    return count == logger.errors();
 }
 
 void verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
@@ -528,8 +546,11 @@ initializeMetadataPtr(CustomData& data,
     return nullptr;
 }
 
-inline void
-registerExternalGlobals(const codegen::SymbolTable& globals, CustomData::Ptr& dataPtr, llvm::LLVMContext& C)
+inline bool
+registerExternalGlobals(const codegen::SymbolTable& globals,
+            CustomData::Ptr& dataPtr,
+            llvm::LLVMContext& C,
+            Logger& logger)
 {
     auto initializerFromToken =
         [&](const ast::tokens::CoreType type, const std::string& name, CustomData& data) -> llvm::Constant* {
@@ -552,15 +573,18 @@ registerExternalGlobals(const codegen::SymbolTable& globals, CustomData::Ptr& da
             case ast::tokens::MAT3D   : return initializeMetadataPtr<math::Mat3<double>>(data, name, C);
             case ast::tokens::MAT4F   : return initializeMetadataPtr<math::Mat4<float>>(data, name, C);
             case ast::tokens::MAT4D   : return initializeMetadataPtr<math::Mat4<double>>(data, name, C);
-            case ast::tokens::STRING  : return initializeMetadataPtr<ax::AXString, ax::AXStringMetadata>(data, name, C);
+            // @note could be const char*, but not all functions have support for const char* args
+            case ast::tokens::STRING  : return initializeMetadataPtr<ax::codegen::String>(data, name, C);
             case ast::tokens::UNKNOWN :
             default      : {
                 // grammar guarantees this is unreachable as long as all types are supported
-                OPENVDB_THROW(AXCompilerError, "Attribute type unsupported or not recognised");
+                assert(false && "Attribute type unsupported or not recognised");
+                return nullptr;
             }
         }
     };
 
+    bool success = true;
     std::string name, typestr;
     for (const auto& global : globals.map()) {
 
@@ -583,13 +607,16 @@ registerExternalGlobals(const codegen::SymbolTable& globals, CustomData::Ptr& da
         llvm::Constant* initializer = initializerFromToken(typetoken, name, *dataPtr);
 
         if (!initializer) {
-            OPENVDB_THROW(AXCompilerError, "Custom data \"" + name + "\" already exists with a "
-                "different type.");
+            logger.error("Custom data \"" + name + "\" already exists with a different type.");
+            success = false;
+            continue;
         }
 
         variable->setInitializer(initializer);
         variable->setConstant(true); // is not written to at runtime
     }
+
+    return success;
 }
 
 struct PointDefaultModifier :
@@ -597,10 +624,6 @@ struct PointDefaultModifier :
 {
     using openvdb::ax::ast::Visitor<PointDefaultModifier, false>::traverse;
     using openvdb::ax::ast::Visitor<PointDefaultModifier, false>::visit;
-
-    PointDefaultModifier() = default;
-
-    virtual ~PointDefaultModifier() = default;
 
     const std::set<std::string> autoVecAttribs {"P", "v", "N", "Cd"};
 
@@ -644,29 +667,24 @@ void Compiler::setFunctionRegistry(std::unique_ptr<codegen::FunctionRegistry>&& 
     mFunctionRegistry = std::move(functionRegistry);
 }
 
-template<>
-PointExecutable::Ptr
-Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
-                                   Logger& logger,
-                                   const CustomData::Ptr customData)
+template <typename ExeT, typename GenT>
+inline typename ExeT::Ptr
+Compiler::compile(const ast::Tree& tree,
+        const std::string& moduleName,
+        const std::vector<std::string>& functions,
+        CustomData::Ptr data,
+        Logger& logger)
 {
-    openvdb::SharedPtr<ast::Tree> tree(syntaxTree.copy());
-    PointDefaultModifier modifier;
-    modifier.traverse(tree.get());
+    // initialize the module and execution engine - the latter isn't needed
+    // for IR generation but we leave the creation of the TM to the EE.
 
-    verifyTypedAccesses(*tree, logger);
-    // initialize the module and generate LLVM IR
-    std::unique_ptr<llvm::Module> module(new llvm::Module("module", *mContext));
-    std::unique_ptr<llvm::TargetMachine> TM = initializeTargetMachine();
-    if (TM) {
-        module->setDataLayout(TM->createDataLayout());
-        module->setTargetTriple(TM->getTargetTriple().normalize());
-    }
+    std::unique_ptr<llvm::Module> M(new llvm::Module(moduleName, *mContext));
+    llvm::Module* module = M.get();
+    std::unique_ptr<llvm::ExecutionEngine> EE = initializeExecutionEngine(std::move(M), logger);
+    if (!EE) return nullptr;
 
-    codegen::codegen_internal::PointComputeGenerator
-        codeGenerator(*module, mCompilerOptions.mFunctionOptions,
-            *mFunctionRegistry, logger);
-    AttributeRegistry::Ptr attributes = codeGenerator.generate(*tree);
+    GenT codeGenerator(*module, mCompilerOptions.mFunctionOptions, *mFunctionRegistry, logger);
+    AttributeRegistry::Ptr attributes = codeGenerator.generate(tree);
 
     // if there has been a compilation error through user error, exit
     if (!attributes) {
@@ -675,15 +693,20 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     }
 
     // map accesses (always do this prior to optimising as globals may be removed)
+
     registerAccesses(codeGenerator.globals(), *attributes);
 
-    CustomData::Ptr validCustomData(customData);
-    registerExternalGlobals(codeGenerator.globals(), validCustomData, *mContext);
+    if (!registerExternalGlobals(codeGenerator.globals(), data, *mContext, logger)) {
+        return nullptr;
+    }
 
-    // optimise
+    // optimise and verify
 
-    llvm::Module* modulePtr = module.get();
-    optimiseAndVerify(modulePtr, mCompilerOptions.mVerify, mCompilerOptions.mOptLevel, TM.get());
+    if (mCompilerOptions.mVerify && !verify(*module, logger)) return nullptr;
+    optimise(*module, mCompilerOptions.mOptLevel, EE->getTargetMachine());
+    if (mCompilerOptions.mOptLevel != CompilerOptions::OptLevel::NONE) {
+        if (mCompilerOptions.mVerify && !verify(*module, logger)) return nullptr;
+    }
 
     // @todo re-constant fold!! although constant folding will work with constant
     //       expressions prior to optimisation, expressions like "int a = 1; cosh(a);"
@@ -693,53 +716,60 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     //       of the function body). What llvm can do, however, is change this example
     //       into "cosh(1)" which we can then handle.
 
-    // create the llvm execution engine which will build our function pointers
-
-    std::string error;
-    std::shared_ptr<llvm::ExecutionEngine>
-        executionEngine(llvm::EngineBuilder(std::move(module))
-            .setEngineKind(llvm::EngineKind::JIT)
-            .setErrorStr(&error)
-            .create());
-
-    if (!executionEngine) {
-        OPENVDB_THROW(AXCompilerError, "Failed to create LLVMExecutionEngine: " + error);
-    }
-
     // map functions
 
-    initializeGlobalFunctions(*mFunctionRegistry, *executionEngine, *modulePtr);
+    if (!initializeGlobalFunctions(*mFunctionRegistry, *EE, *module, logger)) {
+        return nullptr;
+    }
 
     // finalize mapping
 
-    executionEngine->finalizeObject();
+    EE->finalizeObject();
 
     // get the built function pointers
+
+    std::unordered_map<std::string, uint64_t> functionMap;
+
+    for (const std::string& name : functions) {
+        const uint64_t address = EE->getFunctionAddress(name);
+        if (!address) {
+            logger.error("Fatal AX Compiler error; Unable to compile compute "
+                "function \"" + name + "\"");
+            return nullptr;
+        }
+        functionMap[name] = address;
+    }
+
+    // create final executable object
+    return typename ExeT::Ptr(new ExeT(mContext,
+        std::move(EE),
+        attributes,
+        data,
+        functionMap,
+        tree));
+}
+
+template<>
+PointExecutable::Ptr
+Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
+                                   Logger& logger,
+                                   const CustomData::Ptr customData)
+{
+    using GenT = codegen::codegen_internal::PointComputeGenerator;
+
+    openvdb::SharedPtr<ast::Tree> tree(syntaxTree.copy());
+    PointDefaultModifier modifier;
+    modifier.traverse(tree.get());
+
+    verifyTypedAccesses(*tree, logger);
 
     const std::vector<std::string> functionNames {
         codegen::PointKernel::getDefaultName(),
         codegen::PointRangeKernel::getDefaultName()
     };
 
-    std::unordered_map<std::string, uint64_t> functionMap;
-
-    for (const std::string& name : functionNames) {
-        const uint64_t address = executionEngine->getFunctionAddress(name);
-        if (!address) {
-            OPENVDB_THROW(AXCompilerError, "Failed to compile compute function \"" + name + "\"");
-        }
-        functionMap[name] = address;
-    }
-
-    // create final executable object
-    PointExecutable::Ptr
-        executable(new PointExecutable(mContext,
-            executionEngine,
-            attributes,
-            validCustomData,
-            functionMap));
-
-    return executable;
+    return this->compile<PointExecutable, GenT>(*tree, "ax.point.module",
+        functionNames, customData, logger);
 }
 
 template<>
@@ -748,74 +778,18 @@ Compiler::compile<VolumeExecutable>(const ast::Tree& syntaxTree,
                                     Logger& logger,
                                     const CustomData::Ptr customData)
 {
+    using GenT = codegen::codegen_internal::VolumeComputeGenerator;
+
     verifyTypedAccesses(syntaxTree, logger);
 
-    // initialize the module and generate LLVM IR
+    const std::vector<std::string> functionNames {
+        // codegen::VolumeKernelValue::getDefaultName(), // currently unused directly
+        codegen::VolumeKernelBuffer::getDefaultName(),
+        codegen::VolumeKernelNode::getDefaultName()
+    };
 
-    std::unique_ptr<llvm::Module> module(new llvm::Module("module", *mContext));
-    std::unique_ptr<llvm::TargetMachine> TM = initializeTargetMachine();
-    if (TM) {
-        module->setDataLayout(TM->createDataLayout());
-        module->setTargetTriple(TM->getTargetTriple().normalize());
-    }
-
-    codegen::codegen_internal::VolumeComputeGenerator
-        codeGenerator(*module, mCompilerOptions.mFunctionOptions,
-            *mFunctionRegistry, logger);
-    AttributeRegistry::Ptr attributes = codeGenerator.generate(syntaxTree);
-
-    // if there has been a compilation error through user error, exit
-    if (!attributes) {
-        assert(logger.hasError());
-        return nullptr;
-    }
-
-    // map accesses (always do this prior to optimising as globals may be removed)
-    registerAccesses(codeGenerator.globals(), *attributes);
-
-    CustomData::Ptr validCustomData(customData);
-    registerExternalGlobals(codeGenerator.globals(), validCustomData, *mContext);
-
-    llvm::Module* modulePtr = module.get();
-    optimiseAndVerify(modulePtr, mCompilerOptions.mVerify, mCompilerOptions.mOptLevel, TM.get());
-
-    std::string error;
-    std::shared_ptr<llvm::ExecutionEngine>
-        executionEngine(llvm::EngineBuilder(std::move(module))
-            .setEngineKind(llvm::EngineKind::JIT)
-            .setErrorStr(&error)
-            .create());
-
-
-    if (!executionEngine) {
-        OPENVDB_THROW(AXCompilerError, "Failed to create LLVMExecutionEngine: " + error);
-    }
-    // map functions
-
-    initializeGlobalFunctions(*mFunctionRegistry, *executionEngine,
-        *modulePtr);
-
-    // finalize mapping
-
-    executionEngine->finalizeObject();
-
-    const std::string name = codegen::VolumeKernel::getDefaultName();
-    const uint64_t address = executionEngine->getFunctionAddress(name);
-    if (!address) {
-        OPENVDB_THROW(AXCompilerError, "Failed to compile compute function \"" + name + "\"");
-    }
-
-    std::unordered_map<std::string, uint64_t> functionMap;
-    functionMap[name] = address;
-
-    // create final executable object
-    VolumeExecutable::Ptr
-        executable(new VolumeExecutable(mContext,
-            executionEngine,
-            attributes,
-            validCustomData,
-            functionMap));
-    return executable;
+    return this->compile<VolumeExecutable, GenT>(syntaxTree, "ax.volume.module",
+        functionNames, customData, logger);
 }
 
 

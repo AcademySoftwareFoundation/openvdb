@@ -7,7 +7,6 @@
 // Uncomment to enable statistics of ray-intersections
 //#define STATS_TEST
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Ray.h>
@@ -22,6 +21,8 @@
 #include <openvdb/util/CpuTimer.h>
 #include <iostream>
 #endif
+
+#include <gtest/gtest.h>
 
 
 #define ASSERT_DOUBLES_APPROX_EQUAL(expected, actual) \

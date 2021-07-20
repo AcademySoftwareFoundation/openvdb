@@ -1,15 +1,15 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/IndexIterator.h>
-
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
 
+#include <gtest/gtest.h>
+#include <tbb/tick_count.h>
+
 #include <sstream>
 #include <iostream>
-#include <tbb/tick_count.h>
 #include <iomanip>//for setprecision
 
 using namespace openvdb;

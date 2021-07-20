@@ -3,7 +3,7 @@
 
 #include "TestHarness.h"
 
-#include "../test/util.h"
+#include "../util.h"
 
 #include <cppunit/extensions/HelperMacros.h>
 

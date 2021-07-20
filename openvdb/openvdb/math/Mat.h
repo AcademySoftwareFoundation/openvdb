@@ -30,11 +30,12 @@ public:
     using ValueType = T;
     enum SIZE_ { size = SIZE };
 
-    // Number of cols, rows, elements
-    static unsigned numRows() { return SIZE; }
-    static unsigned numColumns() { return SIZE; }
-    static unsigned numElements() { return SIZE*SIZE; }
-
+#if OPENVDB_ABI_VERSION_NUMBER >= 8
+    /// Trivial constructor, the matrix is NOT initialized
+    /// @note destructor, copy constructor, assignment operator and
+    ///   move constructor are left to be defined by the compiler (default)
+    Mat() = default;
+#else
     /// Default ctor.  Does nothing.  Required because declaring a copy (or
     /// other) constructor means the default constructor gets left out.
     Mat() { }
@@ -54,6 +55,12 @@ public:
         }
         return *this;
     }
+#endif
+
+    // Number of cols, rows, elements
+    static unsigned numRows() { return SIZE; }
+    static unsigned numColumns() { return SIZE; }
+    static unsigned numElements() { return SIZE*SIZE; }
 
     /// @return string representation of matrix
     /// Since output is multiline, optional indentation argument prefixes

@@ -19,8 +19,8 @@
 #include "CustomData.h"
 #include "Logger.h"
 
-#include "../ax.h" // backward compat support for initialize()
-#include "../ast/Parse.h"
+#include "openvdb_ax/ax.h" // backward compat support for initialize()
+#include "openvdb_ax/ast/Parse.h"
 
 #include <openvdb/version.h>
 
@@ -176,49 +176,16 @@ public:
 
     ///////////////////////////////////////////////////////////////////////////
 
-    /// @brief deprecated methods
-    template <typename ExecutableT>
-    OPENVDB_DEPRECATED
-    typename ExecutableT::Ptr
-    compile(const ast::Tree& syntaxTree,
-            const CustomData::Ptr data,
-            std::vector<std::string>* warnings) {
-        openvdb::ax::Logger logger(
-            // throw immediately on first error
-            [] (const std::string& error) {
-            OPENVDB_THROW(AXSyntaxError, error);
-            },
-            // collect warnings in vector
-            [&warnings] (const std::string& warn) {
-                if (warnings) warnings->emplace_back(warn);
-            }
-        );
-        return compile<ExecutableT>(syntaxTree, logger, data);
-    }
-
-    template <typename ExecutableT>
-    OPENVDB_DEPRECATED
-    typename ExecutableT::Ptr
-    compile(const std::string& code,
-            const CustomData::Ptr data,
-            std::vector<std::string>* warnings) {
-        openvdb::ax::Logger logger(
-            // throw immediately on first error
-            [] (const std::string& error) {
-            OPENVDB_THROW(AXSyntaxError, error);
-            },
-            // collect warnings in vector
-            [&warnings] (const std::string& warn) {
-                if (warnings) warnings->emplace_back(warn);
-            }
-        );
-        return compile<ExecutableT>(code, logger, data);
-    }
-
-    ///////////////////////////////////////////////////////////////////////////
+private:
+    template <typename ExeT, typename GenT>
+    typename ExeT::Ptr
+    compile(const ast::Tree& tree,
+            const std::string& moduleName,
+            const std::vector<std::string>& functions,
+            CustomData::Ptr data,
+            Logger& logger);
 
 private:
-
     std::shared_ptr<llvm::LLVMContext> mContext;
     const CompilerOptions mCompilerOptions;
     std::shared_ptr<codegen::FunctionRegistry> mFunctionRegistry;

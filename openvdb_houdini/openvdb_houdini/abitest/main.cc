@@ -32,15 +32,23 @@ int test()
     }
 
     { // check ABI from Houdini to non-Houdini
-        void* grid = houdini::createGrid();
-        validateGrid(grid);
-        houdini::cleanupGrid(grid);
+        void* grid = houdini::createFloatGrid();
+        validateFloatGrid(grid);
+        houdini::cleanupFloatGrid(grid);
+
+        grid = houdini::createPointsGrid();
+        validatePointsGrid(grid);
+        houdini::cleanupPointsGrid(grid);
     }
 
     { // check ABI from non-Houdini to Houdini
-        void* grid = createGrid();
-        houdini::validateGrid(grid);
-        cleanupGrid(grid);
+        void* grid = createFloatGrid();
+        houdini::validateFloatGrid(grid);
+        cleanupFloatGrid(grid);
+
+        grid = createPointsGrid();
+        houdini::validatePointsGrid(grid);
+        cleanupPointsGrid(grid);
     }
 
     return 0;
@@ -49,8 +57,6 @@ int test()
 int
 main(int, char**)
 {
-    openvdb::initialize();
-
     try {
         test();
     } catch (const std::runtime_error& e) {

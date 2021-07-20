@@ -7,7 +7,25 @@
 #include "version.h"
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
+
+#ifdef OPENVDB_USE_IMATH_HALF
 #include <OpenEXR/half.h>
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace math {
+using half = half;
+}}}
+#else
+#include <openvdb/math/Half.h>
+namespace openvdb {
+OPENVDB_USE_VERSION_NAMESPACE
+namespace OPENVDB_VERSION_NAME {
+namespace math {
+using half = internal::half;
+}}}
+#endif
+
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/math/Quat.h>
@@ -41,7 +59,7 @@ using Real    = double;
 using Vec2R = math::Vec2<Real>;
 using Vec2I = math::Vec2<Index32>;
 using Vec2f = math::Vec2<float>;
-using Vec2H = math::Vec2<half>;
+using Vec2H = math::Vec2<math::half>;
 using math::Vec2i;
 using math::Vec2s;
 using math::Vec2d;
@@ -50,7 +68,7 @@ using math::Vec2d;
 using Vec3R = math::Vec3<Real>;
 using Vec3I = math::Vec3<Index32>;
 using Vec3f = math::Vec3<float>;
-using Vec3H = math::Vec3<half>;
+using Vec3H = math::Vec3<math::half>;
 using Vec3U8 = math::Vec3<uint8_t>;
 using Vec3U16 = math::Vec3<uint16_t>;
 using math::Vec3i;
@@ -65,7 +83,7 @@ using BBoxd = math::BBox<Vec3d>;
 using Vec4R = math::Vec4<Real>;
 using Vec4I = math::Vec4<Index32>;
 using Vec4f = math::Vec4<float>;
-using Vec4H = math::Vec4<half>;
+using Vec4H = math::Vec4<math::half>;
 using math::Vec4i;
 using math::Vec4s;
 using math::Vec4d;
@@ -299,7 +317,7 @@ template<typename FromType, typename ToType> struct CopyConstness {
     using Type = typename std::remove_const<ToType>::type;
 };
 
-/// @cond OPENVDB_TYPES_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
     using Type = const ToType;
 };
@@ -376,7 +394,7 @@ enum MergePolicy {
 template<typename T> const char* typeNameAsString()                 { return typeid(T).name(); }
 template<> inline const char* typeNameAsString<bool>()              { return "bool"; }
 template<> inline const char* typeNameAsString<ValueMask>()         { return "mask"; }
-template<> inline const char* typeNameAsString<half>()              { return "half"; }
+template<> inline const char* typeNameAsString<math::half>()              { return "half"; }
 template<> inline const char* typeNameAsString<float>()             { return "float"; }
 template<> inline const char* typeNameAsString<double>()            { return "double"; }
 template<> inline const char* typeNameAsString<int8_t>()            { return "int8"; }

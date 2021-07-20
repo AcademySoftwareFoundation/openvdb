@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderFunctions.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation rendering utilities code.
 */
 
@@ -110,7 +105,7 @@ inline __hostdev__ nanovdb::Vec4f valueToColor(const uint32_t v)
     return nanovdb::Vec4f(v);
 }
 
-inline __hostdev__ nanovdb::Vec4f valueToColor(const nanovdb::PackedRGBA8 v)
+inline __hostdev__ nanovdb::Vec4f valueToColor(const nanovdb::Rgba8 v)
 {
     return nanovdb::Vec4f(v[0], v[1], v[2], v[3]) / 255.f;
 }

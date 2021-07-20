@@ -20,6 +20,7 @@
 #include <openvdb/tools/GridTransformer.h>
 #include <openvdb/tools/PointIndexGrid.h>
 #include <openvdb/tools/Prune.h>
+#include <openvdb/thread/Threading.h>
 
 #include <CH/CH_Manager.h>
 #include <CVEX/CVEX_Context.h>
@@ -47,7 +48,6 @@
 #include <VOP/VOP_ExportedParmsManager.h>
 #include <VOP/VOP_LanguageContextTypeList.h>
 
-#include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
@@ -59,6 +59,7 @@
 #include <hboost/algorithm/string/split.hpp>
 
 #include <algorithm> // std::sort
+#include <atomic>
 #include <cmath> // trigonometric functions
 #include <memory>
 #include <set>
@@ -786,7 +787,7 @@ struct ConstructCandidateVoxelMask
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             if (this->wasInterrupted()) {
-                tbb::task::self().cancel_group_execution();
+                openvdb::thread::cancelGroupExecution();
                 break;
             }
 
@@ -1954,7 +1955,7 @@ private:
     UT_WorkArgs mVexArgs;
     const size_t mMaxArraySize;
     fpreal mTime, mTimeInc, mFrame;
-    tbb::atomic<int> mIsTimeDependant;
+    std::atomic<int> mIsTimeDependant;
     GU_VexGeoInputs mVexInputs;
 };
 
@@ -2092,7 +2093,7 @@ struct RasterizePoints
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
 
             if (this->wasInterrupted()) {
-                tbb::task::self().cancel_group_execution();
+                openvdb::thread::cancelGroupExecution();
                 break;
             }
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncher.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of Grid Render-platform manager.
 */
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherC99impl.c
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implmentation of C99 Render launcher.
 */
 

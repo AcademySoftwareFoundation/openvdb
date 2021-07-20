@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/io.h>
+
+#include <gtest/gtest.h>
 
 #include <cmath>
 #include <ios>
@@ -269,8 +269,8 @@ TEST_F(TestPointDataLeaf, testOffsets)
 
         // empty Descriptor should throw on leaf node initialize
         auto emptyDescriptor = std::make_shared<Descriptor>();
-        LeafType* emptyLeafNode = new LeafType();
-        EXPECT_THROW(emptyLeafNode->initializeAttributes(emptyDescriptor, 5),
+        LeafType emptyLeafNode;
+        EXPECT_THROW(emptyLeafNode.initializeAttributes(emptyDescriptor, 5),
             openvdb::IndexError);
 
         // create a non-empty Descriptor
@@ -1186,7 +1186,7 @@ TEST_F(TestPointDataLeaf, testIO)
                 AttributeF::cast(leafFromDisk->constAttributeArray("density")));
 
             EXPECT_TRUE(leafFromDisk->buffer().isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(position.isOutOfCore());
             EXPECT_TRUE(density.isOutOfCore());
 #else
@@ -1201,7 +1201,7 @@ TEST_F(TestPointDataLeaf, testIO)
             // ensure out-of-core data is now in-core after pre-fetching
 
             EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(position.isOutOfCore());
             EXPECT_TRUE(density.isOutOfCore());
 #else
@@ -1233,7 +1233,7 @@ TEST_F(TestPointDataLeaf, testIO)
 
             EXPECT_TRUE(!leafFromDisk->buffer().isOutOfCore());
             EXPECT_TRUE(!position2.isOutOfCore());
-#if OPENVDB_USE_BLOSC
+#ifdef OPENVDB_USE_BLOSC
             EXPECT_TRUE(density2.isOutOfCore());
 #else
             EXPECT_TRUE(!density2.isOutOfCore());

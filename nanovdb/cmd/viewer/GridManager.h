@@ -3,11 +3,6 @@
 
 /*!
 	\file GridManager.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Class definition for a manager and loader of grid assets.
 */
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherOptix.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of Optix-platform Grid renderer.
 */
 
@@ -35,6 +30,7 @@
 
 #include "optix/NanoVDB_optix.h"
 #include <nanovdb/NanoVDB.h>
+#include <nanovdb/util/NodeManager.h>
 
 #define STRINGIFY(x) STRINGIFY2(x)
 #define STRINGIFY2(x) #x
@@ -731,6 +727,7 @@ RenderLauncherOptix::Resource::~Resource()
 {
     delete reinterpret_cast<RenderState*>(mOptixRenderState);
     cudaFree(mDeviceGrid);
+    cudaFree(mDeviceEnumeration);
 }
 
 std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResource(const nanovdb::GridHandle<>& gridHdl, MaterialClass renderMethod)
@@ -766,7 +763,7 @@ std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResour
         RenderState& state = *rs;
 
         VolumeGeometry volume_geometry;
-        volume_geometry.grid = resource->mDeviceGrid;
+        volume_geometry.grid = resource->mDeviceGrid;        
 
         VolumeMaterial volume_material;
         volume_material.importance_cutoff = 0.01f;
@@ -775,6 +772,12 @@ std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResour
         std::vector<OptixAabb> aabbs;
         CUdeviceptr            d_boundingBoxes = 0;
         static const int       NodeLevel = 0;
+
+        auto grid = gridHdl.grid<float>();
+        auto mgr = nanovdb::createNodeMgr(*grid);
+        
+        int numNodes = mgr.nodeCount(NodeLevel);
+        int* enumeration = new int [numNodes];
 
         if (NodeLevel >= 3) {
             auto      boundsMin = gridHdl.gridMetaData()->worldBBox().min();
@@ -790,13 +793,22 @@ std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResour
 
             aabbs.push_back(aabb);
         } else {
-            auto grid = gridHdl.grid<float>();
-
-            int numNodes = grid->tree().nodeCount(NodeLevel);
+            
 
             for (int i = 0; i < numNodes; ++i) {
                 OptixAabb aabb;
-                auto      node = grid->tree().getNode<NodeLevel>(i);
+
+                void* nodeAddress;
+                if (NodeLevel == 0)
+                    nodeAddress = (void*)mgr.leaf(i);
+                if (NodeLevel == 1)
+                    nodeAddress = (void*)mgr.lower(i);
+                if (NodeLevel == 2)
+                    nodeAddress = (void*)mgr.upper(i);
+
+                auto* node = static_cast<typename nanovdb::TreeNode<nanovdb::FloatTree, NodeLevel>::type*>(nodeAddress);
+
+                enumeration[i] = (uintptr_t(node) - uintptr_t(grid)) / 32;
 #if 1
                 // use node's size.
                 nanovdb::Coord boundsMin(node->origin());
@@ -822,6 +834,11 @@ std::shared_ptr<RenderLauncherOptix::Resource> RenderLauncherOptix::ensureResour
                 //printf("%d. (%d %d %d) (%.2f %.2f %.2f)\n", i, boundsMin[0], boundsMin[1], boundsMin[2], volumeData.bmin.x, volumeData.bmin.y, volumeData.bmin.z);
             }
         }
+
+        NANOVDB_CUDA_SAFE_CALL(cudaMalloc((void**)&resource->mDeviceEnumeration, numNodes * sizeof(int)));
+        NANOVDB_CUDA_SAFE_CALL(cudaMemcpy(resource->mDeviceEnumeration, enumeration, numNodes * sizeof(int), cudaMemcpyHostToDevice));
+        delete[] enumeration;
+        volume_geometry.enumeration = resource->mDeviceEnumeration;
 
         std::cout << "BVH contains " << aabbs.size() << " AABBs" << std::endl;
 

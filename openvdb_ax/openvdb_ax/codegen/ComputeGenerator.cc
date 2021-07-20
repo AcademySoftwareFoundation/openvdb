@@ -91,8 +91,8 @@ ComputeKernel::getArgumentKeys()
 std::string ComputeKernel::getDefaultName() { return "ax.compute"; }
 
 
-////////////////////////////////////////////////////////////////////////////////////////////////////
-////////////////////////////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
 
 namespace codegen_internal {
 
@@ -138,7 +138,15 @@ bool ComputeGenerator::generate(const ast::Tree& tree)
 
     // if traverse is false, log should have error, but can error
     // without stopping traversal, so check both
-    return this->traverse(&tree) && !mLog.hasError();
+
+    const bool result = this->traverse(&tree) && !mLog.hasError();
+    if (!result) return false;
+
+    // free strings at terminating blocks
+
+    this->createFreeSymbolStrings(mBuilder);
+
+    return true;
 }
 
 bool ComputeGenerator::visit(const ast::Block* block)
@@ -166,14 +174,18 @@ bool ComputeGenerator::visit(const ast::CommaOperator* comma)
     // traverse the contents of the comma expression
     const size_t children = comma->children();
     llvm::Value* value = nullptr;
+    bool hasErrored = false;
     for (size_t i = 0; i < children; ++i) {
         if (this->traverse(comma->child(i))) {
             value = mValues.top(); mValues.pop();
         }
-        else if (mLog.atErrorLimit()) return false;
+        else {
+            if (mLog.atErrorLimit()) return false;
+            hasErrored = true;
+        }
     }
     // only keep the last value
-    if (!value) return false;
+    if (!value || hasErrored) return false;
     mValues.push(value);
     return true;
 }
@@ -232,9 +244,9 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     llvm::Value* trueValue = nullptr;
     llvm::Type* trueType = nullptr;
     bool truePtr = false;
-    bool hasErrored = false; // track error state of this node
     // generate conditional
-    if (this->traverse(tern->condition())) {
+    bool conditionSuccess = this->traverse(tern->condition());
+    if (conditionSuccess) {
         // get the condition
         trueValue = mValues.top(); mValues.pop();
         assert(trueValue);
@@ -252,7 +264,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         }
         else {
             if (!mLog.error("cannot convert non-scalar type to bool in condition", tern->condition())) return false;
-            hasErrored = true;
+            conditionSuccess = false;
         }
     }
     else if (mLog.atErrorLimit()) return false;
@@ -260,20 +272,25 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     // generate true branch, if it exists otherwise take condition as true value
 
     mBuilder.SetInsertPoint(trueBlock);
+    bool trueSuccess = conditionSuccess;
     if (tern->hasTrue()) {
-        if (this->traverse(tern->trueBranch())) {
+        trueSuccess = this->traverse(tern->trueBranch());
+        if (trueSuccess) {
             trueValue = mValues.top(); mValues.pop();// get true value from true expression
             // update true type details
             trueType = trueValue->getType();
         }
         else if (mLog.atErrorLimit()) return false;
     }
+
     llvm::BranchInst* trueBranch = mBuilder.CreateBr(returnBlock);
 
     // generate false branch
 
     mBuilder.SetInsertPoint(falseBlock);
-    if (!this->traverse(tern->falseBranch()) && mLog.atErrorLimit()) return false;
+    bool falseSuccess = this->traverse(tern->falseBranch());
+    // even if the condition isnt successful but the others are, we continue to code gen to find type errors in branches
+    if (!(trueSuccess && falseSuccess)) return false;
 
     llvm::BranchInst* falseBranch = mBuilder.CreateBr(returnBlock);
 
@@ -375,7 +392,8 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
                 }
             }
             else {
-                mLog.error("unsupported implicit cast in ternary operation", tern);
+                mLog.error("unsupported implicit cast in ternary operation",
+                           tern->hasTrue() ? tern->trueBranch() : tern->falseBranch());
                 return false;
             }
         }
@@ -385,7 +403,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
         // push void value to stop use of return from this expression
         mBuilder.SetInsertPoint(returnBlock);
         mValues.push(falseValue);
-        return !hasErrored;
+        return conditionSuccess && trueSuccess && falseSuccess;
     }
 
     // reset to continue block
@@ -398,7 +416,7 @@ bool ComputeGenerator::visit(const ast::TernaryOperator* tern)
     ternary->addIncoming(falseValue, falseBranch->getParent());
 
     mValues.push(ternary);
-    return !hasErrored;
+    return conditionSuccess && trueSuccess && falseSuccess;
 }
 
 bool ComputeGenerator::visit(const ast::Loop* loop)
@@ -551,7 +569,8 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
         llvm::BasicBlock* rhsBlock = llvm::BasicBlock::Create(mContext, "binary_rhs", mFunction);
         llvm::BasicBlock* returnBlock = llvm::BasicBlock::Create(mContext, "binary_return", mFunction);
         llvm::Value* lhs = nullptr;
-        if (this->traverse(node->lhs())) {
+        bool lhsSuccess = this->traverse(node->lhs());
+        if (lhsSuccess) {
             lhs = mValues.top(); mValues.pop();
             llvm::Type* lhsType = lhs->getType();
             if (lhsType->isPointerTy()) {
@@ -570,13 +589,16 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
                 }
             }
             else {
-                if (!mLog.error("cannot convert non-scalar lhs to bool", node->lhs())) return false;
+                mLog.error("cannot convert non-scalar lhs to bool", node->lhs());
+                lhsSuccess = false;
             }
         }
-        else if (mLog.atErrorLimit()) return false;
+
+        if (mLog.atErrorLimit()) return false;
 
         mBuilder.SetInsertPoint(rhsBlock);
-        if (this->traverse(node->rhs())) {
+        bool rhsSuccess = this->traverse(node->rhs());
+        if (rhsSuccess) {
             llvm::Value* rhs = mValues.top(); mValues.pop();
             llvm::Type* rhsType = rhs->getType();
             if (rhsType->isPointerTy()) {
@@ -596,14 +618,13 @@ bool ComputeGenerator::visit(const ast::BinaryOperator* node)
                     result->addIncoming(rhs, rhsBranch->getParent());
                     mValues.push(result);
                 }
-                else return false;
             }
             else {
                 mLog.error("cannot convert non-scalar rhs to bool", node->rhs());
-                return false;
+                rhsSuccess = false;
             }
         }
-        else if (mLog.atErrorLimit()) return false;
+        return lhsSuccess && rhsSuccess;
     }
     else {
         llvm::Value* lhs = nullptr;
@@ -754,7 +775,6 @@ bool ComputeGenerator::visit(const ast::AssignExpression* assign)
     }
 
     if (!this->assignExpression(lhs, rhs, assign)) return false;
-
     return true;
 }
 
@@ -796,7 +816,8 @@ bool ComputeGenerator::visit(const ast::Crement* node)
 
 bool ComputeGenerator::visit(const ast::FunctionCall* node)
 {
-    const FunctionGroup* const function = this->getFunction(node->name());
+    const FunctionGroup* const function =
+        mFunctionRegistry.getOrInsert(node->name(), mOptions, false);
     if (!function) {
         mLog.error("unable to locate function \"" + node->name() + "\"", node);
         return false;
@@ -823,7 +844,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
             }
             else {
                 // arrays should never be loaded
-                assert(!type->isArrayTy() && type != LLVMType<AXString>::get(mContext));
+                assert(!type->isArrayTy() && type != LLVMType<codegen::String>::get(mContext));
                 if (type->isIntegerTy() || type->isFloatingPointTy()) {
                     /*pass by value*/
                 }
@@ -835,7 +856,7 @@ bool ComputeGenerator::visit(const ast::FunctionCall* node)
         valuesToTypes(arguments, inputTypes);
 
         Function::SignatureMatch match;
-        const Function::Ptr target = function->match(inputTypes, mContext, &match);
+        const Function* target = function->match(inputTypes, mContext, &match);
 
         if (!target) {
             assert(!function->list().empty()
@@ -924,20 +945,28 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
 {
     // create storage for the local value.
     llvm::Type* type = llvmTypeFromToken(node->type(), mContext);
-    llvm::Value* value = insertStaticAlloca(mBuilder, type);
+    llvm::Value* value;
 
-    // for strings, make sure we correctly initialize to the empty string.
-    // strings are the only variable type that are currently default allocated
-    // otherwise you can run into issues with binary operands
+    // @note  For strings, we call the string::string function rather than
+    //  rely on the behaviour of insertStaticAlloca. The key difference here is
+    //  that the string::string method performs the complete list of functions
+    //  that are comprised by the ax::codegen::String constructor. In other
+    //  words, it ensures all observable behaviour matches between the IR for
+    //  strings and the C++ string implementation. Importantly,
+    //  insertStaticAlloca does not initialise the first character of the SSO
+    //  array to '\0' and does not call alloc (which, although does not change
+    //  the string state compared to insertStaticAlloca, may change the order
+    //  of assignments and other observable behaviour). Ideally,
+    //  insertStaticAlloca should call string::string.
     if (node->type() == ast::tokens::STRING) {
-        llvm::Value* loc = mBuilder.CreateGlobalStringPtr(""); // char*
-        llvm::Constant* constLoc = llvm::cast<llvm::Constant>(loc);
-        llvm::Constant* size = LLVMType<AXString::SizeType>::get
-            (mContext, static_cast<AXString::SizeType>(0));
-        llvm::Value* constStr = LLVMType<AXString>::get(mContext, constLoc, size);
-        mBuilder.CreateStore(constStr, value);
+        const FunctionGroup* axstring = this->getFunction("string::string", /*internal*/true);
+        value = axstring->execute({}, mBuilder);
+    }
+    else {
+        value = insertStaticAlloca(mBuilder, type);
     }
 
+    assert(value);
     SymbolTable* current = mSymbolTables.getOrInsert(mScopeIndex);
 
     const std::string& name = node->local()->name();
@@ -1098,6 +1127,8 @@ bool ComputeGenerator::visit(const ast::ArrayPack* node)
     // or another array
     if (num == 1) return true;
 
+    llvm::Type* strtype = LLVMType<codegen::String>::get(mContext);
+
     std::vector<llvm::Value*> values;
     values.reserve(num);
     for (size_t i = 0; i < num; ++i) {
@@ -1105,7 +1136,16 @@ bool ComputeGenerator::visit(const ast::ArrayPack* node)
         if (value->getType()->isPointerTy()) {
             value = mBuilder.CreateLoad(value);
         }
-        values.push_back(value);
+        if (value->getType()->isArrayTy()) {
+            mLog.error("cannot build nested arrays", node->child(num-(i+1)));
+            return false;
+        }
+        if (value->getType() == strtype) {
+            mLog.error("cannot build arrays of strings", node->child(num-(i+1)));
+            return false;
+        }
+
+        values.emplace_back(value);
     }
 
     // reserve the values
@@ -1151,28 +1191,21 @@ bool ComputeGenerator::visit(const ast::Value<double>* node)
 
 bool ComputeGenerator::visit(const ast::Value<std::string>* node)
 {
-    assert(node->value().size() <
-        static_cast<size_t>(std::numeric_limits<AXString::SizeType>::max()));
-
+    assert(node->value().size() < static_cast<size_t>(std::numeric_limits<size_t>::max()));
+    const FunctionGroup* axstring = this->getFunction("string::string", /*internal*/true);
     llvm::Value* loc = mBuilder.CreateGlobalStringPtr(node->value()); // char*
-    llvm::Constant* constLoc = llvm::cast<llvm::Constant>(loc);
-
-    llvm::Constant* size = LLVMType<AXString::SizeType>::get
-        (mContext, static_cast<AXString::SizeType>(node->value().size()));
-    llvm::Value* constStr = LLVMType<AXString>::get(mContext, constLoc, size);
-
-    // Always allocate an AXString here for easier passing to functions
-    // @todo shouldn't need an AXString for char* literals
-    llvm::Value* alloc = insertStaticAlloca(mBuilder, LLVMType<AXString>::get(mContext));
-    mBuilder.CreateStore(constStr, alloc);
-    mValues.push(alloc);
+    llvm::Value* result = axstring->execute({loc}, mBuilder);
+    mValues.push(result);
     return true;
 }
 
 const FunctionGroup* ComputeGenerator::getFunction(const std::string &identifier,
                                                 const bool allowInternal)
 {
-    return mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
+    const FunctionGroup* F =
+        mFunctionRegistry.getOrInsert(identifier, mOptions, allowInternal);
+    assert(F);
+    return F;
 }
 
 template <typename ValueType>
@@ -1243,7 +1276,7 @@ bool ComputeGenerator::visit(const ast::Attribute*)
 
 bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, const ast::Node* node)
 {
-    llvm::Type* strtype = LLVMType<AXString>::get(mContext);
+    llvm::Type* strtype = LLVMType<codegen::String>::get(mContext);
 
     llvm::Type* ltype = lhs->getType();
     llvm::Type* rtype = rhs->getType();
@@ -1336,49 +1369,8 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
         }
     }
     else if (string) {
-        // get the size of the rhs string
-        llvm::Type* strType = LLVMType<AXString>::get(mContext);
-        llvm::Value* rstrptr = nullptr;
-        llvm::Value* size = nullptr;
-
-        if (llvm::isa<llvm::Constant>(rhs)) {
-            llvm::Constant* zero =
-                llvm::cast<llvm::Constant>(LLVMType<int32_t>::get(mContext, 0));
-            llvm::Constant* constant = llvm::cast<llvm::Constant>(rhs)->getAggregateElement(zero); // char*
-            rstrptr = constant;
-            constant = constant->stripPointerCasts();
-            const size_t count = constant->getType()->getPointerElementType()->getArrayNumElements();
-            assert(count < static_cast<size_t>(std::numeric_limits<AXString::SizeType>::max()));
-
-            size = LLVMType<AXString::SizeType>::get
-                (mContext, static_cast<AXString::SizeType>(count));
-        }
-        else {
-            rstrptr = mBuilder.CreateStructGEP(strType, rhs, 0); // char**
-            rstrptr = mBuilder.CreateLoad(rstrptr);
-            size = mBuilder.CreateStructGEP(strType, rhs, 1); // AXString::SizeType*
-            size = mBuilder.CreateLoad(size);
-        }
-
-        // total with term
-        llvm::Value* one = LLVMType<AXString::SizeType>::get(mContext, 1);
-        llvm::Value* totalTerm = binaryOperator(size, one, ast::tokens::PLUS, mBuilder);
-
-        // re-allocate the string array
-        llvm::Value* string = mBuilder.CreateAlloca(LLVMType<char>::get(mContext), totalTerm);
-        llvm::Value* lstrptr = mBuilder.CreateStructGEP(strType, lhs, 0); // char**
-        llvm::Value* lsize = mBuilder.CreateStructGEP(strType, lhs, 1); // AXString::SizeType*
-
-#if LLVM_VERSION_MAJOR >= 10
-        mBuilder.CreateMemCpy(string, /*dest-align*/llvm::MaybeAlign(0),
-            rstrptr, /*src-align*/llvm::MaybeAlign(0), totalTerm);
-#elif LLVM_VERSION_MAJOR > 6
-        mBuilder.CreateMemCpy(string, /*dest-align*/0, rstrptr, /*src-align*/0, totalTerm);
-#else
-        mBuilder.CreateMemCpy(string, rstrptr, totalTerm, /*align*/0);
-#endif
-        mBuilder.CreateStore(string, lstrptr);
-        mBuilder.CreateStore(size, lsize);
+        const FunctionGroup* axstringassign = this->getFunction("string::op=", /*internal*/true);
+        axstringassign->execute({lhs, rhs}, mBuilder);
     }
     else {
         mLog.error("unsupported implicit cast in assignment", node);
@@ -1387,10 +1379,61 @@ bool ComputeGenerator::assignExpression(llvm::Value* lhs, llvm::Value*& rhs, con
     return true;
 }
 
+///////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////
+
+
+void ComputeGenerator::createFreeSymbolStrings(llvm::IRBuilder<>& B)
+{
+    llvm::Type* strtype = LLVMType<codegen::String>::get(mContext);
+
+    // Loop through the initial function allocations and create string clears
+    // to any strings that were created. Allocs should only be made at the
+    // start of the function, so we only have to scan the function entry block.
+    //
+    // @note technically, AX guarantees that the first set of instructions are
+    // allocs, so we could stop on the first instr that isn't an alloc. This
+    // would be hard to test though should this change in the future.
+
+    llvm::Function* F = B.GetInsertBlock()->getParent();
+    llvm::BasicBlock& entry = F->getEntryBlock();
+
+    std::vector<llvm::Value*> ptrs;
+
+    // collect string allocas
+    for (auto& inst : entry) {
+        if (!llvm::isa<llvm::AllocaInst>(inst)) continue;
+        llvm::AllocaInst* alloc = llvm::cast<llvm::AllocaInst>(&inst);
+        if (alloc->getAllocatedType() != strtype) continue;
+        ptrs.emplace_back(alloc);
+    }
+
+    if (ptrs.empty()) return;
+
+    // clear the strings to make sure malloc has been freed
+    const FunctionGroup* axstringclear =
+        this->getFunction("string::clear", /*internal*/true);
+
+    const auto IP = B.saveIP();
+
+    for (llvm::BasicBlock& BB : *F) {
+        llvm::Instruction* TI = BB.getTerminator();
+        assert(TI);
+        if (llvm::isa<llvm::ReturnInst>(TI)) {
+            B.SetInsertPoint(TI);
+            for (auto ptr : ptrs) {
+                axstringclear->execute({ptr}, B);
+            }
+        }
+    }
+
+    B.restoreIP(IP);
+}
+
 bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
     const ast::tokens::OperatorToken op, const ast::Node* node)
 {
-    llvm::Type* strtype = LLVMType<AXString>::get(mContext);
+    llvm::Type* strtype = LLVMType<codegen::String>::get(mContext);
 
     llvm::Type* ltype = lhs->getType();
     llvm::Type* rtype = rhs->getType();
@@ -1414,8 +1457,18 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
             rhs = scalarToMatrix(rhs, mBuilder, lsize == 9 ? 3 : 4);
             rtype = rhs->getType()->getPointerElementType();
             rsize = lsize;
+            if (auto* child = node->child(0)) {
+                if (child->isType<ast::ArrayPack>()) {
+                    mLog.error("unable to deduce implicit {...} type for binary op as value "
+                        "may be a matrix or array. assign to a local mat variable", child);
+                    return false;
+                }
+            }
+            if (!mLog.warning("implicit cast to matrix from scalar. resulting "
+                "cast will be equal to scalar * identity.", node->child(1))) return false;
         }
     }
+
     if (rsize == 9 || rsize == 16) {
         if (ltype->isIntegerTy() || ltype->isFloatingPointTy()) {
             if (lhs->getType()->isPointerTy()) {
@@ -1425,6 +1478,15 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
             lhs = scalarToMatrix(lhs, mBuilder, rsize == 9 ? 3 : 4);
             ltype = lhs->getType()->getPointerElementType();
             lsize = rsize;
+            if (auto* child = node->child(1)) {
+                if (child->isType<ast::ArrayPack>()) {
+                    mLog.error("unable to deduce implicit {...} type for binary op as value "
+                        "may be a matrix or array. assign to a local mat variable", child);
+                    return false;
+                }
+            }
+            if (!mLog.warning("implicit cast to matrix from scalar. resulting "
+                "cast will be equal to scalar * identity.", node->child(0))) return false;
         }
     }
 
@@ -1449,7 +1511,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
                 result = this->getFunction("pretransform")->execute({lhs, rhs}, mBuilder);
             }
             else if ((lsize == 3 && rsize ==  9) ||
-                     (lsize == 4 && rsize == 16) ||
+                     (lsize == 3 && rsize == 16) ||
                      (lsize == 4 && rsize == 16)) {
                 // vector matrix multiplication all handled through transform
                 result = this->getFunction("transform")->execute({lhs, rhs}, mBuilder);
@@ -1572,7 +1634,7 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
         elements.reserve(resultsize);
 
         // handle floored modulo
-        Function::Ptr target;
+        const Function* target = nullptr;
         auto runop = [&target, op, this](llvm::Value* a, llvm::Value* b) {
             if (target) return target->call({a,b}, this->mBuilder, /*cast=*/false);
             else        return binaryOperator(a, b, op, this->mBuilder);
@@ -1630,73 +1692,8 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
             return false;
         }
 
-        auto& B = mBuilder;
-        auto structToString = [&B, strtype](llvm::Value*& str) -> llvm::Value*
-        {
-            llvm::Value* size = nullptr;
-            if (llvm::isa<llvm::Constant>(str)) {
-                llvm::Constant* zero =
-                    llvm::cast<llvm::Constant>(LLVMType<int32_t>::get(B.getContext(), 0));
-                llvm::Constant* constant = llvm::cast<llvm::Constant>(str)->getAggregateElement(zero); // char*
-                str = constant;
-                constant = constant->stripPointerCasts();
-
-                // array size should include the null terminator
-                llvm::Type* arrayType = constant->getType()->getPointerElementType();
-                assert(arrayType->getArrayNumElements() > 0);
-
-                const size_t count = arrayType->getArrayNumElements() - 1;
-                assert(count < static_cast<size_t>(std::numeric_limits<AXString::SizeType>::max()));
-
-                size = LLVMType<AXString::SizeType>::get
-                    (B.getContext(), static_cast<AXString::SizeType>(count));
-            }
-            else {
-                llvm::Value* rstrptr = B.CreateStructGEP(strtype, str, 0); // char**
-                rstrptr = B.CreateLoad(rstrptr);
-                size = B.CreateStructGEP(strtype, str, 1); // AXString::SizeType*
-                size = B.CreateLoad(size);
-                str = rstrptr;
-            }
-
-            return size;
-        };
-
-        // lhs and rhs get set to the char* arrays in structToString
-        llvm::Value* lhsSize = structToString(lhs);
-        llvm::Value* rhsSize = structToString(rhs);
-        // rhs with null terminator
-        llvm::Value* one = LLVMType<AXString::SizeType>::get(mContext, 1);
-        llvm::Value* rhsTermSize = binaryOperator(rhsSize, one, ast::tokens::PLUS, mBuilder);
-        // total and total with term
-        llvm::Value* total = binaryOperator(lhsSize, rhsSize, ast::tokens::PLUS, mBuilder);
-        llvm::Value* totalTerm = binaryOperator(lhsSize, rhsTermSize, ast::tokens::PLUS, mBuilder);
-
-        // get ptrs to the new structs values
-        result = insertStaticAlloca(mBuilder, strtype);
-        llvm::Value* string = mBuilder.CreateAlloca(LLVMType<char>::get(mContext), totalTerm);
-        llvm::Value* strptr = mBuilder.CreateStructGEP(strtype, result, 0); // char**
-        llvm::Value* sizeptr = mBuilder.CreateStructGEP(strtype, result, 1); // AXString::SizeType*
-
-        // get rhs offset
-        llvm::Value* stringRhsOffset = mBuilder.CreateGEP(string, lhsSize);
-
-        // memcpy
-#if LLVM_VERSION_MAJOR >= 10
-        mBuilder.CreateMemCpy(string, /*dest-align*/llvm::MaybeAlign(0),
-            lhs, /*src-align*/llvm::MaybeAlign(0), lhsSize);
-        mBuilder.CreateMemCpy(stringRhsOffset, /*dest-align*/llvm::MaybeAlign(0),
-            rhs, /*src-align*/llvm::MaybeAlign(0), rhsTermSize);
-#elif LLVM_VERSION_MAJOR > 6
-        mBuilder.CreateMemCpy(string, /*dest-align*/0, lhs, /*src-align*/0, lhsSize);
-        mBuilder.CreateMemCpy(stringRhsOffset, /*dest-align*/0, rhs, /*src-align*/0, rhsTermSize);
-#else
-        mBuilder.CreateMemCpy(string, lhs, lhsSize, /*align*/0);
-        mBuilder.CreateMemCpy(stringRhsOffset, rhs, rhsTermSize, /*align*/0);
-#endif
-
-        mBuilder.CreateStore(string, strptr);
-        mBuilder.CreateStore(total, sizeptr);
+        const FunctionGroup* axstringplus = this->getFunction("string::op+", /*internal*/true);
+        result = axstringplus->execute({lhs, rhs}, mBuilder);
     }
 
     if (!result) {
@@ -1706,7 +1703,6 @@ bool ComputeGenerator::binaryExpression(llvm::Value*& result, llvm::Value* lhs, 
 
     return true;
 }
-
 
 } // namespace codegen_internal
 

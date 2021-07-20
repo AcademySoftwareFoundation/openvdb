@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArrayString.h>
 #include <openvdb/util/CpuTimer.h>
-
 #include <openvdb/openvdb.h>
+
+#include <gtest/gtest.h>
 
 #include <iostream>
 
@@ -271,14 +271,12 @@ TEST_F(TestAttributeArrayString, testStringAttribute)
         EXPECT_EQ(attr.isHidden(), attrB.isHidden());
         EXPECT_EQ(isString(attr), isString(attrB));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         AttributeArray& baseAttr(attr);
         EXPECT_EQ(Name(typeNameAsString<Index>()), baseAttr.valueType());
         EXPECT_EQ(Name("str"), baseAttr.codecType());
         EXPECT_EQ(Index(4), baseAttr.valueTypeSize());
         EXPECT_EQ(Index(4), baseAttr.storageTypeSize());
         EXPECT_TRUE(!baseAttr.valueTypeIsFloatingPoint());
-#endif
     }
 
     { // IO

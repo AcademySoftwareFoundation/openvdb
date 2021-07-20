@@ -51,8 +51,6 @@ AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
 // AttributeArray implementation
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
-
 #if OPENVDB_ABI_VERSION_NUMBER >= 7
 AttributeArray::AttributeArray(const AttributeArray& rhs)
     : AttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
@@ -67,7 +65,7 @@ AttributeArray::AttributeArray(const AttributeArray& rhs)
     : mIsUniform(rhs.mIsUniform)
     , mFlags(rhs.mFlags)
     , mUsePagedRead(rhs.mUsePagedRead)
-    , mOutOfCore(rhs.mOutOfCore)
+    , mOutOfCore(rhs.mOutOfCore.load())
     , mPageHandle()
 {
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
@@ -84,13 +82,12 @@ AttributeArray::operator=(const AttributeArray& rhs)
     mIsUniform = rhs.mIsUniform;
     mFlags = rhs.mFlags;
     mUsePagedRead = rhs.mUsePagedRead;
-    mOutOfCore = rhs.mOutOfCore;
+    mOutOfCore.store(rhs.mOutOfCore);
     if (mFlags & PARTIALREAD)       mCompressedBytes = rhs.mCompressedBytes;
     else if (rhs.mPageHandle)       mPageHandle = rhs.mPageHandle->copy();
     else                            mPageHandle.reset();
     return *this;
 }
-#endif
 
 
 AttributeArray::Ptr
@@ -107,15 +104,6 @@ AttributeArray::create(const NamePair& type, Index length, Index stride,
             "Cannot create attribute of unregistered type " << type.first << "_" << type.second);
     }
     return (iter->second)(length, stride, constantStride, metadata);
-}
-
-
-// deprecated
-AttributeArray::Ptr
-AttributeArray::create(const NamePair& type, Index length, Index stride,
-    bool constantStride, const ScopedRegistryLock* lock)
-{
-    return AttributeArray::create(type, length, stride, constantStride, nullptr, lock);
 }
 
 

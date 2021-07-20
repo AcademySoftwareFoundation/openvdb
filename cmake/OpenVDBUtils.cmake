@@ -16,6 +16,17 @@ Use this module by invoking include with the form::
 
 The following functions are provided:
 
+``OPENVDB_GET_VERSION_DEFINE``
+
+  OPENVDB_GET_VERSION_DEFINE ( <header_path> <key> <value> )
+
+  Parse the provided version file to retrieve the a given OpenVDB define
+  specified by <key> and store the result in <value>. If the define has a
+  value, the value is stored. If the define has no value but exists, ON is
+  stored. Else, OFF is stored.
+
+  If the file does not exist, <value> is unmodified.
+
 ``OPENVDB_VERSION_FROM_HEADER``
 
   OPENVDB_VERSION_FROM_HEADER ( <header_path>
@@ -49,34 +60,44 @@ The following functions are provided:
 cmake_minimum_required(VERSION 3.12)
 
 
+function(OPENVDB_GET_VERSION_DEFINE HEADER KEY VALUE)
+  if(NOT EXISTS ${HEADER})
+    return()
+  endif()
+
+  file(STRINGS "${HEADER}" details REGEX "^#define[\t ]+${KEY}[\t ]+.*")
+  if(details)
+    # define has a value, extract it and return
+    string(REGEX REPLACE "^.*${KEY}[\t ]+([0-9]*).*$" "\\1" details "${details}")
+    set(${VALUE} ${details} PARENT_SCOPE)
+    return()
+  endif()
+
+  #  try re-searching for single defines
+  file(STRINGS "${HEADER}" details REGEX "^#define[\t ]+${KEY}.*")
+  if(details)
+    set(${VALUE} ON PARENT_SCOPE)
+  else()
+    set(${VALUE} OFF PARENT_SCOPE)
+  endif()
+endfunction()
+
+
+########################################################################
+########################################################################
+
+
 function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
-  cmake_parse_arguments(_VDB "" "VERSION;MAJOR;MINOR;PATCH" "" ${ARGN})
+  cmake_parse_arguments(_VDB "" "VERSION;MAJOR;MINOR;PATCH;ABI" "" ${ARGN})
 
   if(NOT EXISTS ${OPENVDB_VERSION_FILE})
     return()
   endif()
 
-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+.*"
-  )
-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _OpenVDB_MAJOR_VERSION "${openvdb_version_str}"
-  )
-
-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+.*"
-  )
-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_MINOR_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _OpenVDB_MINOR_VERSION "${openvdb_version_str}"
-  )
-
-  file(STRINGS "${OPENVDB_VERSION_FILE}" openvdb_version_str
-    REGEX "^#define[\t ]+OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+.*"
-  )
-  string(REGEX REPLACE "^.*OPENVDB_LIBRARY_PATCH_VERSION_NUMBER[\t ]+([0-9]*).*$" "\\1"
-    _OpenVDB_PATCH_VERSION "${openvdb_version_str}"
-  )
-  unset(openvdb_version_str)
+  OPENVDB_GET_VERSION_DEFINE(${OPENVDB_VERSION_FILE} "OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER" _OpenVDB_MAJOR_VERSION)
+  OPENVDB_GET_VERSION_DEFINE(${OPENVDB_VERSION_FILE} "OPENVDB_LIBRARY_MINOR_VERSION_NUMBER" _OpenVDB_MINOR_VERSION)
+  OPENVDB_GET_VERSION_DEFINE(${OPENVDB_VERSION_FILE} "OPENVDB_LIBRARY_PATCH_VERSION_NUMBER" _OpenVDB_PATCH_VERSION)
+  OPENVDB_GET_VERSION_DEFINE(${OPENVDB_VERSION_FILE} "OPENVDB_ABI_VERSION_NUMBER" _OpenVDB_ABI_VERSION)
 
   if(_VDB_VERSION)
     set(${_VDB_VERSION}
@@ -92,6 +113,9 @@ function(OPENVDB_VERSION_FROM_HEADER OPENVDB_VERSION_FILE)
   endif()
   if(_VDB_PATCH)
     set(${_VDB_PATCH} ${_OpenVDB_PATCH_VERSION} PARENT_SCOPE)
+  endif()
+  if(_VDB_ABI)
+    set(${_VDB_ABI} ${_OpenVDB_ABI_VERSION} PARENT_SCOPE)
   endif()
 endfunction()
 

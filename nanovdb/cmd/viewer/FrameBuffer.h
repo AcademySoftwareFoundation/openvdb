@@ -3,11 +3,6 @@
 
 /*!
 	\file FrameBuffer.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Class definition for a platform-agnostic Framebuffer.
 */
 

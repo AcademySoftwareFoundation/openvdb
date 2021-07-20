@@ -30,18 +30,29 @@ namespace nanovdb {
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN. 
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createLevelSetSphere(ValueT             radius = 100,
-                     const Vec3d&       center = Vec3d(0),
-                     ValueT             voxelSize = 1.0,
-                     ValueT             halfWidth = 3.0,
-                     const Vec3d&       origin = Vec3d(0),
-                     const std::string& name = "sphere_ls",
-                     StatsMode          sMode = StatsMode::Default,
-                     ChecksumMode       cMode = ChecksumMode::Default,
-                     const BufferT&     buffer = BufferT());
+createLevelSetSphere(ValueT              radius = 100,
+                     const Vec3<ValueT>& center = Vec3<ValueT>(0),
+                     double              voxelSize = 1.0,
+                     double              halfWidth = 3.0,
+                     const Vec3d&        origin = Vec3d(0),
+                     const std::string&  name = "sphere_ls",
+                     StatsMode           sMode = StatsMode::Default,
+                     ChecksumMode        cMode = ChecksumMode::Default,
+                     float               tolerance = -1.0f,
+                     bool                ditherOn = false,
+                     const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -58,18 +69,29 @@ createLevelSetSphere(ValueT             radius = 100,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN. 
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createFogVolumeSphere(ValueT             radius = 100,
-                      const Vec3d&       center = Vec3d(0),
-                      ValueT             voxelSize = 1.0,
-                      ValueT             halfWidth = 3.0,
-                      const Vec3d&       origin = Vec3d(0),
-                      const std::string& name = "sphere_fog",
-                      StatsMode          sMode = StatsMode::Default,
-                      ChecksumMode       cMode = ChecksumMode::Default,
-                      const BufferT&     buffer = BufferT());
+createFogVolumeSphere(ValueT              radius = 100.0f,
+                      const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                      double              voxelSize = 1.0f,
+                      double              halfWidth = 3.0f,
+                      const Vec3d&        origin = Vec3d(0.0),
+                      const std::string&  name = "sphere_fog",
+                      StatsMode           sMode = StatsMode::Default,
+                      ChecksumMode        cMode = ChecksumMode::Default,
+                      float               tolerance = -1.0f,
+                      bool                ditherOn = false,
+                      const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -84,16 +106,19 @@ createFogVolumeSphere(ValueT             radius = 100,
 /// @param name           Name of the grid
 /// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+template<typename ValueT = float,
+         typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
-createPointSphere(int                pointsPerVoxel = 1,
-                  ValueT             radius = 100,
-                  const Vec3d&       center = Vec3d(0),
-                  ValueT             voxelSize = 1.0,
-                  const Vec3d&       origin = Vec3d(0),
-                  const std::string& name = "sphere_points",
-                  ChecksumMode       mode = ChecksumMode::Default,
-                  const BufferT&     buffer = BufferT());
+createPointSphere(int                 pointsPerVoxel = 1,
+                  ValueT              radius = 100.0f,
+                  const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                  double              voxelSize = 1.0f,
+                  const Vec3d&        origin = Vec3d(0.0),
+                  const std::string&  name = "sphere_points",
+                  ChecksumMode        mode = ChecksumMode::Default,
+                  const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -108,19 +133,30 @@ createPointSphere(int                pointsPerVoxel = 1,
 /// @param name        Name of the grid
 /// @param sMode       Mode of computation for the statistics.
 /// @param cMode       Mode of computation for the checksum.
+/// @param tolerance   Global error tolerance use when VoxelT = FpN
+/// @param ditherOn    If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer      Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createLevelSetTorus(ValueT             majorRadius = 100,
-                    ValueT             minorRadius = 50,
-                    const Vec3d&       center = Vec3d(0),
-                    ValueT             voxelSize = 1.0,
-                    ValueT             halfWidth = 3.0,
-                    const Vec3d&       origin = Vec3d(0),
-                    const std::string& name = "torus_ls",
-                    StatsMode          sMode = StatsMode::Default,
-                    ChecksumMode       cMode = ChecksumMode::Default,
-                    const BufferT&     buffer = BufferT());
+createLevelSetTorus(ValueT              majorRadius = 100.0f,
+                    ValueT              minorRadius = 50.0f,
+                    const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                    double              voxelSize = 1.0,
+                    double              halfWidth = 3.0,
+                    const Vec3d&        origin = Vec3d(0.0),
+                    const std::string&  name = "torus_ls",
+                    StatsMode           sMode = StatsMode::Default,
+                    ChecksumMode        cMode = ChecksumMode::Default,
+                    float               tolerance = -1.0f,
+                    bool                ditherOn = false,
+                    const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -138,19 +174,30 @@ createLevelSetTorus(ValueT             majorRadius = 100,
 /// @param name        Name of the grid
 /// @param sMode       Mode of computation for the statistics.
 /// @param cMode       Mode of computation for the checksum.
+/// @param tolerance   Global error tolerance use when VoxelT = FpN
+/// @param ditherOn    If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer      Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createFogVolumeTorus(ValueT             majorRadius = 100,
-                     ValueT             minorRadius = 50,
-                     const Vec3d&       center = Vec3d(0),
-                     ValueT             voxelSize = 1.0,
-                     ValueT             halfWidth = 3.0,
-                     const Vec3d&       origin = Vec3d(0),
-                     const std::string& name = "torus_fog",
-                     StatsMode          sMode = StatsMode::Default,
-                     ChecksumMode       cMode = ChecksumMode::Default,
-                     const BufferT&     buffer = BufferT());
+createFogVolumeTorus(ValueT              majorRadius = 100.0f,
+                     ValueT              minorRadius = 50.0f,
+                     const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                     double              voxelSize = 1.0,
+                     double              halfWidth = 3.0,
+                     const Vec3d&        origin = Vec3d(0),
+                     const std::string&  name = "torus_fog",
+                     StatsMode           sMode = StatsMode::Default,
+                     ChecksumMode        cMode = ChecksumMode::Default,
+                     float               tolerance = -1.0f,
+                     bool                ditherOn = false,
+                     const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -166,17 +213,20 @@ createFogVolumeTorus(ValueT             majorRadius = 100,
 /// @param name           Name of the grid
 /// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+//
+/// @details The @c ValueT template parameter must be float (default) or double.
+template<typename ValueT = float, 
+         typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
-createPointTorus(int                pointsPerVoxel = 1, // half-width of narrow band in voxel units
-                 ValueT             majorRadius = 100, // major radius of torus in world units
-                 ValueT             minorRadius = 50, // minor radius of torus in world units
-                 const Vec3d&       center = Vec3d(0), //center of torus in world units
-                 ValueT             voxelSize = 1.0, // size of a voxel in world units
-                 const Vec3d&       origin = Vec3d(0), // origin of grid in world units
-                 const std::string& name = "torus_points", // name of grid
-                 ChecksumMode       cMode = ChecksumMode::Default,
-                 const BufferT&     buffer = BufferT());
+createPointTorus(int                 pointsPerVoxel = 1, // half-width of narrow band in voxel units
+                 ValueT              majorRadius = 100.0f, // major radius of torus in world units
+                 ValueT              minorRadius = 50.0f, // minor radius of torus in world units
+                 const Vec3<ValueT>& center = Vec3<ValueT>(0.0f), //center of torus in world units
+                 double              voxelSize = 1.0, // size of a voxel in world units
+                 const Vec3d&        origin = Vec3d(0.0f), // origin of grid in world units
+                 const std::string&  name = "torus_points", // name of grid
+                 ChecksumMode        cMode = ChecksumMode::Default,
+                 const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -192,20 +242,31 @@ createPointTorus(int                pointsPerVoxel = 1, // half-width of narrow 
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+//// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createLevelSetBox(ValueT             width = 40,
-                  ValueT             height = 60,
-                  ValueT             depth = 100,
-                  const Vec3d&       center = Vec3d(0),
-                  ValueT             voxelSize = 1.0,
-                  ValueT             halfWidth = 3.0,
-                  const Vec3d&       origin = Vec3d(0),
-                  const std::string& name = "box_ls",
-                  StatsMode          sMode = StatsMode::Default,
-                  ChecksumMode       cMode = ChecksumMode::Default,
-                  const BufferT&     buffer = BufferT());
+createLevelSetBox(ValueT              width = 40.0f,
+                  ValueT              height = 60.0f,
+                  ValueT              depth = 100.0f,
+                  const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                  double              voxelSize = 1.0,
+                  double              halfWidth = 3.0,
+                  const Vec3d&        origin = Vec3d(0.0),
+                  const std::string&  name = "box_ls",
+                  StatsMode           sMode = StatsMode::Default,
+                  ChecksumMode        cMode = ChecksumMode::Default,
+                  float               tolerance = -1.0f,
+                  bool                ditherOn = false,
+                  const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -224,20 +285,31 @@ createLevelSetBox(ValueT             width = 40,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createFogVolumeBox(ValueT             width = 40,
-                   ValueT             height = 60,
-                   ValueT             depth = 100,
-                   const Vec3d&       center = Vec3d(0),
-                   ValueT             voxelSize = 1.0,
-                   ValueT             halfWidth = 3.0,
-                   const Vec3d&       origin = Vec3d(0),
-                   const std::string& name = "box_fog",
-                   StatsMode          sMode = StatsMode::Default,
-                   ChecksumMode       cMode = ChecksumMode::Default,
-                   const BufferT&     buffer = BufferT());
+createFogVolumeBox(ValueT              width = 40.0f,
+                   ValueT              height = 60.0f,
+                   ValueT              depth = 100.0f,
+                   const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                   double              voxelSize = 1.0,
+                   double              halfWidth = 3.0,
+                   const Vec3d&        origin = Vec3d(0.0),
+                   const std::string&  name = "box_fog",
+                   StatsMode           sMode = StatsMode::Default,
+                   ChecksumMode        cMode = ChecksumMode::Default,
+                   float               tolerance = -1.0f,
+                   bool                ditherOn = false,
+                   const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -251,18 +323,29 @@ createFogVolumeBox(ValueT             width = 40,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createLevelSetOctahedron(ValueT             scale = 100,
-                         const Vec3d&       center = Vec3d(0),
-                         ValueT             voxelSize = 1.0,
-                         ValueT             halfWidth = 3.0,
-                         const Vec3d&       origin = Vec3d(0),
-                         const std::string& name = "octadedron_ls",
-                         StatsMode          sMode = StatsMode::Default,
-                         ChecksumMode       cMode = ChecksumMode::Default,
-                         const BufferT&     buffer = BufferT());
+createLevelSetOctahedron(ValueT              scale = 100.0f,
+                         const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                         double              voxelSize = 1.0,
+                         double              halfWidth = 3.0,
+                         const Vec3d&        origin = Vec3d(0.0),
+                         const std::string&  name = "octadedron_ls",
+                         StatsMode           sMode = StatsMode::Default,
+                         ChecksumMode        cMode = ChecksumMode::Default,
+                         float               tolerance = -1.0f,
+                         bool                ditherOn = false,
+                         const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -279,18 +362,29 @@ createLevelSetOctahedron(ValueT             scale = 100,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createFogVolumeOctahedron(ValueT             scale = 100,
-                          const Vec3d&       center = Vec3d(0),
-                          ValueT             voxelSize = 1.0,
-                          ValueT             halfWidth = 3.0,
-                          const Vec3d&       origin = Vec3d(0),
-                          const std::string& name = "octadedron_fog",
-                          StatsMode          sMode = StatsMode::Default,
-                          ChecksumMode       cMode = ChecksumMode::Default,
-                          const BufferT&     buffer = BufferT());
+createFogVolumeOctahedron(ValueT              scale = 100.0f,
+                          const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                          double              voxelSize = 1.0,
+                          double              halfWidth = 3.0,
+                          const Vec3d&        origin = Vec3d(0.0),
+                          const std::string&  name = "octadedron_fog",
+                          StatsMode           sMode = StatsMode::Default,
+                          ChecksumMode        cMode = ChecksumMode::Default,
+                          float               tolerance = -1.0f,
+                          bool                ditherOn = false,
+                          const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -307,22 +401,32 @@ createFogVolumeOctahedron(ValueT             scale = 100,
 /// @param name      Name of the grid
 /// @param sMode     Mode of computation for the statistics.
 /// @param cMode     Mode of computation for the checksum.
+/// @param tolerance Global error tolerance use when VoxelT = FpN
+/// @param ditherOn  If true dithering will be applied when VoxelT = {Fp4,Fp8,Fp16,FpN}
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+///
+/// @details The @c ValueT template parameter must be float (default) or double.
+///          The @c VoxelT template parameter must be one of the following:
+///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float, 
+         typename VoxelT = ValueT, 
+         typename BufferT = HostBuffer>
 GridHandle<BufferT>
-createLevelSetBBox(ValueT             width = 40,
-                   ValueT             height = 60,
-                   ValueT             depth = 100,
-                   ValueT             thickness = 10,
-                   const Vec3d&       center = Vec3d(0),
-                   ValueT             voxelSize = 1.0,
-                   ValueT             halfWidth = 3.0,
-                   const Vec3d&       origin = Vec3d(0),
-                   const std::string& name = "bbox_ls",
-                   StatsMode          sMode = StatsMode::Default,
-                   ChecksumMode       cMode = ChecksumMode::Default,
-                   const BufferT&     buffer = BufferT());
-
+createLevelSetBBox(ValueT              width = 40.0f,
+                   ValueT              height = 60.0f,
+                   ValueT              depth = 100.0f,
+                   ValueT              thickness = 10.0f,
+                   const Vec3<ValueT>& center = Vec3<ValueT>(0.0f),
+                   double              voxelSize = 1.0,
+                   double              halfWidth = 3.0,
+                   const Vec3d&        origin = Vec3d(0.0),
+                   const std::string&  name = "bbox_ls",
+                   StatsMode           sMode = StatsMode::Default,
+                   ChecksumMode        cMode = ChecksumMode::Default,
+                   float               tolerance = -1.0f,
+                   bool                ditherOn = false,
+                   const BufferT&      buffer = BufferT());
 
 
 //================================================================================================
@@ -340,18 +444,19 @@ createLevelSetBBox(ValueT             width = 40,
 /// @param name      Name of the grid
 /// @param mode      Mode of computation for the checksum.
 /// @param buffer    Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+template<typename ValueT = float,
+         typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
-createPointBox(int                pointsPerVoxel = 1, // half-width of narrow band in voxel units
-               ValueT             width = 40, // width of box in world units
-               ValueT             height = 60, // height of box in world units
-               ValueT             depth = 100, // depth of box in world units
-               const Vec3d&       center = Vec3d(0), //center of box in world units
-               ValueT             voxelSize = 1.0, // size of a voxel in world units
-               const Vec3d&       origin = Vec3d(0), // origin of grid in world units
-               const std::string& name = "box_points", // name of grid
-               ChecksumMode       mode = ChecksumMode::Default,
-               const BufferT&     buffer = BufferT());
+createPointBox(int                 pointsPerVoxel = 1, // half-width of narrow band in voxel units
+               ValueT              width = 40.0f, // width of box in world units
+               ValueT              height = 60.0f, // height of box in world units
+               ValueT              depth = 100.0f, // depth of box in world units
+               const Vec3<ValueT>& center = Vec3<ValueT>(0.0f), //center of box in world units
+               double              voxelSize = 1.0, // size of a voxel in world units
+               const Vec3d&        origin = Vec3d(0.0), // origin of grid in world units
+               const std::string&  name = "box_points", // name of grid
+               ChecksumMode        mode = ChecksumMode::Default,
+               const BufferT&      buffer = BufferT());
 
 //================================================================================================
 
@@ -363,7 +468,8 @@ createPointBox(int                pointsPerVoxel = 1, // half-width of narrow ba
 /// @param name           Name of the grid
 /// @param mode           Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
-template<typename ValueT = float, typename BufferT = HostBuffer>
+template<typename ValueT = float,
+         typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
 createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world units
                    int                     pointsPerVoxel = 1, // half-width of narrow band in voxel units
@@ -380,15 +486,19 @@ namespace {
 /// @brief Note, this is not (yet) a valid level set SDF field since values inside sphere (and outside
 ///        the narrow band) are still undefined. Call GridBuilder::sdfToLevelSet() to set those
 ///        values or alternatively call GridBuilder::sdfToFog to generate a FOG volume.
-template<typename ValueT>
-std::shared_ptr<GridBuilder<ValueT>>
-initSphere(ValueT       radius, // radius of sphere in world units
-           const Vec3d& center, //center of sphere in world units
-           ValueT       voxelSize, // size of a voxel in world units
-           ValueT       halfWidth, // half-width of narrow band in voxel units
-           const Vec3d& origin) // origin of grid in world units
+///
+/// @details The @c VoxelT template parameter must be one of the following:
+///          float (default), Fp4, Fp8, Fp16 or FpN.
+template<typename ValueT, typename VoxelT>
+std::shared_ptr<GridBuilder<ValueT, VoxelT>>
+initSphere(ValueT              radius, // radius of sphere in world units
+           const Vec3<ValueT>& center, //center of sphere in world units
+           double              voxelSize, // size of a voxel in world units
+           double              halfWidth, // half-width of narrow band in voxel units
+           const Vec3d&        origin) // origin of grid in world units
 {
-    static_assert(is_floating_point<ValueT>::value, "Sphere: expect floating point");
+    static_assert(is_floating_point<ValueT>::value, "initSphere: expect floating point");
+    static_assert(is_floating_point<typename BuildToValueMap<VoxelT>::Type>::value, "initSphere: expect floating point");
     if (!(radius > 0))
         throw std::runtime_error("Sphere: radius must be positive!");
     if (!(voxelSize > 0))
@@ -396,15 +506,16 @@ initSphere(ValueT       radius, // radius of sphere in world units
     if (!(halfWidth > 0))
         throw std::runtime_error("Sphere: halfWidth must be positive!");
 
-    auto builder = std::make_shared<GridBuilder<ValueT>>(halfWidth * voxelSize);
+    auto builder = std::make_shared<GridBuilder<ValueT, VoxelT>>(ValueT(halfWidth * voxelSize));
     auto acc = builder->getAccessor();
 
     // Define radius of sphere with narrow-band in voxel units
     const ValueT r0 = radius / voxelSize, rmax = r0 + halfWidth;
 
     // Radius below the Nyquist frequency
-    if (r0 < ValueT(1.5))
+    if (r0 < ValueT(1.5f)) {
         return builder;
+    }
 
     // Define center of sphere in voxel units
     const Vec3<ValueT> c(ValueT(center[0] - origin[0]) / voxelSize,
@@ -439,16 +550,17 @@ initSphere(ValueT       radius, // radius of sphere in world units
     return builder;
 } // initSphere
 
-template<typename ValueT>
-std::shared_ptr<GridBuilder<ValueT>>
-initTorus(ValueT       radius1, // major radius of torus in world units
-          ValueT       radius2, // minor radius of torus in world units
-          const Vec3d& center, //center of torus in world units
-          ValueT       voxelSize, // size of a voxel in world units
-          ValueT       halfWidth, // half-width of narrow band in voxel units
-          const Vec3d& origin) // origin of grid in world units
+template<typename ValueT, typename VoxelT>
+std::shared_ptr<GridBuilder<ValueT, VoxelT>>
+initTorus(ValueT              radius1, // major radius of torus in world units
+          ValueT              radius2, // minor radius of torus in world units
+          const Vec3<ValueT>& center, //center of torus in world units
+          double              voxelSize, // size of a voxel in world units
+          double              halfWidth, // half-width of narrow band in voxel units
+          const Vec3d&        origin) // origin of grid in world units
 {
-    static_assert(is_floating_point<ValueT>::value, "Torus: expect floating point");
+    static_assert(is_floating_point<ValueT>::value, "initTorus: expect floating point");
+    static_assert(is_floating_point<typename BuildToValueMap<VoxelT>::Type>::value, "initTorus: expect floating point");
     if (!(radius2 > 0))
         throw std::runtime_error("Torus: radius2 must be positive!");
     if (!(radius1 > radius2))
@@ -458,7 +570,7 @@ initTorus(ValueT       radius1, // major radius of torus in world units
     if (!(halfWidth > 0))
         throw std::runtime_error("Torus: halfWidth must be positive!");
 
-    auto builder = std::make_shared<GridBuilder<ValueT>>(halfWidth * voxelSize);
+    auto builder = std::make_shared<GridBuilder<ValueT, VoxelT>>(ValueT(halfWidth * voxelSize));
     auto acc = builder->getAccessor();
 
     // Define size of torus with narrow-band in voxel units
@@ -501,18 +613,19 @@ initTorus(ValueT       radius1, // major radius of torus in world units
     return builder;
 } // initTorus
 
-template<typename ValueT>
-std::shared_ptr<GridBuilder<ValueT>>
-initBox(ValueT       width, // major radius of torus in world units
-        ValueT       height, // minor radius of torus in world units
-        ValueT       depth,
-        const Vec3d& center, //center of box in world units
-        ValueT       voxelSize, // size of a voxel in world units
-        ValueT       halfWidth, // half-width of narrow band in voxel units
-        const Vec3d& origin) // origin of grid in world units
+template<typename ValueT, typename VoxelT>
+std::shared_ptr<GridBuilder<ValueT, VoxelT>>
+initBox(ValueT              width, // major radius of torus in world units
+        ValueT              height, // minor radius of torus in world units
+        ValueT              depth,
+        const Vec3<ValueT>& center, //center of box in world units
+        double              voxelSize, // size of a voxel in world units
+        double              halfWidth, // half-width of narrow band in voxel units
+        const Vec3d&        origin) // origin of grid in world units
 {
+    static_assert(is_floating_point<ValueT>::value, "initBox: expect floating point");
+    static_assert(is_floating_point<typename BuildToValueMap<VoxelT>::Type>::value, "initBox: expect floating point");
     using Vec3T = Vec3<ValueT>;
-    static_assert(is_floating_point<ValueT>::value, "Box: expect floating point");
     if (!(width > 0))
         throw std::runtime_error("Box: width must be positive!");
     if (!(height > 0))
@@ -525,7 +638,7 @@ initBox(ValueT       width, // major radius of torus in world units
     if (!(halfWidth > 0))
         throw std::runtime_error("Box: halfWidth must be positive!");
 
-    auto builder = std::make_shared<GridBuilder<ValueT>>(halfWidth * voxelSize);
+    auto builder = std::make_shared<GridBuilder<ValueT, VoxelT>>(ValueT(halfWidth * voxelSize));
     auto acc = builder->getAccessor();
 
     // Define size of box with narrow-band in voxel units
@@ -540,14 +653,14 @@ initBox(ValueT       width, // major radius of torus in world units
                   ValueT(center[1] - origin[1]) / voxelSize,
                   ValueT(center[2] - origin[2]) / voxelSize);
 
-    // Define utinity functions
+    // Define utility functions
     auto Pos = [](ValueT x) { return x > 0 ? x : 0; };
     auto Neg = [](ValueT x) { return x < 0 ? x : 0; };
 
     // Define bounds of the voxel coordinates
     const BBox<Vec3T> b(c - r - Vec3T(halfWidth), c + r + Vec3T(halfWidth));
     const CoordBBox   bbox(Coord(Floor(b[0][0]), Floor(b[0][1]), Floor(b[0][2])),
-                         Coord(Ceil(b[1][0]), Ceil(b[1][1]), Ceil(b[1][2])));
+                           Coord(Ceil(b[1][0]),  Ceil(b[1][1]),  Ceil(b[1][2])));
 
     // Compute signed distances to box using leapfrogging in k
     int m = 1;
@@ -575,19 +688,20 @@ initBox(ValueT       width, // major radius of torus in world units
     return builder;
 } // initBox
 
-template<typename ValueT>
-std::shared_ptr<GridBuilder<ValueT>>
-initBBox(ValueT       width, // width of the bbox in world units
-         ValueT       height, // height of the bbox in world units
-         ValueT       depth, // depth of the bbox in world units
-         ValueT       thickness, // thickness of the wire in world units
-         const Vec3d& center, //center of bbox in world units
-         ValueT       voxelSize, // size of a voxel in world units
-         ValueT       halfWidth, // half-width of narrow band in voxel units
-         const Vec3d& origin) // origin of grid in world units
+template<typename ValueT, typename VoxelT>
+std::shared_ptr<GridBuilder<ValueT, VoxelT>>
+initBBox(ValueT              width, // width of the bbox in world units
+         ValueT              height, // height of the bbox in world units
+         ValueT              depth, // depth of the bbox in world units
+         ValueT              thickness, // thickness of the wire in world units
+         const Vec3<ValueT>& center, //center of bbox in world units
+         double              voxelSize, // size of a voxel in world units
+         double              halfWidth, // half-width of narrow band in voxel units
+         const Vec3d&        origin) // origin of grid in world units
 {
+    static_assert(is_floating_point<ValueT>::value, "initBBox: expect floating point");
+    static_assert(is_floating_point<typename BuildToValueMap<VoxelT>::Type>::value, "initBBox: expect floating point");
     using Vec3T = Vec3<ValueT>;
-    static_assert(is_floating_point<ValueT>::value, "BBox: expect floating point");
     if (!(width > 0))
         throw std::runtime_error("BBox: width must be positive!");
     if (!(height > 0))
@@ -596,10 +710,10 @@ initBBox(ValueT       width, // width of the bbox in world units
         throw std::runtime_error("BBox: depth must be positive!");
     if (!(thickness > 0))
         throw std::runtime_error("BBox: thickness must be positive!");
-    if (!(voxelSize > 0))
+    if (!(voxelSize > 0.0))
         throw std::runtime_error("BBox: voxelSize must be positive!");
 
-    auto builder = std::make_shared<GridBuilder<ValueT>>(halfWidth * voxelSize);
+    auto builder = std::make_shared<GridBuilder<ValueT, VoxelT>>(ValueT(halfWidth * voxelSize));
     auto acc = builder->getAccessor();
 
     // Define size of bbox with narrow-band in voxel units
@@ -662,16 +776,17 @@ initBBox(ValueT       width, // width of the bbox in world units
     return builder;
 } // initBBox
 
-template<typename ValueT>
-std::shared_ptr<GridBuilder<ValueT>>
-initOctahedron(ValueT       scale, // scale of the octahedron in world units
-               const Vec3d& center, //center of octahedron in world units
-               ValueT       voxelSize, // size of a voxel in world units
-               ValueT       halfWidth, // half-width of narrow band in voxel units
-               const Vec3d& origin) // origin of grid in world units
+template<typename ValueT, typename VoxelT>
+std::shared_ptr<GridBuilder<ValueT, VoxelT>>
+initOctahedron(ValueT              scale, // scale of the octahedron in world units
+               const Vec3<ValueT>& center, //center of octahedron in world units
+               double              voxelSize, // size of a voxel in world units
+               double              halfWidth, // half-width of narrow band in voxel units
+               const Vec3d&        origin) // origin of grid in world units
 {
+    static_assert(is_floating_point<ValueT>::value, "initOctahedron: expect floating point");
+    static_assert(is_floating_point<typename BuildToValueMap<VoxelT>::Type>::value, "initOctahedron: expect floating point");
     using Vec3T = Vec3<ValueT>;
-    static_assert(is_floating_point<ValueT>::value, "Octahedron: expect floating point");
     if (!(scale > 0))
         throw std::runtime_error("Octahedron: width must be positive!");
     if (!(voxelSize > 0))
@@ -707,22 +822,6 @@ initOctahedron(ValueT       scale, // scale of the octahedron in world units
     const BBox<Vec3T> b(c - Vec3T(s + halfWidth), c + Vec3T(s + halfWidth));
     const CoordBBox   bbox(Coord(Floor(b[0][0]), Floor(b[0][1]), Floor(b[0][2])),
                            Coord(Ceil(b[1][0]),  Ceil(b[1][1]),  Ceil(b[1][2])));
-
-    /*
-   float sdOctahedron( vec3 p, float s)
-   {
-       p = abs(p);
-       float m = p.x+p.y+p.z-s;
-       vec3 q;
-       if( 3.0*p.x < m ) q = p.xyz;
-       else if( 3.0*p.y < m ) q = p.yzx;
-       else if( 3.0*p.z < m ) q = p.zxy;
-       else return m*0.57735027;
-    
-       float k = clamp(0.5*(q.z-q.y+s),0.0,s); 
-       return length(vec3(q.x,q.y-s+k,q.z-k)); 
-    }
-    */
 
     // Compute signed distances to octahedron using leapfrogging in k
     int m = 1;
@@ -762,42 +861,54 @@ initOctahedron(ValueT       scale, // scale of the octahedron in world units
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createLevelSetSphere(ValueT             radius, // radius of sphere in world units
-                     const Vec3d&       center, //center of sphere in world units
-                     ValueT             voxelSize, // size of a voxel in world units
-                     ValueT             halfWidth, // half-width of narrow band in voxel units
-                     const Vec3d&       origin, // origin of grid in world units
-                     const std::string& name, // name of grid
-                     StatsMode          sMode, // mode of computation for the statistics
-                     ChecksumMode       cMode, // mode of computation for the checksum
-                     const BufferT&     buffer)
+createLevelSetSphere(ValueT              radius, // radius of sphere in world units
+                     const Vec3<ValueT>& center, //center of sphere in world units
+                     double              voxelSize, // size of a voxel in world units
+                     double              halfWidth, // half-width of narrow band in voxel units
+                     const Vec3d&        origin, // origin of grid in world units
+                     const std::string&  name, // name of grid
+                     StatsMode           sMode, // mode of computation for the statistics
+                     ChecksumMode        cMode, // mode of computation for the checksum
+                     float               tolerance,// only used if VoxelT = FpN
+                     bool                ditherOn,
+                     const BufferT&      buffer)
 {
-    auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
+    auto builder = initSphere<ValueT, VoxelT>(radius, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createLevelSetSphere
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createFogVolumeSphere(ValueT             radius, // radius of sphere in world units
-                      const Vec3d&       center, //center of sphere in world units
-                      ValueT             voxelSize, // size of a voxel in world units
-                      ValueT             halfWidth, // half-width of narrow band in voxel units
-                      const Vec3d&       origin, // origin of grid in world units
-                      const std::string& name, // name of grid
-                      StatsMode          sMode, // mode of computation for the statistics
-                      ChecksumMode       cMode, // mode of computation for the checksum
-                      const BufferT&     buffer)
+createFogVolumeSphere(ValueT              radius, // radius of sphere in world units
+                      const Vec3<ValueT>& center, //center of sphere in world units
+                      double              voxelSize, // size of a voxel in world units
+                      double              halfWidth, // half-width of narrow band in voxel units
+                      const Vec3d&        origin, // origin of grid in world units
+                      const std::string&  name, // name of grid
+                      StatsMode           sMode, // mode of computation for the statistics
+                      ChecksumMode        cMode, // mode of computation for the checksum
+                      float               tolerance,// only used if VoxelT = FpN
+                      bool                ditherOn,
+                      const BufferT&      buffer)
 {
-    auto builder = initSphere(radius, center, voxelSize, halfWidth, origin);
+    auto builder = initSphere<ValueT, VoxelT>(radius, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeSphere
@@ -806,16 +917,17 @@ createFogVolumeSphere(ValueT             radius, // radius of sphere in world un
 
 template<typename ValueT, typename BufferT>
 inline GridHandle<BufferT>
-createPointSphere(int                pointsPerVoxel, // half-width of narrow band in voxel units
-                  ValueT             radius, // radius of sphere in world units
-                  const Vec3d&       center, //center of sphere in world units
-                  ValueT             voxelSize, // size of a voxel in world units
-                  const Vec3d&       origin, // origin of grid in world units
-                  const std::string& name, // name of grid
-                  ChecksumMode       cMode, // mode of computation for the checksum
-                  const BufferT&     buffer)
+createPointSphere(int                 pointsPerVoxel, // half-width of narrow band in voxel units
+                  ValueT              radius, // radius of sphere in world units
+                  const Vec3<ValueT>& center, //center of sphere in world units
+                  double              voxelSize, // size of a voxel in world units
+                  const Vec3d&        origin, // origin of grid in world units
+                  const std::string&  name, // name of grid
+                  ChecksumMode        cMode, // mode of computation for the checksum
+                  const BufferT&      buffer)
 {
-    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
+    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5, origin, "dummy", 
+                                             StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(sphereHandle);
     auto* sphereGrid = sphereHandle.template grid<ValueT>();
     assert(sphereGrid);
@@ -826,44 +938,56 @@ createPointSphere(int                pointsPerVoxel, // half-width of narrow ban
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createLevelSetTorus(ValueT             majorRadius, // major radius of torus in world units
-                    ValueT             minorRadius, // minor radius of torus in world units
-                    const Vec3d&       center, //center of torus in world units
-                    ValueT             voxelSize, // size of a voxel in world units
-                    ValueT             halfWidth, // half-width of narrow band in voxel units
-                    const Vec3d&       origin, // origin of grid in world units
-                    const std::string& name, // name of grid
-                    StatsMode          sMode, // mode of computation for the statistics
-                    ChecksumMode       cMode, // mode of computation for the checksum
-                    const BufferT&     buffer)
+createLevelSetTorus(ValueT              majorRadius, // major radius of torus in world units
+                    ValueT              minorRadius, // minor radius of torus in world units
+                    const Vec3<ValueT>& center, //center of torus in world units
+                    double              voxelSize, // size of a voxel in world units
+                    double              halfWidth, // half-width of narrow band in voxel units
+                    const Vec3d&        origin, // origin of grid in world units
+                    const std::string&  name, // name of grid
+                    StatsMode           sMode, // mode of computation for the statistics
+                    ChecksumMode        cMode, // mode of computation for the checksum
+                    float               tolerance,
+                    bool                ditherOn,
+                    const BufferT&      buffer)
 {
-    auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
+    auto builder = initTorus<ValueT, VoxelT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createLevelSetTorus
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createFogVolumeTorus(ValueT             majorRadius, // major radius of torus in world units
-                     ValueT             minorRadius, // minor radius of torus in world units
-                     const Vec3d&       center, //center of torus in world units
-                     ValueT             voxelSize, // size of a voxel in world units
-                     ValueT             halfWidth, // half-width of narrow band in voxel units
-                     const Vec3d&       origin, // origin of grid in world units
-                     const std::string& name, // name of grid
-                     StatsMode          sMode, // mode of computation for the statistics
-                     ChecksumMode       cMode, // mode of computation for the checksum
-                     const BufferT&     buffer)
+createFogVolumeTorus(ValueT              majorRadius, // major radius of torus in world units
+                     ValueT              minorRadius, // minor radius of torus in world units
+                     const Vec3<ValueT>& center, //center of torus in world units
+                     double              voxelSize, // size of a voxel in world units
+                     double              halfWidth, // half-width of narrow band in voxel units
+                     const Vec3d&        origin, // origin of grid in world units
+                     const std::string&  name, // name of grid
+                     StatsMode           sMode, // mode of computation for the statistics
+                     ChecksumMode        cMode, // mode of computation for the checksum
+                     float               tolerance,
+                     bool                ditherOn,
+                     const BufferT&      buffer)
 {
-    auto builder = initTorus(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
+    auto builder = initTorus<ValueT, VoxelT>(majorRadius, minorRadius, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeTorus
@@ -872,17 +996,18 @@ createFogVolumeTorus(ValueT             majorRadius, // major radius of torus in
 
 template<typename ValueT, typename BufferT>
 inline GridHandle<BufferT>
-createPointTorus(int                pointsPerVoxel, // half-width of narrow band in voxel units
-                 ValueT             majorRadius, // major radius of torus in world units
-                 ValueT             minorRadius, // minor radius of torus in world units
-                 const Vec3d&       center, //center of torus in world units
-                 ValueT             voxelSize, // size of a voxel in world units
-                 const Vec3d&       origin, // origin of grid in world units
-                 const std::string& name, // name of grid
-                 ChecksumMode       cMode, // mode of computation for the checksum
-                 const BufferT&     buffer)
+createPointTorus(int                 pointsPerVoxel, // half-width of narrow band in voxel units
+                 ValueT              majorRadius, // major radius of torus in world units
+                 ValueT              minorRadius, // minor radius of torus in world units
+                 const Vec3<ValueT>& center, //center of torus in world units
+                 double              voxelSize, // size of a voxel in world units
+                 const Vec3d&        origin, // origin of grid in world units
+                 const std::string&  name, // name of grid
+                 ChecksumMode        cMode, // mode of computation for the checksum
+                 const BufferT&      buffer)
 {
-    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
+    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, 
+                                           "dummy", StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(torusHandle);
     auto* torusGrid = torusHandle.template grid<ValueT>();
     assert(torusGrid);
@@ -893,112 +1018,142 @@ createPointTorus(int                pointsPerVoxel, // half-width of narrow band
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createLevelSetBox(ValueT             width, // width of box in world units
-                  ValueT             height, // height of box in world units
-                  ValueT             depth, // depth of box in world units
-                  const Vec3d&       center, //center of box in world units
-                  ValueT             voxelSize, // size of a voxel in world units
-                  ValueT             halfWidth, // half-width of narrow band in voxel units
-                  const Vec3d&       origin, // origin of grid in world units
-                  const std::string& name, // name of grid
-                  StatsMode          sMode, // mode of computation for the statistics
-                  ChecksumMode       cMode, // mode of computation for the checksum
-                  const BufferT&     buffer)
+createLevelSetBox(ValueT              width, // width of box in world units
+                  ValueT              height, // height of box in world units
+                  ValueT              depth, // depth of box in world units
+                  const Vec3<ValueT>& center, //center of box in world units
+                  double              voxelSize, // size of a voxel in world units
+                  double              halfWidth, // half-width of narrow band in voxel units
+                  const Vec3d&        origin, // origin of grid in world units
+                  const std::string&  name, // name of grid
+                  StatsMode           sMode, // mode of computation for the statistics
+                  ChecksumMode        cMode, // mode of computation for the checksum
+                  float               tolerance,
+                  bool                ditherOn,
+                  const BufferT&      buffer)
 {
-    auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
+    auto builder = initBox<ValueT, VoxelT>(width, height, depth, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createLevelSetBox
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createLevelSetOctahedron(ValueT             scale, // scale of the octahedron in world units
-                         const Vec3d&       center, //center of box in world units
-                         ValueT             voxelSize, // size of a voxel in world units
-                         ValueT             halfWidth, // half-width of narrow band in voxel units
-                         const Vec3d&       origin, // origin of grid in world units
-                         const std::string& name, // name of grid
-                         StatsMode          sMode, // mode of computation for the statistics
-                         ChecksumMode       cMode, // mode of computation for the checksum
-                         const BufferT&     buffer)
+createLevelSetOctahedron(ValueT              scale, // scale of the octahedron in world units
+                         const Vec3<ValueT>& center, //center of box in world units
+                         double              voxelSize, // size of a voxel in world units
+                         double              halfWidth, // half-width of narrow band in voxel units
+                         const Vec3d&        origin, // origin of grid in world units
+                         const std::string&  name, // name of grid
+                         StatsMode           sMode, // mode of computation for the statistics
+                         ChecksumMode        cMode, // mode of computation for the checksum
+                         float               tolerance,
+                         bool                ditherOn,  
+                         const BufferT&      buffer)
 {
-    auto builder = initOctahedron(scale, center, voxelSize, halfWidth, origin);
+    auto builder = initOctahedron<ValueT, VoxelT>(scale, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createLevelSetOctahedron
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createLevelSetBBox(ValueT             width, // width of bbox in world units
-                   ValueT             height, // height of bbox in world units
-                   ValueT             depth, // depth of bbox in world units
-                   ValueT             thickness, // thickness of the wire in world units
-                   const Vec3d&       center, //center of bbox in world units
-                   ValueT             voxelSize, // size of a voxel in world units
-                   ValueT             halfWidth, // half-width of narrow band in voxel units
-                   const Vec3d&       origin, // origin of grid in world units
-                   const std::string& name, // name of grid
-                   StatsMode          sMode, // mode of computation for the statistics
-                   ChecksumMode       cMode, // mode of computation for the checksum
-                   const BufferT&     buffer)
+createLevelSetBBox(ValueT              width, // width of bbox in world units
+                   ValueT              height, // height of bbox in world units
+                   ValueT              depth, // depth of bbox in world units
+                   ValueT              thickness, // thickness of the wire in world units
+                   const Vec3<ValueT>& center, //center of bbox in world units
+                   double              voxelSize, // size of a voxel in world units
+                   double              halfWidth, // half-width of narrow band in voxel units
+                   const Vec3d&        origin, // origin of grid in world units
+                   const std::string&  name, // name of grid
+                   StatsMode           sMode, // mode of computation for the statistics
+                   ChecksumMode        cMode, // mode of computation for the checksum
+                   float               tolerance,
+                   bool                ditherOn,
+                   const BufferT&      buffer)
 {
-    auto builder = initBBox(width, height, depth, thickness, center, voxelSize, halfWidth, origin);
+    auto builder = initBBox<ValueT, VoxelT>(width, height, depth, thickness, center, voxelSize, halfWidth, origin);
     builder->sdfToLevelSet();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::LevelSet, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createLevelSetBBox
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createFogVolumeBox(ValueT             width, // width of box in world units
-                   ValueT             height, // height of box in world units
-                   ValueT             depth, // depth of box in world units
-                   const Vec3d&       center, //center of box in world units
-                   ValueT             voxelSize, // size of a voxel in world units
-                   ValueT             halfWidth, // half-width of narrow band in voxel units
-                   const Vec3d&       origin, // origin of grid in world units
-                   const std::string& name, // name of grid
-                   StatsMode          sMode, // mode of computation for the statistics
-                   ChecksumMode       cMode, // mode of computation for the checksum
-                   const BufferT&     buffer)
+createFogVolumeBox(ValueT              width, // width of box in world units
+                   ValueT              height, // height of box in world units
+                   ValueT              depth, // depth of box in world units
+                   const Vec3<ValueT>& center, //center of box in world units
+                   double              voxelSize, // size of a voxel in world units
+                   double              halfWidth, // half-width of narrow band in voxel units
+                   const Vec3d&        origin, // origin of grid in world units
+                   const std::string&  name, // name of grid
+                   StatsMode           sMode, // mode of computation for the statistics
+                   ChecksumMode        cMode, // mode of computation for the checksum
+                   float               tolerance,
+                   bool                ditherOn,
+                   const BufferT&      buffer)
 {
-    auto builder = initBox(width, height, depth, center, voxelSize, halfWidth, origin);
+    auto builder = initBox<ValueT, VoxelT>(width, height, depth, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeBox
 
 //================================================================================================
 
-template<typename ValueT, typename BufferT>
+template<typename ValueT, typename VoxelT, typename BufferT>
 inline GridHandle<BufferT>
-createFogVolumeOctahedron(ValueT             scale, // scale of octahedron in world units
-                          const Vec3d&       center, //center of box in world units
-                          ValueT             voxelSize, // size of a voxel in world units
-                          ValueT             halfWidth, // half-width of narrow band in voxel units
-                          const Vec3d&       origin, // origin of grid in world units
-                          const std::string& name, // name of grid
-                          StatsMode          sMode, // mode of computation for the statistics
-                          ChecksumMode       cMode, // mode of computation for the checksum
-                          const BufferT&     buffer)
+createFogVolumeOctahedron(ValueT              scale, // scale of octahedron in world units
+                          const Vec3<ValueT>& center, //center of box in world units
+                          double              voxelSize, // size of a voxel in world units
+                          double              halfWidth, // half-width of narrow band in voxel units
+                          const Vec3d&        origin, // origin of grid in world units
+                          const std::string&  name, // name of grid
+                          StatsMode           sMode, // mode of computation for the statistics
+                          ChecksumMode        cMode, // mode of computation for the checksum
+                          float               tolerance,
+                          bool                ditherOn,
+                          const BufferT&      buffer)
 {
-    auto builder = initOctahedron(scale, center, voxelSize, halfWidth, origin);
+    auto builder = initOctahedron<ValueT, VoxelT>(scale, center, voxelSize, halfWidth, origin);
     builder->sdfToFog();
-    auto handle = builder->template getHandle<BufferT>(double(voxelSize), origin, name, GridClass::FogVolume, sMode, cMode, buffer);
+    builder->setStats(sMode);
+    builder->setChecksum(cMode);
+    builder->enableDithering(ditherOn);
+    AbsDiff oracle(tolerance);
+    auto handle = builder->template getHandle<AbsDiff, BufferT>(voxelSize, origin, name, oracle, buffer);
     assert(handle);
     return handle;
 } // createFogVolumeOctahedron
@@ -1007,18 +1162,19 @@ createFogVolumeOctahedron(ValueT             scale, // scale of octahedron in wo
 
 template<typename ValueT, typename BufferT>
 inline GridHandle<BufferT>
-createPointBox(int                pointsPerVoxel, // half-width of narrow band in voxel units
-               ValueT             width, // width of box in world units
-               ValueT             height, // height of box in world units
-               ValueT             depth, // depth of box in world units
-               const Vec3d&       center, //center of box in world units
-               ValueT             voxelSize, // size of a voxel in world units
-               const Vec3d&       origin, // origin of grid in world units
-               const std::string& name, // name of grid
-               ChecksumMode       cMode, // mode of computation for the checksum
-               const BufferT&     buffer)
+createPointBox(int                 pointsPerVoxel, // half-width of narrow band in voxel units
+               ValueT              width, // width of box in world units
+               ValueT              height, // height of box in world units
+               ValueT              depth, // depth of box in world units
+               const Vec3<ValueT>& center, //center of box in world units
+               double              voxelSize, // size of a voxel in world units
+               const Vec3d&        origin, // origin of grid in world units
+               const std::string&  name, // name of grid
+               ChecksumMode        cMode, // mode of computation for the checksum
+               const BufferT&      buffer)
 {
-    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5f, origin, "dummy", StatsMode::BBox, ChecksumMode::Disable, buffer);
+    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5, origin, "dummy", 
+                                       StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(boxHandle);
     auto* boxGrid = boxHandle.template grid<ValueT>();
     assert(boxGrid);
@@ -1056,7 +1212,7 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
     }
     std::vector<Vec3T> xyz;
     xyz.reserve(pointCount);
-    GridBuilder<uint32_t> builder(std::numeric_limits<uint32_t>::max(), pointSize);
+    GridBuilder<uint32_t> builder(std::numeric_limits<uint32_t>::max(), GridClass::PointData, pointSize);
     auto                  dstAcc = builder.getAccessor();
     std::srand(1234);
     const ValueT s = 1 / (1 + ValueT(RAND_MAX)); // scale so s*rand() is in ] 0, 1 [
@@ -1065,8 +1221,9 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
         return s * Vec3T(rand(), rand(), rand()) - Vec3T(0.5);
     };
     const auto& srcTree = srcGrid.tree();
+    auto srcMgr = createLeafMgr(srcGrid);
     for (uint32_t i = 0, end = srcTree.nodeCount(0); i < end; ++i) {
-        auto* srcLeaf = srcTree.template getNode<0>(i);
+        auto* srcLeaf = srcMgr[i];
         auto* dstLeaf = dstAcc.setValue(srcLeaf->origin(), pointsPerVoxel); // allocates leaf node
         dstLeaf->mValueMask = srcLeaf->valueMask();
         for (uint32_t j = 0, m = 0; j < 512; ++j) {
@@ -1079,7 +1236,10 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
         }
     }
     assert(pointCount == xyz.size());
-    auto handle = builder.template getHandle<BufferT>(srcGrid.map(), name, GridClass::PointData, StatsMode::MinMax, ChecksumMode::Disable, buffer);
+    builder.setStats(StatsMode::MinMax);
+    builder.setChecksum(ChecksumMode::Disable);
+    const AbsDiff dummy;
+    auto handle = builder.template getHandle<AbsDiff, BufferT>(srcGrid.map(), name, dummy, buffer);
     assert(handle);
     auto* dstGrid = handle.template grid<uint32_t>();
     assert(dstGrid);
@@ -1087,13 +1247,14 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
     if (dstTree.nodeCount(0) == 0) {
         throw std::runtime_error("Expect leaf nodes!");
     }
-    auto* leafData = const_cast<typename NanoLeaf<uint32_t>::DataType*>(dstTree.template getNode<0>(0u)->data());
+    auto dstMgr = createLeafMgr(*dstGrid);
+    auto* leafData = dstMgr[0]->data();
     leafData[0].mMinimum = 0; // start of prefix sum
     for (uint32_t i = 1, n = dstTree.nodeCount(0); i < n; ++i) {
         leafData[i].mMinimum = leafData[i - 1].mMinimum + leafData[i - 1].mMaximum;
     }
     auto& meta = const_cast<GridBlindMetaData&>(dstGrid->blindMetaData(0u));
-    meta.mByteOffset = handle.size() - pointSize; // offset from Grid to blind data
+    
     meta.mElementCount = xyz.size();
     meta.mFlags = 0;
     meta.mDataClass = GridBlindDataClass::AttributeArray;
@@ -1112,7 +1273,11 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
     } else {
         throw std::runtime_error("Unsupported value type");
     }
-    memcpy(handle.data() + meta.mByteOffset, xyz.data(), xyz.size() * sizeof(Vec3T));
+    if (const auto *p = dstGrid->blindData(0)) {
+        memcpy(const_cast<void*>(p), xyz.data(), xyz.size() * sizeof(Vec3T));
+    } else {
+        throw std::runtime_error("Blind data pointer was NULL");
+    }
     updateChecksum(*dstGrid, cMode);
     return handle;
 } // createPointScatter

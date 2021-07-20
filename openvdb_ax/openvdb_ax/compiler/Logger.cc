@@ -22,6 +22,7 @@ struct Logger::Settings
     const char* mErrorPrefix = "error: ";
     const char* mWarningPrefix = "warning: ";
     bool        mPrintLines = false;
+    std::string mIndent;
 };
 
 
@@ -142,19 +143,24 @@ std::string format(const std::string& message,
                    const size_t numMessage,
                    const bool numbered,
                    const bool printLines,
+                   const std::string& indent,
                    Logger::SourceCode* sourceCode)
 {
     std::stringstream ss;
+    ss << indent;
     if (numbered) ss << "[" << numMessage + 1 << "] ";
-    ss << message;
+    for (auto c : message) {
+        ss << c;
+        if (c == '\n') ss << indent;
+    }
     if (loc.first > 0) {
         ss << " " << loc.first << ":" << loc.second;
         if (printLines && sourceCode) {
-            ss << "\n";
+            ss << '\n' << indent;
             sourceCode->getLine(loc.first, &ss);
-            ss << "\n";
-            for (size_t i = 0; i < loc.second - 1; ++i) ss << "-";
-            ss << "^";
+            ss << '\n' << indent;
+            for (size_t i = 0; i < loc.second - 1; ++i) ss << '-';
+            ss << '^';
         }
     }
     return ss.str();
@@ -188,6 +194,7 @@ bool Logger::error(const std::string& message,
                         this->errors(),
                         this->getNumberedOutput(),
                         this->getPrintLines(),
+                        this->mSettings->mIndent,
                         this->mCode.get()));
     ++mNumErrors;
     // now exceeds the limit
@@ -213,6 +220,7 @@ bool Logger::warning(const std::string& message,
                               this->warnings(),
                               this->getNumberedOutput(),
                               this->getPrintLines(),
+                              this->mSettings->mIndent,
                               this->mCode.get()));
         ++mNumWarnings;
         return true;
@@ -250,6 +258,11 @@ void Logger::setNumberedOutput(const bool numbered)
     mSettings->mNumbered = numbered;
 }
 
+void Logger::setIndent(const size_t ident)
+{
+    mSettings->mIndent = std::string(ident, ' ');
+}
+
 void Logger::setErrorPrefix(const char* prefix)
 {
     mSettings->mErrorPrefix = prefix;
@@ -268,6 +281,11 @@ void Logger::setPrintLines(const bool print)
 bool Logger::getNumberedOutput() const
 {
     return mSettings->mNumbered;
+}
+
+size_t Logger::getIndent() const
+{
+    return mSettings->mIndent.size();
 }
 
 const char* Logger::getErrorPrefix() const

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherCpuMT.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of CPU-multithreaded-platform Grid renderer.
 */
 

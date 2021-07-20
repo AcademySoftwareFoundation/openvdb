@@ -3,11 +3,6 @@
 
 /*!
 	\file   nanovdb_viewer.cpp
-
-	\author Wil Braithwaite
-
-	\date   April 26, 2020
-
 	\brief  nanovdb batch-renderer/viewer.
 */
 

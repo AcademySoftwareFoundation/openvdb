@@ -14,7 +14,7 @@
 #include <openvdb/tools/Clip.h> // for tools::clip()
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfInteriorMask()
 #include <openvdb/tools/Mask.h> // for tools::interiorMask()
-#include <openvdb/tools/Morphology.h> // for tools::dilateActiveValues(), tools::erodeVoxels()
+#include <openvdb/tools/Morphology.h> // for tools::dilateActiveValues(), tools::erodeActiveValues()
 #include <openvdb/points/PointDataGrid.h>
 #include <OBJ/OBJ_Camera.h>
 #include <cmath> // for std::abs(), std::round()
@@ -282,12 +282,6 @@ struct DilatedMaskOp
         maskGrid->setTransform(grid.transform().copy());
         maskGrid->topologyUnion(grid);
 
-        if (dilation < 0) {
-            // Densify the mask, since tools::erodeVoxels() ignores active tiles.
-            /// @todo Remove this once tools::erodeActiveValues() is implemented.
-            maskGrid->tree().voxelizeActiveTiles();
-        }
-
         UT_AutoInterrupt progress{
             ((dilation > 0 ? "Dilating" : "Eroding") + std::string{" VDB mask"}).c_str()};
 
@@ -300,8 +294,7 @@ struct DilatedMaskOp
             if (dilation > 0) {
                 openvdb::tools::dilateActiveValues(maskGrid->tree(), iterations);
             } else {
-                /// @todo Replace with tools::erodeActiveValues() once it is implemented.
-                openvdb::tools::erodeVoxels(maskGrid->tree(), iterations);
+                openvdb::tools::erodeActiveValues(maskGrid->tree(), iterations);
             }
         };
 

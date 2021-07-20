@@ -12,4 +12,4 @@ The current OpenVDB maintainers are:
 | Dan Bailey | danbailey@ilm.com
 | Nick Avramoussis | nna@dneg.com
 | Ken Museth | ken.museth@gmail.com
-| Peter Cucka | peter.cucka@dreamworks.com
+| Andre Pradhana | andre.pradhana@dreamworks.com

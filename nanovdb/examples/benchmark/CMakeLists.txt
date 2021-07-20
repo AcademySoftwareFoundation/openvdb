@@ -17,7 +17,44 @@ endif()
 # launching from the cmake binary working directory.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
-add_executable(benchmark Benchmark.cpp BenchKernels.cu Image.h)
+set(BENCHMARK_SOURCES Benchmark.cpp Camera.h Image.h)
+
+if(NANOVDB_USE_CUDA)
+
+  list(APPEND BENCHMARK_SOURCES BenchKernels_nano.cu)
+
+  add_executable(benchmark_nano Benchmark_nano.cpp BenchKernels_nano.cu)
+  add_executable(benchmark_dense Benchmark_dense.cpp BenchKernels_dense.cu)
+
+  target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY})
+  target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY})
+
+  target_link_libraries(
+    benchmark_nano
+    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
+            ${NANOVDB_BLOSC} # optional
+  )
+
+  target_link_libraries(
+    benchmark_dense
+    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
+            ${NANOVDB_BLOSC} # optional
+  )
+
+  target_compile_definitions(
+    benchmark_nano
+    PRIVATE "-D${NANOVDB_USE_CUDA_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
+            "-D${NANOVDB_USE_ZLIB_FLAG}")
+
+  target_compile_definitions(
+    benchmark_dense
+    PRIVATE "-D${NANOVDB_USE_CUDA_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
+            "-D${NANOVDB_USE_ZLIB_FLAG}")
+
+endif()
+
+# -----------------------------------------------------------------------
+add_executable(benchmark ${BENCHMARK_SOURCES})
 
 target_include_directories(benchmark PUBLIC ${TBB_INCLUDE_DIRECTORY}
                                             ${CUDA_INCLUDE_DIRECTORY})

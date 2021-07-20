@@ -1,13 +1,16 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Exceptions.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MultiResGrid.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/Diagnostics.h>
+
+#include <gtest/gtest.h>
+
 #include <cstdio> // for remove()
+
 
 class TestMultiResGrid : public ::testing::Test
 {

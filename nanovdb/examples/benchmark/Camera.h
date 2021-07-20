@@ -11,6 +11,7 @@
 #define NANOVDB_CAMERA_H_HAS_BEEN_INCLUDED
 
 #include <nanovdb/NanoVDB.h> // for Vec3
+#include <nanovdb/util/Ray.h>
 
 namespace nanovdb {
 

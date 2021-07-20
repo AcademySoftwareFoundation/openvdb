@@ -155,6 +155,7 @@ private:
     BufferObject mInteriorBuffer, mSurfaceBuffer, mVectorBuffer;
     bool mIsInitialized;
     ShaderProgram mFlatShader, mSurfaceShader;
+    bool mDrawingPointGrid;
 };
 
 

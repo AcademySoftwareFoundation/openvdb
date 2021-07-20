@@ -3,16 +3,12 @@
 
 /*!
 	\file RenderLauncherCL.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of OpenCL-platform Grid renderer.
 */
 
 #ifdef NANOVDB_USE_OPENCL
 
+#include <nanovdb/util/NodeManager.h>
 #include "RenderLauncherImpl.h"
 #include "FrameBufferHost.h"
 #if defined(NANOVDB_USE_OPENGL)
@@ -475,9 +471,14 @@ std::shared_ptr<RenderLauncherCL::Resource> RenderLauncherCL::ensureResource(con
 
             auto gridData = uintptr_t(grid);
             auto rootData = uintptr_t(&grid->tree().root());
-            auto node2Level = (counts[2] > 0) ? uintptr_t(grid->tree().getNode<Node2T>(0)) : rootData + RootT::memUsage(0);
-            auto node1Level = (counts[1] > 0) ? uintptr_t(grid->tree().getNode<Node1T>(0)) : node2Level;
-            auto node0Level = (counts[0] > 0) ? uintptr_t(grid->tree().getNode<Node0T>(0)) : node1Level;
+
+            auto mgr = nanovdb::createNodeMgr(*grid);
+
+            // TODO: This does not work because upper is Node**...
+            // we need to create enumeration buffers and upload.
+            auto node2Level = (counts[2] > 0) ? uintptr_t(mgr.upper(0)) : rootData + RootT::memUsage(0);
+            auto node1Level = (counts[1] > 0) ? uintptr_t(mgr.lower(0)) : node2Level;
+            auto node0Level = (counts[0] > 0) ? uintptr_t(mgr.leaf(0)) : node1Level;
 
             uint32_t offsets[] = {
                 uint32_t(node0Level - gridData),
@@ -720,7 +721,7 @@ bool RenderLauncherCL::render(MaterialClass method, int width, int height, Frame
         kernelCl = (cl_kernel)resource->mKernelLevelSetCl;
     } else if (method == MaterialClass::kFogVolumePathTracer) {
         kernelCl = (cl_kernel)resource->mKernelFogVolumeCl;
-    } 
+    }
 
     if (!kernelCl)
         return false;

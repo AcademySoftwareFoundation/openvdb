@@ -1,4 +1,6 @@
-# NanoVDB
+<img src="https://www.openvdb.org/images/nanovdb_logo.png" height="150">
+
+# NanoVDB:
 A lightweight GPU friendly version of VDB initially targeting rendering applications.
 
 * [Build instructions for make and cmake](docs/HowToBuild.md)

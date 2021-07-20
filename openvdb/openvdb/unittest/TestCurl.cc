@@ -1,10 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/GridOperators.h>
+
+#include <gtest/gtest.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/1e-6);

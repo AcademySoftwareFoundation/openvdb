@@ -66,7 +66,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
-#include "Morphology.h" // for erodeVoxels
+#include "Morphology.h" // for erodeActiveValues
 
 
 namespace openvdb {
@@ -278,6 +278,7 @@ struct DirichletBoundaryOp {
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -311,6 +312,7 @@ struct LeafIndexOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename VIndexTreeType>
 inline void
@@ -367,6 +369,7 @@ createIndexTree(const TreeType& tree)
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -408,6 +411,7 @@ struct CopyToVecOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename VectorValueType, typename SourceTreeType>
 inline typename math::pcg::Vector<VectorValueType>::Ptr
@@ -433,6 +437,7 @@ createVectorFromTree(const SourceTreeType& tree,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -464,6 +469,7 @@ struct CopyFromVecOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename TreeValueType, typename VIndexTreeType, typename VectorValueType>
 inline typename VIndexTreeType::template ValueConverter<TreeValueType>::Type::Ptr
@@ -491,6 +497,7 @@ createTreeFromVector(
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -683,6 +690,8 @@ struct ISLaplacianOp
 
 } // namespace internal
 
+/// @endcond
+
 
 template<typename BoolTreeType>
 inline LaplacianMatrix::Ptr
@@ -811,7 +820,7 @@ solveWithBoundaryConditionsAndPreconditioner(
     /// @todo Is this really needed?
     typename MaskTreeT::Ptr interiorMask(
         new MaskTreeT(*idxTree, /*background=*/false, TopologyCopy()));
-    tools::erodeVoxels(*interiorMask, /*iterations=*/1, tools::NN_FACE);
+    tools::erodeActiveValues(*interiorMask, /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
 
     // 4. Create the Laplacian matrix.
     LaplacianMatrix::Ptr laplacian = createISLaplacianWithBoundaryConditions(

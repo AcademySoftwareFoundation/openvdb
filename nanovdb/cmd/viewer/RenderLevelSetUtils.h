@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLevelSetUtils.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation of the LevelSet rendering code.
 */
 
@@ -22,15 +17,16 @@
 namespace render {
 namespace levelset {
 
-template<typename ValueT, int InterpolationOrder>
+template<typename BuildT, int InterpolationOrder>
 struct RenderLevelSetRgba32fFn
 {
+    using ValueT = typename nanovdb::NanoGrid<BuildT>::ValueType;
     using RealT = float;
     using Vec3T = nanovdb::Vec3<RealT>;
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<BuildT>* grid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         auto outPixel = &imgBuffer[4 * (ix + width * iy)];
 
@@ -63,7 +59,7 @@ struct RenderLevelSetRgba32fFn
                 RayT iRay = wRay.worldToIndexF(*grid);
 
                 CoordT ijk;
-                ValueT v0 = 0.0f;
+                ValueT v0 = ValueT(0);
                 float  t;
                 if (nanovdb::ZeroCrossing(iRay, acc, ijk, v0, t)) {
                     Vec3T iPrimaryPos = Vec3T(RealT(ijk[0]), RealT(ijk[1]), RealT(ijk[2]));

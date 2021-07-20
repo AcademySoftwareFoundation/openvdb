@@ -4,14 +4,16 @@
 //#define BENCHMARK_TEST
 
 #include <openvdb/openvdb.h>
-#include "gtest/gtest.h"
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/Dense.h>
 #include <openvdb/Exceptions.h>
-#include <sstream>
 #ifdef BENCHMARK_TEST
 #include <openvdb/util/CpuTimer.h>
 #endif
+
+#include <gtest/gtest.h>
+
+#include <sstream>
 
 
 class TestDense: public ::testing::Test

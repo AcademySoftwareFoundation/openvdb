@@ -6,7 +6,7 @@
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tree/LeafManager.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 
 class TestNodeManager: public ::testing::Test
@@ -36,15 +36,17 @@ struct NodeCountOp {
         totalCount += other.totalCount;
     }
     // do nothing for the root node
-    void operator()(const typename TreeT::RootNodeType&)
+    bool operator()(const typename TreeT::RootNodeType&, size_t = 0)
     {
+        return true;
     }
     // count the internal and leaf nodes
     template<typename NodeT>
-    void operator()(const NodeT&)
+    bool operator()(const NodeT&, size_t = 0)
     {
         ++(nodeCount[NodeT::LEVEL]);
         ++totalCount;
+        return true;
     }
     std::vector<openvdb::Index64> nodeCount;
     openvdb::Index64 totalCount;
@@ -154,10 +156,10 @@ TEST_F(TestNodeManager, testConst)
     FloatGrid::Ptr grid = FloatGrid::create(/*background=*/half_width*voxel_size);
     const FloatTree& tree = grid->constTree();
 
-    tree::NodeManager<const FloatTree> manager(tree);
+    tree::NodeManager<const FloatTree> nodeManager(tree);
 
     NodeCountOp<const FloatTree> topDownOp;
-    manager.reduceTopDown(topDownOp);
+    nodeManager.reduceTopDown(topDownOp);
 
     std::vector<Index64> nodeCount;
     for (openvdb::Index i=0; i<FloatTree::DEPTH; ++i) nodeCount.push_back(0);
@@ -165,10 +167,17 @@ TEST_F(TestNodeManager, testConst)
 
     Index64 totalCount = 0;
     for (openvdb::Index i=0; i<FloatTree::RootNodeType::LEVEL; ++i) {//exclude root in nodeCount
-        EXPECT_EQ(nodeCount[i], manager.nodeCount(i));
+        EXPECT_EQ(nodeCount[i], nodeManager.nodeCount(i));
         totalCount += nodeCount[i];
     }
-    EXPECT_EQ(totalCount, manager.nodeCount());
+    EXPECT_EQ(totalCount, nodeManager.nodeCount());
+    EXPECT_EQ(totalCount, topDownOp.totalCount);
+
+    // test DynamicNodeManager also works with a const tree
+
+    tree::DynamicNodeManager<const FloatTree> dynamicNodeManager(tree);
+    dynamicNodeManager.reduceTopDown(topDownOp);
+    EXPECT_EQ(totalCount, topDownOp.totalCount);
 }
 
 

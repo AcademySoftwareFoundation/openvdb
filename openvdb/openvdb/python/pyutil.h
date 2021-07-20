@@ -7,10 +7,10 @@
 #include "openvdb/openvdb.h"
 #include "openvdb/points/PointDataGrid.h"
 #include <boost/python.hpp>
-#include <tbb/mutex.h>
-#include <map> // for std::pair
-#include <string>
+#include <mutex>
 #include <sstream>
+#include <string>
+#include <utility> // for std::pair
 
 
 namespace pyutil {
@@ -129,12 +129,12 @@ struct StringEnum
     /// Return the (key, value) map as a Python dict.
     static boost::python::dict items()
     {
-        static tbb::mutex sMutex;
+        static std::mutex sMutex;
         static boost::python::dict itemDict;
         if (!itemDict) {
             // The first time this function is called, populate
             // the static dict with (key, value) pairs.
-            tbb::mutex::scoped_lock lock(sMutex);
+            std::lock_guard<std::mutex> lock(sMutex);
             if (!itemDict) {
                 for (int i = 0; ; ++i) {
                     const CStringPair item = Descr::item(i);

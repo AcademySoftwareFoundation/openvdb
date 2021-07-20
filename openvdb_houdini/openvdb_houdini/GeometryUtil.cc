@@ -591,9 +591,12 @@ SharpenFeaturesOp::operator()(const GA_SplittableRange& range) const
     openvdb::Vec3d pos, normal;
     openvdb::Coord ijk;
 
-    std::vector<openvdb::Vec3d> points(12), normals(12);
-    std::vector<openvdb::Index32> primitives(12);
+    std::vector<openvdb::Vec3d> points, normals;
+    std::vector<openvdb::Index32> primitives;
 
+    points.reserve(12);
+    normals.reserve(12);
+    primitives.reserve(12);
     for (GA_PageIterator pageIt = range.beginPages(); !pageIt.atEnd(); ++pageIt) {
         for (GA_Iterator blockIt(pageIt.begin()); blockIt.blockAdvance(start, end); ) {
             for (ptnOffset = start; ptnOffset < end; ++ptnOffset) {

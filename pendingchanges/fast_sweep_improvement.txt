@@ -1,0 +1,2 @@
+Improvements:
+    - Minor performance improvements to dilation calls in fast sweeping algorithms

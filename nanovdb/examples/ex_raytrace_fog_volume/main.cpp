@@ -24,9 +24,9 @@ int main(int ac, char** av)
         nanovdb::GridHandle<BufferT> handle;
         if (ac > 1) {
             handle = nanovdb::io::readGrid<BufferT>(av[1]);
-            std::cout << "Loaded NanoVDB grid[" << handle.gridMetaData()->gridName() << "]...\n";
+            std::cout << "Loaded NanoVDB grid[" << handle.gridMetaData()->shortGridName() << "]...\n";
         } else {
-            handle = nanovdb::createFogVolumeSphere<float, BufferT>(100.0f, nanovdb::Vec3R(-20, 0, 0), 1.0f, 3.0f, nanovdb::Vec3R(0), "sphere");
+            handle = nanovdb::createFogVolumeSphere<float, float, BufferT>(100.0f, nanovdb::Vec3f(-20, 0, 0), 1.0, 3.0, nanovdb::Vec3d(0), "sphere");
         }
 
         if (handle.gridMetaData()->isFogVolume() == false) {

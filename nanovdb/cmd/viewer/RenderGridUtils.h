@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderGridUtils.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation of the Grid rendering code.
 */
 

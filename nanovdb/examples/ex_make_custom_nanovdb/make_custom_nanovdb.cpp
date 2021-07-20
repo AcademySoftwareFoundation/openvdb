@@ -3,6 +3,8 @@
 
 #include <nanovdb/util/GridBuilder.h>
 
+#include <iostream>
+
 /// @brief Creates a NanoVDB grids with custom values and access them.
 ///
 /// @note This example only depends on NanoVDB.

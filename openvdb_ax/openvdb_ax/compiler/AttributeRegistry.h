@@ -21,6 +21,8 @@
 #include "../ast/Scanners.h"
 
 #include <openvdb/version.h>
+#include <openvdb/Types.h>
+#include <openvdb/util/Name.h>
 
 #include <unordered_map>
 
@@ -67,6 +69,7 @@ public:
         const std::vector<const AccessData*>& uses() const { return mUses; }
 
         bool dependson(const AccessData* data) const {
+            assert(data);
             for (auto& dep : mDependencies) {
                 if (dep == data) return true;
             }
@@ -110,13 +113,9 @@ public:
     inline std::pair<bool,bool>
     accessPattern(const std::string& name, const ast::tokens::CoreType type) const
     {
-        for (const auto& data : mAccesses) {
-            if ((type == ast::tokens::UNKNOWN || data.type() == type)
-                && data.name() == name) {
-                return data.mAccess;
-            }
-        }
-        return std::pair<bool,bool>(false,false);
+        auto* data = this->get(name, type);
+        if (!data) return std::pair<bool,bool>(false,false);
+        return data->mAccess;
     }
 
     /// @brief  Returns whether or not an access is registered.
@@ -142,6 +141,18 @@ public:
             ++i;
         }
         return -1;
+    }
+
+    const AccessData*
+    get(const std::string& name, const ast::tokens::CoreType type) const
+    {
+        for (const auto& data : mAccesses) {
+            if ((type == ast::tokens::UNKNOWN || data.type() == type)
+                && data.name() == name) {
+                return &data;
+            }
+        }
+        return nullptr;
     }
 
     /// @brief  Returns a const reference to the vector of registered accesss

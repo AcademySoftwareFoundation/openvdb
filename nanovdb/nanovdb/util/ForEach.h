@@ -8,7 +8,7 @@
 
     \date August 24, 2020
 
-    \brief A unified wrapper for tbb::parallel_for and a naive std::thread analog
+    \brief A unified wrapper for tbb::parallel_for and a naive std::thread fallback
 */
 
 #ifndef NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
@@ -18,27 +18,33 @@
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_for.h>
-#endif
-
+#else
 #include <thread>
 #include <mutex>
 #include <vector>
+#endif
 
 namespace nanovdb {
 
-/// @return 0 for no work, 1 for serial, 2 for tbb multi-threading, and 3 for std multi-threading
-/// func = [](const RangeT&){...}, 
-/// RangeT = Range, CoordBBox, tbb::blocked_range, blocked_range2D, or blocked_range3D.
-template <typename RangeT, typename Func>
-int forEach(RangeT taskRange, const Func &taskFunc)
+/// @brief simple wrapper for tbb::parallel_for with a naive std fallback
+///
+/// @param range Range, CoordBBox, tbb::blocked_range, blocked_range2D, or blocked_range3D.
+/// @param func functor with the signature [](const RangeT&){...},
+///
+/// @code
+///     std::vector<int> array(100);
+///     auto func = [&array](auto &r){for (auto i=r.begin(); i!=r.end(); ++i) array[i]=i;};
+///     forEach(array, func);
+/// @endcode
+template <typename RangeT, typename FuncT>
+inline void forEach(RangeT range, const FuncT &func)
 {
-    if (taskRange.empty()) return 0;
+    if (range.empty()) return;
 #ifdef NANOVDB_USE_TBB
-    tbb::parallel_for(taskRange, taskFunc);
-    return 2;/// tbb multi-threading
-#else
+    tbb::parallel_for(range, func);
+#else// naive and likely slow alternative based on std::thread
     if (const size_t threadCount = std::thread::hardware_concurrency()>>1) {
-        std::vector<RangeT> rangePool{ taskRange };
+        std::vector<RangeT> rangePool{ range };
         while(rangePool.size() < threadCount) {
             const size_t oldSize = rangePool.size();
             for (size_t i = 0; i < oldSize && rangePool.size() < threadCount; ++i) {
@@ -48,24 +54,33 @@ int forEach(RangeT taskRange, const Func &taskFunc)
             if (rangePool.size() == oldSize) break;// none of the ranges were divided so stop
         }
         std::vector<std::thread> threadPool;
-        for (auto &r : rangePool) threadPool.emplace_back(taskFunc, r);// launch threads
+        for (auto &r : rangePool) threadPool.emplace_back(func, r);// launch threads
         for (auto &t : threadPool) t.join();// synchronize threads
-        return 3;// std multi-threading
-    } else {
-        taskFunc(taskRange);
-        return 1;// serial
+    } else {//serial
+        func(range);
     }
 #endif
-    return -1;// should never happen
 }
 
-/// @brief Simple wrapper to the method defined above func = [](const Range1D&){...}
-///
-/// @return 0 for no work, 1 for serial, 2 for tbb multi-threading, and 3 for std multi-threading
-template <typename Func>
-int forEach(size_t begin, size_t end, size_t grainSize, const Func& func)
+/// @brief Simple wrapper for the function defined above
+template <typename FuncT>
+inline void forEach(size_t begin, size_t end, size_t grainSize, const FuncT& func)
 {
-    return forEach(Range1D(begin, end, grainSize), func);
+    forEach(Range1D(begin, end, grainSize), func);
+}
+
+/// @brief Simple wrapper for the function defined above, which works with std::containers
+template <template<typename...> class ContainerT, typename... T, typename FuncT>
+inline void forEach(const ContainerT<T...> &c, const FuncT& func)
+{
+    forEach(Range1D(0, c.size(), 1), func);
+}
+
+/// @brief Simple wrapper for the function defined above, which works with std::containers
+template <template<typename...> class ContainerT, typename... T, typename FuncT>
+inline void forEach(const ContainerT<T...> &c, size_t grainSize, const FuncT& func)
+{
+    forEach(Range1D(0, c.size(), grainSize), func);
 }
 
 }// namespace nanovdb

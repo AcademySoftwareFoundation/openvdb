@@ -67,7 +67,7 @@ inline void appendAttribute(PointDataTreeT& tree,
 /// @param transient          mark attribute as transient
 template <typename ValueType,
           typename CodecType = NullCodec,
-          typename PointDataTreeT = PointDataTree>
+          typename PointDataTreeT>
 inline void appendAttribute(PointDataTreeT& tree,
                             const std::string& name,
                             const ValueType& uniformValue =
@@ -156,6 +156,7 @@ inline void compactAttributes(PointDataTreeT& tree);
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_attribute_internal {
 
@@ -234,6 +235,8 @@ struct MetadataStorage<PointDataTreeT, Name>
 
 } // namespace point_attribute_internal
 
+/// @endcond
+
 
 ////////////////////////////////////////
 
@@ -284,7 +287,7 @@ inline void appendAttribute(PointDataTreeT& tree,
 
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
-        [&](typename PointDataTree::LeafNodeType& leaf, size_t /*idx*/) {
+        [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
             auto expected = leaf.attributeSet().descriptorPtr();
 
             auto attribute = leaf.appendAttribute(*expected, newDescriptor,
@@ -360,7 +363,7 @@ inline void collapseAttribute(  PointDataTreeT& tree,
 
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
-        [&](typename PointDataTree::LeafNodeType& leaf, size_t /*idx*/) {
+        [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
             assert(leaf.hasAttribute(index));
             AttributeArray& array = leaf.attributeArray(index);
             point_attribute_internal::collapseAttribute(
@@ -397,7 +400,7 @@ inline void dropAttributes( PointDataTreeT& tree,
 
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
-        [&](typename PointDataTree::LeafNodeType& leaf, size_t /*idx*/) {
+        [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
             auto expected = leaf.attributeSet().descriptorPtr();
             leaf.dropAttributes(indices, *expected, newDescriptor);
         }, /*threaded=*/true
@@ -528,53 +531,10 @@ inline void compactAttributes(PointDataTreeT& tree)
 
     tree::LeafManager<PointDataTreeT> leafManager(tree);
     leafManager.foreach(
-        [&](typename PointDataTree::LeafNodeType& leaf, size_t /*idx*/) {
+        [&](typename PointDataTreeT::LeafNodeType& leaf, size_t /*idx*/) {
             leaf.compactAttributes();
         }, /*threaded=*/ true
     );
-}
-
-
-////////////////////////////////////////
-
-
-template <typename PointDataTreeT>
-OPENVDB_DEPRECATED inline void
-appendAttribute(PointDataTreeT& tree,
-                const Name& name,
-                const NamePair& type,
-                const Index strideOrTotalSize,
-                const bool constantStride,
-                Metadata::Ptr metaDefaultValue,
-                const bool hidden = false,
-                const bool transient = false)
-{
-    // default metadata value must now be provided as a raw pointer
-    appendAttribute(tree, name, type, strideOrTotalSize, constantStride,
-        metaDefaultValue.get(), hidden, transient);
-}
-
-
-template <typename ValueType,
-          typename CodecType = NullCodec,
-          typename PointDataTreeT = PointDataTree>
-OPENVDB_DEPRECATED inline void
-appendAttribute(PointDataTreeT& tree,
-                const std::string& name,
-                const ValueType& uniformValue,
-                const Index strideOrTotalSize,
-                const bool constantStride,
-                Metadata::Ptr metaDefaultValue,
-                const bool hidden = false,
-                const bool transient = false)
-{
-    // default metadata value must now be provided as a typed raw pointer
-    TypedMetadata<ValueType>* metadata = nullptr;
-    if (metaDefaultValue) {
-        metadata = dynamic_cast<TypedMetadata<ValueType>*>(metaDefaultValue.get());
-    }
-    appendAttribute<ValueType, CodecType>(tree, name, uniformValue, strideOrTotalSize, constantStride,
-        metadata, hidden, transient);
 }
 
 

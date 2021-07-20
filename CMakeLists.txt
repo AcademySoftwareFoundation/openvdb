@@ -18,12 +18,12 @@
   and required dependencies are expected. See the dependency documentation
   for more information:
 
-    https://www.openvdb.org/documentation/doxygen/dependencies.html
+    https://academysoftwarefoundation.github.io/openvdb/dependencies.html
 
   And the documentation on building OpenVDB for more in depth installation
   instructions:
 
-    https://www.openvdb.org/documentation/doxygen/build.html
+    https://academysoftwarefoundation.github.io/openvdb/build.html
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core
@@ -50,7 +50,14 @@ if(POLICY CMP0091)
   cmake_policy(SET CMP0091 NEW)
 endif()
 
-project(OpenVDB LANGUAGES CXX)
+###### Version
+
+set(OpenVDB_MAJOR_VERSION 8)
+set(OpenVDB_MINOR_VERSION 1)
+set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
+
+project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
 
 ###### OpenVDB Build/Component Options
 
@@ -70,12 +77,9 @@ option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
-option(OPENVDB_INSTALL_HOUDINI_PYTHONRC [=[Install a Houdini startup script that sets
-the visibilty of OpenVDB nodes and their native equivalents.]=] OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-option(OPENVDB_CODE_COVERAGE "Enable code coverage. This also overrides CMAKE_BUILD_TYPE to Debug" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -97,10 +101,11 @@ option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
-option(USE_EXR [=[
-Use OpenEXR while building the core openvdb library. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
-openvdb build configuration to decide on OpenEXR support. You may set this to on to force OpenEXR to be used if you
-know it to be required.]=] OFF)
+option(USE_IMATH_HALF [=[
+Use the definiton of half floating point types from the Imath library. If OFF, the embedded definition provided
+by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located openvdb build configuration
+to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
+required.]=] OFF)
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
@@ -117,14 +122,20 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_5 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" OFF)
+option(OPENVDB_USE_FUTURE_ABI_9 "Bypass future ABI check" OFF)
+option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
+option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
+set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
+The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
+cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
+NOT the number of TU's ]=])
+
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -164,6 +175,10 @@ set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 
 ###### Deprecated options
 
+if(USE_EXR)
+  message(FATAL_ERROR "The USE_EXR option has been removed. Use USE_IMATH_HALF to use the Half "
+    "implementation from IMath, or leave OFF to use the new embedded version of half floating point types.")
+endif()
 if(OPENVDB_BUILD_HOUDINI_SOPS)
   message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
@@ -179,15 +194,15 @@ mark_as_advanced(
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
+  USE_IMATH_HALF
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
-  OPENVDB_USE_DEPRECATED_ABI_5
   OPENVDB_USE_DEPRECATED_ABI_6
+  OPENVDB_USE_FUTURE_ABI_9
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
-  OPENVDB_CODE_COVERAGE
   USE_COLORED_OUTPUT
   SYSTEM_LIBRARY_PATHS
   OPENVDB_SIMD
@@ -196,6 +211,8 @@ mark_as_advanced(
 # Configure minimum version requirements - some are treated specially and fall
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
 
+set(MINIMUM_CXX_STANDARD 14)
+
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
 # Later versions (including 1.5.4), can be buggy on certain platforms.
@@ -203,8 +220,8 @@ set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 6)
-set(MINIMUM_CXX_STANDARD 14)
 set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
+set(FUTURE_OPENVDB_ABI_VERSION 9)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2019 of the VFX platform where available
@@ -213,9 +230,9 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_ICC_VERSION 17)
   set(MINIMUM_MSVC_VERSION 19.10)
 
-  set(MINIMUM_BOOST_VERSION 1.66)
-  set(MINIMUM_ILMBASE_VERSION 2.3)
-  set(MINIMUM_OPENEXR_VERSION 2.3)
+  set(MINIMUM_BOOST_VERSION 1.61)  # @warning should be 1.66, but H18 ships with 1.61
+  set(MINIMUM_ILMBASE_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
+  set(MINIMUM_OPENEXR_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2018.0)
   set(MINIMUM_LLVM_VERSION 6.0.0)
@@ -236,7 +253,8 @@ endif()
 # VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
 # Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY and numpy modules with CMake 3.14
+# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
+# python linkage on macOS (Python::Module target in 3.15)
 set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 
 # No compiler upgrades planned
@@ -251,6 +269,7 @@ set(FUTURE_MINIMUM_TBB_VERSION 2019.0)
 set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
 set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
 set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
+set(FUTURE_MINIMUM_LLVM_VERSION 8.0.0)
 
 #########################################################################
 
@@ -274,12 +293,10 @@ endif()
 # Configure MS Runtime
 
 if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
+  # CMAKE_MSVC_RUNTIME_LIBRARY selects the MSVC runtime library for use by compilers
+  # targeting the MSVC ABI. Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug
+  # MultiThreadedDebugDLL. If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
   message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
-elseif(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
-  set(CMAKE_MSVC_RUNTIME_LIBRARY "" CACHE STRING
-    "Select the MSVC runtime library for use by compilers targeting the MSVC ABI.
-    Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug MultiThreadedDebugDLL.
-    If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL." FORCE)
 endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
@@ -300,7 +317,6 @@ if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
     endif()
   endif()
 endif()
-
 
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
@@ -396,6 +412,14 @@ if(NOT (
   return()
 endif()
 
+if(WIN32)
+  if(OPENVDB_BUILD_AX OR
+     OPENVDB_BUILD_AX_BINARIES OR
+     OPENVDB_BUILD_AX_UNITTESTS)
+    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
+  endif()
+endif()
+
 if(USE_MAYA AND USE_HOUDINI)
   # @todo technically this is possible so long as library versions match
   # exactly but it's difficult to validate and dangerous
@@ -418,32 +442,30 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration - default to Release if none is set unless
-# code coverage is in use, in which case override to Debug
+# Build type configuration
 
 if(OPENVDB_CODE_COVERAGE)
-  message(WARNING "Code coverage requires debug mode, setting CMAKE_BUILD_TYPE "
-    "to Debug.")
-  set(CMAKE_BUILD_TYPE Debug CACHE STRING
-    "Code coverage requires debug mode." FORCE
-  )
-elseif(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release CACHE STRING
-    "Choose the type of build, options are: None Debug Release RelWithDebInfo MinSizeRel." FORCE
-  )
+  message(DEPRECATION "The OPENVDB_CODE_COVERAGE option is deprecated. Choose instead the unique"
+    "build type -DCMAKE_BUILD_TYPE=coverage")
+  set(CMAKE_BUILD_TYPE coverage)
 endif()
-message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
 
-# Code coverage configuration
+include(cmake/config/OpenVDBBuildTypes.cmake)
 
-if(OPENVDB_CODE_COVERAGE)
-  # set gcov compile and link flags
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} --coverage")
-  set(CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} --coverage")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} --coverage")
-
+if(CMAKE_BUILD_TYPE EQUAL coverage)
   # use .gcno extension instead of .cc.gcno
+  # @note This is an undocumented internal cmake var and does not work
+  # with multi config generators
   set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
+endif()
+
+# CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
+get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _isMultiConfig)
+  message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
 endif()
 
 #########################################################################
@@ -532,12 +554,6 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   endif()
   # Increase the number of sections that an object file can contain
   add_compile_options(/bigobj)
-  # Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-  # defined on MSVC
-  # https://msdn.microsoft.com/en-us/library/4hwaceh6.aspx
-  add_definitions(-D_USE_MATH_DEFINES)
-  # Disable the non-portable Windows definitions of min() and max() macros
-  add_definitions(-DNOMINMAX)
   # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
   add_definitions(-DWIN32_LEAN_AND_MEAN)
   # Disable non-secure CRT library function warnings
@@ -562,6 +578,10 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     add_compile_options(/wd4275)
     # Truncation from 'int' to 'bool'
     add_compile_options(/wd4305)
+  endif()
+  # If a user has explicitly requested a parallel build, configure this during CMake
+  if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+    add_compile_options(/MP${MSVC_MP_THREAD_COUNT})
   endif()
 endif()
 
@@ -625,7 +645,8 @@ endif()
 # Configure OpenVDB Library and ABI versions
 
 if(NOT OPENVDB_BUILD_CORE)
-  # Find VDB installation and determine lib/abi versions
+  # Find VDB installation and determine lib/abi versions. This resets the
+  # version and ABI numbers
   find_package(OpenVDB REQUIRED)
   # Check ABI version was found and explicitly error if attempting to build against
   # an incompatible Houdini version
@@ -636,31 +657,11 @@ if(NOT OPENVDB_BUILD_CORE)
         "ABI ${OpenVDB_ABI}.")
     endif()
   endif()
-else()
-  include("${CMAKE_CURRENT_LIST_DIR}/cmake/OpenVDBUtils.cmake")
-  set(OPENVDB_VERSION_HEADER "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/version.h")
-  if(NOT EXISTS "${OPENVDB_VERSION_HEADER}")
-    message(FATAL_ERROR "Unable to read ${OPENVDB_VERSION_HEADER}. File does not exist.")
-  endif()
-
-  OPENVDB_VERSION_FROM_HEADER("${OPENVDB_VERSION_HEADER}"
-    VERSION OpenVDB_VERSION
-    MAJOR   OpenVDB_MAJOR_VERSION
-    MINOR   OpenVDB_MINOR_VERSION
-    PATCH   OpenVDB_PATCH_VERSION
-  )
-  message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 endif()
+
+message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 
 # Locate openvdb_ax if necessary
-
-if(WIN32)
-  if(OPENVDB_BUILD_AX OR
-     OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
-    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
-  endif()
-endif()
 
 if(NOT OPENVDB_BUILD_AX AND
    (OPENVDB_BUILD_AX_BINARIES OR
@@ -690,35 +691,44 @@ if(OPENVDB_HOUDINI_ABI AND (NOT "${OpenVDB_ABI}" EQUAL "${OPENVDB_HOUDINI_ABI}")
   set(OpenVDB_ABI ${OPENVDB_HOUDINI_ABI})
 endif()
 
+# Validate ABI value if outside supported range
+
 if(OpenVDB_ABI LESS MINIMUM_OPENVDB_ABI_VERSION)
   message(FATAL_ERROR "OpenVDB ABI versions earlier than ${MINIMUM_OPENVDB_ABI_VERSION} are "
     "no longer supported.")
 endif()
 
 if(FUTURE_MINIMUM_OPENVDB_ABI_VERSION AND OpenVDB_ABI LESS FUTURE_MINIMUM_OPENVDB_ABI_VERSION)
-  if((OpenVDB_ABI EQUAL 5 AND OPENVDB_USE_DEPRECATED_ABI_5) OR
-     (OpenVDB_ABI EQUAL 6 AND OPENVDB_USE_DEPRECATED_ABI_6))
-    message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated and will soon be removed.")
-  else()
+  if(NOT OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
     message(FATAL_ERROR "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
-      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_5 or
-      OPENVDB_USE_DEPRECATED_ABI_6 to ON to suppress this error.")
+      "are deprecated. Set CMake option OPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI} to ON to "
+      "suppress this error.")
   endif()
+
+  message(DEPRECATION "OpenVDB ABI versions earlier than ${FUTURE_MINIMUM_OPENVDB_ABI_VERSION} "
+    "are deprecated and will soon be removed.")
   # global target definition
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_5)
-  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_6)
+  add_definitions(-DOPENVDB_USE_DEPRECATED_ABI_${OpenVDB_ABI})
 endif()
 
-# The ABI is a global target definition, applicable to all components, so just add it
-# via add_definitions()
+if(OpenVDB_ABI EQUAL FUTURE_OPENVDB_ABI_VERSION)
+  if(NOT OPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI})
+    message(FATAL_ERROR "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
+      "in active development and have not been finalized. Set CMake option "
+      "OPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI} to ON to suppress this error.")
+  endif()
 
-add_definitions(-DOPENVDB_ABI_VERSION_NUMBER=${OpenVDB_ABI})
+  message(WARNING "OpenVDB ABI version ${OpenVDB_ABI} contains changes to ABI that are still "
+    "in active development and have not been finalized.")
+  # global target definition
+  add_definitions(-DOPENVDB_USE_FUTURE_ABI_${OpenVDB_ABI})
+endif()
+
 message(STATUS "Configuring for OpenVDB ABI Version ${OpenVDB_ABI}")
 
 # Always force set as we may need to change it if it's incompatible with Houdini
 set(OPENVDB_ABI_VERSION_NUMBER ${OpenVDB_ABI} CACHE STRING [=[
-Build for compatibility with version N of the OpenVDB Grid ABI, where N is 3, 4, 5 etc. (some newer features
+Build for compatibility with version N of the OpenVDB Grid ABI, where N is 6, 7, 8 etc. (some newer features
 will be disabled). If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the installed vdb_print binary to
 determine the ABI number. You may set this to force a given ABI number.]=] FORCE)
 
@@ -766,6 +776,8 @@ endif()
 
 ##########################################################################
 
-add_custom_target(uninstall
-  COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/Uninstall.cmake
-)
+if(OPENVDB_ENABLE_UNINSTALL)
+  add_custom_target(uninstall
+    COMMAND ${CMAKE_COMMAND} -P ${PROJECT_SOURCE_DIR}/cmake/Uninstall.cmake
+  )
+endif()

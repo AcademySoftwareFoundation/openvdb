@@ -10,7 +10,7 @@
 
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/math/Math.h>
-#include "Morphology.h" // for erodeVoxels()
+#include "Morphology.h" // for erodeActiveValues()
 #include "PointScatter.h"
 #include "LevelSetRebuild.h"
 #include "LevelSetUtil.h"
@@ -62,22 +62,6 @@ fillWithSpheres(
     const GridT& grid,
     std::vector<openvdb::Vec4s>& spheres,
     const Vec2i& sphereCount = Vec2i(1, 50),
-    bool overlapping = false,
-    float minRadius = 1.0,
-    float maxRadius = std::numeric_limits<float>::max(),
-    float isovalue = 0.0,
-    int instanceCount = 10000,
-    InterrupterT* interrupter = nullptr);
-
-
-/// @deprecated Use the @a sphereCount overload instead.
-template<typename GridT, typename InterrupterT = util::NullInterrupter>
-OPENVDB_DEPRECATED
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
     bool overlapping = false,
     float minRadius = 1.0,
     float maxRadius = std::numeric_limits<float>::max(),
@@ -155,6 +139,8 @@ private:
 
 
 // Internal utility methods
+
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace v2s_internal {
 
@@ -638,26 +624,9 @@ UpdatePoints::operator()(const tbb::blocked_range<size_t>& range)
 
 } // namespace v2s_internal
 
+/// @endcond
 
 ////////////////////////////////////////
-
-
-template<typename GridT, typename InterrupterT>
-inline void
-fillWithSpheres(
-    const GridT& grid,
-    std::vector<openvdb::Vec4s>& spheres,
-    int maxSphereCount,
-    bool overlapping,
-    float minRadius,
-    float maxRadius,
-    float isovalue,
-    int instanceCount,
-    InterrupterT* interrupter)
-{
-    fillWithSpheres(grid, spheres, Vec2i(1, maxSphereCount), overlapping,
-        minRadius, maxRadius, isovalue, instanceCount, interrupter);
-}
 
 
 template<typename GridT, typename InterrupterT>
@@ -758,11 +727,13 @@ fillWithSpheres(
         // use the uneroded mask instead.  (But if the minimum sphere count is zero,
         // then eroding away the mask is acceptable.)
         if (!addNarrowBandPoints || (minSphereCount <= 0)) {
-            erodeVoxels(interiorMaskPtr->tree(), 1);
+            tools::erodeActiveValues(interiorMaskPtr->tree(), /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::pruneInactive(interiorMaskPtr->tree());
         } else {
             auto& maskTree = interiorMaskPtr->tree();
             auto copyOfTree = StaticPtrCast<BoolTreeT>(maskTree.copy());
-            erodeVoxels(maskTree, 1);
+            tools::erodeActiveValues(maskTree, /*iterations=*/1, tools::NN_FACE, tools::IGNORE_TILES);
+            tools::pruneInactive(maskTree);
             if (maskTree.empty()) { interiorMaskPtr->setTree(copyOfTree); }
         }
 

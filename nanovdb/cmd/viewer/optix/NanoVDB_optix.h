@@ -34,6 +34,7 @@ struct MissData
 struct VolumeGeometry
 {
     const void* grid;
+    const int*  enumeration;
 };
 
 struct VolumeMaterial

@@ -70,7 +70,7 @@ struct MatMulNormalize
 
 
 //{
-/// @cond OPENVDB_VECTOR_TRANSFORMER_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 /// @internal This overload is enabled only for scalar-valued grids.
 template<typename GridType> inline

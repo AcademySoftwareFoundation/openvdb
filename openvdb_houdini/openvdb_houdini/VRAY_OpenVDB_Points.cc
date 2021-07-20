@@ -100,8 +100,8 @@ struct GenerateBBoxOp {
 
                 if (pscaleType == typeNameAsString<float>()) {
                     expandBBox<float>(*leafIter, pscaleIndex);
-                } else if (pscaleType == typeNameAsString<half>()) {
-                    expandBBox<half>(*leafIter, pscaleIndex);
+                } else if (pscaleType == typeNameAsString<math::half>()) {
+                    expandBBox<math::half>(*leafIter, pscaleIndex);
                 } else {
                     throw TypeError("Unsupported pscale type - " + pscaleType);
                 }
@@ -283,16 +283,16 @@ getBoundingBox( const std::vector<typename PointDataGridT::Ptr>& gridPtrs,
                 const std::vector<Name>& includeGroups,
                 const std::vector<Name>& excludeGroups)
 {
-    using PointDataTree     = typename PointDataGridT::TreeType;
+    using PointDataTreeT     = typename PointDataGridT::TreeType;
 
     BBoxd worldBounds;
 
     for (const auto& grid : gridPtrs) {
 
-        tree::LeafManager<const PointDataTree> leafManager(grid->tree());
+        typename tree::LeafManager<const PointDataTreeT> leafManager(grid->tree());
 
         // size and combine the boxes for each leaf in the tree via a reduction
-        GenerateBBoxOp<PointDataTree> generateBbox(grid->transform(), includeGroups, excludeGroups);
+        GenerateBBoxOp<PointDataTreeT> generateBbox(grid->transform(), includeGroups, excludeGroups);
         tbb::parallel_reduce(leafManager.leafRange(), generateBbox);
 
         if (generateBbox.mBbox.empty())     continue;

@@ -17,6 +17,7 @@
 #include <llvm/IR/Value.h>
 
 #include <string>
+#include <map>
 #include <unordered_map>
 
 namespace openvdb {
@@ -146,17 +147,15 @@ struct SymbolTableBlocks
         return &(mTables[index]);
     }
 
-    /// @brief  Get a SymbolTable with a unique index. If the symbol table does not exist,
-    ///         this function throws a runtime error
+    /// @brief  Get a SymbolTable with a unique index. If it doesn't exist, nullptr is returned
     ///
     /// @param  index  The SymbolTable index
     ///
-    inline SymbolTable& get(const size_t index)
+    inline SymbolTable* get(const size_t index)
     {
         auto iter = mTables.find(index);
-        if (iter != mTables.end()) return iter->second;
-        throw std::runtime_error("Attempted to access invalid symbol table with index "
-            + std::to_string(index));
+        if (iter == mTables.end()) return nullptr;
+        return &(iter->second);
     }
 
     /// @brief  Find a variable within the program starting at a given table index. If

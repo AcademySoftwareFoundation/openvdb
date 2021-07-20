@@ -3,11 +3,6 @@
 
 /*!
 	\file StringUtils.h
-
-	\author Wil Braithwaite
-
-	\date October 09, 2020
-
 	\brief Helpful string utility methods.
 */
 

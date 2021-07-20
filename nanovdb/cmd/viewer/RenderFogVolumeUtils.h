@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderFunctions.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation of the FogVolume rendering code.
 */
 
@@ -389,15 +384,16 @@ inline __hostdev__ nanovdb::Vec3f traceBlackbodyVolume(float& throughput, bool& 
     return radiance;
 }
 
-template<typename ValueT, int InterpolationOrder>
+template<typename BuildT, int InterpolationOrder>
 struct RenderVolumeRgba32fFn
 {
+    using ValueT = typename nanovdb::NanoGrid<BuildT>::ValueType;
     using RealT = float;
     using Vec3T = nanovdb::Vec3<RealT>;
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<BuildT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
@@ -421,8 +417,8 @@ struct RenderVolumeRgba32fFn
 
             HeterogenousMedium medium;
             medium.densityScale = params.volumeDensityScale;
-            medium.densityMin = valueToScalar(densityGrid->tree().root().valueMin()) * medium.densityScale;
-            medium.densityMax = valueToScalar(densityGrid->tree().root().valueMax()) * medium.densityScale;
+            medium.densityMin = valueToScalar(densityGrid->tree().root().minimum()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityGrid->tree().root().maximum()) * medium.densityScale;
             medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
             medium.hgMeanCosine = params.phase;
             medium.temperatureScale = params.volumeTemperatureScale;
@@ -484,15 +480,16 @@ struct RenderVolumeRgba32fFn
     }
 };
 
-template<typename ValueT, int InterpolationOrder>
+template<typename BuildT, int InterpolationOrder>
 struct RenderBlackBodyVolumeRgba32fFn
 {
+    using ValueT = typename nanovdb::NanoGrid<BuildT>::ValueType;
     using RealT = float;
     using Vec3T = nanovdb::Vec3<RealT>;
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const nanovdb::NanoGrid<ValueT>* temperatureGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<BuildT>* densityGrid, const nanovdb::NanoGrid<BuildT>* temperatureGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
@@ -519,8 +516,8 @@ struct RenderBlackBodyVolumeRgba32fFn
 
             HeterogenousMedium medium;
             medium.densityScale = params.volumeDensityScale;
-            medium.densityMin = valueToScalar(densityTree.root().valueMin()) * medium.densityScale;
-            medium.densityMax = valueToScalar(densityTree.root().valueMax()) * medium.densityScale;
+            medium.densityMin = valueToScalar(densityTree.root().minimum()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityTree.root().maximum()) * medium.densityScale;
             medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
             medium.hgMeanCosine = params.phase;
             medium.temperatureScale = params.volumeTemperatureScale;
@@ -589,9 +586,11 @@ struct FogVolumeFastRenderFn
     using CoordT = nanovdb::Coord;
     using RayT = nanovdb::Ray<RealT>;
 
-    template<typename ValueT>
-    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<ValueT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
+    template<typename BuildT>
+    inline __hostdev__ void operator()(int ix, int iy, int width, int height, float* imgBuffer, int numAccumulations, const nanovdb::BBoxR /*proxy*/, const nanovdb::NanoGrid<BuildT>* densityGrid, const SceneRenderParameters sceneParams, const MaterialParameters params) const
     {
+        //using ValueT = typename nanovdb::NanoGrid<BuildT>::ValueType;
+
         float* outPixel = &imgBuffer[4 * (ix + width * iy)];
         float  color[4] = {0, 0, 0, 0};
 
@@ -608,8 +607,8 @@ struct FogVolumeFastRenderFn
             auto&              densityTree = densityGrid->tree();
             HeterogenousMedium medium;
             medium.densityScale = params.volumeDensityScale;
-            medium.densityMin = valueToScalar(densityTree.root().valueMin()) * medium.densityScale;
-            medium.densityMax = valueToScalar(densityTree.root().valueMax()) * medium.densityScale;
+            medium.densityMin = valueToScalar(densityTree.root().minimum()) * medium.densityScale;
+            medium.densityMax = valueToScalar(densityTree.root().maximum()) * medium.densityScale;
             medium.densityMax = fmaxf(medium.densityMin, fmaxf(medium.densityMax, 0.001f));
             medium.transmittanceMethod = params.transmittanceMethod;
             medium.transmittanceThreshold = params.transmittanceThreshold;

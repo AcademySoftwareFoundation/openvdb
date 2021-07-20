@@ -16,6 +16,7 @@
 
 #include <algorithm>// for std::generate
 #include <array>
+#include <vector>
 #include <cstdint>
 #include <cstddef>// offsetof macro
 #include <numeric>
@@ -24,6 +25,7 @@
 #include "../NanoVDB.h"
 #include "GridHandle.h"
 #include "ForEach.h"
+#include "NodeManager.h"
 
 namespace nanovdb {
 
@@ -128,29 +130,6 @@ inline std::uint_fast32_t crc32(IterT begin, IterT end)
     return crc.checksum(); 
 }
 
-/// @warning This methods is very slow and should only be used for testing
-template <typename ValueT>
-inline std::uint_fast32_t crc32_slow(const NanoGrid<ValueT> &grid)
-{
-    // Validate the assumed memory layout
-    static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
-    static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
-    return crc32(reinterpret_cast<const uint8_t*>(&grid) + 16, grid.totalMemUsage() - 16);
-}
-
-/// @warning This methods is very slow and should only be used for testing
-inline std::uint_fast32_t crc32_slow(const GridHandleBase &handle)
-{
-    // Validate the assumed memory layout
-    static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
-    static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to major version number");
-    CRC32 crc;
-    crc(handle.data() + 16, handle.size() - 16);
-    return crc.checksum();
-}
-
 /// @brief Class that encapsulates two CRC32 checksums, one for the Grid, Tree and Root node meta data
 ///        and one for the remaining grid nodes.
 class GridChecksum
@@ -191,40 +170,49 @@ public:
     bool operator!=(const GridChecksum &rhs) const {return mChecksum != rhs.mChecksum;}
 };// GridChecksum
 
-// [GridData][TreeData]---[RootData][ROOT TILES...]---[NodeData<5>]---[ModeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
+// [GridData][TreeData]---[RootData][ROOT TILES...]---[NodeData<5>]---[NodeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
 template <typename ValueT>
 void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     // Validate the assumed memory layout
-    static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
-    static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
+#if 1    
+    NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mMagic)    ==  0);
+    NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mChecksum) ==  8);
+    NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mVersion)  == 16);
+#else// the static asserts below generate compiler warnings
+    static_assert(offsetof(GridData, mMagic)    ==  0, "Unexpected offset to magic number");
+    static_assert(offsetof(GridData, mChecksum) ==  8, "Unexpected offset to checksum");
+    static_assert(offsetof(GridData, mVersion)  == 16, "Unexpected offset to version number");
+#endif
     static const size_t offset = 16;
 
     mChecksum = EMPTY;
 
     if (mode == ChecksumMode::Disable) return;
     
-    // process Grid + Tree + Root
     const auto &tree = grid.tree();
-    const uint8_t *begin = reinterpret_cast<const uint8_t*>(&grid);
-    const uint8_t *end = tree.isEmpty() ? begin + grid.totalMemUsage() : reinterpret_cast<const uint8_t*>(tree.template getNode<2>(0));
-    
+    const auto &root = tree.root();
     CRC32 crc;
-    crc(begin + offset, (end - begin) - offset);
+
+    // process Grid + Tree + Root but exclude mMagic and mChecksum
+    const uint8_t *begin = reinterpret_cast<const uint8_t*>(&grid);
+    const uint8_t *end = begin + grid.memUsage() + tree.memUsage() + root.memUsage(); 
+    crc(begin + offset, end);
+
     mCRC[0] = crc.checksum();
 
     if (mode == ChecksumMode::Partial || tree.isEmpty()) return;
 
+    auto mgr = createNodeMgr(grid);
     const auto nodeCount = tree.nodeCount(0) + tree.nodeCount(1) + tree.nodeCount(2);
-    std::vector<std::uint_fast32_t> checksums(nodeCount);
+    std::vector<std::uint_fast32_t> checksums(nodeCount, 0);
 
     // process upper internal nodes
     auto kernel2 = [&](const Range1D &r) {
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = tree.template getNode<2>(i);
+            const auto *node = mgr.upper(i);
             local(node, sizeof(*node) );
             *p++ = local.checksum();
             local.reset();
@@ -236,7 +224,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = tree.template getNode<1>(i);
+            const auto *node = mgr.lower(i);
             local(node, sizeof(*node) );
             *p++ = local.checksum();
             local.reset();
@@ -248,13 +236,13 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(1) + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *leaf = tree.template getNode<0>(i);
+            const auto *leaf = mgr.leaf(i);
             local(leaf, sizeof(*leaf) );
             *p++ = local.checksum();
             local.reset();
         }
     };
-
+    
     forEach(0, tree.nodeCount(2), 1, kernel2);
     forEach(0, tree.nodeCount(1), 1, kernel1);
     forEach(0, tree.nodeCount(0), 8, kernel0);
@@ -285,78 +273,8 @@ void updateChecksum(NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     GridChecksum cs;
     cs(grid, mode);
-    reinterpret_cast<GridData&>(grid).mChecksum = cs.checksum();
+    grid.data()->mChecksum = cs.checksum();
 }
-
-//[GridData][TreeData]---[RootData][ROOT TILES...]---[NodeData<5>]---[ModeData<4>]---[LeafData<3>]---[BLINDMETA...]---[BLIND0]---[BLIND1]---etc.
-template <typename ValueT>
-std::uint_fast32_t crc32(const NanoGrid<ValueT> &grid)
-{
-    // Validate the assumed memory layout
-    static_assert(offsetof(GridData, mMagic) == 0, "Unexpected offset to magic number");
-    static_assert(offsetof(GridData, mChecksum) == 8, "Unexpected offset to checksum");
-    static_assert(offsetof(GridData, mVersion) == 16, "Unexpected offset to version number");
-    static const size_t offset = 16;
-
-    CRC32 totalCRC;
-    
-    // process Grid + Tree + Root
-    const auto &tree = grid.tree();
-    const uint8_t *begin = reinterpret_cast<const uint8_t*>(&grid) + offset;
-    if (tree.isEmpty()) {
-        totalCRC(begin, grid.totalMemUsage() - offset);
-        return totalCRC.checksum();
-    }
-    const auto *child = reinterpret_cast<const uint8_t*>(tree.template getNode<2>(0));
-    totalCRC(begin + offset, child - begin);
-
-    std::vector<std::uint_fast32_t> checksums(tree.nodeCount(0) + tree.nodeCount(1) + tree.nodeCount(2));
-
-    {// process upper internal nodes
-        auto kernel = [&](const Range1D &r) {
-            CRC32 localCRC;
-            std::uint_fast32_t *p = checksums.data() + r.begin();
-            for (auto i = r.begin(); i != r.end(); ++i) {
-                const auto *node = tree.template getNode<2>(i);
-                localCRC(node, sizeof(*node) );
-                *p++ = localCRC.checksum();
-                localCRC.reset();
-            }
-        };
-        forEach(0, tree.nodeCount(2), 1, kernel);
-    }
-
-    {// process lower internal nodes
-        auto kernel = [&](const Range1D &r) {
-            CRC32 localCRC;
-            std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(2);
-            for (auto i = r.begin(); i != r.end(); ++i) {
-                const auto *node = tree.template getNode<1>(i);
-                localCRC(node, sizeof(*node) );
-                *p++ = localCRC.checksum();
-                localCRC.reset();
-            }
-        };
-        forEach(0, tree.nodeCount(1), 1, kernel);
-    }
-
-    {// process leaf nodes
-        auto kernel = [&](const Range1D &r) {
-            CRC32 localCRC;
-            std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(1) + tree.nodeCount(2);
-            for (auto i = r.begin(); i != r.end(); ++i) {
-                const auto *leaf = tree.template getNode<0>(i);
-                localCRC(leaf, sizeof(*leaf) );
-                *p++ = localCRC.checksum();
-                localCRC.reset();
-            }
-        };
-        forEach(0, tree.nodeCount(0), 8, kernel);
-    }
-
-    totalCRC(checksums.data(), sizeof(std::uint_fast32_t)*checksums.size() );
-    return totalCRC.checksum();
-}// crc32(grid)
 
 } // namespace nanovdb
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderConstants.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Declaration of RenderConstants structure used for render platforms.
 */
 

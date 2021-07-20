@@ -194,6 +194,7 @@ opExtrema(const IterT& iter, const OperatorT& op = OperatorT(), bool threaded = 
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace stats_internal {
 
@@ -335,6 +336,7 @@ struct MathOp
 
 } // namespace stats_internal
 
+/// @endcond
 
 template<typename IterT>
 inline math::Histogram

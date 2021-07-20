@@ -154,8 +154,8 @@ private:
         }
 #endif
         mT0 = mNext[axis];
-        mNext[axis] += mDim * mDelta[axis];
-        mVoxel[axis] += mDim * mStep[axis];
+        mNext[ axis] += mDim * mDelta[axis];
+        mVoxel[axis] += mDim * mStep[ axis];
         return mT0 <= mT1;
     }
 
@@ -167,6 +167,11 @@ private:
 
 /////////////////////////////////////////// ZeroCrossing ////////////////////////////////////////////
 
+/// @brief returns true if the ray intersects a zero-crossing at the voxel level of the grid in the accessor 
+///        The empty-space ray-marching is performed at all levels of the tree using an 
+///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the closest 
+///        voxel after the intersection point, v contains the grid values at ijk, and t is set to the time of 
+///        the intersection along the ray.
 template<typename RayT, typename AccT>
 inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
 {
@@ -195,7 +200,8 @@ inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename 
 
 /////////////////////////////////////////// DDA ////////////////////////////////////////////
 
-/// @brief A Digital Differential Analyzer
+/// @brief A Digital Differential Analyzer. Unlike HDDA (defined above) this DDA
+///        uses a fixed step-size defined by the template parameter Dim!
 ///
 /// @note The Ray template class is expected to have the following
 /// methods: test(time), t0(), t1(), invDir(), and  operator()(time).
@@ -356,6 +362,29 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
         }
     }
     return false;
+}
+
+/////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
+
+/// @brief returns true if the ray intersects an active value at any level of the grid in the accessor. 
+///        The empty-space ray-marching is performed at all levels of the tree using an 
+///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the first 
+///        active voxel or tile, and t is set to the time of its intersection along the ray.
+template<typename RayT, typename AccT>
+inline __hostdev__ bool firstActive(RayT& ray, AccT& acc, Coord &ijk, float& t)
+{
+    if (!ray.clip(acc.root().bbox()) || ray.t1() > 1e20) {// clip ray to bbox
+        return false;// missed or undefined bbox
+    }
+    static const float Delta = 1.0001f;// forward step-size along the ray to avoid getting stuck
+    t = ray.t0();// initiate time
+    ijk = RoundDown<Coord>(ray.start()); // first voxel inside bbox
+    for (HDDA<RayT, Coord> hdda(ray, acc.getDim(ijk, ray)); !acc.isActive(ijk); hdda.update(ray, acc.getDim(ijk, ray))) {
+        if (!hdda.step()) return false;// leap-frog HDDA and exit if ray bound is exceeded
+        t = hdda.time() + Delta;// update time
+        ijk = RoundDown<Coord>( ray(t) );// update ijk
+    }
+    return true;
 }
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////

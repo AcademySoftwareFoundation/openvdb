@@ -1,24 +1,21 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
-
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/io/TempFile.h>
 
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
+
+#include <gtest/gtest.h>
 
 #include <cmath>
 #include <cstdio> // for std::remove()
 #include <cstdlib> // for std::getenv()
 #include <string>
 #include <vector>
-
-#ifdef _MSC_VER
-#include <windows.h>
-#endif
 
 using namespace openvdb;
 using namespace openvdb::points;
@@ -187,23 +184,6 @@ TEST_F(TestPointCount, testGroup)
     PointDataGrid::Ptr grid = createPointDataGrid<NullCodec, PointDataGrid>(positions, *transform);
     PointDataTree& tree = grid->tree();
 
-    // setup temp directory
-
-    std::string tempDir;
-    if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
-    if (tempDir.empty()) {
-        char tempDirBuffer[MAX_PATH+1];
-        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
-        EXPECT_TRUE(tempDirLen > 0 && tempDirLen <= MAX_PATH);
-        tempDir = tempDirBuffer;
-    }
-#else
-    if (tempDir.empty()) tempDir = P_tmpdir;
-#endif
-
-    std::string filename;
-
     // check one leaf
     EXPECT_EQ(tree.leafCount(), Index32(1));
 
@@ -303,14 +283,14 @@ TEST_F(TestPointCount, testGroup)
         EXPECT_EQ(pointCount(tree, ActiveFilter()), Index64(3));
         EXPECT_EQ(pointCount(tree, InactiveFilter()), Index64(1));
 
+        std::string filename;
+
         // write out grid to a temp file
         {
-            filename = tempDir + "/openvdb_test_point_load";
-
+            io::TempFile file;
+            filename = file.filename();
             io::File fileOut(filename);
-
             GridCPtrVec grids{grid};
-
             fileOut.write(grids);
         }
 
@@ -356,6 +336,8 @@ TEST_F(TestPointCount, testGroup)
             EXPECT_EQ(pointCount(inputTree, BinaryFilter<GroupFilter, InactiveFilter>(
                 groupFilter, InactiveFilter()), inCoreOnly), Index64(1));
         }
+
+        std::remove(filename.c_str());
 
         // update the value mask and confirm point counts once again
 
@@ -443,6 +425,15 @@ TEST_F(TestPointCount, testOffsets)
 {
     using namespace openvdb::math;
 
+    // empty tree
+    {
+        PointDataTree tree;
+        std::vector<Index64> offsets{ 10 };
+        Index64 total = pointOffsets(offsets, tree);
+        EXPECT_EQ(total, Index64(0));
+        EXPECT_TRUE(offsets.empty());
+    }
+
     const float voxelSize(1.0);
     math::Transform::Ptr transform(math::Transform::createLinearTransform(voxelSize));
 
@@ -525,31 +516,14 @@ TEST_F(TestPointCount, testOffsets)
         EXPECT_EQ(total, Index64(4));
     }
 
-    // setup temp directory
-
-    std::string tempDir;
-    if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
-    if (tempDir.empty()) {
-        char tempDirBuffer[MAX_PATH+1];
-        int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
-        EXPECT_TRUE(tempDirLen > 0 && tempDirLen <= MAX_PATH);
-        tempDir = tempDirBuffer;
-    }
-#else
-    if (tempDir.empty()) tempDir = P_tmpdir;
-#endif
-
     std::string filename;
 
     // write out grid to a temp file
     {
-        filename = tempDir + "/openvdb_test_point_load";
-
+        io::TempFile file;
+        filename = file.filename();
         io::File fileOut(filename);
-
         GridCPtrVec grids{grid};
-
         fileOut.write(grids);
     }
 
@@ -595,6 +569,7 @@ TEST_F(TestPointCount, testOffsets)
         EXPECT_EQ(offsets[3], Index64(5));
         EXPECT_EQ(total, Index64(5));
     }
+
     std::remove(filename.c_str());
 }
 

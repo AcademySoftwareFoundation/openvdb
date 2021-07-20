@@ -14,8 +14,10 @@
 #ifndef NANOVDB_RANGE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_RANGE_H_HAS_BEEN_INCLUDED
 
+#include <cassert>
+
 #ifdef NANOVDB_USE_TBB
-#include "tbb/tbb_stddef.h"// for tbb::split
+#include <tbb/blocked_range.h>// for tbb::split
 #endif
 
 namespace nanovdb {

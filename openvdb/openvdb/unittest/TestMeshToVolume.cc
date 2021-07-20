@@ -1,15 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <vector>
-#include "gtest/gtest.h"
-
 #include <openvdb/openvdb.h>
 #include <openvdb/Exceptions.h>
-
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/Util.h>
 
+#include <gtest/gtest.h>
+#include <vector>
 
 class TestMeshToVolume: public ::testing::Test
 {

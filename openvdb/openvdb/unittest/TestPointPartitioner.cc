@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/tools/PointPartitioner.h>
+#include <gtest/gtest.h>
 
 #include <vector>
 

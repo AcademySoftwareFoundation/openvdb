@@ -11,21 +11,23 @@
 #ifndef OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DIAGNOSTICS_HAS_BEEN_INCLUDED
 
-#include <openvdb/Grid.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Vec3.h>
-#include <openvdb/math/Stencils.h>
-#include <openvdb/math/Operators.h>
-#include <openvdb/tree/LeafManager.h>
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/math/Vec3.h"
+#include "openvdb/math/Stencils.h"
+#include "openvdb/math/Operators.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/thread/Threading.h"
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
+
 #include <cmath> // for std::isnan(), std::isfinite()
 #include <set>
 #include <sstream>
 #include <string>
 #include <type_traits>
 #include <vector>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -1091,6 +1093,7 @@ checkFogVolume(const GridType& grid, size_t n)
 
 // Internal utility objects and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace diagnostics_internal {
 
@@ -1160,13 +1163,13 @@ InactiveVoxelValues<TreeType>::operator()(const tbb::blocked_range<size_t>& rang
 {
     typename TreeType::LeafNodeType::ValueOffCIter iter;
 
-    for (size_t n = range.begin(); n < range.end() && !tbb::task::self().is_cancelled(); ++n) {
+    for (size_t n = range.begin(); n < range.end() && !thread::isGroupExecutionCancelled(); ++n) {
         for (iter = mLeafArray.leaf(n).cbeginValueOff(); iter; ++iter) {
             mInactiveValues.insert(iter.getValue());
         }
 
         if (mInactiveValues.size() > mNumValues) {
-            tbb::task::self().cancel_group_execution();
+            thread::cancelGroupExecution();
         }
     }
 }
@@ -1250,14 +1253,14 @@ template<typename TreeType>
 inline void
 InactiveTileValues<TreeType>::operator()(IterRange& range)
 {
-    for (; range && !tbb::task::self().is_cancelled(); ++range) {
+    for (; range && !thread::isGroupExecutionCancelled(); ++range) {
         typename TreeType::ValueOffCIter iter = range.iterator();
         for (; iter; ++iter) {
             mInactiveValues.insert(iter.getValue());
         }
 
         if (mInactiveValues.size() > mNumValues) {
-            tbb::task::self().cancel_group_execution();
+            thread::cancelGroupExecution();
         }
     }
 }
@@ -1278,6 +1281,7 @@ InactiveTileValues<TreeType>::getInactiveValues(SetType& values) const
 
 } // namespace diagnostics_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

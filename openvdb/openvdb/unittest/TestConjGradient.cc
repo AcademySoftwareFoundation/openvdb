@@ -1,10 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
 #include <openvdb/math/ConjGradient.h>
+
+#include <gtest/gtest.h>
 
 
 class TestConjGradient: public ::testing::Test

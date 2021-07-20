@@ -4,6 +4,7 @@
 #include "util.h"
 
 #include <openvdb_ax/codegen/Types.h>
+#include <openvdb_ax/codegen/String.h>
 
 #include <openvdb/math/Vec2.h>
 #include <openvdb/math/Vec3.h>
@@ -20,10 +21,12 @@ public:
     CPPUNIT_TEST_SUITE(TestTypes);
     CPPUNIT_TEST(testTypes);
     CPPUNIT_TEST(testVDBTypes);
+    CPPUNIT_TEST(testString);
     CPPUNIT_TEST_SUITE_END();
 
     void testTypes();
     void testVDBTypes();
+    void testString();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestTypes);
@@ -157,3 +160,22 @@ TestTypes::testVDBTypes()
         LLVMType<openvdb::math::Mat4<double>>::get(C));
 }
 
+void
+TestTypes::testString()
+{
+    using openvdb::ax::codegen::LLVMType;
+
+    unittest_util::LLVMState state;
+    llvm::LLVMContext& C = state.context();
+
+    llvm::Type* type = LLVMType<openvdb::ax::codegen::String>::get(C);
+    CPPUNIT_ASSERT(type->isAggregateType());
+    CPPUNIT_ASSERT_EQUAL(llvm::Type::StructTyID, type->getTypeID());
+    CPPUNIT_ASSERT_EQUAL(unsigned(3), type->getNumContainedTypes()); // char*, SSO, len
+    CPPUNIT_ASSERT_EQUAL(unsigned(3), type->getStructNumElements()); // char*, SSO, len
+
+    // Check members
+    CPPUNIT_ASSERT_EQUAL((llvm::Type*)LLVMType<char*>::get(C), type->getContainedType(0));
+    CPPUNIT_ASSERT_EQUAL(LLVMType<char[openvdb::ax::codegen::String::SSO_LENGTH]>::get(C), type->getContainedType(1));
+    CPPUNIT_ASSERT_EQUAL(LLVMType<int64_t>::get(C), type->getContainedType(2));
+}

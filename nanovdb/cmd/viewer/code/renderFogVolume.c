@@ -2,8 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 //	\file renderFogVolume.c
-//	\author Wil Braithwaite
-//	\date July 24, 2020
 //	\brief General (C99-ish) implementation of the FogVolume rendering code.
 //
 ////////////////////////////////////////////////////////

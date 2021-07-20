@@ -167,11 +167,7 @@ private:
 class OPENVDB_API PageHandle
 {
 public:
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
     using Ptr = std::unique_ptr<PageHandle>;
-#else
-    using Ptr = std::shared_ptr<PageHandle>;
-#endif
 
     /// @brief Create the page handle
     /// @param page a shared ptr to the page that stores the buffer

@@ -1,13 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/AttributeGroup.h>
 #include <openvdb/points/IndexIterator.h>
 #include <openvdb/points/IndexFilter.h>
 
 #include <openvdb/openvdb.h>
+
+#include <gtest/gtest.h>
 
 #include <iostream>
 #include <sstream>
@@ -80,14 +81,12 @@ TEST_F(TestAttributeGroup, testAttributeGroup)
         EXPECT_EQ(attr.isHidden(), attrB.isHidden());
         EXPECT_EQ(isGroup(attr), isGroup(attrB));
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 6
         AttributeArray& baseAttr(attr);
         EXPECT_EQ(Name(typeNameAsString<GroupType>()), baseAttr.valueType());
         EXPECT_EQ(Name("grp"), baseAttr.codecType());
         EXPECT_EQ(Index(1), baseAttr.valueTypeSize());
         EXPECT_EQ(Index(1), baseAttr.storageTypeSize());
         EXPECT_TRUE(!baseAttr.valueTypeIsFloatingPoint());
-#endif
     }
 
     { // casting
