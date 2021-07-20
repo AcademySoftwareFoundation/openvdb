@@ -1,2 +1,6 @@
 Improvements:
     - Minor performance improvements to dilation calls in fast sweeping algorithms
+    - Add support for dilation in one direction and extending a field in one direction
+
+Houdini:
+    - SOP Extrapolate supports dilation in one direction and extending a field in one direction
