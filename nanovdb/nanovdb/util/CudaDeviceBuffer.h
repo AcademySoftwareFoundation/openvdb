@@ -16,7 +16,8 @@
 #ifndef NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_CUDA_DEVICE_BUFFER_H_HAS_BEEN_INCLUDED
 
-#include <nanovdb/util/GridHandle.h>
+#include "HostBuffer.h"// for BufferTraits
+
 #include <cuda_runtime_api.h> // for cudaMalloc/cudaMallocManaged/cudaFree
 
 // Convenience function for checking CUDA runtime API results

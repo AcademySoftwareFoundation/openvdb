@@ -241,7 +241,7 @@ template<typename TreeOrAccT>
 template<typename RealT, template<typename...> class Vec3T>
 Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(const Vec3T<RealT> &uvw, const ValueT (&v)[2][2][2])
 {
-    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::gradient requires a floating-point type");
+    static_assert(is_floating_point<ValueT>::value, "TrilinearSampler::gradient requires a floating-point type");
 #if 0
   auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b-a, a); };// = w*(b-a) + a
   //auto lerp = [](ValueT a, ValueT b, ValueT w){ return fma(w, b, fma(-w, a, a));};// = (1-w)*a + w*b
@@ -272,7 +272,7 @@ Vec3T<typename TreeOrAccT::ValueType> TrilinearSampler<TreeOrAccT>::gradient(con
 template<typename TreeOrAccT>
 bool TrilinearSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[2][2][2])
 {
-    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
+    static_assert(is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
     const bool less = v[0][0][0] < ValueT(0);
     return (less ^ (v[0][0][1] < ValueT(0))) ||
            (less ^ (v[0][1][1] < ValueT(0))) ||
@@ -547,7 +547,7 @@ typename TreeOrAccT::ValueType TriquadraticSampler<TreeOrAccT>::sample(const Vec
 template<typename TreeOrAccT>
 bool TriquadraticSampler<TreeOrAccT>::zeroCrossing(const ValueT (&v)[3][3][3])
 {
-    static_assert(std::is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
+    static_assert(is_floating_point<ValueT>::value, "TrilinearSampler::zeroCrossing requires a floating-point type");
     const bool less = v[0][0][0] < ValueT(0);
     for (int dx = 0; dx < 3; ++dx) {
         for (int dy = 0; dy < 3; ++dy) {

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderVoxelUtils.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation of the Voxel rendering code.
 */
 
@@ -30,7 +25,7 @@ inline __hostdev__ bool rayIntersectSphere(const nanovdb::Ray<float>& ray, const
     using namespace nanovdb;
 
     const Vec3f& rd = ray.dir();
-    const Vec3f& rd_inv = ray.invDir();
+    //const Vec3f& rd_inv = ray.invDir();
     const Vec3f  ro = ray.eye() - center;
 
     float b = ro.dot(rd);
@@ -115,22 +110,24 @@ __hostdev__ inline bool
 rayIntersectSdf(const nanovdb::Ray<float>& ray, const nanovdb::Vec3f& center, float radius, float& s, nanovdb::Vec3f& normal)
 {
     using namespace nanovdb;
-
+    
+#if 1
     auto sdSphere = [radius] __hostdev__(const Vec3f& p) -> float {
         return p.length() - radius;
     };
-
-    const float b = radius * 2;
+    auto sdf = [sdSphere, center] __hostdev__(const Vec3f& p) -> float {
+        return sdSphere(p - center);
+    };
+#else
+const float b = radius * 2;
     auto        sdRoundBox = [b] __hostdev__(const Vec3f& p) -> float {
         const auto q = Vec3f(Abs(p[0] - b), Abs(p[1] - b), Abs(p[2] - b));
         return Vec3f(Max(q[0], 0.f), Max(q[1], 0.f), Max(q[2], 0.f)).length() + Min(Max(q[0], Max(q[1], q[2])), 0.0f) - 0.0f;
     };
-
-    auto sdf = [sdSphere, sdRoundBox, center] __hostdev__(const Vec3f& p) -> float {
-        //return sdRoundBox(p - center);
-        return sdSphere(p - center);
+    auto sdf = [sdRoundBox, center] __hostdev__(const Vec3f& p) -> float {
+        return sdRoundBox(p - center);
     };
-
+#endif
     auto calcNormal = [sdf] __hostdev__(const Vec3f& p) -> Vec3f {
         return Vec3f(
                    sdf(Vec3f(p[0] + 0.001f, p[1], p[2])) - sdf(Vec3f(p[0] - 0.001f, p[1], p[2])),
@@ -222,7 +219,7 @@ struct OcclusionHitFn
 
 struct PrimaryHitFn
 {
-    using RayT = nanovdb::Ray<float>;
+    using RayT  = nanovdb::Ray<float>;
     using Vec3T = nanovdb::Vec3f;
 
     template<typename ValueT, typename GridT, typename AccT>

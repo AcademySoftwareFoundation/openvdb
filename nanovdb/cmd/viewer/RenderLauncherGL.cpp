@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherGL.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of GL-platform Grid renderer.
 */
 
@@ -19,6 +14,7 @@
 #include <cstring>
 #include "RenderLauncherImpl.h"
 #include "FrameBufferGL.h"
+#include <nanovdb/util/NodeManager.h>
 
 static const char* g_kKernelString_Platform_h = "code/CPlatform.h";
 static const char* g_kKernelString_HDDA_h = "code/CHDDA.h";
@@ -91,15 +87,19 @@ bool RenderLauncherGL::ensureGridResource(const std::shared_ptr<Resource>& resou
         uint32_t(RootT::memUsage(grid->tree().root().tileCount())),
         uint32_t(GridT::memUsage())};
 
-    auto node0Level = grid->tree().getNode<Node0T>(0);
-    auto node1Level = grid->tree().getNode<Node1T>(0);
-    auto node2Level = grid->tree().getNode<Node2T>(0);
-    auto rootData = &grid->tree().root();
-    auto gridData = grid;
+    auto mgr = nanovdb::createNodeMgr(*grid);
+
+    // TODO: This does not work because upper is Node**...
+    // we need to create enumeration buffers and upload.
+    auto* node0Level = mgr.leaf(0);
+    auto* node1Level = mgr.lower(0);
+    auto* node2Level = mgr.upper(0);
+    auto  rootData = &grid->tree().root();
+    auto  gridData = grid;
 
     uintptr_t gridBaseAddr = uintptr_t(grid);
     //uintptr_t treeBaseAddr = uintptr_t(&grid->tree());
-    uint32_t  offsets[] = {
+    uint32_t offsets[] = {
         uint32_t(uintptr_t(node0Level) - gridBaseAddr),
         uint32_t(uintptr_t(node1Level) - gridBaseAddr),
         uint32_t(uintptr_t(node2Level) - gridBaseAddr),

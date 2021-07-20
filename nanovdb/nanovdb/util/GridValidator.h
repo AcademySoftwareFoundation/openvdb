@@ -16,10 +16,7 @@
 
 #include "../NanoVDB.h"
 #include "GridChecksum.h"
-#include "Range.h"
-#include "ForEach.h"
 
-#include <atomic>
 namespace nanovdb {
 
 /// @brief Return true if the specified grid passes several validation tests.
@@ -34,151 +31,129 @@ bool isValid(const NanoGrid<ValueT> &grid, bool detailed = true, bool verbose = 
 template <typename ValueT>
 class GridValidator
 {
-    using Node0 = LeafNode<ValueT>; // leaf
-    using Node1 = InternalNode<Node0>; // lower
-    using Node2 = InternalNode<Node1>; // upper
-    using RootT = RootNode<Node2>;
-    using TreeT = Tree<RootT>;
-    using GridT = Grid<TreeT>;
-
-    const NanoGrid<ValueT>* mGrid;
-    std::string             mErrorStr;
-    
-    void checkGrid(bool detailed);
-    void checkTree();
-    void checkRoot();
-    template <typename NodeT>
-    void checkNodes();
+    using GridT = NanoGrid<ValueT>;   
+    inline static void checkTree( const GridT&, std::string&, bool);
+    inline static void checkRoot( const GridT&, std::string&, bool);
+    inline static void checkNodes(const GridT&, std::string&);
 
 public:
-    GridValidator() : mGrid(nullptr) {}
-
     /// @brief Returns an error message (an empty string means no error)
-    const std::string& operator()(const NanoGrid<ValueT> &grid, bool detailed = true);
+    ///
+    /// @param grid NanoVDB grid to be tested
+    /// @param detailed If true the checksum is computed and validated as well as all the node pointers
+    ///
+    /// @note The validation is much slower if @c detailed == true!
+    static std::string check(const GridT &grid, bool detailed = true);
 
 };// GridValidator
 
 //================================================================================================
 
 template <typename ValueT>
-const std::string& GridValidator<ValueT>::operator()(const NanoGrid<ValueT> &grid, bool detailed)
+std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
 {
-    mGrid = &grid;
-    mErrorStr.clear();
-    
-    this->checkGrid(detailed);
-    this->checkTree();
-    this->checkRoot();
-    if (detailed) {
-        this->template checkNodes<Node2>();
-        this->template checkNodes<Node1>();
+    std::string errorStr;
+
+    // First check the Grid  
+    auto *data = reinterpret_cast<const typename GridT::DataType*>(&grid);
+    std::stringstream ss;
+    if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
+        ss << "Incorrect magic number: Expected " << NANOVDB_MAGIC_NUMBER << ", but read " << data->mMagic;
+        errorStr = ss.str();
+    } else if (!validateChecksum(grid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
+        errorStr.assign("Mis-matching checksum");
+    } else if (data->mVersion >= Version(29,0,0) && data->mVersion.getMajor() != NANOVDB_MAJOR_VERSION_NUMBER) {
+        ss << "Invalid major version number: Expected " << NANOVDB_MAJOR_VERSION_NUMBER << ", but read " << data->mVersion.c_str();
+        errorStr = ss.str();
+    } else if (data->mVersion < Version(29,0,0) && data->mVersion.id() != 28u) {
+        ss << "Invalid old major version number: Expected 28 or newer, but read " << data->mVersion.id();
+        errorStr = ss.str();
+    } else if (data->mGridClass >= GridClass::End) {
+        errorStr.assign("Invalid GridClass");
+     } else if (data->mGridType >= GridType::End) {
+        errorStr.assign("Invalid GridType");
+    } else if (data->mGridType != mapToGridType<ValueT>()) {
+        errorStr.assign("Invalid combination of ValueType and GridType");
+    } else if (!isValid(data->mGridType, data->mGridClass)) {
+        errorStr.assign("Invalid combination of GridType and GridClass");
+    } else if ( (const uint8_t*)(&(grid.tree())) != (const uint8_t*)(&grid+1) ) {
+        errorStr.assign("Invalid Tree pointer");
+    } else {
+        checkTree(grid, errorStr, detailed);
     }
-    return mErrorStr;
+    return errorStr;
 }
 
 //================================================================================================
 
 template<typename ValueT>
-void GridValidator<ValueT>::checkGrid(bool detailed)
+void GridValidator<ValueT>::checkTree(const GridT &grid, std::string &errorStr, bool detailed)
 {
-    if (!mErrorStr.empty()) return;
-    auto *data = reinterpret_cast<const typename GridT::DataType*>(mGrid);
-    std::stringstream ss;
-    if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
-        ss << "Incorrect magic number: Expected " << NANOVDB_MAGIC_NUMBER << ", but read " << data->mMagic;
-        mErrorStr = ss.str();
-    } else if (!validateChecksum(*mGrid, detailed ? ChecksumMode::Full : ChecksumMode::Partial)) {
-        mErrorStr.assign("Mis-matching checksum");
-    } else if ( data->mVersion >= Version(29,0,0) && data->mVersion.getMajor() != NANOVDB_MAJOR_VERSION_NUMBER) {
-        ss << "Invalid major version number: Expected " << NANOVDB_MAJOR_VERSION_NUMBER << ", but read " << data->mVersion.c_str();
-        mErrorStr = ss.str();
-    } else if ( data->mVersion < Version(29,0,0) && data->mVersion.id() != 28u) {
-        ss << "Invalid old major version number: Expected 28 or newer, but read " << data->mVersion.id();
-        mErrorStr = ss.str();
-    } else if (data->mGridClass >= GridClass::End) {
-        mErrorStr.assign("Invalid GridClass");
-     } else if (data->mGridType >= GridType::End) {
-        mErrorStr.assign("Invalid GridType");
-    } else if (data->mGridType != mapToGridType<ValueT>()) {
-        mErrorStr.assign("Invalid combination of ValueType and GridType");
-    } else if (!isValid(data->mGridType, data->mGridClass)) {
-        mErrorStr.assign("Invalid combination of GridType and GridClass");
-    } else if ( (const void*)(&(mGrid->tree())) != (const void*)(mGrid+1) ) {
-        mErrorStr.assign("Invalid Tree pointer");
-    }
-}// GridValidator::validateGrid
-
-//================================================================================================
-
-template<typename ValueT>
-void GridValidator<ValueT>::checkTree()
-{
-    if (!mErrorStr.empty()) return;
-    auto *data = mGrid->tree().data();
-    if (data->mCount[3] != 1u) {
-        mErrorStr.assign("Invalide number of root nodes in the tree");
-    }  else if ( (const uint8_t*)(&mGrid->tree().root()) < (const uint8_t*)(&mGrid->tree()+1)) {
-       mErrorStr.assign("Invalide root pointer (should be located after the Grid and Tree)");
-    } else if ( mGrid->isEmpty() && (const uint8_t*)(&mGrid->tree().root()) > (const uint8_t*)(mGrid) + mGrid->totalMemUsage()) {
-       mErrorStr.assign("Invalide root pointer (appears to be located after the end of the buffer)");
-    } else if (!mGrid->isEmpty() && (const uint8_t*)(&mGrid->tree().root()) > (const uint8_t*)(mGrid->tree().template getNode<2>(0)) ) {
-       mErrorStr.assign("Invalide root pointer (appears to be after the first upper internal node)");
+    if ( (const uint8_t*)(&grid.tree().root()) < (const uint8_t*)(&grid.tree()+1)) {
+       errorStr.assign("Invalid root pointer (should be located after the Grid and Tree)");
+    } else if ( (const uint8_t*)(&grid.tree().root()) > (const uint8_t*)(&grid) + grid.gridSize() - sizeof(grid.tree().root()) ) {
+       errorStr.assign("Invalid root pointer (appears to be located after the end of the buffer)");
+    } else {
+       checkRoot(grid, errorStr, detailed);
     }
 }// GridValidator::checkTree
 
 //================================================================================================
 
 template<typename ValueT>
-void GridValidator<ValueT>::checkRoot()
+void GridValidator<ValueT>::checkRoot(const GridT &grid, std::string &errorStr, bool detailed)
 {
-    if (!mErrorStr.empty()) return;
-    auto *data = mGrid->tree().root().data();
-    const int32_t maxID = static_cast<int32_t>(data->mTileCount);
-    const auto nodeCount = mGrid->tree().nodeCount(2);
-    const uint8_t *minPtr = nodeCount>0 ? (const uint8_t*)(mGrid->tree().template getNode<2>(0)) : nullptr;
-    const uint8_t *maxPtr = nodeCount>0 ? (const uint8_t*)(mGrid->tree().template getNode<2>(nodeCount-1)) : nullptr;
-    for (uint32_t i = 0; i<data->mTileCount; ++i) {
-        auto& tile = data->tile(i);
-        if (tile.childID == -1) continue;
-        if (tile.childID < -1 || tile.childID >= maxID) {
-            mErrorStr.assign("Invalid Tile.childID");
-            return;
-        } else if ( (const uint8_t*)(&data->child(tile)) < minPtr ) {
-            mErrorStr.assign("Invalid root child pointer (below lower bound");
-            return;
-        } else if ( (const uint8_t*)(&data->child(tile)) > maxPtr ) {
-            mErrorStr.assign("Invalid root child pointer (above higher bound");
-            return;
+    auto &root = grid.tree().root();
+    auto *data = root.data();
+    const uint8_t *minPtr = (const uint8_t*)(&root + 1);
+    const uint8_t *maxPtr = (const uint8_t*)(&root) + root.memUsage();
+    for (uint32_t i = 0; errorStr.empty() && i<data->mTableSize; ++i) {
+        const auto *tile = data->tile(i);
+        if ( (const uint8_t *) tile < minPtr ) {
+            errorStr.assign("Invalid root tile pointer (below lower bound");
+        } else if ( (const uint8_t *) tile > maxPtr - sizeof(*tile) ) {
+            errorStr.assign("Invalid root tile pointer (above higher bound");
         }
+    }
+    if (detailed && errorStr.empty()) {
+        checkNodes(grid, errorStr);
     }
 }// GridValidator::processRoot
 
 //================================================================================================
 template<typename ValueT>
-template<typename NodeT>
-void GridValidator<ValueT>::
-checkNodes()
-{// this is just a place holder for now
-    using ChildT = typename NodeT::ChildNodeType;
-    const auto &tree = mGrid->tree();
-    const auto nodeCount = mGrid->tree().template nodeCount<ChildT>();
-    if (!mErrorStr.empty() || nodeCount == 0) return;
-    const uint8_t *minPtr = (const uint8_t*)(mGrid->tree().template getNode<ChildT>(0));
-    const uint8_t *maxPtr = (const uint8_t*)(mGrid->tree().template getNode<ChildT>(nodeCount-1));
-    std::atomic_bool error{false};
-    auto kernel = [&](const Range1D &r) 
-    {
-        for (auto i = r.begin(); !error && i != r.end(); ++i) {
-            auto *node = const_cast<NodeT*>(tree.template getNode<NodeT>(i));
-            auto *data = node->data();
-            for (auto childIter = data->mChildMask.beginOn(); !error && childIter; ++childIter) {
-                auto* p = (const uint8_t*)(data->child(*childIter));
-                if (p < minPtr ||  p > maxPtr) error = true;
-            }
+void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
+{
+    auto &root = grid.tree().root();// note, the root node was already checked
+    const uint8_t *minPtr = (const uint8_t*)(&root) + root.memUsage();
+    const uint8_t *maxPtr = (const uint8_t*)(&grid) + grid.gridSize();
+    
+    auto check = [&](const void * ptr, size_t ptrSize) -> bool {
+        if ( (const uint8_t *) ptr < minPtr ) {
+            errorStr.assign("Invalid node pointer: below lower bound");
+        } else if ( (const uint8_t *) ptr > maxPtr - ptrSize ) {
+            errorStr.assign("Invalid node pointer: above higher bound");
         }
+        return errorStr.empty();
     };
-    forEach(0, tree.template nodeCount<NodeT>(), 4, kernel);
-    if (error) mErrorStr.assign("Invalid internal child node pointer");
+
+    auto *data3 = grid.tree().root().data();
+    for (uint32_t i=0, size=data3->mTableSize; i<size; ++i) {
+        auto *tile = data3->tile(i);// note, we already checked the root
+        if (!tile->isChild()) continue;
+        auto *node2 = data3->getChild(tile);
+        if (!check(node2, sizeof(*node2))) return;
+        auto *data2 = node2->data();
+        for (auto it2 = data2->mChildMask.beginOn(); it2; ++it2) {
+            auto *node1 = data2->getChild(*it2);
+            if (!check(node1, sizeof(*node1))) return;
+            auto *data1 = node1->data();
+            for (auto it1 = data1->mChildMask.beginOn(); it1; ++it1) {
+                auto *leaf = data1->getChild(*it1);
+                if (!check(leaf, sizeof(*leaf))) return;
+            }// loop over child nodes of the lower internal node
+        }// loop over child nodes of the upper internal node
+    }// loop over child nodes of the root node
 } // GridValidator::processNodes
 
 
@@ -187,8 +162,7 @@ checkNodes()
 template <typename ValueT>
 bool isValid(const NanoGrid<ValueT> &grid, bool detailed, bool verbose)
 {
-    GridValidator<ValueT> validator;
-    const std::string &str = validator( grid, detailed );
+    const std::string str = GridValidator<ValueT>::check( grid, detailed );
     if (verbose && !str.empty()) std::cerr << "Validation failed: " << str << std::endl;
     return str.empty();
 }

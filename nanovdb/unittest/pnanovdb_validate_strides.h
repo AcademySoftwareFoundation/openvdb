@@ -17,7 +17,7 @@
 
 #include <nanovdb/PNanoVDB.h>
 
-pnanovdb_uint32_t allocate(pnanovdb_uint32_t* poffset, pnanovdb_uint32_t size, pnanovdb_uint32_t alignment)
+static pnanovdb_uint32_t allocate(pnanovdb_uint32_t* poffset, pnanovdb_uint32_t size, pnanovdb_uint32_t alignment)
 {
 	if (alignment > 0u)
 	{
@@ -28,7 +28,7 @@ pnanovdb_uint32_t allocate(pnanovdb_uint32_t* poffset, pnanovdb_uint32_t size, p
 	return ret;
 }
 
-void compute_root_strides(
+static void compute_root_strides(
 	pnanovdb_uint32_t grid_type,
 	pnanovdb_uint32_t* background_off, 
 	pnanovdb_uint32_t* min_off, pnanovdb_uint32_t* max_off, 
@@ -36,7 +36,7 @@ void compute_root_strides(
 	pnanovdb_uint32_t* total_size)
 {
 	pnanovdb_uint32_t offset = 0u;
-	allocate(&offset, PNANOVDB_ROOT_SIZE, 32u);
+	allocate(&offset, PNANOVDB_ROOT_BASE_SIZE, 32u);
 
 	pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
 	pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
@@ -50,10 +50,10 @@ void compute_root_strides(
 	*total_size = allocate(&offset, 0u, 32u);
 }
 
-void compute_tile_strides(pnanovdb_uint32_t grid_type, pnanovdb_uint32_t* value_off, pnanovdb_uint32_t* total_size)
+static void compute_tile_strides(pnanovdb_uint32_t grid_type, pnanovdb_uint32_t* value_off, pnanovdb_uint32_t* total_size)
 {
 	pnanovdb_uint32_t offset = 0u;
-	allocate(&offset, PNANOVDB_ROOT_TILE_SIZE, 32u);
+	allocate(&offset, PNANOVDB_ROOT_TILE_BASE_SIZE, 32u);
 
 	pnanovdb_uint32_t valueStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
 	pnanovdb_uint32_t valueAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
@@ -62,7 +62,7 @@ void compute_tile_strides(pnanovdb_uint32_t grid_type, pnanovdb_uint32_t* value_
 	*total_size = allocate(&offset, 0u, 32u);
 }
 
-void compute_node_strides(
+static void compute_node_strides(
 	pnanovdb_uint32_t grid_type,
 	pnanovdb_uint32_t nodeLevel, 
 	pnanovdb_uint32_t* min_off, pnanovdb_uint32_t* max_off, 
@@ -70,26 +70,35 @@ void compute_node_strides(
 	pnanovdb_uint32_t* table_off,
 	pnanovdb_uint32_t* total_size)
 {
-	static const pnanovdb_uint32_t node_size[3] = { PNANOVDB_NODE0_SIZE, PNANOVDB_NODE1_SIZE, PNANOVDB_NODE2_SIZE };
-	static const pnanovdb_uint32_t node_elements[3] = { PNANOVDB_NODE0_TABLE_COUNT, PNANOVDB_NODE1_TABLE_COUNT, PNANOVDB_NODE2_TABLE_COUNT };
+	static const pnanovdb_uint32_t node_size[3] = { PNANOVDB_LEAF_BASE_SIZE, PNANOVDB_LOWER_BASE_SIZE, PNANOVDB_UPPER_BASE_SIZE };
+	static const pnanovdb_uint32_t node_elements[3] = { PNANOVDB_LEAF_TABLE_COUNT, PNANOVDB_LOWER_TABLE_COUNT, PNANOVDB_UPPER_TABLE_COUNT };
 	pnanovdb_uint32_t offset = 0u;
 	allocate(&offset, node_size[nodeLevel], 32u);
 
 	pnanovdb_uint32_t valueStrideBits = pnanovdb_grid_type_value_strides_bits[grid_type];
-	pnanovdb_uint32_t tableStrideBits = (nodeLevel == 0u || valueStrideBits > 32) ? valueStrideBits : 32;
+	pnanovdb_uint32_t tableStrideBits = nodeLevel == 0u ? valueStrideBits : pnanovdb_grid_type_table_strides_bits[grid_type];
 	pnanovdb_uint32_t tableAlign = 32u;
 	pnanovdb_uint32_t tableFullStride = (tableStrideBits * node_elements[nodeLevel]) / 8u;
 
 	pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
 	pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
 	pnanovdb_uint32_t statStride = pnanovdb_grid_type_stat_strides_bits[grid_type] / 8u;
-	if (nodeLevel == 0u && pnanovdb_grid_type_leaf_lite[grid_type])
+	if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
 	{
 		minmaxStride = 0u;
 		minmaxAlign = 0u;
 		statStride = 0u;
 	}
 
+	if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_FP)
+	{
+		minmaxStride = 2u;
+		minmaxAlign = 2u;
+		statStride = 2u;
+		// allocate minimum and quantum
+		allocate(&offset, 4u, 4u);
+		allocate(&offset, 4u, 4u);
+	}
 	*min_off = allocate(&offset, minmaxStride, minmaxAlign);
 	*max_off = allocate(&offset, minmaxStride, minmaxAlign);
 	*ave_off = allocate(&offset, statStride, statStride);
@@ -98,7 +107,7 @@ void compute_node_strides(
 	*total_size = allocate(&offset, 0u, 32u);
 }
 
-bool validate_strides(int(*local_printf)(const char* format, ...))
+static bool validate_strides(int(*local_printf)(const char* format, ...))
 {
 	pnanovdb_grid_type_constants_t constants[PNANOVDB_GRID_TYPE_END];
 
@@ -111,24 +120,31 @@ bool validate_strides(int(*local_printf)(const char* format, ...))
 		pnanovdb_uint32_t tile_value, tile_size;
 		compute_tile_strides(idx, &tile_value, &tile_size);
 
-		pnanovdb_uint32_t node2_min, node2_max, node2_ave, node2_stddev, node2_table, node2_size;
-		compute_node_strides(idx, 2, &node2_min, &node2_max, &node2_ave, &node2_stddev, &node2_table, &node2_size);
+		pnanovdb_uint32_t upper_min, upper_max, upper_ave, upper_stddev, upper_table, upper_size;
+		compute_node_strides(idx, 2, &upper_min, &upper_max, &upper_ave, &upper_stddev, &upper_table, &upper_size);
 
-		pnanovdb_uint32_t node1_min, node1_max, node1_ave, node1_stddev, node1_table, node1_size;
-		compute_node_strides(idx, 1, &node1_min, &node1_max, &node1_ave, &node1_stddev, &node1_table, &node1_size);
+		pnanovdb_uint32_t lower_min, lower_max, lower_ave, lower_stddev, lower_table, lower_size;
+		compute_node_strides(idx, 1, &lower_min, &lower_max, &lower_ave, &lower_stddev, &lower_table, &lower_size);
 
-		pnanovdb_uint32_t node0_min, node0_max, node0_ave, node0_stddev, node0_table, node0_size;
-		compute_node_strides(idx, 0, &node0_min, &node0_max, &node0_ave, &node0_stddev, &node0_table, &node0_size);
+		pnanovdb_uint32_t leaf_min, leaf_max, leaf_ave, leaf_stddev, leaf_table, leaf_size;
+		compute_node_strides(idx, 0, &leaf_min, &leaf_max, &leaf_ave, &leaf_stddev, &leaf_table, &leaf_size);
 
 		pnanovdb_uint32_t valueStrideBits = pnanovdb_grid_type_value_strides_bits[idx];
-		pnanovdb_uint32_t tableStride = (valueStrideBits > 32 ? valueStrideBits : 32) / 8u;
+		pnanovdb_uint32_t tableStrideBits = pnanovdb_grid_type_table_strides_bits[idx];
+		pnanovdb_uint32_t tableStride = tableStrideBits / 8u;
+
+		// For FP, always return the base of the table
+		if (pnanovdb_grid_type_leaf_type[idx] == PNANOVDB_LEAF_TYPE_FP)
+		{
+			valueStrideBits = 0u;
+		}
 
 		pnanovdb_grid_type_constants_t local_constants = {
 			root_background, root_min, root_max, root_ave, root_stddev, root_size,
 			valueStrideBits, tableStride, tile_value, tile_size,
-			node2_min, node2_max, node2_ave, node2_stddev, node2_table, node2_size,
-			node1_min, node1_max, node1_ave, node1_stddev, node1_table, node1_size,
-			node0_min, node0_max, node0_ave, node0_stddev, node0_table, node0_size
+			upper_min, upper_max, upper_ave, upper_stddev, upper_table, upper_size,
+			lower_min, lower_max, lower_ave, lower_stddev, lower_table, lower_size,
+			leaf_min, leaf_max, leaf_ave, leaf_stddev, leaf_table, leaf_size
 		};
 		constants[idx] = local_constants;
 	}
@@ -143,27 +159,33 @@ bool validate_strides(int(*local_printf)(const char* format, ...))
 			mismatch = true;
 		}
 	}
-	if (mismatch) {
+	if (mismatch)
+	{
 		local_printf("Error: Mismatch between constant tables.\n");
-		for (pnanovdb_uint32_t pass = 0u; pass < 2u; pass++) {
-			if (pass == 0u) {
+		for (pnanovdb_uint32_t pass = 0u; pass < 2u; pass++)
+		{
+			if (pass == 0u)
+			{
 				local_printf("Printing expected values:\n");
-			} else {
+			}
+			else
+			{
 				local_printf("Printing current header values:\n");
 			}
-			for (pnanovdb_uint32_t idx = 0u; idx < PNANOVDB_GRID_TYPE_END; idx++) {
+			for (pnanovdb_uint32_t idx = 0u; idx < PNANOVDB_GRID_TYPE_END; idx++)
+			{
 				pnanovdb_grid_type_constants_t c = (pass == 0u) ? constants[idx] : pnanovdb_grid_type_constants[idx];
 				local_printf("{%d, %d, %d, %d, %d, %d,  %d, %d, %d, %d,  %d, %d, %d, %d, %d, %d,  %d, %d, %d, %d, %d, %d,  %d, %d, %d, %d, %d, %d},\n",
 					c.root_off_background, c.root_off_min, c.root_off_max, c.root_off_ave, c.root_off_stddev, c.root_size,
 					c.value_stride_bits, c.table_stride, c.root_tile_off_value, c.root_tile_size,
-					c.node2_off_min, c.node2_off_max, c.node2_off_ave, c.node2_off_stddev, c.node2_off_table, c.node2_size,
-					c.node1_off_min, c.node1_off_max, c.node1_off_ave, c.node1_off_stddev, c.node1_off_table, c.node1_size,
-					c.node0_off_min, c.node0_off_max, c.node0_off_ave, c.node0_off_stddev, c.node0_off_table, c.node0_size
+					c.upper_off_min, c.upper_off_max, c.upper_off_ave, c.upper_off_stddev, c.upper_off_table, c.upper_size,
+					c.lower_off_min, c.lower_off_max, c.lower_off_ave, c.lower_off_stddev, c.lower_off_table, c.lower_size,
+					c.leaf_off_min, c.leaf_off_max, c.leaf_off_ave, c.leaf_off_stddev, c.leaf_off_table, c.leaf_size
 				);
 			}
 		}
 	}
-    return !mismatch;
+	return !mismatch;
 }
 
 #endif// end of NANOVDB_PNANOVDB_VALIDATE_STRIDES_H_HAS_BEEN_INCLUDED

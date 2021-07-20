@@ -20,7 +20,8 @@
 #define CUDA_TIMING
 
 // This is called by the device
-__global__ void render_kernel(const nanovdb::NanoGrid<float>& grid,
+template <typename T>
+__global__ void render_kernel(const nanovdb::NanoGrid<T>& grid,
                               const nanovdb::Camera<float>&   camera,
                               nanovdb::Image&                 img)
 {
@@ -42,9 +43,14 @@ __global__ void render_kernel(const nanovdb::NanoGrid<float>& grid,
 
     auto   acc = tree.getAccessor();
     CoordT ijk;
-    float  v0;
     float  t;
+    float  v0;
     if (nanovdb::ZeroCrossing(ray, acc, ijk, v0, t)) {
+#if 1// second-order central difference
+        Vec3T grad(acc.getValue(ijk.offsetBy(1,0,0)) - acc.getValue(ijk.offsetBy(-1,0,0)),
+                   acc.getValue(ijk.offsetBy(0,1,0)) - acc.getValue(ijk.offsetBy(0,-1,0)),
+                   acc.getValue(ijk.offsetBy(0,0,1)) - acc.getValue(ijk.offsetBy(0,0,-1)));
+#else// first order single-sided difference
         Vec3T grad(-v0);
         ijk[0] += 1;
         grad[0] += acc.getValue(ijk);
@@ -54,6 +60,7 @@ __global__ void render_kernel(const nanovdb::NanoGrid<float>& grid,
         ijk[1] -= 1;
         ijk[2] += 1;
         grad[2] += acc.getValue(ijk);
+#endif
         grad *= rnorm3df(grad[0], grad[1], grad[2]);
         img(w, h) = ColorRGB(abs(grad.dot(ray.dir())), 0, 0);
     } else {
@@ -63,15 +70,16 @@ __global__ void render_kernel(const nanovdb::NanoGrid<float>& grid,
 }
 
 // This is called by the host
-extern "C" void launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>&  gridHandle,
+extern "C" float launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuffer>&  gridHandle,
                                nanovdb::ImageHandle<nanovdb::CudaDeviceBuffer>& imgHandle,
                                const nanovdb::Camera<float>*                          camera,
                                cudaStream_t                                           stream)
 {
+    using BuildT = nanovdb::FpN;
     const auto* img = imgHandle.image(); // host image!
     auto        round = [](int a, int b) { return (a + b - 1) / b; };
     const dim3  threadsPerBlock(8, 8), numBlocks(round(img->width(), threadsPerBlock.x), round(img->height(), threadsPerBlock.y));
-    auto*       deviceGrid = gridHandle.deviceGrid<float>(); // note this cannot be de-referenced since it points to a memory address on the GPU!
+    auto*       deviceGrid = gridHandle.deviceGrid<BuildT>(); // note this cannot be de-referenced since it points to a memory address on the GPU!
     auto*       deviceImage = imgHandle.deviceImage(); // note this cannot be de-referenced since it points to a memory address on the GPU!
     assert(deviceGrid && deviceImage);
 
@@ -84,13 +92,14 @@ extern "C" void launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuff
 
     // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
     render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
-
+    
+    float elapsedTime = 0.0f;
 #ifdef CUDA_TIMING
     cudaEventRecord(stop, stream);
     cudaEventSynchronize(stop);
-    float elapsedTime;
+    
     cudaEventElapsedTime(&elapsedTime, start, stop);
-    //printf("NanoVDB: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.cpuImage()->size(), elapsedTime);
+    //printf("NanoVDB: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.image()->size(), elapsedTime);
     cudaError_t errCode = cudaGetLastError();
     if (errCode != cudaSuccess) {
         fprintf(stderr, "CUDA Runtime Error: %s %s %d\n", cudaGetErrorString(errCode), __FILE__, __LINE__);
@@ -99,4 +108,5 @@ extern "C" void launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuff
     cudaEventDestroy(start);
     cudaEventDestroy(stop);
 #endif
+    return elapsedTime;
 }

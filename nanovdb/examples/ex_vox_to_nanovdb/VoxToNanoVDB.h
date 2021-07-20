@@ -184,7 +184,8 @@ nanovdb::GridHandle<BufferT> convertVoxToNanoVDB(const std::string& inFilename, 
 
             printf("scene processing end.\n");
             ogt_vox_destroy_scene(scene);
-            return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), modelName, nanovdb::GridClass::VoxelVolume);
+            builder.setGridClass(nanovdb::GridClass::VoxelVolume);
+            return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), modelName);
         } else {
             std::ostringstream ss;
             ss << "Invalid file \"" << inFilename << "\"";

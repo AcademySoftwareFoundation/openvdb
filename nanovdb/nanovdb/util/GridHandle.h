@@ -20,18 +20,7 @@
 #include "../NanoVDB.h"// for mapToGridType
 #include "HostBuffer.h"
 
-#include <fstream> // for std::ifstream
-#include <iostream> // for std::cerr/cout
-#include <string> // for std::string
-#include <type_traits> // for std::is_pod
-
 namespace nanovdb {
-
-template<typename BufferT>
-struct BufferTraits
-{
-    static const bool hasDeviceDual = false;
-};
 
 // --------------------------> GridHandleBase <------------------------------------
 
@@ -50,7 +39,7 @@ public:
     bool empty() const { return size() == 0; }
 
     /// @brief Return true if this handle contains a grid
-    operator bool() const { return !empty(); }
+    operator bool() const { return !this->empty(); }
 
     /// @brief Returns a const point to the grid meta data (see definition above).
     ///
@@ -63,7 +52,14 @@ public:
         const GridMetaData* ptr = this->gridMetaData();
         return ptr ? ptr->gridType() : GridType::End; 
     }
-};
+
+    /// @brief Return the number of grids contained in this buffer
+    uint32_t gridCount() const 
+    { 
+        auto *ptr = this->gridMetaData();
+        return ptr ? ptr->gridCount() : 0; 
+    }
+};// GridHandleBase
 
 // --------------------------> GridHandle <------------------------------------
 
@@ -75,9 +71,20 @@ class GridHandle : public GridHandleBase
 {
     BufferT mBuffer;
 
-public:
-    GridHandle(BufferT&& resources);
+    template<typename ValueT>
+    const NanoGrid<ValueT>* getGrid(uint32_t n = 0) const;
 
+    template<typename ValueT, typename U = BufferT>
+    typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
+    getDeviceGrid(uint32_t n = 0) const;
+
+    template <typename T>
+    static T* no_const(const T* ptr) { return const_cast<T*>(ptr); }
+
+public:
+    /// @brief Move constructor from a buffer
+    GridHandle(BufferT&& buffer) { mBuffer = std::move(buffer); }
+    /// @brief Empty ctor
     GridHandle() = default;
     /// @brief Disallow copy-construction
     GridHandle(const GridHandle&) = delete;
@@ -90,111 +97,113 @@ public:
         return *this;
     }
     /// @brief Move copy-constructor
-    GridHandle(GridHandle&& other) noexcept
-    {
-        mBuffer = std::move(other.mBuffer);
-    }
+    GridHandle(GridHandle&& other) noexcept { mBuffer = std::move(other.mBuffer); }
     /// @brief Default destructor
     ~GridHandle() override { reset(); }
-
+    /// @brief clear the buffer
     void reset() { mBuffer.clear(); }
 
+    /// @brief Return a reference to the buffer
     BufferT&       buffer() { return mBuffer; }
+
+    /// @brief Return a const reference to the buffer
     const BufferT& buffer() const { return mBuffer; }
 
     /// @brief Returns a non-const pointer to the data.
     ///
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    uint8_t* data() override
-    {
-        return mBuffer.data();
-    }
+    uint8_t* data() override { return mBuffer.data(); }
 
     /// @brief Returns a const pointer to the data.
     ///
     /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized
-    const uint8_t* data() const override
-    {
-        return mBuffer.data();
-    }
+    const uint8_t* data() const override { return mBuffer.data(); }
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this GridHandle's allocator.
-    uint64_t size() const override
-    {
-        return mBuffer.size();
-    }
+    uint64_t size() const override { return mBuffer.size(); }
 
-    /// @brief Returns a const pointer to the NanoVDB grid encoded in the GridHandle.
+    /// @brief Returns a const pointer to the @a n'th NanoVDB grid encoded in this GridHandle.
     ///
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized or the template
-    ///          parameter does not match!
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    ///          or if the template parameter does not match the specified grid!
     template<typename ValueT>
-    const NanoGrid<ValueT>* grid() const;
+    const NanoGrid<ValueT>* grid(uint32_t n = 0) const { return this->template getGrid<ValueT>(n); }
 
+    /// @brief Returns a pointer to the @a n'th  NanoVDB grid encoded in this GridHandle.
+    ///
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    ///          or if the template parameter does not match the specified grid!
     template<typename ValueT>
-    NanoGrid<ValueT>* grid();
+    NanoGrid<ValueT>* grid(uint32_t n = 0) { return no_const(this->template getGrid<ValueT>(n)); }
 
+    /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
+    ///
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    ///          or if the template parameter does not match the specified grid!
     template<typename ValueT, typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
-    deviceGrid() const;
+    deviceGrid(uint32_t n = 0) const { return this->template getDeviceGrid<ValueT>(n); }
 
+    /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
+    ///
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    ///          or if the template parameter does not match the specified grid!
+    template<typename ValueT, typename U = BufferT>
+    typename std::enable_if<BufferTraits<U>::hasDeviceDual, NanoGrid<ValueT>*>::type
+    deviceGrid(uint32_t n = 0) { return no_const(this->template getDeviceGrid<ValueT>(n)); }
+
+    /// @brief Upload the grid to the device, e.g. from CPU to GPU
+    ///
+    /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceUpload(void* stream = nullptr, bool sync = true);
+    deviceUpload(void* stream = nullptr, bool sync = true) { mBuffer.deviceUpload(stream, sync); }
 
+    /// @brief Download the grid to from the device, e.g. from GPU to CPU
+    ///
+    /// @note This method is only available if the buffer supports devices
     template<typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type
-    deviceDownload(void* stream = nullptr, bool sync = true);
+    deviceDownload(void* stream = nullptr, bool sync = true) { mBuffer.deviceDownload(stream, sync); }
 }; // GridHandle
 
-// --------------------------> Implementation of GridHandle <------------------------------------
-
-template<typename BufferT>
-GridHandle<BufferT>::GridHandle(BufferT&& resources)
-{
-    mBuffer = std::move(resources);
-}
+// --------------------------> Implementation of private methods in GridHandle <------------------------------------
 
 template<typename BufferT>
 template<typename ValueT>
-inline const NanoGrid<ValueT>* GridHandle<BufferT>::grid() const
+inline const NanoGrid<ValueT>* GridHandle<BufferT>::getGrid(uint32_t index) const
 {
     using GridT = const NanoGrid<ValueT>;
-    GridT* grid = reinterpret_cast<GridT*>(mBuffer.data());
-    return (grid && grid->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
-}
-
-template<typename BufferT>
-template<typename ValueT>
-inline NanoGrid<ValueT>* GridHandle<BufferT>::grid()
-{
-    using GridT = NanoGrid<ValueT>;
-    GridT* grid = reinterpret_cast<GridT*>(mBuffer.data());
-    return (grid && grid->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
+    auto  *data = mBuffer.data();
+    GridT *grid = reinterpret_cast<GridT*>(data);
+    if (grid == nullptr || index >= grid->gridCount()) {// un-initialized or index is out of range
+        return nullptr;
+    }
+    while(index != grid->gridIndex()) {
+        data += grid->gridSize();
+        grid  = reinterpret_cast<GridT*>(data);
+    }
+    return grid->gridType() == mapToGridType<ValueT>() ? grid : nullptr;
 }
 
 template<typename BufferT>
 template<typename ValueT, typename U>
 inline typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
-GridHandle<BufferT>::deviceGrid() const
+GridHandle<BufferT>::getDeviceGrid(uint32_t index) const
 {
     using GridT = const NanoGrid<ValueT>;
-    GridT* grid = reinterpret_cast<GridT*>(mBuffer.deviceData());
-    return (grid && this->gridMetaData()->gridType() == mapToGridType<ValueT>()) ? grid : nullptr;
-}
-
-template<typename BufferT>
-template<typename U>
-inline typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type GridHandle<BufferT>::deviceUpload(void* stream, bool sync)
-{
-    mBuffer.deviceUpload(stream, sync);
-}
-
-template<typename BufferT>
-template<typename U>
-inline typename std::enable_if<BufferTraits<U>::hasDeviceDual, void>::type GridHandle<BufferT>::deviceDownload(void* stream, bool sync)
-{
-    mBuffer.deviceDownload(stream, sync);
+    auto  *data = mBuffer.data();
+    GridT *grid = reinterpret_cast<GridT*>(data);
+    if (grid == nullptr || index >= grid->gridCount()) {// un-initialized or index is out of range
+        return nullptr;
+    }
+    auto* dev = mBuffer.deviceData();
+    while(index != grid->gridIndex()) {
+        data += grid->gridSize();
+        dev  += grid->gridSize();
+        grid  = reinterpret_cast<GridT*>(data);
+    }
+    return grid->gridType() == mapToGridType<ValueT>() ? reinterpret_cast<GridT*>(dev) : nullptr;
 }
 
 } // namespace nanovdb

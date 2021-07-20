@@ -170,6 +170,7 @@ int main(int argc, char* argv[])
             auto       voxelSizeWidth = std::string("Scale").length() + padding;
             auto       versionWidth = std::string("Version").length() + padding;
             auto       configWidth = std::string("32^3->16^3->8^3").length() + padding;
+            auto       tileWidth = std::string("# Active tiles").length() + padding;
             auto       resWidth = std::string("Resolution").length() + padding;
             for (auto& m : list) {
                 width(nameWidth, m.gridName);
@@ -183,10 +184,16 @@ int main(int argc, char* argv[])
                 width(fileWidth, format(m.fileSize));
                 width(versionWidth, std::string(m.version.c_str()));
                 width(configWidth, nodesToStr(m.nodeCount));
+                width(tileWidth, nodesToStr(m.tileCount));
                 width(voxelsWidth, std::to_string(m.voxelCount));
                 width(voxelSizeWidth, vec3RToStr(m.voxelSize));
             }
-            std::cout << "\nThe file \"" << file << "\" contains the following " << list.size() << " grid(s):\n";
+            std::cout << "\nThe file \"" << file << "\" contains the following ";
+            if (list.size()>1) {
+                std::cout << list.size() << " grids:\n";
+            } else {
+                std::cout << "grid:\n";
+            }
             std::cout << std::left << std::setw(numberWidth) << "#"
                       << std::left << std::setw(nameWidth) << "Name"
                       << std::left << std::setw(typeWidth) << "Type";
@@ -202,8 +209,9 @@ int main(int argc, char* argv[])
                       << std::left << std::setw(resWidth) << "Resolution";
             if (mode == Long) {
                 std::cout << std::left << std::setw(configWidth) << "32^3->16^3->8^3"
-                          << std::left << std::setw(ibboxWidth) << "Index Bounding Box"
-                          << std::left << std::setw(wbboxWidth) << "World Bounding Box";
+                          << std::left << std::setw(tileWidth)   << "# Active tiles"
+                          << std::left << std::setw(ibboxWidth)  << "Index Bounding Box"
+                          << std::left << std::setw(wbboxWidth)  << "World Bounding Box";
             }
             std::cout << std::endl;
             int n = 0;
@@ -225,8 +233,9 @@ int main(int argc, char* argv[])
                           << std::left << std::setw(resWidth) << resToStr(m.indexBBox);
                 if (mode == Long) {
                     std::cout << std::left << std::setw(configWidth) << nodesToStr(m.nodeCount)
-                              << std::left << std::setw(ibboxWidth) << ibboxToStr(m.indexBBox)
-                              << std::left << std::setw(wbboxWidth) << wbboxToStr(m.worldBBox);
+                              << std::left << std::setw(tileWidth)   << nodesToStr(m.tileCount)
+                              << std::left << std::setw(ibboxWidth)  << ibboxToStr(m.indexBBox)
+                              << std::left << std::setw(wbboxWidth)  << wbboxToStr(m.worldBBox);
                 }
                 std::cout << std::endl;
             }
@@ -278,6 +287,7 @@ int main(int argc, char* argv[])
                 width(w, "\"# Voxels\":");
                 width(w, "\"Resolution\":");
                 width(w, "\"32^3->16^3->8^3\":");
+                width(w, "\"# Active tiles\":");
                 width(w, "\"Index Bounding Box\":");
                 width(w, "\"World Bounding Box\":");
                 std::cout << std::left << std::setw(w) << "\n\"Name\":"  << "name of a grid. Note that it is optional and hence might be empty."
@@ -291,6 +301,7 @@ int main(int argc, char* argv[])
                           << std::left << std::setw(w) << "\n\"# Voxels\":" << "total number of active values in a grid. Note this includes both active tiles and voxels."
                           << std::left << std::setw(w) << "\n\"Resolution\":" << "Efficient resolution of all the active values in a grid!"
                           << std::left << std::setw(w) << "\n\"32^3->16^3->8^3\":" << "Number of nodes at each level of the tree structure from the root to leaf level."
+                          << std::left << std::setw(w) << "\n\"# Active tiles\":" << "Number of active tiles at each level of the tree structure from the root to leaf level."
                           << std::left << std::setw(w) << "\n\"Index Bounding Box\":" << "coordinate bounding box of all the active values in a grid. Note that both min and max coordinates are inclusive!"
                           << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid. Note that min is inclusive and max is exclusive!\n";  
                 break;

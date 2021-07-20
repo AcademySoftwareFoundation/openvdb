@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderFunctions.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief General C++ implementation of the Grid rendering code.
 */
 
@@ -90,9 +85,9 @@ struct PointIntegrator
             float                               t0 = 0, t1 = 0;
             while (marcher.step(&node, t0, t1)) {
 
-                if (node->valueMax() == 0)
+                if (node->maximum() == 0)
                     continue;
-                const auto nodeStartIndex = node->valueMin();
+                const auto nodeStartIndex = node->minimum();
 
                 // DDA through the node's values...
                 nanovdb::DDA<RayT> dda;

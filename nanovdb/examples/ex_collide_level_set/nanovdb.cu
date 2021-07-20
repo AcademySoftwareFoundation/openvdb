@@ -77,7 +77,7 @@ void runNanoVDB(nanovdb::GridHandle<BufferT>& handle, int numIterations, int num
             auto wDistance = acc.getValue(ijk);
             if (wDistance <= 0) { // are we inside the levelset?
                 // get the normal for collision resolution.
-                Vec3f normal(wDistance);
+                Vec3f normal(-wDistance);
                 ijk[0] += 1;
                 normal[0] += acc.getValue(ijk);
                 ijk[0] -= 1;

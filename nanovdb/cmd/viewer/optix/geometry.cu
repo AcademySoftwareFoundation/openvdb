@@ -77,8 +77,9 @@ extern "C" __global__ void __intersection__nanovdb_levelset()
     const VolumeGeometry* volume = reinterpret_cast<VolumeGeometry*>(optixGetSbtDataPointer());
     const auto*           grid = reinterpret_cast<const nanovdb::FloatGrid*>(volume->grid);
 
-    const auto leafIndex = optixGetPrimitiveIndex();
-    const auto leafNode = grid->tree().getNode<typename nanovdb::FloatTree::LeafNodeType>(leafIndex);
+    const auto primIndex = optixGetPrimitiveIndex();
+    const int leafIndex = volume->enumeration[primIndex];
+    const auto leafNode = reinterpret_cast<const nanovdb::FloatTree::LeafNodeType*>(reinterpret_cast<const uint8_t*>(grid) + uintptr_t(leafIndex)*32);
 
     const float3 ray_orig = optixGetWorldRayOrigin();
     const float3 ray_dir = optixGetWorldRayDirection();
@@ -142,11 +143,12 @@ extern "C" __global__ void __intersection__nanovdb_fogvolume()
 //
 extern "C" __global__ void __intersection__nanovdb_grid()
 {
-    const auto leafIndex = optixGetPrimitiveIndex();
-
     const auto* sbt_data = reinterpret_cast<const HitGroupData*>(optixGetSbtDataPointer());
     const auto* grid = reinterpret_cast<const nanovdb::FloatGrid*>(sbt_data->geometry.volume.grid);
-    const auto  leafNode = grid->tree().getNode<typename nanovdb::FloatTree::LeafNodeType>(leafIndex);
+    
+    const auto primIndex = optixGetPrimitiveIndex();
+    const int leafIndex = sbt_data->geometry.volume.enumeration[primIndex];
+    const auto leafNode = reinterpret_cast<const nanovdb::FloatTree::LeafNodeType*>(reinterpret_cast<const uint8_t*>(grid) + uintptr_t(leafIndex)*32);
 
     const float3 ray_orig = optixGetWorldRayOrigin();
     const float3 ray_dir = optixGetWorldRayDirection();

@@ -3,11 +3,6 @@
 
 /*!
 	\file GridAssetUrl.cpp
-
-	\author Wil Braithwaite
-
-	\date October 10, 2020
-
 	\brief Class for handling Grid-Asset URLs.
 */
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherImpl.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Declaration of Grid Renderer implementations.
 */
 
@@ -65,14 +60,26 @@ struct LauncherForType<MaterialClass::kGrid>
         if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Float)) {
             auto grid = launcher.template grid<float>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp4)) {
+            auto grid = launcher.template grid<nanovdb::Fp4>(gridParams.gridHandle);
+            launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp8)) {
+            auto grid = launcher.template grid<nanovdb::Fp8>(gridParams.gridHandle);
+            launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp16)) {
+            auto grid = launcher.template grid<nanovdb::Fp16>(gridParams.gridHandle);
+            launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::FpN)) {
+            auto grid = launcher.template grid<nanovdb::FpN>(gridParams.gridHandle);
+            launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Double)) {
             auto grid = launcher.template grid<double>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) {
             auto grid = launcher.template grid<uint32_t>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
-        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::PackedRGBA8)) {
-            auto grid = launcher.template grid<nanovdb::PackedRGBA8>(gridParams.gridHandle);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::RGBA8)) {
+            auto grid = launcher.template grid<nanovdb::Rgba8>(gridParams.gridHandle);
             launcher.render(width, height, render::grid::RenderGridRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Int64)) {
             auto grid = launcher.template grid<int64_t>(gridParams.gridHandle);
@@ -111,8 +118,8 @@ struct LauncherForType<MaterialClass::kVoxels>
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::UInt32)) {
             auto grid = launcher.template grid<uint32_t>(gridParams.gridHandle);
             launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
-        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::PackedRGBA8)) {
-            auto grid = launcher.template grid<nanovdb::PackedRGBA8>(gridParams.gridHandle);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::RGBA8)) {
+            auto grid = launcher.template grid<nanovdb::Rgba8>(gridParams.gridHandle);
             launcher.render(width, height, render::voxel::RenderVoxelsRgba32fFn(), imgPtr, numAccumulations, grid, sceneParams, materialParams);
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Int64)) {
             auto grid = launcher.template grid<int64_t>(gridParams.gridHandle);
@@ -146,30 +153,42 @@ struct LauncherForType<MaterialClass::kFogVolumePathTracer>
             auto densityGrid = launcher.template grid<float>(densityGridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<float, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<float, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<float, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             }
         } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Double)) {
             auto densityGrid = launcher.template grid<double>(densityGridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<double, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<double, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<double, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             }
         } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Vec3f)) {
             auto densityGrid = launcher.template grid<nanovdb::Vec3f>(densityGridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3f, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3f, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3f, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             }
         } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Vec3d)) {
             auto densityGrid = launcher.template grid<nanovdb::Vec3d>(densityGridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3d, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3d, 1>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Vec3d, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams); break;
             }
+        } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Fp4)) {
+            auto densityGrid = launcher.template grid<nanovdb::Fp4>(densityGridParams.gridHandle);
+            launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Fp4, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams);
+        } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Fp8)) {
+            auto densityGrid = launcher.template grid<nanovdb::Fp8>(densityGridParams.gridHandle);
+            launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Fp8, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams);
+        } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::Fp16)) {
+            auto densityGrid = launcher.template grid<nanovdb::Fp16>(densityGridParams.gridHandle);
+            launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::Fp16, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams);
+        } else if (gridIsType(densityGridParams.gridHandle, nanovdb::GridType::FpN)) {
+            auto densityGrid = launcher.template grid<nanovdb::FpN>(densityGridParams.gridHandle);
+            launcher.render(width, height, render::fogvolume::RenderVolumeRgba32fFn<nanovdb::FpN, 0>(), imgPtr, numAccumulations, densityBounds, densityGrid, sceneParams, materialParams);
         } else {
             launcher.render(width, height, render::RenderEnvRgba32fFn(), imgPtr, numAccumulations, sceneParams, materialParams);
         }
@@ -253,16 +272,28 @@ struct LauncherForType<MaterialClass::kLevelSetFast>
             auto lsGrid = launcher.template grid<float>(gridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<float, 1>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<float, 1>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<float, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
             }
         } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Double)) {
             auto lsGrid = launcher.template grid<double>(gridParams.gridHandle);
             switch (materialParams.interpolationOrder) {
             default:
-            case 1: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<double, 1>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
+            //case 1: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<double, 1>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
             case 0: launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<double, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams); break;
             }
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp4)) {
+            auto lsGrid = launcher.template grid<nanovdb::Fp4>(gridParams.gridHandle);
+            launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<nanovdb::Fp4, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp8)) {
+            auto lsGrid = launcher.template grid<nanovdb::Fp8>(gridParams.gridHandle);
+            launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<nanovdb::Fp8, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::Fp16)) {
+            auto lsGrid = launcher.template grid<nanovdb::Fp16>(gridParams.gridHandle);
+            launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<nanovdb::Fp16, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams);
+        } else if (gridIsType(gridParams.gridHandle, nanovdb::GridType::FpN)) {
+            auto lsGrid = launcher.template grid<nanovdb::FpN>(gridParams.gridHandle);
+            launcher.render(width, height, render::levelset::RenderLevelSetRgba32fFn<nanovdb::FpN, 0>(), imgPtr, numAccumulations, gridBounds, lsGrid, sceneParams, materialParams);
         } else {
             launcher.render(width, height, render::RenderEnvRgba32fFn(), imgPtr, numAccumulations, sceneParams, materialParams);
         }
@@ -409,6 +440,7 @@ private:
 
         bool          mInitialized = false;
         void*         mDeviceGrid = nullptr;
+        int*          mDeviceEnumeration = nullptr;
         void*         mGlTextureResourceCUDA = nullptr;
         size_t        mGlTextureResourceSize = 0;
         int           mGlTextureResourceId = 0;

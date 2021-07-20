@@ -3,11 +3,6 @@
 
 /*!
 	\file GridManager.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of GridManager.
 */
 
@@ -40,24 +35,24 @@ static nanovdb::GridHandle<> createInternalGrid(std::string typeName, std::strin
 {
     if (typeName == "empty") {
         nanovdb::GridBuilder<float> builder(0);
-        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName, nanovdb::GridClass::Unknown);
+        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName);
     } else if (typeName == "ls_sphere_100") {
-        return nanovdb::createLevelSetSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createLevelSetSphere(100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_torus_100") {
-        return nanovdb::createLevelSetTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createLevelSetTorus(100.0f, 50.f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_box_100") {
-        return nanovdb::createLevelSetBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createLevelSetBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_octahedron_100") {
-        return nanovdb::createLevelSetOctahedron(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createLevelSetOctahedron(100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_sphere_100") {
-        return nanovdb::createFogVolumeSphere(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createFogVolumeSphere(100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_torus_100") {
-        return nanovdb::createFogVolumeTorus(100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createFogVolumeTorus(100.0f, 50.f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_box_100") {
-        return nanovdb::createFogVolumeBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createFogVolumeBox(100.0f, 100.0f, 100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "fog_mandelbulb_100") {
 
-        nanovdb::GridBuilder<float> builder(0);
+        nanovdb::GridBuilder<float> builder(0, nanovdb::GridClass::FogVolume);
         auto                        acc = builder.getAccessor();
 
         const int radius = 100;
@@ -73,17 +68,17 @@ static nanovdb::GridHandle<> createInternalGrid(std::string typeName, std::strin
                 }
             }
         }
-        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName, nanovdb::GridClass::FogVolume);      
+        return builder.getHandle<>(1.0f, nanovdb::Vec3d(0), typeName);      
     } else if (typeName == "fog_octahedron_100") {
-        return nanovdb::createFogVolumeOctahedron(100.0f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createFogVolumeOctahedron(100.0f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "points_sphere_100") {
-        return nanovdb::createPointSphere(1, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createPointSphere(1, 100.0f, nanovdb::Vec3f(0), 1.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "points_torus_100") {
-        return nanovdb::createPointTorus(1, 100.0f, 50.f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createPointTorus(1, 100.0f, 50.f, nanovdb::Vec3f(0), 1.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "points_box_100") {
-        return nanovdb::createPointBox(1, 100.0f, 100.0f, 100.0f, nanovdb::Vec3d(0), 1.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createPointBox(1, 100.0f, 100.0f, 100.0f, nanovdb::Vec3f(0), 1.0, nanovdb::Vec3R(0), typeName);
     } else if (typeName == "ls_bbox_100") {
-        return nanovdb::createLevelSetBBox(100.0f, 100.0f, 100.0f, 10.f, nanovdb::Vec3d(0), 1.0f, 3.0f, nanovdb::Vec3R(0), typeName);
+        return nanovdb::createLevelSetBBox(100.0f, 100.0f, 100.0f, 10.f, nanovdb::Vec3f(0), 1.0, 3.0, nanovdb::Vec3R(0), typeName);
     } else {
         return nanovdb::GridHandle<>();
     }
@@ -485,7 +480,8 @@ bool GridManager::addGridsFromLocalFile(const std::string& url, const std::strin
             if (gridName.empty()) {
                 auto grids = file.getGrids();
                 for (auto& grid : *grids) {
-                    auto gridHdl = nanovdb::openToNanoVDB(grid, nanovdb::StatsMode::Default, nanovdb::ChecksumMode::Default, false, verbosity);
+                    
+                    auto gridHdl = nanovdb::openToNanoVDB(grid, nanovdb::StatsMode::Default, nanovdb::ChecksumMode::Default, verbosity);
                     gridAsset = ensureGridAsset(asset, grid->getName(), AssetGridStatus::kLoaded, std::move(gridHdl));
                     addEventMessage({GridManager::EventMessage::Type::kInfo, "Successfully loaded grid \"" + grid->getName() + "\" from \"" + url + "\""});
                 }
@@ -493,7 +489,7 @@ bool GridManager::addGridsFromLocalFile(const std::string& url, const std::strin
             } else {
                 auto grid = file.readGrid(gridName);
                 if (grid) {
-                    auto gridHdl = nanovdb::openToNanoVDB(grid, nanovdb::StatsMode::Default, nanovdb::ChecksumMode::Default, false, verbosity);
+                    auto gridHdl = nanovdb::openToNanoVDB(grid, nanovdb::StatsMode::Default, nanovdb::ChecksumMode::Default, verbosity);
                     gridAsset = ensureGridAsset(asset, gridName, AssetGridStatus::kLoaded, std::move(gridHdl));
                     addEventMessage({GridManager::EventMessage::Type::kInfo, "Successfully loaded grid \"" + gridName + "\" from \"" + url + "\""});
                 }

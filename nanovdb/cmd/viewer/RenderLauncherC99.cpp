@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherC.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of C99-platform Grid renderer.
 */
 
@@ -16,6 +11,7 @@
 #include <fstream>
 #include "RenderLauncherImpl.h"
 #include "FrameBuffer.h"
+#include <nanovdb/util/NodeManager.h>
 
 extern "C" {
 #define VALUETYPE float
@@ -53,11 +49,13 @@ bool RenderLauncherC99::render(MaterialClass method, int width, int height, Fram
         using Node1T = Node2T::ChildNodeType;
         using Node0T = Node1T::ChildNodeType;
 
-        auto node0Level = grid->tree().getNode<Node0T>(0);
-        auto node1Level = grid->tree().getNode<Node1T>(0);
-        auto node2Level = grid->tree().getNode<Node2T>(0);
-        auto rootData = &grid->tree().root();
-        auto gridData = grid;
+        auto mgr = nanovdb::createNodeMgr(*grid);
+
+        auto* node0Level = mgr.leaf(0);
+        auto* node1Level = mgr.lower(0);
+        auto* node2Level = mgr.upper(0);
+        auto* rootData = &grid->tree().root();
+        auto* gridData = grid;
 
         nanovdb::Vec3f cameraP = sceneParams.camera.P();
         nanovdb::Vec3f cameraU = sceneParams.camera.U();

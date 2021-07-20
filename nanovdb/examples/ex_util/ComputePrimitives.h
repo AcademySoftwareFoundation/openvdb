@@ -2,9 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /// @file ComputePrimitives.h
-///
-/// @author Wil Braithwaite
-///
 /// @brief A collection of parallel compute primitives
 
 #pragma once

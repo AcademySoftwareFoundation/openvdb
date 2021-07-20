@@ -3,13 +3,15 @@
 
 #include <nanovdb/util/Primitives.h>
 
+#include <iostream>
+
 /// @brief Creates a NanoVDB grids of a level set sphere and accesses a value.
 ///
 /// @note This example only depends on NanoVDB.
 int main()
 {
     try {
-        auto handle = nanovdb::createLevelSetSphere<float>(100.0f);
+        auto handle = nanovdb::createLevelSetSphere(100.0f);
 
         auto* dstGrid = handle.grid<float>(); // Get a (raw) pointer to the NanoVDB grid form the GridManager.
         if (!dstGrid)

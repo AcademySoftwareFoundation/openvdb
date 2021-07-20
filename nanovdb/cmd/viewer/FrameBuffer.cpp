@@ -3,11 +3,6 @@
 
 /*!
 	\file FrameBuffer.cpp
-
-	\author Wil Braithwaite
-
-	\date May 26, 2020
-
 	\brief Implementation of FrameBufferBase.
 */
 

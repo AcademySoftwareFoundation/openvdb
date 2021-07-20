@@ -14,9 +14,10 @@
 */
 
 #include <nanovdb/NanoVDB.h> // manages and streams the raw memory buffer of a NanoVDB grid.
-#include <openvdb/openvdb.h>
+#include <nanovdb/util/GridHandle.h>
+#include "ForEach.h"
 
-#include <tbb/parallel_for.h>
+#include <openvdb/openvdb.h>
 
 #ifndef NANOVDB_NANOTOOPENVDB_H_HAS_BEEN_INCLUDED
 #define NANOVDB_NANOTOOPENVDB_H_HAS_BEEN_INCLUDED
@@ -55,10 +56,6 @@ class NanoToOpenVDB
     using DstTreeT = openvdb::tree::Tree<DstRootT>;
     using DstGridT = openvdb::Grid<DstTreeT>;
 
-    const SrcGridT*    mSrcGrid;
-    DstGridT*          mDstGrid;
-    std::vector<void*> mDstNodes[3];
-
 public:
     /// @brief Construction from an existing const OpenVDB Grid.
     NanoToOpenVDB(){};
@@ -67,13 +64,13 @@ public:
     typename DstGridT::Ptr operator()(const NanoGrid<ValueType>& grid, int verbose = 0);
 
 private:
-    void processGrid();
-
-    void processLeafs();
 
     template<typename SrcNodeT, typename DstNodeT>
-    void processNodes();
+    DstNodeT* processNode(const SrcNodeT*);
 
+    DstNode2* process(const SrcNode2* node) {return this->template processNode<SrcNode2, DstNode2>(node);}
+    DstNode1* process(const SrcNode1* node) {return this->template processNode<SrcNode1, DstNode1>(node);}
+    DstNode0* process(const SrcNode0* node);
 }; // NanoToOpenVDB class
 
 template<typename T>
@@ -83,116 +80,122 @@ struct ConvertTrait
 };
 
 template<typename T>
-struct ConvertTrait<Vec3<T>>
+struct ConvertTrait< Vec3<T> >
 {
     using Type = openvdb::math::Vec3<T>;
+};
+
+template<typename T>
+struct ConvertTrait< Vec4<T> >
+{
+    using Type = openvdb::math::Vec4<T>;
 };
 
 template<typename T>
 typename NanoToOpenVDB<T>::DstGridT::Ptr
 NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
 {
-    // since the input nanovdb grid might use nanovdb types (Coord, Mask, Vec3) we case to use openvdb types
-    mSrcGrid = reinterpret_cast<const SrcGridT*>(&grid);
-
-    this->processGrid();
-
-    this->processLeafs();
-
-    this->template processNodes<SrcNode1, DstNode1>();
-
-    this->template processNodes<SrcNode2, DstNode2>();
-
-    auto& dstRoot = mDstGrid->tree().root();
-    for (auto& child : mDstNodes[2])
-        dstRoot.addChild(reinterpret_cast<DstNode2*>(child));
-
-    return openvdb::SharedPtr<DstGridT>(mDstGrid);
-}
-
-template<typename T>
-void NanoToOpenVDB<T>::processGrid()
-{
-    mDstGrid = new DstGridT(mSrcGrid->tree().background());
-    mDstGrid->setName(mSrcGrid->gridName()); // set grid name
-    switch (mSrcGrid->gridClass()) { // set grid class
+    // since the input nanovdb grid might use nanovdb types (Coord, Mask, Vec3) we cast to use openvdb types
+    const SrcGridT *srcGrid = reinterpret_cast<const SrcGridT*>(&grid);
+    auto dstGrid = openvdb::createGrid<DstGridT>(srcGrid->tree().background());
+    dstGrid->setName(srcGrid->gridName()); // set grid name
+    switch (srcGrid->gridClass()) { // set grid class
     case nanovdb::GridClass::LevelSet:
-        mDstGrid->setGridClass(openvdb::GRID_LEVEL_SET);
+        dstGrid->setGridClass(openvdb::GRID_LEVEL_SET);
         break;
     case nanovdb::GridClass::FogVolume:
-        mDstGrid->setGridClass(openvdb::GRID_FOG_VOLUME);
+        dstGrid->setGridClass(openvdb::GRID_FOG_VOLUME);
         break;
     case nanovdb::GridClass::Staggered:
-        mDstGrid->setGridClass(openvdb::GRID_STAGGERED);
+        dstGrid->setGridClass(openvdb::GRID_STAGGERED);
         break;
+    case nanovdb::GridClass::PointIndex:
+        throw std::runtime_error("NanoToOpenVDB does not yet support PointIndexGrids");
+    case nanovdb::GridClass::PointData:
+        throw std::runtime_error("NanoToOpenVDB does not yet support PointDataGrids");
+    case nanovdb::GridClass::Topology:
+        throw std::runtime_error("NanoToOpenVDB does not yet support Mask (or Topology) Grids");
     default:
-        mDstGrid->setGridClass(openvdb::GRID_UNKNOWN);
+        dstGrid->setGridClass(openvdb::GRID_UNKNOWN);
     }
     // set transform
-    const nanovdb::Map& nanoMap = reinterpret_cast<const GridData*>(mSrcGrid)->mMap;
+    const nanovdb::Map& nanoMap = reinterpret_cast<const GridData*>(srcGrid)->mMap;
     auto                mat = openvdb::math::Mat4<double>::identity();
     mat.setMat3(openvdb::math::Mat3<double>(nanoMap.mMatD));
     mat.transpose(); // the 3x3 in nanovdb is transposed relative to openvdb's 3x3
     mat.setTranslation(openvdb::math::Vec3<double>(nanoMap.mVecD));
-    mDstGrid->setTransform(openvdb::math::Transform::createLinearTransform(mat)); // calls simplify!
+    dstGrid->setTransform(openvdb::math::Transform::createLinearTransform(mat)); // calls simplify!
+
+    // process root node
+    auto &root = dstGrid->tree().root();
+    auto *data = srcGrid->tree().root().data();
+    for (uint32_t i=0; i<data->mTableSize; ++i) {
+        auto *tile = data->tile(i);
+        if (tile->isChild()) {
+            root.addChild( this->process( data->getChild(tile)) );
+        } else {
+            root.addTile(tile->origin(), tile->value, tile->state);
+        }
+    }
+    
+    return dstGrid;
 }
 
 template<typename T>
-void NanoToOpenVDB<T>::processLeafs()
+template<typename SrcNodeT, typename DstNodeT>
+DstNodeT*
+NanoToOpenVDB<T>::processNode(const SrcNodeT *srcNode)
 {
-    const SrcTreeT& srcTree = mSrcGrid->tree();
-    mDstNodes[0].resize(srcTree.template nodeCount<SrcNode0>());
-
-    auto kernel = [&](const tbb::blocked_range<size_t>& r) {
+    DstNodeT *dstNode = new DstNodeT(); // un-initialized for fast construction
+    dstNode->setOrigin(srcNode->origin());
+    const auto& childMask = srcNode->childMask();
+    const_cast<typename DstNodeT::NodeMaskType&>(dstNode->getValueMask()) = srcNode->valueMask();
+    const_cast<typename DstNodeT::NodeMaskType&>(dstNode->getChildMask()) = childMask;
+    auto* dstTable = const_cast<typename DstNodeT::UnionType*>(dstNode->getTable());
+    auto* srcData  = srcNode->data();
+    std::vector<std::pair<uint32_t, const typename SrcNodeT::ChildNodeType*>> childNodes;
+    const auto childCount = childMask.countOn();
+    childNodes.reserve(childCount);
+    for (uint32_t n = 0; n < DstNodeT::NUM_VALUES; ++n) {
+        if (childMask.isOn(n)) {
+            childNodes.emplace_back(n, srcData->getChild(n));
+        } else {
+            dstTable[n].setValue(srcData->mTable[n].value);
+        }
+    }
+    auto kernel = [&](const auto& r) {
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const SrcNode0* srcNode = srcTree.template getNode<SrcNode0>(i);
-            DstNode0*       dstNode = new DstNode0(); // un-initialized for fast construction
-            dstNode->setOrigin(srcNode->origin());
-            dstNode->setValueMask(srcNode->valueMask());
-            const ValueT* src = &srcNode->getValue(0);
-            for (ValueT *dst = dstNode->buffer().data(), *end = dst + DstNode0::SIZE; dst != end; dst += 4, src += 4) {
-                dst[0] = src[0];
-                dst[1] = src[1];
-                dst[2] = src[2];
-                dst[3] = src[3];
-            }
-            mDstNodes[0][i] = dstNode;
+            auto &p = childNodes[i];
+            dstTable[p.first].setChild( this->process(p.second) );
         }
     };
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, mDstNodes[0].size(), 4), kernel);
 
-} // processLeafs
+#if 0
+    kernel(Range1D(0, childCount));
+#else
+    forEach(0, childCount, 1, kernel);
+#endif
+    return dstNode;
+} // processNode
 
 template<typename T>
-template<typename SrcNodeT, typename DstNodeT>
-void NanoToOpenVDB<T>::processNodes()
+typename NanoToOpenVDB<T>::DstNode0* 
+NanoToOpenVDB<T>::process(const SrcNode0 *srcNode)
 {
-    const SrcTreeT& srcTree = mSrcGrid->tree();
-    mDstNodes[DstNodeT::LEVEL].resize(srcTree.template nodeCount<SrcNodeT>());
+    DstNode0* dstNode = new DstNode0(); // un-initialized for fast construction
+    dstNode->setOrigin(srcNode->origin());
+    dstNode->setValueMask(srcNode->valueMask());
+   
+    const ValueT* src = srcNode->data()->mValues;// doesn't work for compressed data, bool or ValueMask
+    for (ValueT *dst = dstNode->buffer().data(), *end = dst + DstNode0::SIZE; dst != end; dst += 4, src += 4) {
+        dst[0] = src[0];
+        dst[1] = src[1];
+        dst[2] = src[2];
+        dst[3] = src[3];
+    }
 
-    auto kernel = [&](const tbb::blocked_range<size_t>& r) {
-        for (auto i = r.begin(); i != r.end(); ++i) {
-            const SrcNodeT* srcNode = srcTree.template getNode<SrcNodeT>(i);
-            DstNodeT*       dstNode = new DstNodeT(); // un-initialized for fast construction
-            dstNode->setOrigin(srcNode->origin());
-            const auto& childMask = srcNode->childMask();
-            const_cast<typename DstNodeT::NodeMaskType&>(dstNode->getValueMask()) = srcNode->valueMask();
-            const_cast<typename DstNodeT::NodeMaskType&>(dstNode->getChildMask()) = childMask;
-            auto* dstTable = const_cast<typename DstNodeT::UnionType*>(dstNode->getTable());
-            auto* srcTable = reinterpret_cast<const typename SrcNodeT::DataType*>(srcNode)->mTable;
-            for (uint32_t n = 0; n < DstNodeT::NUM_VALUES; ++n) {
-                if (childMask.isOn(n)) {
-                    void* child = mDstNodes[DstNodeT::LEVEL - 1][srcTable[n].childID];
-                    dstTable[n].setChild(reinterpret_cast<typename DstNodeT::ChildNodeType*>(child));
-                } else {
-                    dstTable[n].setValue(srcTable[n].value);
-                }
-            }
-            mDstNodes[DstNodeT::LEVEL][i] = dstNode;
-        }
-    };
-    tbb::parallel_for(tbb::blocked_range<size_t>(0, mDstNodes[DstNodeT::LEVEL].size(), 4), kernel);
-} // processNodes
+    return dstNode;
+} // process(SrcNode0)
 
 template<typename ValueT>
 typename openvdb::Grid<typename openvdb::tree::Tree4<typename ConvertTrait<ValueT>::Type>::Type>::Ptr
@@ -218,8 +221,12 @@ nanoToOpenVDB(const GridHandle<BufferT>& handle, int verbose)
         return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else if (auto grid = handle.template grid<nanovdb::Vec3d>()) {
         return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::Vec4f>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
+    } else if (auto grid = handle.template grid<nanovdb::Vec4d>()) {
+        return nanovdb::nanoToOpenVDB(*grid, verbose);
     } else {
-        OPENVDB_THROW(openvdb::RuntimeError, "Unrecognized NanoVDB grid type");
+        OPENVDB_THROW(openvdb::RuntimeError, "Unsupported NanoVDB grid type");
     }
 }
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file primitives.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief primitives math functions.
 */
 

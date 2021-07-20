@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncher.h
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Declaration of Grid Render-platform manager class.
 */
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file CallbackPool.h
-
-	\author Wil Braithwaite
-
-	\date October 10, 2020
-
 	\brief Class to handle a pool of threads.
 */
 

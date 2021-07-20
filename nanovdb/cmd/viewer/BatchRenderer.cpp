@@ -3,17 +3,13 @@
 
 /*!
 	\file BatchRenderer.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of BatchRenderer.
 */
 
 #include "BatchRenderer.h"
 #include <sstream>
 #include <iomanip>
+#include <iostream>
 
 #if defined(NANOVDB_USE_EGL)
 #define EGL_EGLEXT_PROTOTYPES

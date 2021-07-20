@@ -20,7 +20,7 @@ USE_ZLIB   := yes
 USE_BLOSC := yes
 USE_CUDA := yes
 USE_TBB := yes
-USE_JEMALLOC := no
+USE_JEMALLOC := yes
 USE_OPENGL := yes
 USE_OPENCL := yes
 USE_INTRINSICS := yes
@@ -39,6 +39,8 @@ ifeq ("$(shell uname -s)","Darwin")
     USE_CUDA = no
     SHELL = /bin/tcsh
 endif
+
+# -arch=sm_82
 
 #CC = clang -Wall -Wunused-parameter -march=native
 CC = g++ -Wfatal-errors -Wall -Wunused-parameter -Wno-invalid-offsetof -march=native
@@ -84,7 +86,7 @@ ifeq (yes,$(USE_GLFW))
 	VIEWER_LIBS += -lglfw
 endif
 
-# tbb...
+# jemalloc...
 ifeq (yes,$(USE_JEMALLOC))
 	LIBS += -ljemalloc
 endif
@@ -124,7 +126,7 @@ ifneq ("$(wildcard $(USE_CUDA))", "")
 endif
 endif
 
-# OpenGL
+# OpenGL...
 ifeq (yes,$(USE_OPENGL))
 ifeq ("$(shell uname -s)","Darwin")
 	LIBS += -framework OpenGL
@@ -137,7 +139,7 @@ endif
 	VIEWER_SRC_FILES += release/FrameBufferGL.o release/RenderLauncherGL.o release/glad.o
 endif
 
-# OpenCL
+# OpenCL...
 ifeq (yes,$(USE_OPENCL))
 ifeq ("$(shell uname -s)","Darwin")
 	LIBS += -framework OpenCL
@@ -153,7 +155,7 @@ ifeq (yes,$(USE_CUDA))
 
 	CUDA_PATH ?= /usr/local/cuda
 	NVCC = $(CUDA_PATH)/bin/nvcc
-	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -DNDEBUG -O3 -use_fast_math --extended-lambda
+	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -DNDEBUG -O3 -use_fast_math --extended-lambda -arch=sm_75
 #	BUILD_CUDA = $(NVCC) $(CXXFLAGS) -O1 -g -use_fast_math
 
 ifneq ("$(wildcard $(CUDA_PATH))", "")
@@ -319,7 +321,7 @@ cuda/Benchmark.o: examples/benchmark/Benchmark.cpp examples/benchmark/*.h $(DEP)
 	@mkdir -p cuda data
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 
-cuda/BenchKernels.o: examples/benchmark/BenchKernels.cu examples/benchmark/*.h $(DEP)
+cuda/BenchKernels.o: examples/benchmark/BenchKernels_nano.cu examples/benchmark/*.h $(DEP)
 	@mkdir -p cuda data
 	$(BUILD_CUDA) $(INCLUDES) -o $@ -c $<
 

@@ -3,11 +3,6 @@
 
 /*!
 	\file RenderLauncherCUDA.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of CUDA-platform Grid renderer.
 */
 
@@ -120,7 +115,7 @@ std::shared_ptr<RenderLauncherCUDA::GridResource> RenderLauncherCUDA::ensureGrid
     if (it != mGridResources.end()) {
         resource = it->second;
     } else {
-        std::cout << "Initializing CUDA grid["<< gridHdl->gridMetaData()->gridName() <<"] resource..." << std::endl;
+        std::cout << "Initializing CUDA grid["<< gridHdl->gridMetaData()->shortGridName() <<"] resource..." << std::endl;
 
         resource = std::make_shared<GridResource>();
         mGridResources.insert(std::make_pair(gridHdl, resource));

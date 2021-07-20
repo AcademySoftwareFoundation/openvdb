@@ -3,11 +3,6 @@
 
 /*!
 	\file FrameBufferGL.cpp
-
-	\author Wil Braithwaite
-
-	\date May 10, 2020
-
 	\brief Implementation of OpenGL image renderer help class.
 */
 

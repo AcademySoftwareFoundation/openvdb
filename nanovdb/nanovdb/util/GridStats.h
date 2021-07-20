@@ -19,7 +19,12 @@
 #include "Range.h"
 #include "ForEach.h"
 
+#ifdef NANOVDB_USE_TBB
+#include <tbb/parallel_reduce.h>
+#endif
+
 #include <atomic>
+#include <iostream>
 
 namespace nanovdb {
 
@@ -103,6 +108,7 @@ public:
     static constexpr bool hasMinMax() { return !std::is_same<bool, ValueT>::value; }
     static constexpr bool hasAverage() { return false; }
     static constexpr bool hasStdDeviation() { return false; }
+    static constexpr size_t size() { return 0; }
 }; // Extrema<T, 0>
 
 /// @brief Template specialization of Extrema on vector value types, i.e. rank = 1
@@ -192,6 +198,7 @@ public:
     static constexpr bool hasMinMax() { return !std::is_same<bool, Real>::value; }
     static constexpr bool hasAverage() { return false; }
     static constexpr bool hasStdDeviation() { return false; }
+    static constexpr size_t size() { return 0; }
 }; // Extrema<T, 1>
 
 //================================================================================================
@@ -398,7 +405,7 @@ struct NoopStats
     NoopStats& add(const ValueT&) { return *this; }
     NoopStats& add(const ValueT&, uint64_t) { return *this; }
     NoopStats& add(const NoopStats&) { return *this; }
-
+    static constexpr size_t size() { return 0; }
     static constexpr bool hasMinMax() { return false; }
     static constexpr bool hasAverage() { return false; }
     static constexpr bool hasStdDeviation() { return false; }
@@ -410,6 +417,7 @@ struct NoopStats
 template<typename GridT, typename StatsT = Stats<typename GridT::ValueType>>
 class GridStats
 {
+    struct NodeStats;
     using TreeT  = typename GridT::TreeType;
     using ValueT = typename TreeT::ValueType;
     using BuildT = typename TreeT::BuildType;
@@ -418,20 +426,17 @@ class GridStats
     using Node2  = typename TreeT::Node2; // upper
     using RootT  = typename TreeT::Node3; // root
     static_assert(std::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
-
     static constexpr bool DO_STATS = StatsT::hasMinMax() ||  StatsT::hasAverage() || StatsT::hasStdDeviation();
+    
+    ValueT mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
 
-    NanoGrid<BuildT>*     mGrid;
-    ValueT                mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
-    std::atomic<uint64_t> mActiveVoxelCount;
-
-    // Below are private methods use to serialize nodes into NanoVDB
-    void processLeafs(std::vector<StatsT>&);
-
+    void process( GridT& );// process grid and all tree nodes
+    void process( TreeT& );// process Tree, root node and child nodes
+    void process( RootT& );// process root node and child nodes
+    NodeStats process( Node0& );// process leaf node
+    
     template<typename NodeT>
-    void processNodes(std::vector<StatsT>&, std::vector<StatsT>&);
-    void processRoot(std::vector<StatsT>&);
-    void processGrid();
+    NodeStats process( NodeT& );// process internal node and child nodes
 
     template<typename DataT, int Rank>
     void setStats(DataT*, const Extrema<ValueT, Rank>&);
@@ -449,44 +454,38 @@ class GridStats
     setFlag(const T& min, const T& max, FlagT& flag) const;
 
 public:
-    GridStats()
-        : mGrid(nullptr)
-    {
-    }
+    GridStats() = default;
 
     void operator()(GridT& grid, ValueT delta = ValueT(0));
 
 }; // GridStats
+
+template<typename GridT, typename StatsT>
+struct GridStats<GridT, StatsT>::NodeStats
+{
+    StatsT    stats;
+    //uint64_t  activeCount;
+    CoordBBox bbox;
+
+    NodeStats(): stats(), bbox() {}//activeCount(0), bbox() {};
+
+    NodeStats& add(const NodeStats &other)
+    {
+        stats.add( other.stats );// no-op for NoopStats?!
+        //activeCount += other.activeCount;
+        bbox[0].minComponent(other.bbox[0]);
+        bbox[1].maxComponent(other.bbox[1]);
+        return *this;
+    }
+};// GridStats::NodeStats
 
 //================================================================================================
 
 template<typename GridT, typename StatsT>
 void GridStats<GridT, StatsT>::operator()(GridT& grid, ValueT delta)
 {
-    mGrid = &grid;
     mDelta = delta; // delta = voxel size for level sets, else 0
-    mActiveVoxelCount = 0;
-
-    std::vector<StatsT> stats0;
-    std::vector<StatsT> stats1;
-
-    if (DO_STATS) { // resolved at compiletime
-        stats0.resize(mGrid->tree().nodeCount(0));
-        stats1.resize(mGrid->tree().nodeCount(1));
-    }
-
-    this->processLeafs(stats0);
-
-    this->template processNodes<Node1>(stats1, stats0);
-
-    if (DO_STATS) { // resolved at compiletime
-        stats0.resize(mGrid->tree().nodeCount(2));
-    }
-    this->template processNodes<Node2>(stats0, stats1);
-
-    this->processRoot(stats0);
-
-    this->processGrid();
+    this->process( grid );
 }
 
 //================================================================================================
@@ -508,7 +507,7 @@ inline void GridStats<GridT, StatsT>::
     data->setMin(s.min());
     data->setMax(s.max());
     data->setAvg(s.avg());
-    data->setStd(s.std());
+    data->setDev(s.std());
 }
 
 //================================================================================================
@@ -529,138 +528,13 @@ GridStats<GridT, StatsT>::
 //================================================================================================
 
 template<typename GridT, typename StatsT>
-void GridStats<GridT, StatsT>::
-    processLeafs(std::vector<StatsT>& stats)
+void GridStats<GridT, StatsT>::process( GridT &grid )
 {
-    auto& tree = mGrid->tree();
-    auto  kernel = [&](const Range1D& r) {
-        uint64_t sum = 0;
-        for (auto i = r.begin(); i != r.end(); ++i) {
-            Node0* leaf = tree.template getNode<Node0>(i);
-            auto* data = leaf->data();
-            if (auto n = data->mValueMask.countOn()) {
-                data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
-                sum += n;
-                leaf->updateBBox(); // optionally update active bounding box
-                if (DO_STATS) { // resolved at compiletime
-                    StatsT&    s = stats[i];
-                    for (auto it = data->mValueMask.beginOn(); it; ++it) {
-                        s.add(data->value(*it));
-                    }
-                    this->setStats(data, s);
-                    this->setFlag(data->valueMin(), data->valueMax(), data->mFlags);
-                }
-            } else {
-                data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf does not contain active voxel
-            }
-        }
-        mActiveVoxelCount += sum;
-    };// kernel
-    forEach(0, tree.nodeCount(0), 8, kernel);
-} // GridStats::processLeafs
+    this->process( grid.tree() );// this processes tree, root and all nodes
 
-//================================================================================================
-template<typename GridT, typename StatsT>
-template<typename NodeT>
-void GridStats<GridT, StatsT>::
-    processNodes(std::vector<StatsT>& stats, std::vector<StatsT>& childStats)
-{
-    using ChildT = typename NodeT::ChildNodeType;
-    auto& tree = mGrid->tree();
-    auto  kernel = [&](const Range1D& r) {
-        uint64_t sum = 0;
-        for (auto i = r.begin(); i != r.end(); ++i) {
-            NodeT* node = tree.template getNode<NodeT>(i);
-            auto*  data = node->data();
-            CoordBBox bbox; // empty
-            for (auto iter = data->mValueMask.beginOn(); iter; ++iter) {
-                sum += ChildT::NUM_VALUES; // active tiles
-                if (DO_STATS) { // resolved at compiletime
-                    stats[i].add(data->mTable[*iter].value, ChildT::NUM_VALUES);
-                }
-                const Coord ijk = node->offsetToGlobalCoord(*iter);
-                bbox[0].minComponent(ijk);
-                bbox[1].maxComponent(ijk + Coord(int32_t(ChildT::DIM) - 1));
-            }
-            for (auto iter = data->mChildMask.beginOn(); iter; ++iter) {
-                const auto& childBBox = data->child(*iter)->bbox();
-                if (childBBox.empty()) continue;
-                bbox[0].minComponent(childBBox[0]);
-                bbox[1].maxComponent(childBBox[1]);
-                if (DO_STATS) { // resolved at compiletime
-                    stats[i].add(childStats[data->mTable[*iter].childID]);
-                }
-            }
-            data->mBBox = bbox;
-            if (bbox.empty()) {
-                data->mFlags &= ~uint32_t(1); // set 1st bit off since node to disable rendering of node
-                data->mFlags &= ~uint32_t(2); // set 2nd bit off since node does not contain active values
-            } else {
-                data->mFlags |=  uint32_t(2); // set 2nd bit on since node contains active values
-                if (DO_STATS) { // resolved at compiletime
-                    this->setStats(data, stats[i]);
-                    this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
-                }
-            }
-        }
-        mActiveVoxelCount += sum;
-    };// kernel
-    forEach(0, tree.template nodeCount<NodeT>(), 4, kernel);
-} // GridStats::processNodes
-
-//================================================================================================
-template<typename GridT, typename StatsT>
-void GridStats<GridT, StatsT>::
-    processRoot(std::vector<StatsT>& childStats)
-{
-    using ChildT = Node2;
-    RootT&    root = mGrid->tree().root();
-    auto&     data = *root.data();
-    CoordBBox bbox; // set to an empty bounding box
-    if (data.mTileCount == 0) { // empty root node
-        data.mMinimum = data.mMaximum = data.mBackground;
-        data.mAverage = data.mStdDevi = 0;
-        data.mActiveVoxelCount = 0;
-    } else {
-        StatsT s; // invalid
-        for (uint32_t i = 0; i < data.mTileCount; ++i) {
-            auto& tile = data.tile(i);
-            if (tile.isChild()) { // process child node
-                auto& childBBox = data.child(tile).bbox();
-                if (childBBox.empty()) continue;
-                bbox[0].minComponent(childBBox[0]);
-                bbox[1].maxComponent(childBBox[1]);
-                if (DO_STATS) { // resolved at compiletime
-                    s.add(childStats[tile.childID]);
-                }
-            } else if (tile.state) { // active tile
-                mActiveVoxelCount += ChildT::NUM_VALUES;
-                const Coord ijk = tile.origin();
-                bbox[0].minComponent(ijk);
-                bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
-                if (DO_STATS) { // resolved at compiletime
-                    s.add(tile.value, ChildT::NUM_VALUES);
-                }
-            }
-        }
-        this->setStats(&data, s);
-        data.mActiveVoxelCount = mActiveVoxelCount;
-        if (bbox.empty()) {
-            std::cerr << "\nWarning: input tree only contained inactive root tiles! While not strictly an error it's suspecious." << std::endl;
-        }
-    }
-    data.mBBox = bbox;
-} // GridStats::processRoot
-
-//================================================================================================
-
-template<typename GridT, typename StatsT>
-void GridStats<GridT, StatsT>::
-    processGrid()
-{
     // set world space AABB
-    auto&       data = *mGrid->data();
-    const auto& indexBBox = mGrid->tree().root().bbox();
+    auto& data = *grid.data();
+    const auto& indexBBox = grid.tree().root().bbox();
     if (indexBBox.empty()) {
         data.mWorldBBox = BBox<Vec3R>();
         data.setBBoxOn(false);
@@ -677,7 +551,7 @@ void GridStats<GridT, StatsT>::
         const Coord max = indexBBox[1] + Coord(1);
         
         auto& worldBBox = data.mWorldBBox;
-        const auto& map = mGrid->map();
+        const auto& map = grid.map();
         worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
         worldBBox.expand(map.applyMap(Vec3d(min[0], min[1], max[2])));
         worldBBox.expand(map.applyMap(Vec3d(min[0], max[1], min[2])));
@@ -693,7 +567,145 @@ void GridStats<GridT, StatsT>::
     data.setMinMaxOn(StatsT::hasMinMax());
     data.setAverageOn(StatsT::hasAverage());
     data.setStdDeviationOn(StatsT::hasStdDeviation());
-} // GridStats::processGrid
+} // GridStats::process( Grid )
+
+//================================================================================================
+
+template<typename GridT, typename StatsT>
+inline void GridStats<GridT, StatsT>::process( typename GridT::TreeType &tree )
+{
+    this->process( tree.root() );
+}
+
+//================================================================================================
+
+template<typename GridT, typename StatsT>
+void GridStats<GridT, StatsT>::process(RootT &root)
+{
+    using ChildT = Node2;
+    auto     &data = *root.data();
+    if (data.mTableSize == 0) { // empty root node
+        data.mMinimum = data.mMaximum = data.mBackground;
+        data.mAverage = data.mStdDevi = 0;
+        //data.mActiveVoxelCount = 0;
+        data.mBBox = CoordBBox();
+    } else {
+        NodeStats total;
+        for (uint32_t i = 0; i < data.mTableSize; ++i) {
+            auto* tile = data.tile(i);
+            if (tile->isChild()) { // process child node
+                total.add( this->process( *data.getChild(tile) ) );
+            } else if (tile->state) { // active tile
+                //total.activeCount += ChildT::NUM_VALUES;
+                const Coord ijk = tile->origin();
+                total.bbox[0].minComponent(ijk);
+                total.bbox[1].maxComponent(ijk + Coord(ChildT::DIM - 1));
+                if (DO_STATS) { // resolved at compiletime
+                    total.stats.add(tile->value, ChildT::NUM_VALUES);
+                }
+            }
+        }
+        this->setStats(&data, total.stats);
+        if (total.bbox.empty()) {
+            std::cerr << "\nWarning: input tree only contained inactive root tiles!"
+                      << "\nWhile not strictly an error it's rather suspicious!\n";
+        }
+        //data.mActiveVoxelCount = total.activeCount;
+        data.mBBox = total.bbox;
+    }
+} // GridStats::process( RootNode )
+
+//================================================================================================
+
+template<typename GridT, typename StatsT>
+template<typename NodeT>
+typename GridStats<GridT, StatsT>::NodeStats
+GridStats<GridT, StatsT>::process(NodeT &node)
+{
+    static_assert(is_same<NodeT,Node1>::value || is_same<NodeT,Node2>::value, "Incorrect node type");
+    using ChildT = typename NodeT::ChildNodeType;
+    
+    NodeStats total;
+    auto* data = node.data();
+
+    // Serial processing of active tiles
+    if (const auto tileCount = data->mValueMask.countOn()) {
+        //total.activeCount = tileCount * ChildT::NUM_VALUES; // active tiles
+        for (auto it = data->mValueMask.beginOn(); it; ++it) {
+            if (DO_STATS) { // resolved at compiletime
+                total.stats.add( data->mTable[*it].value, ChildT::NUM_VALUES );
+            }
+            const Coord ijk = node.offsetToGlobalCoord(*it);
+            total.bbox[0].minComponent(ijk);
+            total.bbox[1].maxComponent(ijk + Coord(int32_t(ChildT::DIM) - 1));
+        }
+    }
+    
+    // Serial or parallel processing of child nodes
+    if (const size_t childCount = data->mChildMask.countOn()) {
+#ifndef NANOVDB_USE_TBB
+        for (auto it = data->mChildMask.beginOn(); it; ++it) {
+            total.add( this->process( *data->getChild(*it) ) );
+        }
+#else
+        std::unique_ptr<ChildT*[]> childNodes(new ChildT*[childCount]);
+        ChildT **ptr = childNodes.get();
+        for (auto it = data->mChildMask.beginOn(); it; ++it) {
+            *ptr++ = data->getChild( *it );
+        }
+        using RangeT = tbb::blocked_range<size_t>;
+        total.add( tbb::parallel_reduce(RangeT(0, childCount), NodeStats(),
+            [&](const RangeT &r, NodeStats local)->NodeStats {
+                for(size_t i=r.begin(); i!=r.end(); ++i){
+                    local.add( this->process( *childNodes[i] ) );
+                }
+                return local;}, 
+            [](NodeStats a, const NodeStats &b)->NodeStats { return a.add( b ); }
+        ));
+#endif
+    }
+
+    data->mBBox = total.bbox;
+    if (total.bbox.empty()) {
+        data->mFlags &= ~uint32_t(1); // set 1st bit off since node to disable rendering of node
+        data->mFlags &= ~uint32_t(2); // set 2nd bit off since node does not contain active values
+    } else {
+        data->mFlags |=  uint32_t(2); // set 2nd bit on since node contains active values
+        if (DO_STATS) { // resolved at compiletime
+            this->setStats(data, total.stats);
+            this->setFlag(data->mMinimum, data->mMaximum, data->mFlags);
+        }
+    }
+    return total;
+} // GridStats::process( InternalNode )
+
+//================================================================================================
+
+template<typename GridT, typename StatsT>
+typename GridStats<GridT, StatsT>::NodeStats 
+GridStats<GridT, StatsT>::process(Node0 &leaf)
+{
+    static_assert(Node0::SIZE == 512u, "Invalid size of leaf nodes");
+    NodeStats local;
+    auto *data = leaf.data();
+    if (auto activeCount = data->mValueMask.countOn()) {
+        data->mFlags |= uint8_t(2); // sets 2nd bit on since leaf contains active voxel
+        //local.activeCount += activeCount;
+        leaf.updateBBox(); // optionally update active bounding box
+        local.bbox[0] = local.bbox[1] = data->mBBoxMin;
+        local.bbox[1] += Coord(data->mBBoxDif[0], data->mBBoxDif[1], data->mBBoxDif[2]);
+        if (DO_STATS) { // resolved at compiletime
+            for (auto it = data->mValueMask.beginOn(); it; ++it) {
+                local.stats.add(data->getValue(*it));
+            }
+            this->setStats(data, local.stats);
+            this->setFlag(data->getMin(), data->getMax(), data->mFlags);
+        }
+    } else {
+        data->mFlags &= ~uint8_t(2); // sets 2nd bit off since leaf does not contain active voxel
+    }
+    return local;
+} // GridStats::process( LeafNode )
 
 //================================================================================================
 
