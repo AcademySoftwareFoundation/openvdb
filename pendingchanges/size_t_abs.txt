@@ -1,0 +1,3 @@
+Improvements:
+  - Improved support for size_t grid types on systems where size_t is a unique type
+  [Contributed by Brecht Van Lommel]
