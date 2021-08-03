@@ -376,25 +376,53 @@ struct is_specialization<TemplateType<Args...>, TemplateType>
 
 /// @brief Maps one type (e.g. the build types above) to other (actual) types
 template <typename T>
-struct BuildToValueMap { using Type = T; };
+struct BuildToValueMap 
+{ 
+    using Type = T; 
+    using type = T;
+};
 
 template<>
-struct BuildToValueMap<ValueMask> { using Type = bool; };
+struct BuildToValueMap<ValueMask> 
+{ 
+    using Type = bool; 
+    using type = bool;
+};
 
 template<>
-struct BuildToValueMap<Half> { using Type = float; };
+struct BuildToValueMap<Half> 
+{ 
+    using Type = float; 
+    using type = float; 
+};
 
 template<>
-struct BuildToValueMap<Fp4> { using Type = float; };
+struct BuildToValueMap<Fp4> 
+{ 
+    using Type = float; 
+    using type = float;
+};
 
 template<>
-struct BuildToValueMap<Fp8> { using Type = float; };
+struct BuildToValueMap<Fp8> 
+{ 
+    using Type = float; 
+    using type = float;
+};
 
 template<>
-struct BuildToValueMap<Fp16> { using Type = float; };
+struct BuildToValueMap<Fp16> 
+{ 
+    using Type = float; 
+    using type = float;
+};
 
 template<>
-struct BuildToValueMap<FpN> { using Type = float; };
+struct BuildToValueMap<FpN> 
+{ 
+    using Type = float; 
+    using type = float; 
+};
 
 // --------------------------> PtrDiff  PtrAdd <------------------------------------
 
@@ -2055,12 +2083,14 @@ template<typename GridOrTreeOrRootT>
 struct NodeTrait<GridOrTreeOrRootT, 0>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = typename GridOrTreeOrRootT::LeafNodeType;
     using type = typename GridOrTreeOrRootT::LeafNodeType;
 };
 template<typename GridOrTreeOrRootT>
 struct NodeTrait<const GridOrTreeOrRootT, 0>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = const typename GridOrTreeOrRootT::LeafNodeType;
     using type = const typename GridOrTreeOrRootT::LeafNodeType;
 };
 
@@ -2068,30 +2098,35 @@ template<typename GridOrTreeOrRootT>
 struct NodeTrait<GridOrTreeOrRootT, 1>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = typename GridOrTreeOrRootT::RootType::ChildNodeType::ChildNodeType;
     using type = typename GridOrTreeOrRootT::RootType::ChildNodeType::ChildNodeType;
 };
 template<typename GridOrTreeOrRootT>
 struct NodeTrait<const GridOrTreeOrRootT, 1>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = const typename GridOrTreeOrRootT::RootType::ChildNodeType::ChildNodeType;
     using type = const typename GridOrTreeOrRootT::RootType::ChildNodeType::ChildNodeType;
 };
 template<typename GridOrTreeOrRootT>
 struct NodeTrait<GridOrTreeOrRootT, 2>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = typename GridOrTreeOrRootT::RootType::ChildNodeType;
     using type = typename GridOrTreeOrRootT::RootType::ChildNodeType;
 };
 template<typename GridOrTreeOrRootT>
 struct NodeTrait<const GridOrTreeOrRootT, 2>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = const typename GridOrTreeOrRootT::RootType::ChildNodeType;
     using type = const typename GridOrTreeOrRootT::RootType::ChildNodeType;
 };
 template<typename GridOrTreeOrRootT>
 struct NodeTrait<GridOrTreeOrRootT, 3>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = typename GridOrTreeOrRootT::RootType;
     using type = typename GridOrTreeOrRootT::RootType;
 };
 
@@ -2099,6 +2134,7 @@ template<typename GridOrTreeOrRootT>
 struct NodeTrait<const GridOrTreeOrRootT, 3>
 {
     static_assert(GridOrTreeOrRootT::RootType::LEVEL == 3, "Tree depth is not supported");
+    using Type = const typename GridOrTreeOrRootT::RootType;
     using type = const typename GridOrTreeOrRootT::RootType;
 };
 
@@ -2469,10 +2505,16 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
 // ----------------------------> GridTree <--------------------------------------
 
 /// @brief defines a tree type from a grid type while perserving constness
-template<typename GridT> struct GridTree {
+template<typename GridT> 
+struct GridTree 
+{
+    using Type = typename GridT::TreeType;
     using type = typename GridT::TreeType;
 };
-template<typename GridT> struct GridTree<const GridT> {
+template<typename GridT> 
+struct GridTree<const GridT> 
+{
+    using Type = const typename GridT::TreeType;
     using type = const typename GridT::TreeType;
 };
 
@@ -3889,13 +3931,29 @@ struct NanoNode;
 
 // Partial template specialization of above Node struct
 template<typename BuildT>
-struct NanoNode<BuildT, 0> {using Type = NanoLeaf<BuildT>;};
+struct NanoNode<BuildT, 0> 
+{
+    using Type = NanoLeaf<BuildT>;
+    using type = NanoLeaf<BuildT>;
+};
 template<typename BuildT>
-struct NanoNode<BuildT, 1> {using Type = NanoLower<BuildT>;};
+struct NanoNode<BuildT, 1> 
+{
+    using Type = NanoLower<BuildT>;
+    using type = NanoLower<BuildT>;
+};
 template<typename BuildT>
-struct NanoNode<BuildT, 2> {using Type = NanoUpper<BuildT>;};
+struct NanoNode<BuildT, 2> 
+{
+    using Type = NanoUpper<BuildT>;
+    using type = NanoUpper<BuildT>;
+};
 template<typename BuildT>
-struct NanoNode<BuildT, 3> {using Type = NanoRoot<BuildT>;};
+struct NanoNode<BuildT, 3> 
+{
+    using Type = NanoRoot<BuildT>;
+    using type = NanoRoot<BuildT>;
+};
 
 using FloatTree  = NanoTree<float>;
 using DoubleTree = NanoTree<double>;
@@ -4029,7 +4087,7 @@ private:
 template <typename BuildT, int LEVEL0>
 class ReadAccessor<BuildT, LEVEL0, -1, -1>//e.g. 0, 1, 2
 {
-    static_assert(LEVEL0 >= 0 && LEVEL0 <= 2, "LEVEL0 should be 0, 1, 2");
+    static_assert(LEVEL0 >= 0 && LEVEL0 <= 2, "LEVEL0 should be 0, 1, or 2");
 
     using TreeT  = NanoTree<BuildT>;
     using RootT  = NanoRoot<BuildT>; //  root node

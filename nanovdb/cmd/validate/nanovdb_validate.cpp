@@ -121,6 +121,14 @@ int main(int argc, char* argv[])
                     test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<nanovdb::Rgba8>()) {
                     test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::Fp4>()) {
+                    test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::Fp8>()) {
+                    test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::Fp16>()) {
+                    test = isValid(*grid, detailed, verbose);
+                } else if (auto* grid = handle.grid<nanovdb::FpN>()) {
+                    test = isValid(*grid, detailed, verbose);
                 } else if (auto* grid = handle.grid<bool>()) {
                     test = isValid(*grid, detailed, verbose);
                 } else {

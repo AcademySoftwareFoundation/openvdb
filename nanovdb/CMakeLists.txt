@@ -249,24 +249,6 @@ if(NANOVDB_USE_BLOSC AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
 endif()
 
 # -----------------------------------------------------------------------
-if(NOT USE_EMSCRIPTEN_TOOLCHAIN)
-  # -----------------------------
-  set(GLAD_SOURCE_DIR ${NanoVDB_TOP_LEVEL_DIR}/external/glad)
-
-  list(APPEND GLAD_SOURCE_FILES ${GLAD_SOURCE_DIR}/src/glad.c
-       ${GLAD_SOURCE_DIR}/include/glad/glad.h)
-
-  add_library(glad ${GLAD_SOURCE_FILES})
-
-  target_include_directories(glad PRIVATE ${GLAD_SOURCE_DIR}/include)
-
-  set(NANOVDB_GLAD_LINK_LIBRARY "glad")
-  set(NANOVDB_GLAD_INCLUDE_DIRECTORY ${GLAD_SOURCE_DIR}/include)
-  set(NANOVDB_USE_GLAD_FLAG "NANOVDB_USE_GLAD")
-
-endif()
-
-# -----------------------------------------------------------------------
 function(assign_source_group)
   foreach(_source IN ITEMS ${ARGN})
     if(IS_ABSOLUTE "${_source}")

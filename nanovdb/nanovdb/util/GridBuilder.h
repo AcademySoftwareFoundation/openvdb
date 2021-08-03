@@ -44,7 +44,10 @@ public:
     AbsDiff(const AbsDiff&) = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
-    /// @brief Required member method    
+    /// @brief Return true if the approximate value is within the accepted
+    ///        absolute error bounds of the exact value.
+    ///
+    /// @details Required member method   
     bool  operator()(float exact, float approx) const 
     { 
         return Abs(exact - approx) <= mTolerance;
@@ -67,7 +70,10 @@ public:
     RelDiff(const RelDiff&) = default;
     void  setTolerance(float tolerance) { mTolerance = tolerance; }
     float getTolerance() const { return mTolerance; }
-    /// @brief Required member method 
+    /// @brief Return true if the approximate value is within the accepted
+    ///        relative error bounds of the exact value.
+    ///
+    /// @details Required member method 
     bool  operator()(float exact, float approx) const 
     { 
         return  Abs(exact - approx)/Max(Abs(exact), Abs(approx)) <= mTolerance;

@@ -371,7 +371,6 @@ LeafManager<GridT>::LeafManager(LeafManager &&other)
 {
     mGrid = other.mGrid;
     mSize = other.mSize;
-    delete [] mLeafs; 
     mLeafs = other.mLeafs;
     other.mGrid = nullptr;
     other.mSize = 0;
