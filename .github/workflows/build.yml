@@ -48,7 +48,6 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release' }
           - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
           - { cxx: clang++, image: '2021', abi: '9', build: 'Release' }
