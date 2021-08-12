@@ -241,6 +241,10 @@ endif()
 
 if(OPENVDB_DSO_NAMES)
   set(OPENVDB_USE_CUSTOM_DSO_NAMES 1)
+  # if AX SOP is explicitly enabled, also switch on the build variable
+  if (SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+    set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+  endif()
 endif()
 
 if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
