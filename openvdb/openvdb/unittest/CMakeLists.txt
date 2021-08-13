@@ -89,6 +89,7 @@ else()
     TestDivergence.cc
     TestDoubleMetadata.cc
     TestExceptions.cc
+    TestExplicitInstantiation.cc
     TestFastSweeping.cc
     TestFile.cc
     TestFilter.cc
