@@ -259,7 +259,7 @@ public:
 
     /// Set the matrix as cross product of the given vector
     void setSkew(const Vec3<T> &v)
-    {*this = skew(v);}
+    {*this = skew<Mat3>(v);}
 
     /// @brief Set this matrix to the rotation matrix specified by the quaternion
     /// @details The quaternion is normalized and used to construct the matrix.
