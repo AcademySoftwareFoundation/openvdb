@@ -6,6 +6,7 @@ on:
     branches:
       - 'master'
       - 'feature/**'
+      - 'pr/**'
     paths-ignore:
       - 'CHANGES'
       - 'doc/**'
@@ -27,8 +28,35 @@ on:
   workflow_dispatch:
 
 jobs:
+  checkcache:
+    # Check that a valid Houdini cache exists. This isn't run on the ASWF repo
+    # as wel always expect a cache to exist there. Note that this required the
+    # cache to be fetched but that is currently trivial. See
+    # https://github.com/actions/toolkit/issues/500
+    if: github.repository_owner != 'AcademySoftwareFoundation'
+    name: Verify Houdini Cache
+    runs-on: ubuntu-latest
+    outputs:
+      HOUDINI_CACHE: ${{ steps.check.outputs.HOUDINI_CACHE }}
+    steps:
+    - uses: actions/cache@v2
+      id: cache
+      with:
+        path: hou
+        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
+    - name: Verify
+      id: check
+      run: echo "::set-output name=HOUDINI_CACHE::${{ steps.cache.outputs.cache-hit == 'true' }}"
+    - name: Skip Next Jobs
+      if: ${{ steps.check.outputs.HOUDINI_CACHE != true }}
+      run: echo "No Houdini Cache available, skipping jobs..."
+
   linux-vfx-houdini:
-    if: github.repository_owner == 'AcademySoftwareFoundation'
+    needs: [checkcache]
+    if: |
+      needs.checkcache.outputs.HOUDINI_CACHE == 'true' ||
+      github.repository_owner == 'AcademySoftwareFoundation'
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
@@ -47,10 +75,6 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - name: install_cmake
-      run: ./ci/install_cmake.sh 3.12.0
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -61,6 +85,10 @@ jobs:
       run: test -f "hou/hou.tar.gz"
     - name: install_houdini
       run: mv hou/hou.tar.gz . && tar -vxzf hou.tar.gz
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.12.0
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >

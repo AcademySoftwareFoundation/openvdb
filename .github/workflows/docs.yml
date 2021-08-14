@@ -6,6 +6,7 @@ on:
     branches:
       - 'master'
       - 'feature/**'
+      - 'pr/**'
     paths-ignore:
       - 'CHANGES'
       - 'openvdb_maya/**'

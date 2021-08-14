@@ -18,12 +18,13 @@ import json
 import base64
 import requests
 import hashlib
+import os
 
 # this argument is for the major.minor version of Houdini to download (such as 15.0, 15.5, 16.0)
 version = sys.argv[1]
 only_production = True if sys.argv[2] == 'ON' else False
-user_client_id = sys.argv[3]
-user_client_secret_key = sys.argv[4]
+user_client_id = os.getenv('HOUDINI_CLIENT_ID')
+user_client_secret_key = os.getenv('HOUDINI_SECRET_KEY')
 
 if not re.match('[0-9][0-9]\.[0-9]$', version):
     raise IOError('Invalid Houdini Version "%s", expecting in the form "major.minor" such as "16.0"' % version)
