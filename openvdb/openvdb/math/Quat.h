@@ -565,8 +565,8 @@ public:
 
     friend Quat slerp<>(const Quat &q1, const Quat &q2, T t, T tolerance);
 
-    void write(std::ostream& os) const { os.write(static_cast<char*>(&mm), sizeof(T) * 4); }
-    void read(std::istream& is) { is.read(static_cast<char*>(&mm), sizeof(T) * 4); }
+    void write(std::ostream& os) const { os.write(reinterpret_cast<const char*>(&mm), sizeof(T) * 4); }
+    void read(std::istream& is) { is.read(reinterpret_cast<char*>(&mm), sizeof(T) * 4); }
 
 protected:
     T mm[4];
