@@ -35,8 +35,8 @@ jobs:
   houdini18_5:
     needs: [checksecret]
     if: |
-      needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation'
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+          (always() && github.repository_owner == 'AcademySoftwareFoundation') }}
     runs-on: ubuntu-latest
     env:
       CXX: clang++
@@ -68,8 +68,8 @@ jobs:
   houdini18_0:
     needs: [checksecret]
     if: |
-      needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation'
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+          (always() && github.repository_owner == 'AcademySoftwareFoundation') }}
     runs-on: ubuntu-latest
     env:
       CXX: clang++

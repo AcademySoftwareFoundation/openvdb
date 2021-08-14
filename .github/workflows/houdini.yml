@@ -45,8 +45,7 @@ jobs:
         path: hou
         key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
         restore-keys: vdb1-houdini${{ matrix.config.hou }}-
-    - name: Verify
-      id: check
+    - id: check
       run: echo "::set-output name=HOUDINI_CACHE::${{ steps.cache.outputs.cache-hit == 'true' }}"
     - name: Skip Next Jobs
       if: ${{ steps.check.outputs.HOUDINI_CACHE != true }}
@@ -55,8 +54,8 @@ jobs:
   linux-vfx-houdini:
     needs: [checkcache]
     if: |
-      needs.checkcache.outputs.HOUDINI_CACHE == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation'
+      ${{ needs.checkcache.outputs.HOUDINI_CACHE == 'true' ||
+          (always() && github.repository_owner == 'AcademySoftwareFoundation') }}
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
