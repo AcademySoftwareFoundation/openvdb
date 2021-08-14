@@ -449,6 +449,19 @@ private:
 template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOn = true;
 template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 
+
+////////////////////////////////////////
+
+
+template<typename T, Index Log2Dim>
+inline std::ostream&
+operator<<(std::ostream& os, const LeafBuffer<T, Log2Dim>& buf)
+{
+    for (Index32 i = 0, N = buf.size(); i < N; ++i) os << buf.data()[i] << ", ";
+    return os;
+}
+
+
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

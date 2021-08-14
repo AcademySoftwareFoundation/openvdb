@@ -1994,14 +1994,6 @@ LeafNode<T, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
 ////////////////////////////////////////
 
 
-template<typename T, Index Log2Dim>
-inline std::ostream&
-operator<<(std::ostream& os, const typename LeafNode<T, Log2Dim>::Buffer& buf)
-{
-    for (Index32 i = 0, N = buf.size(); i < N; ++i) os << buf.mData[i] << ", ";
-    return os;
-}
-
 } // namespace tree
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
