@@ -167,7 +167,6 @@ private:
     static ChildType&       getChild(const MapIter& i) { return *(i->second.child); }
     static const ChildType& getChild(const MapCIter& i) { return *(i->second.child); }
     static ChildType&       stealChild(const MapIter& i, const Tile& t) {return i->second.steal(t);}
-    static const ChildType& stealChild(const MapCIter& i,const Tile& t) {return i->second.steal(t);}
 
     static bool isChild(const MapCIter& i)   { return i->second.isChild(); }
     static bool isChild(const MapIter& i)    { return i->second.isChild(); }
