@@ -106,7 +106,7 @@ jobs:
           - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
+          #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -260,10 +260,11 @@ jobs:
       shell: bash
       run: |
         brew update
-        brew install bash cmake ilmbase openexr@2 boost tbb glfw googletest
+        brew install bash gnu-getopt cmake ilmbase openexr@2 boost tbb glfw googletest
         echo "IlmBase_ROOT=/usr/local/opt/ilmbase" >> $GITHUB_ENV
         echo "OpenEXR_ROOT=/usr/local/opt/openexr@2" >> $GITHUB_ENV
         echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
+        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
     - name: build
       shell: bash
       run: >
