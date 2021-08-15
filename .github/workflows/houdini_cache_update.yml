@@ -46,13 +46,16 @@ jobs:
     - name: download_houdini
       run: ./ci/download_houdini.sh 18.5 ON
     - name: install_houdini
-      run: mv hou/hou.tar.gz . && tar -xzf hou.tar.gz
+      run: |
+        mkdir houdini_install
+        cp hou/hou.tar.gz houdini_install/hou.tar.gz
+        cd houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
-        cd hou && source houdini_setup_bash && cd - &&
+        cd houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
@@ -63,7 +66,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb1-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        key: vdb-v2-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
   houdini18_0:
     needs: [checksecret]
@@ -82,13 +85,16 @@ jobs:
     - name: download_houdini
       run: ./ci/download_houdini.sh 18.0 ON
     - name: install_houdini
-      run: mv hou/hou.tar.gz . && tar -xzf hou.tar.gz
+      run: |
+        mkdir houdini_install
+        cp hou/hou.tar.gz houdini_install/hou.tar.gz
+        cd houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
-        cd hou && source houdini_setup_bash && cd - &&
+        cd houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
@@ -99,4 +105,4 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb1-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        key: vdb-v2-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-set -e
+set -ex
 
 HOUDINI_MAJOR="$1"
 GOLD="$2"
@@ -35,6 +35,10 @@ cp -r dsolib/libtbb* ../hou/dsolib/.
 cp -r dsolib/libHalf* ../hou/dsolib/.
 cp -r dsolib/libjemalloc* ../hou/dsolib/.
 cp -r dsolib/liblzma* ../hou/dsolib/.
+cp -r dsolib/libIex* ../hou/dsolib/.
+cp -r dsolib/libImath* ../hou/dsolib/.
+cp -r dsolib/libIlmThread* ../hou/dsolib/.
+cp -r dsolib/libIlmImf* ../hou/dsolib/.
 
 # needed for < H18.0 (due to sesitag)
 if [ "$HOUDINI_MAJOR" == "17.0" ] || [ "$HOUDINI_MAJOR" == "17.5" ]; then

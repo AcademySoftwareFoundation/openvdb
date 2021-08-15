@@ -28,31 +28,27 @@ on:
   workflow_dispatch:
 
 jobs:
-  checkcache:
-    # Check that a valid Houdini cache exists. Note that this required the
-    # cache to be fetched but that is currently trivial. See
-    # https://github.com/actions/toolkit/issues/500
-    name: Verify Houdini Cache
+  checksecret:
+    # Check that valid github secrets have been set. This isn't needed to retrieve
+    # the cache, but ensures that the job doens't start with an empty cache
+    name: Verify Houdini Secrets
     runs-on: ubuntu-latest
     outputs:
-      HOUDINI_CACHE: ${{ steps.check.outputs.HOUDINI_CACHE }}
+      HOUDINI_SECRETS: ${{ steps.check.outputs.HOUDINI_SECRETS }}
     steps:
-    - uses: actions/cache@v2
-      id: cache
-      with:
-        path: hou
-        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
-    - id: check
-      run: echo "::set-output name=HOUDINI_CACHE::${{ steps.cache.outputs.cache-hit == 'true' }}"
-    - name: Skip Next Jobs
-      if: steps.check.outputs.HOUDINI_CACHE != 'true'
-      run: echo "No Houdini Cache available, skipping jobs..."
+      - id: check
+        env:
+            HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
+            HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
+        run: echo "::set-output name=HOUDINI_SECRETS::${{ env.HOUDINI_CLIENT_ID != '' && env.HOUDINI_SECRET_KEY != '' }}"
+      - name: Skip Next Jobs
+        if: steps.check.outputs.HOUDINI_SECRETS != 'true'
+        run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
   linux-vfx-houdini:
-    needs: [checkcache]
+    needs: [checksecret]
     if: >
-      ${{ needs.checkcache.outputs.HOUDINI_CACHE == 'true' ||
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
           github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
@@ -76,8 +72,8 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb1-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb1-houdini${{ matrix.config.hou }}-
+        key: vdb-v2-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb-v2-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
     - name: install_houdini
