@@ -65,7 +65,7 @@ while true; do
         -v|--verbose) # options which dont take an argument
             PARMS["$1"]="ON"; shift
             ;;
-        --[a-z]*) # all other arguments (key/values)
+        -[a-z]*|--[a-z]*) # all other arguments (key/values)
             PARMS["$1"]="$2"; shift 2
             ;;
         --)

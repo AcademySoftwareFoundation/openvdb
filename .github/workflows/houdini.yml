@@ -48,14 +48,14 @@ jobs:
     - id: check
       run: echo "::set-output name=HOUDINI_CACHE::${{ steps.cache.outputs.cache-hit == 'true' }}"
     - name: Skip Next Jobs
-      if: ${{ steps.check.outputs.HOUDINI_CACHE != true }}
+      if: steps.check.outputs.HOUDINI_CACHE != 'true'
       run: echo "No Houdini Cache available, skipping jobs..."
 
   linux-vfx-houdini:
     needs: [checkcache]
-    if: |
+    if: >
       ${{ needs.checkcache.outputs.HOUDINI_CACHE == 'true' ||
-          (always() && github.repository_owner == 'AcademySoftwareFoundation') }}
+          github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
@@ -93,7 +93,7 @@ jobs:
       run: >
         cd hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
-        -j=${{ matrix.config.j }}
+        -j ${{ matrix.config.j }}
         --build-type=${{ matrix.config.build }}
         --components="${{ matrix.config.components }}"
         --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
