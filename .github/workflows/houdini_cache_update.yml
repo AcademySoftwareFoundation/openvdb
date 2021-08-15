@@ -14,10 +14,7 @@ on:
 jobs:
   checksecret:
     # Check that valid github secrets have been set for the ability to
-    # download Houdini and cache it. Note that this isn't run on the
-    # ASWF repo where we expect the secrets to exist. The secrets are
-    # used in download_houdini.py
-    if: github.repository_owner != 'AcademySoftwareFoundation'
+    # download Houdini and cache it. The secrets are used in download_houdini.py
     name: Verify Houdini Secrets
     runs-on: ubuntu-latest
     outputs:

@@ -29,11 +29,9 @@ on:
 
 jobs:
   checkcache:
-    # Check that a valid Houdini cache exists. This isn't run on the ASWF repo
-    # as wel always expect a cache to exist there. Note that this required the
+    # Check that a valid Houdini cache exists. Note that this required the
     # cache to be fetched but that is currently trivial. See
     # https://github.com/actions/toolkit/issues/500
-    if: github.repository_owner != 'AcademySoftwareFoundation'
     name: Verify Houdini Cache
     runs-on: ubuntu-latest
     outputs:
