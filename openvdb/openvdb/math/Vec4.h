@@ -293,7 +293,8 @@ public:
     Vec4<T> unitSafe() const
     {
         T l2 = lengthSqr();
-        return l2 ? *this / static_cast<T>(sqrt(l2)) : Vec4<T>(1, 0, 0, 0);
+        const bool nonZero = (l2 != zeroVal<T>());
+        return nonZero ? *this / static_cast<T>(sqrt(l2)) : Vec4<T>(1, 0, 0, 0);
     }
 
     /// Multiply each element of this vector by @a scalar.
