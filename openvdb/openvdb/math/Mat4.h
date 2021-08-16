@@ -557,7 +557,7 @@ public:
 
         } else {
             invertible = true;
-            detA = 1.0 / detA;
+            detA = static_cast<T>(1.0 / detA);
 
             //
             // Calculate A^-1
@@ -599,7 +599,7 @@ public:
                     invertible = false;
 
                 } else {
-                    h = 1.0 / h;
+                    h = static_cast<T>(1.0 / h);
 
                     //
                     // Calculate h, g, and f
@@ -1282,8 +1282,8 @@ bool Mat4<T>::invert(Mat4<T> &inverse, T tolerance) const
 
         // scale row i
         for (int k = 0; k < 4; ++k) {
-            temp[i][k] /= pivot;
-            inverse[i][k] /= pivot;
+            temp[i][k] = static_cast<T>(temp[i][k] / pivot);
+            inverse[i][k] = static_cast<T>(inverse[i][k] / pivot);
         }
 
         // eliminate in rows below i
@@ -1292,8 +1292,8 @@ bool Mat4<T>::invert(Mat4<T> &inverse, T tolerance) const
             if (!isExactlyEqual(t, 0.0)) {
                 // subtract scaled row i from row j
                 for (int k = 0; k < 4; ++k) {
-                    temp[j][k] -= temp[i][k] * t;
-                    inverse[j][k] -= inverse[i][k] * t;
+                    temp[j][k] -= static_cast<T>(temp[i][k] * t);
+                    inverse[j][k] -= static_cast<T>(inverse[i][k] * t);
                 }
             }
         }
@@ -1306,7 +1306,7 @@ bool Mat4<T>::invert(Mat4<T> &inverse, T tolerance) const
 
             if (!isExactlyEqual(t, 0.0)) {
                 for (int k = 0; k < 4; ++k) {
-                    inverse[j][k] -= inverse[i][k]*t;
+                    inverse[j][k] -= static_cast<T>(inverse[i][k]*t);
                 }
             }
         }

@@ -278,8 +278,8 @@ rotation(const Vec3<typename MatType::value_type> &_axis, typename MatType::valu
     Vec3<T> axis(_axis.unit());
 
     // compute trig properties of angle:
-    T c(cos(double(angle)));
-    T s(sin(double(angle)));
+    T c(static_cast<T>(cos(double(angle))));
+    T s(static_cast<T>(sin(double(angle))));
     T t(1 - c);
 
     MatType result;
@@ -593,9 +593,9 @@ rotation(
                 result[i][j] = static_cast<T>(
                     a * u[i] * u[j] + b * v[i] * v[j] + c * v[j] * u[i]);
         }
-        result[0][0] += 1.0;
-        result[1][1] += 1.0;
-        result[2][2] += 1.0;
+        result[0][0] = static_cast<T>(result[0][0] + 1.0);
+        result[1][1] = static_cast<T>(result[1][1] + 1.0);
+        result[2][2] = static_cast<T>(result[2][2] + 1.0);
 
         if(MatType::numColumns() == 4) padMat4(result);
         return result;

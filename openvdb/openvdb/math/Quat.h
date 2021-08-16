@@ -500,7 +500,7 @@ public:
     /// this = normalized this
     Quat unit() const
     {
-        T d = sqrt(mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3]);
+        T d = static_cast<T>(sqrt(mm[0]*mm[0] + mm[1]*mm[1] + mm[2]*mm[2] + mm[3]*mm[3]));
         if( isExactlyEqual(d , T(0.0) ) )
             OPENVDB_THROW(ArithmeticError,
                 "Normalizing degenerate quaternion");
