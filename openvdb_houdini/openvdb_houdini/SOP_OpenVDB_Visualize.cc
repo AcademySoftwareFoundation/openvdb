@@ -1935,8 +1935,8 @@ TreeVisualizer::render(bool node, const GridType& grid, openvdb::Int32 sliceInde
             RenderVerticesOp<TreeType> renderVerticesOp(node, vertices, sliceIndex, *this);
             nodeManager.foreachTopDown(renderVerticesOp, /*threaded=*/true);
 
-            if ((style1 == STYLE_WIRE_BOX && (style2 != STYLE_SOLID_BOX)) ||
-                 style2 == STYLE_WIRE_BOX && (style1 != STYLE_SOLID_BOX)) {
+            if ((style1 == STYLE_WIRE_BOX && style2 != STYLE_SOLID_BOX) ||
+                (style2 == STYLE_WIRE_BOX && style1 != STYLE_SOLID_BOX)) {
                 if (mParms.sliceStyle == SLICE_VOXEL_FLATTEN) {
                     GEO_PolyCounts sizelist;
                     sizelist.append(5, polygonCount);
@@ -1946,8 +1946,8 @@ TreeVisualizer::render(bool node, const GridType& grid, openvdb::Int32 sliceInde
                     sizelist.append(16, polygonCount);
                     GU_PrimPoly::buildBlock(mGeo, pointOffset, pointCount, sizelist, vertices.get(), /*closed=*/false);
                 }
-            } else if ((style1 == STYLE_SOLID_BOX && (style2 != STYLE_WIRE_BOX)) ||
-                        style2 == STYLE_SOLID_BOX && (style1 != STYLE_WIRE_BOX)) {
+            } else if ((style1 == STYLE_SOLID_BOX && style2 != STYLE_WIRE_BOX) ||
+                        (style2 == STYLE_SOLID_BOX && style1 != STYLE_WIRE_BOX)) {
                 GEO_PolyCounts sizelist;
                 sizelist.append(4, polygonCount);
                 GU_PrimPoly::buildBlock(mGeo, pointOffset, pointCount, sizelist, vertices.get(), /*closed=*/true);
@@ -2097,11 +2097,7 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 
         // create and set a gl_lit detail attribute to zero to disable gl lighting
 
-        GA_RWAttributeRef attributeRef = gdp->addTuple(GA_STORE_INT32, GA_ATTRIB_DETAIL, "gl_lit", 1);
-        if (attributeRef.isValid()) {
-            GA_RWHandleI handle = attributeRef.getAttribute();
-            handle.set(0, 0);
-        }
+        gdp->setDetailAttributeI("gl_lit", 0);
 
         boss.end();
 
