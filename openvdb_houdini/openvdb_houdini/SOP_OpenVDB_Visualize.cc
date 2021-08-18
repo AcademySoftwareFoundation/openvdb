@@ -19,7 +19,7 @@
 #include <GU/GU_Detail.h>
 #include <GU/GU_PrimPoly.h>
 #include <PRM/PRM_Parm.h>
-#include <UT/UT_Color.h> // for UT_ColorRamp
+#include <UT/UT_Ramp.h>
 #include <UT/UT_Interrupt.h>
 #include <UT/UT_VectorTypes.h> // for UT_Vector3i
 
@@ -306,21 +306,21 @@ newSopOperator(OP_OperatorTable* table)
         .setDefault(PRMzeroDefaults)
         .setTypeExtended(PRM_TYPE_TOGGLE_JOIN));
 
-    {   // Color remap
-        char const * const items[] = {
-            "none", "No Mapping",
-            "false", UT_Color::getRampColorName(UT_COLORRAMP_FALSE),
-            "pink", UT_Color::getRampColorName(UT_COLORRAMP_PINK),
-            "mono", UT_Color::getRampColorName(UT_COLORRAMP_MONO),
-            "blackbody", UT_Color::getRampColorName(UT_COLORRAMP_BLACKBODY),
-            "bipartite", UT_Color::getRampColorName(UT_COLORRAMP_BIPARTITE),
-            nullptr
-        };
-        parms.add(hutil::ParmFactory(PRM_STRING, "vismode", "Visualization Ramp")
-            .setChoiceListItems(PRM_CHOICELIST_SINGLE, items)
-            .setDefault("false")
-            .setDocumentation("The color scheme for visualizing the attribute values."));
-    }
+    // infra-red values with controls disabled by default
+
+    PRM_SpareData visRampSpare(PRM_SpareArgs()
+        << PRM_SpareToken("rampshowcontrolsdefault", "0")
+        << PRM_SpareToken("rampcolordefault",
+            "1pos ( 0 ) 1c ( 0.2 0 1 ) 1interp ( linear ) "
+            "2pos ( 0.25 ) 2c ( 0 0.85 1 ) 2interp ( linear ) "
+            "3pos ( 0.5 ) 3c ( 0 1 0.1 ) 3interp ( linear ) "
+            "4pos ( 0.75 ) 4c ( 0.95 1 0 ) 4interp ( linear ) "
+            "5pos ( 1 ) 5c ( 1 0 0 ) 5interp ( linear )"));
+
+    parms.add(hutil::ParmFactory(PRM_MULTITYPE_RAMP_RGB, "visramp", "Visualization Ramp")
+        .setDefault(PRMfiveDefaults)
+        .setSpareData(&visRampSpare)
+        .setHelpText("Color ramp to visualize the attribute values."));
 
     std::vector<fpreal> visDefaults{0, 1};
     parms.add(hutil::ParmFactory(PRM_FLT_E, "visrange", "Visualization Range")
@@ -607,7 +607,7 @@ SOP_OpenVDB_Visualize::updateParmsFlags()
     const bool visualize = bool(evalInt("visualize", 0, time));
 
     changed |= enableParm("visualize", addcolor && (drawTiles || drawVoxels));
-    changed |= enableParm("vismode", addcolor && visualize && (drawTiles || drawVoxels));
+    changed |= enableParm("visramp", addcolor && visualize && (drawTiles || drawVoxels));
     changed |= enableParm("visrange", addcolor && visualize && (drawTiles || drawVoxels));
 
     return changed;
@@ -675,7 +675,7 @@ struct TreeParms
     bool useWorldSpace = false;
     double sliceOffset = 0;
     bool visualize = false;
-    UT_ColorRamp colorRamp = UT_COLORRAMP_NUMMODES;
+    UT_Ramp colorRamp;
     double colorMin = 0.0f;
     double colorRange = 1.0f;
     double* cachedOffset = nullptr;
@@ -1184,8 +1184,9 @@ struct TreeVisualizer::RenderPointsOp
         const double range = mParent.mParms.colorRange;
         const double remap = (value - min) * range;
 
-        UT_Vector3 color;
-        UT_Color::getRampColor(mParent.mParms.colorRamp, remap, &color.r(), &color.g(), &color.b());
+        float values[4];
+        mParent.mParms.colorRamp.getColor(remap, values);
+        UT_Vector3 color(values[0], values[1], values[2]);
         for (size_t i = 0; i < count; i++) {
             mParent.mCdHandle.set(idx+i, color);
         }
@@ -2049,14 +2050,11 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 
         treeParms.visualize = bool(evalInt("visualize", 0, time));
         if (treeParms.visualize) {
-
-            std::string colorRamp = evalStdString("vismode", time);
-            if (colorRamp == "false")           treeParms.colorRamp = UT_COLORRAMP_FALSE;
-            else if (colorRamp == "pink")       treeParms.colorRamp = UT_COLORRAMP_PINK;
-            else if (colorRamp == "mono")       treeParms.colorRamp = UT_COLORRAMP_MONO;
-            else if (colorRamp == "blackbody")   treeParms.colorRamp = UT_COLORRAMP_BLACKBODY;
-            else if (colorRamp == "bipartite")   treeParms.colorRamp = UT_COLORRAMP_BIPARTITE;
-
+            // copy data to the TreeParms UT_Ramp object
+            SOP_Node* node = cookparms()->getSrcNode();
+            if (node) {
+                node->updateRampFromMultiParm(time, node->getParm("visramp"), treeParms.colorRamp);
+            }
             treeParms.colorMin = evalFloat("visrange", 0, time);
             double colorMax = evalFloat("visrange", 1, time);
             treeParms.colorRange = 1.0 / (colorMax - treeParms.colorMin);
