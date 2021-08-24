@@ -170,14 +170,9 @@ public:
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the transient data value.
-    Index64 transientData() const { return Index64(mTransientData); }
+    Index32 transientData() const { return mTransientData; }
     /// Set the transient data value.
-    void setTransientData(Index64 transientData)
-    {
-        // assert that offset does not exceed 32-bit limit
-        assert(transientData <= Index64(std::numeric_limits<Index32>::max()));
-        mTransientData = static_cast<Index32>(transientData);
-    }
+    void setTransientData(Index32 transientData) { mTransientData = transientData; }
 #endif
 
     /// Return a string representation of this node.

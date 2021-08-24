@@ -526,12 +526,12 @@ TEST_F(TestLeaf, testTransientData)
     const Coord origin(-9, -2, -8);
     LeafT leaf(origin, 1.0f, false);
 
-    EXPECT_EQ(Index64(0), leaf.transientData());
-    leaf.setTransientData(Index64(5));
-    EXPECT_EQ(Index64(5), leaf.transientData());
+    EXPECT_EQ(Index32(0), leaf.transientData());
+    leaf.setTransientData(Index32(5));
+    EXPECT_EQ(Index32(5), leaf.transientData());
     LeafT leaf2(leaf);
-    EXPECT_EQ(Index64(5), leaf2.transientData());
+    EXPECT_EQ(Index32(5), leaf2.transientData());
     LeafT leaf3 = leaf;
-    EXPECT_EQ(Index64(5), leaf3.transientData());
+    EXPECT_EQ(Index32(5), leaf3.transientData());
 }
 #endif

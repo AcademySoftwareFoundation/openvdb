@@ -568,12 +568,12 @@ TEST_F(TestLeafMask, testTransientData)
 {
     LeafType leaf(openvdb::Coord(0, 0, 0), /*background=*/false);
 
-    EXPECT_EQ(openvdb::Index64(0), leaf.transientData());
-    leaf.setTransientData(openvdb::Index64(5));
-    EXPECT_EQ(openvdb::Index64(5), leaf.transientData());
+    EXPECT_EQ(openvdb::Index32(0), leaf.transientData());
+    leaf.setTransientData(openvdb::Index32(5));
+    EXPECT_EQ(openvdb::Index32(5), leaf.transientData());
     LeafType leaf2(leaf);
-    EXPECT_EQ(openvdb::Index64(5), leaf2.transientData());
+    EXPECT_EQ(openvdb::Index32(5), leaf2.transientData());
     LeafType leaf3 = leaf;
-    EXPECT_EQ(openvdb::Index64(5), leaf3.transientData());
+    EXPECT_EQ(openvdb::Index32(5), leaf3.transientData());
 }
 #endif
