@@ -1,0 +1,2 @@
+Houdini:
+    * Fix bug to allow VDB LOD SOPs to be chained together.
