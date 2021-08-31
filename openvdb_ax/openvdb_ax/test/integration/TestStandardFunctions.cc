@@ -662,12 +662,26 @@ TestStandardFunctions::hash()
 void
 TestStandardFunctions::hsvtorgb()
 {
+    auto axmod = [](auto D, auto d) -> auto {
+        auto r = std::fmod(D, d);
+        if ((r > 0 && d < 0) || (r < 0 && d > 0)) r = r+d;
+        return r;
+    };
+
     // HSV to RGB conversion. Taken from OpenEXR's ImathColorAlgo
-    auto convert = [](const openvdb::Vec3d& hsv) {
+    // @note  AX adds flooredmod of input hue to wrap to [0,1] domain
+    // @note  AX also clamp saturation to [0,1]
+    auto convert = [&](const openvdb::Vec3d& hsv) {
         double hue = hsv.x();
         double sat = hsv.y();
         double val = hsv.z();
         openvdb::Vec3d rgb(0.0);
+
+        // additions
+        hue = axmod(hue, 1.0);
+        sat = std::max(0.0, sat);
+        sat = std::min(1.0, sat);
+        //
 
         if (hue == 1) hue = 0;
         else          hue *= 6;
@@ -705,10 +719,14 @@ TestStandardFunctions::hsvtorgb()
     const std::vector<openvdb::Vec3d> values{
         convert({0,0,0}),
         convert({1,1,1}),
+        convert({5.8,1,1}),
+        convert({-0.1,-0.5,10}),
+        convert({-5.1,10.5,-5}),
+        convert({-7,-11.5,5}),
         convert({0.5,0.5,0.5}),
         convert({0.3,1.0,10.0})
     };
-    mHarness.addAttributes<openvdb::Vec3d>(unittest_util::nameSequence("test", 4), values);
+    mHarness.addAttributes<openvdb::Vec3d>(unittest_util::nameSequence("test", 8), values);
     testFunctionOptions(mHarness, "hsvtorgb");
 }
 

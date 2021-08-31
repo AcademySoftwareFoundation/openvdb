@@ -2735,6 +2735,13 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         llvm::Value* zero = llvm::ConstantFP::get(precision, 0.0);
         llvm::Value* one = llvm::ConstantFP::get(precision, 1.0);
 
+        // wrap hue values to [0,1] domain, including negative values
+        // i.e. -0.1 -> 0.9, 4.5 -> 0.5
+        hsv[0] = axfloormod(op)->execute({hsv[0], one}, B);
+
+        // clamp saturation values to [0,1]
+        hsv[1] = axclamp(op)->execute({hsv[1], zero, one}, B);
+
         llvm::BasicBlock* then = llvm::BasicBlock::Create(B.getContext(), "then", base);
         llvm::BasicBlock* el = llvm::BasicBlock::Create(B.getContext(), "else", base);
         llvm::BasicBlock* post = llvm::BasicBlock::Create(B.getContext(), "post", base);
@@ -2861,6 +2868,8 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         .addSignature<HSVtoRGB3F, true>(generate)
         .setArgumentNames({"input"} )
         .addDependency("floor")
+        .addDependency("floormod")
+        .addDependency("clamp")
         .addParameterAttribute(0, llvm::Attribute::NoAlias)
         .addParameterAttribute(1, llvm::Attribute::ReadOnly)
         .addFunctionAttribute(llvm::Attribute::NoUnwind)
