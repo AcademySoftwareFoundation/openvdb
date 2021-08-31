@@ -13,8 +13,7 @@
 #include "Math.h"
 #include "Vec3.h"
 
-namespace tbb { class split; } // forward declaration
-
+#include <tbb/blocked_range.h> // for tbb::split
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

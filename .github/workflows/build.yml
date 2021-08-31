@@ -200,3 +200,28 @@ jobs:
     - name: test
       shell: bash
       run: cd build && ctest -V
+
+  testmacos1015_tbb2021:
+    runs-on: macos-10.15
+    env:
+      CXX: clang++
+    steps:
+    - uses: actions/checkout@v2
+    - name: install
+      shell: bash
+      run: |
+        brew update
+        brew install bash cmake ilmbase openexr@2 boost tbb glfw
+        echo "IlmBase_ROOT=/usr/local/opt/ilmbase" >> $GITHUB_ENV
+        echo "OpenEXR_ROOT=/usr/local/opt/openexr@2" >> $GITHUB_ENV
+        echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
+    - name: install
+      shell: bash
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      shell: bash
+      run: ./ci/build.sh Release "core,bin,test" \
+         -DOPENVDB_CXX_STRICT=OFF -DUSE_BLOSC=OFF -DUSE_ZLIB=OFF
+    - name: test
+      shell: bash
+      run: cd build && ctest -V

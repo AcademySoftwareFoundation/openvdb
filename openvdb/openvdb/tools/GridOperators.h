@@ -9,14 +9,15 @@
 #ifndef OPENVDB_TOOLS_GRID_OPERATORS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_GRID_OPERATORS_HAS_BEEN_INCLUDED
 
-#include <openvdb/Grid.h>
-#include <openvdb/math/Operators.h>
-#include <openvdb/util/NullInterrupter.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/tree/ValueAccessor.h>
+#include "openvdb/Grid.h"
+#include "openvdb/math/Operators.h"
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/thread/Threading.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/tree/ValueAccessor.h"
 #include "ValueTransformer.h" // for tools::foreach()
-#include <tbb/parallel_for.h>
 
+#include <tbb/parallel_for.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -383,7 +384,9 @@ public:
     /// TBB threads only!
     void operator()(const typename LeafManagerT::LeafRange& range) const
     {
-        if (util::wasInterrupted(mInterrupt)) tbb::task::self().cancel_group_execution();
+        if (util::wasInterrupted(mInterrupt)) {
+            thread::cancelGroupExecution();
+        }
 
         for (typename LeafManagerT::LeafRange::Iterator leaf=range.begin(); leaf; ++leaf) {
             for (typename OutLeafT::ValueOnIter value=leaf->beginValueOn(); value; ++value) {

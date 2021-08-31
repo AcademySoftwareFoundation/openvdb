@@ -9,7 +9,6 @@ brew install ilmbase
 brew install openexr@2
 brew install boost
 brew install boost-python3 # also installs the dependent python version
-brew install gtest
 brew install tbb@2020
 brew install zlib
 brew install glfw
