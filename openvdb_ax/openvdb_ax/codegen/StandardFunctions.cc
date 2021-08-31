@@ -2876,7 +2876,9 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
         .addFunctionAttribute(llvm::Attribute::AlwaysInline)
         .setConstantFold(op.mConstantFoldCBindings)
         .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)
-        .setDocumentation("Convert HSV color space into RGB color space.")
+        .setDocumentation("Convert HSV color space into RGB color space. Note "
+            "that the input hue is wrapped to its periodic [0,1] values and "
+            "the input saturation is clamped between [0,1].")
         .get();
 }
 
