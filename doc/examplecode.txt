@@ -1345,7 +1345,7 @@ int main()
             // Extract the voxel-space position of the point.
             openvdb::Vec3f voxelPosition = positionHandle.get(*indexIter);
 
-            // Extract the world-space position of the voxel.
+            // Extract the index-space position of the voxel.
             const openvdb::Vec3d xyz = indexIter.getCoord().asVec3d();
 
             // Compute the world-space position of the point.
