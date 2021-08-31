@@ -38,16 +38,32 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.image }}
     env:
       CXX: ${{ matrix.compiler }}
+      CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.parallel }}
     strategy:
       matrix:
         image: ['2019-clang8', '2020-clang7', '2021-clang10']
-        compiler: ['clang++', 'g++']
+        compiler: ['clang++']
         build: ['Release']
         # Extra builds
         include:
           - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
+          - image: '2020-clang7'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            parallel: 1
+          - image: '2019-clang8'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            parallel: 1
+          - image: '2021-clang10'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            parallel: 1
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -71,6 +87,7 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.image }}
     env:
       CXX: ${{ matrix.compiler }}
+      CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.parallel }}
     strategy:
       matrix:
         image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
@@ -81,6 +98,8 @@ jobs:
           - image: '2020-clang7'
             compiler: 'g++'
             build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            parallel: 1
           - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
