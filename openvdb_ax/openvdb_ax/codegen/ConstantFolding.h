@@ -134,10 +134,12 @@ struct ConstantFolder<SignatureT, 0>
     }
 
 private:
+
     // @brief  Specialization for the invoking of the provided function if the return
-    //         type is not void.
+    //         type is not void or a pointer
     template <typename ReturnT, typename ...Tys>
-    static typename std::enable_if<!std::is_same<ReturnT, void>::value, llvm::Value*>::type
+    static typename std::enable_if<!std::is_pointer<ReturnT>::value &&
+        !std::is_same<ReturnT, void>::value, llvm::Value*>::type
     call(const std::vector<llvm::Constant*>&,
          const SignatureT& function,
          llvm::LLVMContext& C,
@@ -147,9 +149,11 @@ private:
         return LLVMType<ReturnT>::get(C, result);
     }
 
-    // @brief  Specialization if the return type is void. No folding is supported.
+    // @brief  Specialization if the return type is void or a pointer. No folding is
+    //         supported.
     template <typename ReturnT, typename ...Tys>
-    static typename std::enable_if<std::is_same<ReturnT, void>::value, llvm::Value*>::type
+    static typename std::enable_if<std::is_pointer<ReturnT>::value ||
+        std::is_same<ReturnT, void>::value, llvm::Value*>::type
     call(const std::vector<llvm::Constant*>&,
          const SignatureT&,
          llvm::LLVMContext&,

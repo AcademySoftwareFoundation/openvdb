@@ -4,12 +4,11 @@
 #ifndef OPENVDB_TYPES_HAS_BEEN_INCLUDED
 #define OPENVDB_TYPES_HAS_BEEN_INCLUDED
 
-#include "BuildConfig.h"
 #include "version.h"
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
 
-#ifdef OPENVDB_BUILDCONFIG_USE_IMATH_HALF
+#ifdef OPENVDB_USE_IMATH_HALF
 #include <OpenEXR/half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -318,7 +317,7 @@ template<typename FromType, typename ToType> struct CopyConstness {
     using Type = typename std::remove_const<ToType>::type;
 };
 
-/// @cond OPENVDB_TYPES_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 template<typename FromType, typename ToType> struct CopyConstness<const FromType, ToType> {
     using Type = const ToType;
 };

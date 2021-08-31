@@ -75,6 +75,7 @@ struct OpMagnitude {
     }
 };
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -86,6 +87,8 @@ struct ReturnValue {
 };
 
 } // namespace internal
+
+/// @endcond
 
 // ---- Operators defined in index space
 

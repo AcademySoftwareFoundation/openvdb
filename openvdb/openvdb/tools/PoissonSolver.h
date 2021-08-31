@@ -278,6 +278,7 @@ struct DirichletBoundaryOp {
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -311,6 +312,7 @@ struct LeafIndexOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename VIndexTreeType>
 inline void
@@ -367,6 +369,7 @@ createIndexTree(const TreeType& tree)
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -408,6 +411,7 @@ struct CopyToVecOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename VectorValueType, typename SourceTreeType>
 inline typename math::pcg::Vector<VectorValueType>::Ptr
@@ -433,6 +437,7 @@ createVectorFromTree(const SourceTreeType& tree,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -464,6 +469,7 @@ struct CopyFromVecOp
 
 } // namespace internal
 
+/// @endcond
 
 template<typename TreeValueType, typename VIndexTreeType, typename VectorValueType>
 inline typename VIndexTreeType::template ValueConverter<TreeValueType>::Type::Ptr
@@ -491,6 +497,7 @@ createTreeFromVector(
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 
@@ -682,6 +689,8 @@ struct ISLaplacianOp
 };
 
 } // namespace internal
+
+/// @endcond
 
 
 template<typename BoolTreeType>

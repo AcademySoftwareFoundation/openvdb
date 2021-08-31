@@ -802,47 +802,56 @@ template<typename NodeT, Index LEVEL>
 class DynamicNodeManagerLink
 {
 public:
+    using NonConstChildNodeType = typename NodeT::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<NodeT, NonConstChildNodeType>::Type;
+
     DynamicNodeManagerLink() = default;
 
     template<typename NodeOpT, typename RootT>
-    void foreachTopDown(const NodeOpT& op, RootT& root, bool threaded, size_t grainSize)
+    void foreachTopDown(const NodeOpT& op, RootT& root, bool threaded,
+        size_t leafGrainSize, size_t nonLeafGrainSize)
     {
         if (!op(root, /*index=*/0))         return;
         if (!mList.initRootChildren(root))  return;
         ForeachFilterOp<NodeOpT> filterOp(op, mList.nodeCount());
-        mList.foreachWithIndex(filterOp, threaded, grainSize);
-        mNext.foreachTopDownRecurse(filterOp, mList, threaded, grainSize);
+        mList.foreachWithIndex(filterOp, threaded, LEVEL == 0 ? leafGrainSize : nonLeafGrainSize);
+        mNext.foreachTopDownRecurse(filterOp, mList, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
     template<typename FilterOpT, typename ParentT>
-    void foreachTopDownRecurse(const FilterOpT& filterOp, ParentT& parent, bool threaded, size_t grainSize)
+    void foreachTopDownRecurse(const FilterOpT& filterOp, ParentT& parent, bool threaded,
+        size_t leafGrainSize, size_t nonLeafGrainSize)
     {
         if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
         FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
-        mList.foreachWithIndex(childFilterOp, threaded, grainSize);
+        mList.foreachWithIndex(childFilterOp, threaded, LEVEL == 0 ? leafGrainSize : nonLeafGrainSize);
+        mNext.foreachTopDownRecurse(childFilterOp, mList, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
     template<typename NodeOpT, typename RootT>
-    void reduceTopDown(NodeOpT& op, RootT& root, bool threaded, size_t grainSize)
+    void reduceTopDown(NodeOpT& op, RootT& root, bool threaded,
+        size_t leafGrainSize, size_t nonLeafGrainSize)
     {
         if (!op(root, /*index=*/0))         return;
         if (!mList.initRootChildren(root))  return;
         ReduceFilterOp<NodeOpT> filterOp(op, mList.nodeCount());
-        mList.reduceWithIndex(filterOp, threaded, grainSize);
-        mNext.reduceTopDownRecurse(filterOp, mList, threaded, grainSize);
+        mList.reduceWithIndex(filterOp, threaded, LEVEL == 0 ? leafGrainSize : nonLeafGrainSize);
+        mNext.reduceTopDownRecurse(filterOp, mList, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
     template<typename FilterOpT, typename ParentT>
-    void reduceTopDownRecurse(FilterOpT& filterOp, ParentT& parent, bool threaded, size_t grainSize)
+    void reduceTopDownRecurse(FilterOpT& filterOp, ParentT& parent, bool threaded,
+        size_t leafGrainSize, size_t nonLeafGrainSize)
     {
         if (!mList.initNodeChildren(parent, filterOp, !threaded))   return;
         FilterOpT childFilterOp(filterOp.op(), mList.nodeCount());
-        mList.reduceWithIndex(childFilterOp, threaded, grainSize);
+        mList.reduceWithIndex(childFilterOp, threaded, LEVEL == 0 ? leafGrainSize : nonLeafGrainSize);
+        mNext.reduceTopDownRecurse(childFilterOp, mList, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
 protected:
     NodeList<NodeT> mList;
-    DynamicNodeManagerLink<typename NodeT::ChildNodeType, LEVEL-1> mNext;
+    DynamicNodeManagerLink<ChildNodeType, LEVEL-1> mNext;
 };// DynamicNodeManagerLink class
 
 
@@ -856,17 +865,19 @@ public:
     DynamicNodeManagerLink() = default;
 
     template<typename NodeFilterOp, typename ParentT>
-    void foreachTopDownRecurse(const NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded, size_t grainSize)
+    void foreachTopDownRecurse(const NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded,
+        size_t leafGrainSize, size_t /*nonLeafGrainSize*/)
     {
         if (!mList.initNodeChildren(parent, nodeFilterOp, !threaded))   return;
-        mList.foreachWithIndex(nodeFilterOp.op(), threaded, grainSize);
+        mList.foreachWithIndex(nodeFilterOp.op(), threaded, leafGrainSize);
     }
 
     template<typename NodeFilterOp, typename ParentT>
-    void reduceTopDownRecurse(NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded, size_t grainSize)
+    void reduceTopDownRecurse(NodeFilterOp& nodeFilterOp, ParentT& parent, bool threaded,
+        size_t leafGrainSize, size_t /*nonLeafGrainSize*/)
     {
         if (!mList.initNodeChildren(parent, nodeFilterOp, !threaded))   return;
-        mList.reduceWithIndex(nodeFilterOp.op(), threaded, grainSize);
+        mList.reduceWithIndex(nodeFilterOp.op(), threaded, leafGrainSize);
     }
 
 protected:
@@ -881,7 +892,10 @@ public:
     static const Index LEVELS = _LEVELS;
     static_assert(LEVELS > 0,
         "expected instantiation of template specialization"); // see specialization below
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
+    using NonConstChildNodeType = typename RootNodeType::ChildNodeType;
+    using ChildNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstChildNodeType>::Type;
     static_assert(RootNodeType::LEVEL >= LEVELS, "number of levels exceeds root node height");
 
     explicit DynamicNodeManager(TreeOrLeafManagerT& tree) : mRoot(tree.root()) { }
@@ -889,15 +903,17 @@ public:
     DynamicNodeManager(const DynamicNodeManager&) = delete;
 
     /// @brief Return a reference to the root node.
-    const RootNodeType& root() const { return mRoot; }
+    const NonConstRootNodeType& root() const { return mRoot; }
 
     /// @brief   Threaded method that applies a user-supplied functor
     ///          to all the nodes in the tree.
     ///
-    /// @param op        user-supplied functor, see examples for interface details.
-    /// @param threaded  optional toggle to disable threading, on by default.
-    /// @param grainSize optional parameter to specify the grainsize
-    ///                  for threading, one by default.
+    /// @param op               user-supplied functor, see examples for interface details.
+    /// @param threaded         optional toggle to disable threading, on by default.
+    /// @param leafGrainSize    optional parameter to specify the grainsize
+    ///                         for threading over leaf nodes, one by default.
+    /// @param nonLeafGrainSize optional parameter to specify the grainsize
+    ///                         for threading over non-leaf nodes, one by default.
     ///
     /// @note There are two key differences to the interface of the
     /// user-supplied functor to the NodeManager class - (1) the operator()
@@ -909,6 +925,10 @@ public:
     ///
     /// @note Unlike the NodeManager, the foreach() method of the
     /// DynamicNodeManager uses copy-by-reference for the user-supplied functor.
+    /// This can be an issue when using a shared Accessor or shared Sampler in
+    /// the operator as they are not inherently thread-safe. For these use
+    /// cases, it is recommended to create the Accessor or Sampler in the
+    /// operator execution itself.
     ///
     /// @par Example:
     /// @code
@@ -953,17 +973,20 @@ public:
     ///
     /// @endcode
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
-        mChain.foreachTopDown(op, mRoot, threaded, grainSize);
+        mChain.foreachTopDown(op, mRoot, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
     /// @brief   Threaded method that processes nodes with a user supplied functor
     ///
     /// @param op        user-supplied functor, see examples for interface details.
     /// @param threaded  optional toggle to disable threading, on by default.
-    /// @param grainSize optional parameter to specify the grainsize
-    ///                  for threading, one by default.
+    /// @param leafGrainSize    optional parameter to specify the grainsize
+    ///                         for threading over leaf nodes, one by default.
+    /// @param nonLeafGrainSize optional parameter to specify the grainsize
+    ///                         for threading over non-leaf nodes, one by default.
     ///
     /// @note There are two key differences to the interface of the
     /// user-supplied functor to the NodeManager class - (1) the operator()
@@ -1017,14 +1040,15 @@ public:
     ///
     /// @endcode
     template<typename NodeOp>
-    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
-        mChain.reduceTopDown(op, mRoot, threaded, grainSize);
+        mChain.reduceTopDown(op, mRoot, threaded, leafGrainSize, nonLeafGrainSize);
     }
 
 protected:
     RootNodeType& mRoot;
-    DynamicNodeManagerLink<typename RootNodeType::ChildNodeType, LEVELS-1> mChain;
+    DynamicNodeManagerLink<ChildNodeType, LEVELS-1> mChain;
 };// DynamicNodeManager class
 
 
@@ -1477,7 +1501,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 1>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 0, "expected instantiation of template specialization");
     static const Index LEVELS = 1;
 
@@ -1489,31 +1514,33 @@ public:
     const RootNodeType& root() const { return mRoot; }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t /*nonLeafGrainSize*/ =1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list0
         if (!mList0.initRootChildren(mRoot))                        return;
         ForeachFilterOp<NodeOp> nodeOp(op, mList0.nodeCount());
-        mList0.foreachWithIndex(nodeOp, threaded, grainSize);
+        mList0.foreachWithIndex(nodeOp, threaded, leafGrainSize);
     }
 
     template<typename NodeOp>
-    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t /*nonLeafGrainSize*/ =1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list0
         if (!mList0.initRootChildren(mRoot))                        return;
         ReduceFilterOp<NodeOp> nodeOp(op, mList0.nodeCount());
-        mList0.reduceWithIndex(nodeOp, threaded, grainSize);
+        mList0.reduceWithIndex(nodeOp, threaded, leafGrainSize);
     }
 
 protected:
     using NodeT1 = RootNodeType;
-    using NodeT0 = typename NodeT1::ChildNodeType;
-
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;
     using ListT0 = NodeList<NodeT0>;
 
     NodeT1& mRoot;
@@ -1530,7 +1557,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 2>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 1, "expected instantiation of template specialization");
     static const Index LEVELS = 2;
 
@@ -1542,40 +1570,44 @@ public:
     const RootNodeType& root() const { return mRoot; }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list1
         if (!mList1.initRootChildren(mRoot))                        return;
         ForeachFilterOp<NodeOp> nodeOp(op, mList1.nodeCount());
-        mList1.foreachWithIndex(nodeOp, threaded, grainSize);
+        mList1.foreachWithIndex(nodeOp, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp, !threaded))   return;
-        mList0.foreachWithIndex(op, threaded, grainSize);
+        mList0.foreachWithIndex(op, threaded, leafGrainSize);
     }
 
     template<typename NodeOp>
-    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list1
         if (!mList1.initRootChildren(mRoot))                        return;
         ReduceFilterOp<NodeOp> nodeOp(op, mList1.nodeCount());
-        mList1.reduceWithIndex(nodeOp, threaded, grainSize);
+        mList1.reduceWithIndex(nodeOp, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp, !threaded))   return;
-        mList0.reduceWithIndex(op, threaded, grainSize);
+        mList0.reduceWithIndex(op, threaded, leafGrainSize);
     }
 
 protected:
     using NodeT2 = RootNodeType;
-    using NodeT1 = typename NodeT2::ChildNodeType; // upper level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // upper level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
-    using ListT1 = NodeList<NodeT1>; // upper level of internal nodes
-    using ListT0 = NodeList<NodeT0>; // lower level of internal nodes or leafs
+    using ListT1 = NodeList<NodeT1>; // upper level
+    using ListT0 = NodeList<NodeT0>; // lower level
 
     NodeT2& mRoot;
     ListT1 mList1;
@@ -1592,7 +1624,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 3>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 2, "expected instantiation of template specialization");
     static const Index LEVELS = 3;
 
@@ -1604,46 +1637,51 @@ public:
     const RootNodeType& root() const { return mRoot; }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list2
         if (!mList2.initRootChildren(mRoot))                        return;
         ForeachFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
-        mList2.foreachWithIndex(nodeOp2, threaded, grainSize);
+        mList2.foreachWithIndex(nodeOp2, threaded, nonLeafGrainSize);
         // list1
         if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
         ForeachFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
-        mList1.foreachWithIndex(nodeOp1, threaded, grainSize);
+        mList1.foreachWithIndex(nodeOp1, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
-        mList0.foreachWithIndex(op, threaded, grainSize);
+        mList0.foreachWithIndex(op, threaded, leafGrainSize);
     }
 
     template<typename NodeOp>
-    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list2
         if (!mList2.initRootChildren(mRoot))                        return;
         ReduceFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
-        mList2.reduceWithIndex(nodeOp2, threaded, grainSize);
+        mList2.reduceWithIndex(nodeOp2, threaded, nonLeafGrainSize);
         // list1
         if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
         ReduceFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
-        mList1.reduceWithIndex(nodeOp1, threaded, grainSize);
+        mList1.reduceWithIndex(nodeOp1, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
-        mList0.reduceWithIndex(op, threaded, grainSize);
+        mList0.reduceWithIndex(op, threaded, leafGrainSize);
     }
 
 protected:
     using NodeT3 = RootNodeType;
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper level
-    using NodeT1 = typename NodeT2::ChildNodeType; // mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT2 = NodeList<NodeT2>; // upper level of internal nodes
     using ListT1 = NodeList<NodeT1>; // lower level of internal nodes
@@ -1665,7 +1703,8 @@ template<typename TreeOrLeafManagerT>
 class DynamicNodeManager<TreeOrLeafManagerT, 4>
 {
 public:
-    using RootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using NonConstRootNodeType = typename TreeOrLeafManagerT::RootNodeType;
+    using RootNodeType = typename CopyConstness<TreeOrLeafManagerT, NonConstRootNodeType>::Type;
     static_assert(RootNodeType::LEVEL > 3, "expected instantiation of template specialization");
     static const Index LEVELS = 4;
 
@@ -1677,55 +1716,61 @@ public:
     const RootNodeType& root() const { return mRoot; }
 
     template<typename NodeOp>
-    void foreachTopDown(const NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void foreachTopDown(const NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list3
         if (!mList3.initRootChildren(mRoot))                        return;
         ForeachFilterOp<NodeOp> nodeOp3(op, mList3.nodeCount());
-        mList3.foreachWithIndex(nodeOp3, threaded, grainSize);
+        mList3.foreachWithIndex(nodeOp3, threaded, nonLeafGrainSize);
         // list2
         if (!mList2.initNodeChildren(mList3, nodeOp3, !threaded))   return;
         ForeachFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
-        mList2.foreachWithIndex(nodeOp2, threaded, grainSize);
+        mList2.foreachWithIndex(nodeOp2, threaded, nonLeafGrainSize);
         // list1
         if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
         ForeachFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
-        mList1.foreachWithIndex(nodeOp1, threaded, grainSize);
+        mList1.foreachWithIndex(nodeOp1, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
-        mList0.foreachWithIndex(op, threaded, grainSize);
+        mList0.foreachWithIndex(op, threaded, leafGrainSize);
     }
 
     template<typename NodeOp>
-    void reduceTopDown(NodeOp& op, bool threaded = true, size_t grainSize=1)
+    void reduceTopDown(NodeOp& op, bool threaded = true,
+        size_t leafGrainSize=1, size_t nonLeafGrainSize=1)
     {
         // root
         if (!op(mRoot, /*index=*/0))                                return;
         // list3
         if (!mList3.initRootChildren(mRoot))                        return;
         ReduceFilterOp<NodeOp> nodeOp3(op, mList3.nodeCount());
-        mList3.reduceWithIndex(nodeOp3, threaded, grainSize);
+        mList3.reduceWithIndex(nodeOp3, threaded, nonLeafGrainSize);
         // list2
         if (!mList2.initNodeChildren(mList3, nodeOp3, !threaded))   return;
         ReduceFilterOp<NodeOp> nodeOp2(op, mList2.nodeCount());
-        mList2.reduceWithIndex(nodeOp2, threaded, grainSize);
+        mList2.reduceWithIndex(nodeOp2, threaded, nonLeafGrainSize);
         // list1
         if (!mList1.initNodeChildren(mList2, nodeOp2, !threaded))   return;
         ReduceFilterOp<NodeOp> nodeOp1(op, mList1.nodeCount());
-        mList1.reduceWithIndex(nodeOp1, threaded, grainSize);
+        mList1.reduceWithIndex(nodeOp1, threaded, nonLeafGrainSize);
         // list0
         if (!mList0.initNodeChildren(mList1, nodeOp1, !threaded))   return;
-        mList0.reduceWithIndex(op, threaded, grainSize);
+        mList0.reduceWithIndex(op, threaded, leafGrainSize);
     }
 
 protected:
     using NodeT4 = RootNodeType;
-    using NodeT3 = typename NodeT4::ChildNodeType; // upper level
-    using NodeT2 = typename NodeT3::ChildNodeType; // upper mid level
-    using NodeT1 = typename NodeT2::ChildNodeType; // lower mid level
-    using NodeT0 = typename NodeT1::ChildNodeType; // lower level
+    using NonConstNodeT3 = typename NodeT4::ChildNodeType;
+    using NodeT3 = typename CopyConstness<RootNodeType, NonConstNodeT3>::Type;  // upper level
+    using NonConstNodeT2 = typename NodeT3::ChildNodeType;
+    using NodeT2 = typename CopyConstness<RootNodeType, NonConstNodeT2>::Type;  // upper mid level
+    using NonConstNodeT1 = typename NodeT2::ChildNodeType;
+    using NodeT1 = typename CopyConstness<RootNodeType, NonConstNodeT1>::Type;  // lower mid level
+    using NonConstNodeT0 = typename NodeT1::ChildNodeType;
+    using NodeT0 = typename CopyConstness<RootNodeType, NonConstNodeT0>::Type;  // lower level
 
     using ListT3 = NodeList<NodeT3>; // upper level of internal nodes
     using ListT2 = NodeList<NodeT2>; // upper mid level of internal nodes

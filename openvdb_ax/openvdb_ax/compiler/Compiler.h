@@ -19,8 +19,8 @@
 #include "CustomData.h"
 #include "Logger.h"
 
-#include "../ax.h" // backward compat support for initialize()
-#include "../ast/Parse.h"
+#include "openvdb_ax/ax.h" // backward compat support for initialize()
+#include "openvdb_ax/ast/Parse.h"
 
 #include <openvdb/version.h>
 
@@ -177,7 +177,15 @@ public:
     ///////////////////////////////////////////////////////////////////////////
 
 private:
+    template <typename ExeT, typename GenT>
+    typename ExeT::Ptr
+    compile(const ast::Tree& tree,
+            const std::string& moduleName,
+            const std::vector<std::string>& functions,
+            CustomData::Ptr data,
+            Logger& logger);
 
+private:
     std::shared_ptr<llvm::LLVMContext> mContext;
     const CompilerOptions mCompilerOptions;
     std::shared_ptr<codegen::FunctionRegistry> mFunctionRegistry;

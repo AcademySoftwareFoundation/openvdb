@@ -62,7 +62,7 @@ TestPointExecutable::testConstructionDestruction()
     openvdb::ax::AttributeRegistry::ConstPtr emptyReg =
         openvdb::ax::AttributeRegistry::create(tree);
     openvdb::ax::PointExecutable::Ptr pointExecutable
-        (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}));
+        (new openvdb::ax::PointExecutable(C, E, emptyReg, nullptr, {}, tree));
 
     CPPUNIT_ASSERT_EQUAL(2, int(wE.use_count()));
     CPPUNIT_ASSERT_EQUAL(2, int(wC.use_count()));
@@ -169,7 +169,7 @@ TestPointExecutable::testGroupExecution()
 
     // non existent group
     executable->setGroupExecution(group);
-    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::LookupError);
+    CPPUNIT_ASSERT_THROW(executable->execute(*grid), openvdb::AXExecutionError);
     checkValues(0);
 
     openvdb::points::appendGroup(grid->tree(), group);
@@ -274,22 +274,25 @@ TestPointExecutable::testCompilerCases()
     // with copied tree
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // empty
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // empty
         CPPUNIT_ASSERT(executable);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("i;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // undeclared variable error
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // undeclared variable error
         CPPUNIT_ASSERT(!executable);
     }
     logger.clear();
     {
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse("int i = 18446744073709551615;", logger);
+        std::unique_ptr<openvdb::ax::ast::Tree> copy(tree->copy());
         openvdb::ax::PointExecutable::Ptr executable =
-            compiler->compile<openvdb::ax::PointExecutable>(*(tree->copy()), logger); // warning
+            compiler->compile<openvdb::ax::PointExecutable>(*copy, logger); // warning
         CPPUNIT_ASSERT(executable);
     }
     logger.clear();

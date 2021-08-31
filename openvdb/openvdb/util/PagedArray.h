@@ -21,7 +21,7 @@
 #include <cassert>
 #include <iostream>
 #include <algorithm>// std::swap
-#include <tbb/atomic.h>
+#include <atomic>
 #include <tbb/spin_mutex.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
@@ -185,7 +185,7 @@ public:
     class Iterator;
 
     /// @brief This method is deprecated and will be removed shortly!
-    [[deprecated]] size_t push_back(const ValueType& value)
+    OPENVDB_DEPRECATED size_t push_back(const ValueType& value)
     {
         return this->push_back_unsafe(value);
     }
@@ -197,7 +197,7 @@ public:
     /// @warning Not thread-safe and mostly intended for debugging!
     size_t push_back_unsafe(const ValueType& value)
     {
-        const size_t index = mSize.fetch_and_increment();
+        const size_t index = mSize.fetch_add(1);
         if (index >= mCapacity) {
             mPageTable.push_back( new Page() );
             mCapacity += Page::Size;
@@ -456,7 +456,7 @@ private:
         }
     }
     PageTableT mPageTable;//holds points to allocated pages
-    tbb::atomic<size_t> mSize;// current number of elements in array
+    std::atomic<size_t> mSize;// current number of elements in array
     size_t mCapacity;//capacity of array given the current page count
     tbb::spin_mutex mGrowthMutex;//Mutex-lock required to grow pages
 }; // Public class PagedArray

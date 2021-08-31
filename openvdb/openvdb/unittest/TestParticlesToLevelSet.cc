@@ -1,14 +1,17 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <vector>
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Types.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tools/LevelSetUtil.h> // for sdfInteriorMask()
 #include <openvdb/tools/ParticlesToLevelSet.h>
+
+#include <gtest/gtest.h>
+
+#include <vector>
+
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);

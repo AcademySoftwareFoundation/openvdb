@@ -21,7 +21,7 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-/// @cond OPENVDB_TYPES_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<typename... Ts> struct TypeList; // forward declaration
 

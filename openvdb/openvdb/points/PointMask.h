@@ -81,6 +81,7 @@ struct DeformerTraits
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_mask_internal {
 
@@ -353,6 +354,7 @@ inline typename GridT::Ptr convertPointsToScalar(
 
 } // namespace point_mask_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

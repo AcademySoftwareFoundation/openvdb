@@ -7,9 +7,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
 #include <openvdb/util/NodeMasks.h>
-#include <tbb/atomic.h>
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
+#include <atomic>
 #include <cstddef> // for offsetof()
 #include <iostream>
 #include <memory>
@@ -22,29 +22,6 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace tree {
-
-namespace internal {
-
-/// @internal For delayed loading to be threadsafe, LeafBuffer::mOutOfCore must be
-/// memory-fenced when it is set in LeafBuffer::doLoad(), otherwise that operation
-/// could be reordered ahead of others in doLoad(), with the possible result that
-/// other threads could see the buffer as in-core before it has been fully loaded.
-/// Making mOutOfCore a TBB atomic solves the problem, since TBB atomics are release-fenced
-/// by default (unlike STL atomics, which are not even guaranteed to be lock-free).
-/// However, TBB atomics have stricter alignment requirements than their underlying value_types,
-/// so a LeafBuffer with an atomic mOutOfCore is potentially ABI-incompatible with
-/// its non-atomic counterpart.
-/// This helper class conditionally declares mOutOfCore as an atomic only if doing so
-/// doesn't break ABI compatibility.
-template<typename T>
-struct LeafBufferFlags
-{
-    /// The type of LeafBuffer::mOutOfCore
-    using type = tbb::atomic<Index32>;
-    static constexpr bool IsAtomic = true;
-};
-
-} // namespace internal
 
 
 /// @brief Array of fixed size 2<SUP>3<I>Log2Dim</I></SUP> that stores
@@ -142,7 +119,7 @@ private:
     inline void doLoad() const;
     inline bool detachFromFile();
 
-    using FlagsType = typename internal::LeafBufferFlags<ValueType>::type;
+    using FlagsType = std::atomic<Index32>;
 
     union {
         ValueType* mData;
@@ -193,7 +170,7 @@ template<typename T, Index Log2Dim>
 inline
 LeafBuffer<T, Log2Dim>::LeafBuffer(const LeafBuffer& other)
     : mData(nullptr)
-    , mOutOfCore(other.mOutOfCore)
+    , mOutOfCore(other.mOutOfCore.load())
 {
     if (other.isOutOfCore()) {
         mFileInfo = new FileInfo(*other.mFileInfo);
@@ -228,7 +205,8 @@ LeafBuffer<T, Log2Dim>::operator=(const LeafBuffer& other)
             if (other.isOutOfCore()) this->deallocate();
         }
         if (other.isOutOfCore()) {
-            mOutOfCore = other.mOutOfCore;
+            mOutOfCore.store(other.mOutOfCore.load(std::memory_order_acquire),
+                             std::memory_order_release);
             mFileInfo = new FileInfo(*other.mFileInfo);
         } else if (other.mData != nullptr) {
             this->allocate();
@@ -275,7 +253,14 @@ inline void
 LeafBuffer<T, Log2Dim>::swap(LeafBuffer& other)
 {
     std::swap(mData, other.mData);
-    std::swap(mOutOfCore, other.mOutOfCore);
+
+    // Two atomics can't be swapped because it would require hardware support:
+    // https://en.wikipedia.org/wiki/Double_compare-and-swap
+    // Note that there's a window in which other.mOutOfCore could be written
+    // between our load from it and our store to it.
+    auto tmp = other.mOutOfCore.load(std::memory_order_acquire);
+    tmp = mOutOfCore.exchange(std::move(tmp));
+    other.mOutOfCore.store(std::move(tmp), std::memory_order_release);
 }
 
 

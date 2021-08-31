@@ -5,4 +5,6 @@ for (int32 i = 0; i < 10000000; ++i) {
     mat4d m2 = m1;
     // sret function, 10000000 x alloca of result
     vec3f v2 = normalize(v1);
+    // strings
+    string a = "foo" + "bar";
 }

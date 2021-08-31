@@ -24,7 +24,7 @@
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/tree/LeafManager.h"
 
-#include <tbb/task_scheduler_init.h>
+#include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/parallel_for.h>
 
@@ -726,7 +726,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
         }
 
         // @note this grain size is used for optimal threading
-        const size_t numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
+        const size_t numThreads = size_t(tbb::this_task_arena::max_concurrency());
         const size_t subTreeSize = math::Max(size_t(1), array.size()/(2*numThreads));
 
         // perform recursive dilation to sub trees
@@ -1031,6 +1031,8 @@ Morphology<TreeType>::NodeMaskOp::gatherEdgesXY(int x, int y, int i1, int n, int
 /////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
+
 namespace morph_internal {
 template <typename T> struct Adapter {
     using TreeType = T;
@@ -1044,6 +1046,8 @@ struct Adapter<openvdb::tree::LeafManager<T>> {
     static void sync(openvdb::tree::LeafManager<T>& M) { M.rebuild(); }
 };
 }
+
+/// @endcond
 
 template<typename TreeOrLeafManagerT>
 inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
@@ -1192,7 +1196,7 @@ inline void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
-[[deprecated]]
+OPENVDB_DEPRECATED_MESSAGE("Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
 inline void dilateVoxels(TreeType& tree,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE)
@@ -1219,7 +1223,7 @@ inline void dilateVoxels(TreeType& tree,
 ///
 /// @note The values of any voxels are unchanged.
 template<typename TreeType>
-[[deprecated]]
+OPENVDB_DEPRECATED_MESSAGE("Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
 inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
                          int iterations = 1,
                          NearestNeighbors nn = NN_FACE)
@@ -1237,7 +1241,7 @@ inline void dilateVoxels(tree::LeafManager<TreeType>& manager,
 /// of any voxels, only their active states.
 /// @todo Currently operates only on leaf voxels; need to extend to tiles.
 template<typename TreeType>
-[[deprecated]]
+OPENVDB_DEPRECATED_MESSAGE("Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
 inline void erodeVoxels(TreeType& tree,
                         int iterations=1,
                         NearestNeighbors nn = NN_FACE)
@@ -1252,7 +1256,7 @@ inline void erodeVoxels(TreeType& tree,
 }
 
 template<typename TreeType>
-[[deprecated]]
+OPENVDB_DEPRECATED_MESSAGE("Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour")
 inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
                         int iterations = 1,
                         NearestNeighbors nn = NN_FACE)

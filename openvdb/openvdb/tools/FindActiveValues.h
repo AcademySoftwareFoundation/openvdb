@@ -27,6 +27,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/tree/ValueAccessor.h>
 
+#include "Count.h" // tools::countActiveVoxels()
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -176,11 +178,11 @@ public:
     ///        between active tiles in the tree and the specified bounding box.
     std::vector<TileDataT> activeTiles(const CoordBBox &bbox) const;
 
-    [[deprecated("Use anyActiveValues() instead")]] inline bool any(const CoordBBox &bbox, bool useAccessor = false) const
+    OPENVDB_DEPRECATED_MESSAGE("Use anyActiveValues() instead") inline bool any(const CoordBBox &bbox, bool useAccessor = false) const
     {
         return this->anyActiveValues(bbox, useAccessor);
     }
-    [[deprecated("Use noActiveValues() instead")]] inline bool none(const CoordBBox &bbox, bool useAccessor = false) const
+    OPENVDB_DEPRECATED_MESSAGE("Use noActiveValues() instead") inline bool none(const CoordBBox &bbox, bool useAccessor = false) const
     {
         return this->noActiveValues(bbox, useAccessor);
     }
@@ -491,11 +493,13 @@ template<typename TreeT>
 inline Index64 FindActiveValues<TreeT>::count(const typename TreeT::LeafNodeType* leaf, const CoordBBox &bbox ) const
 {
     Index64 count = 0;
-    if (leaf->getValueMask().isOn()) {
-        auto b = leaf->getNodeBoundingBox();
+    auto b = leaf->getNodeBoundingBox();
+    if (b.isInside(bbox)) { // leaf node is completely inside bbox
+        count = leaf->onVoxelCount();
+    } else if (leaf->isDense()) {
         b.intersect(bbox);
         count = b.volume();
-    } else {
+    } else if (b.hasOverlap(bbox)) {
         for (auto i = leaf->cbeginValueOn(); i; ++i) {
             if (bbox.isInside(i.getCoord())) ++count;
         }
@@ -684,8 +688,7 @@ template<typename TreeT>
 inline Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
-    FindActiveValues<TreeT> op(tree);
-    return op.count(bbox);
+    return tools::countActiveVoxels(tree, bbox);
 }
 
 // Implementation of stand-alone function

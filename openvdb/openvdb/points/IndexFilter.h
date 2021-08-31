@@ -63,7 +63,7 @@ namespace points {
 
 ////////////////////////////////////////
 
-
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace index_filter_internal {
 
@@ -96,6 +96,8 @@ generateRandomSubset(const unsigned int seed, const IntType n, const IntType m)
 
 
 } // namespace index_filter_internal
+
+/// @endcond
 
 
 /// Index filtering on active / inactive state of host voxel

@@ -107,8 +107,10 @@ given FindModule e.g. `FindBlosc.cmake`:
     - @b Xxx_FOUND - True if the headers and library was found and exists
     - @b Xxx_VERSION - The library version
     - @b Xxx_INCLUDE_DIRS - A list of paths to all required include directories
-    - @b Xxx_LIBRARY_DIRS - A list of paths to all required library directories
-    - @b Xxx_LIBRARIES - A list of libraries needed to use Xxx
+    - @b Xxx_RELEASSE_LIBRARY_DIRS - A list of paths to all required release library directories
+    - @b Xxx_DEBUG_LIBRARY_DIRS - A list of paths to all required debug library directories
+    - @b Xxx_RELEASE_LIBRARIES - A list of libraries needed to use the release version of Xxx
+    - @b Xxx_DEBUG_LIBRARIES - A list of libraries needed to use the debug version of Xxx
   - Each module produces an [imported target](https://cmake.org/cmake/help/latest/command/add_library.html#imported-libraries)
   in the form @b Xxx::xxx, and may generate multiple imported targets if multiple
   components are found.
@@ -307,16 +309,23 @@ cmake -D BOOST_ROOT=/path/to/boost/install \
       ../
 @endcode
 
-After the CMake build files have been successfully generated, run make within
-the build directory to compile the project, where the value of the `j` argument
-is the number of CPU threads to use for a multi-threaded build.
+After the CMake build files have been successfully generated, run the build
+tool within the build directory to compile the project. On UNIX, you can
+typically incoke `make` directly:
 @code
 make -j4
 @endcode
 
+Where the value of the `j` argument is the number of CPU threads to use for a
+multi-threaded build. On Windows, you can leverage CMake's build tool to invoke
+the selected builder (usually msbuild):
+@code
+cmake --build .
+@endcode
+
 Finally, once a successful build has completed, you can install all files.
 @code
-make install
+cmake --build . --target install   # or simply `make install`
 @endcode
 
 See the [troubleshooting](@ref buildTroubleshooting) section for help with
@@ -395,16 +404,23 @@ As the Maya plugin is disabled by default, you may also want to add
 [components](@ref buildComponents) section shows which targets are enabled by
 default.
 
-After the CMake build files have been successfully generated, run make within
-the build directory to compile the project, where the value of the `j` argument
-is the number of CPU threads to use for a multi-threaded build.
+After the CMake build files have been successfully generated, run the build
+tool within the build directory to compile the project. On UNIX, you can
+typically incoke `make` directly:
 @code
 make -j4
 @endcode
 
+Where the value of the `j` argument is the number of CPU threads to use for a
+multi-threaded build. On Windows, you can leverage CMake's build tool to invoke
+the selected builder (usually msbuild):
+@code
+cmake --build .
+@endcode
+
 Finally, once a successful build has completed, you can install all files.
 @code
-make install
+cmake --build . --target install   # or simply `make install`
 @endcode
 
 @b Note: The Maya OpenVDB Visualize Node is @b only compatible with Legacy
@@ -450,16 +466,23 @@ cmake -D CMAKE_INSTALL_PREFIX=$HOME/openvdb ../
 See the [components](@ref buildComponents) section to find which targets are
 available, their corresponding CMake flags and their default values.
 
-After the CMake build files have been successfully generated, run make within
-the build directory to compile the project, where the value of the `j` argument
-is the number of CPU threads to use for a multi-threaded build.
+After the CMake build files have been successfully generated, run the build
+tool within the build directory to compile the project. On UNIX, you can
+typically incoke `make` directly:
 @code
 make -j4
 @endcode
 
+Where the value of the `j` argument is the number of CPU threads to use for a
+multi-threaded build. On Windows, you can leverage CMake's build tool to invoke
+the selected builder (usually msbuild):
+@code
+cmake --build .
+@endcode
+
 Finally, once a successful build has completed, you can install all files.
 @code
-make install
+cmake --build . --target install   # or simply `make install`
 @endcode
 
 See the [troubleshooting](@ref buildTroubleshooting) section for help with
@@ -507,7 +530,8 @@ troubleshooting for more information.
 @section buildTroubleshooting Troubleshooting
 
 If after reading this guide you're unable to find your specific issue below,
-please get in touch with the OpenVDB TSC.
+please get in touch or [file an issue](https://github.com/AcademySoftwareFoundation/openvdb/issues)
+with the OpenVDB TSC.
 
 @b Note: If running into issues when changing CMake settings/dependency paths,
 try clearing the designated CMake build directory and running your `cmake`
@@ -582,5 +606,61 @@ versions of CMake are required:
 
 Use the above list to identify the version of CMake you require for your version
 of Boost. Note that this may be implemented into the OpenVDB CMake in the future.
+
+@subsection troubleshoot4 Detected VCPKG toolchain is using a mismatching triplet for OpenVDB build artifacts
+
+If you are on Windows and using vcpkg, builds of OpenVDB should usually only
+build the static OR shared library depending on your vcpkg triplet. This is
+related to how libraries link against the Windows CRT. In vcpkg, static triplets,
+such as @b x64-windows-static, will use the @b MultiThreaded (/MT) flag and
+dynamic triplets, such as @b x64-windows, will use the @b MultiThreadedDLL (/MD)
+flag. These flags @b must match throughout all software artifacts in your
+toolchain (regardless if you are using vcpkg or not).
+
+This warning is shown when OpenVDB detects you using either a dynamic or static
+VCPKG toolchain on Windows, but have the opposite core library variant enabled.
+By default, the static build of OpenVDB links against the @b MultiThreaded
+(/MT) CRT and the dynamic library links against the  @b MultiThreadedDLL (/MD)
+CRT. As OpenVDB configures both by default, it is typical that you may want
+to disable one or the other depending on your needs.
+
+Note that you can provide a value for `CMAKE_MSVC_RUNTIME_LIBRARY` which is a
+native CMake variable to override any CRT selection done by OpenVDB.
+
+For more information, see the following articles:
+Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
+In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
+Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
+`CMAKE_MSVC_RUNTIME_LIBRARY` docs: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
+
+@subsection troubleshoot5 Unexpected value for the Windows CRT with target build artifacts.
+
+On Windows, it is typical for static builds to link to static libraries and
+dynamic builds to link to dynamic library variants. This is not related to the
+libraries themselves, rather it is due to the way that all libraries used within
+a specific toolchain must use the same version of the CRT. The rule of thumb is
+to configure static builds against the static CRT and dynamic builds against
+the dynamic CRT.
+
+This warning is shown if you have provided a value for the CMake variable
+`CMAKE_MSVC_RUNTIME_LIBRARY`, but this value is the opposite of what's expected
+for a target library.
+
+Note that there are some cases where it makes sense to link static builds of
+OpenVDB against the dynamic (/MD) CRT. However, unless you are confident in your
+usage, it is strongly encouraged to match the selection against your desired
+build type.
+
+For more information, see the following articles:
+Description of CRT selection: https://docs.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library
+In depth descriptopn of the CRT on Windows: https://docs.microsoft.com/en-us/cpp/c-runtime-library/crt-library-features
+Related errors: https://docs.microsoft.com/en-us/cpp/error-messages/tool-errors/linker-tools-error-lnk2038
+`CMAKE_MSVC_RUNTIME_LIBRARY` docs: https://cmake.org/cmake/help/latest/variable/CMAKE_MSVC_RUNTIME_LIBRARY.html
+
+@subsection troubleshoot6 error LNK2038: mismatch detected for 'RuntimeLibrary'
+
+A build artifact of OpenVDB has been linked against a dependency which uses a
+different version of the Window CRT. See the [above section](@ref troubleshoot5)
+on dealing with CRT selection for static and dynamic library builds on Windows.
 
 */

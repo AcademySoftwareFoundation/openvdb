@@ -19,13 +19,55 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace codegen {
 
-const std::array<std::string, VolumeKernel::N_ARGS>&
-VolumeKernel::argumentKeys()
+const std::array<std::string, VolumeKernelValue::N_ARGS>&
+VolumeKernelValue::argumentKeys()
 {
-    static const std::array<std::string, VolumeKernel::N_ARGS> arguments = {{
+    static const std::array<std::string, VolumeKernelValue::N_ARGS> arguments = {{
+        "custom_data",
+        "origin",
+        "value",
+        "active",
+        "offset",
+        "accessors",
+        "transforms",
+        "write_index"
+    }};
+
+    return arguments;
+}
+
+const char* VolumeKernelValue::getDefaultName() { return "ax.compute.voxel.k1"; }
+
+//
+
+const std::array<std::string, VolumeKernelBuffer::N_ARGS>&
+VolumeKernelBuffer::argumentKeys()
+{
+    static const std::array<std::string, VolumeKernelBuffer::N_ARGS> arguments = {{
+        "custom_data",
+        "origin",
+        "value_buffer",
+        "active_buffer",
+        "buffer_size",
+        "mode",
+        "accessors",
+        "transforms",
+        "write_index"
+    }};
+
+    return arguments;
+}
+
+const char* VolumeKernelBuffer::getDefaultName() { return "ax.compute.voxel.k2"; }
+
+//
+
+const std::array<std::string, VolumeKernelNode::N_ARGS>&
+VolumeKernelNode::argumentKeys()
+{
+    static const std::array<std::string, VolumeKernelNode::N_ARGS> arguments = {{
         "custom_data",
         "coord_is",
-        "coord_ws",
         "accessors",
         "transforms",
         "write_index",
@@ -35,13 +77,218 @@ VolumeKernel::argumentKeys()
     return arguments;
 }
 
-std::string VolumeKernel::getDefaultName() { return "ax.compute.voxel"; }
+const char* VolumeKernelNode::getDefaultName() { return "ax.compute.voxel.k3"; }
 
 
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
 namespace codegen_internal {
+
+inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const AttributeRegistry&)
+{
+    auto generate =
+        [&](const std::vector<llvm::Value*>& args,
+            llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 9);
+        llvm::Value* vbuff = args[2]; //extractArgument(rangeFunction, "value_buffer");
+        llvm::Value* abuff = args[3]; //extractArgument(rangeFunction, "active_buffer");
+        llvm::Value* buffSize = args[4]; //extractArgument(rangeFunction, "buffer_size");
+        llvm::Value* mode = args[5]; //extractArgument(rangeFunction, "mode");
+        assert(buffSize);
+        assert(vbuff);
+        assert(abuff);
+        assert(mode);
+
+        llvm::Function* base = B.GetInsertBlock()->getParent();
+        llvm::LLVMContext& C = B.getContext();
+
+        llvm::BasicBlock* conditionBlock = llvm::BasicBlock::Create(C, "k2.condition", base);
+        llvm::BasicBlock* bodyBlock = llvm::BasicBlock::Create(C, "k2.body", base);
+        llvm::BasicBlock* iterBlock = llvm::BasicBlock::Create(C, "k2.iter", base);
+
+        // init var - loops from 0 -> buffSize
+        llvm::Value* incr = insertStaticAlloca(B, LLVMType<int64_t>::get(C));
+        B.CreateStore(B.getInt64(0), incr);
+        B.CreateBr(conditionBlock);
+
+        // increment
+        B.SetInsertPoint(iterBlock);
+        llvm::Value* new_incr = B.CreateAdd(B.CreateLoad(incr), B.getInt64(1));
+        B.CreateStore(new_incr, incr);
+        B.CreateBr(conditionBlock);
+
+        // generate loop body
+        B.SetInsertPoint(bodyBlock);
+        llvm::Value* lincr = B.CreateLoad(incr);
+
+        // Extract mask bit from array of words
+        // NodeMask::isOn() = (0 != (mWords[n >> 6] & (Word(1) << (n & 63))));
+        llvm::Value* mask = binaryOperator(B.getInt64(1),
+            binaryOperator(lincr, B.getInt64(63), ast::tokens::BITAND, B),
+                ast::tokens::SHIFTLEFT, B);
+        llvm::Value* word_idx = binaryOperator(lincr, B.getInt64(6), ast::tokens::SHIFTRIGHT, B);
+        llvm::Value* word = B.CreateGEP(abuff, word_idx);
+        word = B.CreateLoad(word);
+        word = binaryOperator(word, mask, ast::tokens::BITAND, B);
+        llvm::Value* ison = B.CreateICmpNE(word, B.getInt64(0));
+
+        // Check if we should run the kernel depending on the mode.
+        //   mode == 0, inactive values
+        //   mode == 1, active values
+        //   mode == 2, all values
+        llvm::Value* matches_mode = B.CreateICmpEQ(B.CreateZExt(ison, mode->getType()), mode);
+        llvm::Value* mode_is_all = B.CreateICmpEQ(mode, B.getInt64(2));
+        llvm::Value* process = binaryOperator(matches_mode, mode_is_all, ast::tokens::OR, B);
+        llvm::BasicBlock* then = llvm::BasicBlock::Create(C, "k2.invoke_k1", base);
+
+        B.CreateCondBr(process, then, iterBlock);
+        B.SetInsertPoint(then);
+        {
+            // invoke the volume kernel for this value
+            const std::array<llvm::Value*, 8> input {
+                args[0],            // ax::CustomData
+                args[1],            // index space coordinate
+                vbuff,              // value buffer
+                ison,               // active/inactive
+                B.CreateLoad(incr), // offset in the value buffer
+                args[6],            // read accessors
+                args[7],            // transforms
+                args[8]             // write index
+            };
+            B.CreateCall(compute, input);
+            B.CreateBr(iterBlock);
+        }
+
+        B.SetInsertPoint(conditionBlock);
+        llvm::Value* endCondition = B.CreateICmpULT(B.CreateLoad(incr), buffSize);
+
+        llvm::BasicBlock* postBlock = llvm::BasicBlock::Create(C, "k2.end", base);
+        B.CreateCondBr(endCondition, bodyBlock, postBlock);
+        B.SetInsertPoint(postBlock);
+        return B.CreateRetVoid();
+    };
+
+    // Use the function builder to generate the correct prototype and body for K2
+    auto k2 = FunctionBuilder(VolumeKernelBuffer::getDefaultName())
+        .addSignature<VolumeKernelBuffer::Signature>(generate, VolumeKernelBuffer::getDefaultName())
+        .setConstantFold(false)
+        .setEmbedIR(false)
+        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+        .addParameterAttribute(0, llvm::Attribute::NoCapture)
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addParameterAttribute(1, llvm::Attribute::NoCapture)
+        .addParameterAttribute(1, llvm::Attribute::NoAlias)
+        .addParameterAttribute(2, llvm::Attribute::NoCapture)
+        .addParameterAttribute(2, llvm::Attribute::NoAlias)
+        .addParameterAttribute(3, llvm::Attribute::NoCapture)
+        .addParameterAttribute(3, llvm::Attribute::NoAlias)
+        .addParameterAttribute(6, llvm::Attribute::NoCapture)
+        .addParameterAttribute(6, llvm::Attribute::NoAlias)
+        .addParameterAttribute(7, llvm::Attribute::NoCapture)
+        .addParameterAttribute(7, llvm::Attribute::NoAlias)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .get();
+
+    k2->list()[0]->create(mContext, &mModule);
+}
+
+inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const AttributeRegistry& reg)
+{
+    const SymbolTable& localTable = *(this->mSymbolTables.get(1));
+
+    auto generate =
+        [&, this](const std::vector<llvm::Value*>& args,
+            llvm::IRBuilder<>& B) -> llvm::Value*
+    {
+        assert(args.size() == 6);
+        llvm::Value* isc = args[1]; // index space coord
+        llvm::Value* wi = args[4]; // write index
+        llvm::Value* wa = args[5]; // write_acccessor
+
+        llvm::Function* base = B.GetInsertBlock()->getParent();
+        llvm::LLVMContext& C = B.getContext();
+
+        for (const AttributeRegistry::AccessData& access : reg.data()) {
+            if (!access.writes()) continue;
+
+            const std::string token = access.tokenname();
+            llvm::Type* type = localTable.get(token)->getType();
+            type = type->getPointerElementType();
+
+            llvm::Value* registeredIndex = this->mModule.getGlobalVariable(token);
+            assert(registeredIndex);
+            registeredIndex = B.CreateLoad(registeredIndex);
+            llvm::Value* result = B.CreateICmpEQ(wi, registeredIndex);
+
+            llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(C, "k3.invoke_k1_" + token, base);
+            llvm::BasicBlock* continueBlock = llvm::BasicBlock::Create(C, "k3.next", base);
+
+            B.CreateCondBr(result, thenBlock, continueBlock);
+            B.SetInsertPoint(thenBlock);
+
+            llvm::Value* location = insertStaticAlloca(B, type);
+            llvm::Value* ison = insertStaticAlloca(B, B.getInt1Ty());
+
+            const FunctionGroup* const F = this->getFunction("probevalue", true);
+            F->execute({wa, isc, ison, location}, B);
+            ison = B.CreateLoad(ison);
+
+            llvm::Value* vptr = B.CreatePointerCast(location, LLVMType<void*>::get(C));
+
+            const std::array<llvm::Value*, 8> input {
+                args[0],        // ax::CustomData
+                args[1],        // index space coordinate
+                vptr,           // value buffer (in this case, a pointer to a single value)
+                ison,           // active/inactive
+                B.getInt64(0),  // offset in the value buffer, always zero
+                args[2],        // read accessors
+                args[3],        // transforms
+                wi              // write index
+            };
+            B.CreateCall(compute, input);
+
+            // set the voxel - load the result (if its a scalar)
+            if (type->isIntegerTy() || type->isFloatingPointTy()) {
+                location = B.CreateLoad(location);
+            }
+
+            const FunctionGroup* const function = this->getFunction("setvoxel", true);
+            function->execute({wa, isc, /*level=unknown*/B.getInt32(-1), ison, location}, B);
+
+            B.CreateBr(continueBlock);
+            B.SetInsertPoint(continueBlock);
+        }
+
+        llvm::Value* ret = B.CreateRetVoid();
+        // insert string frees for k3 which can allocate them
+        this->createFreeSymbolStrings(B);
+        return ret;
+    };
+
+    auto k3 = FunctionBuilder(VolumeKernelNode::getDefaultName())
+        .addSignature<VolumeKernelNode::Signature>(generate, VolumeKernelNode::getDefaultName())
+        .setConstantFold(false)
+        .setEmbedIR(false)
+        .addParameterAttribute(0, llvm::Attribute::ReadOnly)
+        .addParameterAttribute(0, llvm::Attribute::NoCapture)
+        .addParameterAttribute(0, llvm::Attribute::NoAlias)
+        .addParameterAttribute(1, llvm::Attribute::ReadOnly)
+        .addParameterAttribute(1, llvm::Attribute::NoCapture)
+        .addParameterAttribute(1, llvm::Attribute::NoAlias)
+        .addParameterAttribute(2, llvm::Attribute::NoCapture)
+        .addParameterAttribute(2, llvm::Attribute::NoAlias)
+        .addParameterAttribute(3, llvm::Attribute::NoCapture)
+        .addParameterAttribute(3, llvm::Attribute::NoAlias)
+        .addParameterAttribute(5, llvm::Attribute::NoCapture)
+        .addParameterAttribute(5, llvm::Attribute::NoAlias)
+        .addFunctionAttribute(llvm::Attribute::NoRecurse)
+        .get();
+
+    k3->list()[0]->create(mContext, &mModule);
+}
 
 VolumeComputeGenerator::VolumeComputeGenerator(llvm::Module& module,
                                                const FunctionOptions& options,
@@ -52,25 +299,24 @@ VolumeComputeGenerator::VolumeComputeGenerator(llvm::Module& module,
 AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
 {
     llvm::FunctionType* type =
-        llvmFunctionTypeFromSignature<VolumeKernel::Signature>(mContext);
+        llvmFunctionTypeFromSignature<VolumeKernelValue::Signature>(mContext);
 
     mFunction = llvm::Function::Create(type,
         llvm::Function::ExternalLinkage,
-        VolumeKernel::getDefaultName(),
+        VolumeKernelValue::getDefaultName(),
         &mModule);
 
     // Set up arguments for initial entry
 
     llvm::Function::arg_iterator argIter = mFunction->arg_begin();
-    const auto arguments = VolumeKernel::argumentKeys();
+    const auto arguments = VolumeKernelValue::argumentKeys();
     auto keyIter = arguments.cbegin();
 
     for (; argIter != mFunction->arg_end(); ++argIter, ++keyIter) {
         argIter->setName(*keyIter);
     }
 
-    llvm::BasicBlock* entry = llvm::BasicBlock::Create(mContext,
-        "entry_" + VolumeKernel::getDefaultName(), mFunction);
+    llvm::BasicBlock* entry = llvm::BasicBlock::Create(mContext, "k1.entry", mFunction);
     mBuilder.SetInsertPoint(entry);
 
     // build the attribute registry
@@ -87,8 +333,21 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
     // run allocations and update the symbol table
 
     for (const AttributeRegistry::AccessData& data : registry->data()) {
-        llvm::Value* value = mBuilder.CreateAlloca(llvmTypeFromToken(data.type(), mContext));
+        llvm::Type* type = llvmTypeFromToken(data.type(), mContext);
+        {
+            llvm::Value* vptr = mBuilder.CreateAlloca(type->getPointerTo(0));
+            localTable->insert(data.tokenname() + "_vptr", vptr);
+            assert(llvm::cast<llvm::AllocaInst>(vptr)->isStaticAlloca());
+        }
+
+        // @warning This method will insert the alloc before the above alloc.
+        //  This is fine, but is worth noting
+        llvm::Value* value = insertStaticAlloca(mBuilder, type);
         assert(llvm::cast<llvm::AllocaInst>(value)->isStaticAlloca());
+
+        // @note  this technically doesn't need to live in the local table
+        //  (only the pointer to this value (_vptr) needs to) but it's
+        //  re-accessed by the subsequent loop. could remove this.
         localTable->insert(data.tokenname(), value);
     }
 
@@ -105,100 +364,23 @@ AttributeRegistry::Ptr VolumeComputeGenerator::generate(const ast::Tree& tree)
 
     if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
 
-    // insert set code
+    // insert free calls for any strings
 
-    std::vector<const AttributeRegistry::AccessData*> write;
-    for (const AttributeRegistry::AccessData& access : registry->data()) {
-        if (access.writes()) write.emplace_back(&access);
-    }
-    if (write.empty()) return registry;
+    this->createFreeSymbolStrings(mBuilder);
 
-    // Cache the basic blocks which have been created as we will create
-    // new branches below
-    std::vector<llvm::BasicBlock*> blocks;
-    for (auto block = mFunction->begin(); block != mFunction->end(); ++block) {
-        blocks.emplace_back(&*block);
-    }
-
-    // insert set voxel calls
-
-    for (auto& block : blocks) {
-
-        // Only inset set calls if theres a valid return instruction in this block
-
-        llvm::Instruction* inst = block->getTerminator();
-        if (!inst || !llvm::isa<llvm::ReturnInst>(inst)) continue;
-        // remove the old return statement (we'll point to the final return jump)
-        inst->eraseFromParent();
-
-        // Set builder to the end of this block
-
-        mBuilder.SetInsertPoint(&(*block));
-
-        for (const AttributeRegistry::AccessData* access : write) {
-
-            const std::string token = access->tokenname();
-            llvm::Value* value = localTable->get(token);
-            // Expected to be used more than one (i.e. should never be zero)
-            assert(value->hasNUsesOrMore(1));
-
-            // Check to see if this value is still being used - it may have
-            // been cleaned up due to returns. If there's only one use, it's
-            // the original get of this attribute.
-            if (value->hasOneUse()) {
-                // @todo  The original get can also be optimized out in this case
-                // this->globals().remove(variable.first);
-                // mModule.getGlobalVariable(variable.first)->eraseFromParent();
-                continue;
-            }
-
-            llvm::Value* coordis = extractArgument(mFunction, "coord_is");
-            llvm::Value* accessIndex = extractArgument(mFunction, "write_index");
-            llvm::Value* accessor = extractArgument(mFunction, "write_acccessor");
-            assert(coordis);
-            assert(accessor);
-            assert(accessIndex);
-
-            llvm::Value* registeredIndex = llvm::cast<llvm::GlobalVariable>
-                (mModule.getOrInsertGlobal(token, LLVMType<int64_t>::get(mContext)));
-            registeredIndex = mBuilder.CreateLoad(registeredIndex);
-
-            llvm::Value* result = mBuilder.CreateICmpEQ(accessIndex, registeredIndex);
-            result = boolComparison(result, mBuilder);
-
-            llvm::BasicBlock* thenBlock =
-                llvm::BasicBlock::Create(mContext, "post_assign " + token, mFunction);
-            llvm::BasicBlock* continueBlock =
-                llvm::BasicBlock::Create(mContext, "post_continue", mFunction);
-
-            mBuilder.CreateCondBr(result, thenBlock, continueBlock);
-            mBuilder.SetInsertPoint(thenBlock);
-
-            llvm::Type* type = value->getType()->getPointerElementType();
-
-            // load the result (if its a scalar)
-            if (type->isIntegerTy() || type->isFloatingPointTy()) {
-                value = mBuilder.CreateLoad(value);
-            }
-
-            const FunctionGroup* const function = this->getFunction("setvoxel", true);
-            function->execute({accessor, coordis, value}, mBuilder);
-
-            mBuilder.CreateBr(continueBlock);
-            mBuilder.SetInsertPoint(continueBlock);
-        }
-
-        mBuilder.CreateRetVoid();
-    }
+    this->computek2(mFunction, *registry);
+    this->computek3(mFunction, *registry);
 
     return registry;
 }
 
 bool VolumeComputeGenerator::visit(const ast::Attribute* node)
 {
-    const std::string globalName = node->tokenname();
     SymbolTable* localTable = this->mSymbolTables.getOrInsert(1);
-    llvm::Value* value = localTable->get(globalName);
+    const std::string globalName = node->tokenname();
+    llvm::Value* value;
+    value = localTable->get(globalName + "_vptr");
+    value = mBuilder.CreateLoad(value);
     assert(value);
     mValues.push(value);
     return true;
@@ -219,24 +401,60 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
     this->globals().insert(globalName, registeredIndex);
     registeredIndex = mBuilder.CreateLoad(registeredIndex);
 
-    // index into the void* array of handles and load the value.
-    // The result is a loaded void* value
+    // first see if pre cached node exists.
 
-    llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
-    llvm::Value* transformPtr = extractArgument(mFunction, "transforms");
-    llvm::Value* coordws = extractArgument(mFunction, "coord_ws");
-    assert(accessorPtr);
-    assert(transformPtr);
-    assert(coordws);
+    llvm::Value* accessIndex = extractArgument(mFunction, "write_index");
+    llvm::Value* result = mBuilder.CreateICmpEQ(accessIndex, registeredIndex);
+    result = boolComparison(result, mBuilder);
 
-    accessorPtr = mBuilder.CreateGEP(accessorPtr, registeredIndex);
-    transformPtr = mBuilder.CreateGEP(transformPtr, registeredIndex);
+    llvm::BasicBlock* then = llvm::BasicBlock::Create(mContext, "then", mFunction);
+    llvm::BasicBlock* els  = llvm::BasicBlock::Create(mContext, "else", mFunction);
+    llvm::BasicBlock* post = llvm::BasicBlock::Create(mContext, "post", mFunction);
+    mBuilder.CreateCondBr(result, then, els);
 
-    llvm::Value* accessor = mBuilder.CreateLoad(accessorPtr);
-    llvm::Value* transform = mBuilder.CreateLoad(transformPtr);
+    mBuilder.SetInsertPoint(then);
+    {
+        llvm::Value* valueptr = extractArgument(mFunction, "value");
+        llvm::Value* offset = extractArgument(mFunction, "offset");
+        assert(valueptr);
+        assert(offset);
 
-    const FunctionGroup* const function = this->getFunction("getvoxel", true);
-    function->execute({accessor, transform, coordws, location}, mBuilder);
+        llvm::Type* type = location->getType(); // ValueType*
+        valueptr = mBuilder.CreatePointerCast(valueptr, type);
+        llvm::Value* value = mBuilder.CreateGEP(valueptr, offset);
+        mBuilder.CreateStore(value, this->mSymbolTables.get(1)->get(globalName + "_vptr"));
+        mBuilder.CreateBr(post);
+    }
+
+    mBuilder.SetInsertPoint(els);
+    {
+        // If no node, index into the void* array of handles and load the value
+        // through an accessor
+
+        llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
+        llvm::Value* transformPtr = extractArgument(mFunction, "transforms");
+        llvm::Value* origin = extractArgument(mFunction, "origin");
+        llvm::Value* offset = extractArgument(mFunction, "offset");
+        assert(accessorPtr);
+        assert(transformPtr);
+        assert(origin);
+        assert(offset);
+
+        accessorPtr = mBuilder.CreateGEP(accessorPtr, registeredIndex);
+        llvm::Value* targetTransform = mBuilder.CreateGEP(transformPtr, registeredIndex);
+        llvm::Value* sourceTransform = mBuilder.CreateGEP(transformPtr, accessIndex);
+
+        llvm::Value* accessor = mBuilder.CreateLoad(accessorPtr);
+        targetTransform = mBuilder.CreateLoad(targetTransform);
+        sourceTransform = mBuilder.CreateLoad(sourceTransform);
+
+        const FunctionGroup* const F = this->getFunction("getvoxel", true);
+        F->execute({accessor, sourceTransform, targetTransform, origin, offset, location}, mBuilder);
+        mBuilder.CreateStore(location, this->mSymbolTables.get(1)->get(globalName + "_vptr"));
+        mBuilder.CreateBr(post);
+    }
+
+    mBuilder.SetInsertPoint(post);
 }
 
 llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& globalName)

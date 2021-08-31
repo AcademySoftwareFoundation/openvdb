@@ -93,6 +93,7 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 
 //////////////////////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace potential_flow_internal {
 
@@ -205,6 +206,7 @@ struct SolveBoundaryOp
 
 } // namespace potential_flow_internal
 
+/// @endcond
 
 ////////////////////////////////////////////////////////////////////////////
 

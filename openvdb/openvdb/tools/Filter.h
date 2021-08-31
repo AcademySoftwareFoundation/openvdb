@@ -14,21 +14,24 @@
 #ifndef OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_FILTER_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_for.h>
-#include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Stencils.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tree/NodeManager.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/util/NullInterrupter.h>
-#include <openvdb/util/Util.h>
-#include <openvdb/Grid.h>
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/math/Stencils.h"
+#include "openvdb/math/Transform.h"
+#include "openvdb/tree/NodeManager.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/util/Util.h"
+#include "openvdb/thread/Threading.h"
 #include "Interpolation.h"
+
+#include <tbb/parallel_for.h>
+#include <tbb/concurrent_vector.h>
+
 #include <algorithm> // for std::max()
 #include <functional>
 #include <type_traits>
-#include <tbb/concurrent_vector.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -205,6 +208,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace filter_internal {
 
@@ -487,8 +491,10 @@ private:
 template<typename T> static inline void accum(T& sum, T addend) { sum += addend; }
 // Overload for bool ValueType
 inline void accum(bool& sum, bool addend) { sum = sum || addend; }
-}
 
+} // namespace filter_internal
+
+/// @endcond
 
 ////////////////////////////////////////
 
@@ -833,7 +839,7 @@ inline bool
 Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 {
     if (util::wasInterrupted(mInterrupter)) {
-        tbb::task::self().cancel_group_execution();
+        thread::cancelGroupExecution();
         return true;
     }
     return false;

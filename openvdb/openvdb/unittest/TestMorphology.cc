@@ -1,13 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/Types.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/LevelSetUtil.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/util/Util.h>
+
+#include <gtest/gtest.h>
 
 
 template<typename TreeT, openvdb::tools::NearestNeighbors NN>
@@ -681,4 +682,23 @@ TEST_F(TestMorphology, testPreserveMaskLeafNodes)
     for (openvdb::Int32 i = 0; i < count; ++i) {
         EXPECT_EQ(mask.probeConstLeaf({i,i,i}), nodes[i]);
     }
+}
+
+
+TEST_F(TestMorphology, testDeprecated)
+{
+    // just test these can be instantiated
+
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
+    openvdb::FloatTree tree;
+    openvdb::tree::LeafManager<openvdb::FloatTree> lm(tree);
+
+    openvdb::tools::dilateVoxels(tree, 1);
+    lm.rebuild();
+    openvdb::tools::dilateVoxels(lm, 1);
+    openvdb::tools::erodeVoxels(tree, 1);
+
+    lm.rebuild();
+    openvdb::tools::erodeVoxels(lm, 1);
+OPENVDB_NO_DEPRECATION_WARNING_END
 }

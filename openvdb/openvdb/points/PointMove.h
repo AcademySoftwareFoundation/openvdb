@@ -548,13 +548,13 @@ inline void movePoints( PointDataGridT& points,
 
     // early exit if no LeafNodes
 
-    PointDataTree::LeafCIter iter = tree.cbeginLeaf();
+    auto iter = tree.cbeginLeaf();
 
     if (!iter)      return;
 
     // build voxel topology taking into account any point group deletion
 
-    auto newPoints = point_mask_internal::convertPointsToScalar<PointDataGrid>(
+    auto newPoints = point_mask_internal::convertPointsToScalar<PointDataGridT>(
         points, transform, filter, deformer, threaded);
     auto& newTree = newPoints->tree();
 

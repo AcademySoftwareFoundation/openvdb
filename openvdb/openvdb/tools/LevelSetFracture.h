@@ -95,6 +95,7 @@ private:
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 // Internal utility objects and implementation details
 
@@ -143,6 +144,7 @@ struct FindMinMaxVoxelValue {
 
 } // namespace level_set_fracture_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

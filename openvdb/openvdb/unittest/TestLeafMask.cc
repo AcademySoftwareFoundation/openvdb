@@ -1,15 +1,14 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <set>
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/tools/Filter.h>
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/util/logging.h>
 #include "util.h" // for unittest_util::makeSphere()
-
+#include <gtest/gtest.h>
+#include <set>
 
 class TestLeafMask: public ::testing::Test
 {

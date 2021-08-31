@@ -211,17 +211,41 @@ an inclusive range, so includes the maximum voxel.)"));
 
     parms.addFolder("Expand");
 /*
-    Expand the active area by the specified number of voxels.  Does not support
-    operation or setting of values.
+    Expand the active area by at least the specified number of voxels.  Does not
+    support operation or setting of values.
 */
-    parms.add(hutil::ParmFactory(PRM_INT, "expand", "Voxels to Expand")
+    parms.add(hutil::ParmFactory(PRM_INT, "expand", "Expand Voxels")
                 .setDefault(PRMoneDefaults)
                 .setRange(PRM_RANGE_FREE, -5, PRM_RANGE_FREE, 5)
-                .setTooltip("Expand the active area by the specified number of voxels.")
+              .setTooltip("Expand the active area by at least the specified number of voxels.")
                 .setDocumentation(
-R"(Expand the active area by the specified number of voxels.  Does not support
+R"(Expand the active area by at least the specified number of voxels.  Does not support
 operation or setting of values.)"));
 
+/*
+    Expand the active area by at least the specified distance. Does not support
+    operation or setting of values.
+*/
+    parms.add(hutil::ParmFactory(PRM_FLT, "expanddist", "Expand Distance")
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, 0.0f, PRM_RANGE_UI, 2.0f)
+              .setTooltip("Expand the active area by at least the specified distance.")
+              .setDocumentation(
+                                R"(Expand the active area by at least the specified distance. Does not support operation or setting of values.)"));
+
+/*
+    Specifies which nearby voxels are considered neighbors for expansion.
+*/
+    parms.add(hutil::ParmFactory(PRM_STRING, "expansionpattern", "Expansion Pattern")
+        .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
+            "face", "Plus",
+            "faceedge", "Diamond",
+            "faceedgevertex", "Box"
+        })
+        .setDefault("face")
+        .setTooltip("Set pattern used to identify neighbor voxels for expansion.")
+        .setDocumentation(
+R"(Specifies which nearby voxels are considered neighbors for expansion.)"));
 
     parms.addFolder("Reference");
 /*
@@ -480,18 +504,16 @@ sopFillSDF(GridType &grid, int dummy)
 
 template <typename GridType>
 static void
-sopDilateVoxels(GridType& grid, int count)
+sopDilateVoxels(GridType& grid, exint count, openvdb::tools::NearestNeighbors nn)
 {
-    // @todo  switch to support tiles
-    openvdb::tools::dilateActiveValues(grid.tree(), count, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
+    openvdb::tools::dilateActiveValues(grid.tree(), static_cast<int>(count), nn);
 }
 
 template <typename GridType>
 static void
-sopErodeVoxels(GridType& grid, int count)
+sopErodeVoxels(GridType& grid, exint count, openvdb::tools::NearestNeighbors nn)
 {
-    // @todo  switch to support tiles
-    openvdb::tools::erodeActiveValues(grid.tree(), count, openvdb::tools::NN_FACE, openvdb::tools::IGNORE_TILES);
+    openvdb::tools::erodeActiveValues(grid.tree(), static_cast<int>(count), nn);
     if (grid.getGridClass() == openvdb::GRID_LEVEL_SET) {
         openvdb::tools::pruneLevelSet(grid.tree());
     }
@@ -549,6 +571,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 {
     using namespace openvdb;
     using namespace openvdb::math;
+    using namespace openvdb::tools;
 
     try
     {
@@ -657,24 +680,43 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
 
                 case REGIONTYPE_EXPAND:         // Dilate
                 {
-                    int         dilation = static_cast<int>(evalInt("expand", 0, t));
+                    exint dilatevoxels = evalInt("expand", 0, t);
+                    exint dilatedist = static_cast<exint>(
+                            SYSceil(sqrt(3.0)
+                                    * SYSsafediv(
+                                            evalFloat("expanddist", 0, t),
+                                            vdb->getVoxelDiameter())));
 
-                    if (dilation > 0)
+                    NearestNeighbors nn = NN_FACE;
+                    const auto str = evalStdString("expansionpattern", t);
+                    if (str == "faceedge")
+                        nn = NN_FACE_EDGE;
+                    else if (str == "faceedgevertex")
+                        nn = NN_FACE_EDGE_VERTEX;
+
+                    exint maxdilate = SYSmax(dilatevoxels, dilatedist);
+                    if (maxdilate > 0)
                     {
                         if (boss->opInterrupt())
                             break;
+
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopDilateVoxels,
-                                         vdb->getGrid(), dilation);
+                                         vdb->getGrid(), maxdilate, nn);
                     }
 
-                    if (dilation < 0)
+                    exint mindilate = SYSmin(dilatevoxels, dilatedist);
+                    if (mindilate < 0)
                     {
                         if (boss->opInterrupt())
                             break;
                         UTvdbCallAllTopology(vdb->getStorageType(),
                                          sopErodeVoxels,
-                                         vdb->getGrid(), -dilation);
+                                         vdb->getGrid(), -mindilate, nn);
+                    }
+                    if (mindilate < 0 && maxdilate > 0)
+                    {
+                        addWarning(SOP_MESSAGE, "Conflicting signs in Voxel/Worldspace dilation request.  Applying both, which may not be expected.");
                     }
                     break;
                 }

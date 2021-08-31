@@ -1,0 +1,21 @@
+
+mat3d inputd = {
+    1.0, -1.0, 0.0,
+    2.0, 2.0, 0.0,
+    0.0, 0.0, -1.0
+};
+
+mat3d cd;
+cd = cofactor(inputd);
+
+mat3f inputf = {
+    1.0f, -1.0f, 0.0f,
+    2.0f, 2.0f, 0.0f,
+    0.0f, 0.0f, -1.0f
+};
+
+mat3f cf;
+cf = cofactor(inputf);
+
+mat3d@test1 = cd;
+mat3f@test2 = cf;

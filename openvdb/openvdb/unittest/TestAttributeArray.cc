@@ -1,12 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "gtest/gtest.h"
 #include <openvdb/points/AttributeArray.h>
 #include <openvdb/points/AttributeSet.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/io/File.h>
+
+#include <gtest/gtest.h>
 
 #ifdef __clang__
 #pragma GCC diagnostic push
@@ -20,8 +21,8 @@
 #include <boost/interprocess/file_mapping.hpp>
 #include <boost/interprocess/mapped_region.hpp>
 #include <tbb/tick_count.h>
-#include <tbb/atomic.h>
 
+#include <atomic>
 #include <cstdio> // for std::remove()
 #include <fstream>
 #include <sstream>
@@ -527,6 +528,32 @@ TEST_F(TestAttributeArray, testAttributeArray)
             EXPECT_EQ(Name("trnc"), attr.codecType());
             EXPECT_EQ(Index(4), attr.valueTypeSize());
             EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, FixedPointCodec<false, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt16"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(2), attr.storageTypeSize());
+            EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
+            EXPECT_TRUE(!attr.valueTypeIsClass());
+            EXPECT_TRUE(!attr.valueTypeIsVector());
+            EXPECT_TRUE(!attr.valueTypeIsQuaternion());
+            EXPECT_TRUE(!attr.valueTypeIsMatrix());
+        }
+        {
+            TypedAttributeArray<float, FixedPointCodec<true, UnitRange>> typedAttr(size);
+            AttributeArray& attr(typedAttr);
+            EXPECT_EQ(Name("float"), attr.valueType());
+            EXPECT_EQ(Name("ufxpt8"), attr.codecType());
+            EXPECT_EQ(Index(4), attr.valueTypeSize());
+            EXPECT_EQ(Index(1), attr.storageTypeSize());
             EXPECT_TRUE(attr.valueTypeIsFloatingPoint());
             EXPECT_TRUE(!attr.valueTypeIsClass());
             EXPECT_TRUE(!attr.valueTypeIsVector());

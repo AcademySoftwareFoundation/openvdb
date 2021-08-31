@@ -66,20 +66,23 @@ struct ComputeKernel
 
 namespace codegen_internal {
 
-/// @brief Visitor object which will generate llvm IR for a syntax tree.
-/// This provides the majority of the code generation functionality but is incomplete
-/// and should be inherited from and extended with ast::Attribute handling (see
-/// PointComputeGenerator.h/VolumeComputeGenerator.h for examples).
-/// @note: The visit/traverse methods work slightly differently to the normal Visitor
-/// to allow proper handling of errors and visitation history. Nodes that inherit from
-/// ast::Expression can return false from visit() (and so traverse()), but this will not
-/// necessarily stop traversal altogether. Instead, any ast::Statements that are not also
-/// ast::Expressions i.e. Block, ConditionalStatement, Loop, DeclareLocal override their
-/// visit/traverse methods to handle custom traversal order, and the catching of failed child
-/// Expression visit/traverse calls. This allows errors in independent Statements to not halt
-/// traversal for future Statements and so allow capturing of multiple errors in an ast::Tree
-/// in a single call to generate().
-///
+/// @brief Visitor object which will generate llvm IR for a syntax tree. This
+///   provides the majority of the code generation functionality except for
+///   attribute access. This design allows for custom geometry to define their
+///   IR implementations for these accesses by deriving and extending this
+///   generator with ast::Attribute handling (see PointComputeGenerator.h and
+///   VolumeComputeGenerator.h for examples).
+/// @note The visit/traverse methods work slightly differently to the normal
+///   Visitor to allow proper handling of errors and visitation history. Nodes
+///   that inherit from ast::Expression can return false from visit() (and so
+///   traverse()), but this will not necessarily stop traversal altogether.
+///   Instead, any ast::Statements that are not also ast::Expressions i.e.
+///   Block, ConditionalStatement, Loop, DeclareLocal, etc override their visit
+///   and traverse methods to handle custom traversal order, and the catching
+///   of failed child Expression visit/traverse calls. This allows errors in
+///   independent Statements to not halt traversal for future Statements and so
+///   allow capturing of multiple errors in an ast::Tree in a single call to
+///   ComputeGenerator::generate().
 struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
 {
     ComputeGenerator(llvm::Module& module,
@@ -176,6 +179,8 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
         return true;
     }
 
+    ///@{
+    /// @brief  Visitor methods for all AST nodes which implement IR generation
     virtual bool visit(const ast::CommaOperator*);
     virtual bool visit(const ast::AssignExpression*);
     virtual bool visit(const ast::Crement*);
@@ -206,10 +211,11 @@ struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
     template <typename ValueType>
     typename std::enable_if<std::is_integral<ValueType>::value, bool>::type
     visit(const ast::Value<ValueType>* node);
-
     template <typename ValueType>
+
     typename std::enable_if<std::is_floating_point<ValueType>::value, bool>::type
     visit(const ast::Value<ValueType>* node);
+    ///@}
 
 protected:
 
@@ -219,6 +225,13 @@ protected:
     bool binaryExpression(llvm::Value*& result, llvm::Value* lhs, llvm::Value* rhs,
         const ast::tokens::OperatorToken op, const ast::Node* node);
     bool assignExpression(llvm::Value* lhs, llvm::Value*& rhs, const ast::Node* node);
+
+    /// @brief Clear any strings which were allocated in a given function.
+    ///   This method accepts an IRBuilder which is expected to be attached to
+    ///   a valid block/function. For each block in the function with a return
+    ///   instruction, this function calls the appropriate memory methods to
+    ///   deallocate any strings (which are alloced in the function prologue).
+    void createFreeSymbolStrings(llvm::IRBuilder<>&);
 
     llvm::Module& mModule;
     llvm::LLVMContext& mContext;

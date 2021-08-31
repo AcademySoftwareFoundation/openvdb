@@ -128,6 +128,7 @@ const ast::Variable* lastUse(const ast::Node& node, const std::string& token);
 //////////////////////////////////////////////////////////////////////
 //////////////////////////////////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace internal {
 template<typename ContainerType, typename T, typename ...Ts>
@@ -143,6 +144,8 @@ struct CollectForEach<ContainerType, TypeList<T, Ts...>> {
     }
 };
 }
+
+// @endcond
 
 template<typename NodeT, typename ContainerType>
 inline void collectNodeType(const ast::Node& node, ContainerType& array)

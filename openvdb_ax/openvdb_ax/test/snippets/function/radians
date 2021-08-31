@@ -1,0 +1,2 @@
+double@test1 = radians(90.0);
+float@test2 = radians(-65.0f);

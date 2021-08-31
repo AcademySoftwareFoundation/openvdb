@@ -210,7 +210,7 @@ private:
 
 
 //{
-/// @cond OPENVDB_SIGNED_FLOOD_FILL_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 
 template<typename TreeOrLeafManagerT>
 inline

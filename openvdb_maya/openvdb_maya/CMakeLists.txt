@@ -136,7 +136,7 @@ set_target_properties(openvdb_maya
 if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()

@@ -12,23 +12,25 @@
 #ifndef OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVEL_SET_TRACKER_HAS_BEEN_INCLUDED
 
-#include <tbb/parallel_for.h>
-#include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/FiniteDifference.h>
-#include <openvdb/math/Operators.h>
-#include <openvdb/math/Stencils.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/Grid.h>
-#include <openvdb/util/NullInterrupter.h>
-#include <openvdb/tree/ValueAccessor.h>
-#include <openvdb/tree/LeafManager.h>
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/math/FiniteDifference.h"
+#include "openvdb/math/Operators.h"
+#include "openvdb/math/Stencils.h"
+#include "openvdb/math/Transform.h"
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/thread/Threading.h"
+#include "openvdb/tree/ValueAccessor.h"
+#include "openvdb/tree/LeafManager.h"
 #include "ChangeBackground.h"// for changeLevelSetBackground
 #include "Morphology.h"//for dilateActiveValues
 #include "Prune.h"// for pruneLevelSet
+
+#include <tbb/parallel_for.h>
+
 #include <functional>
 #include <type_traits>
-
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -383,7 +385,7 @@ LevelSetTracker<GridT, InterruptT>::
 checkInterrupter()
 {
     if (util::wasInterrupted(mInterrupter)) {
-        tbb::task::self().cancel_group_execution();
+        thread::cancelGroupExecution();
         return false;
     }
     return true;

@@ -1,12 +1,60 @@
 OpenVDB Version History
 =======================
 
-Version 8.1.0 - In development
+Version 8.1.1 - In development
+
+    Improvements:
+    - Moved from the deprecated TBB task scheduler to TBB arenas. Various
+      methods now respect the TBB arena state they were invoked from.
+    - Introduced a new thread/Threading.h header to consolidate calls to
+      third-party threading methods.
+    - Minor performance improvements to dilation calls in fast sweeping
+      algorithms.
+
+    Houdini:
+    - Fix crash in VDB Combine in Copy B mode if the second input has
+      more VDBs than the first.
+    - VDB Vector Merge SOP is now VDB Vector From Scalar SOP to distinguish
+      it from the VDB Merge SOP. It keeps the same internal name so this
+      is merely a label change.
+
+    Build:
+    - Added support for TBB 2021.
+    - Enabled the OPENVDB_FUTURE_DEPRECATION variable by default to warn on
+      upcoming deprecations.
+    - Introduced a OPENVDB_DOXYGEN_INTERNAL CMake variable which is ON by
+      default and removes the majority of internal namespaces from the
+      generated doxygen.
+    - Improved the doxygen deprecation listings, folder layouts and fixes
+      issues when using later versions of doxygen.
+
+
+Version 8.1.0 - June 11, 2021
+
+      As of this release, support for grid ABI=5 has been removed.
 
     New features:
     - Added tools::erodeActiveValues() to match the existing
       tools::dilateActiveValues(). New erosion tools support all tile policies
-      and edge/vertex neighbour patterns.
+      and edge/vertex neighbor patterns.
+    - Added support for automatic filtering of active tiles in tools::Filter
+      by setting tools::Filter::setProcessTiles. Active tiles are densified
+      on demand, only when necessary.
+    - Added tools::visitNodesDepthFirst and tools::DepthFirstNodeVisitor which
+      visit nodes in a tree or sub-tree in single-threaded depth-first order.
+    - Significant performance improvements to AX volume kernels, primarily due
+      to improved vectorization. Performance scales depending on the available
+      host CPU instruction set and scalability of the AX kernel. Trivial
+      assignments profile upwards of 3x faster on AVX.
+    - Introduced Active Tile Streaming for volumes kernels. AX can now
+      dynamically expand and collapse active nodes at all levels of a VDB tree
+      on demand, switching on or off by checking the spatial access pattern of
+      AX programs.
+    - Added tools::countActiveVoxels() for multi-threaded counting of active
+      voxels, optionally by bounding box. The Tree::activeVoxelCount() method
+      now uses this implementation.
+    - Added tools::memUsage() for multi-threaded counting of bytes of memory
+      used. The Tree::memUsage() method now uses this implementation.
 
     Improvements:
     - Significant performance improvements to large dilations with
@@ -18,6 +66,59 @@ Version 8.1.0 - In development
     - Reduced the time spent in the hot path of openvdb::initialize() and
       openvdb::uninitialize() by leveraging atomics with double-checked locks.
       [Contributed by Ben FrantzDale].
+    - Extended tree::DynamicNodeManager to allow for use with a const tree.
+    - Replace tbb::mutex with std::mutex and tbb::atomic with std::atomic as
+      these have now been removed in TBB 2021.
+      [Contributed by Ben FrantzDale].
+    - Significant performance improvements to tools::activate and
+      tools::deactivate through use of the DynamicNodeManager to parallelize
+      tile processing.
+    - Added degree() and radians() AX helper functions for converting radians
+      to degrees and vice versa, respectively.
+    - Added adjoint(), cofactor() and inverse() AX matrix functions.
+    - Added sort(), argsort(), isfinite(), isinf() and isnan() AX utility and
+      math functions.
+    - Added Vec4 argument support to normalize() AX function.
+    - Removed unused int16 AX modulo function signatures.
+    - Refactored the backend AX representation of strings with SSO support and
+      heap allocation.
+    - Added new methods on the VolumeExecutable to control active tile
+      streaming and node execution levels
+    - The deletepoint() AX function is now natively supported by the
+      PointExecutable
+    - Added tools::SumMergeOp that uses a parallel breadth-first algorithm to
+      accelerate summing grids.
+    - vdb_view: Fixed a bug which wouldn't reset the camera speed on focus
+    - vdb_view: Improved the drawing of PointDataGrids
+    - vdb_view: Improved the exception handling of BufferObjects and added
+      support for drawing an array without index values
+
+    Bug Fixes:
+    - Fix a memory leak in AttributeArray when delayed-loading is disabled.
+    - Fixed a crash in OpenVDB AX when declaring arrays with non-scalar
+      elements (unsupported) i.e. {"foo", 1, 2}, {1, {1,2}, 3} etc.
+    - Fixed a bug in OpenVDB AX which would cause an error when multiplying a
+      vec3 by a mat4.
+    - In OpenVDB AX, improved the error message produced when attempting to use
+      a matrix literal (i.e. {1,2,3...}) in a binary expression (this is
+      invalid but would previously print out bad IR).
+    - Fixed a non-deterministic failure in the TestStreamCompression unit test.
+    - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+      performance regression.
+    - tools::deactivate now also works with a MaskTree.
+    - Fixed a memory leak in the OpenVDB AX parser
+    - Fixed an occurrence of undefined behavior in the OpenVDB AX visitor
+    - Fixed some memory leaks in the OpenVDB and OpenVDB AX unit tests
+    - Fixed a bug in AX which could cause string allocations in loops to overflow
+      the stack
+    - Fixed a bug where the ValueOff iterator for the AX VolumeExecutable could
+      remove child branches of a VDB tree.
+    - Fixed a crash in the AX Houdini SOP with an empty PointDataGrid input.
+    - Fixed all cases where PointIndex and PointData aliases were used instead
+      of a templated type.  [Reported by Karl Marrett]
+    - Fixed a crash when calling openvdb::points::pointOffsets with an empty
+      PointDataGrid input.
+    - Add missing 8-bit and 16-bit attribute type registration.
 
     API changes:
     - Restructured the internals of Morphology.h and moved tools::activate()
@@ -27,6 +128,8 @@ Version 8.1.0 - In development
     - The openvdb::tools::Film class no longer has a saveExr method in
       any build configuration. Sample code for saving exrs from this
       object can be found in the command line render tool.
+    - Added ability to run tools::activate and tools::deactivate
+      single-threaded.
 
     Houdini:
     - Updated the VDB Activate SOP and others to use the multi-threaded
@@ -34,6 +137,28 @@ Version 8.1.0 - In development
       increase.
     - Introduced the VDB AX SOP which provides an interface for running
       OpenVDB AX code in Houdini on VDB grids.
+    - Updated the VDB Smooth SOP to support the filtering of active tiles.
+    - Fixed a parameter warning in VDB AX SOP.
+    - Transfer Surface Attributes in Convert VDB SOP could use uninitialized
+      memory.
+    - VDB Activate SOP now uses the multi-threaded tools::deactivate for much
+      faster performance.
+    - Improved the formatting and updated the OpenVDB AX SOPs help card.
+    - The AX SOP utilizes the new Active Tile Streaming feature for Volumes.
+      Grids will only be densified in areas where unique values are created.
+    - VDB Activate SOP dilation will affect tiles, changing its behavior
+      from previous versions, but producing a more expected result.
+    - VDB Activate SOP has a world space dilation option.
+    - Introduced the VDB Merge SOP that merges multiple grids in parallel and
+      is faster and more convenient to use than the VDB Combine SOP.
+    - Fix a bug where the VDB Rebuild SDF was not preserving metadata from the
+      input grid.
+    - Fix a bug in VDB Resample SOP where input transform was not being used for
+      voxel size and voxel scale transform modes.
+    - Added Extrapolate SOP, which wraps the tools leveraging the Fast Sweeping
+      algorithm (tools::dilateSdf, tools::maskSdf, tools::fogToSdf,
+      tools::sdfToSdf, tools::sdfToExt, tools::fogToExt, tools::sdfToSdfAndExt,
+      tools::fogToSdfAndExt).
 
     Build:
     - Dependency on OpenEXR's Half implementation has been removed from the
@@ -41,12 +166,54 @@ Version 8.1.0 - In development
       This is fully bitwise compatible, but may require switching Half
       references to math::Half. The USE_IMATH_HALF build configuration can
       be used to switch back to OpenEXR based half.
+    - Blosc, Log4cplus, IlmBase, OpenEXR and TBB find modules now configure
+      release and debug library variants.
+      [Reported by Matthew Cong]
+    - Fixed an issue where FindBlosc wouldn't add zstd as a dep in non static
+      builds BLOSC_USE_EXTERNAL_SOURCES.
+    - Fixed Log4cplus interface language and missing interface libraries on
+      Win32.
+    - Removed Jemalloc and Tbbmalloc logic from the core library builds.
+    - The variable CMAKE_MSVC_RUNTIME_LIBRARY is no longer set by the OpenVDB
+      CMake. If CMAKE_MSVC_RUNTIME_LIBRARY is not explicitly provided, OpenVDB
+      configures the static library with /MT(d) and the dynamic library
+      with /MD(d).
+      [Reported by Jérémie Dumas]
+    - Added support for ABI=9 and a CMake option OPENVDB_USE_FUTURE_ABI_9 to
+      use it without errors.
+    - The value of CONCURRENT_MALLOC is now respected when building the vdb_ax
+      command line binary.
+    - Added an option OPENVDB_ENABLE_UNINSTALL to allow the toggling of the
+      uninstall build target.
+      [Contributed by Jérémie Dumas]
+    - Improved the behavior of locating static zlib libraries when
+      USE_STATIC_DEPENDENCIES is enabled.
+    - Fixed an issue where extra hboost libraries could not be found when
+      building against Houdini 18.5 on Windows.
+    - Build fixes to OpenVDB AX for LLVM 12.
+    - Re-introduced the OPENVDB_DEPRECATED macro with an additional option that
+      takes a message.  Added support to disable deprecations throughout
+      OpenVDB by defining OPENVDB_NO_DEPRECATION_WARNINGS
+    - Added an optional OPENVDB_TESTS variable to easily build a subset of the
+      unit tests.
+    - Fixed various incorrect RPATH directory paths in CMake (introduced in
+      8.0.1)
+      [Contributed by Ignacio Vizzo].
+    - Removed some unnecessary CMake for vdb_view
+    - The Windows defines NOMINMAX and _USE_MATH_DEFINES are now provided in
+      Platform.h.
+    - Moved the logic from PlatformConfig.h into Platform.h.
+    - The version.h header is now an auto generated header (version.h.in)
+      populated by CMake.  The OpenVDB Version and ABI defines are computed
+      from the installation settings.  Importantly, the value of
+      OPENVDB_ABI_VERSION_NUMBER now always matches the version used at build
+      time.
+    - Added OPENVDB_USE_HALF, OPENVDB_USE_BLOSC and OPENVDB_USE_ZLIB as
+      publicly available defines in version.h. These will be defined depending
+      on the settings used to build OpenVDB.
+
 
 Version 8.0.1 - February 5, 2021
-
-    Bug fixes:
-    - Fixed a bug in the new CSG intersection merge algorithm where data
-      outside of the intersection region was not being removed.
 
     Bug fixes:
     - Fixed a bug in the new CSG intersection merge algorithm where data
@@ -132,6 +299,12 @@ Version 8.0.0 - December 23, 2020
       [Reported by Alexander Hagen]
     - Removed OPENVDB_DEPRECATED macro in favor of C++14 [[deprecated]]
       attribute.
+
+Version 7.2.3 - March 16, 2021
+
+    Bug fixes:
+    - Use copy-by-reference for the operator in a DynamicNodeManager to fix a
+      performance regression.
 
 Version 7.2.2 - February 4, 2021
 
@@ -1399,8 +1572,7 @@ Version 3.2.0 - August 10, 2016
     - Fixed isApproxZero() so that it works correctly when tolerance is zero.
       [Reported by Joshua Olson]
     - Fixed bugs in tree::NodeUnion that could cause crashes.
-    - Fixed memory leak in
-      tools::mesh_to_volume_internal::ExpandNarrowband
+    - Fixed memory leak in a tools::meshToVolume sub-tool (expandNarrowband).
       [Reported by Kévin Dietrich]
     - Fixed parameter type inconsistencies in math/Stencils.h and
       tools/RayIntersector.h.

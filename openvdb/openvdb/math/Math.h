@@ -319,10 +319,11 @@ inline long double Abs(long double x) { return std::fabs(x); }
 inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 inline bool Abs(bool b) { return b; }
-// On OSX size_t and uint64_t are different types
-#if defined(__APPLE__) || defined(MACOSX)
-inline size_t Abs(size_t i) { return i; }
-#endif
+// On systems like macOS and FreeBSD, size_t and uint64_t are different types
+template <typename T, typename std::enable_if<
+        std::is_same<T, size_t>::value
+        >::type* = nullptr>
+inline T Abs(T i) { return i; }
 //@}
 
 
@@ -558,7 +559,7 @@ inline Type Pow3(Type x) { return x*x*x; }
 template<typename Type>
 inline Type Pow4(Type x) { return Pow2(Pow2(x)); }
 
-/// Return @a x<sup>@a n</sup>.
+/// Return @a x<sup>n</sup>.
 template<typename Type>
 Type
 Pow(Type x, int n)
@@ -573,7 +574,7 @@ Pow(Type x, int n)
 }
 
 //@{
-/// Return @a b<sup>@a e</sup>.
+/// Return @a b<sup>e</sup>.
 inline float
 Pow(float b, float e)
 {
@@ -708,7 +709,7 @@ Min(const Type& a, const Type& b, const Type& c, const Type& d,
 
 // ============> Exp <==================
 
-/// Return @a e<sup>@a x</sup>.
+/// Return @a e<sup>x</sup>.
 template<typename Type>
 inline Type Exp(const Type& x) { return std::exp(x); }
 

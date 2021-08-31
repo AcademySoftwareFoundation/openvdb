@@ -146,6 +146,7 @@ nonUniformPointScatter(const GridT& grid,
 
 ////////////////////////////////////////
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_scatter_internal
 {
@@ -208,6 +209,7 @@ generatePositions(LeafNodeT& leaf,
 
 } // namespace point_scatter_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

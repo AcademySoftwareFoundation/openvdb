@@ -607,12 +607,12 @@ thread-safe counter.
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <tbb/parallel_for.h>
-#include <tbb/atomic.h>
+#include <atomic>
 #include <cassert>
 #include <iostream>
 
 // Global active voxel counter, atomically updated from multiple threads
-tbb::atomic<openvdb::Index64> activeLeafVoxelCount;
+std::atomic<openvdb::Index64> activeLeafVoxelCount;
 
 // Functor for use with tbb::parallel_for() that operates on a grid's leaf nodes
 template<typename GridType>
@@ -632,7 +632,7 @@ struct LeafProcessor
             // Retrieve the leaf node to which the iterator is pointing.
             const LeafNode& leaf = *range.iterator();
             // Update the global counter.
-            activeLeafVoxelCount.fetch_and_add(leaf.onVoxelCount());
+            activeLeafVoxelCount.fetch_add(leaf.onVoxelCount());
         }
     }
 };
@@ -1345,7 +1345,7 @@ int main()
             // Extract the voxel-space position of the point.
             openvdb::Vec3f voxelPosition = positionHandle.get(*indexIter);
 
-            // Extract the world-space position of the voxel.
+            // Extract the index-space position of the voxel.
             const openvdb::Vec3d xyz = indexIter.getCoord().asVec3d();
 
             // Compute the world-space position of the point.

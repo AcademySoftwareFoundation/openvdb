@@ -65,7 +65,7 @@ if(OPENVDB_ENABLE_RPATH)
     ${Tbb_LIBRARY_DIRS}
   )
   if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_LIBDIR})
+    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
   else()
     list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
   endif()
@@ -138,6 +138,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
   )
 
   if(WIN32)
+    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
     get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
     if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       target_compile_definitions(vdb_render  PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
@@ -166,15 +167,6 @@ endif()
 #### vdb_view
 
 if(OPENVDB_BUILD_VDB_VIEW)
-  if(NOT Boost_USE_STATIC_LIBS)
-    # @note  Both of these must be set for Boost 1.70 (VFX2020) to link against
-    #        boost shared libraries (more specifically libraries built with -fPIC).
-    #        http://boost.2283326.n4.nabble.com/CMake-config-scripts-broken-in-1-70-td4708957.html
-    #        https://github.com/boostorg/boost_install/commit/160c7cb2b2c720e74463865ef0454d4c4cd9ae7c
-    set(BUILD_SHARED_LIBS ON)
-    set(Boost_USE_STATIC_LIBS OFF)
-  endif()
-
   find_package(OpenGL REQUIRED)
 
   if(WIN32)

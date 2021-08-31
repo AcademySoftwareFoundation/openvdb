@@ -13,6 +13,7 @@
 #include <algorithm> // for std::min()
 #include <cmath> // for std::abs(), std::fabs(), std::floor()
 #include <limits>
+#include <stdexcept>
 #include <type_traits> // for std::is_const
 
 
@@ -226,6 +227,25 @@ MinMaxVoxel<TreeType>::join(const MinMaxVoxel<TreeType>& rhs)
 ////////////////////////////////////////
 
 
+inline void verifyShaderLinked(GLuint program)
+{
+    GLint linked = 0;
+    glGetProgramiv(program, GL_LINK_STATUS, &linked);
+    if (linked != GL_FALSE) return;
+
+    GLint maxLength = 0;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &maxLength);
+
+    std::vector<GLchar> infoLog(maxLength);
+    glGetProgramInfoLog(program, maxLength, &maxLength, &infoLog[0]);
+    glDeleteProgram(program);
+
+    std::ostringstream os;
+    os << "Error: Unable to link shader program:\n\n" << infoLog.data();
+    throw std::runtime_error(os.str());
+}
+
+
 // BufferObject
 
 BufferObject::BufferObject():
@@ -243,21 +263,22 @@ BufferObject::~BufferObject() { clear(); }
 void
 BufferObject::render() const
 {
-    if (mPrimNum == 0 || !glIsBuffer(mIndexBuffer) || !glIsBuffer(mVertexBuffer)) {
+    if (!glIsBuffer(mVertexBuffer)) {
         OPENVDB_LOG_DEBUG_RUNTIME("request to render empty or uninitialized buffer");
         return;
     }
 
     const bool usesColorBuffer = glIsBuffer(mColorBuffer);
     const bool usesNormalBuffer = glIsBuffer(mNormalBuffer);
+    const bool usesIndices = glIsBuffer(mIndexBuffer);
 
     glBindBuffer(GL_ARRAY_BUFFER, mVertexBuffer);
     glEnableClientState(GL_VERTEX_ARRAY);
     glVertexPointer(3, GL_FLOAT, 0, nullptr);
 
     if (usesColorBuffer) {
-        glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
         glEnableClientState(GL_COLOR_ARRAY);
+        glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
         glColorPointer(3, GL_FLOAT, 0, nullptr);
     }
 
@@ -267,8 +288,13 @@ BufferObject::render() const
         glNormalPointer(GL_FLOAT, 0, nullptr);
     }
 
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
-    glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, nullptr);
+    if (usesIndices) {
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
+        glDrawElements(mPrimType, mPrimNum, GL_UNSIGNED_INT, nullptr);
+    }
+    else {
+        glDrawArrays(mPrimType, 0, mPrimNum);
+    }
 
     // disable client-side capabilities
     if (usesColorBuffer) glDisableClientState(GL_COLOR_ARRAY);
@@ -288,12 +314,12 @@ BufferObject::genIndexBuffer(const std::vector<GLuint>& v, GLenum primType)
     // gen new buffer
     glGenBuffers(1, &mIndexBuffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, mIndexBuffer);
-    if (glIsBuffer(mIndexBuffer) == GL_FALSE) throw "Error: Unable to create index buffer";
+    if (glIsBuffer(mIndexBuffer) == GL_FALSE) throw std::runtime_error("Error: Unable to create index buffer");
 
     // upload data
     glBufferData(GL_ELEMENT_ARRAY_BUFFER,
         sizeof(GLuint) * v.size(), &v[0], GL_STATIC_DRAW); // upload data
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to upload index buffer data";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to upload index buffer data");
 
     // release buffer
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
@@ -305,16 +331,22 @@ BufferObject::genIndexBuffer(const std::vector<GLuint>& v, GLenum primType)
 void
 BufferObject::genVertexBuffer(const std::vector<GLfloat>& v)
 {
+    assert((v.size() % 3) == 0);
     if (glIsBuffer(mVertexBuffer) == GL_TRUE) glDeleteBuffers(1, &mVertexBuffer);
 
     glGenBuffers(1, &mVertexBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, mVertexBuffer);
-    if (glIsBuffer(mVertexBuffer) == GL_FALSE) throw "Error: Unable to create vertex buffer";
+    if (glIsBuffer(mVertexBuffer) == GL_FALSE) throw std::runtime_error("Error: Unable to create vertex buffer");
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), &v[0], GL_STATIC_DRAW);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to upload vertex buffer data";
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), v.data(), GL_STATIC_DRAW);
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to upload vertex buffer data");
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
+
+    // If no index buffer has been associated with this buffer object,
+    // set the prim num to the number of verts to draw. If an index buffer
+    // is set later, this value is overwritten
+    if (!glIsBuffer(mIndexBuffer)) mPrimNum = GLsizei(v.size() / 3);
 }
 
 void
@@ -324,10 +356,10 @@ BufferObject::genNormalBuffer(const std::vector<GLfloat>& v)
 
     glGenBuffers(1, &mNormalBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, mNormalBuffer);
-    if (glIsBuffer(mNormalBuffer) == GL_FALSE) throw "Error: Unable to create normal buffer";
+    if (glIsBuffer(mNormalBuffer) == GL_FALSE) throw std::runtime_error("Error: Unable to create normal buffer");
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), &v[0], GL_STATIC_DRAW);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to upload normal buffer data";
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), v.data(), GL_STATIC_DRAW);
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to upload normal buffer data");
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
@@ -339,10 +371,10 @@ BufferObject::genColorBuffer(const std::vector<GLfloat>& v)
 
     glGenBuffers(1, &mColorBuffer);
     glBindBuffer(GL_ARRAY_BUFFER, mColorBuffer);
-    if (glIsBuffer(mColorBuffer) == GL_FALSE) throw "Error: Unable to create color buffer";
+    if (glIsBuffer(mColorBuffer) == GL_FALSE) throw std::runtime_error("Error: Unable to create color buffer");
 
-    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), &v[0], GL_STATIC_DRAW);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to upload color buffer data";
+    glBufferData(GL_ARRAY_BUFFER, sizeof(GLfloat) * v.size(), v.data(), GL_STATIC_DRAW);
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to upload color buffer data");
 
     glBindBuffer(GL_ARRAY_BUFFER, 0);
 }
@@ -376,80 +408,71 @@ void
 ShaderProgram::setVertShader(const std::string& s)
 {
     mVertShader = glCreateShader(GL_VERTEX_SHADER);
-    if (glIsShader(mVertShader) == GL_FALSE) throw "Error: Unable to create shader program.";
+    if (glIsShader(mVertShader) == GL_FALSE) throw std::runtime_error("Error: Unable to create shader program.");
 
     GLint length = GLint(s.length());
     const char *str = s.c_str();
     glShaderSource(mVertShader, 1, &str, &length);
 
     glCompileShader(mVertShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to compile vertex shader.";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to compile vertex shader.");
 }
 
 void
 ShaderProgram::setFragShader(const std::string& s)
 {
     mFragShader = glCreateShader(GL_FRAGMENT_SHADER);
-    if (glIsShader(mFragShader) == GL_FALSE) throw "Error: Unable to create shader program.";
+    if (glIsShader(mFragShader) == GL_FALSE) throw std::runtime_error("Error: Unable to create shader program.");
 
     GLint length = GLint(s.length());
     const char *str = s.c_str();
     glShaderSource(mFragShader, 1, &str, &length);
 
     glCompileShader(mFragShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to compile fragment shader.";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to compile fragment shader.");
 }
 
 void
 ShaderProgram::build()
 {
     mProgram = glCreateProgram();
-    if (glIsProgram(mProgram) == GL_FALSE) throw "Error: Unable to create shader program.";
+    if (glIsProgram(mProgram) == GL_FALSE) throw std::runtime_error("Error: Unable to create shader program.");
 
     if (glIsShader(mVertShader) == GL_TRUE) glAttachShader(mProgram, mVertShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to attach vertex shader.";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to attach vertex shader.");
 
     if (glIsShader(mFragShader) == GL_TRUE) glAttachShader(mProgram, mFragShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to attach fragment shader.";
-
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to attach fragment shader.");
 
     glLinkProgram(mProgram);
-
-    GLint linked = 0;
-    glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-
-    if (!linked) throw "Error: Unable to link shader program.";
+    verifyShaderLinked(mProgram);
 }
 
 void
 ShaderProgram::build(const std::vector<GLchar*>& attributes)
 {
     mProgram = glCreateProgram();
-    if (glIsProgram(mProgram) == GL_FALSE) throw "Error: Unable to create shader program.";
+    if (glIsProgram(mProgram) == GL_FALSE) throw std::runtime_error("Error: Unable to create shader program.");
 
     for (GLuint n = 0, N = GLuint(attributes.size()); n < N; ++n) {
         glBindAttribLocation(mProgram, n, attributes[n]);
     }
 
     if (glIsShader(mVertShader) == GL_TRUE) glAttachShader(mProgram, mVertShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to attach vertex shader.";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to attach vertex shader.");
 
     if (glIsShader(mFragShader) == GL_TRUE) glAttachShader(mProgram, mFragShader);
-    if (GL_NO_ERROR != glGetError()) throw "Error: Unable to attach fragment shader.";
+    if (GL_NO_ERROR != glGetError()) throw std::runtime_error("Error: Unable to attach fragment shader.");
 
     glLinkProgram(mProgram);
-
-    GLint linked;
-    glGetProgramiv(mProgram, GL_LINK_STATUS, &linked);
-
-    if (!linked) throw "Error: Unable to link shader program.";
+    verifyShaderLinked(mProgram);
 }
 
 void
 ShaderProgram::startShading() const
 {
     if (glIsProgram(mProgram) == GL_FALSE) {
-        throw "Error: called startShading() on uncompiled shader program.";
+        throw std::runtime_error("Error: called startShading() on uncompiled shader program.");
     }
     glUseProgram(mProgram);
 }
@@ -750,7 +773,7 @@ TreeTopologyModule::TreeTopologyModule(const openvdb::GridBase::ConstPtr& grid):
         "#version 120\n"
         "void main() {\n"
         "gl_FrontColor = gl_Color;\n"
-        "gl_Position =  ftransform();\n"
+        "gl_Position = ftransform();\n"
         "gl_ClipVertex = gl_ModelViewMatrix * gl_Vertex;\n"
         "}\n");
 
@@ -1357,28 +1380,26 @@ private:
 
         struct Handle
         {
-            explicit Handle(VectorAttributeWrapper& attribute):
-                mValues(attribute.mValues), mIndices(attribute.mIndices) {}
+            explicit Handle(VectorAttributeWrapper& attribute)
+                : mValues(attribute.mValues) {}
 
             void set(openvdb::Index offset, openvdb::Index/*unused*/, const ValueType& value)
             {
-                if (mIndices) (*mIndices)[offset] = static_cast<GLuint>(offset);
                 offset *= 3;
                 for (int i = 0; i < 3; ++i, ++offset) { mValues[offset] = value[i]; }
             }
+
         private:
             GLfloatVec& mValues;
-            GLuintVec* mIndices;
         }; // struct Handle
 
-        explicit VectorAttributeWrapper(GLfloatVec& values, GLuintVec* indices = nullptr):
-            mValues(values), mIndices(indices) {}
+        explicit VectorAttributeWrapper(GLfloatVec& values)
+            : mValues(values) {}
 
         void expand() {}
         void compact() {}
     private:
         GLfloatVec& mValues;
-        GLuintVec* mIndices;
     }; // struct VectorAttributeWrapper
 
 public:
@@ -1393,16 +1414,12 @@ public:
         std::vector<openvdb::Index64> pointOffsets;
         const openvdb::Index64 total = openvdb::points::pointOffsets(pointOffsets, tree);
 
-        // @todo use glDrawArrays with GL_POINTS to avoid generating indices
         GLfloatVec values(total * 3);
-        GLuintVec indices(total);
-
-        VectorAttributeWrapper positionWrapper{values, &indices};
-        openvdb::points::convertPointDataGridPosition(positionWrapper, *grid, pointOffsets, 0);
+        VectorAttributeWrapper vecWrapper{values};
+        openvdb::points::convertPointDataGridPosition(vecWrapper, *grid, pointOffsets, 0);
 
         // gen buffers and upload data to GPU
         mBuffer->genVertexBuffer(values);
-        mBuffer->genIndexBuffer(indices, GL_POINTS);
 
         const auto leafIter = tree.cbeginLeaf();
         if (!leafIter) return;
@@ -1412,8 +1429,7 @@ public:
 
         const auto& colorArray = leafIter->constAttributeArray(colorIdx);
         if (colorArray.template hasValueType<openvdb::Vec3f>()) {
-            VectorAttributeWrapper colorWrapper{values};
-            openvdb::points::convertPointDataGridAttribute(colorWrapper, tree, pointOffsets,
+            openvdb::points::convertPointDataGridAttribute(vecWrapper, tree, pointOffsets,
                 /*startOffset=*/0, static_cast<unsigned>(colorIdx));
 
             // gen color buffer
@@ -1430,15 +1446,17 @@ private:
 
 // Active value render module
 
-VoxelModule::VoxelModule(const openvdb::GridBase::ConstPtr& grid):
-    mGrid(grid),
-    mIsInitialized(false)
+VoxelModule::VoxelModule(const openvdb::GridBase::ConstPtr& grid)
+    : mGrid(grid)
+    , mIsInitialized(false)
+    , mDrawingPointGrid(false)
 {
     mFlatShader.setVertShader(
         "#version 120\n"
         "void main() {\n"
+        "gl_PointSize = 1.0;\n" // only used for PointDataGrid shading, ignored otherwise
         "gl_FrontColor = gl_Color;\n"
-        "gl_Position =  ftransform();\n"
+        "gl_Position = ftransform();\n"
         "gl_ClipVertex = gl_ModelViewMatrix * gl_Vertex;\n"
         "}\n");
 
@@ -1480,10 +1498,12 @@ VoxelModule::init()
     mIsInitialized = true;
 
     if (mGrid->isType<openvdb::points::PointDataGrid>()) {
+        mDrawingPointGrid = true;
         mSurfaceBuffer.clear();
         PointDataOp drawPoints(mInteriorBuffer);
         util::doProcessTypedGrid<openvdb::points::PointDataGrid>(mGrid, drawPoints);
     } else {
+        mDrawingPointGrid = false;
         ActiveScalarValuesOp drawScalars(mInteriorBuffer, mSurfaceBuffer);
         if (!util::processTypedScalarOrPointDataGrid(mGrid, drawScalars)) {
             ActiveVectorValuesOp drawVectors(mVectorBuffer);
@@ -1502,14 +1522,25 @@ VoxelModule::render()
     if (!mIsVisible) return;
     if (!mIsInitialized) init();
 
-    mFlatShader.startShading();
-        mInteriorBuffer.render();
-        mVectorBuffer.render();
-    mFlatShader.stopShading();
+    if (mDrawingPointGrid) {
+        glEnable(GL_POINT_SMOOTH);
+        glEnable(GL_VERTEX_PROGRAM_POINT_SIZE);
+        mFlatShader.startShading();
+            mInteriorBuffer.render();
+        mFlatShader.stopShading();
+        glDisable(GL_POINT_SMOOTH);
+        glDisable(GL_VERTEX_PROGRAM_POINT_SIZE);
+    }
+    else {
+        mFlatShader.startShading();
+            mInteriorBuffer.render();
+            mVectorBuffer.render();
+        mFlatShader.stopShading();
 
-    mSurfaceShader.startShading();
-        mSurfaceBuffer.render();
-    mSurfaceShader.stopShading();
+        mSurfaceShader.startShading();
+            mSurfaceBuffer.render();
+        mSurfaceShader.stopShading();
+    }
 }
 
 

@@ -4,7 +4,6 @@
 /// @file unittest/TestPoissonSolver.cc
 /// @authors D.J. Hill, Peter Cucka
 
-#include "gtest/gtest.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/ConjGradient.h> // for JacobiPreconditioner
@@ -13,6 +12,9 @@
 #include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
 #include <openvdb/tools/MeshToVolume.h> // for createLevelSetBox()
 #include <openvdb/tools/PoissonSolver.h>
+
+#include <gtest/gtest.h>
+
 #include <cmath>
 
 

@@ -70,12 +70,13 @@ public:
         const OutputFunction& warnings = [](const std::string&){});
     ~Logger();
 
-    /// @brief Log a compiler error and its offending code location.
+    /// @brief Log a compiler error and its offending code location. If the
+    ///   offending location is (0,0), the message is treated as not having an
+    ///   associated code location.
     /// @param message The error message
     /// @param lineCol The line/column number of the offending code
     /// @return true if non-fatal and can continue to capture future messages.
-    /// @todo: add logging of non position specific errors
-    bool error(const std::string& message, const CodeLocation& lineCol);
+    bool error(const std::string& message, const CodeLocation& lineCol = CodeLocation(0,0));
 
     /// @brief Log a compiler error using the offending AST node. Used in AST
     ///   traversal.
@@ -84,11 +85,13 @@ public:
     /// @return true if non-fatal and can continue to capture future messages.
     bool error(const std::string& message, const ax::ast::Node* node);
 
-    /// @brief Log a compiler warning and its offending code location.
+    /// @brief Log a compiler warning and its offending code location. If the
+    ///   offending location is (0,0), the message is treated as not having an
+    ///   associated code location.
     /// @param message The warning message
     /// @param lineCol The line/column number of the offending code
     /// @return true if non-fatal and can continue to capture future messages.
-    bool warning(const std::string& message, const CodeLocation& lineCol);
+    bool warning(const std::string& message, const CodeLocation& lineCol = CodeLocation(0,0));
 
     /// @brief Log a compiler warning using the offending AST node. Used in AST
     ///   traversal.
@@ -138,7 +141,9 @@ public:
     /// @brief Set whether the output should number the errors/warnings
     /// @param numbered If true, messages will be numbered
     void setNumberedOutput(const bool numbered = true);
-    /// @brief Set a prefix for each error message
+    /// @brief Number of spaces to indent every new line before the message is formatted
+    void setIndent(const size_t ident = 0);
+    /// @brief Set a prefix for each warning message
     void setErrorPrefix(const char* prefix = "error: ");
     /// @brief Set a prefix for each warning message
     void setWarningPrefix(const char* prefix = "warning: ");
@@ -149,6 +154,8 @@ public:
 
     /// @brief Returns whether the messages will be numbered
     bool getNumberedOutput() const;
+    /// @brief Returns the number of spaces to be printed before every new line
+    size_t getIndent() const;
     /// @brief Returns the prefix for each error message
     const char* getErrorPrefix() const;
     /// @brief Returns the prefix for each warning message

@@ -8,8 +8,10 @@
 //#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
-#include <tbb/atomic.h>
-#include <tbb/mutex.h>
+
+#include <atomic>
+#include <mutex>
+
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>
 #endif
@@ -18,12 +20,22 @@
     #error ABI <= 5 is no longer supported
 #endif
 
-// If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an error
-// directive. This can be optionally suppressed by setting the CMake option
-// OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
+// If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an
+// error directive. This can be optionally suppressed by defining:
+//   OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
 #ifndef OPENVDB_USE_DEPRECATED_ABI_6
     #if OPENVDB_ABI_VERSION_NUMBER == 6
         #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error
+    #endif
+#endif
+
+// If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
+// This can be optionally suppressed by defining:
+//   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
+#ifndef OPENVDB_USE_FUTURE_ABI_9
+    #if OPENVDB_ABI_VERSION_NUMBER == 9
+        #error ABI = 9 is still in active development and has not been finalized, \
+CMake option OPENVDB_USE_FUTURE_ABI_9 suppresses this error
     #endif
 #endif
 
@@ -31,21 +43,18 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
-typedef tbb::mutex Mutex;
-typedef Mutex::scoped_lock Lock;
-
 namespace {
 // Declare this at file scope to ensure thread-safe initialization.
-Mutex sInitMutex;
-tbb::atomic<bool> sIsInitialized{false};
+std::mutex sInitMutex;
+std::atomic<bool> sIsInitialized{false};
 }
 
 void
 initialize()
 {
-    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return;
-    Lock lock(sInitMutex);
-    if (sIsInitialized.load<tbb::memory_semantics::acquire>()) return; // Double-checked lock
+    if (sIsInitialized.load(std::memory_order_acquire)) return;
+    std::lock_guard<std::mutex> lock(sInitMutex);
+    if (sIsInitialized.load(std::memory_order_acquire)) return; // Double-checked lock
 
     logging::initialize();
 
@@ -120,7 +129,7 @@ initialize()
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized.store<tbb::memory_semantics::release>(true);
+    sIsInitialized.store(true, std::memory_order_release);
 
 #ifdef __ICC
 __pragma(warning(default:1711))
@@ -131,14 +140,14 @@ __pragma(warning(default:1711))
 void
 uninitialize()
 {
-    Lock lock(sInitMutex);
+    std::lock_guard<std::mutex> lock(sInitMutex);
 #ifdef __ICC
 // Disable ICC "assignment to statically allocated variable" warning.
 // This assignment is mutex-protected and therefore thread-safe.
 __pragma(warning(disable:1711))
 #endif
 
-    sIsInitialized.store<tbb::memory_semantics::full_fence>(false); // What memory order? We can't have anything below reordered above this, right?
+    sIsInitialized.store(false, std::memory_order_seq_cst); // Do we need full memory order?
 
 #ifdef __ICC
 __pragma(warning(default:1711))

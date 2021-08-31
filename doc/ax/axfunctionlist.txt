@@ -13,6 +13,8 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
     <li> @ref axacos "acos"</li>
     <li> @ref axacosh "acosh"</li>
     <li> @ref axaddtogroup "addtogroup"</li>
+    <li> @ref axadjoint "adjoint"</li>
+    <li> @ref axargsort "argsort"</li>
     <li> @ref axasin "asin"</li>
     <li> @ref axasinh "asinh"</li>
     <li> @ref axatan "atan"</li>
@@ -23,10 +25,12 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
     <li> @ref axcbrt "cbrt"</li>
     <li> @ref axceil "ceil"</li>
     <li> @ref axclamp "clamp"</li>
+    <li> @ref axcofactor "cofactor"</li>
     <li> @ref axcos "cos"</li>
     <li> @ref axcosh "cosh"</li>
     <li> @ref axcross "cross"</li>
     <li> @ref axcurlsimplexnoise "curlsimplexnoise"</li>
+    <li> @ref axdegrees "degrees"</li>
     <li> @ref axdeletepoint "deletepoint"</li>
     <li> @ref axdeterminant "determinant"</li>
     <li> @ref axdiag "diag"</li>
@@ -48,6 +52,10 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
     <li> @ref axidentity3 "identity3"</li>
     <li> @ref axidentity4 "identity4"</li>
     <li> @ref axingroup "ingroup"</li>
+    <li> @ref axinverse "inverse"</li>
+    <li> @ref axisfinite "isfinite"</li>
+    <li> @ref axisinf "isinf"</li>
+    <li> @ref axisnan "isnan"</li>
     <li> @ref axlength "length"</li>
     <li> @ref axlengthsq "lengthsq"</li>
     <li> @ref axlerp "lerp"</li>
@@ -63,6 +71,7 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
     <li> @ref axprescale "prescale"</li>
     <li> @ref axpretransform "pretransform"</li>
     <li> @ref axprint "print"</li>
+    <li> @ref axradians "radians"</li>
     <li> @ref axrand "rand"</li>
     <li> @ref axrand32 "rand32"</li>
     <li> @ref axremovefromgroup "removefromgroup"</li>
@@ -72,6 +81,7 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
     <li> @ref axsimplexnoise "simplexnoise"</li>
     <li> @ref axsin "sin"</li>
     <li> @ref axsinh "sinh"</li>
+    <li> @ref axsort "sort"</li>
     <li> @ref axsqrt "sqrt"</li>
     <li> @ref axtan "tan"</li>
     <li> @ref axtanh "tanh"</li>
@@ -84,7 +94,7 @@ usually automatically updated from the most recent output of the @ref vdbaxbinar
 
 @anchor axabs
 @par abs
- Computes the absolute value of an integer number.
+Computes the absolute value of an integer number.
 @code{.c}
 int64(int64 n);
 int32(int32 n);
@@ -94,7 +104,7 @@ float(float n);
 
 @anchor axacos
 @par acos
- Computes the principal value of the arc cosine of the input.
+Computes the principal value of the arc cosine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -102,7 +112,7 @@ float(float arg);
 
 @anchor axacosh
 @par acosh
- Computes the inverse hyperbolic cosine of the input.
+Computes the inverse hyperbolic cosine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -110,16 +120,36 @@ float(float arg);
 
 @anchor axaddtogroup
 @par addtogroup
- Add the current point to the given group name, effectively setting its membership to true. If the
- group does not exist, it is implicitly created. This function has no effect if the point
- already belongs to the given group.
+Add the current point to the given group name, effectively setting its membership to true. If the
+group does not exist, it is implicitly created. This function has no effect if the point
+already belongs to the given group.
 @code{.c}
 void(string);
 @endcode
 
+@anchor axadjoint
+@par adjoint
+Returns the adjoint of a 3x3 matrix. That is, the transpose of its cofactor matrix.
+@code{.c}
+mat3d(mat3d input);
+mat3f(mat3f input);
+@endcode
+
+@anchor axargsort
+@par argsort
+Returns a vector of the indexes that would sort the input vector.
+@code{.c}
+vec3i(vec3d v);
+vec3i(vec3f v);
+vec3i(vec3i v);
+vec4i(vec4d v);
+vec4i(vec4f v);
+vec4i(vec4i v);
+@endcode
+
 @anchor axasin
 @par asin
- Computes the principal value of the arc sine of the input.
+Computes the principal value of the arc sine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -127,7 +157,7 @@ float(float arg);
 
 @anchor axasinh
 @par asinh
- Computes the inverse hyperbolic sine of the input.
+Computes the inverse hyperbolic sine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -135,7 +165,7 @@ float(float arg);
 
 @anchor axatan
 @par atan
- Computes the principal value of the arc tangent of the input.
+Computes the principal value of the arc tangent of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -143,7 +173,7 @@ float(float arg);
 
 @anchor axatan2
 @par atan2
- Computes the arc tangent of y/x using the signs of arguments to determine the correct quadrant.
+Computes the arc tangent of y/x using the signs of arguments to determine the correct quadrant.
 @code{.c}
 double(double y; double x);
 float(float y; float x);
@@ -151,7 +181,7 @@ float(float y; float x);
 
 @anchor axatanh
 @par atanh
- Computes the inverse hyperbolic tangent of the input.
+Computes the inverse hyperbolic tangent of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -159,23 +189,23 @@ float(float arg);
 
 @anchor axatof
 @par atof
- Parses the string input, interpreting its content as a floating point number and returns its value
- as a double.
+Parses the string input, interpreting its content as a floating point number and returns its value
+as a double.
 @code{.c}
 double(i8* str);
 @endcode
 
 @anchor axatoi
 @par atoi
- Parses the string input interpreting its content as an integral number, which is returned as a value
- of type int.
+Parses the string input interpreting its content as an integral number, which is returned as a value
+of type int.
 @code{.c}
 int32(i8* str);
 @endcode
 
 @anchor axcbrt
 @par cbrt
- Computes the cubic root of the input.
+Computes the cubic root of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -183,7 +213,7 @@ float(float arg);
 
 @anchor axceil
 @par ceil
- Computes the smallest integer value not less than arg.
+Computes the smallest integer value not less than arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -191,7 +221,7 @@ float(float n);
 
 @anchor axclamp
 @par clamp
- Clamps the first argument to the minimum second argument value and maximum third argument value
+Clamps the first argument to the minimum second argument value and maximum third argument value
 @code{.c}
 double(double in; double min; double max);
 float(float in; float min; float max);
@@ -199,9 +229,17 @@ int64(int64 in; int64 min; int64 max);
 int32(int32 in; int32 min; int32 max);
 @endcode
 
+@anchor axcofactor
+@par cofactor
+Returns the cofactor matrix of a 3x3 matrix. That is, the matrix of its cofactors.
+@code{.c}
+mat3d(mat3d input);
+mat3f(mat3f input);
+@endcode
+
 @anchor axcos
 @par cos
- Computes the cosine of arg (measured in radians).
+Computes the cosine of arg (measured in radians).
 @code{.c}
 double(double n);
 float(float n);
@@ -209,7 +247,7 @@ float(float n);
 
 @anchor axcosh
 @par cosh
- Computes the hyperbolic cosine of the input.
+Computes the hyperbolic cosine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -217,7 +255,7 @@ float(float arg);
 
 @anchor axcross
 @par cross
- Returns the length of the given vector
+Returns the length of the given vector
 @code{.c}
 vec3d(vec3d a; vec3d b);
 vec3f(vec3f a; vec3f b);
@@ -226,24 +264,32 @@ vec3i(vec3i a; vec3i b);
 
 @anchor axcurlsimplexnoise
 @par curlsimplexnoise
- Generates divergence-free 3D noise, computed using a curl function on Simplex Noise.
+Generates divergence-free 3D noise, computed using a curl function on Simplex Noise.
 @code{.c}
 vec3d(vec3d pos);
 vec3d(double pos; double; double);
 @endcode
 
+@anchor axdegrees
+@par degrees
+Converts the number of radians to degrees.
+@code{.c}
+double(double radians);
+float(float radians);
+@endcode
+
 @anchor axdeletepoint
 @par deletepoint
- Delete the current point from the point set. Note that this does not stop AX execution - any
- additional AX commands will be executed on the point and it will remain accessible until the
- end of execution.
+Delete the current point from the point set. Note that this does not stop AX execution - any
+additional AX commands will be executed on the point and it will remain accessible until the
+end of execution.
 @code{.c}
 void();
 @endcode
 
 @anchor axdeterminant
 @par determinant
- Returns the determinant of a matrix.
+Returns the determinant of a matrix.
 @code{.c}
 double(mat3d mat);
 float(mat3f mat);
@@ -253,7 +299,7 @@ float(mat4f mat);
 
 @anchor axdiag
 @par diag
- Create a diagonal matrix from a vector, or return the diagonal components of a matrix as a vector.
+Create a diagonal matrix from a vector, or return the diagonal components of a matrix as a vector.
 @code{.c}
 vec3d(mat3d vec);
 vec3f(mat3f vec);
@@ -267,7 +313,7 @@ mat4f(vec4f mat);
 
 @anchor axdot
 @par dot
- Computes the dot product of two vectors.
+Computes the dot product of two vectors.
 @code{.c}
 double(vec3d a; vec3d b);
 float(vec3f a; vec3f b);
@@ -276,21 +322,20 @@ int32(vec3i a; vec3i b);
 
 @anchor axeuclideanmod
 @par euclideanmod
- Euclidean modulo, where by the result of the division operator on (dividend / divisor) is floored or
- ceiled depending on its sign, guaranteeing that the return value is always positive. The
- remainder is thus calculated with D - d * (d < 0 ? ceil(D/d) : floor(D/d)). This is NOT equal
- to a%b in AX. See truncatemod(), floormod().
+Euclidean modulo, where by the result of the division operator on (dividend / divisor) is floored or
+ceiled depending on its sign, guaranteeing that the return value is always positive. The
+remainder is thus calculated with D - d * (d < 0 ? ceil(D/d) : floor(D/d)). This is NOT equal
+to a%b in AX. See truncatemod(), floormod().
 @code{.c}
 double(double dividend; double divisor);
 float(float dividend; float divisor);
 int64(int64 dividend; int64 divisor);
 int32(int32 dividend; int32 divisor);
-int16(int16 dividend; int16 divisor);
 @endcode
 
 @anchor axexp
 @par exp
- Computes e (Euler's number, 2.7182818...) raised to the given power arg.
+Computes e (Euler's number, 2.7182818...) raised to the given power arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -298,7 +343,7 @@ float(float n);
 
 @anchor axexp2
 @par exp2
- Computes 2 raised to the given power arg.
+Computes 2 raised to the given power arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -306,24 +351,24 @@ float(float n);
 
 @anchor axexternal
 @par external
- Find a custom user parameter with a given name of type 'float' in the Custom data provided to the AX
- compiler. If the data can not be found, or is not of the expected type 0.0f is returned.
+Find a custom user parameter with a given name of type 'float' in the Custom data provided to the AX
+compiler. If the data can not be found, or is not of the expected type 0.0f is returned.
 @code{.c}
 float(string str);
 @endcode
 
 @anchor axexternalv
 @par externalv
- Find a custom user parameter with a given name of type 'vector float' in the Custom data provided to
- the AX compiler. If the data can not be found, or is not of the expected type { 0.0f, 0.0f,
- 0.0f } is returned.
+Find a custom user parameter with a given name of type 'vector float' in the Custom data provided to
+the AX compiler. If the data can not be found, or is not of the expected type { 0.0f, 0.0f,
+0.0f } is returned.
 @code{.c}
 vec3f(string str);
 @endcode
 
 @anchor axfabs
 @par fabs
- Computes the absolute value of a floating point value arg.
+Computes the absolute value of a floating point value arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -331,9 +376,9 @@ float(float n);
 
 @anchor axfit
 @par fit
- Fit the first argument to the output range by first clamping the value between the second and third
- input range arguments and then remapping the result to the output range fourth and fifth
- arguments
+Fit the first argument to the output range by first clamping the value between the second and third
+input range arguments and then remapping the result to the output range fourth and fifth
+arguments
 @code{.c}
 double(double value; double omin; double omax; double nmin; double nmax);
 float(float value; float omin; float omax; float nmin; float nmax);
@@ -343,7 +388,7 @@ double(int32 value; int32 omin; int32 omax; int32 nmin; int32 nmax);
 
 @anchor axfloor
 @par floor
- Computes the largest integer value not greater than arg.
+Computes the largest integer value not greater than arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -351,77 +396,140 @@ float(float n);
 
 @anchor axfloormod
 @par floormod
- Floored modulo, where the result of the division operator on (dividend / divisor) is floored. The
- remainder is thus calculated with D - d * floor(D/d). This is the implemented modulo % operator
- of AX. This is equal to the python % implementation. See trucnatemod(), euclideanmod().
+Floored modulo, where the result of the division operator on (dividend / divisor) is floored. The
+remainder is thus calculated with D - d * floor(D/d). This is the implemented modulo % operator
+of AX. This is equal to the python % implementation. See trucnatemod(), euclideanmod().
 @code{.c}
 double(double dividend; double divisor);
 float(float dividend; float divisor);
 int64(int64 dividend; int64 divisor);
 int32(int32 dividend; int32 divisor);
-int16(int16 dividend; int16 divisor);
 @endcode
 
 @anchor axgetcoordx
 @par getcoordx
- Returns the current voxel's X index value in index space as an integer.
+Returns the current voxel's X index value in index space as an integer.
 @code{.c}
 int32();
 @endcode
 
 @anchor axgetcoordy
 @par getcoordy
- Returns the current voxel's Y index value in index space as an integer.
+Returns the current voxel's Y index value in index space as an integer.
 @code{.c}
 int32();
 @endcode
 
 @anchor axgetcoordz
 @par getcoordz
- Returns the current voxel's Z index value in index space as an integer.
+Returns the current voxel's Z index value in index space as an integer.
 @code{.c}
 int32();
 @endcode
 
 @anchor axgetvoxelpws
 @par getvoxelpws
- Returns the current voxel's position in world space as a vector float.
+Returns the current voxel's position in world space as a vector float.
 @code{.c}
 vec3f();
 @endcode
 
 @anchor axhash
 @par hash
- Return a hash of the provided string.
+Return a hash of the provided string.
 @code{.c}
 int64(string str);
 @endcode
 
 @anchor axidentity3
 @par identity3
- Returns the 3x3 identity matrix
+Returns the 3x3 identity matrix
 @code{.c}
 mat3f();
 @endcode
 
 @anchor axidentity4
 @par identity4
- Returns the 4x4 identity matrix
+Returns the 4x4 identity matrix
 @code{.c}
 mat4f();
 @endcode
 
 @anchor axingroup
 @par ingroup
- Return whether or not the current point is a member of the given group name. This returns false if
- the group does not exist.
+Return whether or not the current point is a member of the given group name. This returns false if
+the group does not exist.
 @code{.c}
 bool(string);
 @endcode
 
+@anchor axinverse
+@par inverse
+Return the inverse of a 3x3 matrix.If the matrix is singular, returns the input matrix.
+@code{.c}
+mat3d(mat3d input);
+mat3f(mat3f input);
+@endcode
+
+@anchor axisfinite
+@par isfinite
+Returns whether the value is finite i.e. not infinite or NaN. For matrix and vector types will
+return false if any element is not finite.
+@code{.c}
+bool(vec2d);
+bool(vec2f);
+bool(vec3d);
+bool(vec3f);
+bool(vec4d);
+bool(vec4f);
+bool(mat3f);
+bool(mat3d);
+bool(mat4f);
+bool(mat4d);
+bool(double arg);
+bool(float arg);
+@endcode
+
+@anchor axisinf
+@par isinf
+Returns whether the value is inf. For matrix and vector types will return true if any element is
+inf.
+@code{.c}
+bool(vec2d);
+bool(vec2f);
+bool(vec3d);
+bool(vec3f);
+bool(vec4d);
+bool(vec4f);
+bool(mat3f);
+bool(mat3d);
+bool(mat4f);
+bool(mat4d);
+bool(double arg);
+bool(float arg);
+@endcode
+
+@anchor axisnan
+@par isnan
+Returns whether the value is NaN (not-a-number).
+@code{.c}
+bool(vec2d);
+bool(vec2f);
+bool(vec3d);
+bool(vec3f);
+bool(vec4d);
+bool(vec4f);
+bool(mat3f);
+bool(mat3d);
+bool(mat4f);
+bool(mat4d);
+bool(double arg);
+bool(float arg);
+@endcode
+
 @anchor axlength
 @par length
- Returns the length of the given vector
+Returns the length of the given vector
 @code{.c}
 double(vec2d v);
 float(vec2f v);
@@ -436,7 +544,7 @@ double(vec4i v);
 
 @anchor axlengthsq
 @par lengthsq
- Returns the squared length of the given vector
+Returns the squared length of the given vector
 @code{.c}
 double(vec2d v);
 float(vec2f v);
@@ -451,9 +559,9 @@ int32(vec4i v);
 
 @anchor axlerp
 @par lerp
- Performs bilinear interpolation between the values. If the amount is outside the range 0 to 1, the
- values will be extrapolated linearly. If amount is 0, the first value is returned. If it is 1,
- the second value is returned. This implementation is guaranteed to be monotonic.
+Performs bilinear interpolation between the values. If the amount is outside the range 0 to 1, the
+values will be extrapolated linearly. If amount is 0, the first value is returned. If it is 1,
+the second value is returned. This implementation is guaranteed to be monotonic.
 @code{.c}
 double(double a; double b; double amount);
 float(float a; float b; float amount);
@@ -461,7 +569,7 @@ float(float a; float b; float amount);
 
 @anchor axlog
 @par log
- Computes the natural (base e) logarithm of arg.
+Computes the natural (base e) logarithm of arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -469,7 +577,7 @@ float(float n);
 
 @anchor axlog10
 @par log10
- Computes the common (base-10) logarithm of arg.
+Computes the common (base-10) logarithm of arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -477,7 +585,7 @@ float(float n);
 
 @anchor axlog2
 @par log2
- Computes the binary (base-2) logarithm of arg.
+Computes the binary (base-2) logarithm of arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -485,7 +593,7 @@ float(float n);
 
 @anchor axmax
 @par max
- Returns the larger of the given values.
+Returns the larger of the given values.
 @code{.c}
 double(double a; double b);
 float(float a; float b);
@@ -495,7 +603,7 @@ int32(int32 a; int32 b);
 
 @anchor axmin
 @par min
- Returns the smaller of the given values.
+Returns the smaller of the given values.
 @code{.c}
 double(double a; double b);
 float(float a; float b);
@@ -505,18 +613,21 @@ int32(int32 a; int32 b);
 
 @anchor axnormalize
 @par normalize
- Returns the normalized result of the given vector.
+Returns the normalized result of the given vector.
 @code{.c}
 vec3d(vec3d v);
 vec3f(vec3f v);
 vec3d(vec3i v);
+vec4d(vec4d v);
+vec4f(vec4f v);
+vec4d(vec4i v);
 @endcode
 
 @anchor axpolardecompose
 @par polardecompose
- Decompose an invertible 3x3 matrix into its orthogonal (unitary) matrix and symmetric matrix
- components. If the determinant of the unitary matrix is 1 it is a rotation, otherwise if it is
- -1 there is some part reflection.
+Decompose an invertible 3x3 matrix into its orthogonal (unitary) matrix and symmetric matrix
+components. If the determinant of the unitary matrix is 1 it is a rotation, otherwise if it is
+-1 there is some part reflection.
 @code{.c}
 bool(mat3d input; mat3d unitary; mat3d symmetric);
 bool(mat3f input; mat3f unitary; mat3f symmetric);
@@ -524,7 +635,7 @@ bool(mat3f input; mat3f unitary; mat3f symmetric);
 
 @anchor axpostscale
 @par postscale
- Post-scale a given matrix by the provided vector.
+Post-scale a given matrix by the provided vector.
 @code{.c}
 void(mat4d transform; vec3d vec);
 void(mat4f transform; vec3f vec);
@@ -532,7 +643,7 @@ void(mat4f transform; vec3f vec);
 
 @anchor axpow
 @par pow
- Computes the value of the first argument raised to the power of the second argument.
+Computes the value of the first argument raised to the power of the second argument.
 @code{.c}
 double(double base; double exp);
 float(float base; float exp);
@@ -541,7 +652,7 @@ double(double base; int32 exp);
 
 @anchor axprescale
 @par prescale
- Pre-scale a given matrix by the provided vector.
+Pre-scale a given matrix by the provided vector.
 @code{.c}
 void(mat4d transform; vec3d vec);
 void(mat4f transform; vec3f vec);
@@ -549,8 +660,8 @@ void(mat4f transform; vec3f vec);
 
 @anchor axpretransform
 @par pretransform
- Return the transformed vector by transpose of this matrix. This function is equivalent to
- pre-multiplying the matrix.
+Return the transformed vector by transpose of this matrix. This function is equivalent to
+pre-multiplying the matrix.
 @code{.c}
 vec3d(mat3d vec; vec3d mat);
 vec3f(mat3f vec; vec3f mat);
@@ -562,7 +673,7 @@ vec4f(mat4f vec; vec4f mat);
 
 @anchor axprint
 @par print
- Prints the input to the standard output stream. Warning: This will be run for every element.
+Prints the input to the standard output stream. Warning: This will be run for every element.
 @code{.c}
 void(double n);
 void(float n);
@@ -584,15 +695,23 @@ void(mat4f n);
 void(mat4d n);
 @endcode
 
+@anchor axradians
+@par radians
+Converts the number of degrees to radians.
+@code{.c}
+double(double degrees);
+float(float degrees);
+@endcode
+
 @anchor axrand
 @par rand
- Creates a random number based on the provided seed. The number will be in the range of 0 to 1. The
- same number is produced for the same seed. Note that if rand is called without a seed the
- previous state of the random number generator is advanced for the currently processing element.
- This state is determined by the last call to rand() with a given seed. If rand is not called
- with a seed, the generator advances continuously across different elements which can produce
- non-deterministic results. It is important that rand is always called with a seed at least once
- for deterministic results.
+Creates a random number based on the provided seed. The number will be in the range of 0 to 1. The
+same number is produced for the same seed. Note that if rand is called without a seed the
+previous state of the random number generator is advanced for the currently processing element.
+This state is determined by the last call to rand() with a given seed. If rand is not called
+with a seed, the generator advances continuously across different elements which can produce
+non-deterministic results. It is important that rand is always called with a seed at least once
+for deterministic results.
 @code{.c}
 double();
 double(double seed);
@@ -601,15 +720,15 @@ double(int64 seed);
 
 @anchor axrand32
 @par rand32
- Creates a random number based on the provided 32 bit seed. The number will be in the range of 0 to
- 1. The same number is produced for the same seed. NOTE: This function does not share the same
- random number generator as rand(). rand32() may provide a higher throughput on some
- architectures, but will produce different results to rand(). NOTE: If rand32 is called without
- a seed the previous state of the random number generator is advanced for the currently
- processing element. This state is determined by the last call to rand32() with a given seed. If
- rand32 is not called with a seed, the generator advances continuously across different elements
- which can produce non-deterministic results. It is important that rand32 is always called with
- a seed at least once for deterministic results.
+Creates a random number based on the provided 32 bit seed. The number will be in the range of 0 to
+1. The same number is produced for the same seed. NOTE: This function does not share the same
+random number generator as rand(). rand32() may provide a higher throughput on some
+architectures, but will produce different results to rand(). NOTE: If rand32 is called without
+a seed the previous state of the random number generator is advanced for the currently
+processing element. This state is determined by the last call to rand32() with a given seed. If
+rand32 is not called with a seed, the generator advances continuously across different elements
+which can produce non-deterministic results. It is important that rand32 is always called with
+a seed at least once for deterministic results.
 @code{.c}
 double();
 double(double seed);
@@ -618,16 +737,16 @@ double(int32 seed);
 
 @anchor axremovefromgroup
 @par removefromgroup
- Remove the current point from the given group name, effectively setting its membership to false.
- This function has no effect if the group does not exist.
+Remove the current point from the given group name, effectively setting its membership to false.
+This function has no effect if the group does not exist.
 @code{.c}
 void(string);
 @endcode
 
 @anchor axround
 @par round
- Computes the nearest integer value to arg (in floating-point format), rounding halfway cases away
- from zero.
+Computes the nearest integer value to arg (in floating-point format), rounding halfway cases away
+from zero.
 @code{.c}
 double(double n);
 float(float n);
@@ -635,9 +754,9 @@ float(float n);
 
 @anchor axsign
 @par sign
- Implements signum, determining if the input is negative, zero or positive. Returns -1 for a negative
- number, 0 for the number zero, and +1 for a positive number. Note that this function does not
- check the sign of floating point +/-0.0 values. See signbit().
+Implements signum, determining if the input is negative, zero or positive. Returns -1 for a negative
+number, 0 for the number zero, and +1 for a positive number. Note that this function does not
+check the sign of floating point +/-0.0 values. See signbit().
 @code{.c}
 int32(double n);
 int32(float n);
@@ -647,8 +766,8 @@ int32(int32 n);
 
 @anchor axsignbit
 @par signbit
- Determines if the given floating point number input is negative. Returns true if arg is negative,
- false otherwise. Will return true for -0.0, false for +0.0
+Determines if the given floating point number input is negative. Returns true if arg is negative,
+false otherwise. Will return true for -0.0, false for +0.0
 @code{.c}
 bool(double n);
 bool(float n);
@@ -656,8 +775,8 @@ bool(float n);
 
 @anchor axsimplexnoise
 @par simplexnoise
- Compute simplex noise at coordinates x, y and z. Coordinates which are not provided will be set to
- 0.
+Compute simplex noise at coordinates x, y and z. Coordinates which are not provided will be set to
+0.
 @code{.c}
 double(double x);
 double(double x; double y);
@@ -667,7 +786,7 @@ double(vec3d pos);
 
 @anchor axsin
 @par sin
- Computes the sine of arg (measured in radians).
+Computes the sine of arg (measured in radians).
 @code{.c}
 double(double n);
 float(float n);
@@ -675,15 +794,27 @@ float(float n);
 
 @anchor axsinh
 @par sinh
- Computes the hyperbolic sine of the input.
+Computes the hyperbolic sine of the input.
 @code{.c}
 double(double arg);
 float(float arg);
 @endcode
 
+@anchor axsort
+@par sort
+Returns the sorted result of the given vector.
+@code{.c}
+vec3d(vec3d v);
+vec3f(vec3f v);
+vec3i(vec3i v);
+vec4d(vec4d v);
+vec4f(vec4f v);
+vec4i(vec4i v);
+@endcode
+
 @anchor axsqrt
 @par sqrt
- Computes the square root of arg.
+Computes the square root of arg.
 @code{.c}
 double(double n);
 float(float n);
@@ -691,7 +822,7 @@ float(float n);
 
 @anchor axtan
 @par tan
- Computes the tangent of arg (measured in radians).
+Computes the tangent of arg (measured in radians).
 @code{.c}
 double(double n);
 float(float n);
@@ -699,7 +830,7 @@ float(float n);
 
 @anchor axtanh
 @par tanh
- Computes the hyperbolic tangent of the input.
+Computes the hyperbolic tangent of the input.
 @code{.c}
 double(double arg);
 float(float arg);
@@ -707,7 +838,7 @@ float(float arg);
 
 @anchor axtrace
 @par trace
- Return the trace of a matrix, the sum of the diagonal elements.
+Return the trace of a matrix, the sum of the diagonal elements.
 @code{.c}
 double(mat3d mat);
 float(mat3f mat);
@@ -717,8 +848,8 @@ float(mat4f mat);
 
 @anchor axtransform
 @par transform
- Return the transformed vector by the provided matrix. This function is equivalent to
- post-multiplying the matrix, i.e. vec * mult.
+Return the transformed vector by the provided matrix. This function is equivalent to
+post-multiplying the matrix, i.e. vec * mult.
 @code{.c}
 vec3d(vec3d vec; mat3d mat);
 vec3f(vec3f vec; mat3f mat);
@@ -730,7 +861,7 @@ vec4f(vec4f vec; mat4f mat);
 
 @anchor axtranspose
 @par transpose
- Returns the transpose of a matrix
+Returns the transpose of a matrix
 @code{.c}
 mat3d(mat3d mat);
 mat3f(mat3f mat);
@@ -740,15 +871,14 @@ mat4f(mat4f mat);
 
 @anchor axtruncatemod
 @par truncatemod
- Truncated modulo, where the result of the division operator on (dividend / divisor) is truncated.
- The remainder is thus calculated with D - d * trunc(D/d). This is equal to the C/C++ %
- implementation. This is NOT equal to a%b in AX. See floormod(), euclideanmod().
+Truncated modulo, where the result of the division operator on (dividend / divisor) is truncated.
+The remainder is thus calculated with D - d * trunc(D/d). This is equal to the C/C++ %
+implementation. This is NOT equal to a%b in AX. See floormod(), euclideanmod().
 @code{.c}
 double(double dividend; double divisor);
 float(float dividend; float divisor);
 int64(int64 dividend; int64 divisor);
 int32(int32 dividend; int32 divisor);
-int16(int16 dividend; int16 divisor);
 @endcode
 
 

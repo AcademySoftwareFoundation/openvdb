@@ -16,6 +16,7 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
+#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
 #include <openvdb/version.h>
@@ -27,9 +28,9 @@
 #include <openvdb/tree/LeafNode.h>
 #include <openvdb/tree/Tree.h>
 
-#include <tbb/atomic.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
+#include <atomic>
 #include <algorithm> // for std::min(), std::max()
 #include <cmath> // for std::sqrt()
 #include <deque>
@@ -337,13 +338,14 @@ private:
 
 // Internal operators and implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_index_grid_internal {
 
 template<typename PointArrayT>
 struct ValidPartitioningOp
 {
-    ValidPartitioningOp(tbb::atomic<bool>& hasChanged,
+    ValidPartitioningOp(std::atomic<bool>& hasChanged,
         const PointArrayT& points, const math::Transform& xform)
         : mPoints(&points)
         , mTransform(&xform)
@@ -355,7 +357,7 @@ struct ValidPartitioningOp
     void operator()(LeafT &leaf, size_t /*leafIndex*/) const
     {
         if ((*mHasChanged)) {
-            tbb::task::self().cancel_group_execution();
+            thread::cancelGroupExecution();
             return;
         }
 
@@ -382,7 +384,7 @@ struct ValidPartitioningOp
 
                 mPoints->getPos(*begin, point);
                 if (voxelCoord != mTransform->worldToIndexCellCentered(point)) {
-                    mHasChanged->fetch_and_store(true);
+                    mHasChanged->store(true);
                     break;
                 }
 
@@ -394,7 +396,7 @@ struct ValidPartitioningOp
 private:
     PointArrayT         const * const mPoints;
     math::Transform     const * const mTransform;
-    tbb::atomic<bool>         * const mHasChanged;
+    std::atomic<bool>         * const mHasChanged;
 };
 
 
@@ -911,6 +913,7 @@ pointIndexSearch(RangeDeque& rangeList, ConstAccessor& acc, const CoordBBox& bbo
 
 } // namespace point_index_grid_internal
 
+/// @endcond
 
 // PointIndexIterator implementation
 
@@ -1311,7 +1314,7 @@ isValidPartition(const PointArrayT& points, const GridT& grid)
         return false;
     }
 
-    tbb::atomic<bool> changed;
+    std::atomic<bool> changed;
     changed = false;
 
     point_index_grid_internal::ValidPartitioningOp<PointArrayT>

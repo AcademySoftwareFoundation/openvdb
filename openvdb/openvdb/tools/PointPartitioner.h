@@ -23,7 +23,7 @@
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
-#include <tbb/task_scheduler_init.h>
+#include <tbb/task_arena.h>
 
 #include <algorithm>
 #include <cmath> // for std::isfinite()
@@ -221,6 +221,7 @@ private:
 
 // Implementation details
 
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace point_partitioner_internal {
 
@@ -764,7 +765,7 @@ inline void binAndSegment(
     using IndexPairListMap = std::map<Coord, IndexPairListPtr>;
     using IndexPairListMapPtr = std::shared_ptr<IndexPairListMap>;
 
-    size_t numTasks = 1, numThreads = size_t(tbb::task_scheduler_init::default_num_threads());
+    size_t numTasks = 1, numThreads = size_t(tbb::this_task_arena::max_concurrency());
     if (points.size() > (numThreads * 2)) numTasks = numThreads * 2;
     else if (points.size() > numThreads) numTasks = numThreads;
 
@@ -934,6 +935,7 @@ inline void partition(
 
 } // namespace point_partitioner_internal
 
+/// @endcond
 
 ////////////////////////////////////////
 

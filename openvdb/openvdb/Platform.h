@@ -6,13 +6,11 @@
 #ifndef OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 #define OPENVDB_PLATFORM_HAS_BEEN_INCLUDED
 
-#include "PlatformConfig.h"
-
 #define PRAGMA(x) _Pragma(#x)
 
 /// @name Utilities
 /// @{
-/// @cond OPENVDB_VERSION_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 #define OPENVDB_PREPROC_STRINGIFY_(x) #x
 /// @endcond
 /// @brief Return @a x as a string literal.  If @a x is a macro,
@@ -20,7 +18,7 @@
 /// @hideinitializer
 #define OPENVDB_PREPROC_STRINGIFY(x) OPENVDB_PREPROC_STRINGIFY_(x)
 
-/// @cond OPENVDB_VERSION_INTERNAL
+/// @cond OPENVDB_DOCS_INTERNAL
 #define OPENVDB_PREPROC_CONCAT_(x, y) x ## y
 /// @endcond
 /// @brief Form a new token by concatenating two existing tokens.
@@ -54,6 +52,31 @@
     #endif
 #endif
 
+/// Windows defines
+#ifdef _WIN32
+    // Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
+    // defined on MSVC
+    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
+    #ifndef _USE_MATH_DEFINES
+        #define _USE_MATH_DEFINES
+    #endif
+    ///Disable the non-portable Windows definitions of min() and max() macros
+    #ifndef NOMINMAX
+        #define NOMINMAX
+    #endif
+
+    // By default, assume we're building OpenVDB as a DLL if we're dynamically
+    // linking in the CRT, unless OPENVDB_STATICLIB is defined.
+    #if defined(_DLL) && !defined(OPENVDB_STATICLIB) && !defined(OPENVDB_DLL)
+        #define OPENVDB_DLL
+    #endif
+
+    // By default, assume that we're dynamically linking OpenEXR, unless
+    // OPENVDB_OPENEXR_STATICLIB is defined.
+    #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
+        #define OPENEXR_DLL
+    #endif
+#endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:
@@ -93,13 +116,22 @@
     #define OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
 #endif
 
+/// Deprecation macros. Define OPENVDB_NO_DEPRECATION_WARNINGS to disable all
+/// deprecation warnings in OpenVDB.
+#ifndef OPENVDB_NO_DEPRECATION_WARNINGS
+#define OPENVDB_DEPRECATED [[deprecated]]
+#define OPENVDB_DEPRECATED_MESSAGE(msg) [[deprecated(msg)]]
+#else
+#define OPENVDB_DEPRECATED
+#define OPENVDB_DEPRECATED_MESSAGE(msg)
+#endif
 
 /// @brief Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END,
 /// to inhibit warnings about deprecated code.
 /// @note Use this sparingly.  Remove references to deprecated code if at all possible.
 /// @details Example:
 /// @code
-/// [[deprecated]] void myDeprecatedFunction() {}
+/// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
 ///
 /// {
 ///     OPENVDB_NO_DEPRECATION_WARNING_BEGIN

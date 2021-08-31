@@ -292,8 +292,11 @@ SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
 
                 openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
 
-                vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss));
+                openvdb::FloatGrid::Ptr newGrid = openvdb::tools::levelSetRebuild(
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss);
+                newGrid->insertMeta(*grid.copyMeta());
+
+                vdbPrim->setGrid(*newGrid);
 
                 const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
                 vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
@@ -302,8 +305,11 @@ SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
 
                 openvdb::DoubleGrid& grid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
 
-                vdbPrim->setGrid(*openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss));
+                openvdb::DoubleGrid::Ptr newGrid = openvdb::tools::levelSetRebuild(
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss);
+                newGrid->insertMeta(*grid.copyMeta());
+
+                vdbPrim->setGrid(*newGrid);
 
                 const GEO_VolumeOptions& visOps = vdbPrim->getVisOptions();
                 vdbPrim->setVisualization(GEO_VOLUMEVIS_ISO, visOps.myIso, visOps.myDensity);
