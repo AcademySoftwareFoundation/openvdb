@@ -71,10 +71,11 @@ inline bool evalMinMax(const PointDataTreeT& points,
 ///   type ResultT to be provided which is used to compute the final result
 ///   as well as for intermediate arithmetic. This allows for higher precision
 ///   results if overflow or underflow is a concern, as well as computing
-///   floating point results from integer types. This method will throw only if
+///   floating point results from integer types. By default the result and all
+///   arithmetic is done at double precision. This method will throw only if
 ///   the templated ValueType does not match the given attribute. This method
-///   will return true if average has been set, false otherwise. The function is
-///   deterministic.
+///   will return true if average has been set, false otherwise. The function
+///   is deterministic.
 /// @param points     the point tree
 /// @param attribute  the attribute to reduce
 /// @param average    the computed min value
@@ -84,7 +85,7 @@ inline bool evalMinMax(const PointDataTreeT& points,
 ///   no points were processed or if the tree was empty.
 /// @warning if "P" is provided as the attributes, it is evaluated in voxel space
 template <typename ValueT,
-    typename ResultT = ValueT,
+    typename ResultT = typename ConvertType<ValueT, double>::Type,
     typename CodecT = UnknownCodec,
     typename FilterT = NullFilter,
     typename PointDataTreeT = points::PointDataTree>
@@ -101,8 +102,9 @@ inline bool evalAverage(const PointDataTreeT& points,
 ///   allows for a different type ResultT to be provided which is used to
 ///   compute the final result as well as for intermediate arithmetic. This
 ///   allows for higher precision results if overflow or underflow is a concern.
-///   This method will throw only if the templated ValueType does not match the
-///   given attribute. This method will return true if val has been set, false
+///   By default the result and all arithmetic is done at 64bits. This method
+///   will throw only if the templated ValueType does not match the given
+///   attribute. This method will return true if val has been set, false
 ///   otherwise. The function is deterministic.
 /// @param points     the point tree
 /// @param attribute  the attribute to reduce
@@ -112,7 +114,7 @@ inline bool evalAverage(const PointDataTreeT& points,
 ///   no points were processed or if the tree was empty.
 /// @warning if "P" is provided as the attributes, it is evaluated in voxel space
 template <typename ValueT,
-    typename ResultT = ValueT,
+    typename ResultT = typename PromoteType<ValueT>::Type,
     typename CodecT = UnknownCodec,
     typename FilterT = NullFilter,
     typename PointDataTreeT = points::PointDataTree>
