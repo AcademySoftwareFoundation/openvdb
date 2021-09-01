@@ -119,7 +119,10 @@ done
 
 ################################################
 
+# github actions runners have 2 threads
+# https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=${PARMS[-j]}
+echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
 
 # NOTE: --parallel only effects the number of projects build, not t-units.
 # We support this with out own MSVC_MP_THREAD_COUNT option for MSVC.

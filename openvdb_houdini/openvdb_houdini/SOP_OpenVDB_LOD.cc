@@ -182,12 +182,26 @@ struct MultiResGridFractionalOp
     template<typename GridType>
     void operator()(const GridType& grid)
     {
+        using TreeT = typename GridType::TreeType;
         if ( level <= 0.0f ) {
             outputGrid = typename GridType::Ptr( new GridType(grid) );
         } else {
             const size_t levels = openvdb::math::Ceil(level) + 1;
-            using TreeT = typename GridType::TreeType;
-            openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
+            const GridType* gridPtr = &grid;
+#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
+            // if grid already has MultiResGrid_Level metadata with type int64, remove it
+            typename GridType::ConstPtr newGridPtr;
+            auto meta = grid.template getMetadata<openvdb::Int64Metadata>("MultiResGrid_Level");
+            if (meta) {
+                // deep copy meta map and remove element
+                openvdb::MetaMap metaMap(static_cast<const openvdb::MetaMap&>(grid));
+                metaMap.removeMeta("MultiResGrid_Level");
+                // the tree and transform are shared with the input grid, but meta map is different
+                newGridPtr = grid.copyReplacingMetadata(metaMap);
+                gridPtr = newGridPtr.get();
+            }
+#endif
+            openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
             outputGrid = mrg.template createGrid<Order>( level );
         }
     }
@@ -205,10 +219,24 @@ struct MultiResGridRangeOp
     template<typename GridType>
     void operator()(const GridType& grid)
     {
+        using TreeT = typename GridType::TreeType;
         if ( end > 0.0f ) {
             const size_t levels = openvdb::math::Ceil(end) + 1;
-            using TreeT = typename GridType::TreeType;
-            openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
+            const GridType* gridPtr = &grid;
+#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
+            // if grid already has MultiResGrid_Level metadata with type int64, remove it
+            typename GridType::ConstPtr newGridPtr;
+            auto meta = grid.template getMetadata<openvdb::Int64Metadata>("MultiResGrid_Level");
+            if (meta) {
+                // deep copy meta map and remove element
+                openvdb::MetaMap metaMap(static_cast<const openvdb::MetaMap&>(grid));
+                metaMap.removeMeta("MultiResGrid_Level");
+                // the tree and transform are shared with the input grid, but meta map is different
+                newGridPtr = grid.copyReplacingMetadata(metaMap);
+                gridPtr = newGridPtr.get();
+            }
+#endif
+            openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
 
             // inclusive range
             for (float level = start; !(level > end); level += step) {
@@ -231,7 +259,21 @@ struct MultiResGridIntegerOp
     void operator()(const GridType& grid)
     {
         using TreeT = typename GridType::TreeType;
-        openvdb::tools::MultiResGrid<TreeT> mrg( levels, grid );
+        const GridType* gridPtr = &grid;
+#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
+        // if grid already has MultiResGrid_Level metadata with type float, remove it
+        typename GridType::ConstPtr newGridPtr;
+        auto meta = grid.template getMetadata<openvdb::FloatMetadata>("MultiResGrid_Level");
+        if (meta) {
+            // deep copy meta map and remove element
+            openvdb::MetaMap metaMap(static_cast<const openvdb::MetaMap&>(grid));
+            metaMap.removeMeta("MultiResGrid_Level");
+            // the tree and transform are shared with the input grid, but meta map is different
+            newGridPtr = grid.copyReplacingMetadata(metaMap);
+            gridPtr = newGridPtr.get();
+        }
+#endif
+        openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
         outputGrids = mrg.grids();
     }
     const size_t levels;
