@@ -130,15 +130,7 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
   endif()
 endif()
 
-if(USE_IMATH_HALF)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-endif()
+find_package(Imath ${MINIMUM_IMATH_VERSION} REQUIRED)
 
 if(USE_LOG4CPLUS)
   # Find Log4CPlus libraries
@@ -183,18 +175,15 @@ if(UNIX)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# Houdini 17.5 we must include Imath deps first to ensure the users chosen
 # namespaced headers are correctly prioritized. Otherwise other include paths
 # from shared installs (including houdini) may pull in the wrong headers
 
 set(OPENVDB_CORE_DEPENDENT_LIBS
+  Imath::Imath
   Boost::iostreams
   Boost::system
 )
-
-if(USE_IMATH_HALF)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS IlmBase::Half)
-endif()
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -236,9 +225,6 @@ endif()
 
 # Configure the version header
 
-if(USE_IMATH_HALF)
-  set(OPENVDB_USE_IMATH_HALF 1)
-endif()
 if(USE_ZLIB)
   set(OPENVDB_USE_ZLIB 1)
   if(USE_BLOSC)
@@ -265,7 +251,6 @@ set(OPENVDB_LIBRARY_SOURCE_FILES
   io/Queue.cc
   io/Stream.cc
   io/TempFile.cc
-  math/Half.cc
   math/Maps.cc
   math/Proximity.cc
   math/QuantizedUnitVec.cc
@@ -314,8 +299,6 @@ set(OPENVDB_LIBRARY_MATH_INCLUDE_FILES
   math/Coord.h
   math/DDA.h
   math/FiniteDifference.h
-  math/Half.h
-  math/HalfLimits.h
   math/LegacyFrustum.h
   math/Maps.h
   math/Mat.h
@@ -474,11 +457,9 @@ endif()
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
 if(WIN32)
-  if(USE_IMATH_HALF)
-    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-      list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
-    endif()
+  # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
+  if(IMATH_USE_STATIC_LIBS OR (${IMATH_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
   endif()
 endif()
 
@@ -548,7 +529,7 @@ if(OPENVDB_CORE_SHARED)
     # @todo There is probably a better way to do this for imported targets
     list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
+      ${Imath_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}
       ${Tbb_LIBRARY_DIRS}

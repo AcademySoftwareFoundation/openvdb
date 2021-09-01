@@ -201,7 +201,7 @@ if(OPENVDB_ENABLE_RPATH)
   set(RPATHS "")
   list(APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
+    ${Imath_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}

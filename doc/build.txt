@@ -89,7 +89,7 @@ given FindModule e.g. `FindBlosc.cmake`:
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
-   find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
+   find package .i.e. Blosc_ROOT, Imath_ROOT, TBB_ROOT etc.
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
    searches.
    - @b XXX_USE_STATIC_LIBS - Only search for static libraries for the given
@@ -348,7 +348,7 @@ CppUnit        | A unit testing framework module for C++                        
 GLFW           | Simple API for OpenGL development                                 | OpenVDB View                     |
 Doxygen        | Documentation generation from C++                                 | Documentation                    |
 OpenEXR        | EXR serialization support                                         | OpenVDB Render                   |
-IlmBase        | Used half precision floating points and EXR serialization support | Optional (All)                   |
+Imath          | Used half precision floating points and EXR serialization support | Optional (All)                   |
 Log4cplus      | An optional dependency for improved OpenVDB Logging               | Optional (All)                   |
 NumPy          | Scientific computing with Python                                  | Optional (Python)                |
 LLVM           | Target-independent code generation                                | OpenVDB AX                       |
@@ -386,14 +386,14 @@ Optional:
  install the Maya plugin to. Defaults to the value of `${CMAKE_INSTALL_PREFIX}/maya${Maya_VERSION}`
   - @b BOOST_ROOT =`/path/to/boost/install` # Path to boost. May not be required,
  CMake may find it automatically
-  - @b IlmBase_ROOT =`/path/to/ilmbase/install` # Path to ilmbase.
+  - @b Imath_ROOT =`/path/to/imath/install` # Path to imath.
 
 For example on MacOS and where the build folder has been created inside the
 OpenVDB source root:
 
 @code
 cmake -D BOOST_ROOT=/path/to/boost/install \
-      -D IlmBase_ROOT=/path/to/ilmbase/install \
+      -D Imath_ROOT=/path/to/imath/install \
       -D Maya_ROOT=/Applications/Autodesk/maya2019/ \
       -D USE_MAYA=ON \
       ../

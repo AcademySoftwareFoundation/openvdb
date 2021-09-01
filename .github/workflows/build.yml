@@ -81,7 +81,7 @@ jobs:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
-          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # USE_STATIC_DEPENDENCIES is required for Imath/OpenEXR defines and
           # Boost as both shared and static libs are installed.
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
           - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
@@ -122,7 +122,7 @@ jobs:
       matrix:
         config:
           - { name: 'abi8lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF' }
-          - { name: 'abi8half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'abi8half', cmake: '-DUSE_BLOSC=OFF' }
           - { name: 'abi8sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
           - { name: 'abi8avx',  cmake: '-DOPENVDB_SIMD=AVX' }
       fail-fast: false
@@ -211,10 +211,7 @@ jobs:
       shell: bash
       run: |
         brew update
-        brew install bash cmake ilmbase openexr@2 boost tbb glfw
-        echo "IlmBase_ROOT=/usr/local/opt/ilmbase" >> $GITHUB_ENV
-        echo "OpenEXR_ROOT=/usr/local/opt/openexr@2" >> $GITHUB_ENV
-        echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
+        brew install bash cmake boost tbb glfw
     - name: install
       shell: bash
       run: ./ci/install_gtest.sh 1.10.0

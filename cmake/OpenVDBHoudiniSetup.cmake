@@ -49,8 +49,8 @@ overwrite user provided values.
 ``ZLIB_LIBRARY``
 ``OPENEXR_INCLUDEDIR``
 ``OPENEXR_LIBRARYDIR``
-``ILMBASE_INCLUDEDIR``
-``ILMBASE_LIBRARYDIR``
+``IMATH_INCLUDEDIR``
+``IMATH_LIBRARYDIR``
 ``TBB_INCLUDEDIR``
 ``TBB_LIBRARYDIR``
 ``BLOSC_INCLUDEDIR``
@@ -299,19 +299,19 @@ if(NOT OPENEXR_LIBRARYDIR)
   set(OPENEXR_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
-# IlmBase
+# Imath
 
-if(NOT ILMBASE_INCLUDEDIR)
-  set(ILMBASE_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
+if(NOT IMATH_INCLUDEDIR)
+  set(IMATH_INCLUDEDIR ${HOUDINI_INCLUDE_DIR})
 endif()
-if(NOT ILMBASE_LIBRARYDIR)
-  set(ILMBASE_LIBRARYDIR ${HOUDINI_LIB_DIR})
+if(NOT IMATH_LIBRARYDIR)
+  set(IMATH_LIBRARYDIR ${HOUDINI_LIB_DIR})
 endif()
 
 # Boost - currently must be provided as VDB is not fully configured to
 # use Houdini's namespaced hboost
 
-# Versions of Houdini >= 17.5 have some namespaced libraries (IlmBase/OpenEXR).
+# Versions of Houdini >= 17.5 have some namespaced libraries (Imath/OpenEXR).
 # Add the required suffix as part of the cmake lib suffix searches
 
 if(APPLE)

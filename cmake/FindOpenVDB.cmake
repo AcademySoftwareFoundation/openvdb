@@ -59,8 +59,6 @@ This will define the following variables:
   True if the OpenVDB Library has been built with zlib support
 ``OpenVDB_USES_LOG4CPLUS``
   True if the OpenVDB Library has been built with log4cplus support
-``OpenVDB_USES_IMATH_HALF``
-  True if the OpenVDB Library has been built with Imath half support
 ``OpenVDB_ABI``
   Set if this module was able to determine the ABI number the located
   OpenVDB Library was built against. Unset otherwise.
@@ -526,7 +524,6 @@ endif()
 set(OpenVDB_USES_BLOSC ${USE_BLOSC})
 set(OpenVDB_USES_ZLIB ${USE_ZLIB})
 set(OpenVDB_USES_LOG4CPLUS ${USE_LOG4CPLUS})
-set(OpenVDB_USES_IMATH_HALF ${USE_IMATH_HALF})
 set(OpenVDB_DEFINITIONS)
 
 if(WIN32)
@@ -552,7 +549,6 @@ endif()
 # Configure deps
 
 if(_OPENVDB_HAS_NEW_VERSION_HEADER)
-  OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_IMATH_HALF" OpenVDB_USES_IMATH_HALF)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_BLOSC" OpenVDB_USES_BLOSC)
   OPENVDB_GET_VERSION_DEFINE(${_OPENVDB_VERSION_HEADER} "OPENVDB_USE_ZLIB" OpenVDB_USES_ZLIB)
 elseif(NOT OPENVDB_USE_STATIC_LIBS)
@@ -596,11 +592,6 @@ elseif(NOT OPENVDB_USE_STATIC_LIBS)
     if(NOT ${_HAS_DEP} EQUAL -1)
       set(OpenVDB_USES_LOG4CPLUS ON)
     endif()
-
-    string(FIND ${PREREQUISITE} "Half" _HAS_DEP)
-    if(NOT ${_HAS_DEP} EQUAL -1)
-      set(OpenVDB_USES_IMATH_HALF ON)
-    endif()
   endforeach()
 
   unset(_OPENVDB_PREREQUISITE_LIST)
@@ -618,22 +609,12 @@ if(OpenVDB_USES_LOG4CPLUS)
   find_package(Log4cplus REQUIRED)
 endif()
 
-if(OpenVDB_USES_IMATH_HALF)
-  find_package(IlmBase REQUIRED COMPONENTS Half)
-  if(WIN32)
-    # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
-      list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
-    endif()
-  endif()
-endif()
-
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
+# Houdini 17.5 we must include Imath deps first to ensure the users chosen
 # namespaced headers are correctly prioritized. Otherwise other include paths
 # from shared installs (including houdini) may pull in the wrong headers
 
@@ -642,9 +623,7 @@ set(_OPENVDB_VISIBLE_DEPENDENCIES
   Boost::system
 )
 
-if(OpenVDB_USES_IMATH_HALF)
-  list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES IlmBase::Half)
-endif()
+list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Imath::Imath)
 
 if(OpenVDB_USES_LOG4CPLUS)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES Log4cplus::log4cplus)

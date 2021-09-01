@@ -8,23 +8,13 @@
 #include "Platform.h"
 #include "TypeList.h" // backwards compat
 
-#ifdef OPENVDB_USE_IMATH_HALF
-#include <OpenEXR/half.h>
+#include <half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace math {
-using half = half;
+using half = IMATH_NAMESPACE::half;
 }}}
-#else
-#include <openvdb/math/Half.h>
-namespace openvdb {
-OPENVDB_USE_VERSION_NAMESPACE
-namespace OPENVDB_VERSION_NAME {
-namespace math {
-using half = internal::half;
-}}}
-#endif
 
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>

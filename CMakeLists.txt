@@ -85,8 +85,8 @@ cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   ON "OPENVDB_BUILD_CORE" OFF)
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
-When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
-provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
+When enabled, you do not need to provide dependency locations for TBB, Blosc, Imath and OpenEXR. Boost must be
+provided. Imath/OpenEXR can optionally be provided if Houdini Version >= 17.5.]=] OFF)
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
@@ -101,11 +101,6 @@ option(USE_LOG4CPLUS [=[
 Use log4cplus while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the
 located openvdb build configuration to decide on log4cplus support. You may set this to on to force log4cplus
 to be used if you know it to be required.]=] OFF)
-option(USE_IMATH_HALF [=[
-Use the definiton of half floating point types from the Imath library. If OFF, the embedded definition provided
-by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located openvdb build configuration
-to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
-required.]=] OFF)
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
@@ -176,8 +171,7 @@ set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
 ###### Deprecated options
 
 if(USE_EXR)
-  message(FATAL_ERROR "The USE_EXR option has been removed. Use USE_IMATH_HALF to use the Half "
-    "implementation from IMath, or leave OFF to use the new embedded version of half floating point types.")
+  message(FATAL_ERROR "The USE_EXR option has been removed." )
 endif()
 if(OPENVDB_BUILD_HOUDINI_SOPS)
   message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
@@ -194,7 +188,6 @@ mark_as_advanced(
   USE_HOUDINI
   USE_MAYA
   USE_LOG4CPLUS
-  USE_IMATH_HALF
   USE_CCACHE
   OPENVDB_BUILD_HOUDINI_ABITESTS
   DISABLE_DEPENDENCY_VERSION_CHECKS
@@ -231,8 +224,8 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_MSVC_VERSION 19.10)
 
   set(MINIMUM_BOOST_VERSION 1.61)  # @warning should be 1.66, but H18 ships with 1.61
-  set(MINIMUM_ILMBASE_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
-  set(MINIMUM_OPENEXR_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
+  set(MINIMUM_IMATH_VERSION 3.1)
+  set(MINIMUM_OPENEXR_VERSION 3.1)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2018.0)
   set(MINIMUM_LLVM_VERSION 6.0.0)
@@ -262,8 +255,8 @@ set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
 #set(FUTURE_MINIMUM_ICC_VERSION 17)
 #set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
 
-set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
-set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
+set(FUTURE_MINIMUM_IMATH_VERSION 3.1)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 3.1)
 set(FUTURE_MINIMUM_BOOST_VERSION 1.70)
 set(FUTURE_MINIMUM_TBB_VERSION 2019.0)
 set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
@@ -356,8 +349,8 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
   set(OPENVDB_CMAKE_MODULES
     cmake/FindBlosc.cmake
     cmake/FindJemalloc.cmake
-    cmake/FindIlmBase.cmake
     cmake/FindLog4cplus.cmake
+    cmake/FindImath.cmake
     cmake/FindOpenEXR.cmake
     cmake/FindOpenVDB.cmake
     cmake/FindTBB.cmake
@@ -632,7 +625,7 @@ endif()
 if(USE_STATIC_DEPENDENCIES)
   set(BLOSC_USE_STATIC_LIBS ON)
   set(OPENEXR_USE_STATIC_LIBS ON)
-  set(ILMBASE_USE_STATIC_LIBS ON)
+  set(IMATH_USE_STATIC_LIBS ON)
   set(TBB_USE_STATIC_LIBS ON)
   set(LOG4CPLUS_USE_STATIC_LIBS ON)
   set(JEMALLOC_USE_STATIC_LIBS ON)

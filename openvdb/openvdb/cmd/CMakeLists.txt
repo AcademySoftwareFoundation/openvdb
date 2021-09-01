@@ -59,7 +59,7 @@ if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
   list(APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
+    ${Imath_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
     ${Tbb_LIBRARY_DIRS}
@@ -116,8 +116,9 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
+  find_package(Imath ${MINIMUM_IMATH_VERSION} REQUIRED)
+  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS
+  OpenEXR Iex IlmThread)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
   add_executable(vdb_render ${VDB_RENDER_SOURCE_FILES})
@@ -129,18 +130,17 @@ if(OPENVDB_BUILD_VDB_RENDER)
   # headers
 
   target_link_libraries(vdb_render
-    IlmBase::Half
-    OpenEXR::IlmImf
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
+    Imath::Imath
+    OpenEXR::OpenEXR
+    OpenEXR::IlmThread
+    OpenEXR::Iex
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 
   if(WIN32)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    get_target_property(ILMBASE_LIB_TYPE IlmBase::Half TYPE)
-    if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    get_target_property(IMATH_LIB_TYPE Imath::Imath TYPE)
+    if(OPENEXR_USE_STATIC_LIBS OR (${IMATH_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       target_compile_definitions(vdb_render  PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()

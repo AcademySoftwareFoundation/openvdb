@@ -37,10 +37,10 @@ Reference Platform, but for those that do, their specified versions are
 
 Component               | Requirements                                                                         | Optional
 ----------------------- | ------------------------------------------------------------------------------------ | --------
-OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::system, Boost::iostream                      | Blosc, ZLib, Log4cplus, IlmBase::Half
+OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::system, Boost::iostream                      | Blosc, ZLib, Log4cplus, Imath
 OpenVDB Print           | Core Library dependencies                                                            | -
 OpenVDB LOD             | Core Library dependencies                                                            | -
-OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
+OpenVDB Render          | Core Library dependencies, OpenEXR, Imath                                            | -
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW*                                      | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy, NumPy
 OpenVDB AX              | Core Library dependencies, LLVM                                                      | Bison, Flex
@@ -61,8 +61,8 @@ GCC            | 6.3.1   | 6.3.1       | C++ 14 Compiler: The GNU Compiler Colle
 Clang          | 3.8     | Latest      | C++ 14 Compiler: A C language family frontend for LLVM            | Y       | Y        | https://clang.llvm.org
 Intel ICC      | 17      | Latest      | C++ 14 Compiler: Intels C++ Compiler                              | Y       | Y        | https://software.intel.com/en-us/c-compilers
 MSVC           | 19.10   | Latest      | C++ 14 Compiler: Microsoft Visual C++ Compiler                    | Y       | Y        | https://visualstudio.microsoft.com/vs
-IlmBase        | 2.2**   | 2.3         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
-OpenEXR        | 2.2**   | 2.3         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
+Imath          | 3.1**   | 3.1         | Used half precision floating points and EXR serialization support | Y       | Y        | http://www.openexr.com
+OpenEXR        | 3.1**   | 3.1         | EXR serialization support                                         | Y       | Y        | http://www.openexr.com
 TBB            | 2018    | 2018        | Threading Building Blocks - template library for task parallelism | Y       | Y        | https://www.threadingbuildingblocks.org
 ZLIB           | 1.2.7   | Latest      | Compression library for disk serialization compression            | Y       | Y        | https://www.zlib.net
 Boost          | 1.66    | 1.66        | Components: system, iostreams, python, numpy                      | Y       | Y        | https://www.boost.org
@@ -115,7 +115,7 @@ options.
 #!/bin/bash
 # Core library
 apt-get install cmake                   # CMake
-apt-get install libilmbase-dev          # IlmBase
+apt-get install libimath-dev            # Imath
 apt-get install libopenexr-dev          # OpenEXR
 apt-get install libtbb-dev              # TBB
 apt-get install zlibc                   # zlib
@@ -151,7 +151,7 @@ using later versions of blosc. See the
 #!/bin/bash
 # Core library
 brew install cmake                     # CMake
-brew install ilmbase                   # IlmBase
+brew install imath                     # Imath
 brew install openexr                   # OpenEXR
 brew install tbb                       # TBB
 brew install zlib                      # zlib
