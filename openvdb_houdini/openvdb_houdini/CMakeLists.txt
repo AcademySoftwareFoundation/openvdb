@@ -72,6 +72,12 @@ else()
   endif()
 endif()
 
+set(OPENVDB_DSO_NAMES "" CACHE STRING [=[
+  An optional list of Houdini DSOs to build. If not provided, all Houdini DSOs will be built.
+  DSOs should be listed without the .cc suffix, for example the string
+  \"SOP_OpenVDB_Activate;SOP_OpenVDB_Resample\" would build just the VDB Activate and
+  VDB Resample SOPs.]=])
+
 #########################################################################
 
 message(STATUS "----------------------------------------------------")
@@ -233,76 +239,88 @@ if (OPENVDB_HOUDINI_OPHIDE_POLICY AND NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} STREQ
     "-DOPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_OPHIDE_POLICY}")
 endif()
 
-set(OPENVDB_DSO_NAMES
-  GR_PrimVDBPoints
-  SHOP_OpenVDB_Points
-  SOP_OpenVDB_Activate
-  SOP_OpenVDB_Advect
-  SOP_OpenVDB_Advect_Points
-  SOP_OpenVDB_Analysis
-  SOP_OpenVDB_Clip
-  SOP_OpenVDB_Combine
-  SOP_OpenVDB_Convert
-  SOP_OpenVDB_Create
-  SOP_OpenVDB_Densify
-  SOP_OpenVDB_Diagnostics
-  SOP_OpenVDB_Extrapolate
-  SOP_OpenVDB_Fill
-  SOP_OpenVDB_Filter
-  SOP_OpenVDB_Filter_Level_Set
-  SOP_OpenVDB_Fracture
-  SOP_OpenVDB_From_Particles
-  SOP_OpenVDB_From_Polygons
-  SOP_OpenVDB_LOD
-  SOP_OpenVDB_Merge
-  SOP_OpenVDB_Metadata
-  SOP_OpenVDB_Morph_Level_Set
-  SOP_OpenVDB_Noise
-  SOP_OpenVDB_Occlusion_Mask
-  SOP_OpenVDB_Platonic
-  SOP_OpenVDB_Points_Convert
-  SOP_OpenVDB_Points_Delete
-  SOP_OpenVDB_Points_Group
-  SOP_OpenVDB_Potential_Flow
-  SOP_OpenVDB_Prune
-  SOP_OpenVDB_Rasterize_Points
-  SOP_OpenVDB_Ray
-  SOP_OpenVDB_Read
-  SOP_OpenVDB_Rebuild_Level_Set
-  SOP_OpenVDB_Remap
-  SOP_OpenVDB_Remove_Divergence
-  SOP_OpenVDB_Resample
-  SOP_OpenVDB_Sample_Points
-  SOP_OpenVDB_Scatter
-  SOP_OpenVDB_Segment
-  SOP_OpenVDB_Sort_Points
-  SOP_OpenVDB_To_Polygons
-  SOP_OpenVDB_To_Spheres
-  SOP_OpenVDB_Topology_To_Level_Set
-  SOP_OpenVDB_Transform
-  SOP_OpenVDB_Vector_Merge
-  SOP_OpenVDB_Vector_Split
-  SOP_OpenVDB_Visualize
-  SOP_OpenVDB_Write
-  VRAY_OpenVDB_Points
-)
-
-if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
-  # Check to see if the AX SOP has been manually disabled
-  if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+if(OPENVDB_DSO_NAMES)
+  set(OPENVDB_USE_CUSTOM_DSO_NAMES 1)
+  # if AX SOP is explicitly enabled, also switch on the build variable
+  if (SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
     set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
   endif()
+endif()
 
-  if(OPENVDB_BUILD_SOP_OpenVDB_AX)
-    # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
-    # if OPENVDB_BUILD_CORE is ON, all deps must also be on
-    # openvdb and openvdb_houdini must be either both enabled or disabled.
-    # openvdb and openvdb_ax must be either both enabled or disabled.
-    if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
-      message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
-        "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
-        "also be rebuilt.")
+if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+  list(APPEND OPENVDB_DSO_NAMES
+    GR_PrimVDBPoints
+    SHOP_OpenVDB_Points
+    SOP_OpenVDB_Activate
+    SOP_OpenVDB_Advect
+    SOP_OpenVDB_Advect_Points
+    SOP_OpenVDB_Analysis
+    SOP_OpenVDB_Clip
+    SOP_OpenVDB_Combine
+    SOP_OpenVDB_Convert
+    SOP_OpenVDB_Create
+    SOP_OpenVDB_Densify
+    SOP_OpenVDB_Diagnostics
+    SOP_OpenVDB_Extrapolate
+    SOP_OpenVDB_Fill
+    SOP_OpenVDB_Filter
+    SOP_OpenVDB_Filter_Level_Set
+    SOP_OpenVDB_Fracture
+    SOP_OpenVDB_From_Particles
+    SOP_OpenVDB_From_Polygons
+    SOP_OpenVDB_LOD
+    SOP_OpenVDB_Merge
+    SOP_OpenVDB_Metadata
+    SOP_OpenVDB_Morph_Level_Set
+    SOP_OpenVDB_Noise
+    SOP_OpenVDB_Occlusion_Mask
+    SOP_OpenVDB_Platonic
+    SOP_OpenVDB_Points_Convert
+    SOP_OpenVDB_Points_Delete
+    SOP_OpenVDB_Points_Group
+    SOP_OpenVDB_Potential_Flow
+    SOP_OpenVDB_Prune
+    SOP_OpenVDB_Rasterize_Points
+    SOP_OpenVDB_Ray
+    SOP_OpenVDB_Read
+    SOP_OpenVDB_Rebuild_Level_Set
+    SOP_OpenVDB_Remap
+    SOP_OpenVDB_Remove_Divergence
+    SOP_OpenVDB_Resample
+    SOP_OpenVDB_Sample_Points
+    SOP_OpenVDB_Scatter
+    SOP_OpenVDB_Segment
+    SOP_OpenVDB_Sort_Points
+    SOP_OpenVDB_To_Polygons
+    SOP_OpenVDB_To_Spheres
+    SOP_OpenVDB_Topology_To_Level_Set
+    SOP_OpenVDB_Transform
+    SOP_OpenVDB_Vector_Merge
+    SOP_OpenVDB_Vector_Split
+    SOP_OpenVDB_Visualize
+    SOP_OpenVDB_Write
+    VRAY_OpenVDB_Points
+  )
+endif()
+
+if(OPENVDB_BUILD_SOP_OpenVDB_AX)
+  if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
+    # Check to see if the AX SOP has been manually disabled
+    if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
     endif()
+  endif()
+
+  # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
+  # if OPENVDB_BUILD_CORE is ON, all deps must also be on
+  # openvdb and openvdb_houdini must be either both enabled or disabled.
+  # openvdb and openvdb_ax must be either both enabled or disabled.
+  if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
+    message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
+      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
+      "also be rebuilt.")
+  endif()
+  if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
   endif()
 endif()
