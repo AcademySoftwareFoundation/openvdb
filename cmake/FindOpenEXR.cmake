@@ -111,7 +111,7 @@ if(NOT TARGET OpenEXR::OpenEXR AND NOT OpenEXR_FOUND)
     GIT_TAG ${OPENEXR_TAG}
     GIT_SHALLOW ON
       )
-    
+
   FetchContent_GetProperties(OpenEXR)
   if(NOT OpenEXR_POPULATED)
     FetchContent_Populate(OpenEXR)
