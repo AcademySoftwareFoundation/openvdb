@@ -72,12 +72,16 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v2-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb-v2-houdini${{ matrix.config.hou }}-
+        key: vdb-v3-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        restore-keys: vdb-v3-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
+      # Make sure the cache is copied, not moved, as the cache action always posts the cache
     - name: install_houdini
-      run: mv hou/hou.tar.gz . && tar -vxzf hou.tar.gz
+      run: |
+        mkdir houdini_install
+        cp hou/hou.tar.gz houdini_install/hou.tar.gz
+        cd houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.12.0
     - name: install_gtest
@@ -85,7 +89,7 @@ jobs:
     - name: build
       shell: bash
       run: >
-        cd hou && source houdini_setup_bash && cd - &&
+        cd houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         -j ${{ matrix.config.j }}
         --build-type=${{ matrix.config.build }}
@@ -93,3 +97,6 @@ jobs:
         --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
     - name: test
       run: cd build && ctest -V
+      # Final check to make sure the cache still exists
+    - name: validate_houdini
+      run: test -f "hou/hou.tar.gz"
