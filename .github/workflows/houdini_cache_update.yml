@@ -66,7 +66,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v2-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        key: vdb-v3-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
   houdini18_0:
     needs: [checksecret]
@@ -105,4 +105,4 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v2-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
+        key: vdb-v3-houdini18_0-${{ hashFiles('hou/hou.tar.gz') }}
