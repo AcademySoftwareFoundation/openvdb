@@ -131,11 +131,15 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-        "is deprecated and will be removed.")
+
+  find_package(Imath CONFIG)
+  if (NOT TARGET Imath::Imath)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+      if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+        message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+          "is deprecated and will be removed.")
+      endif()
     endif()
   endif()
 endif()
@@ -193,7 +197,8 @@ set(OPENVDB_CORE_DEPENDENT_LIBS
 )
 
 if(USE_IMATH_HALF)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS IlmBase::Half)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)
 endif()
 
 if(WIN32)
@@ -476,7 +481,8 @@ list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 if(WIN32)
   if(USE_IMATH_HALF)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY) OR
+       IMATH_USE_STATIC_LIBS OR (${IMATH_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()
@@ -548,6 +554,7 @@ if(OPENVDB_CORE_SHARED)
     # @todo There is probably a better way to do this for imported targets
     list(APPEND RPATHS
       ${Boost_LIBRARY_DIRS}
+      ${Imath_LIBRARY_DIRS}
       ${IlmBase_LIBRARY_DIRS}
       ${Log4cplus_LIBRARY_DIRS}
       ${Blosc_LIBRARY_DIRS}

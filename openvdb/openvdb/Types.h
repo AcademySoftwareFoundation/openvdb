@@ -9,7 +9,7 @@
 #include "TypeList.h" // backwards compat
 
 #ifdef OPENVDB_USE_IMATH_HALF
-#include <OpenEXR/half.h>
+#include <half.h>
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
