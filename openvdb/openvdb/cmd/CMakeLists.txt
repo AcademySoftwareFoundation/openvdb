@@ -121,7 +121,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
   if (NOT TARGET Imath::Imath)
     find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
   endif()
-  
+
   find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
