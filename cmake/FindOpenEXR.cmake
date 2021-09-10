@@ -174,10 +174,10 @@ if(EXISTS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h")
 endif()
 
 if(${OpenEXR_VERSION_MAJOR} MATCHES "3")
-  set(_OPENEXR_COMPONENT_LIST OpenEXR OpenEXRUtil Iex IlmThread)
+  set(_OPENEXR_COMPONENT_LIST OpenEXR Iex IlmThread)
 else()
-  set(_OPENEXR_COMPONENT_LIST IlmImf IlmImfUtil)
-endif()  
+  set(_OPENEXR_COMPONENT_LIST IlmImf)
+endif()
 
 if(OpenEXR_FIND_COMPONENTS)
   set(OPENEXR_COMPONENTS_PROVIDED TRUE)
