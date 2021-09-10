@@ -11,7 +11,7 @@
     \brief This class allows for sequential access to nodes in a NanoVDB tree.
 
     \brief Currently it is limited to the host (CPU) but it can easily be ported
-           to the device (GPU) is sequential node access is required.
+           to the device (GPU) if sequential node access is required.
 */
 
 #include "../NanoVDB.h"
