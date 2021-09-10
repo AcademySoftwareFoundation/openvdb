@@ -65,7 +65,7 @@ public:
 
 /// @brief This class serves to manage a raw memory buffer of a NanoVDB Grid.
 ///
-/// @note  It is important to note that is class does NOT depend on OpenVDB.
+/// @note  It is important to note that this class does NOT depend on OpenVDB.
 template<typename BufferT = HostBuffer>
 class GridHandle : public GridHandleBase
 {
