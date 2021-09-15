@@ -162,6 +162,16 @@ convertPointDataGridGroup(  Group& group,
                             const FilterT& filter = NullFilter(),
                             const bool inCoreOnly = false);
 
+// for internal use only - this traits class extracts T::value_type if defined,
+// otherwise falls back to using Vec3R
+namespace internal {
+template <typename...> using void_t = void;
+template <typename T, typename = void>
+struct ValueTypeTraits { using Type = Vec3R; /* default type if T::value_type is not defined*/ };
+template <typename T>
+struct ValueTypeTraits <T, void_t<typename T::value_type>> { using Type = typename T::value_type; };
+} // namespace internal
+
 /// @ brief Given a container of world space positions and a target points per voxel,
 /// compute a uniform voxel size that would best represent the storage of the points in a grid.
 /// This voxel size is typically used for conversion of the points into a PointDataGrid.
@@ -172,9 +182,13 @@ convertPointDataGridGroup(  Group& group,
 /// @param decimalPlaces    for readability, truncate voxel size to this number of decimals
 /// @param interrupter      an optional interrupter
 ///
+/// @note VecT will be PositionWrapper::value_type or Vec3R (if there is no value_type defined)
+///
 /// @note if none or one point provided in positions, the default voxel size of 0.1 will be returned
 ///
-template<typename PositionWrapper, typename InterrupterT = openvdb::util::NullInterrupter>
+template<   typename PositionWrapper,
+            typename InterrupterT = openvdb::util::NullInterrupter,
+            typename VecT = typename internal::ValueTypeTraits<PositionWrapper>::Type>
 inline float
 computeVoxelSize(  const PositionWrapper& positions,
                    const uint32_t pointsPerVoxel,
@@ -565,7 +579,7 @@ struct ConvertPointDataGridGroupOp {
     const bool                              mInCoreOnly;
 }; // ConvertPointDataGridGroupOp
 
-template<typename PositionArrayT>
+template<typename PositionArrayT, typename VecT = Vec3R>
 struct CalculatePositionBounds
 {
     CalculatePositionBounds(const PositionArrayT& positions,
@@ -582,7 +596,7 @@ struct CalculatePositionBounds
         , mMax(-std::numeric_limits<Real>::max()) {}
 
     void operator()(const tbb::blocked_range<size_t>& range) {
-        Vec3R pos;
+        VecT pos;
         for (size_t n = range.begin(), N = range.end(); n != N; ++n) {
             mPositions.getPos(n, pos);
             pos = mInverseMat.transform(pos);
@@ -603,7 +617,7 @@ struct CalculatePositionBounds
 private:
     const PositionArrayT& mPositions;
     const math::Mat4d&    mInverseMat;
-    Vec3R mMin, mMax;
+    VecT mMin, mMax;
 };
 
 } // namespace point_conversion_internal
@@ -867,7 +881,7 @@ convertPointDataGridGroup(  Group& group,
     group.finalize();
 }
 
-template<typename PositionWrapper, typename InterrupterT>
+template<typename PositionWrapper, typename InterrupterT, typename VecT>
 inline float
 computeVoxelSize(  const PositionWrapper& positions,
                    const uint32_t pointsPerVoxel,
@@ -938,7 +952,7 @@ computeVoxelSize(  const PositionWrapper& positions,
     inverseTransform = math::unit(inverseTransform);
 
     tbb::blocked_range<size_t> range(0, numPoints);
-    CalculatePositionBounds<PositionWrapper> calculateBounds(positions, inverseTransform);
+    CalculatePositionBounds<PositionWrapper, VecT> calculateBounds(positions, inverseTransform);
     tbb::parallel_reduce(range, calculateBounds);
 
     BBoxd bbox = calculateBounds.getBoundingBox();
@@ -1000,7 +1014,7 @@ computeVoxelSize(  const PositionWrapper& positions,
         MaskGrid::Ptr mask = createGrid<MaskGrid>(false);
         mask->setTransform(newTransform);
         tools::PointsToMask<MaskGrid, InterrupterT> pointMaskOp(*mask, interrupter);
-        pointMaskOp.addPoints(positions);
+        pointMaskOp.template addPoints<PositionWrapper, VecT>(positions);
 
         if (interrupter && util::wasInterrupted(interrupter)) break;
 

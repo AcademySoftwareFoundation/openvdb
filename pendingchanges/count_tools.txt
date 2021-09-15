@@ -1,0 +1,4 @@
+New features:
+    - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
+      tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
+      multi-threaded counting. The Tree methods now use these implementations.

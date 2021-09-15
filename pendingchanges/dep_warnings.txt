@@ -1,2 +1,0 @@
-Build:
-  - Enabled the OPENVDB_FUTURE_DEPRECATION variable by default to warn on upcoming deprecations.

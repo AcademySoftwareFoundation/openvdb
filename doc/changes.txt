@@ -6,6 +6,36 @@
 @par
 <B>Version 8.1.1</B> - <I>In development</I>
 
+@par
+Improvements:
+- Moved from the deprecated TBB task scheduler to TBB arenas. Various
+  methods now respect the TBB arena state they were invoked from.
+- Introduced a new thread/Threading.h header to consolidate calls to
+  third-party threading methods.
+- Minor performance improvements to dilation calls in fast sweeping
+  algorithms.
+
+@par
+Houdini:
+- Fix crash in VDB Combine in Copy B mode if the second input has
+  more VDBs than the first.
+- VDB Vector Merge SOP is now VDB Vector From Scalar SOP to distinguish
+  it from the VDB Merge SOP. It keeps the same internal name so this
+  is merely a label change.
+
+@par
+Build:
+- Added support for TBB 2021.
+- Enabled the OPENVDB_FUTURE_DEPRECATION variable by default to warn on
+  upcoming deprecations.
+- Introduced a OPENVDB_DOXYGEN_INTERNAL CMake variable which is ON by
+  default and removes the majority of internal namespaces from the
+  generated doxygen.
+- Improved the doxygen deprecation listings, folder layouts and fixes
+  issues when using later versions of doxygen.
+
+
+
 @htmlonly <a name="v8_1_0_changes"></a>@endhtmlonly
 @par
 <B>Version 8.1.0</B> - <I>June 11, 2021</I>
