@@ -1423,6 +1423,8 @@ TEST_F(TestOpenVDB, CNanoVDB)
             auto       ijk = *it;
             const auto v = cnanovdb_readaccessor_getValueF(&dstAcc, (cnanovdb_coord*)&ijk);
             EXPECT_EQ(srcAcc.getValue(ijk), v);
+            const bool t = cnanovdb_readaccessor_isActiveF(&dstAcc, (cnanovdb_coord*)&ijk);
+            EXPECT_EQ(srcAcc.isValueOn(ijk), t);
         }
     };
 
