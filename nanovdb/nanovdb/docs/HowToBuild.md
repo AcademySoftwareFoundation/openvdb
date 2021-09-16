@@ -23,7 +23,7 @@ Here is an example of how to build a typical configuration using CMake (change t
   ```console
   foo@bar:~$ mkdir build
   foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DOpenVDB_ROOT=/home/kmu/local -DIlmBase_ROOT=/home/kmu/local -DTBB_ROOT=/home/kmu/local -DBlosc_ROOT=/home/kmu/local -DCMAKE_BUILD_TYPE=Release
+  foo@bar:~$ cmake .. -DOpenVDB_ROOT=/home/kmu/local -DIlmBase_ROOT=/home/kmu/local -DTBB_ROOT=/home/kmu/local -DBlosc_ROOT=/home/kmu/local -DCMAKE_BUILD_TYPE=Release -DCMAKE_CUDA_ARCHITECTURES=75 -DCMAKE_VERBOSE_MAKEFILE=ON
   foo@bar:~$ make -j
   ```
 
