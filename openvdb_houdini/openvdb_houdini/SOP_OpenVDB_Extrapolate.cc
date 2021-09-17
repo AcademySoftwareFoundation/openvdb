@@ -36,7 +36,7 @@ struct FastSweepingParms {
         mFSPrimName(""),
         mExtPrimName(""),
         mExtFieldProcessed(false),
-        mSweepingDirection(openvdb::tools::FastSweepingDirection::SWEEP_DEFAULT),
+        mSweepingDomain(openvdb::tools::FastSweepingDomain::SWEEP_ALL),
         mNewFSGrid(nullptr),
         mNewExtGrid(nullptr)
     { }
@@ -54,7 +54,7 @@ struct FastSweepingParms {
     std::string mFSPrimName;
     std::string mExtPrimName;
     bool mExtFieldProcessed;
-    openvdb::tools::FastSweepingDirection mSweepingDirection;
+    openvdb::tools::FastSweepingDomain mSweepingDomain;
 
     // updated fast sweeping grid placeholder
     hvdb::Grid::Ptr mNewFSGrid;
@@ -260,8 +260,8 @@ newSopOperator(OP_OperatorTable* table)
             "     This mode only uses the first SDF grid\n"
             "     specified by the __Source Group__ parameter."));
 
-    // Sweeping Direction
-    parms.add(hutil::ParmFactory(PRM_STRING, "sweepdirection", "Direction")
+    // Sweeping Domain Direction
+    parms.add(hutil::ParmFactory(PRM_STRING, "sweepdomain", "Domain Direction")
         .setChoiceListItems(PRM_CHOICELIST_SINGLE, {
             "alldirection", "All Directions",
             "greaterthanisovalue", "Greater Than Isovalue",
@@ -275,7 +275,7 @@ newSopOperator(OP_OperatorTable* table)
                      "__Extend Field(s) Off Fog VDB__ and __Extend Field(s) Off SDF__\n"
                      "option.")
         .setDocumentation(
-            "The options for sweeping direction are:\n"
+            "The options for sweeping domain direction are:\n"
             "__All Directions__\n"
             "    Perform an update for the extension field(s) in all directions.\n"
             "__Greater Than Isovalue__\n"
@@ -392,7 +392,7 @@ SOP_OpenVDB_Extrapolate::updateParmsFlags()
     changed |= enableParm("sdfisovalue", (mode == "renormalize" || mode == "sdfext")); // not mask & not dilate, but sdf
     changed |= enableParm("ignoretiles", mode == "mask");
     changed |= enableParm("convertorrenormalize", (mode == "fogext" || mode == "sdfext"));
-    changed |= enableParm("sweepdirection", (mode == "fogext" || mode == "sdfext" || mode == "dilate"));
+    changed |= enableParm("sweepdomain", (mode == "fogext" || mode == "sdfext" || mode == "dilate"));
 
     return changed;
 }
@@ -596,7 +596,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 if (parms.mMode == "fogext" && (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
                     addMessage(SOP_MESSAGE, msg.c_str());
-                    parms.mNewExtGrid = fogToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDirection, extGrid);
+                    parms.mNewExtGrid = fogToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDomain, extGrid);
                 }
                 else if (parms.mMode == "fogext" && (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "VDB primitive " + parms.mFSPrimName + " is a level set.\n"
@@ -606,7 +606,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 } else if (parms.mMode == "sdfext" && (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " SDF grid.";
                     addMessage(SOP_MESSAGE, msg.c_str());
-                    parms.mNewExtGrid = sdfToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDirection, extGrid);
+                    parms.mNewExtGrid = sdfToExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDomain, extGrid);
                 } else {
                     std::string msg = "VDB primitive " + parms.mFSPrimName + " is not a level set.\n"
                         "You may want to use __Extend Field(s) Off Fog VDB__.";
@@ -625,7 +625,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 if (parms.mMode == "fogext" && (fsGrid->getGridClass() != openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " Fog grid.";
                     addMessage(SOP_MESSAGE, msg.c_str());
-                    outPair = fogToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDirection, extGrid);
+                    outPair = fogToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDomain, extGrid);
                 }
                 else if (parms.mMode == "fogext" && (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "VDB primitive " + parms.mFSPrimName + " is a level set.\n"
@@ -635,7 +635,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 } else if (parms.mMode == "sdfext" && (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET)) {
                     std::string msg = "Extending " + extGrid->getName() + " grid using " + parms.mFSPrimName + " SDF grid.";
                     addMessage(SOP_MESSAGE, msg.c_str());
-                    outPair = sdfToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDirection, extGrid);
+                    outPair = sdfToSdfAndExt(*fsGrid, op, background, fsIsoValue, parms.mNSweeps, parms.mSweepingDomain, extGrid);
                 } else {
                     std::string msg = "VDB primitive " + parms.mFSPrimName + " is not a level set.\n"
                         "You may want to use __Extend Field(s) Off Fog VDB__.";
@@ -664,7 +664,7 @@ SOP_OpenVDB_Extrapolate::Cache::process(
 
             const NearestNeighbors nn =
                 (parms.mPattern == "NN18") ? NN_FACE_EDGE : ((parms.mPattern == "NN26") ? NN_FACE_EDGE_VERTEX : NN_FACE);
-            parms.mNewFSGrid = dilateSdf(*fsGrid, parms.mDilate, nn, parms.mNSweeps, parms.mSweepingDirection);
+            parms.mNewFSGrid = dilateSdf(*fsGrid, parms.mDilate, nn, parms.mNSweeps, parms.mSweepingDomain);
         } else if (parms.mMode == "convert") {
             if (fsGrid->getGridClass() == openvdb::GRID_LEVEL_SET) {
                 std::string msg = "VDB primitive " + parms.mFSPrimName + " was not converted to SDF because it is already a level set.";
@@ -734,14 +734,14 @@ SOP_OpenVDB_Extrapolate::Cache::evalFastSweepingParms(OP_Context& context, FastS
     evalString(parms.mPattern, "pattern", 0, time);
     parms.mDilate = static_cast<int>(evalInt("dilate", 0, time));
 
-    UT_String sweepDirection;
-    evalString(sweepDirection, "sweepdirection", 0, time);
-    if (sweepDirection == "alldirection")
-        parms.mSweepingDirection = openvdb::tools::FastSweepingDirection::SWEEP_DEFAULT;
-    else if (sweepDirection == "greaterthanisovalue")
-        parms.mSweepingDirection = openvdb::tools::FastSweepingDirection::SWEEP_GREATER_THAN_ISOVALUE;
-    else if (sweepDirection == "lessthanisovalue")
-        parms.mSweepingDirection = openvdb::tools::FastSweepingDirection::SWEEP_LESS_THAN_ISOVALUE;
+    UT_String sweepDomain;
+    evalString(sweepDomain, "sweepdomain", 0, time);
+    if (sweepDomain == "alldirection")
+        parms.mSweepingDomain = openvdb::tools::FastSweepingDomain::SWEEP_ALL;
+    else if (sweepDomain == "greaterthanisovalue")
+        parms.mSweepingDomain = openvdb::tools::FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE;
+    else if (sweepDomain == "lessthanisovalue")
+        parms.mSweepingDomain = openvdb::tools::FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE;
 
     return error();
 }

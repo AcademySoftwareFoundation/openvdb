@@ -59,9 +59,9 @@ namespace tools {
 /// @brief Fast Sweeping update mode. This is useful to determine
 ///        narrow-band extension or field extension in one side
 ///        of a signed distance field.
-enum class FastSweepingDirection {
+enum class FastSweepingDomain {
     /// Update all voxels affected by the sweeping algorithm
-    SWEEP_DEFAULT,
+    SWEEP_ALL,
     // Update voxels corresponding to an sdf/fog values that are greater than a given isovalue
     SWEEP_GREATER_THAN_ISOVALUE,
     // Update voxels corresponding to an sdf/fog values that are less than a given isovalue
@@ -156,13 +156,13 @@ sdfToSdf(const GridT &sdfGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @param mode     Determines the mode of updating the extension field. SWEEP_DEFAULT
+/// @param mode     Determines the mode of updating the extension field. SWEEP_ALL
 ///                 will update all voxels of the extension field affected by the
 ///                 fast sweeping algorithm. SWEEP_GREATER_THAN_ISOVALUE will update
 ///                 all voxels corresponding to fog values that are greater than a given
 ///                 isovalue. SWEEP_LESS_THAN_ISOVALUE will update all voxels corresponding
 ///                 to fog values that are less than a given isovalue. If a mode other
-///                 than SWEEP_DEFAULT is chosen, a user needs to supply @a extGrid.
+///                 than SWEEP_ALL is chosen, a user needs to supply @a extGrid.
 ///
 /// @param extGrid  Optional parameter required to supply a default value for the extension
 ///                 field when SWEEP_GREATER_THAN_ISOVALUE or SWEEP_LESS_THAN_ISOVALUE
@@ -192,7 +192,7 @@ fogToExt(const FogGridT &fogGrid,
          const ExtValueT& background,
          typename FogGridT::ValueType isoValue,
          int nIter = 1,
-         FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT,
+         FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
          const typename FogGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid = nullptr);
 
 /// @brief Computes the extension of a field (scalar, vector, or int are supported), defined
@@ -215,13 +215,13 @@ fogToExt(const FogGridT &fogGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @param mode     Determines the mode of updating the extension field. SWEEP_DEFAULT
+/// @param mode     Determines the mode of updating the extension field. SWEEP_ALL
 ///                 will update all voxels of the extension field affected by the
 ///                 fast sweeping algorithm. SWEEP_GREATER_THAN_ISOVALUE will update
 ///                 all voxels corresponding to level set values that are greater than a given
 ///                 isovalue. SWEEP_LESS_THAN_ISOVALUE will update all voxels corresponding
 ///                 to level set values that are less than a given isovalue. If a mode other
-///                 than SWEEP_DEFAULT is chosen, a user needs to supply @a extGrid.
+///                 than SWEEP_ALL is chosen, a user needs to supply @a extGrid.
 ///
 /// @param extGrid  Optional parameter required to supply a default value for the extension
 ///                 field when SWEEP_GREATER_THAN_ISOVALUE or SWEEP_LESS_THAN_ISOVALUE
@@ -250,7 +250,7 @@ sdfToExt(const SdfGridT &sdfGrid,
          const ExtValueT &background,
          typename SdfGridT::ValueType isoValue = 0,
          int nIter = 1,
-         FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT,
+         FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
          const typename SdfGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid = nullptr);
 
 /// @brief Computes the signed distance field and the extension of a field (scalar, vector, or
@@ -274,13 +274,13 @@ sdfToExt(const SdfGridT &sdfGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @param mode     Determines the mode of updating the extension field. SWEEP_DEFAULT
+/// @param mode     Determines the mode of updating the extension field. SWEEP_ALL
 ///                 will update all voxels of the extension field affected by the
 ///                 fast sweeping algorithm. SWEEP_GREATER_THAN_ISOVALUE will update
 ///                 all voxels corresponding to fog values that are greater than a given
 ///                 isovalue. SWEEP_LESS_THAN_ISOVALUE will update all voxels corresponding
 ///                 to fog values that are less than a given isovalue. If a mode other
-///                 than SWEEP_DEFAULT is chosen, a user needs to supply @a extGrid.
+///                 than SWEEP_ALL is chosen, a user needs to supply @a extGrid.
 ///
 /// @param extGrid  Optional parameter required to supply a default value for the extension
 ///                 field when SWEEP_GREATER_THAN_ISOVALUE or SWEEP_LESS_THAN_ISOVALUE
@@ -313,7 +313,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
                const ExtValueT &background,
                typename FogGridT::ValueType isoValue,
                int nIter = 1,
-               FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT,
+               FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
                const typename FogGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid = nullptr);
 
 /// @brief Computes the signed distance field and the extension of a field (scalar, vector, or
@@ -337,13 +337,13 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @param mode     Determines the mode of updating the extension field. SWEEP_DEFAULT
+/// @param mode     Determines the mode of updating the extension field. SWEEP_ALL
 ///                 will update all voxels of the extension field affected by the
 ///                 fast sweeping algorithm. SWEEP_GREATER_THAN_ISOVALUE will update
 ///                 all voxels corresponding to level set values that are greater than a given
 ///                 isovalue. SWEEP_LESS_THAN_ISOVALUE will update all voxels corresponding
 ///                 to level set values that are less than a given isovalue. If a mode other
-///                 than SWEEP_DEFAULT is chosen, a user needs to supply @a extGrid.
+///                 than SWEEP_ALL is chosen, a user needs to supply @a extGrid.
 ///
 /// @param extGrid  Optional parameter required to supply a default value for the extension
 ///                 field when SWEEP_GREATER_THAN_ISOVALUE or SWEEP_LESS_THAN_ISOVALUE
@@ -376,7 +376,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
                const ExtValueT &background,
                typename SdfGridT::ValueType isoValue = 0,
                int nIter = 1,
-               FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT,
+               FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
                const typename SdfGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid = nullptr);
 
 /// @brief Dilates an existing signed distance field by a specified number of voxels
@@ -392,7 +392,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
 /// @param nIter    Number of iterations of the fast sweeping algorithm.
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
-/// @param mode     Determines the direction of the dilation. SWEEP_DEFAULT
+/// @param mode     Determines the direction of the dilation. SWEEP_ALL
 ///                 will dilate in both sides of the signed distance function,
 ///                 SWEEP_GREATER_THAN_ISOVALUE will dilate in the positive
 ///                 side of the iso-surface, SWEEP_LESS_THAN_ISOVALUE will dilate
@@ -408,7 +408,7 @@ dilateSdf(const GridT &sdfGrid,
           int dilation,
           NearestNeighbors nn = NN_FACE,
           int nIter = 1,
-          FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT);
+          FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL);
 
 /// @brief Fills mask by extending an existing signed distance field into
 ///        the active values of this input ree of arbitrary value type.
@@ -550,13 +550,13 @@ public:
     /// @param isInputSdf Used to determine if @a sdfGrid is a sigend distance field (true)
     ///                   or a scalar fog volume (false).
     ///
-    /// @param mode     Determines the mode of updating the extension field. SWEEP_DEFAULT
+    /// @param mode     Determines the mode of updating the extension field. SWEEP_ALL
     ///                 will update all voxels of the extension field affected by the
     ///                 fast sweeping algorithm. SWEEP_GREATER_THAN_ISOVALUE will update
     ///                 all voxels corresponding to fog values that are greater than a given
     ///                 isovalue. SWEEP_LESS_THAN_ISOVALUE will update all voxels corresponding
     ///                 to fog values that are less than a given isovalue. If a mode other
-    ///                 than SWEEP_DEFAULT is chosen, a user needs to supply @a extGrid.
+    ///                 than SWEEP_ALL is chosen, a user needs to supply @a extGrid.
     ///
     /// @param extGrid  Optional parameter required to supply a default value for the extension
     ///                 field when SWEEP_GREATER_THAN_ISOVALUE or SWEEP_LESS_THAN_ISOVALUE
@@ -579,7 +579,7 @@ public:
                  const ExtValueT &background,
                  SdfValueT isoValue,
                  bool isInputSdf,
-                 FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT,
+                 FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
                  const typename ExtGridT::ConstPtr extGrid = nullptr);
 
     /// @brief Initializer used when dilating an exsiting signed distance field.
@@ -592,7 +592,7 @@ public:
     ///
     /// @param nn       Stencil-pattern used for dilation
     ///
-    /// @param mode     Determines the direction of the dilation. SWEEP_DEFAULT
+    /// @param mode     Determines the direction of the dilation. SWEEP_ALL
     ///                 will dilate in both sides of the signed distance function,
     ///                 SWEEP_GREATER_THAN_ISOVALUE will dilate in the positive
     ///                 side of the iso-surface, SWEEP_LESS_THAN_ISOVALUE will dilate
@@ -606,7 +606,7 @@ public:
     bool initDilate(const SdfGridT &sdfGrid,
                     int dilation,
                     NearestNeighbors nn = NN_FACE,
-                    FastSweepingDirection mode = FastSweepingDirection::SWEEP_DEFAULT);
+                    FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL);
 
     /// @brief Initializer used for the extamnsion of an exsiting signed distance field
     ///        into the active values of an input mask of arbitrary value type.
@@ -656,13 +656,13 @@ public:
     /// @brief Return true if there are voxels and boundaries to solve for
     bool isValid() const { return mSweepingVoxelCount > 0 && mBoundaryVoxelCount > 0; }
 
-    /// @brief Return whether the sweep update is in all direction (SWEEP_DEFAULT),
+    /// @brief Return whether the sweep update is in all direction (SWEEP_ALL),
     ///        greater than isovalue (SWEEP_GREATER_THAN_ISOVALUE), or less than isovalue
     ///        (SWEEP_LESS_THAN_ISOVALUE).
     ///
     /// @note SWEEP_GREATER_THAN_ISOVALUE and SWEEP_LESS_THAN_ISOVALUE modes are used
     ///       in dilating the narrow-band of a levelset or in extending a field.
-    FastSweepingDirection sweepDirection() const { return mSweepDirection; }
+    FastSweepingDomain sweepDirection() const { return mSweepDirection; }
 
     /// @brief Return whether the fast-sweeping input grid a signed distance function or not (fog).
     bool isInputSdf() { return mIsInputSdf; }
@@ -692,7 +692,7 @@ private:
     SweepMaskTreeT mSweepMask; // mask tree containing all non-boundary active voxels, in the case of dilation, does not include active voxel
     std::vector<Coord> mSweepMaskLeafOrigins; // cache of leaf node origins for mask tree
     size_t mSweepingVoxelCount, mBoundaryVoxelCount;
-    FastSweepingDirection mSweepDirection; // only used in dilate and extending a field
+    FastSweepingDomain mSweepDirection; // only used in dilate and extending a field
     bool mIsInputSdf;
 };// FastSweeping
 
@@ -706,7 +706,7 @@ const Coord FastSweeping<SdfGridT, ExtValueT>::mOffset[6] = {{-1,0,0},{1,0,0},
 
 template <typename SdfGridT, typename ExtValueT>
 FastSweeping<SdfGridT, ExtValueT>::FastSweeping()
-    : mSdfGrid(nullptr), mExtGrid(nullptr), mSweepingVoxelCount(0), mBoundaryVoxelCount(0), mSweepDirection(FastSweepingDirection::SWEEP_DEFAULT), mIsInputSdf(true)
+    : mSdfGrid(nullptr), mExtGrid(nullptr), mSweepingVoxelCount(0), mBoundaryVoxelCount(0), mSweepDirection(FastSweepingDomain::SWEEP_ALL), mIsInputSdf(true)
 {
 }
 
@@ -718,7 +718,7 @@ void FastSweeping<SdfGridT, ExtValueT>::clear()
     mSweepMask.clear();
     if (mExtGridInput) mExtGridInput.reset();
     mSweepingVoxelCount = mBoundaryVoxelCount = 0;
-    mSweepDirection = FastSweepingDirection::SWEEP_DEFAULT;
+    mSweepDirection = FastSweepingDomain::SWEEP_ALL;
     mIsInputSdf = true;
 }
 
@@ -764,11 +764,11 @@ bool FastSweeping<SdfGridT, ExtValueT>::initSdf(const SdfGridT &fogGrid, SdfValu
 
 template <typename SdfGridT, typename ExtValueT>
 template <typename OpT>
-bool FastSweeping<SdfGridT, ExtValueT>::initExt(const SdfGridT &fogGrid, const OpT &op, const ExtValueT &background, SdfValueT isoValue, bool isInputSdf, FastSweepingDirection mode, const typename ExtGridT::ConstPtr extGrid)
+bool FastSweeping<SdfGridT, ExtValueT>::initExt(const SdfGridT &fogGrid, const OpT &op, const ExtValueT &background, SdfValueT isoValue, bool isInputSdf, FastSweepingDomain mode, const typename ExtGridT::ConstPtr extGrid)
 {
-    if (mode != FastSweepingDirection::SWEEP_DEFAULT) {
+    if (mode != FastSweepingDomain::SWEEP_ALL) {
         if (!extGrid)
-            OPENVDB_THROW(RuntimeError, "FastSweeping::initExt Calling initExt with mode != SWEEP_DEFAULT requires an extension grid!");
+            OPENVDB_THROW(RuntimeError, "FastSweeping::initExt Calling initExt with mode != SWEEP_ALL requires an extension grid!");
         if (extGrid->transform() != fogGrid.transform())
             OPENVDB_THROW(RuntimeError, "FastSweeping::initExt extension grid input should have the same transform as Fog/SDF grid!");
     }
@@ -778,7 +778,7 @@ bool FastSweeping<SdfGridT, ExtValueT>::initExt(const SdfGridT &fogGrid, const O
     mExtGrid = createGrid<ExtGridT>( background );
     mSweepDirection = mode;
     mIsInputSdf = isInputSdf;
-    if (mSweepDirection != FastSweepingDirection::SWEEP_DEFAULT) {
+    if (mSweepDirection != FastSweepingDomain::SWEEP_ALL) {
         mExtGridInput = extGrid->deepCopy();
     }
     mExtGrid->topologyUnion( *mSdfGrid );//very fast
@@ -789,7 +789,7 @@ bool FastSweeping<SdfGridT, ExtValueT>::initExt(const SdfGridT &fogGrid, const O
 
 
 template <typename SdfGridT, typename ExtValueT>
-bool FastSweeping<SdfGridT, ExtValueT>::initDilate(const SdfGridT &sdfGrid, int dilate, NearestNeighbors nn, FastSweepingDirection mode)
+bool FastSweeping<SdfGridT, ExtValueT>::initDilate(const SdfGridT &sdfGrid, int dilate, NearestNeighbors nn, FastSweepingDomain mode)
 {
     this->clear();
     mSdfGrid = sdfGrid.deepCopy();//very fast
@@ -837,7 +837,7 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
     if (!mSdfGrid) {
         OPENVDB_THROW(RuntimeError, "FastSweeping::sweep called before initialization!");
     }
-    if (mExtGrid && mSweepDirection != FastSweepingDirection::SWEEP_DEFAULT && !mExtGridInput) {
+    if (mExtGrid && mSweepDirection != FastSweepingDomain::SWEEP_ALL && !mExtGridInput) {
         OPENVDB_THROW(RuntimeError, "FastSweeping: Trying to extend a field in one direction needs"
                                      " a non-null reference extension grid input.");
     }
@@ -981,7 +981,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
         using LeafManagerT = tree::LeafManager<typename SdfGridT::TreeType>;
         using LeafT = typename SdfGridT::TreeType::LeafNodeType;
 
-        const FastSweepingDirection mode = mParent->mSweepDirection;
+        const FastSweepingDomain mode = mParent->mSweepDirection;
 
         LeafManagerT leafManager(mParent->mSdfGrid->tree());
 
@@ -1000,10 +1000,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
                     maskLeaf->setValueOff(voxelIter.pos());
                 } else {
                     switch (mode) {
-                        case FastSweepingDirection::SWEEP_DEFAULT :
+                        case FastSweepingDomain::SWEEP_ALL :
                             voxelIter.setValue(value > 0 ? Unknown : -Unknown);
                             break;
-                        case FastSweepingDirection::SWEEP_GREATER_THAN_ISOVALUE :
+                        case FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE :
                             if (value > 0) voxelIter.setValue(Unknown);
                             else {
                                 maskLeaf->setValueOff(voxelIter.pos());
@@ -1012,7 +1012,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::DilateKernel
                                 else voxelIter.setValue(inputValue);
                             }
                             break;
-                        case FastSweepingDirection::SWEEP_LESS_THAN_ISOVALUE :
+                        case FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE :
                             if (value < 0) voxelIter.setValue(-Unknown);
                             else {
                                 maskLeaf->setValueOff(voxelIter.pos());
@@ -1559,13 +1559,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
         const SdfValueT h = static_cast<SdfValueT>(mParent->mSdfGrid->voxelSize()[0]);
         const SdfValueT sqrt2h = math::Sqrt(SdfValueT(2))*h;
-        const FastSweepingDirection mode = mParent->mSweepDirection;
+        const FastSweepingDomain mode = mParent->mSweepDirection;
         const bool isInputSdf = mParent->mIsInputSdf;
 
         // If we are using an extension in one direction, we need a reference grid
         // for the default value of the extension for the voxels that are not
         // intended to be updated by the sweeping algorithm.
-        if (tree2 && mode != FastSweepingDirection::SWEEP_DEFAULT) assert(tree3);
+        if (tree2 && mode != FastSweepingDomain::SWEEP_ALL) assert(tree3);
 
         const std::vector<Coord>& leafNodeOrigins = mParent->mSweepMaskLeafOrigins;
 
@@ -1632,13 +1632,13 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                         if (update < absV) {
                             value = sign * update;
                             if (acc2) {
-                                // There is an assert upstream to check if mExtGridInput exists if mode != SWEEP_DEFAULT
+                                // There is an assert upstream to check if mExtGridInput exists if mode != SWEEP_ALL
                                 ExtValueT updateExt = acc2->getValue(d1(ijk));
-                                if (mode == FastSweepingDirection::SWEEP_GREATER_THAN_ISOVALUE) {
+                                if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
                                     if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
                                     else updateExt = (value <= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
                                 } // SWEEP_GREATER_THAN_ISOVALUE
-                                else if (mode == FastSweepingDirection::SWEEP_LESS_THAN_ISOVALUE) {
+                                else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
                                     if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
                                     else updateExt = (value >= SdfValueT(0)) ? acc2->getValue(d1(ijk)) : acc3->getValue(ijk);
                                 } // SWEEP_LESS_THAN_ISOVALUE
@@ -1668,11 +1668,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                     const ExtValueT extVal = twoNghbr(d1, d2, w, v1, v2);
 
                                     ExtValueT updateExt = extVal;
-                                    if (mode == FastSweepingDirection::SWEEP_GREATER_THAN_ISOVALUE) {
+                                    if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
                                         if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                         else updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                     } // SWEEP_GREATER_THAN_ISOVALUE
-                                    else if (mode == FastSweepingDirection::SWEEP_LESS_THAN_ISOVALUE) {
+                                    else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
                                         if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                         else updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                     } // SWEEP_LESS_THAN_ISOVALUE
@@ -1706,11 +1706,11 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
                                 const ExtValueT extVal = threeNghbr(d1, d2, d3, w, v1, v2, v3);
 
                                 ExtValueT updateExt = extVal;
-                                if (mode == FastSweepingDirection::SWEEP_GREATER_THAN_ISOVALUE) {
+                                if (mode == FastSweepingDomain::SWEEP_GREATER_THAN_ISOVALUE) {
                                     if (isInputSdf) updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                     else updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                 } // SWEEP_GREATER_THAN_ISOVALUE
-                                else if (mode == FastSweepingDirection::SWEEP_LESS_THAN_ISOVALUE) {
+                                else if (mode == FastSweepingDomain::SWEEP_LESS_THAN_ISOVALUE) {
                                     if (isInputSdf) updateExt = (value <= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                     else updateExt = (value >= SdfValueT(0)) ? extVal : acc3->getValue(ijk);
                                 } // SWEEP_LESS_THAN_ISOVALUE
@@ -1790,7 +1790,7 @@ fogToExt(const FogGridT &fogGrid,
          const ExtValueT& background,
          typename FogGridT::ValueType isoValue,
          int nIter,
-         FastSweepingDirection mode,
+         FastSweepingDomain mode,
          const typename FogGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid)
 {
   FastSweeping<FogGridT, ExtValueT> fs;
@@ -1806,7 +1806,7 @@ sdfToExt(const SdfGridT &sdfGrid,
          const ExtValueT &background,
          typename SdfGridT::ValueType isoValue,
          int nIter,
-         FastSweepingDirection mode,
+         FastSweepingDomain mode,
          const typename SdfGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid)
 {
   FastSweeping<SdfGridT, ExtValueT> fs;
@@ -1822,7 +1822,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
                const ExtValueT &background,
                typename FogGridT::ValueType isoValue,
                int nIter,
-               FastSweepingDirection mode,
+               FastSweepingDomain mode,
                const typename FogGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid)
 {
   FastSweeping<FogGridT, ExtValueT> fs;
@@ -1838,7 +1838,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
                const ExtValueT &background,
                typename SdfGridT::ValueType isoValue,
                int nIter,
-               FastSweepingDirection mode,
+               FastSweepingDomain mode,
                const typename SdfGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid)
 {
   FastSweeping<SdfGridT, ExtValueT> fs;
@@ -1853,7 +1853,7 @@ dilateSdf(const GridT &sdfGrid,
           int dilation,
           NearestNeighbors nn,
           int nIter,
-          FastSweepingDirection mode)
+          FastSweepingDomain mode)
 {
     FastSweeping<GridT> fs;
     if (fs.initDilate(sdfGrid, dilation, nn, /*sweep direction*/ mode)) fs.sweep(nIter);
