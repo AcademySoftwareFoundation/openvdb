@@ -424,6 +424,8 @@ CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_GridData)
     uint64_t         mChecksum; // 8B. Checksum of grid buffer.
     uint32_t         mMajor;// 4B. major version number.
     uint32_t         mFlags; // 4B. flags for grid.
+    uint32_t         mGridIndex;// 4B. Index of this grid in the buffer
+    uint32_t         mGridCount; // 4B. Total number of grids in the buffer
     uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
     uint32_t         mGridName[256/4]; // 256B
     nanovdb_Map      mMap; // 264B. affine transformation between index and world space in both single and double precision
