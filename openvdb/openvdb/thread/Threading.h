@@ -8,6 +8,12 @@
 
 #include "openvdb/version.h"
 
+#ifndef __TBB_show_deprecation_message_task_H
+    #define __TBB_show_deprecation_message_task_H
+    #define OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+#endif
+
+
 /// @note tbb/blocked_range.h is the ONLY include that persists from TBB 2020
 ///   to TBB 2021 that itself includes the TBB specific version header files.
 ///   In TBB 2020, the version header was called tbb/stddef.h. In 2021, it's
@@ -50,5 +56,11 @@ inline bool isGroupExecutionCancelled()
 } // namespace thread
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
+
+#ifdef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+    #undef __TBB_show_deprecation_message_task_H
+    #undef OPENVDB_THREAD_THREADING_RESTORE_DEPRECATION_MESSAGE_TASK
+#endif
+
 
 #endif // OPENVDB_THREAD_THREADING_HAS_BEEN_INCLUDED
