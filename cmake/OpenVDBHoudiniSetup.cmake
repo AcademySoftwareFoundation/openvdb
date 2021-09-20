@@ -145,6 +145,8 @@ elseif(MINIMUM_HOUDINI_VERSION)
   endif()
 endif()
 
+set(Houdini_VERSION_MAJOR_MINOR "${Houdini_VERSION_MAJOR}.${Houdini_VERSION_MINOR}")
+
 find_package(PackageHandleStandardArgs)
 find_package_handle_standard_args(Houdini
   REQUIRED_VARS _houdini_install_root Houdini_FOUND
@@ -329,14 +331,12 @@ endif()
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-if(Houdini_VERSION VERSION_LESS 17)
-  set(OPENVDB_HOUDINI_ABI 4)
-elseif(Houdini_VERSION VERSION_LESS 18)
-  set(OPENVDB_HOUDINI_ABI 5)
-elseif(Houdini_VERSION VERSION_LESS 18.5)
+if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
   set(OPENVDB_HOUDINI_ABI 6)
-else()
+elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
+else()
+  set(OPENVDB_HOUDINI_ABI 8)
 endif()
 
 # ------------------------------------------------------------------------
