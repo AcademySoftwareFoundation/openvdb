@@ -1,2 +1,0 @@
-Improvements:
-    - PointDataGrid conversion can now be performed using 32-bit float arrays.

@@ -1,3 +1,0 @@
-API:
-- DynamicNodeManager can now set one grain size for threading across leaf nodes
-  and another for threading across non-leaf nodes.

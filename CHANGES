@@ -3,6 +3,11 @@ OpenVDB Version History
 
 Version 8.1.1 - In development
 
+    New features:
+    - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
+      tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
+      multi-threaded counting. The Tree methods now use these implementations.
+
     Improvements:
     - Moved from the deprecated TBB task scheduler to TBB arenas. Various
       methods now respect the TBB arena state they were invoked from.
@@ -10,6 +15,16 @@ Version 8.1.1 - In development
       third-party threading methods.
     - Minor performance improvements to dilation calls in fast sweeping
       algorithms.
+    - Added hsvtogrb() and rgbtohsv() AX helper functions for converting
+      hue, saturation and value inputs to RGB values and vice-versa.
+    - PointDataGrid conversion can now be performed using 32-bit float arrays.
+    - Improved support for size_t grid types on systems where size_t is a
+      unique type
+      [Contributed by Brecht Van Lommel]
+
+    API changes:
+    - DynamicNodeManager can now set one grain size for threading across leaf nodes
+      and another for threading across non-leaf nodes.
 
     Houdini:
     - Fix crash in VDB Combine in Copy B mode if the second input has
@@ -17,6 +32,12 @@ Version 8.1.1 - In development
     - VDB Vector Merge SOP is now VDB Vector From Scalar SOP to distinguish
       it from the VDB Merge SOP. It keeps the same internal name so this
       is merely a label change.
+    - Add option to pass in OPENVDB_DSO_NAMES to CMake to configure which
+      Houdini DSOs are compiled.
+    - VDB Activate SOP now has an option for the expansion pattern to use
+      for dilation.
+    - The label for Voxels to Expand is now Expand Voxels to match Houdini.
+    - Fix bug to allow VDB LOD SOPs to be chained together.
 
     Build:
     - Added support for TBB 2021.
@@ -27,6 +48,8 @@ Version 8.1.1 - In development
       generated doxygen.
     - Improved the doxygen deprecation listings, folder layouts and fixes
       issues when using later versions of doxygen.
+    - Build fixes for MinGW on Windows
+      [Contributed by Brecht Sanders]
 
 
 Version 8.1.0 - June 11, 2021
