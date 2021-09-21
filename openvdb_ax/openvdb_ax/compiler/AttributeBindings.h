@@ -91,7 +91,7 @@ public:
     ///     If another binding exists for the supplied dataname that will be removed.
     /// @param bindings Vector of AX name data name pairs
     inline void set(const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings) {
-        for (const auto binding : bindings) {
+        for (const auto& binding : bindings) {
             this->set(binding.first, binding.second);
         }
     }
