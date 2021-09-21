@@ -63,7 +63,13 @@ void uninitialize();
 ///        stages. See Exceptions.h for the possible different errors.
 /// @param  ax    The null terminated AX code string to parse and compile
 /// @param  grid  The grid to which to apply the compiled AX function
-void run(const char* ax, openvdb::GridBase& grid);
+/// @param  bindings A vector of attribute mappings from the AX string to the
+///                  names of the point attributes/grids (points/volumes resp.).
+///                  These should be pairs of strings e.g.
+///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
+///                  AttributeBindings.h for details.
+void run(const char* ax, openvdb::GridBase& grid,
+         const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings = {});
 
 /// @brief  Run a full AX pipeline (parse, compile and execute) on a vector of
 ///         OpenVDB numerical grids OR a vector of OpenVDB Point Data grids.
@@ -85,7 +91,13 @@ void run(const char* ax, openvdb::GridBase& grid);
 ///        stages. See Exceptions.h for the possible different errors.
 /// @param  ax     The null terminated AX code string to parse and compile
 /// @param  grids  The grids to which to apply the compiled AX function
-void run(const char* ax, openvdb::GridPtrVec& grids);
+/// @param  bindings A vector of attribute mappings from the AX string to the
+///                  names of the point attributes/grids (points/volumes resp.)
+///                  These should be pairs of strings e.g.
+///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
+///                  AttributeBindings.h for details.
+void run(const char* ax, openvdb::GridPtrVec& grids,
+         const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings = {});
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME

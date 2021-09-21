@@ -14,6 +14,7 @@
 
 #include "CustomData.h"
 #include "AttributeRegistry.h"
+#include "AttributeBindings.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
@@ -120,6 +121,13 @@ public:
     void setGrainSize(const size_t grain);
     /// @return  The current grain size
     size_t getGrainSize() const;
+
+    /// @brief  Set attribute bindings.
+    /// @param attributeBindings A map of attribute bindings to expected names on
+    ///   the geometry to be executed over
+    void setAttributeBindings(const AttributeBindings& bindings);
+    /// @return  The current attribute bindings map
+    const AttributeBindings& getAttributeBindings() const;
 
     ////////////////////////////////////////////////////////
 

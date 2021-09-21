@@ -48,6 +48,7 @@
 #include <mutex>
 #include <sstream>
 #include <string>
+#include <unordered_set>
 
 namespace hvdb = openvdb_houdini;
 namespace hax =  openvdb_ax_houdini;
@@ -343,6 +344,19 @@ newSopOperator(OP_OperatorTable* table)
             "Whether to try to compact VDB Point Attributes after execution\n\n"
             ":note:\n"
             "    Compacting uniform values affects only the memory usage of the attributes.\n"));
+
+    hutil::ParmList bindings;
+    bindings.add(hutil::ParmFactory(PRM_STRING, "attrname#", "Attribute Name")
+        .setHelpText("Attribute name on geometry."));
+    bindings.add(hutil::ParmFactory(PRM_STRING, "binding#", "AX Binding")
+        .setHelpText("Attribute binding in AX code snippet."));
+
+    parms.add(hutil::ParmFactory(PRM_MULTITYPE_LIST, "bindings", "Attribute Bindings")
+        .setHelpText("The number of attribute bindings. These are used to remove the need to update the code snippet "
+                     "when an attribute name changes on the inputs, the binding in the code will instead refer to this attribute."
+                     " If not included in this list, attributes will automatically bind by name.")
+        .setMultiparms(bindings)
+        .setDefault(PRMzeroDefaults));
 
     parms.endSwitcher();
 
@@ -790,6 +804,33 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
         const bool recompile =
             (hash != mHash || parmCache != mParameterCache);
 
+        openvdb::ax::AttributeBindings bindings;
+        const int numBindings = static_cast<int>(evalInt("bindings", 0, time));
+        UT_String name, binding;
+        std::unordered_set<std::string> unbindable = {"P", "ix", "iy", "iz"};
+        bool bindError = false;
+        for (int i = 1; i <= numBindings; ++i) {
+            evalStringInst("attrname#", &i, name, 0, time);
+            evalStringInst("binding#", &i, binding, 0, time);
+            if (name.equal("") || binding.equal("")) continue;
+            const std::string bindingStr = binding.toStdString();
+            const std::string nameStr = name.toStdString();
+            if (mParameterCache.mTargetType == hax::TargetType::VOLUMES) {
+                // check nothing tries to bind to P, ix, iy, iz
+                // as these have been replaced by function calls
+                for (const auto& unbind : unbindable) {
+                    if (bindingStr == unbind || nameStr == unbind) {
+                        addError(SOP_MESSAGE,
+                                 std::string("Cannot bind to \"@" + unbind +
+                                  "\" as it is a protected name.").c_str());
+                        bindError = true;
+                    }
+                }
+            }
+            bindings.set(bindingStr, nameStr);
+        }
+        if (bindError) return error();
+
         if (recompile) {
 
             // Empty the hash - if there are any compiler failures, the hash won't be
@@ -938,7 +979,11 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
                 const auto& desc = leafIter->attributeSet().descriptor();
 
                 for (const auto& attribute : mCompilerCache.mAttributeRegistry->data()) {
-                    const auto& name = attribute.name();
+                    const std::string* nameptr = &attribute.name();
+                    const std::string* binding = bindings.dataNameBoundTo(*nameptr);
+                    if (binding) nameptr = binding;
+                    assert(nameptr);
+                    const std::string& name = *nameptr;
                     if (desc.find(name) == openvdb::points::AttributeSet::INVALID_POS) {
                         missingAttributes.emplace_back(name);
                     }
@@ -947,6 +992,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
 
                 mCompilerCache.mPointExecutable->setGroupExecution(pointsGroup);
                 mCompilerCache.mPointExecutable->setCreateMissing(true);
+                mCompilerCache.mPointExecutable->setAttributeBindings(bindings);
                 mCompilerCache.mPointExecutable->execute(*points);
 
                 if (evalInt("compact", 0, time)) {
@@ -1003,8 +1049,12 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
             std::vector<UT_String> missingAttributes;
             const auto& attribRegistry = mCompilerCache.mAttributeRegistry;
             for (const auto& attribute : attribRegistry->data()) {
-                const auto& name = attribute.name();
-                if (names.find(name) == names.cend()) missingAttributes.emplace_back(name);
+                    const std::string* nameptr = &attribute.name();
+                    const std::string* binding = bindings.dataNameBoundTo(*nameptr);
+                    if (binding) nameptr = binding;
+                    assert(nameptr);
+                    const std::string& name = *nameptr;
+                    if (names.find(name) == names.cend()) missingAttributes.emplace_back(name);
             }
             checkAttributesAgainstList(attribList, missingAttributes);
 
@@ -1032,6 +1082,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
             mCompilerCache.mVolumeExecutable->setValueIterator(iterType);
 #endif
             mCompilerCache.mVolumeExecutable->setCreateMissing(true);
+            mCompilerCache.mVolumeExecutable->setAttributeBindings(bindings);
             mCompilerCache.mVolumeExecutable->execute(grids);
 
             if (evalInt("prune", 0, time)) {

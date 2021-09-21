@@ -14,6 +14,7 @@
 
 #include "CustomData.h"
 #include "AttributeRegistry.h"
+#include "AttributeBindings.h"
 
 #include <openvdb/version.h>
 #include <openvdb/Grid.h>
@@ -244,6 +245,13 @@ public:
 
     /// @return  The tree execution level.
     [[deprecated]] Index getTreeExecutionLevel() const;
+
+    /// @brief  Set attribute bindings.
+    /// @param attributeBindings A map of attribute bindings to expected names on
+    ///   the geometry to be executed over
+    void setAttributeBindings(const AttributeBindings& bindings);
+    /// @return  The current attribute bindings map
+    const AttributeBindings& getAttributeBindings() const;
 
     ////////////////////////////////////////////////////////
 

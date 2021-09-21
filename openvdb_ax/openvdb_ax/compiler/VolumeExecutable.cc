@@ -44,6 +44,7 @@ struct VolumeExecutable::Settings
     Streaming mActiveTileStreaming = Streaming::AUTO;
     size_t mGrainSize = 1;
     size_t mTileGrainSize = 32;
+    AttributeBindings mBindings;
 };
 
 namespace {
@@ -849,6 +850,7 @@ private:
 std::unique_ptr<GridCache>
 registerVolumes(GridPtrVec& grids,
     const AttributeRegistry& registry,
+    const AttributeBindings& bindings,
     const bool createMissing,
     Logger& logger)
 {
@@ -859,9 +861,13 @@ registerVolumes(GridPtrVec& grids,
         openvdb::GridBase* matchedGrid = nullptr;
         bool matchedName = false;
         ast::tokens::CoreType type = ast::tokens::UNKNOWN;
-
+        const std::string& iterName = iter.name();
+        const std::string* volumeNamePtr = nullptr;
+        volumeNamePtr = bindings.isBoundAXName(iterName) ?  bindings.dataNameBoundTo(iterName) : &iterName;
+        assert(volumeNamePtr);
+        const std::string& volumeName = *volumeNamePtr;
         for (const auto& grid : grids) {
-            if (grid->getName() != iter.name()) continue;
+            if (grid->getName() != volumeName) continue;
             matchedName = true;
             type = ast::tokens::tokenFromTypeString(grid->valueType());
             if (type != iter.type()) continue;
@@ -872,7 +878,7 @@ registerVolumes(GridPtrVec& grids,
         if (createMissing && !matchedGrid) {
             auto created = createGrid(iter.type());
             if (created) {
-                created->setName(iter.name());
+                created->setName(volumeName);
                 grids.emplace_back(created);
                 type = iter.type();
                 matchedName = true;
@@ -885,8 +891,9 @@ registerVolumes(GridPtrVec& grids,
                 "@" + iter.name() + "\".");
         }
         else if (matchedName && !matchedGrid) {
-            logger.error("Mismatching grid access type. \"@" + iter.name() +
-                "\" exists but has been accessed with type \"" +
+            logger.error("Mismatching grid access type. \"@" + volumeName +
+                (volumeName != iter.name() ? "\" [bound to \"" + iter.name() + "\"]" : "\"") +
+                " exists but has been accessed with type \"" +
                 ast::tokens::typeStringFromToken(iter.type()) + "\".");
         }
 
@@ -931,7 +938,6 @@ inline void run(GridT& grid, OpData& data, const VolumeExecutable& E)
     // Get the active index of the grid being executed
     const ast::tokens::CoreType type =
         ast::tokens::tokenFromTypeString(grid.valueType());
-    data.mActiveIndex = data.mAttributeRegistry->accessIndex(grid.getName(), type);
     assert(data.mActiveIndex >= 0);
 
     // Set the active tile streaming behaviour for this grid if
@@ -1045,16 +1051,23 @@ inline void run(GridCache& cache,
         data.mVoidTransforms.emplace_back(static_cast<void*>(&(*read)->transform()));
     }
 
-    for (const auto& grid : cache.mWrite) {
-        const bool success = grid->apply<SupportedTypeList>([&](auto& typed) {
-            using GridType = typename std::decay<decltype(typed)>::type;
-            run<IterT, GridType>(typed, data, E);
-        });
-        if (!success) {
-            logger.error("Could not write to volume '" + grid->getName()
-                + "' as it has an unknown or unsupported value type '" + grid->valueType()
-                + "'");
+    size_t regidx = 0, cacheidx = 0;
+    for (const auto& attr : registry.data()) {
+        if (attr.writes()) {
+            const auto& grid = cache.mWrite[cacheidx];
+            const bool success = grid->apply<SupportedTypeList>([&](auto& typed) {
+                using GridType = typename std::decay<decltype(typed)>::type;
+                data.mActiveIndex = regidx;
+                run<IterT, GridType>(typed, data, E);
+            });
+            if (!success) {
+                logger.error("Could not write to volume '" + grid->getName()
+                    + "' as it has an unknown or unsupported value type '" + grid->valueType()
+                    + "'");
+            }
+            ++cacheidx;
         }
+        ++regidx;
     }
 }
 } // anonymous namespace
@@ -1099,6 +1112,11 @@ VolumeExecutable::VolumeExecutable(const std::shared_ptr<const llvm::LLVMContext
         if (stream) mSettings->mActiveTileStreaming = Streaming::AUTO;
         else        mSettings->mActiveTileStreaming = Streaming::OFF;
     }
+
+    // Set up the default attribute bindings
+     for (const auto& iter : mAttributeRegistry->data()) {
+        mSettings->mBindings.set(iter.name(), iter.name());
+    }
 }
 
 VolumeExecutable::VolumeExecutable(const VolumeExecutable& other)
@@ -1125,7 +1143,7 @@ void VolumeExecutable::execute(openvdb::GridPtrVec& grids) const
     }
 
     std::unique_ptr<GridCache> cache =
-        registerVolumes(grids, *mAttributeRegistry, mSettings->mCreateMissing, *logger);
+        registerVolumes(grids, *mAttributeRegistry, mSettings->mBindings, mSettings->mCreateMissing, *logger);
 
     if (logger->hasError()) return;
 
@@ -1261,6 +1279,33 @@ size_t VolumeExecutable::getActiveTileStreamingGrainSize() const
     return mSettings->mTileGrainSize;
 }
 
+void VolumeExecutable::setAttributeBindings(const AttributeBindings& bindings)
+{
+    for (const auto& binding : bindings.axToDataMap()) {
+        mSettings->mBindings.set(binding.first, binding.second);
+    }
+    // check the registry to make sure everything is bound
+    for (const auto& access : mAttributeRegistry->data()) {
+        if (!mSettings->mBindings.isBoundAXName(access.name())) {
+            if (bindings.isBoundDataName(access.name())) {
+                OPENVDB_THROW(AXExecutionError, "AX attribute \"@"
+                    + access.name() + "\" not bound to any volume."
+                    " Volume \"" + access.name() + "\" bound to \"@"
+                    + *bindings.axNameBoundTo(access.name()) + "\".");
+            }
+            else {
+                // rebind to itself as it may have been unbound
+                // by a previous set call
+                mSettings->mBindings.set(access.name(), access.name());
+            }
+        }
+    }
+}
+
+const AttributeBindings& VolumeExecutable::getAttributeBindings() const
+{
+    return mSettings->mBindings;
+}
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME
