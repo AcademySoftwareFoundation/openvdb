@@ -317,8 +317,8 @@ if(OPENVDB_BUILD_SOP_OpenVDB_AX)
   # openvdb and openvdb_ax must be either both enabled or disabled.
   if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
     message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
-      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
-      "also be rebuilt.")
+      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, all sub components must "
+      "be rebuilt for SOP_OpenVDB_AX.")
   endif()
   if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
