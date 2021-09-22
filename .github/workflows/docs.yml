@@ -50,8 +50,6 @@ jobs:
         --cargs=\"-DUSE_BLOSC=OFF -DOPENVDB_CORE_STATIC=OFF -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\"
     - name: epydoc
       run: |
-        export LD_LIBRARY_PATH=/usr/local/lib64
-        export PYTHONPATH=/usr/local/lib64/python2.7
         epydoc --html -o /usr/local/share/doc/OpenVDB/html/python pyopenvdb
     - name: deploy
       # only deploy documentation to gh-pages on a manual workflow dispatch
