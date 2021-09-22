@@ -303,22 +303,22 @@ if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
   )
 endif()
 
-if(OPENVDB_BUILD_SOP_OpenVDB_AX)
-  if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
-    # Check to see if the AX SOP has been manually disabled
-    if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
-      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
-    endif()
+if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
+  # Check to see if the AX SOP has been manually disabled
+  if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+    set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
   endif()
+endif()
 
+if(OPENVDB_BUILD_SOP_OpenVDB_AX)
   # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
   # if OPENVDB_BUILD_CORE is ON, all deps must also be on
   # openvdb and openvdb_houdini must be either both enabled or disabled.
   # openvdb and openvdb_ax must be either both enabled or disabled.
   if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
     message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
-      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
-      "also be rebuilt.")
+      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, all sub components must "
+      "be rebuilt for SOP_OpenVDB_AX.")
   endif()
   if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
