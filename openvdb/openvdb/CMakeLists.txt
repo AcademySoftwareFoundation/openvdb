@@ -17,10 +17,9 @@ include(GNUInstallDirs)
 option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON)
 option(OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON)
 
-if(NOT OPENVDB_CUSTOM_NAMESPACE)
-  set(OPENVDB_CUSTOM_NAMESPACE "" CACHE STRING
-    "An optional custom string to insert into the OpenVDB namespace between the
-     version number and ABI suffix (if any). This is used to configure version.h.")
+if(NOT OPENVDB_NAMESPACE_SUFFIX)
+  set(OPENVDB_NAMESPACE_SUFFIX "" CACHE STRING
+    "An optional custom string to append to the OpenVDB namespace. This is used to configure version.h.")
 endif()
 
 set(OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
