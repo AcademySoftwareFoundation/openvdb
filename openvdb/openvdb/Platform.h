@@ -248,6 +248,14 @@
     #define OPENVDB_HOUDINI_API OPENVDB_IMPORT
 #endif
 
+/// Define explicit template instantiation symbol visibility
+/// This must differ from OPENVDB_API because explicit instantiations forbid attributes
+#ifdef _WIN32
+    #define OPENVDB_TEMPLATE_API OPENVDB_API
+#else
+    #define OPENVDB_TEMPLATE_API
+#endif
+
 #if defined(__ICC)
 
 // Use these defines to bracket a region of code that has safe static accesses.
