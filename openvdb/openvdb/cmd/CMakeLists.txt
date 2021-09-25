@@ -120,9 +120,9 @@ if(OPENVDB_BUILD_VDB_RENDER)
   find_package(Imath CONFIG)
   if (NOT TARGET Imath::Imath)
     find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
+  else()
+    find_package(OpenEXR CONFIG)
   endif()
-
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
   add_executable(vdb_render ${VDB_RENDER_SOURCE_FILES})
@@ -137,11 +137,13 @@ if(OPENVDB_BUILD_VDB_RENDER)
     # For Imath/OpenEXR v3.X
     $<TARGET_NAME_IF_EXISTS:Imath::Imath>
     $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXR>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXRUtil>
     $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmThread>
     $<TARGET_NAME_IF_EXISTS:OpenEXR::Iex>
     # For IlmBase/OpenEXR v2.X
     $<TARGET_NAME_IF_EXISTS:IlmBase::Half>
     $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImf>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImfUtil>
     $<TARGET_NAME_IF_EXISTS:IlmBase::IlmThread>
     $<TARGET_NAME_IF_EXISTS:IlmBase::Iex>
     $<TARGET_NAME_IF_EXISTS:IlmBase::Imath>

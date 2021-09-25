@@ -141,6 +141,8 @@ if(USE_IMATH_HALF)
           "is deprecated and will be removed.")
       endif()
     endif()
+  else()
+    message(STATUS "Found Imath ${Imath_VERSION}")
   endif()
 endif()
 
