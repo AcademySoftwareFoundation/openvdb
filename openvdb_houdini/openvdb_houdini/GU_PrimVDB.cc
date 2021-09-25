@@ -1908,13 +1908,15 @@ setAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     using RWHandleT = typename MetaAttrT::RWHandleT;
     using TupleT = typename MetaAttrT::TupleT;
 
-    /// @todo If there is an existing attribute with the given name but
-    /// a different type, this will replace the old attribute with a new one.
-    /// See GA_ReuseStrategy for alternative behaviors.
-    GA_RWAttributeRef attrRef = geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
-    if (attrRef.isInvalid()) return;
-
-    RWHandleT handle(attrRef.getAttribute());
+    // Try to bind the type, if fails, then create a tuple.
+    RWHandleT handle(&geo, owner, name, MetaAttrT::theTupleSize);
+    if (!handle.isValid())
+    {
+        geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
+        handle.bind(&geo, owner, name, MetaAttrT::theTupleSize);
+        if (!handle.isValid())
+            return;
+    }
 
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
     switch (MetaAttrT::theTupleSize) {
@@ -1935,10 +1937,14 @@ static void
 setStrAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     const char* name, const openvdb::Metadata& meta_base)
 {
-    GA_RWAttributeRef attrRef = geo.addStringTuple(owner, name, 1);
-    if (attrRef.isInvalid()) return;
-
-    GA_RWHandleS handle(attrRef.getAttribute());
+    GA_RWHandleS handle(&geo, owner, name);
+    if (!handle.isValid())
+    {
+        geo.addStringTuple(owner, name, 1);
+        handle.bind(&geo, owner, name);
+        if (!handle.isValid())
+            return;
+    }
 
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
     handle.set(elem, 0, MetaTuple<const char*, MetadataT, 0>::get(meta));
@@ -1953,10 +1959,15 @@ setMatAttr(GEO_Detail& geo, GA_AttributeOwner owner, GA_Offset elem,
     using RWHandleT = typename MetaAttrT::RWHandleT;
     using TupleT = typename MetaAttrT::TupleT;
 
-    GA_RWAttributeRef attrRef = geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
-    if (attrRef.isInvalid()) return;
-
-    RWHandleT handle(attrRef.getAttribute());
+    // Try to bind the type, if fails, then create a tuple.
+    RWHandleT handle(&geo, owner, name, MetaAttrT::theTupleSize);
+    if (!handle.isValid())
+    {
+        geo.addTuple(MetaAttrT::theStorage, owner, name, MetaAttrT::theTupleSize);
+        handle.bind(&geo, owner, name, MetaAttrT::theTupleSize);
+        if (!handle.isValid())
+            return;
+    }
 
     const MetadataT& meta = static_cast<const MetadataT&>(meta_base);
 
