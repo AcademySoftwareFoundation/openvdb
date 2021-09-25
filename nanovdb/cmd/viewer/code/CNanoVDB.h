@@ -90,11 +90,13 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_LEAF_NODE_struct_(LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_Node##LEVEL##_##SUFFIX) \
         nanovdb_Coord            mBBox_min; \
-        uint32_t                 mBBoxDifAndFlags; \
+        uint8_t                  mBBoxDif[3]; \
+        uint8_t                  mFlags; \
         nanovdb_BitMask##LOG2DIM mValueMask; \
         VALUET                   mValueMin; \
         VALUET                   mValueMax; \
-        uint32_t                 _reserved[CNANOVDB_ALIGNMENT_PADDING((8 << (3 * LOG2DIM - 6)) + (12) + (4) + (SIZEOF_VALUET * 2), CNANOVDB_DATA_ALIGNMENT) / 4]; \
+        VALUET                   mAverage; \
+        VALUET                   mStdDevi; \
         VALUET                   mVoxels[1 << (3 * LOG2DIM)]; \
     CNANOVDB_DECLARE_STRUCT_END(nanovdb_Node##LEVEL##_##SUFFIX) \
 \
@@ -104,6 +106,7 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_LEAF_NODE_struct(LEVEL, LOG2DIM, TOTAL, VALUET, SIZEOF_VALUET, SUFFIX) \
     DEFINE_LEAF_NODE_struct_(LEVEL, LOG2DIM, (TOTAL - LOG2DIM), TOTAL, ((1 << TOTAL) - 1), VALUET, SIZEOF_VALUET, SUFFIX)
 
+#define SIZEOF_LEAF_NODE(SIZEOF_VALUET, LOG2DIM) ((12) + (3) + (1) + (((1 << (3 * LOG2DIM)) >> CNANOVDB_WORD_LOG2SIZE) * (CNANOVDB_WORD_SIZE)) + (SIZEOF_VALUET * 4) + (SIZEOF_VALUET * (1 << (3 * LOG2DIM))))
 //// functions:
 
 #define DEFINE_LEAF_NODE_functions_(LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUET, SIZEOF_VALUET, SUFFIX) \
@@ -131,7 +134,7 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
     CNANOVDB_INLINE int32_t \
         nanovdb_Node##LEVEL##_##SUFFIX##_getDimAndCache(CNANOVDB_CONTEXT cxt, int32_t nodeIndex, nanovdb_Coord ijk, nanovdb_Ray ray, CNANOVDB_REF(nanovdb_ReadAccessor) acc) \
     { \
-        return ((CNANOVDB_NODEDATA(cxt, LEVEL)[nodeIndex].mBBoxDifAndFlags & 7) != 0u) ? 1 << TOTAL : 1; \
+        return ((CNANOVDB_NODEDATA(cxt, LEVEL)[nodeIndex].mBBoxDif[2] & 7) != 0u) ? 1 << TOTAL : 1; \
     }
 
 #define DEFINE_LEAF_NODE_functions(LEVEL, LOG2DIM, TOTAL, VALUET, SIZEOF_VALUET, SUFFIX) \
@@ -147,7 +150,7 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
     CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_TileEntry_##SUFFIX) \
         int32_t valueOrChildID; \
     CNANOVDB_DECLARE_STRUCT_END(nanovdb_TileEntry_##SUFFIX)
-#define SIZEOF_NODE_TILE_ENTRY(SUFFIX) 4
+#define SIZEOF_TILE_ENTRY(SIZEOF_VALUET) 4
 
 //// functions:
 
@@ -170,9 +173,9 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_NODE_TILE_ENTRY_struct_(VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_DECLARE_UNION_BEGIN(nanovdb_TileEntry_##SUFFIX) \
     VALUET  value; \
-    int32_t childID; \
+    int64_t child; \
     CNANOVDB_DECLARE_UNION_END(nanovdb_TileEntry_##SUFFIX)
-#define SIZEOF_NODE_TILE_ENTRY(SUFFIX) sizeof(nanovdb_TileEntry_##SUFFIX)
+#define SIZEOF_TILE_ENTRY(SIZEOF_VALUET) (SIZEOF_VALUET <= 8 ? 8 : SIZEOF_VALUET)
 
 //// functions:
 
@@ -182,10 +185,10 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
     { \
         return entry.value; \
     } \
-    CNANOVDB_INLINE int32_t \
+    CNANOVDB_INLINE int64_t \
         nanovdb_TileEntry_##SUFFIX##_getChild(nanovdb_TileEntry_##SUFFIX entry) \
     { \
-        return entry.childID; \
+        return entry.child; \
     }
 
 #endif
@@ -203,25 +206,29 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_INTERNAL_NODE_struct_(CHILDLEVEL, LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_Node##LEVEL##_##SUFFIX) \
         nanovdb_Coord              mBBox_min, mBBox_max; \
-        int32_t                    mOffset; \
-        uint32_t                   mFlags; \
+        uint64_t                   mFlags; \
         nanovdb_BitMask##LOG2DIM   mValueMask; \
         nanovdb_BitMask##LOG2DIM   mChildMask; \
         VALUET                     mValueMin; \
         VALUET                     mValueMax; \
-        uint32_t                   _reserved[CNANOVDB_ALIGNMENT_PADDING((24) + (4) + (4) + (8 << (3 * LOG2DIM - 6)) * 2 + (SIZEOF_VALUET * 2), CNANOVDB_DATA_ALIGNMENT) / 4]; \
+        VALUET                     mAverage; \
+        VALUET                     mStdDevi; \
+        uint32_t                   _reserved[CNANOVDB_ALIGNMENT_PADDING((24) + (8) + (8 << (3 * LOG2DIM - 6)) * 2 + (SIZEOF_VALUET * 4), CNANOVDB_DATA_ALIGNMENT) / 4]; \
         nanovdb_TileEntry_##SUFFIX mTable[1 << (3 * LOG2DIM)]; \
     CNANOVDB_DECLARE_STRUCT_END(nanovdb_Node##LEVEL##_##SUFFIX) \
 \
     CNANOVDB_CONSTANT_MEM int32_t nanovdb_Node##LEVEL##_TOTAL = TOTAL; \
     CNANOVDB_CONSTANT_MEM int32_t nanovdb_Node##LEVEL##_MASK = MASK;
 
+#define SIZEOF_INTERNAL_NODE_(SIZEOF_VALUET, LOG2DIM) ((12 * 2) + (8) + ((8 << (3 * LOG2DIM - 6)) * 2) + (SIZEOF_VALUETYPE * 4) + (CNANOVDB_ALIGNMENT_PADDING((24) + (8) + (8 << (3 * LOG2DIM - 6)) * 2 + (SIZEOF_VALUETYPE * 4), CNANOVDB_DATA_ALIGNMENT)) + ((1 << (3 * LOG2DIM)) * SIZEOF_TILE_ENTRY(SIZEOF_VALUETYPE)))
+#define SIZEOF_INTERNAL_NODE(LEVEL, SIZEOF_VALUET, LOG2DIM) (LEVEL == 0 ? SIZEOF_LEAF_NODE(SIZEOF_VALUET, LOG2DIM) : SIZEOF_INTERNAL_NODE_(SIZEOF_VALUET, LOG2DIM))
+
 #define DEFINE_INTERNAL_NODE_struct(CHILDLEVEL, LEVEL, LOG2DIM, TOTAL, VALUET, SIZEOF_VALUET, SUFFIX) \
     DEFINE_INTERNAL_NODE_struct_(CHILDLEVEL, LEVEL, LOG2DIM, (TOTAL - LOG2DIM), TOTAL, ((1 << TOTAL) - 1), VALUET, SIZEOF_VALUET, SUFFIX)
 
 //// functions:
 
-#define DEFINE_INTERNAL_NODE_functions_(CHILDLEVEL, LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUET, SIZEOF_VALUET, SUFFIX) \
+#define DEFINE_INTERNAL_NODE_functions_(CHILDLEVEL, CHILDLOG2DIM, LEVEL, LOG2DIM, CHILDTOTAL, TOTAL, MASK, VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_INLINE int32_t \
         nanovdb_Node##LEVEL##_##SUFFIX##_CoordToOffset(nanovdb_Coord ijk) \
     { \
@@ -233,7 +240,14 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
     CNANOVDB_INLINE int32_t \
         nanovdb_Node##LEVEL##_##SUFFIX##_getChild(CNANOVDB_CONTEXT cxt, int32_t nodeIndex, int32_t n) \
     { \
-        return nanovdb_TileEntry_##SUFFIX##_getChild(CNANOVDB_NODEDATA(cxt, LEVEL)[nodeIndex].mTable[n]); \
+        int64_t            offset = nanovdb_TileEntry_##SUFFIX##_getChild(CNANOVDB_NODEDATA(cxt, LEVEL)[nodeIndex].mTable[n]); \
+        CNANOVDB_WORD_TYPE root = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_NODEDATA(cxt, CHILDLEVEL)); \
+        CNANOVDB_WORD_TYPE array_base = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_NODEDATA(cxt, LEVEL)); \
+        CNANOVDB_WORD_TYPE array_item_offset = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(nodeIndex * SIZEOF_INTERNAL_NODE(LEVEL, SIZEOF_VALUETYPE, LOG2DIM)); \
+        CNANOVDB_WORD_TYPE child_addr = array_base + array_item_offset + offset; \
+        int32_t            diff = CNANOVDB_MAKE(int32_t)(child_addr - root); \
+        int32_t            childIndex = diff / SIZEOF_INTERNAL_NODE(CHILDLEVEL, SIZEOF_VALUETYPE, CHILDLOG2DIM); \
+        return childIndex; \
     } \
 \
     CNANOVDB_INLINE boolean \
@@ -277,8 +291,8 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
         return 1 << nanovdb_Node##CHILDLEVEL##_TOTAL; \
     }
 
-#define DEFINE_INTERNAL_NODE_functions(CHILDLEVEL, LEVEL, LOG2DIM, TOTAL, VALUET, SIZEOF_VALUET, SUFFIX) \
-    DEFINE_INTERNAL_NODE_functions_(CHILDLEVEL, LEVEL, LOG2DIM, (TOTAL - LOG2DIM), TOTAL, ((1 << TOTAL) - 1), VALUET, SIZEOF_VALUET, SUFFIX)
+#define DEFINE_INTERNAL_NODE_functions(CHILDLEVEL, CHILDLOG2DIM, LEVEL, LOG2DIM, TOTAL, VALUET, SIZEOF_VALUET, SUFFIX) \
+    DEFINE_INTERNAL_NODE_functions_(CHILDLEVEL, CHILDLOG2DIM, LEVEL, LOG2DIM, (TOTAL - LOG2DIM), TOTAL, ((1 << TOTAL) - 1), VALUET, SIZEOF_VALUET, SUFFIX)
 
 ////////////////////////////////////////////////////////
 
@@ -311,11 +325,13 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_ROOT_TILE_struct_(VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_RootData_Tile_##SUFFIX) \
         DEFINE_ROOT_KEY(key); \
-        int32_t  childID; \
+        int64_t  child; \
         uint32_t state; \
         VALUET   value; \
-        uint32_t _reserved[CNANOVDB_ALIGNMENT_PADDING((SIZEOF_ROOT_KEY) + (4) + (4) + (SIZEOF_VALUET), CNANOVDB_DATA_ALIGNMENT) / 4]; \
+        uint32_t _reserved[CNANOVDB_ALIGNMENT_PADDING((SIZEOF_ROOT_KEY) + (8) + (4) + (SIZEOF_VALUET), CNANOVDB_DATA_ALIGNMENT) / 4]; \
     CNANOVDB_DECLARE_STRUCT_END(nanovdb_RootData_Tile_##SUFFIX)
+
+#define SIZEOF_ROOT_TILE(SIZEOF_VALUET) ((SIZEOF_ROOT_KEY) + (8) + (4) + (SIZEOF_VALUET) + (CNANOVDB_ALIGNMENT_PADDING((SIZEOF_ROOT_KEY) + (8) + (4) + (SIZEOF_VALUET), CNANOVDB_DATA_ALIGNMENT)))
 
 #define DEFINE_ROOT_TILE_struct(VALUET, SIZEOF_VALUET, SUFFIX) \
     DEFINE_ROOT_TILE_struct_(VALUET, SIZEOF_VALUET, SUFFIX)
@@ -323,15 +339,16 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_ROOT_NODE_struct_(VALUET, SIZEOF_VALUET, SUFFIX) \
     CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_RootData_##SUFFIX) \
         nanovdb_Coord mBBox_min, mBBox_max; \
-        uint64_t      mActiveVoxelCount; \
         int32_t       mTileCount; \
-        VALUET        mBackground, mValueMin, mValueMax; \
-        uint32_t      _reserved[CNANOVDB_ALIGNMENT_PADDING((24) + (8) + (4) + (SIZEOF_VALUET * 3), CNANOVDB_DATA_ALIGNMENT) / 4]; \
+        VALUET        mBackground, mValueMin, mValueMax, mAverage, mStdDevi; \
+        uint32_t      _reserved[CNANOVDB_ALIGNMENT_PADDING((24) + (4) + (SIZEOF_VALUET * 5), CNANOVDB_DATA_ALIGNMENT) / 4]; \
     CNANOVDB_DECLARE_STRUCT_END(nanovdb_RootData_##SUFFIX)
+
+#define SIZEOF_ROOT_NODE(SIZEOF_VALUET) ((12 * 2) + (4) + (SIZEOF_VALUET) + (CNANOVDB_ALIGNMENT_PADDING((24) + (4) + (SIZEOF_VALUET * 5), CNANOVDB_DATA_ALIGNMENT)))
 
 //// functions:
 
-#define DEFINE_ROOT_NODE_functions_(VALUET, SIZEOF_VALUET, SUFFIX) \
+#define DEFINE_ROOT_NODE_functions_(VALUET, SIZEOF_VALUET, SUFFIX, LOG2DIM) \
     CNANOVDB_INLINE int32_t \
         nanovdb_RootData_##SUFFIX##_findTile(CNANOVDB_CONTEXT cxt, nanovdb_Coord ijk) \
     { \
@@ -347,9 +364,15 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
         int32_t rootTileIndex = nanovdb_RootData_##SUFFIX##_findTile(cxt, ijk); \
         if (rootTileIndex < 0) \
             return CNANOVDB_ROOTDATA(cxt).mBackground; \
-        int32_t childIndex = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].childID; \
-        if (childIndex < 0) \
+        int64_t offset = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].child; \
+        if (offset == 0) \
             return CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].value; \
+        CNANOVDB_WORD_TYPE root = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_NODEDATA(cxt, 2)); \
+        CNANOVDB_WORD_TYPE array_base = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_ROOTDATATILES(cxt)); \
+        CNANOVDB_WORD_TYPE array_item_offset = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(rootTileIndex * SIZEOF_ROOT_TILE(SIZEOF_VALUETYPE)); \
+        CNANOVDB_WORD_TYPE child_addr = array_base + array_item_offset + offset; \
+        int32_t            diff = CNANOVDB_MAKE(int32_t)(child_addr - root); \
+        int32_t            childIndex = diff / SIZEOF_INTERNAL_NODE(2, SIZEOF_VALUET, LOG2DIM); \
         return nanovdb_Node2_##SUFFIX##_getValue(cxt, childIndex, ijk); \
     } \
 \
@@ -359,9 +382,15 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
         int32_t rootTileIndex = nanovdb_RootData_##SUFFIX##_findTile(cxt, ijk); \
         if (rootTileIndex < 0) \
             return CNANOVDB_ROOTDATA(cxt).mBackground; \
-        int32_t childIndex = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].childID; \
-        if (childIndex < 0) \
+        int64_t offset = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].child; \
+        if (offset == 0) \
             return CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].value; \
+        CNANOVDB_WORD_TYPE root = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_NODEDATA(cxt, 2)); \
+        CNANOVDB_WORD_TYPE array_base = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_ROOTDATATILES(cxt)); \
+        CNANOVDB_WORD_TYPE array_item_offset = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(rootTileIndex * SIZEOF_ROOT_TILE(SIZEOF_VALUETYPE)); \
+        CNANOVDB_WORD_TYPE child_addr = array_base + array_item_offset + offset; \
+        int32_t            diff = CNANOVDB_MAKE(int32_t)(child_addr - root); \
+        int32_t            childIndex = diff / SIZEOF_INTERNAL_NODE(2, SIZEOF_VALUET, LOG2DIM); \
         nanovdb_ReadAccessor_insert(acc, 2, childIndex, ijk); \
         return nanovdb_Node2_##SUFFIX##_getValueAndCache(cxt, childIndex, ijk, acc); \
     } \
@@ -372,9 +401,15 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
         int32_t rootTileIndex = nanovdb_RootData_##SUFFIX##_findTile(cxt, ijk); \
         if (rootTileIndex < 0) \
             return 1 << nanovdb_Node2_TOTAL; \
-        int32_t childIndex = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].childID; \
-        if (childIndex < 0) \
+        int64_t offset = CNANOVDB_ROOTDATATILES(cxt)[rootTileIndex].child; \
+        if (offset == 0) \
             return 1 << nanovdb_Node2_TOTAL; \
+        CNANOVDB_WORD_TYPE root = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_NODEDATA(cxt, 2)); \
+        CNANOVDB_WORD_TYPE array_base = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(CNANOVDB_ROOTDATATILES(cxt)); \
+        CNANOVDB_WORD_TYPE array_item_offset = CNANOVDB_MAKE(CNANOVDB_WORD_TYPE)(rootTileIndex * SIZEOF_ROOT_TILE(SIZEOF_VALUETYPE)); \
+        CNANOVDB_WORD_TYPE child_addr = array_base + array_item_offset + offset; \
+        int32_t            diff = CNANOVDB_MAKE(int32_t)(child_addr - root); \
+        int32_t            childIndex = diff / SIZEOF_INTERNAL_NODE(2, SIZEOF_VALUET, LOG2DIM); \
         nanovdb_ReadAccessor_insert(acc, 2, childIndex, ijk); \
         return nanovdb_Node2_##SUFFIX##_getDimAndCache(cxt, childIndex, ijk, ray, acc); \
     }
@@ -382,8 +417,8 @@ CNANOVDB_INLINE void nanovdb_ReadAccessor_insert(CNANOVDB_REF(nanovdb_ReadAccess
 #define DEFINE_ROOT_NODE_struct(VALUET, SIZEOF_VALUET, SUFFIX) \
     DEFINE_ROOT_NODE_struct_(VALUET, SIZEOF_VALUET, SUFFIX)
 
-#define DEFINE_ROOT_NODE_functions(VALUET, SIZEOF_VALUET, SUFFIX) \
-    DEFINE_ROOT_NODE_functions_(VALUET, SIZEOF_VALUET, SUFFIX)
+#define DEFINE_ROOT_NODE_functions(VALUET, SIZEOF_VALUET, SUFFIX, LOG2DIM) \
+    DEFINE_ROOT_NODE_functions_(VALUET, SIZEOF_VALUET, SUFFIX, LOG2DIM)
 
 ////////////////////////////////////////////////////////
 
@@ -420,21 +455,23 @@ CNANOVDB_INLINE void nanovdb_coord_to_key(nanovdb_Coord key, nanovdb_Coord ijk)
 #endif
 
 CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_GridData)
-    uint64_t         mMagic; // 8B magic to validate it is valid grid data.
-    uint64_t         mChecksum; // 8B. Checksum of grid buffer.
-    uint32_t         mMajor;// 4B. major version number.
-    uint32_t         mFlags; // 4B. flags for grid.
-    uint64_t         mGridSize; // 8B. byte count of entire grid buffer.
-    uint32_t         mGridName[256/4]; // 256B
-    nanovdb_Map      mMap; // 264B. affine transformation between index and world space in both single and double precision
-    double           mBBoxMin[3]; // 24B. floating-point min-corner of active values in WORLD SPACE
-    double           mBBoxMax[3]; // 24B. floating-point max-corner of active values in WORLD SPACE
-    double           mVoxelSize[3]; // 24B. size of a voxel in world units
-    uint32_t         mGridClass; // 4B.
-    uint32_t         mGridType; // 4B.
-    uint64_t         mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures.
-    uint32_t         mBlindMetadataCount; // 4B. count of GridBlindMetaData structures.
-    uint32_t         _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 8 + 256 + 24 + 24 + CNANOVDB_SIZEOF_nanovdb_Map + 24 + 4 + 4 + 8 + 4, CNANOVDB_DATA_ALIGNMENT) / 4];
+    uint64_t    mMagic; // 8B magic to validate it is valid grid data.
+    uint64_t    mChecksum; // 8B. Checksum of grid buffer.
+    uint32_t    mMajor; // 4B. major version number.
+    uint32_t    mFlags; // 4B. flags for grid.
+    uint32_t    mGridIndex; // 4B. Index of this grid in the buffer
+    uint32_t    mGridCount; // 4B. Total number of grids in the buffer
+    uint64_t    mGridSize; // 8B. byte count of entire grid buffer.
+    uint32_t    mGridName[256/4]; // 256B
+    nanovdb_Map mMap; // 264B. affine transformation between index and world space in both single and double precision
+    double      mBBoxMin[3]; // 24B. floating-point min-corner of active values in WORLD SPACE
+    double      mBBoxMax[3]; // 24B. floating-point max-corner of active values in WORLD SPACE
+    double      mVoxelSize[3]; // 24B. size of a voxel in world units
+    uint32_t    mGridClass; // 4B.
+    uint32_t    mGridType; // 4B.
+    uint64_t    mBlindMetadataOffset; // 8B. offset of GridBlindMetaData structures.
+    uint32_t    mBlindMetadataCount; // 4B. count of GridBlindMetaData structures.
+    uint32_t    _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 8 + 256 + 24 + 24 + CNANOVDB_SIZEOF_nanovdb_Map + 24 + 4 + 4 + 8 + 4, CNANOVDB_DATA_ALIGNMENT) / 4];
 CNANOVDB_DECLARE_STRUCT_END(nanovdb_GridData)
 
 CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_GridBlindMetaData)
@@ -445,7 +482,7 @@ CNANOVDB_DECLARE_STRUCT_BEGIN(nanovdb_GridBlindMetaData)
     uint32_t mDataClass;
     uint32_t mDataType;
     uint32_t mName[256 / 4];
-    //uint32_t _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 4 + 4 + 256, CNANOVDB_DATA_ALIGNMENT)/4];
+//uint32_t _reserved[CNANOVDB_ALIGNMENT_PADDING(8 + 8 + 4 + 4 + 4 + 4 + 256, CNANOVDB_DATA_ALIGNMENT)/4];
 CNANOVDB_DECLARE_STRUCT_END(nanovdb_GridBlindMetaData)
 
 #define DEFINE_GRID(VALUET, SIZEOF_VALUET, SUFFIX) \
