@@ -54,6 +54,7 @@ class   GEO_PrimVolume;
 class   GEO_PrimVolumeXform;
 class   UT_MemoryCounter;
 
+class CE_VDBGrid;
 
 class OPENVDB_HOUDINI_API GEO_PrimVDB : public GEO_Primitive
 {
@@ -78,6 +79,24 @@ public:
     UT_Vector3          computeNormal() const override;
     void                copyPrimitive(const GEO_Primitive *src) override;
     void                copySubclassData(const GA_Primitive *source) override;
+
+    /// Acquire a CE grid and cache it on the GPU.  If marked for
+    /// writing, the CPU version will be overwritten.
+    /// Note that the getVoxelHandle does *NOT* auto-flush these!
+    /// NOTE: If someone else fetches a non-read grid, and you fetch it
+    /// as a read grid, you will not get any copied data.
+    CE_VDBGrid          *getCEGrid(bool read, bool write) const;
+
+    /// Any modified CE cache on the GPU will be copied back to the
+    /// CPU.  Will leave result on GPU.
+    void                flushCEWriteCaches() override;
+
+    /// Remove all CE caches from the GPU, possibly writing back
+    /// if necessary.
+    void                flushCECaches() override;
+
+    /// Steal the underlying CE buffer from the source.
+    void                stealCEBuffers(const GA_Primitive *src) override;
 
     using GEO_Primitive::getVertexOffset;
     using GEO_Primitive::getPointOffset;
@@ -229,6 +248,8 @@ public:
     /// The returned space's fromVoxelSpace() method will convert index space
     /// voxel coordinates to world space positions (and the vice versa for
     /// toVoxelSpace()).
+    /// Note: The transformation is not the same as `posToIndex`
+    /// getIndexSpaceTransform().toVoxelSpace(pos) == posToIndex(pos) + {0.5, 0.5, 0.5}
     GEO_PrimVolumeXform getIndexSpaceTransform() const;
 
     /// Equivalent to getSpaceTransform(getGrid().evalActiveVoxelBoundingBox()).
@@ -734,6 +755,10 @@ private:
     GridAccessor            myGridAccessor;
 
     GEO_VolumeOptions       myVis;
+
+    mutable CE_VDBGrid			*myCEGrid;
+    mutable bool			 myCEGridAuthorative;
+    mutable bool                         myCEGridIsOwned;
 
     AtomicUniqueId          myUniqueId;
     AtomicUniqueId          myTreeUniqueId;

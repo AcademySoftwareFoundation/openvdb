@@ -46,6 +46,9 @@
 #include <UT/UT_Vector.h>
 #include <UT/UT_XformOrder.h>
 
+#include <CE/CE_Context.h>
+#include <CE/CE_VDBGrid.h>
+
 #include <GA/GA_AttributeRefMap.h>
 #include <GA/GA_AttributeRefMapDestHandle.h>
 #include <GA/GA_Defragment.h>
@@ -101,7 +104,16 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
     , myTreeUniqueId(GEO_PrimVDB::nextUniqueId())
     , myMetadataUniqueId(GEO_PrimVDB::nextUniqueId())
     , myTransformUniqueId(GEO_PrimVDB::nextUniqueId())
+    , myCEGrid(0)
+    , myCEGridAuthorative(false)
+    , myCEGridIsOwned(true)
 {
+}
+
+GEO_PrimVDB::~GEO_PrimVDB() 
+{
+    if (myCEGridIsOwned)
+        delete myCEGrid;
 }
 
 void
@@ -124,6 +136,13 @@ GEO_PrimVDB::stashed(bool beingstashed, GA_Offset offset)
         // This also makes sure that myGridAccessor will be
         // as if freshly constructed when unstashing.
         myGridAccessor.clear();
+
+        // Throw away any GPU cache.
+        if (myCEGridIsOwned)
+            delete myCEGrid;
+        myCEGrid = nullptr;
+        myCEGridAuthorative = false;
+        myCEGridIsOwned = true;
     }
     // Set our internal state to default
     myVis = GEO_VolumeOptions(GEO_VOLUMEVIS_SMOKE, /*iso*/0.0, /*density*/1.0,
@@ -1382,6 +1401,79 @@ GEO_PrimVDB::isActiveRegionMatched(const GEO_PrimVDB *vdb) const
     return vdb->getGrid().baseTreePtr() == getGrid().baseTreePtr();
 }
 
+CE_VDBGrid *
+GEO_PrimVDB::getCEGrid(bool read, bool write) const
+{
+    UT_ASSERT(!write);
+    UT_ASSERT(read);
+
+    if (myCEGrid)
+        return myCEGrid;
+
+    CE_VDBGrid	*cegrid = new CE_VDBGrid();
+
+    try
+    {
+        cegrid->initFromVDB(getGrid());
+        myCEGridIsOwned = true;
+    }
+    catch (cl::Error &err)
+    {
+	CE_Context::reportError(err);
+	delete cegrid;
+	cegrid = 0;
+    }
+
+    myCEGrid = cegrid;
+    myCEGridAuthorative = write;
+
+    return myCEGrid;
+}
+
+void
+GEO_PrimVDB::flushCEWriteCaches()
+{
+    if (!myCEGrid)
+	return;
+    if (myCEGridAuthorative)
+    {
+	// Write back.
+        UT_ASSERT(!"Not implemented");
+	myCEGridAuthorative = false;
+    }
+}
+
+void
+GEO_PrimVDB::flushCECaches()
+{
+    // Write back if needed
+    flushCEWriteCaches();
+    // Destroy the grid.
+    if (myCEGridIsOwned)
+        delete myCEGrid;
+    myCEGrid = 0;
+    myCEGridAuthorative = false;
+    myCEGridIsOwned = true;
+}
+
+void
+GEO_PrimVDB::stealCEBuffers(const GA_Primitive *psrc)
+{
+    UT_ASSERT(psrc && getTypeId() == psrc->getTypeId());
+    if (!psrc || getTypeId() != psrc->getTypeId())
+        return;
+    const GEO_PrimVDB *src = UTverify_cast<const GEO_PrimVDB *>(psrc);
+
+    myCEGrid = src->myCEGrid;
+    myCEGridAuthorative = src->myCEGridAuthorative;
+    myCEGridIsOwned = src->myCEGridIsOwned;
+
+    src->myCEGrid = 0;
+    src->myCEGridAuthorative = false;
+    src->myCEGridIsOwned = true;    
+}
+
+
 void
 GEO_PrimVDB::indexToPos(int x, int y, int z, UT_Vector3 &pos) const
 {
@@ -1864,11 +1956,17 @@ GEO_PrimVDB::getRes(int &rx, int &ry, int &rz) const
     using namespace openvdb;
 
     const GridBase &    grid = getGrid();
-    const math::Vec3d   dim = grid.evalActiveVoxelDim().asVec3d();
+    const math::Coord   dim = grid.evalActiveVoxelDim();
 
-    rx = static_cast<int>(dim[0]);
-    ry = static_cast<int>(dim[1]);
-    rz = static_cast<int>(dim[2]);
+    // We could overflow with very large grids and get a negative
+    // coordinate back.
+    UT_ASSERT(dim[0] >= 0);
+    UT_ASSERT(dim[1] >= 0);
+    UT_ASSERT(dim[2] >= 0);
+
+    rx = SYSmax(dim[0], 0);
+    ry = SYSmax(dim[1], 0);
+    rz = SYSmax(dim[2], 0);
 }
 
 fpreal
@@ -3264,15 +3362,12 @@ GEO_PrimVDB::copyPrimitive(const GEO_Primitive *psrc)
 {
     if (psrc == this) return;
 
+    // Ensure the vertices are copied.
+    GEO_Primitive::copyPrimitive(psrc);
+
     const GEO_PrimVDB *src = (const GEO_PrimVDB *)psrc;
 
     copyGridFrom(*src); // makes a shallow copy
-
-    // TODO: Well and good to reuse the attribute handle for all our
-    //       vertices, but we should do so across primitives as well.
-    GA_VertexWrangler vertex_wrangler(*getParent(), *src->getParent());
-
-    GEO_Primitive::copyPrimitive(psrc);
 
     myVis = src->myVis;
 }
@@ -3432,7 +3527,8 @@ const char *
 GEO_PrimVDB::getGridName() const
 {
     GA_ROHandleS nameAttr(getParent(), GA_ATTRIB_PRIMITIVE, "name");
-    return nameAttr.isValid() ? nameAttr.get(getMapOffset()) : "";
+    return nameAttr.isValid() 
+	? static_cast<const char *>(nameAttr.get(getMapOffset())) : "";
 }
 
 
@@ -3452,6 +3548,10 @@ namespace // anonymous
         geo_INTRINSIC_VOLUMEVISUALDENSITY,
         geo_INTRINSIC_VOLUMEVISUALISO,
         geo_INTRINSIC_VOLUMEVISUALLOD,
+
+        geo_INTRINSIC_VOLUMEMINVALUE,
+        geo_INTRINSIC_VOLUMEMAXVALUE,
+        geo_INTRINSIC_VOLUMEAVGVALUE,
 
         geo_INTRINSIC_META_GRID_CLASS,
         geo_INTRINSIC_META_GRID_CREATOR,
@@ -3698,6 +3798,13 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
             "volumevisualiso", getVisIso)
     GA_INTRINSIC_S(GEO_PrimVDB, geo_INTRINSIC_VOLUMEVISUALLOD,
             "volumevisuallod", intrinsicVisualLod)
+
+    GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEMINVALUE,
+	 "volumeminvalue", calcMinimum)
+    GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEMAXVALUE,
+	 "volumemaxvalue", calcMaximum)
+    GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEAVGVALUE,
+	 "volumeavgvalue", calcAverage)
 
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CLASS)
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CREATOR)

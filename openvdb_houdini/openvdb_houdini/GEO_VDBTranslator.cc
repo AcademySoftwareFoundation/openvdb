@@ -130,7 +130,13 @@ GEO_VDBTranslator::fileStat(const char *filename, GA_Stat &stat, uint /*level*/)
 
             meta_minbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_min");
             meta_maxbbox = stats->getMetadata<openvdb::Vec3IMetadata>("file_bbox_max");
-            if (meta_minbbox && meta_maxbbox)
+            // empty vdbs have invalid bounding boxes, and often very
+            // huge ones, so we intentionally skip them here.
+	    if (meta_minbbox && meta_maxbbox &&
+                meta_minbbox->value().x() <= meta_maxbbox->value().x() &&
+                meta_minbbox->value().y() <= meta_maxbbox->value().y() &&
+                meta_minbbox->value().z() <= meta_maxbbox->value().z()
+                )
             {
                 UT_Vector3              minv, maxv;
                 minv = UTvdbConvert(meta_minbbox->value());
