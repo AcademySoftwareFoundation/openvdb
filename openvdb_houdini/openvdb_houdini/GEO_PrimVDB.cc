@@ -110,7 +110,7 @@ GEO_PrimVDB::GEO_PrimVDB(GEO_Detail *d, GA_Offset offset)
 {
 }
 
-GEO_PrimVDB::~GEO_PrimVDB() 
+GEO_PrimVDB::~GEO_PrimVDB()
 {
     if (myCEGridIsOwned)
         delete myCEGrid;
@@ -1410,7 +1410,7 @@ GEO_PrimVDB::getCEGrid(bool read, bool write) const
     if (myCEGrid)
         return myCEGrid;
 
-    CE_VDBGrid	*cegrid = new CE_VDBGrid();
+    CE_VDBGrid  *cegrid = new CE_VDBGrid();
 
     try
     {
@@ -1419,9 +1419,9 @@ GEO_PrimVDB::getCEGrid(bool read, bool write) const
     }
     catch (cl::Error &err)
     {
-	CE_Context::reportError(err);
-	delete cegrid;
-	cegrid = 0;
+        CE_Context::reportError(err);
+        delete cegrid;
+        cegrid = 0;
     }
 
     myCEGrid = cegrid;
@@ -1434,12 +1434,12 @@ void
 GEO_PrimVDB::flushCEWriteCaches()
 {
     if (!myCEGrid)
-	return;
+        return;
     if (myCEGridAuthorative)
     {
-	// Write back.
+        // Write back.
         UT_ASSERT(!"Not implemented");
-	myCEGridAuthorative = false;
+        myCEGridAuthorative = false;
     }
 }
 
@@ -1470,7 +1470,7 @@ GEO_PrimVDB::stealCEBuffers(const GA_Primitive *psrc)
 
     src->myCEGrid = 0;
     src->myCEGridAuthorative = false;
-    src->myCEGridIsOwned = true;    
+    src->myCEGridIsOwned = true;
 }
 
 
@@ -3527,8 +3527,8 @@ const char *
 GEO_PrimVDB::getGridName() const
 {
     GA_ROHandleS nameAttr(getParent(), GA_ATTRIB_PRIMITIVE, "name");
-    return nameAttr.isValid() 
-	? static_cast<const char *>(nameAttr.get(getMapOffset())) : "";
+    return nameAttr.isValid()
+   ? static_cast<const char *>(nameAttr.get(getMapOffset())) : "";
 }
 
 
@@ -3800,11 +3800,11 @@ GA_START_INTRINSIC_DEF(GEO_PrimVDB, geo_NUM_INTRINSICS)
             "volumevisuallod", intrinsicVisualLod)
 
     GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEMINVALUE,
-	 "volumeminvalue", calcMinimum)
+         "volumeminvalue", calcMinimum)
     GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEMAXVALUE,
-	 "volumemaxvalue", calcMaximum)
+         "volumemaxvalue", calcMaximum)
     GA_INTRINSIC_METHOD_F(GEO_PrimVDB, geo_INTRINSIC_VOLUMEAVGVALUE,
-	 "volumeavgvalue", calcAverage)
+         "volumeavgvalue", calcAverage)
 
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CLASS)
     VDB_INTRINSIC_META_STR(GEO_PrimVDB, geo_INTRINSIC_META_GRID_CREATOR)

@@ -756,8 +756,8 @@ private:
 
     GEO_VolumeOptions       myVis;
 
-    mutable CE_VDBGrid			*myCEGrid;
-    mutable bool			 myCEGridAuthorative;
+    mutable CE_VDBGrid                  *myCEGrid;
+    mutable bool                         myCEGridAuthorative;
     mutable bool                         myCEGridIsOwned;
 
     AtomicUniqueId          myUniqueId;
