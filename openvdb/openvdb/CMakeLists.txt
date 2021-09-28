@@ -127,62 +127,6 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
   endif()
 endif()
 
-find_package(TBB ${MINIMUM_TBB_VERSION} REQUIRED COMPONENTS tbb)
-if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
-  if(${Tbb_VERSION} VERSION_LESS FUTURE_MINIMUM_TBB_VERSION)
-    message(DEPRECATION "Support for TBB versions < ${FUTURE_MINIMUM_TBB_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
-endif()
-
-if(USE_IMATH_HALF)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
-endif()
-
-if(USE_LOG4CPLUS)
-  # Find Log4CPlus libraries
-  find_package(Log4cplus ${MINIMUM_LOG4CPLUS_VERSION} REQUIRED)
-endif()
-
-if(USE_BLOSC)
-  # Find Blosc libraries
-  find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-  if(Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION)
-    message(WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
-      "There have been reported issues with using later versions of Blosc with OpenVDB. "
-      "OpenVDB has been tested fully against Blosc ${MINIMUM_BLOSC_VERSION}, it is "
-      "recommended that you use this version where possible."
-    )
-  endif()
-else()
-  message(WARNING "Blosc support is disabled. It is strongly recommended to "
-    "enable blosc for optimal builds of OpenVDB and to support compatible "
-    "serialization of other OpenVDB installations."
-  )
-endif()
-
-if(USE_BLOSC OR USE_ZLIB)
-  if(USE_STATIC_DEPENDENCIES)
-    set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
-      set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
-    else()
-      set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
-    endif()
-  endif()
-  find_package(ZLIB ${MINIMUM_ZLIB_VERSION} REQUIRED)
-  if(USE_STATIC_DEPENDENCIES)
-    set(CMAKE_FIND_LIBRARY_SUFFIXES ${_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES})
-    unset(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
-  endif()
-endif()
-
 if(UNIX)
   find_package(Threads REQUIRED)
 endif()
