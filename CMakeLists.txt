@@ -123,7 +123,8 @@ its default system search routine if it cannot find a dependency with the provid
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_FUTURE_ABI_9 "Bypass future ABI check" OFF)
+option(OPENVDB_USE_DEPRECATED_ABI_7 "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -200,7 +201,8 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI_6
-  OPENVDB_USE_FUTURE_ABI_9
+  OPENVDB_USE_DEPRECATED_ABI_7
+  OPENVDB_USE_FUTURE_ABI_10
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
   USE_COLORED_OUTPUT
@@ -220,8 +222,8 @@ set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 6)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
-set(FUTURE_OPENVDB_ABI_VERSION 9)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 8)
+set(FUTURE_OPENVDB_ABI_VERSION 10)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   # @note  Currently tracking CY2019 of the VFX platform where available

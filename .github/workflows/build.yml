@@ -149,10 +149,10 @@ jobs:
     strategy:
       matrix:
         config:
-          - { name: 'abi8lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF' }
-          - { name: 'abi8half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'abi8sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'abi8avx',  cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'abi9lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF' }
+          - { name: 'abi9half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'abi9sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'abi9avx',  cmake: '-DOPENVDB_SIMD=AVX' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -163,11 +163,11 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=8 ${{ matrix.config.cmake }}\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=9 ${{ matrix.config.cmake }}\"
     - name: test
       run: cd build && ctest -V
 
-  testabi8gcc10:
+  testabi9gcc10:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
@@ -188,11 +188,11 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
+        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DCMAKE_INSTALL_PREFIX=`pwd`\"
     - name: test
       run: cd build && ctest -V
 
-  testabi8clang10:
+  testabi9clang10:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
@@ -213,7 +213,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
+        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DCMAKE_INSTALL_PREFIX=`pwd`\"
     - name: test
       run: cd build && ctest -V
 
@@ -245,7 +245,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DOPENVDB_SIMD=SSE42\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
       run: cd build && ctest -V
