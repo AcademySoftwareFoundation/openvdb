@@ -320,10 +320,9 @@ inline uint32_t Abs(uint32_t i) { return i; }
 inline uint64_t Abs(uint64_t i) { return i; }
 inline bool Abs(bool b) { return b; }
 // On systems like macOS and FreeBSD, size_t and uint64_t are different types
-template <typename T, typename std::enable_if<
-        std::is_same<T, size_t>::value
-        >::type* = nullptr>
-inline T Abs(T i) { return i; }
+template <typename T>
+inline typename std::enable_if<std::is_same<T, size_t>::value, T>::type
+Abs(T i) { return i; }
 //@}
 
 

@@ -95,7 +95,7 @@ All meetings of the TSC are open to participation by any member of the OpenVDB c
 * Ken Museth, Chair / NVIDIA
 * Andre Pradhana, DreamWorks
 * Jeff Lait, SideFX
-* Nick Avramoussis, DNEG
+* Nick Avramoussis, WETA
 * Dan Bailey, ILM
 
 # Release Process

@@ -1,0 +1,2 @@
+Build:
+    - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides the ability to customise the VDB namespace.

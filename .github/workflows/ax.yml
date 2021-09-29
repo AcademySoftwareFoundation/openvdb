@@ -4,7 +4,9 @@ name: AX
 on:
   push:
     branches:
-      - '**'
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
     paths-ignore:
       - 'CHANGES'
       - 'doc/**'
@@ -25,10 +27,20 @@ on:
   schedule:
     # run this workflow every midnight Tuesday
     - cron:  '0 0 * * 2'
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'The type of CI to run (all, mac, linux, grammar)'
+        required: true
+        default: 'all'
 
 jobs:
   linux-ax-vfx:
     # VFX platform builds for OpenVDB AX
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'linux'
     runs-on: ubuntu-latest
     name: >
       linux-ax-vfx:${{ matrix.image }}-
@@ -41,19 +53,40 @@ jobs:
     strategy:
       matrix:
         image: ['2019-clang8', '2020-clang7', '2021-clang10']
-        compiler: ['clang++', 'g++']
+        compiler: ['clang++']
         build: ['Release']
+        j: [2]
         # Extra builds
         include:
           - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
+            j: 2
+          - image: '2020-clang7'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            j: 1
+          - image: '2019-clang8'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            j: 1
+          - image: '2021-clang10'
+            compiler: 'g++'
+            build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            j: 1
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: build
-        run: |
-          ./ci/build.sh ${{ matrix.build }} "core,axcore,axbin,axtest" -DOPENVDB_CXX_STRICT=ON
+        run: >
+          ./ci/build.sh -v
+          -j ${{ matrix.j }}
+          --build-type=${{ matrix.build }}
+          --components="core,axcore,axbin,axtest"
+          --cargs="-DOPENVDB_CXX_STRICT=ON"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
@@ -61,6 +94,10 @@ jobs:
 
   linux-ax-standalone-vfx:
     # VFX platform builds for OpenVDB AX against an existing VDB installation
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'linux'
     runs-on: ubuntu-latest
     name: >
       linux-ax-standalone-vfx:${{ matrix.image }}-
@@ -76,29 +113,47 @@ jobs:
         image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
         compiler: ['clang++']
         build: ['Release']
+        j: [2]
         # Extra builds
         include:
           - image: '2020-clang7'
             compiler: 'g++'
             build: 'Release'
+            # disable parallel builds when using GCC due to memory limits
+            j: 1
           - image: '2020-clang7'
             compiler: 'clang++'
             build: 'Debug'
+            j: 2
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: vdb
-        run: |
-          ./ci/build.sh ${{ matrix.build }} "core" -DOPENVDB_CXX_STRICT=ON
-          rm -rf build
+        run: >
+          ./ci/build.sh -v
+          -j ${{ matrix.j }}
+          --build-type=${{ matrix.build }}
+          --components="core"
+          --cargs="-DOPENVDB_CXX_STRICT=ON"
+      - name: clean
+        run: rm -rf build
       - name: build
-        run: ./ci/build.sh ${{ matrix.build }} "axcore,axbin,axtest" -DOPENVDB_CXX_STRICT=ON
+        run: >
+          ./ci/build.sh -v
+          -j ${{ matrix.j }}
+          --build-type=${{ matrix.build }}
+          --components="axcore,axbin,axtest"
+          --cargs="-DOPENVDB_CXX_STRICT=ON"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
 
   macos-core:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'mac'
     runs-on: macos-10.15
     name: macos-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
     env:
@@ -122,10 +177,30 @@ jobs:
       - name: install_deps
         run: ./ci/install_macos_ax.sh ${{ matrix.llvm }}
       - name: build
-        run: |
-          ./ci/build.sh ${{ matrix.build }} "core,axcore,axbin,axtest" \
-            -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm
+        run: >
+          ./ci/build.sh -v
+          --build-type=${{ matrix.build }}
+          --components="core,axcore,axbin,axtest"
+          --cargs="-DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
+
+  gen-grammar:
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.type == 'grammar'
+    runs-on: ubuntu-latest
+    container:
+      image: aswf/ci-openvdb:2021-clang10
+    steps:
+    - uses: actions/checkout@v2
+    - name: build
+      run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
+    - name: upload grammar
+      uses: actions/upload-artifact@v2
+      with:
+        name: ax_grammar
+        path: ./build/openvdb_ax/openvdb_ax/openvdb_ax/grammar
+        retention-days: 5
