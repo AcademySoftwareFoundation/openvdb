@@ -310,22 +310,6 @@ if(OPENVDB_AX_SHARED)
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
     )
 
-  if(OPENVDB_ENABLE_RPATH)
-    # @todo There is probably a better way to do this for imported targets
-    list(APPEND RPATHS
-      ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
-      ${Log4cplus_LIBRARY_DIRS}
-      ${Blosc_LIBRARY_DIRS}
-      ${Tbb_LIBRARY_DIRS}
-      ${LLVM_LIBRARY_DIRS}
-    )
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(openvdb_ax_shared
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
-
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 endif()
 

@@ -546,23 +546,7 @@ if(OPENVDB_CORE_SHARED)
     PROPERTIES
       OUTPUT_NAME ${OPENVDB_SHARED_LIBRARY_NAME}
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
-      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-  )
-
-  if(OPENVDB_ENABLE_RPATH)
-    # @todo There is probably a better way to do this for imported targets
-    list(APPEND RPATHS
-      ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
-      ${Log4cplus_LIBRARY_DIRS}
-      ${Blosc_LIBRARY_DIRS}
-      ${Tbb_LIBRARY_DIRS}
-    )
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(openvdb_shared
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
+      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION})
 
   if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
