@@ -2051,9 +2051,14 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
         treeParms.visualize = bool(evalInt("visualize", 0, time));
         if (treeParms.visualize) {
             // copy data to the TreeParms UT_Ramp object
-            SOP_Node* node = cookparms()->getSrcNode();
-            if (node) {
-                node->updateRampFromMultiParm(time, node->getParm("visramp"), treeParms.colorRamp);
+            auto &&sopparms = cookparms()->parms<SOP_NodeParmsOptions>();
+            const UT_OptionEntry *rampentry = sopparms.getOptionEntry("visramp");
+            if (rampentry) {
+                UT_StringHolder value;
+                if (rampentry->importOption(value)) {
+                    UT_IStream is(value.c_str(), value.length(), UT_ISTREAM_ASCII);
+                    treeParms.colorRamp.load(is);
+                }
             }
             treeParms.colorMin = evalFloat("visrange", 0, time);
             double colorMax = evalFloat("visrange", 1, time);
