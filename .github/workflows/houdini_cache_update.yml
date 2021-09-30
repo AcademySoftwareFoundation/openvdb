@@ -29,7 +29,7 @@ jobs:
         if: steps.check.outputs.HOUDINI_SECRETS != 'true'
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
-  houdini18_5:
+  linux_houdini18_5:
     needs: [checksecret]
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
@@ -59,7 +59,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
     - name: write_houdini_cache
@@ -68,7 +68,7 @@ jobs:
         path: hou
         key: vdb-v3-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
-  houdini18_0:
+  linux_houdini18_0:
     needs: [checksecret]
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
@@ -98,7 +98,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
     - name: write_houdini_cache
