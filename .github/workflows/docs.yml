@@ -42,6 +42,8 @@ jobs:
       run: pip install epydoc
     - name: install_latex
       run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
+    - name: install_cmake
+      run: ./ci/install_cmake.sh 3.15.0
     - name: build
       run: >
         ./ci/build.sh -v

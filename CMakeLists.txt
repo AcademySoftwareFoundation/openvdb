@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -252,11 +252,6 @@ endif()
 
 # VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
 
-# Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
-# python linkage on macOS (Python::Module target in 3.15)
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
-
 # No compiler upgrades planned
 #set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
 #set(FUTURE_MINIMUM_ICC_VERSION 17)
@@ -292,12 +287,6 @@ endif()
 
 # Configure MS Runtime
 
-if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
-  # CMAKE_MSVC_RUNTIME_LIBRARY selects the MSVC runtime library for use by compilers
-  # targeting the MSVC ABI. Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug
-  # MultiThreadedDebugDLL. If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
-  message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
-endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
@@ -343,13 +332,6 @@ enable_testing()
 # Add our cmake modules
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
-# Add backports to support older versions of CMake
-#  FindNumPy.cmake is needed if CMake < 3.14
-
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
-endif()
 
 # Add cmake modules to installation command
 # @todo fix our glew cmake module
