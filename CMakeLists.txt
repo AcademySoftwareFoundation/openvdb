@@ -330,6 +330,8 @@ if(OPENVDB_ENABLE_RPATH)
   set(CMAKE_SKIP_BUILD_RPATH FALSE)
   set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
   set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+  # @todo make relocatable?
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
 endif()
 
 # For CMake's find Threads module which brings in pthread - This flag
@@ -380,6 +382,15 @@ if(OPENVDB_BUILD_MAYA_PLUGIN)
   set(USE_MAYA ON)
 endif()
 
+if(USE_MAYA AND USE_HOUDINI)
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met."
+  )
+endif()
+
 # Configure component dependencies by loading the Houdini/Maya setup
 # scripts. These also find the Houdini/Maya installations
 
@@ -393,6 +404,22 @@ endif()
 
 if(OPENVDB_BUILD_DOCS)
   add_subdirectory(doc)
+endif()
+
+if(WIN32)
+  if(OPENVDB_BUILD_AX OR
+     OPENVDB_BUILD_AX_GRAMMAR OR
+     OPENVDB_BUILD_AX_BINARIES OR
+     OPENVDB_BUILD_AX_UNITTESTS)
+    message(FATAL_ERROR "Currently no support for building OpenVDB AX or the OpenVDB AX grammar on Windows.")
+  endif()
+endif()
+
+if(NOT OPENVDB_BUILD_AX AND OPENVDB_BUILD_AX_GRAMMAR)
+  # only re-generate the AX grammar
+  set(OPENVDB_AX_SHARED OFF CACHE BOOL "" FORCE)
+  set(OPENVDB_AX_STATIC OFF CACHE BOOL "" FORCE)
+  add_subdirectory(openvdb_ax/openvdb_ax)
 endif()
 
 # Early exit if there's nothing to build
@@ -410,23 +437,6 @@ if(NOT (
     OPENVDB_BUILD_MAYA_PLUGIN)
   )
   return()
-endif()
-
-if(WIN32)
-  if(OPENVDB_BUILD_AX OR
-     OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
-    message(FATAL_ERROR "Currently no support for building OpenVDB AX on Windows.")
-  endif()
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
 endif()
 
 #########################################################################

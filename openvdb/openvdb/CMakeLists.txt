@@ -17,6 +17,11 @@ include(GNUInstallDirs)
 option(OPENVDB_CORE_SHARED "Build dynamically linked version of the core library." ON)
 option(OPENVDB_CORE_STATIC "Build statically linked version of the core library." ON)
 
+if(NOT OPENVDB_NAMESPACE_SUFFIX)
+  set(OPENVDB_NAMESPACE_SUFFIX "" CACHE STRING
+    "An optional custom string to append to the OpenVDB namespace. This is used to configure version.h.")
+endif()
+
 set(OPENVDB_SHARED_LIBRARY_NAME "openvdb" CACHE STRING
   "The base name of the built shared openvdb library. Prefixed by \"lib\" on UNIX platforms."
 )
@@ -183,18 +188,53 @@ if(UNIX)
 endif()
 
 # Set deps. Note that the order here is important. If we're building against
-# Houdini 17.5 we must include IlmBase deps first to ensure the users chosen
-# namespaced headers are correctly prioritized. Otherwise other include paths
-# from shared installs (including houdini) may pull in the wrong headers
+# Houdini 17.5 or later we must include IlmBase deps first to ensure the users
+# chosen namespaced headers are correctly prioritized. Otherwise other include
+# paths from shared installs (including houdini) may pull in the wrong headers
 
-set(OPENVDB_CORE_DEPENDENT_LIBS
-  Boost::iostreams
-  Boost::system
-)
+set(OPENVDB_CORE_DEPENDENT_LIBS "")
 
 if(USE_IMATH_HALF)
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS IlmBase::Half)
 endif()
+
+# We then choose to pull in TBB. If building aganst Houdini, TBB should
+# always be pulled from there (we should always be using the version of TBB
+# shipped with Houdini).
+
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
+
+if(USE_LOG4CPLUS)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus)
+endif()
+
+# @todo blosc and zlib should be hidden (privately linked in):
+# See FindOpenVDB.cmake
+# @warning If building against Houdini these should be picked up from the
+# Houdini installation. If a custom version of EXR is in use, be careful
+# that zlib/blosc headers/libs are not also in the same location e.g.
+# /usr/local
+
+if(USE_BLOSC)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
+endif()
+
+if(USE_BLOSC OR USE_ZLIB)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
+endif()
+
+if(UNIX)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
+endif()
+
+# Pull in Boost last as houdini's boost (hboost) is fully namespaced and libs
+# are renamed too. Boost can be pulled in at any time, but do it last so that,
+# if it's in a shared place (like /usr/local) it doesn't accidently pull in
+# other headers.
+
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+  Boost::iostreams
+  Boost::system)
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -207,27 +247,6 @@ if(WIN32)
         Boost::disable_autolinking  # add -DBOOST_ALL_NO_LIB
       )
   endif()
-endif()
-
-if(USE_LOG4CPLUS)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Log4cplus::log4cplus)
-endif()
-
-# @todo blosc and zlib should be hidden (privately linked in):
-# See FindOpenVDB.cmake
-
-if(USE_BLOSC)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Blosc::blosc)
-endif()
-
-if(USE_BLOSC OR USE_ZLIB)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
-endif()
-
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS TBB::tbb)
-
-if(UNIX)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Threads::Threads)
 endif()
 
 ##########################################################################
@@ -542,23 +561,7 @@ if(OPENVDB_CORE_SHARED)
     PROPERTIES
       OUTPUT_NAME ${OPENVDB_SHARED_LIBRARY_NAME}
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
-      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-  )
-
-  if(OPENVDB_ENABLE_RPATH)
-    # @todo There is probably a better way to do this for imported targets
-    list(APPEND RPATHS
-      ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
-      ${Log4cplus_LIBRARY_DIRS}
-      ${Blosc_LIBRARY_DIRS}
-      ${Tbb_LIBRARY_DIRS}
-    )
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(openvdb_shared
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
+      VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION})
 
   if(MSVC)
     if(NOT CMAKE_MSVC_RUNTIME_LIBRARY)
