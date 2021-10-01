@@ -59,6 +59,7 @@ if(OPENVDB_ENABLE_RPATH)
   # @todo There is probably a better way to do this for imported targets
   list(APPEND RPATHS
     ${Boost_LIBRARY_DIRS}
+    ${Imath_LIBRARY_DIRS}
     ${IlmBase_LIBRARY_DIRS}
     ${Log4cplus_LIBRARY_DIRS}
     ${Blosc_LIBRARY_DIRS}
@@ -116,8 +117,13 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
+  find_package(Imath CONFIG)
+  if (NOT TARGET Imath::Imath)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
+    find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
+  else()
+    find_package(OpenEXR CONFIG)
+  endif()
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
   add_executable(vdb_render ${VDB_RENDER_SOURCE_FILES})
@@ -129,11 +135,19 @@ if(OPENVDB_BUILD_VDB_RENDER)
   # headers
 
   target_link_libraries(vdb_render
-    IlmBase::Half
-    OpenEXR::IlmImf
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
+    # For Imath/OpenEXR v3.X
+    $<TARGET_NAME_IF_EXISTS:Imath::Imath>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXR>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXRUtil>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmThread>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::Iex>
+    # For IlmBase/OpenEXR v2.X
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Half>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImf>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImfUtil>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::IlmThread>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Iex>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Imath>
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 
