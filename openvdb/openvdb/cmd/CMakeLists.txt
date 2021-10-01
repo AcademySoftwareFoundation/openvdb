@@ -52,30 +52,6 @@ endif()
 
 ##########################################################################
 
-# rpath handling
-
-set(RPATHS "")
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${Imath_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-endif()
-
-##########################################################################
-
 ##### VDB binaries
 
 #### vdb_print
@@ -84,12 +60,6 @@ if(OPENVDB_BUILD_VDB_PRINT)
   set(VDB_PRINT_SOURCE_FILES openvdb_print.cc)
   add_executable(vdb_print ${VDB_PRINT_SOURCE_FILES})
   target_link_libraries(vdb_print ${OPENVDB_BINARIES_DEPENDENT_LIBS})
-
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_print
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   install(TARGETS vdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -102,12 +72,6 @@ if(OPENVDB_BUILD_VDB_LOD)
   set(VDB_LOD_SOURCE_FILES  openvdb_lod.cc)
   add_executable(vdb_lod ${VDB_LOD_SOURCE_FILES})
   target_link_libraries(vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS})
-
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_lod
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   install(TARGETS vdb_lod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -159,20 +123,6 @@ if(OPENVDB_BUILD_VDB_RENDER)
     endif()
   endif()
 
-  if(OPENVDB_ENABLE_RPATH)
-    set(OPENVDB_RENDER_RPATHS)
-    list(APPEND OPENVDB_RENDER_RPATHS
-      ${OpenEXR_LIBRARY_DIRS}
-      ${RPATHS}
-    )
-    list(REMOVE_DUPLICATES OPENVDB_RENDER_RPATHS)
-
-    set_target_properties(vdb_render
-      PROPERTIES INSTALL_RPATH "${OPENVDB_RENDER_RPATHS}"
-    )
-    unset(OPENVDB_RENDER_RPATHS)
-  endif()
-
   install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -213,12 +163,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
   endif()
 
   target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
-
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_view
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

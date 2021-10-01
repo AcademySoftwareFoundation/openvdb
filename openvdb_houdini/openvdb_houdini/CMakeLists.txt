@@ -202,32 +202,6 @@ target_link_libraries(openvdb_houdini PUBLIC
 
 target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
 
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  set(RPATHS "")
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${Imath_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-
-  set_target_properties(openvdb_houdini
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
-endif()
-
-
 set_target_properties(openvdb_houdini
   PROPERTIES
     OUTPUT_NAME openvdb_houdini
@@ -358,25 +332,6 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
     PREFIX ""
     TAGINFO ""
   )
-
-  # Configure rpaths
-  # Encode the path to libopenvdb.so into plugins, and because some
-  # plugins might depend on Houdini libraries that are not linked into
-  # hython (among other tools), encode the Houdini library path as well.
-
-  if(OPENVDB_ENABLE_RPATH)
-    set(RPATHS)
-    if(OPENVDB_BUILD_CORE)
-      list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-    else()
-      list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-    endif()
-    list(APPEND RPATHS ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX})
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(${DSO_NAME}
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   add_dependencies(openvdb_houdini_dsos ${DSO_NAME})
 endforeach()
