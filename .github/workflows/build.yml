@@ -262,7 +262,7 @@ jobs:
       shell: bash
       run: |
         brew update
-        brew install bash gnu-getopt cmake imath boost tbb glfw googletest
+        brew install bash gnu-getopt cmake imath openexr boost tbb glfw googletest
         echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
     - name: build
       shell: bash
