@@ -15,7 +15,7 @@
              be shared between multiple buffers or belong to a single buffer.
 
    Example that uses HostBuffer::create inside io::readGrids to create a
-   full self-managed buffer, i.e. not shared, per grid in the file. 
+   full self-managed buffer, i.e. not shared and without padding, per grid in the file. 
    @code
         auto handles = nanovdb::io::readGrids("file.nvdb");
    @endcode
@@ -32,13 +32,13 @@
 
    Example that uses HostBuffer::createPool for internally managed host memory.
    Suppose you want to read multiple grids in multiple files, but reuse the same
-   fixed sized memory buffer to avoid memory fragmentation and never to exceed a 
-   fixed memory ceiling!
+   fixed sized memory buffer to both avoid memory fragmentation as well as 
+   exceeding the fixed memory ceiling!
    @code
         auto pool = nanovdb::HostBuffer::createPool(1 << 30);// 1 GB memory pool
         std::vector<std::string>> frames;// vector of grid names
         for (int i=0; i<frames.size(); ++i) {
-            auto handles = nanovdb::io::readGrids(frames[i], 0, pool);// throws if file exceeds 1 GB
+            auto handles = nanovdb::io::readGrids(frames[i], 0, pool);// throws if grids in file exceed 1 GB
             ...
             pool.reset();// clears all handles and resets the memory pool for reuse
         }

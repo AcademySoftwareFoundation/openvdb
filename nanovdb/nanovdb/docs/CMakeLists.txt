@@ -18,7 +18,6 @@ add_custom_target(
   SOURCES doxygen-config
           doc.md
           codingstyle.txt
-          ToDo.md
           FAQ.md
           SourceTree.md
           HowToBuild.md

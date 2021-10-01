@@ -2359,7 +2359,7 @@ public:
     template<typename Vec3T>
     __hostdev__ Vec3T worldToIndex(const Vec3T& xyz) const { return this->applyInverseMap(xyz); }
 
-    /// @brief world to index space transformation
+    /// @brief index to world space transformation
     template<typename Vec3T>
     __hostdev__ Vec3T indexToWorld(const Vec3T& xyz) const { return this->applyMap(xyz); }
 

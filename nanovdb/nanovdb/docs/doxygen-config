@@ -775,7 +775,6 @@ INPUT                  = ./include/nanovdb \
                          ./docs/codingstyle.txt \
                          ./docs/HowToBuild.md \
                          ./docs/HelloWorld.md \
-                         ./docs/ToDo.md \
                          ./docs/FAQ.md \
                          ./docs/SourceTree.md
 
