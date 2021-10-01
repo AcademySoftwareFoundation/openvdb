@@ -60,18 +60,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release' }
           - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '9', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Debug'   }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Debug'   }
           - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
           - { cxx: g++,     image: '2021', abi: '8', build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', abi: '9', build: 'Release' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
     - name: install_gtest
-      run: ./ci/install_gtest.sh 1.8.0
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -143,7 +143,7 @@ jobs:
     runs-on: ubuntu-latest
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2021
+      image: aswf/ci-openvdb:2022-clang11
     env:
       CXX: clang++
     strategy:
