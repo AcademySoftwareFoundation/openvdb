@@ -9,7 +9,7 @@
 #include "TypeList.h" // backwards compat
 
 #ifdef OPENVDB_USE_IMATH_HALF
-#ifdef Imath_VERSION
+#ifdef OPENVDB_IMATH_VERSION
 #include <Imath/half.h>
 #else
 #include <OpenEXR/half.h>
