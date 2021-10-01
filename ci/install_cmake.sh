@@ -3,16 +3,13 @@
 set -ex
 
 CMAKE_VERSION="$1"
+CMAKE_PACKAGE=cmake-${CMAKE_VERSION}-Linux-x86_64
 
-git clone https://github.com/Kitware/CMake.git
-cd CMake
+wget https://github.com/Kitware/CMake/releases/download/v${CMAKE_VERSION}/${CMAKE_PACKAGE}.tar.gz
 
-if [ "$CMAKE_VERSION" != "latest" ]; then
-    git checkout tags/v${CMAKE_VERSION} -b v${CMAKE_VERSION}
-fi
+tar -xf ${CMAKE_PACKAGE}.tar.gz
+cp ${CMAKE_PACKAGE}/bin/* /usr/local/bin/
+cp -r ${CMAKE_PACKAGE}/share/* /usr/local/share/
 
-mkdir build
-cd build
-cmake ../.
-make -j4
-make install
+rm -rf ${CMAKE_PACKAGE}
+rm -rf ${CMAKE_PACKAGE}.tar.gz
