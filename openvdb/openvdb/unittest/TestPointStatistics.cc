@@ -374,7 +374,7 @@ TEST_F(TestPointStatistics, testEvalAverage)
             ConvertElementType<float, double>::Type avg = 0;
             bool success = points::evalAverage<float>(points->tree(), "floattest", avg);
             EXPECT_TRUE(success);
-            EXPECT_FLOAT_EQ(1.075, avg);
+            EXPECT_NEAR(1.075, avg, 1e-6);
         }
 
         // Vec3f
@@ -382,9 +382,9 @@ TEST_F(TestPointStatistics, testEvalAverage)
             ConvertElementType<Vec3f, double>::Type avg(0);
             bool success = points::evalAverage<Vec3f>(points->tree(), "vectest", avg);
             EXPECT_TRUE(success);
-            EXPECT_FLOAT_EQ(0.2125, avg.x());
-            EXPECT_FLOAT_EQ(0.0625, avg.y());
-            EXPECT_FLOAT_EQ(0.05,   avg.z());
+            EXPECT_NEAR(0.2125, avg.x(), 1e-6);
+            EXPECT_NEAR(0.0625, avg.y(), 1e-6);
+            EXPECT_NEAR(0.05,   avg.z(), 1e-6);
         }
 
         // Test avg filter
@@ -468,12 +468,12 @@ TEST_F(TestPointStatistics, testEvalAverage)
             ResultTree<decltype(*points), decltype(avg)> avgt;
             bool success = points::evalAverage<float>(points->tree(), "floattest", avg, points::NullFilter(), &avgt);
             EXPECT_TRUE(success);
-            EXPECT_FLOAT_EQ(1.075, avg);
+            EXPECT_NEAR(1.075, avg, 1e-6);
 
             EXPECT_EQ(avgt.leafCount(), 0);
             EXPECT_EQ(avgt.activeTileCount(), 1);
             EXPECT_TRUE(avgt.isValueOn({0,0,0}));
-            EXPECT_FLOAT_EQ(avgt.getValue({0,0,0}), 1.075f);
+            EXPECT_NEAR(avgt.getValue({0,0,0}), 1.075f, 1e-6);
         }
 
         // test avg trees filter
@@ -581,7 +581,7 @@ TEST_F(TestPointStatistics, testAccumulate)
             PromoteType<float>::Highest total=0;
             bool success = points::accumulate<float>(points->tree(), "floattest", total);
             EXPECT_TRUE(success);
-            EXPECT_FLOAT_EQ(-4.3f+5.1f+-1.1f+0.0f+9.5f+-10.2f+3.4f+6.2f, total);
+            EXPECT_NEAR(-4.3+5.1+-1.1+0.0+9.5+-10.2+3.4+6.2, total, 1e-6);
         }
 
         // Vec3f
@@ -589,10 +589,10 @@ TEST_F(TestPointStatistics, testAccumulate)
             PromoteType<Vec3f>::Highest total(0);
             bool success = points::accumulate<Vec3f>(points->tree(), "vectest", total);
             EXPECT_TRUE(success);
-            Vec3f r = Vec3f(0.3f) + Vec3f(1.0f,-0.5f,-0.2f) + Vec3f(0.2f) + Vec3f(0.2f, 0.5f, 0.1f) + Vec3f(-0.1f) + Vec3f(0.1f);
-            EXPECT_FLOAT_EQ(r.x(), total.x());
-            EXPECT_FLOAT_EQ(r.y(), total.y());
-            EXPECT_FLOAT_EQ(r.z(), total.z());
+            Vec3d r = Vec3d(0.3) + Vec3d(1.0,-0.5,-0.2) + Vec3d(0.2) + Vec3d(0.2, 0.5, 0.1) + Vec3d(-0.1) + Vec3d(0.1);
+            EXPECT_NEAR(r.x(), total.x(), 1e-6);
+            EXPECT_NEAR(r.y(), total.y(), 1e-6);
+            EXPECT_NEAR(r.z(), total.z(), 1e-6);
         }
 
         // Test accumulate filter
@@ -687,12 +687,12 @@ TEST_F(TestPointStatistics, testAccumulate)
             ResultTree<decltype(*points), decltype(total)> totalt;
             bool success = points::accumulate<float>(points->tree(), "floattest", total, points::NullFilter(), &totalt);
             EXPECT_TRUE(success);
-            EXPECT_FLOAT_EQ(-4.3f+5.1f+-1.1f+0.0f+9.5f+-10.2f+3.4f+6.2f, total);
+            EXPECT_NEAR(-4.3+5.1+-1.1+0.0+9.5+-10.2+3.4+6.2, total, 1e-6);
 
             EXPECT_EQ(totalt.leafCount(), 0);
             EXPECT_EQ(totalt.activeTileCount(), 1);
             EXPECT_TRUE(totalt.isValueOn({0,0,0}));
-            EXPECT_FLOAT_EQ(totalt.getValue({0,0,0}), -4.3f+5.1f+-1.1f+0.0f+9.5f+-10.2f+3.4f+6.2f);
+            EXPECT_NEAR(totalt.getValue({0,0,0}), -4.3+5.1+-1.1+0.0+9.5+-10.2+3.4+6.2, 1e-6);
         }
 
         // test total trees filter
