@@ -455,9 +455,6 @@ inline bool evalAverage(const PointDataTreeT& points,
         typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* averageTree)
 {
     using ResultT = typename ConvertElementType<ValueT, double>::Type;
-    using ElementT = typename ValueTraits<ResultT>::ElementType;
-    using DivisorT = typename std::conditional<
-        std::is_floating_point<ElementT>::value, ElementT, double>::type;
 
     struct Sample
     {
