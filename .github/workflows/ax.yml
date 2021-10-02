@@ -52,7 +52,7 @@ jobs:
       CXX: ${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2020-clang7', 2021-clang10', '2022-clang11']
+        image: ['2020-clang7', '2021-clang10', '2022-clang11']
         compiler: ['clang++']
         build: ['Release']
         j: [2]
