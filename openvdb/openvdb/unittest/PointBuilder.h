@@ -12,7 +12,8 @@
 /// @brief  Get 8 corner points from a cube with a given scale, ordered such
 ///   that if used for conversion to OpenVDB Points, that the default
 ///   iteration order remains consistent
-inline std::vector<openvdb::Vec3f> getBoxPoints(const float scale = 1.0)
+inline std::vector<openvdb::Vec3f>
+getBoxPoints(const float scale = 1.0f)
 {
     // This order is configured to be the same layout when
     // a vdb points grid is constructed and so matches methods

@@ -274,31 +274,31 @@ struct ValueTraits<T, false>
 
 /// @brief Conversion classes for changing the underlying type of VDB types
 /// @{
-template<typename T, typename SubT> struct ConvertType { using Type = SubT; };
-template<typename T, typename SubT> struct ConvertType<math::Vec2<T>, SubT> { using Type = math::Vec2<SubT>; };
-template<typename T, typename SubT> struct ConvertType<math::Vec3<T>, SubT> { using Type = math::Vec3<SubT>; };
-template<typename T, typename SubT> struct ConvertType<math::Vec4<T>, SubT> { using Type = math::Vec4<SubT>; };
-template<typename T, typename SubT> struct ConvertType<math::Quat<T>, SubT> { using Type = math::Quat<SubT>; };
-template<typename T, typename SubT> struct ConvertType<math::Mat3<T>, SubT> { using Type = math::Mat3<SubT>; };
-template<typename T, typename SubT> struct ConvertType<math::Mat4<T>, SubT> { using Type = math::Mat4<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType { using Type = SubT; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec2<T>, SubT> { using Type = math::Vec2<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec3<T>, SubT> { using Type = math::Vec3<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec4<T>, SubT> { using Type = math::Vec4<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Quat<T>, SubT> { using Type = math::Quat<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Mat3<T>, SubT> { using Type = math::Mat3<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Mat4<T>, SubT> { using Type = math::Mat4<SubT>; };
 /// @}
 
 namespace types_internal
 {
 template <size_t Bits, bool Signed> struct int_t;
-template <> struct int_t<8, true>   { using type = int8_t;   };
-template <> struct int_t<16, true>  { using type = int16_t;  };
-template <> struct int_t<32, true>  { using type = int32_t;  };
-template <> struct int_t<64, true>  { using type = int64_t;  };
-template <> struct int_t<8, false>  { using type = uint8_t;  };
-template <> struct int_t<16, false> { using type = uint16_t; };
-template <> struct int_t<32, false> { using type = uint32_t; };
-template <> struct int_t<64, false> { using type = uint64_t; };
+template <> struct int_t<8ul, true>   { using type = int8_t;   };
+template <> struct int_t<16ul, true>  { using type = int16_t;  };
+template <> struct int_t<32ul, true>  { using type = int32_t;  };
+template <> struct int_t<64ul, true>  { using type = int64_t;  };
+template <> struct int_t<8ul, false>  { using type = uint8_t;  };
+template <> struct int_t<16ul, false> { using type = uint16_t; };
+template <> struct int_t<32ul, false> { using type = uint32_t; };
+template <> struct int_t<64ul, false> { using type = uint64_t; };
 
 template <size_t Bits> struct flt_t;
-template <> struct flt_t<16> { using type = math::half; };
-template <> struct flt_t<32> { using type = float; };
-template <> struct flt_t<64> { using type = double; };
+template <> struct flt_t<16ul> { using type = math::half; };
+template <> struct flt_t<32ul> { using type = float; };
+template <> struct flt_t<64ul> { using type = double; };
 }
 
 /// @brief Promotion classes which provide an interface for elevating and
@@ -313,7 +313,7 @@ private:
     template <size_t bits>
     using TypeT = typename std::conditional<std::is_integral<T>::value,
         types_internal::int_t<bits, std::is_signed<T>::value>,
-        types_internal::flt_t<bits>>::type;
+        types_internal::flt_t<std::max(16ul, bits)>>::type;
 public:
     static_assert(sizeof(T) <= 8ul, "Unsupported source type for promotion");
 
