@@ -345,8 +345,8 @@ public:
     bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
-    /// Virtual function to retrieve the data buffer cast to a char byte array
-    virtual const char* dataAsByteArray() const = 0;
+    /// Indirect virtual function to retrieve the data buffer cast to a char byte array
+    const char* constDataAsByteArray() const { return this->dataAsByteArray(); }
 #endif
 
 private:
@@ -358,9 +358,7 @@ private:
 
     /// Virtual function to retrieve the data buffer cast to a char byte array
     virtual char* dataAsByteArray() = 0;
-#if OPENVDB_ABI_VERSION_NUMBER < 9
     virtual const char* dataAsByteArray() const = 0;
-#endif
 
     /// Private implementation for copyValues/copyValuesUnsafe
     template <typename IterT>
@@ -748,10 +746,9 @@ public:
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the raw data buffer
-    inline const StorageType* data() const { assert(validData()); return mData.get(); }
-
-    /// Virtual function to retrieve the data buffer from the derived class cast to a char byte array
-    const char* dataAsByteArray() const override;
+    inline const StorageType* constData() const { return this->data(); }
+    /// Indiect virtual function to retrieve the data buffer from the derived class cast to a char byte array
+    const char* constDataAsByteArray() const override { return this->dataAsByteArray(); }
 #endif
 
 protected:
@@ -759,9 +756,7 @@ protected:
 
     /// Return the raw data buffer
     inline StorageType* data() { assert(validData()); return mData.get(); }
-#if OPENVDB_ABI_VERSION_NUMBER < 9
     inline const StorageType* data() const { assert(validData()); return mData.get(); }
-#endif
 
     /// Verify that data is not out-of-core or in a partially-read state
     inline bool validData() const { return !(isOutOfCore() || (flags() & PARTIALREAD)); }
@@ -789,9 +784,7 @@ private:
 
     /// Virtual function to retrieve the data buffer from the derived class cast to a char byte array
     char* dataAsByteArray() override;
-#if OPENVDB_ABI_VERSION_NUMBER < 9
     const char* dataAsByteArray() const override;
-#endif
 
     size_t arrayMemUsage() const;
     void allocate();
