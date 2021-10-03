@@ -747,8 +747,6 @@ public:
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Return the raw data buffer
     inline const StorageType* constData() const { return this->data(); }
-    /// Indiect virtual function to retrieve the data buffer from the derived class cast to a char byte array
-    const char* constDataAsByteArray() const override { return this->dataAsByteArray(); }
 #endif
 
 protected:
