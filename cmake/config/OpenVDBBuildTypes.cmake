@@ -1,4 +1,6 @@
 
+cmake_minimum_required(VERSION 3.15)
+
 # Build Types
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}
   CACHE STRING [=[Choose the type of build. CMake natively supports the following options: None Debug Release
@@ -13,15 +15,6 @@ set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan)
 
 # DebugNoInfo - An internal build type only used by the OpenVDB CI. no optimizations, no symbols, asserts enabled
 set(CMAKE_CXX_FLAGS_DebugNoInfo "" CACHE STRING "Flags used by the C++ compiler during DebugNoInfo builds.")
-
-# Requires add_link_options from 3.13
-if(${CMAKE_VERSION} VERSION_LESS 3.13)
-  if(${CMAKE_BUILD_TYPE} IN_LIST EXTRA_BUILD_TYPES)
-    message(FATAL_ERROR "Build type ${CMAKE_BUILD_TYPE} requires CMake version 3.13 or higher.")
-  endif()
-  return()
-endif()
-cmake_minimum_required(VERSION 3.13)
 
 foreach(TYPE ${EXTRA_BUILD_TYPES})
   set(CMAKE_CXX_FLAGS_${U_TYPE} "" CACHE STRING "Flags used by the C++ compiler during ${TYPE} builds.")

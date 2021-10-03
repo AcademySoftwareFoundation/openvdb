@@ -131,15 +131,7 @@ echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
 # However it does not seem to for our project.
 # https://gitlab.kitware.com/cmake/cmake/-/issues/20564
 
-CMAKE_BUILD_CMD="cmake --build . --parallel ${PARMS[-j]} --target $TARGET"
-
-if HAS_PARM -v || HAS_PARM --verbose; then
-    # cmake 3.14 and later required for --verbose
-    function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
-    if [ $(version $CMAKE_VERSION) -gt $(version '3.14.0') ]; then
-        CMAKE_BUILD_CMD+=" --verbose"
-    fi
-fi
+CMAKE_BUILD_CMD="cmake --build . --parallel ${PARMS[-j]} --target $TARGET --verbose"
 
 if HAS_PARM --config; then
     CMAKE_BUILD_CMD+=" --config ${PARMS[--config]}"
@@ -157,7 +149,7 @@ set -x
 # - all sub binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
 cmake \
     -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
-    -DOPENVDB_USE_FUTURE_ABI_9=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_RENDER=ON \
