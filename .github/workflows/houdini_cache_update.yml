@@ -29,7 +29,7 @@ jobs:
         if: steps.check.outputs.HOUDINI_SECRETS != 'true'
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
-  houdini18_5:
+  linux_houdini18_5:
     needs: [checksecret]
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
@@ -47,19 +47,19 @@ jobs:
       run: ./ci/download_houdini.sh 18.5 ON
     - name: install_houdini
       run: |
-        mkdir houdini_install
-        cp hou/hou.tar.gz houdini_install/hou.tar.gz
-        cd houdini_install && tar -xzf hou.tar.gz && cd -
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
-        cd houdini_install/hou && source houdini_setup_bash && cd - &&
+        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
     - name: write_houdini_cache
@@ -68,7 +68,7 @@ jobs:
         path: hou
         key: vdb-v3-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
 
-  houdini18_0:
+  linux_houdini18_0:
     needs: [checksecret]
     if: >
       ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
@@ -86,19 +86,19 @@ jobs:
       run: ./ci/download_houdini.sh 18.0 ON
     - name: install_houdini
       run: |
-        mkdir houdini_install
-        cp hou/hou.tar.gz houdini_install/hou.tar.gz
-        cd houdini_install && tar -xzf hou.tar.gz && cd -
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
-        cd houdini_install/hou && source houdini_setup_bash && cd - &&
+        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
     - name: write_houdini_cache

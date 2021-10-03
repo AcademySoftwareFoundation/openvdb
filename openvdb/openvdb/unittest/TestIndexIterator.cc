@@ -80,7 +80,7 @@ TEST_F(TestIndexIterator, testNullFilter)
     NullFilter filter;
     EXPECT_TRUE(filter.initialized());
     EXPECT_TRUE(filter.state() == index::ALL);
-    int a;
+    int a = 0;
     EXPECT_TRUE(filter.valid(a));
 }
 

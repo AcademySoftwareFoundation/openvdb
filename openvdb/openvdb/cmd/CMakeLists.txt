@@ -52,29 +52,6 @@ endif()
 
 ##########################################################################
 
-# rpath handling
-
-set(RPATHS "")
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-endif()
-
-##########################################################################
-
 ##### VDB binaries
 
 #### vdb_print
@@ -83,12 +60,6 @@ if(OPENVDB_BUILD_VDB_PRINT)
   set(VDB_PRINT_SOURCE_FILES openvdb_print.cc)
   add_executable(vdb_print ${VDB_PRINT_SOURCE_FILES})
   target_link_libraries(vdb_print ${OPENVDB_BINARIES_DEPENDENT_LIBS})
-
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_print
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   install(TARGETS vdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
@@ -102,12 +73,6 @@ if(OPENVDB_BUILD_VDB_LOD)
   add_executable(vdb_lod ${VDB_LOD_SOURCE_FILES})
   target_link_libraries(vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_lod
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
-
   install(TARGETS vdb_lod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
@@ -116,8 +81,13 @@ endif()
 #### vdb_render
 
 if(OPENVDB_BUILD_VDB_RENDER)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
-  find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
+  find_package(Imath CONFIG)
+  if (NOT TARGET Imath::Imath)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half Iex IlmThread Imath)
+    find_package(OpenEXR ${MINIMUM_OPENEXR_VERSION} REQUIRED COMPONENTS IlmImf)
+  else()
+    find_package(OpenEXR CONFIG)
+  endif()
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
   add_executable(vdb_render ${VDB_RENDER_SOURCE_FILES})
@@ -129,11 +99,19 @@ if(OPENVDB_BUILD_VDB_RENDER)
   # headers
 
   target_link_libraries(vdb_render
-    IlmBase::Half
-    OpenEXR::IlmImf
-    IlmBase::IlmThread
-    IlmBase::Iex
-    IlmBase::Imath
+    # For Imath/OpenEXR v3.X
+    $<TARGET_NAME_IF_EXISTS:Imath::Imath>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXR>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::OpenEXRUtil>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmThread>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::Iex>
+    # For IlmBase/OpenEXR v2.X
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Half>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImf>
+    $<TARGET_NAME_IF_EXISTS:OpenEXR::IlmImfUtil>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::IlmThread>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Iex>
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Imath>
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}
   )
 
@@ -143,20 +121,6 @@ if(OPENVDB_BUILD_VDB_RENDER)
     if(OPENEXR_USE_STATIC_LIBS OR (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY))
       target_compile_definitions(vdb_render  PUBLIC -DOPENVDB_OPENEXR_STATICLIB)
     endif()
-  endif()
-
-  if(OPENVDB_ENABLE_RPATH)
-    set(OPENVDB_RENDER_RPATHS)
-    list(APPEND OPENVDB_RENDER_RPATHS
-      ${OpenEXR_LIBRARY_DIRS}
-      ${RPATHS}
-    )
-    list(REMOVE_DUPLICATES OPENVDB_RENDER_RPATHS)
-
-    set_target_properties(vdb_render
-      PROPERTIES INSTALL_RPATH "${OPENVDB_RENDER_RPATHS}"
-    )
-    unset(OPENVDB_RENDER_RPATHS)
   endif()
 
   install(TARGETS vdb_render RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -199,12 +163,6 @@ if(OPENVDB_BUILD_VDB_VIEW)
   endif()
 
   target_compile_definitions(vdb_view PRIVATE -DGL_GLEXT_PROTOTYPES=1)
-
-  if(OPENVDB_ENABLE_RPATH)
-    set_target_properties(vdb_view
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   install(TARGETS vdb_view RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()

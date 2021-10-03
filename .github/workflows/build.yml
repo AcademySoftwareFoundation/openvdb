@@ -65,6 +65,7 @@ jobs:
           - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
           - { cxx: clang++, image: '2021', abi: '9', build: 'Release' }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Debug'   }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Release' }
           - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
           - { cxx: g++,     image: '2021', abi: '8', build: 'Release' }
       fail-fast: false
@@ -250,7 +251,8 @@ jobs:
       shell: bash
       run: cd build && ctest -V
 
-  testmacos1015_tbb2021:
+  # Test EXR 3 and TBB 2021 on MacOS
+  testmacos1015_latest:
     runs-on: macos-10.15
     env:
       CXX: clang++
@@ -260,10 +262,7 @@ jobs:
       shell: bash
       run: |
         brew update
-        brew install bash gnu-getopt cmake ilmbase openexr@2 boost tbb glfw googletest
-        echo "IlmBase_ROOT=/usr/local/opt/ilmbase" >> $GITHUB_ENV
-        echo "OpenEXR_ROOT=/usr/local/opt/openexr@2" >> $GITHUB_ENV
-        echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
+        brew install bash gnu-getopt cmake imath openexr boost tbb glfw googletest
         echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
     - name: build
       shell: bash

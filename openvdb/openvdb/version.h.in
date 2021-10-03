@@ -111,14 +111,16 @@
 ///
 /// where X, Y and N are the major, minor and ABI version numbers, respectively.
 #if OPENVDB_ABI_VERSION_NUMBER == OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
-    #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}
+    #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}${OPENVDB_NAMESPACE_SUFFIX}
 #else
-    #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}abi${OPENVDB_ABI_VERSION_NUMBER}
+    #define OPENVDB_VERSION_NAME v${OpenVDB_MAJOR_VERSION}_${OpenVDB_MINOR_VERSION}abi${OPENVDB_ABI_VERSION_NUMBER}${OPENVDB_NAMESPACE_SUFFIX}
 #endif
 
 /* Denotes whether VDB was built with IMath Half support */
 #ifndef OPENVDB_USE_IMATH_HALF
 #cmakedefine OPENVDB_USE_IMATH_HALF
+/* Denotes whether VDB was built against Imath 3+ */
+#cmakedefine OPENVDB_IMATH_VERSION
 #endif
 
 /* Denotes whether VDB was built with Blosc support */

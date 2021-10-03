@@ -254,30 +254,6 @@ if(USE_NUMPY)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
 endif()
 
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  set(RPATHS "")
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-    ${Python_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-  set_target_properties(pyopenvdb
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
-endif()
-
 set(PYTHON_PUBLIC_INCLUDE_NAMES
   pyopenvdb.h
 )

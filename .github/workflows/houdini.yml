@@ -76,12 +76,14 @@ jobs:
         restore-keys: vdb-v3-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
-      # Make sure the cache is copied, not moved, as the cache action always posts the cache
+      # Make sure the cache is copied, not moved, as the cache action always posts the cache.
+      # Also make sure that the unpacked install is NOT in the root of the OpenVDB checkout
+      # otherwise CMake's install RPATHs wil not work correctly.
     - name: install_houdini
       run: |
-        mkdir houdini_install
-        cp hou/hou.tar.gz houdini_install/hou.tar.gz
-        cd houdini_install && tar -xzf hou.tar.gz && cd -
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.12.0
     - name: install_gtest
@@ -89,12 +91,12 @@ jobs:
     - name: build
       shell: bash
       run: >
-        cd houdini_install/hou && source houdini_setup_bash && cd - &&
+        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         -j ${{ matrix.config.j }}
         --build-type=${{ matrix.config.build }}
         --components="${{ matrix.config.components }}"
-        --cargs=\"-DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
     - name: test
       run: cd build && ctest -V
       # Final check to make sure the cache still exists
