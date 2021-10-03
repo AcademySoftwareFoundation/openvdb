@@ -14,11 +14,18 @@
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>
+
+#ifdef OPENVDB_USE_EXR
 #include <OpenEXR/ImfChannelList.h>
 #include <OpenEXR/ImfFrameBuffer.h>
 #include <OpenEXR/ImfHeader.h>
 #include <OpenEXR/ImfOutputFile.h>
 #include <OpenEXR/ImfPixelType.h>
+#endif
+
+#ifdef OPENVDB_USE_PNG
+#include <png.h>
+#endif
 
 // tbb/task_scheduler_init.h was removed in TBB 2021. The best construct to swap
 // to is tbb/global_control (for executables). global_control was only officially
@@ -45,6 +52,14 @@ const char* gProgName = "";
 
 const double LIGHT_DEFAULTS[] = { 0.3, 0.3, 0.0, 0.7, 0.7, 0.7 };
 
+static const char* sExtensions = "ppm"
+#ifdef OPENVDB_USE_EXR
+",exr"
+#endif
+#ifdef OPENVDB_USE_PNG
+",png"
+#endif
+;
 
 struct RenderOpts
 {
@@ -151,7 +166,6 @@ struct RenderOpts
 
 std::ostream& operator<<(std::ostream& os, const RenderOpts& opts) { return opts.put(os); }
 
-
 void
 usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 {
@@ -161,14 +175,16 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 
     std::ostringstream ostr;
     ostr << std::setprecision(3) <<
-"Usage: " << gProgName << " in.vdb out.{exr,ppm} [options]\n" <<
+"Usage: " << gProgName << " in.vdb out.{" << sExtensions << "} [options]\n" <<
 "Which: ray-traces OpenVDB volumes\n" <<
 "Options:\n" <<
 "    -aperture F       perspective camera aperture in mm (default: " << opts.aperture << ")\n" <<
 "    -camera S         camera type; either \"persp[ective]\" or \"ortho[graphic]\"\n" <<
 "                      (default: " << opts.camera << ")\n" <<
+#ifdef OPENVDB_USE_EXR
 "    -compression S    EXR compression scheme; either \"none\" (uncompressed),\n" <<
 "                      \"rle\" or \"zip\" (default: " << opts.compression << ")\n" <<
+#endif
 "    -cpus N           number of rendering threads, or 1 to disable threading,\n" <<
 "                      or 0 to use all available CPUs (default: " << opts.threads << ")\n" <<
 "    -far F            camera far plane depth (default: " << opts.zfar << ")\n" <<
@@ -218,10 +234,10 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
 "                      (default: " << opts.step[0] << ")\n" <<
 "\n" <<
 "Examples:\n" <<
-"    " << gProgName << " crawler.vdb crawler.exr -shader diffuse -res 1920x1080 \\\n" <<
+"    " << gProgName << " crawler.vdb crawler.{" << sExtensions << "} -shader diffuse -res 1920x1080 \\\n" <<
 "        -focal 35 -samples 4 -translate 0,210.5,400 -compression rle -v\n" <<
 "\n" <<
-"    " << gProgName << " bunny_cloud.vdb bunny_cloud.exr -res 1920x1080 \\\n" <<
+"    " << gProgName << " bunny_cloud.vdb bunny_cloud.{" << sExtensions << "} -res 1920x1080 \\\n" <<
 "        -translate 0,0,110 -absorb 0.4,0.2,0.1 -gain 0.2 -v\n" <<
 "\n" <<
 "Warning:\n" <<
@@ -233,7 +249,31 @@ usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
     exit(exitStatus);
 }
 
+inline void isExtensionSupported(const std::string& fname)
+{
+    // .ppm always supported
+    if (boost::iends_with(fname, ".ppm")) return;
+    else if (boost::iends_with(fname, ".exr"))
+    {
+#ifndef OPENVDB_USE_EXR
+        OPENVDB_THROW(openvdb::RuntimeError,
+            "vdb_render has not been compiled with .exr support.");
+#endif
+    }
+    else if (boost::iends_with(fname, ".png"))
+    {
+#ifndef OPENVDB_USE_PNG
+        OPENVDB_THROW(openvdb::RuntimeError,
+            "vdb_render has not been compiled with .png support.");
+#endif
+    }
+    else {
+        OPENVDB_THROW(openvdb::ValueError,
+            "unsupported image file format (" + fname + ")");
+    }
+}
 
+#ifdef OPENVDB_USE_EXR
 void
 saveEXR(const std::string& fname, const openvdb::tools::Film& film, const RenderOpts& opts)
 {
@@ -290,7 +330,95 @@ saveEXR(const std::string& fname, const openvdb::tools::Film& film, const Render
         std::cout << ostr.str() << std::endl;
     }
 }
+#else
+void
+saveEXR(const std::string&, const openvdb::tools::Film&, const RenderOpts&)
+{
+    OPENVDB_THROW(openvdb::RuntimeError,
+        "vdb_render has not been compiled with .exr support.");
+}
+#endif
 
+#ifdef OPENVDB_USE_PNG
+struct PngWriter
+{
+    PngWriter() = default;
+    ~PngWriter() { this->reset(); }
+
+    inline void write(const std::string& fname, const openvdb::tools::Film& film)
+    {
+        png = png_create_write_struct(PNG_LIBPNG_VER_STRING, nullptr, nullptr, nullptr);
+        if (!png) OPENVDB_THROW(openvdb::RuntimeError, "png_create_write_struct failed");
+        info = png_create_info_struct(png);
+        if (!info) OPENVDB_THROW(openvdb::RuntimeError, "png_create_info_struct failed.")
+
+        fp = std::fopen(fname.c_str(), "wb");
+        if (!fp) {
+            OPENVDB_THROW(openvdb::IoError,
+                "Unable to open '" + fname + "' for writing");
+        }
+
+        if (setjmp(png_jmpbuf(png))) {
+            OPENVDB_THROW(openvdb::IoError, "Error during initialization of PNG I/O.");
+        }
+        png_init_io(png, fp);
+
+        if (setjmp(png_jmpbuf(png))) {
+            OPENVDB_THROW(openvdb::IoError, "Error writing PNG file header.");
+        }
+        // Output is 8bit depth, RGB format.
+        png_set_IHDR(png, info,
+            int(film.width()), int(film.height()),
+            8,
+            PNG_COLOR_TYPE_RGB,
+            PNG_INTERLACE_NONE,
+            PNG_COMPRESSION_TYPE_DEFAULT,
+            PNG_FILTER_TYPE_DEFAULT);
+        png_write_info(png, info);
+
+        const size_t channels = 3; // 3 = RGB, 4 = RGBA
+        auto buffer = film.convertToBitBuffer<uint8_t>(/*alpha=*/false);
+        uint8_t* tmp = buffer.get();
+
+        std::unique_ptr<png_bytep[]>
+            row_pointers(new png_bytep[film.height()]);
+
+        for (size_t row = 0; row < film.height(); row++) {
+            row_pointers[row] = tmp + (row * film.width() * channels);
+        }
+
+        if (setjmp(png_jmpbuf(png))) {
+            OPENVDB_THROW(openvdb::IoError, "Error writing PNG data buffers.");
+        }
+        /* write out the entire image data in one call */
+        png_write_image(png, row_pointers.get());
+        png_write_end(png, nullptr);
+
+        this->reset();
+    }
+
+    inline void reset()
+    {
+        if (fp)  std::fclose(fp);
+        if (png) png_destroy_write_struct(&png, &info);
+        png = nullptr;
+        info = nullptr;
+        fp = nullptr;
+    }
+
+private:
+    FILE* fp = nullptr;
+    png_structp png = nullptr;
+    png_infop info = nullptr;
+};
+#else
+struct PngWriter {
+    inline void write(const std::string&, const openvdb::tools::Film&) {
+        OPENVDB_THROW(openvdb::RuntimeError,
+            "vdb_render has not been compiled with .png support.");
+    }
+};
+#endif
 
 template<typename GridType>
 void
@@ -391,6 +519,9 @@ render(const GridType& grid, const std::string& imgFilename, const RenderOpts& o
     } else if (boost::iends_with(imgFilename, ".exr")) {
         // Save as EXR (slow, but small file size).
         saveEXR(imgFilename, film, opts);
+    } else if (boost::iends_with(imgFilename, ".png")) {
+        PngWriter png;
+        png.write(imgFilename, film);
     } else {
         OPENVDB_THROW(ValueError, "unsupported image file format (" + imgFilename + ")");
     }
@@ -613,6 +744,9 @@ main(int argc, char *argv[])
     }
 
     try {
+        // throw if an extension has been set but we don't support it
+        isExtensionSupported(imgFilename);
+
         std::unique_ptr<tbb::global_control> control;
         if (opts.threads > 0) {
             // note, opts.threads == 0 means use all threads (default), so don't
