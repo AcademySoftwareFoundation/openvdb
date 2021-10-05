@@ -80,6 +80,9 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
+
+option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library" OFF)
+
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -780,6 +783,10 @@ endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
   add_subdirectory(openvdb_maya/openvdb_maya)
+endif()
+
+if(OPENVDB_BUILD_NANOVDB)
+  add_subdirectory(nanovdb/nanovdb)
 endif()
 
 ##########################################################################
