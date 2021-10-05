@@ -263,7 +263,7 @@ function(assign_source_group)
 endfunction(assign_source_group)
 
 # -----------------------------------------------------------------------
-set(NANOVDB_LOCATION ".")
+set(NANOVDB_LOCATION "..")
 set(NANOVDB_INCLUDE_DIR "${NANOVDB_LOCATION}")
 set(NANOVDB_INCLUDE_DIRECTORY
     ${NANOVDB_INCLUDE_DIR}
