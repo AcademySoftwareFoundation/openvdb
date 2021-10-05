@@ -165,6 +165,7 @@ file(COPY
     GT_GEOPrimCollectVDB.h
     GU_PrimVDB.h
     GU_VDBPointTools.h
+    Interrupter.h
     PointUtils.h
     SOP_NodeVDB.h
     SOP_VDBVerbUtils.h
@@ -183,6 +184,7 @@ add_library(openvdb_houdini SHARED
   GT_GEOPrimCollectVDB.cc
   GU_PrimVDB.cc
   GU_VDBPointTools.cc
+  Interrupter.cc
   ParmFactory.cc
   PointUtils.cc
   SOP_NodeVDB.cc

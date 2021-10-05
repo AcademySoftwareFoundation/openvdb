@@ -7,6 +7,7 @@
 #define OPENVDB_UTIL_NULL_INTERRUPTER_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <string>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -51,6 +52,34 @@ inline bool wasInterrupted(T* i, int percent = -1) { return i && i->wasInterrupt
 /// Specialization for NullInterrupter
 template<>
 inline bool wasInterrupted<util::NullInterrupter>(util::NullInterrupter*, int) { return false; }
+
+
+/// @brief An interrupter class with weak symbols for client code overrides
+///
+/// The host application calls start() at the beginning of an interruptible operation,
+/// end() at the end of the operation, and wasInterrupted() periodically during the
+/// operation. If any call to wasInterrupted() returns @c true, the operation will
+/// be aborted.
+struct CustomInterrupter
+{
+    /// Constructor with optional name used if none provided for the operation
+    explicit CustomInterrupter(const char* = nullptr) __attribute__((weak));
+    /// Signal the start of an interruptible operation.
+    /// @param name  an optional descriptive name for the operation
+    void start(const char* = nullptr) __attribute__((weak));
+    /// Signal the end of an interruptible operation.
+    void end() __attribute__((weak));
+    /// Check if an interruptible operation should be aborted.
+    /// @param percent  an optional (when >= 0) percentage indicating
+    ///     the fraction of the operation that has been completed
+    /// @note this method is assumed to be thread-safe.
+    bool wasInterrupted(int = -1) __attribute__((weak));
+
+private:
+    char* const mInterrupter = nullptr;
+    bool mRunning = false;
+    std::string mTitle = "";
+};
 
 } // namespace util
 } // namespace OPENVDB_VERSION_NAME

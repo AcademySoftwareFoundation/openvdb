@@ -8,10 +8,10 @@
 #ifndef OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_UTILS_HAS_BEEN_INCLUDED
 
+#include "Interrupter.h"
 #include "GU_PrimVDB.h"
 #include <OP/OP_Node.h> // for OP_OpTypeId
 #include <UT/UT_SharedPtr.h>
-#include <UT/UT_Interrupt.h>
 #include <openvdb/openvdb.h>
 #include <functional>
 #include <type_traits>
@@ -162,43 +162,6 @@ public:
     GU_PrimVDB* operator->() const { return getPrimitive(); }
     //@}
 }; // class VdbPrimIterator
-
-
-////////////////////////////////////////
-
-
-/// @brief Wrapper class that adapts a Houdini @c UT_Interrupt object
-/// for use with OpenVDB library routines
-/// @sa openvdb/util/NullInterrupter.h
-class Interrupter
-{
-public:
-    explicit Interrupter(const char* title = nullptr):
-        mUTI{UTgetInterrupt()}, mRunning{false}, mTitle{title ? title : ""}
-    {}
-    ~Interrupter() { if (mRunning) this->end(); }
-
-    Interrupter(const Interrupter&) = default;
-    Interrupter& operator=(const Interrupter&) = default;
-
-    /// @brief Signal the start of an interruptible operation.
-    /// @param name  an optional descriptive name for the operation
-    void start(const char* name = nullptr) {
-        if (!mRunning) { mRunning = true; mUTI->opStart(name ? name : mTitle.c_str()); }
-    }
-    /// Signal the end of an interruptible operation.
-    void end() { if (mRunning) { mUTI->opEnd(); mRunning = false; } }
-
-    /// @brief Check if an interruptible operation should be aborted.
-    /// @param percent  an optional (when >= 0) percentage indicating
-    ///     the fraction of the operation that has been completed
-    bool wasInterrupted(int percent=-1) { return mUTI->opInterrupt(percent); }
-
-private:
-    UT_Interrupt* mUTI;
-    bool mRunning;
-    std::string mTitle;
-};
 
 
 ////////////////////////////////////////

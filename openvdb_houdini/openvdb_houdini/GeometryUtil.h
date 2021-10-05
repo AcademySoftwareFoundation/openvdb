@@ -8,6 +8,7 @@
 #ifndef OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_GEOMETRY_UTIL_HAS_BEEN_INCLUDED
 
+#include "Interrupter.h"
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MeshToVolume.h> // for openvdb::tools::MeshToVoxelEdgeData
 #include <openvdb/tree/LeafManager.h>
@@ -36,8 +37,6 @@ class OP_Node;
 
 
 namespace openvdb_houdini {
-
-class Interrupter;
 
 
 /// Add geometry to the given detail to indicate the extents of a frustum transform.

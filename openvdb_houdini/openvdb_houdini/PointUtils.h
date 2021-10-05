@@ -10,6 +10,7 @@
 #ifndef OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 #define OPENVDB_HOUDINI_POINT_UTILS_HAS_BEEN_INCLUDED
 
+#include "Interrupter.h"
 #include <openvdb/math/Vec3.h>
 #include <openvdb/Types.h>
 #include <openvdb/points/PointDataGrid.h>
@@ -60,10 +61,6 @@ enum POINT_COMPRESSION_TYPE
     COMPRESSION_UNIT_FIXED_POINT_8,
     COMPRESSION_UNIT_FIXED_POINT_16,
 };
-
-
-// forward declaration
-class Interrupter;
 
 
 /// @brief Compute a voxel size from a Houdini detail
