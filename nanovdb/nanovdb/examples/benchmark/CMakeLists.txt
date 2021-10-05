@@ -26,18 +26,24 @@ if(NANOVDB_USE_CUDA)
   add_executable(benchmark_nano Benchmark_nano.cpp BenchKernels_nano.cu)
   add_executable(benchmark_dense Benchmark_dense.cpp BenchKernels_dense.cu)
 
-  target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY})
-  target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY})
+  target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY}
+                                                   ${NANOVDB_LOCAL_INCLUDEDIR}
+                                                   ${NANOVDB_LOCAL_INCLUDEDIR}/util
+  )
+  target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY}
+                                                   ${NANOVDB_LOCAL_INCLUDEDIR}
+                                                   ${NANOVDB_LOCAL_INCLUDEDIR}/util
+  )
 
   target_link_libraries(
     benchmark_nano
-    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
+    PRIVATE nanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
             ${NANOVDB_BLOSC} # optional
   )
 
   target_link_libraries(
     benchmark_dense
-    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
+    PRIVATE nanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
             ${NANOVDB_BLOSC} # optional
   )
 
@@ -61,7 +67,7 @@ target_include_directories(benchmark PUBLIC ${TBB_INCLUDE_DIRECTORY}
 
 target_link_libraries(
   benchmark
-  PRIVATE libnanovdb
+  PRIVATE nanovdb
           ${NANOVDB_GTEST}
           ${NANOVDB_TBB} # optional
           ${NANOVDB_OPENVDB} # optional

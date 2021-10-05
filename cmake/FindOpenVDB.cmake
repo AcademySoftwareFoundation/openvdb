@@ -18,6 +18,7 @@ Use this module by invoking find_package with the form::
                            # "pyopenvdb" for the python plugin
                            # "openvdb_ax" for the OpenVDB AX extension
                            # "openvdb_houdini" for the houdini plugin
+                           # "nanovdb" for the nanovdb extension
     )
 
 IMPORTED Targets
@@ -33,6 +34,8 @@ IMPORTED Targets
   The openvdb houdini library target.
 ``OpenVDB::openvdb_ax``
   The openvdb_ax library target.
+``OpenVDB::nanovdb``
+  The nanovdb library target.
 
 Result Variables
 ^^^^^^^^^^^^^^^^
@@ -127,6 +130,7 @@ set(_OPENVDB_COMPONENT_LIST
   pyopenvdb
   openvdb_ax
   openvdb_houdini
+  nanovdb
 )
 
 if(OpenVDB_FIND_COMPONENTS)
@@ -272,6 +276,16 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
         ${CMAKE_INSTALL_INCLUDEDIR}
         include
     )
+  elseif(${COMPONENT} STREQUAL "nanovdb")
+    # Look for NanoVDB.h
+    find_path(OpenVDB_${COMPONENT}_INCLUDE_DIR NanoVDB.h
+      ${_FIND_OPENVDB_ADDITIONAL_OPTIONS}
+      PATHS ${_VDB_COMPONENT_SEARCH_DIRS}
+      PATH_SUFFIXES
+        ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb
+        ${CMAKE_INSTALL_INCLUDEDIR}
+        include
+    )
   endif()
   unset(_VDB_COMPONENT_SEARCH_DIRS)
 endforeach()
@@ -356,6 +370,7 @@ endif()
 set(OpenVDB_LIB_COMPONENTS "")
 
 foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
+  message("COMPONENT = " ${COMPONENT})
   set(LIB_NAME ${COMPONENT})
 
   # Add in extra component paths
@@ -386,10 +401,19 @@ foreach(COMPONENT ${OpenVDB_FIND_COMPONENTS})
   endif()
 
   list(APPEND OpenVDB_LIB_COMPONENTS ${OpenVDB_${COMPONENT}_LIBRARY})
-  if(OpenVDB_${COMPONENT}_LIBRARY)
-    set(OpenVDB_${COMPONENT}_FOUND TRUE)
+  if(${COMPONENT} STREQUAL "nanovdb")
+    # nanovdb is headers-only, no lib component
+    if(OpenVDB_${COMPONENT}_INCLUDE_DIR)
+      set(OpenVDB_${COMPONENT}_FOUND TRUE)
+    else()
+      set(OpenVDB_${COMPONENT}_FOUND FALSE)
+    endif()
   else()
-    set(OpenVDB_${COMPONENT}_FOUND FALSE)
+    if(OpenVDB_${COMPONENT}_LIBRARY)
+      set(OpenVDB_${COMPONENT}_FOUND TRUE)
+    else()
+      set(OpenVDB_${COMPONENT}_FOUND FALSE)
+    endif()
   endif()
   unset(_VDB_COMPONENT_SEARCH_DIRS)
 endforeach()
@@ -405,13 +429,13 @@ unset(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 # ------------------------------------------------------------------------
 #  Cache and set OPENVDB_FOUND
 # ------------------------------------------------------------------------
-
 include(FindPackageHandleStandardArgs)
+# nanovdb is headers-only, no lib component
 find_package_handle_standard_args(OpenVDB
   FOUND_VAR OpenVDB_FOUND
   REQUIRED_VARS
     OpenVDB_INCLUDE_DIR
-    OpenVDB_LIB_COMPONENTS
+    # OpenVDB_LIB_COMPONENTS
   VERSION_VAR OpenVDB_VERSION
   HANDLE_COMPONENTS
 )
@@ -794,6 +818,20 @@ if(OpenVDB_openvdb_ax_LIBRARY)
       INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;${LLVM_LIBS}"
       INTERFACE_COMPILE_FEATURES cxx_std_14
     )
+  endif()
+endif()
+
+# OpenVDB::nanovdb
+
+if(OpenVDB_nanovdb_LIBRARY)
+  if(NOT TARGET OpenVDB::nanovdb)
+    add_library(OpenVDB::nanovdb INTERFACE IMPORTED)
+    set_target_properties(OpenVDB::nanovdb PROPERTIES
+      IMPORTED_LOCATION "${OpenVDB_nanovdb_LIBRARY}"
+      INTERFACE_INCLUDE_DIRECTORIES "${OpenVDB_nanovdb_INCLUDE_DIR}"
+      INTERFACE_LINK_LIBRARIES "OpenVDB::openvdb;"
+      INTERFACE_COMPILE_FEATURES cxx_std_14
+   )
   endif()
 endif()
 

@@ -51,6 +51,10 @@ See @subpage openvdbax "OpenVDB AX" for the AX documentation.
 See the @subpage houdini "Houdini Cookbook" for help on implementing Houdini nodes.
 @endif
 
+@if NANOVDB
+See @subpage NanoVDB "NanoVDB" for the NanoVDB documentation.
+@endif
+
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".
 

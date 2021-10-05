@@ -1,11 +1,35 @@
-# Copyright Contributors to the OpenVDB Project SPDX-License-Identifier: MPL-2.0
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
 
-# -----------------------------------------------------------------------
+  CMake Configuration for NanoVDB Examples
+
+#]=======================================================================]
+
+cmake_minimum_required(VERSION 3.12)
+project(NanoVDBExamples LANGUAGES CXX)
+
+include(GNUInstallDirs)
+
+###############################################################################
+
+message(STATUS "----------------------------------------------------")
+message(STATUS "---------- Configuring NanoVDB Examples ------------")
+message(STATUS "----------------------------------------------------")
+
+###############################################################################
+
 if(WIN32)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
 
-# ---------------------------------------------------------------
+#set(NANOVDB_INSTALL_EXAMPLEDIR ${CMAKE_INSTALL_PREFIX}/bin/nanovdb_examples)
+set(NANOVDB_LOCAL_EXAMPLEDIR ${PROJECT_BINARY_DIR}/examples)
+
+# -----------------------------------------------------------------------------`
+# helper function
+# -----------------------------------------------------------------------------`
 function(_ADD_EXAMPLE)
   set(options "")
   set(oneValueArgs NAME PATH GENERATED GENPATHS)
@@ -17,61 +41,58 @@ function(_ADD_EXAMPLE)
   set(EXAMPLE_NAME ${_ADD_EXAMPLE_NAME})
   set(EXAMPLE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_NAME}")
 
-  # many of the sample projects depend on a data directory. This allows Debug
-  # launching from the cmake binary working directory.
-  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
+  file(GLOB EXAMPLE_HEADER_FILES ${EXAMPLE_ROOT}/*.h
+                                 ${EXAMPLE_ROOT}/*.inl
+                                 ${EXAMPLE_ROOT}/*.hh
+                                 ${EXAMPLE_ROOT}/*.hpp
+                                 ${EXAMPLE_ROOT}/*.cuh)
 
-  file(
-    GLOB
-    EXAMPLE_HEADER_FILES
-    ${EXAMPLE_ROOT}/*.h
-    ${EXAMPLE_ROOT}/*.inl
-    ${EXAMPLE_ROOT}/*.hh
-    ${EXAMPLE_ROOT}/*.hpp
-    ${EXAMPLE_ROOT}/*.cuh)
-
-  file(GLOB EXAMPLE_SOURCE_FILES ${EXAMPLE_ROOT}/*.c ${EXAMPLE_ROOT}/*.cpp
-       ${EXAMPLE_ROOT}/*.cc)
+  file(GLOB EXAMPLE_SOURCE_FILES ${EXAMPLE_ROOT}/*.c
+                                 ${EXAMPLE_ROOT}/*.cpp
+                                 ${EXAMPLE_ROOT}/*.cc)
 
   file(GLOB EXAMPLE_SOURCE_CUDA_FILES ${EXAMPLE_ROOT}/*.cu)
 
-  # message( STATUS "EXAMPLE_NAME = ${EXAMPLE_NAME}")
-  message(STATUS "EXAMPLE_ROOT = ${EXAMPLE_ROOT}")
-
+  # configure CUDA
+  find_package(CUDA)
   if(EXAMPLE_SOURCE_CUDA_FILES AND NOT CUDA_FOUND)
     message(WARNING " - CUDA required to build ${EXAMPLE_NAME}. Skipping.")
     return()
   endif()
 
-  add_executable(
-    ${EXAMPLE_NAME} ${EXAMPLE_SOURCE_FILES} ${EXAMPLE_SOURCE_CUDA_FILES}
-                    ${EXAMPLE_HEADER_FILES})
+  add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE_FILES}
+                                 ${EXAMPLE_SOURCE_CUDA_FILES}
+                                 ${EXAMPLE_HEADER_FILES})
 
-  target_include_directories(
-    ${EXAMPLE_NAME} PUBLIC ex_util ${TBB_INCLUDE_DIRECTORY}
-                           ${CUDA_INCLUDE_DIRECTORY} ${NANOVDB_OGT_INCLUDE_DIRECTORY})
+  target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util
+                                                    ${NANOVDB_LOCAL_INCLUDEDIR}
+                                                    ${NANOVDB_LOCAL_INCLUDEDIR}/util
+                                                    ${TBB_INCLUDE_DIRECTORY}
+                                                    ${CUDA_INCLUDE_DIRECTORY}
+                                                    ${NANOVDB_OGT_INCLUDE_DIRECTORY})
 
-  target_link_libraries(
-    ${EXAMPLE_NAME}
-    PRIVATE libnanovdb
-            ${CUDA_LIBRARIES}
-            ${NANOVDB_OPENVDB} # optional
-            ${NANOVDB_TBB} # optional
-            ${NANOVDB_ZLIB} # optional
-            ${NANOVDB_BLOSC} # optional
+  target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb
+                                                ${CUDA_LIBRARIES}
+                                                ${NANOVDB_OPENVDB} # optional
+                                                ${NANOVDB_TBB} # optional
+                                                ${NANOVDB_ZLIB} # optional
+                                                ${NANOVDB_BLOSC} # optional
   )
 
-  target_compile_definitions(
-    ${EXAMPLE_NAME}
-    PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}" "${NANOVDB_USE_CUDA_FLAG}" "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
-            "${NANOVDB_USE_TBB_FLAG}" "${NANOVDB_USE_BLOSC_FLAG}"
-            "${NANOVDB_USE_ZLIB_FLAG}")
+  target_compile_definitions(${EXAMPLE_NAME} PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}"
+                                                     "${NANOVDB_USE_CUDA_FLAG}"
+                                                     "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
+                                                     "${NANOVDB_USE_TBB_FLAG}"
+                                                     "${NANOVDB_USE_BLOSC_FLAG}"
+                                                     "${NANOVDB_USE_ZLIB_FLAG}")
 
-  install(TARGETS ${EXAMPLE_NAME} DESTINATION examples)
+  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${NANOVDB_LOCAL_EXAMPLEDIR})
 
 endfunction()
 
-# ---------------------------------------------------------------
+# -----------------------------------------------------------------------------`
+# helper function
+# -----------------------------------------------------------------------------`
 function(_ADD_EXAMPLE_OPENVDB)
   set(options "")
   set(oneValueArgs NAME PATH GENERATED GENPATHS)
@@ -83,61 +104,60 @@ function(_ADD_EXAMPLE_OPENVDB)
   set(EXAMPLE_NAME ${_ADD_EXAMPLE_NAME})
   set(EXAMPLE_ROOT "${CMAKE_CURRENT_SOURCE_DIR}/${EXAMPLE_NAME}")
 
-  # many of the sample projects depend on a data directory. This allows Debug
-  # launching from the cmake binary working directory.
-  file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
+  file(GLOB EXAMPLE_HEADER_FILES ${EXAMPLE_ROOT}/*.h
+                                 ${EXAMPLE_ROOT}/*.inl
+                                 ${EXAMPLE_ROOT}/*.hh
+                                 ${EXAMPLE_ROOT}/*.hpp
+                                 ${EXAMPLE_ROOT}/*.cuh)
 
-  file(
-    GLOB
-    EXAMPLE_HEADER_FILES
-    ${EXAMPLE_ROOT}/*.h
-    ${EXAMPLE_ROOT}/*.inl
-    ${EXAMPLE_ROOT}/*.hh
-    ${EXAMPLE_ROOT}/*.hpp
-    ${EXAMPLE_ROOT}/*.cuh)
-
-  file(GLOB EXAMPLE_SOURCE_FILES ${EXAMPLE_ROOT}/*.c ${EXAMPLE_ROOT}/*.cpp
-       ${EXAMPLE_ROOT}/*.cc)
+  file(GLOB EXAMPLE_SOURCE_FILES ${EXAMPLE_ROOT}/*.c
+                                 ${EXAMPLE_ROOT}/*.cpp
+                                 ${EXAMPLE_ROOT}/*.cc)
 
   file(GLOB EXAMPLE_SOURCE_CUDA_FILES ${EXAMPLE_ROOT}/*.cu)
 
-  # message( STATUS "EXAMPLE_NAME = ${EXAMPLE_NAME}")
-  message(STATUS "EXAMPLE_ROOT = ${EXAMPLE_ROOT}")
-
+  # configure CUDA
+  find_package(CUDA)
   if(EXAMPLE_SOURCE_CUDA_FILES AND NOT CUDA_FOUND)
     message(WARNING " - CUDA required to build ${EXAMPLE_NAME}. Skipping.")
     return()
   endif()
 
+  # configure OpenVDB
+  find_package(OpenVDB)
   if(NOT (OpenVDB_FOUND))
     message(WARNING " - OpenVDB required to build ${EXAMPLE_NAME}. Skipping.")
     return()
   endif()
 
-  add_executable(
-    ${EXAMPLE_NAME} ${EXAMPLE_SOURCE_FILES} ${EXAMPLE_SOURCE_CUDA_FILES}
-                    ${EXAMPLE_HEADER_FILES})
+  add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE_FILES}
+                                 ${EXAMPLE_SOURCE_CUDA_FILES}
+                                 ${EXAMPLE_HEADER_FILES})
 
-  target_include_directories(
-    ${EXAMPLE_NAME} PUBLIC ex_util ${OpenVDB_INCLUDE_DIRS}
-                           ${TBB_INCLUDE_DIRECTORY} ${CUDA_INCLUDE_DIRECTORY} ${NANOVDB_OGT_INCLUDE_DIRECTORY})
+  target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util
+                                                    ${NANOVDB_LOCAL_INCLUDEDIR}
+                                                    ${NANOVDB_LOCAL_INCLUDEDIR}/util
+                                                    ${OpenVDB_INCLUDE_DIRS}
+                                                    ${TBB_INCLUDE_DIRECTORY}
+                                                    ${CUDA_INCLUDE_DIRECTORY}
+                                                    ${NANOVDB_OGT_INCLUDE_DIRECTORY})
 
-  target_link_libraries(
-    ${EXAMPLE_NAME}
-    PRIVATE libnanovdb
-            ${NANOVDB_OPENVDB} # optional
-            ${NANOVDB_TBB} # optional
-            ${NANOVDB_ZLIB} # optional
-            ${NANOVDB_BLOSC} # optional
+  target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb
+                                                ${NANOVDB_OPENVDB} # optional
+                                                ${NANOVDB_TBB} # optional
+                                                ${NANOVDB_ZLIB} # optional
+                                                ${NANOVDB_BLOSC} # optional
+                                                ${OPENVDB_LIB} # optional
   )
 
-  target_compile_definitions(
-    ${EXAMPLE_NAME}
-    PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}" "${NANOVDB_USE_CUDA_FLAG}" "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
-            "${NANOVDB_USE_TBB_FLAG}" "${NANOVDB_USE_BLOSC_FLAG}"
-            "${NANOVDB_USE_ZLIB_FLAG}")
+  target_compile_definitions(${EXAMPLE_NAME} PRIVATE "${NANOVDB_USE_OPENVDB_FLAG}"
+                                                     "${NANOVDB_USE_CUDA_FLAG}"
+                                                     "${NANOVDB_USE_MAGICAVOXEL_FLAG}"
+                                                     "${NANOVDB_USE_TBB_FLAG}"
+                                                     "${NANOVDB_USE_BLOSC_FLAG}"
+                                                     "${NANOVDB_USE_ZLIB_FLAG}")
 
-  install(TARGETS ${EXAMPLE_NAME} DESTINATION examples)
+  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${NANOVDB_LOCAL_EXAMPLEDIR})
 
 endfunction()
 
@@ -167,4 +187,6 @@ _add_example(NAME "ex_vox_to_nanovdb")
 endif()
 # add_subdirectory(ex_sph_benchmark)
 
-# ---------------------------------------------------------------
+# many of the sample projects depend on a data directory. This allows Debug
+# launching from the cmake binary working directory.
+file(MAKE_DIRECTORY "${NANOVDB_LOCAL_EXAMPLEDIR}/data")

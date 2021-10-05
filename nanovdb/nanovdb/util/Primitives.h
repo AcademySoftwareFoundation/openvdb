@@ -211,7 +211,7 @@ createFogVolumeTorus(ValueT              majorRadius = 100.0f,
 /// @param voxelSize      Size of a voxel in world units
 /// @param origin         Origin of grid in world units
 /// @param name           Name of the grid
-/// @param mode           Mode of computation for the checksum.
+/// @param cMode          Mode of computation for the checksum.
 /// @param buffer         Buffer used for memory allocation by the handle
 //
 /// @details The @c ValueT template parameter must be float (default) or double.

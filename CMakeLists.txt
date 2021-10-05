@@ -80,6 +80,9 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
+
+option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
+
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
@@ -90,6 +93,8 @@ provided. IlmBase/OpenEXR can optionally be provided if Houdini Version >= 17.5.
 option(USE_MAYA [=[
 Build the library against a Maya installation. Turns on automatically if OPENVDB_BUILD_MAYA_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB. All other dependencies must be provided.]=] OFF)
+option(USE_TBB [=[
+Use TBB in building the NanoVDB library.]=] ON)
 option(USE_BLOSC [=[
 Use blosc while building openvdb components. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the located
 openvdb build configuration to decide on blosc support. You may set this to on to force blosc to be used if you
@@ -133,6 +138,7 @@ option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" O
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
+option(USE_NANOVDB "Use NANOVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
@@ -173,6 +179,17 @@ endif()
 
 if(USE_BLOSC AND NOT USE_ZLIB)
   message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
+endif()
+
+if(USE_NANOVDB)
+  if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_NANOVDB)
+    message(FATAL_ERROR "Invalid CMake build configuration:
+      OPENVDB_BUILD_CORE:    [ON]
+      OPENVDB_BUILD_NANOVDB: [OFF]
+      USE_NANOVDB:           [ON]
+    If you are rebuilding the core library and using sub components, building
+    these sub components must also be enabled (i.e. -DOPENVDB_BUILD_NANOVDB=ON).")
+  endif()
 endif()
 
 # Top-level location for all openvdb headers
@@ -663,6 +680,14 @@ if(NOT OPENVDB_BUILD_AX AND
   find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
 endif()
 
+# Locate nanovdb if necessary
+
+if(NOT OPENVDB_BUILD_NANOVDB AND
+   USE_NANOVDB)
+  find_package(OpenVDB REQUIRED COMPONENTS nanovdb)
+endif()
+
+
 # Validate the OpenVDB ABI Version. If OpenVDB_ABI is not set, we're either building
 # the core library OR the ABI hasn't been deduced from a VDB installation. Use the
 # value from OPENVDB_ABI_VERSION_NUMBER, falling back to the lib major version number
@@ -766,6 +791,10 @@ endif()
 
 if(OPENVDB_BUILD_MAYA_PLUGIN)
   add_subdirectory(openvdb_maya/openvdb_maya)
+endif()
+
+if(OPENVDB_BUILD_NANOVDB)
+  add_subdirectory(nanovdb/nanovdb)
 endif()
 
 ##########################################################################

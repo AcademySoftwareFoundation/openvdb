@@ -283,7 +283,7 @@ struct HostBuffer::Pool
     /// @brief Disallow move assignment operation
     Pool& operator=(const Pool&&) = delete;
 
-    /// @bried Return the total number of bytes used from this Pool by buffers
+    /// @brief Return the total number of bytes used from this Pool by buffers
     uint64_t usage() const { return static_cast<uint64_t>(mFree - mData); }
 
     /// @brief Allocate a buffer of the specified size and add it to the register

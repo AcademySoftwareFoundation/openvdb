@@ -1,74 +1,35 @@
-# Copyright Contributors to the OpenVDB Project SPDX-License-Identifier: MPL-2.0
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
 
-# -----------------------------------------------------------------------
-# NanoVDB cmake file.
+  CMake Configuration for NanoVDB
 
-cmake_minimum_required(VERSION 3.11.4)
+#]=======================================================================]
 
+cmake_minimum_required(VERSION 3.12)
 project(NanoVDB LANGUAGES C CXX)
 
-# -----------------------------------------------------------------------
-# Setup.
+include(GNUInstallDirs)
 
-include(FetchContent)
+###############################################################################
 
-set(CMAKE_CXX_STANDARD 11)
-set(NanoVDB_TOP_LEVEL_DIR ${PROJECT_SOURCE_DIR})
+message(STATUS "----------------------------------------------------")
+message(STATUS "--------------- Configuring NanoVDB ----------------")
+message(STATUS "----------------------------------------------------")
 
-if(POLICY CMP0074)
-  cmake_policy(SET CMP0074 NEW)
-endif()
-
-if(POLICY CMP0104)
-  cmake_policy(SET CMP0104 OLD)
-endif()
-
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-# Set the default build to Release. NB. this can't do anything for MSVC which
-# defaults to Debug on startup.
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE
-      "Release"
-      CACHE
-        STRING
-        "Choose the type of build, options are: Debug Release RelWithDebInfo MinSizeRel."
-        FORCE)
-endif(NOT CMAKE_BUILD_TYPE)
-
-if(${CMAKE_SYSTEM_NAME} MATCHES "Emscripten")
-  set(USE_EMSCRIPTEN_TOOLCHAIN
-      ON
-      CACHE INTERNAL "using emscripten toolchain")
+###############################################################################
+# TODO: set this option if you want to build something in nano that depends
+# on openvdb
+if(NOT OPENVDB_BUILD_CORE)
+  set(OPENVDB_LIB OpenVDB::openvdb)
 else()
-  set(USE_EMSCRIPTEN_TOOLCHAIN
-      OFF
-      CACHE INTERNAL "using emscripten toolchain")
+  set(OPENVDB_LIB openvdb)
 endif()
 
-# -----------------------------------------------------------------------
-option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" ON)
-option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
-option(NANOVDB_BUILD_BENCHMARK "Build benchmark" ON)
-option(NANOVDB_BUILD_DOCS "Build docs" OFF)
-option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
-option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
-
-option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" ON)
-option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" ON)
-option(NANOVDB_USE_OPENGL "Build with OpenGL support" ON)
-option(NANOVDB_USE_OPENCL "Build with OpenCL support" ON)
-option(NANOVDB_USE_CUDA "Build with CUDA support" ON)
-option(NANOVDB_USE_TBB "Build with TBB support" ON)
-option(NANOVDB_USE_BLOSC "Build with BLOSC support" ON)
-option(NANOVDB_USE_ZLIB "Build with ZLIB support" ON)
-option(NANOVDB_USE_OPTIX "Build with OptiX support" ON)
-option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" ON)
-
-option(NANOVDB_ALLOW_FETCHCONTENT
-       "Allow FetchContent to download missing dependencies" ON)
-
-# -----------------------------------------------------------------------
+###############################################################################
+# Configuring CXXFLAGS
+###############################################################################
 # This is required to compile OpenVDB headers on windows.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
@@ -78,62 +39,41 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 endif()
 
-# -----------------------------------------------------------------------
+###############################################################################
+# add options
+###############################################################################
+option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" ON)
+option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
+option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" ON)
+option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
+
+option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
+option(NANOVDB_USE_CUDA "Build with CUDA support" ON)
+option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+
+option(NANOVDB_USE_BLOSC "Build with BLOSC support" ${USE_BLOSC})
+option(NANOVDB_USE_ZLIB "Build with ZLIB support" ${USE_ZLIB})
+option(NANOVDB_USE_TBB "Build with TBB support" ${USE_TBB})
+option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" ON)
+option(NANOVDB_USE_OPENCL "Build with OpenCL support" ON)
+option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" OFF)
+
+option(NANOVDB_ALLOW_FETCHCONTENT
+       "Allow FetchContent to download missing dependencies" ON)
+
+#------------------------------------------------------------------------------
 if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
-  if(NANOVDB_ALLOW_FETCHCONTENT)
-    message(STATUS "Downloading GTest...")
-    include(FetchContent)
-    FetchContent_Declare(
-      googletest
-      GIT_REPOSITORY https://github.com/google/googletest.git
-      GIT_TAG release-1.10.0)
-    set(INSTALL_GTEST
-        OFF
-        CACHE BOOL "" FORCE)
-    set(BUILD_GMOCK
-        OFF
-        CACHE BOOL "" FORCE)
-    set(gtest_force_shared_crt
-        ON
-        CACHE BOOL "" FORCE)
-    FetchContent_GetProperties(googletest)
-    if(NOT googletest_POPULATED)
-      FetchContent_Populate(googletest)
-      add_subdirectory(${googletest_SOURCE_DIR} ${googletest_BINARY_DIR})
-    endif()
-    set(NANOVDB_GTEST "gtest" "gtest_main")
+  find_package(GTest)
+  if(GTEST_FOUND)
+    set(NANOVDB_GTEST "GTest::GTest" "GTest::Main")
   else()
-    find_package(GTest)
-    if(GTEST_FOUND)
-      set(NANOVDB_GTEST "GTest::GTest" "GTest::Main")
-    endif()
+    message(WARNING "GTest required to build NanoVDB unit test or NanoVDB bencmarks.")
   endif()
 endif()
 
-# ---------------------------------------------------------------
-if(NANOVDB_USE_MAGICAVOXEL)
-  if(NANOVDB_ALLOW_FETCHCONTENT)
-    if(NOT ogt_POPULATED)
-      message(STATUS "Downloading ogt...")
-
-      FetchContent_Declare(
-        ogt
-        GIT_REPOSITORY https://github.com/jpaver/opengametools.git
-        GIT_TAG master)
-
-      FetchContent_GetProperties(ogt)
-      if(NOT ogt_POPULATED)
-        FetchContent_Populate(ogt)
-        set(NANOVDB_OGT_INCLUDE_DIRECTORY ${ogt_SOURCE_DIR}/src)
-        set(NANOVDB_USE_MAGICAVOXEL_FLAG "NANOVDB_USE_MAGICAVOXEL")
-      endif()
-    endif()
-  endif()
-endif(NANOVDB_USE_MAGICAVOXEL)
-
-# -----------------------------------------------------------------------
+#------------------------------------------------------------------------------
 if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
-  find_package(CUDA)
+  find_package(CUDA REQUIRED)
   if(CUDA_FOUND)
     set(CMAKE_CUDA_STANDARD 11)
     set(CMAKE_CUDA_STANDARD_REQUIRED ON)
@@ -145,6 +85,9 @@ if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
 
     set(CMAKE_CUDA_FLAGS
         "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo")
+
+    # TODO: double check this with Ken
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
 
     # find NVRTC library.
     find_library(
@@ -166,16 +109,14 @@ if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
     set(CUDA_LINK_LIBRARY ${CUDA_LIBRARIES})
     set(CUDA_INCLUDE_DIRECTORY ${CUDA_INCLUDE_DIRS})
     set(NVRTC_LINK_LIBRARY ${CUDA_nvrtc_LIBRARY})
-
   endif()
 endif()
 
-# -----------------------------------------------------------------------
 if(NANOVDB_USE_INTRINSICS)
   set(NANOVDB_USE_INTRINSICS_FLAG "NANOVDB_USE_INTRINSICS")
 endif()
 
-# -----------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if(NANOVDB_USE_OPENCL AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(OpenCL)
   if(OpenCL_FOUND)
@@ -185,27 +126,7 @@ if(NANOVDB_USE_OPENCL AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   endif()
 endif()
 
-# -----------------------------------------------------------------------
-if(NANOVDB_USE_OPENGL AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
-  find_package(OpenGL)
-  if(OpenGL_FOUND)
-    set(NANOVDB_OPENGL OpenGL::GL ${CMAKE_DL_LIBS})
-    set(OPENGL_INCLUDE_DIRECTORY ${OPENGL_INCLUDE_DIR})
-    set(NANOVDB_USE_OPENGL_FLAG "NANOVDB_USE_OPENGL")
-  endif()
-endif()
-
-# -----------------------------------------------------------------------
-if(NANOVDB_USE_OPTIX AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
-  find_package(OptiX)
-  if(OptiX_FOUND)
-    set(NANOVDB_OPTIX_INCLUDE_DIRECTORY ${OptiX_INCLUDE_DIR})
-    set(NANOVDB_OPTIX_LINK_LIBRARY ${OptiX_LIBRARIES})
-    set(NANOVDB_USE_OPTIX_FLAG "NANOVDB_USE_OPTIX")
-  endif()
-endif()
-
-# -----------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if(NANOVDB_USE_OPENVDB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(OpenVDB)
   if(OpenVDB_FOUND)
@@ -217,7 +138,7 @@ if(NANOVDB_USE_OPENVDB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   set(BUILD_SHARED_LIBS OFF)
 endif()
 
-# -----------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if(NANOVDB_USE_TBB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(TBB)
   if(Tbb_VERSION)
@@ -230,7 +151,7 @@ if(NANOVDB_USE_TBB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   endif()
 endif()
 
-# -----------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if(NANOVDB_USE_ZLIB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(ZLIB REQUIRED)
   if(ZLIB_FOUND)
@@ -239,7 +160,7 @@ if(NANOVDB_USE_ZLIB AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   endif()
 endif()
 
-# -----------------------------------------------------------------------
+#-------------------------------------------------------------------------------
 if(NANOVDB_USE_BLOSC AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   find_package(Blosc REQUIRED)
   if(Blosc_FOUND)
@@ -248,46 +169,87 @@ if(NANOVDB_USE_BLOSC AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
   endif()
 endif()
 
-# -----------------------------------------------------------------------
-function(assign_source_group)
-  foreach(_source IN ITEMS ${ARGN})
-    if(IS_ABSOLUTE "${_source}")
-      file(RELATIVE_PATH _source_rel "${CMAKE_CURRENT_SOURCE_DIR}" "${_source}")
-    else()
-      set(_source_rel "${_source}")
+#-------------------------------------------------------------------------------
+if(NANOVDB_USE_MAGICAVOXEL)
+  if(NANOVDB_ALLOW_FETCHCONTENT)
+    if(NOT ogt_POPULATED)
+      message(STATUS "Downloading ogt...")
+
+      FetchContent_Declare(
+        ogt
+        GIT_REPOSITORY https://github.com/jpaver/opengametools.git
+        GIT_TAG master)
+
+      FetchContent_GetProperties(ogt)
+      if(NOT ogt_POPULATED)
+        FetchContent_Populate(ogt)
+        set(NANOVDB_OGT_INCLUDE_DIRECTORY ${ogt_SOURCE_DIR}/src)
+        set(NANOVDB_USE_MAGICAVOXEL_FLAG "NANOVDB_USE_MAGICAVOXEL")
+      endif()
     endif()
-    get_filename_component(_source_path "${_source_rel}" PATH)
-    string(REPLACE "/" "\\" _source_path_msvc "${_source_path}")
-    source_group("${_source_path_msvc}" FILES "${_source}")
-  endforeach()
-endfunction(assign_source_group)
+  endif()
+endif(NANOVDB_USE_MAGICAVOXEL)
 
-# -----------------------------------------------------------------------
-set(NANOVDB_LOCATION "..")
-set(NANOVDB_INCLUDE_DIR "${NANOVDB_LOCATION}")
-set(NANOVDB_INCLUDE_DIRECTORY
-    ${NANOVDB_INCLUDE_DIR}
-    CACHE STRING "NANOVDB include directory")
+###############################################################################
+# Installation
+###############################################################################
+set(NANOVDB_LOCAL_INCLUDEDIR ${PROJECT_BINARY_DIR})
+set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
+set(NANOVDB_LOCAL_UTILDIR ${NANOVDB_LOCAL_INCLUDEDIR}/util)
+set(NANOVDB_INSTALL_UTILDIR ${NANOVDB_INSTALL_INCLUDEDIR}/util)
 
-file(GLOB_RECURSE NANOVDB_HEADERS "${NANOVDB_INCLUDE_DIR}/nanovdb/*.h")
-assign_source_group(${NANOVDB_HEADERS})
+# NanoVDB header files
+set(NANOVDB_INCLUDE_FILES
+  CNanoVDB.h
+  NanoVDB.h
+  PNanoVDB.h
+)
 
-# ---------------------------------------------------------------
-add_library(libnanovdb INTERFACE)
+# NanoVDB util header files
+set(NANOVDB_INCLUDE_UTILFILES
+  util/CSampleFromVoxels.h
+  util/CudaDeviceBuffer.h
+  util/DitherLUT.h
+  util/ForEach.h
+  util/GridBuilder.h
+  util/GridChecksum.h
+  util/GridHandle.h
+  util/GridStats.h
+  util/GridValidator.h
+  util/HDDA.h
+  util/HostBuffer.h
+  util/Invoke.h
+  util/IO.h
+  util/NanoToOpenVDB.h
+  util/NodeManager.h
+  util/OpenToNanoVDB.h
+  util/Primitives.h
+  util/Range.h
+  util/Ray.h
+  util/Reduce.h
+  util/SampleFromVoxels.h
+  util/Stencils.h
+)
 
-target_include_directories(libnanovdb INTERFACE ${NANOVDB_INCLUDE_DIR}
-                                                ${NANOVDB_INCLUDE_DIR}/nanovdb)
+add_library(nanovdb INTERFACE)
+target_include_directories(nanovdb INTERFACE
+  ${NANOVDB_LOCAL_INCLUDEDIR}
+  ${NANOVDB_LOCAL_UTILDIR}
+  ${PROJECT_BINARY_DIR}
+)
+target_compile_definitions(nanovdb INTERFACE "-DNOMINMAX" "-D${NANOVDB_USE_INTRINSICS_FLAG}")
 
-target_compile_definitions(libnanovdb INTERFACE "-DNOMINMAX" "-D${NANOVDB_USE_INTRINSICS_FLAG}")
+file(MAKE_DIRECTORY ${NANOVDB_LOCAL_INCLUDEDIR})
+file(COPY ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_LOCAL_INCLUDEDIR})
+install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR})
 
-add_custom_target(nanovdb SOURCES ${NANOVDB_HEADERS})
+file(MAKE_DIRECTORY ${NANOVDB_LOCAL_UTILDIR})
+file(COPY ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_LOCAL_UTILDIR})
+install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_INSTALL_UTILDIR})
 
-# -----------------------------------------------------------------------
-# many of the sample projects depend on a data directory. This allows Debug
-# launching from the cmake binary working directory.
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
-
-# -----------------------------------------------------------------------
+###############################################################################
+# Options
+###############################################################################
 if(NANOVDB_BUILD_TOOLS)
   add_subdirectory(cmd)
 endif()
@@ -299,17 +261,3 @@ endif()
 if(NANOVDB_BUILD_EXAMPLES)
   add_subdirectory(examples)
 endif()
-
-if(NANOVDB_BUILD_DOCS)
-  add_subdirectory(docs)
-endif()
-
-# ---------------------------------------------------------------
-# Installation
-#
-
-# ---------------------------------------------------------------
-# copy header files to ${release}/nanovdb/*
-install(DIRECTORY ${NANOVDB_INCLUDE_DIR}/nanovdb DESTINATION ./)
-
-# ---------------------------------------------------------------

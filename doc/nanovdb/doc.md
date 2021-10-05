@@ -1,4 +1,4 @@
-# NanoVDB {#mainpage}
+# NanoVDB {#NanoVDB}
 
 Welcome to the NanoVDB docs.
 

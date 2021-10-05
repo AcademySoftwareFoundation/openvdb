@@ -21,6 +21,7 @@ include(GNUInstallDirs)
 # all documentation is included.
 option(OPENVDB_DOXYGEN_AX "Build AX documentation" ON)
 option(OPENVDB_DOXYGEN_HOUDINI "Build Houdini documentation" ON)
+option(OPENVDB_DOXYGEN_NANOVDB "Build NanoVDB documentation" ON)
 option(OPENVDB_DOXYGEN_INTERNAL [=[
 Enable documentation of methods and classes which have been explicitly marked as internal
 ]=] OFF)
@@ -219,6 +220,22 @@ if(OPENVDB_DOXYGEN_AX)
     openvdb_ax/openvdb_ax/grammar/generated
     openvdb_ax/openvdb_ax/math
     openvdb_ax/openvdb_ax/test)
+endif()
+
+if(OPENVDB_DOXYGEN_NANOVDB)
+  list(APPEND DOXYGEN_ENABLED_SECTIONS "NANOVDB")
+
+  list(APPEND DOXY_FILES
+    doc/nanovdb/doc.md
+    doc/nanovdb/FAQ.md
+    doc/nanovdb/SourceTree.md
+    doc/nanovdb/HowToBuild.md
+    doc/nanovdb/HelloWorld.md
+    nanovdb/nanovdb
+    nanovdb/nanovdb/cmd
+    nanovdb/nanovdb/examples
+    nanovdb/nanovdb/unittest
+    nanovdb/nanovdb/util)
 endif()
 
 set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)
