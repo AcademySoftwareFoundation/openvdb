@@ -1,3 +1,0 @@
-Build:
-    - Added support for OpenEXR 3.
-    [Contributed by Cary Phillips].
