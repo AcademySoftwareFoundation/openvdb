@@ -57,6 +57,32 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 endif()
 
+#########################################################################
+# add options
+##########################################################################
+set(NANOVDB_LOCATION ${CMAKE_CURRENT_SOURCE_DIR})
+get_filename_component(NANOVDB_INCLUDE_DIR ${NANOVDB_LOCATION} DIRECTORY)
+option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
+option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
+option(NANOVDB_BUILD_BENCHMARK "Build benchmark" OFF)
+option(NANOVDB_BUILD_DOCS "Build docs" OFF)
+option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
+option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+
+if(NANOVDB_BUILD_TOOLS)
+  add_subdirectory(cmd)
+endif()
+
+if(NANOVDB_BUILD_UNITTESTS)
+  add_subdirectory(unittest)
+endif()
+
+if(NANOVDB_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+#########################################################################
+# end options
+##########################################################################
 
 # NanoVDB header files
 set(NANOVDB_INCLUDE_FILES
