@@ -1,2 +1,0 @@
-Houdini:
-    - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.

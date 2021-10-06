@@ -2,6 +2,15 @@
 
 @page changes Release Notes
 
+@htmlonly <a name="v9_0_0_changes"></a>@endhtmlonly
+@par
+<B>Version 9.0.0</B> - <I>In development</I>
+
+@par
+ABI changes:
+- Added transient data to the RootNode, InternalNode and LeafNode.
+
+
 @htmlonly <a name="v8_2_0_changes"></a>@endhtmlonly
 @par
 <B>Version 8.2.0</B> - <I>In development</I>
@@ -26,6 +35,9 @@ Improvements:
 - Improved support for size_t grid types on systems where size_t is a unique
   type
   [Contributed by Brecht Van Lommel]
+- Minor performance improvements to dilation calls in fast sweeping algorithms
+- Add support for dilation in one direction and extending a field in one
+  direction
 
 @par
 API changes:
@@ -45,6 +57,11 @@ Houdini:
   for dilation.
 - The label for Voxels to Expand is now Expand Voxels to match Houdini.
 - Fix bug to allow VDB LOD SOPs to be chained together.
+- SOP Extrapolate supports dilation in one direction and extending a field in
+  one (domain) direction.
+- The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
+- VDB Visualize Tree SOP is now multi-threaded and provides slicing and color
+  remapping.
 
 @par
 Build:
@@ -58,7 +75,13 @@ Build:
   issues when using later versions of doxygen.
 - Build fixes for MinGW on Windows
   [Contributed by Brecht Sanders]
-
+- Added support for OpenEXR 3
+  [Contributed by Cary Phillips]
+- Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides the
+  ability to customise the VDB namespace.
+- The Python Module now appends the base directory defined by Python_SITELIB
+  to the default install path (typically dist-packages or site-packages)
+  [Contributed by Ignacio Vizzo]
 
 
 @htmlonly <a name="v8_1_0_changes"></a>@endhtmlonly
