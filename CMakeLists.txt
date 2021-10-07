@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 8)
-set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_MAJOR_VERSION 9)
+set(OpenVDB_MINOR_VERSION 0)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -123,7 +123,8 @@ its default system search routine if it cannot find a dependency with the provid
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
-option(OPENVDB_USE_FUTURE_ABI_9 "Bypass future ABI check" OFF)
+option(OPENVDB_USE_DEPRECATED_ABI_7 "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
@@ -200,7 +201,8 @@ mark_as_advanced(
   DISABLE_DEPENDENCY_VERSION_CHECKS
   DISABLE_CMAKE_SEARCH_PATHS
   OPENVDB_USE_DEPRECATED_ABI_6
-  OPENVDB_USE_FUTURE_ABI_9
+  OPENVDB_USE_DEPRECATED_ABI_7
+  OPENVDB_USE_FUTURE_ABI_10
   OPENVDB_FUTURE_DEPRECATION
   CONCURRENT_MALLOC
   USE_COLORED_OUTPUT
@@ -220,56 +222,51 @@ set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 6)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 7)
-set(FUTURE_OPENVDB_ABI_VERSION 9)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 8)
+set(FUTURE_OPENVDB_ABI_VERSION 10)
 
 if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2019 of the VFX platform where available
+  # @note  Currently tracking CY2020 of the VFX platform where available
   set(MINIMUM_GCC_VERSION 6.3.1)
   set(MINIMUM_CLANG_VERSION 3.8)
   set(MINIMUM_ICC_VERSION 17)
   set(MINIMUM_MSVC_VERSION 19.10)
 
-  set(MINIMUM_BOOST_VERSION 1.61)  # @warning should be 1.66, but H18 ships with 1.61
-  set(MINIMUM_ILMBASE_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
-  set(MINIMUM_OPENEXR_VERSION 2.2) # @warning should be 2.3, but H18 ships with 2.2
+  set(MINIMUM_BOOST_VERSION 1.70)
+  set(MINIMUM_ILMBASE_VERSION 2.4)
+  set(MINIMUM_OPENEXR_VERSION 2.4)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
-  set(MINIMUM_TBB_VERSION 2018.0)
-  set(MINIMUM_LLVM_VERSION 6.0.0)
+  set(MINIMUM_TBB_VERSION 2019.0)
+  set(MINIMUM_LLVM_VERSION 7.0.0)
 
-  set(MINIMUM_PYTHON_VERSION 2.7)
+  set(MINIMUM_PYTHON_VERSION 2.7) # @warning should be 3.7.x, but H18.5+ can still be used with 2.7.x
   set(MINIMUM_NUMPY_VERSION 1.14.0)
 
   set(MINIMUM_GOOGLETEST_VERSION 1.8)
   set(MINIMUM_GLFW_VERSION 3.1)
   set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 18.0)
+  set(MINIMUM_HOUDINI_VERSION 18.5)
 
   # These always promote warnings rather than errors
   set(MINIMUM_MAYA_VERSION 2017)
   set(MINIMUM_DOXYGEN_VERSION 1.8.8)
 endif()
 
-# VFX 20 deprecations to transition to MINIMUM_* variables in OpenVDB 9.0.0
-
-# Note: CMake 3.15 chosen as possible next version due to Windows support
-# with CMAKE_MSVC_RUNTIME_LIBRARY, numpy modules with CMake 3.14 and simplified
-# python linkage on macOS (Python::Module target in 3.15)
-set(FUTURE_MINIMUM_CMAKE_VERSION 3.15)
+# VFX 21 deprecations to transition to MINIMUM_* variables in OpenVDB 10.0.0
 
 # No compiler upgrades planned
-#set(FUTURE_MINIMUM_GCC_VERSION 6.3.1)
-#set(FUTURE_MINIMUM_ICC_VERSION 17)
-#set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
+set(FUTURE_MINIMUM_GCC_VERSION 9.3.1)
+set(FUTURE_MINIMUM_ICC_VERSION 19)
+# set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
 
-set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
-set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
-set(FUTURE_MINIMUM_BOOST_VERSION 1.70)
-set(FUTURE_MINIMUM_TBB_VERSION 2019.0)
+# set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
+# set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.73)
+set(FUTURE_MINIMUM_TBB_VERSION 2020.2)
 set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
 set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
-set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
-set(FUTURE_MINIMUM_LLVM_VERSION 8.0.0)
+# set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
+set(FUTURE_MINIMUM_LLVM_VERSION 10.0.0)
 
 #########################################################################
 
@@ -292,12 +289,6 @@ endif()
 
 # Configure MS Runtime
 
-if(CMAKE_MSVC_RUNTIME_LIBRARY AND CMAKE_VERSION VERSION_LESS 3.15)
-  # CMAKE_MSVC_RUNTIME_LIBRARY selects the MSVC runtime library for use by compilers
-  # targeting the MSVC ABI. Options are: MultiThreaded MultiThreadedDLL MultiThreadedDebug
-  # MultiThreadedDebugDLL. If empty, CMake defaults to MultiThreaded$<$<CONFIG:Debug>:Debug>DLL
-  message(FATAL_ERROR "CMAKE_MSVC_RUNTIME_LIBRARY support is only available from CMake 3.15")
-endif()
 if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
   message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
 
@@ -343,13 +334,6 @@ enable_testing()
 # Add our cmake modules
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
-
-# Add backports to support older versions of CMake
-#  FindNumPy.cmake is needed if CMake < 3.14
-
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-  list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/backports")
-endif()
 
 # Add cmake modules to installation command
 # @todo fix our glew cmake module

@@ -52,13 +52,13 @@ jobs:
       CXX: ${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2019-clang8', '2020-clang7', '2021-clang10']
+        image: ['2020-clang7', '2021-clang10', '2022-clang11']
         compiler: ['clang++']
         build: ['Release']
         j: [2]
         # Extra builds
         include:
-          - image: '2020-clang7'
+          - image: '2022-clang11'
             compiler: 'clang++'
             build: 'Debug'
             j: 2
@@ -67,12 +67,12 @@ jobs:
             build: 'Release'
             # disable parallel builds when using GCC due to memory limits
             j: 1
-          - image: '2019-clang8'
+          - image: '2021-clang10'
             compiler: 'g++'
             build: 'Release'
             # disable parallel builds when using GCC due to memory limits
             j: 1
-          - image: '2021-clang10'
+          - image: '2022-clang11'
             compiler: 'g++'
             build: 'Release'
             # disable parallel builds when using GCC due to memory limits
@@ -110,18 +110,18 @@ jobs:
       CXX: ${{ matrix.compiler }}
     strategy:
       matrix:
-        image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
+        image: ['2021-clang10', '2022-clang11']
         compiler: ['clang++']
         build: ['Release']
         j: [2]
         # Extra builds
         include:
-          - image: '2020-clang7'
+          - image: '2022-clang11'
             compiler: 'g++'
             build: 'Release'
             # disable parallel builds when using GCC due to memory limits
             j: 1
-          - image: '2020-clang7'
+          - image: '2022-clang11'
             compiler: 'clang++'
             build: 'Debug'
             j: 2

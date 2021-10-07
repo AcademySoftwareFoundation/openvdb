@@ -75,7 +75,7 @@ may be provided to tell this module where to look.
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
