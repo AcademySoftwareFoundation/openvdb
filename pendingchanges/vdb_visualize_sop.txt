@@ -1,3 +1,0 @@
-Houdini:
-    - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
-      color remapping.

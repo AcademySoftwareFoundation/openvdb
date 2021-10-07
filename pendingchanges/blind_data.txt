@@ -1,3 +1,0 @@
-ABI changes (v9.0.0):
-- Added transient data to the RootNode, InternalNode and LeafNode for
-  ABI=9.
