@@ -60,19 +60,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release' }
-          - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '9', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Debug'   }
           - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Release' }
-          - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Debug'   }
+          - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
+          - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', abi: '9', build: 'Release' }
           - { cxx: g++,     image: '2021', abi: '8', build: 'Release' }
+          - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
     - name: install_gtest
-      run: ./ci/install_gtest.sh 1.8.0
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -144,17 +143,17 @@ jobs:
     runs-on: ubuntu-latest
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2021
+      image: aswf/ci-openvdb:2022-clang11
     env:
       CXX: clang++
     strategy:
       matrix:
         config:
-          - { name: 'abi8all',  cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'abi8lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
-          - { name: 'abi8half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'abi8sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'abi8avx',  cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'all',  cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
+          - { name: 'half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',  cmake: '-DOPENVDB_SIMD=AVX' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -165,11 +164,11 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=8 ${{ matrix.config.cmake }}\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=9 ${{ matrix.config.cmake }}\"
     - name: test
       run: cd build && ctest -V
 
-  testabi8gcc10:
+  testabi9gcc10:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
@@ -190,11 +189,11 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
+        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DCMAKE_INSTALL_PREFIX=`pwd`\"
     - name: test
       run: cd build && ctest -V
 
-  testabi8clang10:
+  testabi9clang10:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
@@ -215,7 +214,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
+        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DCMAKE_INSTALL_PREFIX=`pwd`\"
     - name: test
       run: cd build && ctest -V
 
@@ -247,7 +246,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DOPENVDB_SIMD=SSE42\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
       run: cd build && ctest -V
