@@ -344,6 +344,11 @@ public:
     bool operator==(const AttributeArray& other) const;
     bool operator!=(const AttributeArray& other) const { return !this->operator==(other); }
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Indirect virtual function to retrieve the data buffer cast to a char byte array
+    const char* constDataAsByteArray() const { return this->dataAsByteArray(); }
+#endif
+
 private:
     friend class ::TestAttributeArray;
 
@@ -738,6 +743,11 @@ public:
 
     /// Return @c true if all data has been loaded
     bool isDataLoaded() const override;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the raw data buffer
+    inline const StorageType* constData() const { return this->data(); }
+#endif
 
 protected:
     AccessorBasePtr getAccessor() const override;
