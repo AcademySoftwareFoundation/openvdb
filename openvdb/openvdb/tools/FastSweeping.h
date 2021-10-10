@@ -45,6 +45,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include "LevelSetUtil.h"
 #include "Morphology.h"
+#include <openvdb/openvdb.h>
 
 #include "Statistics.h"
 #ifdef BENCHMARK_FAST_SWEEPING
@@ -1871,6 +1872,31 @@ maskSdf(const GridT &sdfGrid,
     if (fs.initMask(sdfGrid, mask, ignoreActiveTiles)) fs.sweep(nIter);
     return fs.sdfGrid();
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_FASTSWEEPING
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr fogToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr sdfToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr dilateSdf(const Grid<TreeT>&, int, NearestNeighbors, int, FastSweepingDomain)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_INSTANTIATE_FASTSWEEPING
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

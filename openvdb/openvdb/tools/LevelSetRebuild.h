@@ -12,6 +12,7 @@
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
+#include <openvdb/openvdb.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <type_traits>
@@ -39,7 +40,7 @@ namespace tools {
 ///
 /// @note If the input grid contains overlapping isosurfaces, interior edges will be lost.
 template<class GridType>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue = 0,
     float halfWidth = float(LEVEL_SET_HALF_WIDTH), const math::Transform* xform = nullptr);
 
@@ -59,7 +60,7 @@ levelSetRebuild(const GridType& grid, float isovalue = 0,
 ///
 /// @note If the input grid contains overlapping isosurfaces, interior edges will be lost.
 template<class GridType>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float inBandWidth,
     const math::Transform* xform = nullptr);
 
@@ -80,7 +81,7 @@ levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float i
 ///
 /// @note If the input grid contains overlapping isosurfaces, interior edges will be lost.
 template<class GridType, typename InterruptT>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float isovalue, float exBandWidth, float inBandWidth,
     const math::Transform* xform = nullptr, InterruptT* interrupter = nullptr);
 
@@ -278,7 +279,7 @@ doLevelSetRebuild(const GridType&, typename GridType::ValueType /*isovalue*/,
 
 
 template<class GridType, typename InterruptT>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
     const math::Transform* xform, InterruptT* interrupter)
 {
@@ -293,7 +294,7 @@ levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
 
 
 template<class GridType>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
     const math::Transform* xform)
 {
@@ -309,7 +310,7 @@ levelSetRebuild(const GridType& grid, float iso, float exWidth, float inWidth,
 
 
 template<class GridType>
-inline typename GridType::Ptr
+typename GridType::Ptr
 levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Transform* xform)
 {
     using ValueT = typename GridType::ValueType;
@@ -321,6 +322,25 @@ levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Tran
         grid, isovalue, halfWidth, halfWidth, xform, nullptr);
 }
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETREBUILD
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr levelSetRebuild(const Grid<TreeT>&, float, float, const math::Transform*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr levelSetRebuild(const Grid<TreeT>&, float, float, float, const math::Transform*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_INSTANTIATE_LEVELSETREBUILD
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

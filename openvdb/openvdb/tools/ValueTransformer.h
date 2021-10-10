@@ -34,6 +34,7 @@
 #include <tbb/parallel_reduce.h>
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
+#include <openvdb/openvdb.h>
 
 
 namespace openvdb {
@@ -200,7 +201,7 @@ inline void accumulate(const IterT& iter, XformOp& op, bool threaded = true);
 /// followed by setValueOn().
 /// @note @a TreeT can be either a Tree or a ValueAccessor.
 template<typename TreeT>
-inline void setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+void setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
 
 /// @brief Set the value of the voxel at the given coordinates in @a tree to
 /// the maximum of its current value and @a value, and mark the voxel as active.
@@ -208,7 +209,7 @@ inline void setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::V
 /// followed by setValueOn().
 /// @note @a TreeT can be either a Tree or a ValueAccessor.
 template<typename TreeT>
-inline void setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+void setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
 
 /// @brief Set the value of the voxel at the given coordinates in @a tree to
 /// the sum of its current value and @a value, and mark the voxel as active.
@@ -216,7 +217,7 @@ inline void setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::V
 /// followed by setValueOn().
 /// @note @a TreeT can be either a Tree or a ValueAccessor.
 template<typename TreeT>
-inline void setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+void setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
 
 /// @brief Set the value of the voxel at the given coordinates in @a tree to
 /// the product of its current value and @a value, and mark the voxel as active.
@@ -224,7 +225,7 @@ inline void setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::V
 /// followed by setValueOn().
 /// @note @a TreeT can be either a Tree or a ValueAccessor.
 template<typename TreeT>
-inline void setValueOnMult(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
+void setValueOnMult(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value);
 
 
 ////////////////////////////////////////
@@ -273,7 +274,7 @@ struct MultOp {
 
 
 template<typename TreeT>
-inline void
+void
 setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
 {
     tree.modifyValue(xyz, valxform::MinOp<typename TreeT::ValueType>(value));
@@ -281,7 +282,7 @@ setValueOnMin(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& va
 
 
 template<typename TreeT>
-inline void
+void
 setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
 {
     tree.modifyValue(xyz, valxform::MaxOp<typename TreeT::ValueType>(value));
@@ -289,7 +290,7 @@ setValueOnMax(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& va
 
 
 template<typename TreeT>
-inline void
+void
 setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
 {
     tree.modifyValue(xyz, valxform::SumOp<typename TreeT::ValueType>(value));
@@ -297,7 +298,7 @@ setValueOnSum(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& va
 
 
 template<typename TreeT>
-inline void
+void
 setValueOnMult(TreeT& tree, const Coord& xyz, const typename TreeT::ValueType& value)
 {
     tree.modifyValue(xyz, valxform::MultOp<typename TreeT::ValueType>(value));
@@ -677,6 +678,36 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
     typename valxform::OpAccumulator<IterT, XformOp> proc(iter, op);
     proc.process(threaded);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_VALUETRANSFORMER
+
+#define _FUNCTION(TreeT) \
+    void setValueOnMin(TreeT&, const Coord&, const TreeT::ValueType&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void setValueOnMax(TreeT&, const Coord&, const TreeT::ValueType&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void setValueOnSum(TreeT&, const Coord&, const TreeT::ValueType&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void setValueOnMult(TreeT&, const Coord&, const TreeT::ValueType&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_INSTANTIATE_VALUETRANSFORMER
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

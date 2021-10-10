@@ -17,6 +17,7 @@
 #include "Mask.h" // interiorMask
 #include "Morphology.h" // erodeActiveValues
 #include "PoissonSolver.h"
+#include <openvdb/openvdb.h>
 
 
 namespace openvdb {
@@ -84,7 +85,7 @@ computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann, math::pcg:
 ///                     values give the Neumann boundaries that should be applied there
 /// @param backgroundVelocity   a background velocity value
 template<typename Vec3GridT>
-inline typename Vec3GridT::Ptr
+typename Vec3GridT::Ptr
 computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potential,
     const Vec3GridT& neumann,
     const typename Vec3GridT::ValueType backgroundVelocity =
@@ -331,7 +332,7 @@ computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann,
 
 
 template<typename Vec3GridT>
-inline typename Vec3GridT::Ptr
+typename Vec3GridT::Ptr
 computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potential,
     const Vec3GridT& neumann,
     const typename Vec3GridT::ValueType backgroundVelocity)
@@ -390,6 +391,19 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 
 
 ////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_POTENTIALFLOW
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr computePotentialFlow(\
+        const VectorToScalarGrid<Grid<TreeT>>::Type&, const Grid<TreeT>&, const TreeT::ValueType)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_INSTANTIATE_POTENTIALFLOW
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
