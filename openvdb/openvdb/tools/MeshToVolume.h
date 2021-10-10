@@ -4233,7 +4233,7 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
     QuadAndTriangleDataAdapter<Vec3s, Vec4I> mesh(points, 8, faces, 6);
 
-    return meshToVolume<GridType>(mesh, xform, halfWidth, halfWidth);
+    return meshToVolume<GridType>(mesh, xform, static_cast<float>(halfWidth), static_cast<float>(halfWidth));
 }
 
 
