@@ -27,9 +27,11 @@ include(GNUInstallDirs)
 # )
 
 ###############################################################################
+
 message(STATUS "----------------------------------------------------")
 message(STATUS "--------------- Configuring NanoVDB ----------------")
 message(STATUS "----------------------------------------------------")
+
 ###############################################################################
 # TODO: set this option if you want to build something in nano that depends
 # on openvdb
@@ -40,9 +42,7 @@ else()
 endif()
 
 ###############################################################################
-message(STATUS "----------------------------------------------------")
-message(STATUS "----------------Configuring CXXFLAGS ---------------")
-message(STATUS "----------------------------------------------------")
+# Configuring CXXFLAGS
 ###############################################################################
 # This is required to compile OpenVDB headers on windows.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -58,7 +58,7 @@ endif()
 ###############################################################################
 # option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
-# option(NANOVDB_BUILD_BENCHMARK "Build benchmark" OFF)
+option(NANOVDB_BUILD_BENCHMARK "Build benchmark" ON)
 # option(NANOVDB_BUILD_DOCS "Build docs" OFF)
 # option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
 # option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
@@ -164,7 +164,7 @@ file(MAKE_DIRECTORY ${NANOVDB_LOCAL_INCLUDEDIR})
 file(COPY ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_LOCAL_INCLUDEDIR})
 install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR})
 
-file(MAKE_DIRECTORY NANOVDB_LOCAL_UTILDIR)
+file(MAKE_DIRECTORY ${NANOVDB_LOCAL_UTILDIR})
 file(COPY ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_LOCAL_UTILDIR})
 install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_INSTALL_UTILDIR})
 
