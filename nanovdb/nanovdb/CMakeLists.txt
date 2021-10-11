@@ -26,13 +26,11 @@ include(GNUInstallDirs)
 #   OPENVDB_BUILD_AX_GRAMMAR
 # )
 
-#########################################################################
-
+###############################################################################
 message(STATUS "----------------------------------------------------")
 message(STATUS "--------------- Configuring NanoVDB ----------------")
 message(STATUS "----------------------------------------------------")
-
-##########################################################################
+###############################################################################
 # TODO: set this option if you want to build something in nano that depends
 # on openvdb
 if(NOT OPENVDB_BUILD_CORE)
@@ -41,13 +39,11 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
-#########################################################################
-
+###############################################################################
 message(STATUS "----------------------------------------------------")
-message(STATUS "--------------- Configuring NanoVDB ----------------")
-message(STATUS "------------- --Configuring CXXFLAGS ---------------")
-
-##########################################################################
+message(STATUS "----------------Configuring CXXFLAGS ---------------")
+message(STATUS "----------------------------------------------------")
+###############################################################################
 # This is required to compile OpenVDB headers on windows.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /bigobj")
@@ -57,32 +53,71 @@ elseif(CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE "-O3 -march=native")
 endif()
 
-#########################################################################
+###############################################################################
 # add options
-##########################################################################
-set(NANOVDB_LOCATION ${CMAKE_CURRENT_SOURCE_DIR})
-get_filename_component(NANOVDB_INCLUDE_DIR ${NANOVDB_LOCATION} DIRECTORY)
-option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
+###############################################################################
+# option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
-option(NANOVDB_BUILD_BENCHMARK "Build benchmark" OFF)
-option(NANOVDB_BUILD_DOCS "Build docs" OFF)
-option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
-option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
+# option(NANOVDB_BUILD_BENCHMARK "Build benchmark" OFF)
+# option(NANOVDB_BUILD_DOCS "Build docs" OFF)
+# option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
+# option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 
-if(NANOVDB_BUILD_TOOLS)
-  add_subdirectory(cmd)
+# option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" ON)
+# option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" ON)
+# option(NANOVDB_USE_TBB "Build with TBB support" ON)
+# option(NANOVDB_USE_BLOSC "Build with BLOSC support" ON)
+# option(NANOVDB_USE_ZLIB "Build with ZLIB support" ON)
+option(NANOVDB_USE_CUDA "Build with CUDA support" ON)
+# option(NANOVDB_USE_OPENGL "Build with OpenGL support" ON)
+# option(NANOVDB_USE_OPENCL "Build with OpenCL support" ON)
+# option(NANOVDB_USE_OPTIX "Build with OptiX support" ON)
+# option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" ON)
+
+if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
+  find_package(CUDA REQUIRED)
+  if(CUDA_FOUND)
+    set(CMAKE_CUDA_STANDARD 11)
+    set(CMAKE_CUDA_STANDARD_REQUIRED ON)
+
+    set(NANOVDB_CUDA_EXTENDED_LAMBDA "--expt-extended-lambda")
+    if(CUDA_VERSION_MAJOR GREATER_EQUAL 11)
+      set(NANOVDB_CUDA_EXTENDED_LAMBDA "--extended-lambda")
+    endif()
+
+    set(CMAKE_CUDA_FLAGS
+        "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo")
+
+    # find NVRTC library.
+    find_library(
+      CUDA_nvrtc_LIBRARY nvrtc "${CUDA_TOOLKIT_ROOT_DIR}/lib/x64"
+      "${CUDA_TOOLKIT_ROOT_DIR}/lib64" "${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32")
+
+    # workaround for win32 bug when nvcc "--keep" is used.
+    if(WIN32)
+      if(NANOVDB_CUDA_KEEP_PTX)
+        file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
+        set(CMAKE_CUDA_FLAGS_RELEASE
+            " --source-in-ptx --keep ${CMAKE_CUDA_FLAGS_RELEASE}")
+      endif()
+    endif()
+
+    enable_language(CUDA)
+
+    set(NANOVDB_USE_CUDA_FLAG "NANOVDB_USE_CUDA")
+    set(CUDA_LINK_LIBRARY ${CUDA_LIBRARIES})
+    set(CUDA_INCLUDE_DIRECTORY ${CUDA_INCLUDE_DIRS})
+    set(NVRTC_LINK_LIBRARY ${CUDA_nvrtc_LIBRARY})
+  endif()
 endif()
 
-if(NANOVDB_BUILD_UNITTESTS)
-  add_subdirectory(unittest)
-endif()
-
-if(NANOVDB_BUILD_EXAMPLES)
-  add_subdirectory(examples)
-endif()
-#########################################################################
-# end options
-##########################################################################
+###############################################################################
+# Installation
+###############################################################################
+set(NANOVDB_LOCAL_INCLUDEDIR ${PROJECT_BINARY_DIR}/nanovdb)
+set(NANOVDB_INSTALL_INCLUDEDIR ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb)
+set(NANOVDB_LOCAL_UTILDIR ${NANOVDB_LOCAL_INCLUDEDIR}/util)
+set(NANOVDB_INSTALL_UTILDIR ${NANOVDB_INSTALL_INCLUDEDIR}/util)
 
 # NanoVDB header files
 set(NANOVDB_INCLUDE_FILES
@@ -117,325 +152,37 @@ set(NANOVDB_INCLUDE_UTILFILES
   util/Stencils.h
 )
 
-# TODO: add dependency like ax if you need to build something in nano that
-# depends on openvdb or something else
 add_library(nanovdb INTERFACE)
-target_include_directories(nanovdb INTERFACE ../)
+target_include_directories(nanovdb INTERFACE
+  ${NANOVDB_LOCAL_INCLUDEDIR}
+  ${NANOVDB_LOCAL_UTILDIR}
+  ${PROJECT_BINARY_DIR}
+)
 target_compile_definitions(nanovdb INTERFACE "-DNOMINMAX" "-D${NANOVDB_USE_INTRINSICS_FLAG}")
 
-# TODO: do I need to do something like
-#  add_custom_target(nanovdb SOURCES ${NANOVDB_INCLUDE_FILES}
-#                                    ${NANOVDB_INCLUDE_UTILFILES})
-install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb/)
-install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/nanovdb/util)
+file(MAKE_DIRECTORY ${NANOVDB_LOCAL_INCLUDEDIR})
+file(COPY ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_LOCAL_INCLUDEDIR})
+install(FILES ${NANOVDB_INCLUDE_FILES} DESTINATION ${NANOVDB_INSTALL_INCLUDEDIR})
 
+file(MAKE_DIRECTORY NANOVDB_LOCAL_UTILDIR)
+file(COPY ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_LOCAL_UTILDIR})
+install(FILES ${NANOVDB_INCLUDE_UTILFILES} DESTINATION ${NANOVDB_INSTALL_UTILDIR})
 
-# # Configure grammar target
-#
-# set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
-# file(MAKE_DIRECTORY ${OPENVDB_AX_GRAMMAR_DIR})
-#
-# if(OPENVDB_BUILD_AX_GRAMMAR)
-#   find_package(FLEX REQUIRED)
-#   find_package(BISON 3.0 REQUIRED)
-#
-#   set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Werror")
-#
-#   if(OPENVDB_AX_GRAMMAR_NO_LINES)
-#     # Suppress #line directives
-#     set(FLEX_COMPILE_FLAGS "${FLEX_COMPILE_FLAGS} -L")
-#     set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
-#   endif()
-#
-#   flex_target(openvdb_ax_lexer grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
-#     COMPILE_FLAGS ${FLEX_COMPILE_FLAGS}
-#   )
-#   bison_target(openvdb_ax_parser grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
-#     DEFINES_FILE ${OPENVDB_AX_GRAMMAR_DIR}/axparser.h
-#     COMPILE_FLAGS ${BISON_COMPILE_FLAGS}
-#   )
-#   add_flex_bison_dependency(openvdb_ax_lexer openvdb_ax_parser)
-#
-#   # Add a custom target so the language is only ever generated once
-#   add_custom_target(openvdb_ax_grammar
-#     COMMENT "Re-generate the AX language files."
-#     DEPENDS
-#       ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
-#       ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
-# endif()
-#
-# if(NOT OPENVDB_AX_SHARED AND NOT OPENVDB_AX_STATIC)
-#   # return if OPENVDB_BUILD_AX_GRAMMAR was enabled, allowing for a
-#   # single CMake run to configure the AX grammar
-#   if(OPENVDB_BUILD_AX_GRAMMAR)
-#     return()
-#   endif()
-#   message(FATAL_ERROR "Both static and shared ax OpenVDB libraries have been disabled. "
-#     "At least one must be enabled when building the ax library."
-#   )
-# endif()
-#
-# #########################################################################
-#
-# # Configure LLVM
-#
-# find_package(LLVM REQUIRED)
-# find_library(found_LLVM LLVM HINTS ${LLVM_LIBRARY_DIRS})
-#
-# if(found_LLVM)
-#   set(LLVM_LIBS "LLVM")
-# else()
-#   llvm_map_components_to_libnames(_llvm_libs
-#     native core executionengine support mcjit passes)
-#   set(LLVM_LIBS "${_llvm_libs}")
-# endif()
-#
-# if(MINIMUM_LLVM_VERSION)
-#   if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
-#     message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
-#       "but required is at least \"${MINIMUM_LLVM_VERSION}\" (found ${LLVM_DIR})")
-#   endif()
-# endif()
-# if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_LLVM_VERSION)
-#   if(LLVM_PACKAGE_VERSION VERSION_LESS FUTURE_MINIMUM_LLVM_VERSION)
-#     message(DEPRECATION "Support for LLVM versions < ${FUTURE_MINIMUM_LLVM_VERSION} "
-#       "is deprecated and will be removed.")
-#   endif()
-# endif()
-#
-# message(STATUS "Found LLVM: ${LLVM_DIR} (found suitable version \"${LLVM_PACKAGE_VERSION}\", "
-#   "minimum required is \"${MINIMUM_LLVM_VERSION}\")")
-#
-# #########################################################################
-#
-# set(OPENVDB_AX_LIBRARY_SOURCE_FILES
-#   ast/Parse.cc
-#   ast/PrintTree.cc
-#   ast/Scanners.cc
-#   ax.cc
-#   codegen/ComputeGenerator.cc
-#   codegen/FunctionRegistry.cc
-#   codegen/FunctionTypes.cc
-#   codegen/PointComputeGenerator.cc
-#   codegen/PointFunctions.cc
-#   codegen/StandardFunctions.cc
-#   codegen/StringFunctions.cc
-#   codegen/Types.cc
-#   codegen/VolumeComputeGenerator.cc
-#   codegen/VolumeFunctions.cc
-#   compiler/Compiler.cc
-#   compiler/Logger.cc
-#   compiler/PointExecutable.cc
-#   compiler/VolumeExecutable.cc
-#   math/OpenSimplexNoise.cc
-# )
-#
-# if(OPENVDB_BUILD_AX_GRAMMAR)
-#   list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
-#     ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
-#     ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
-# else()
-#   list(APPEND OPENVDB_AX_LIBRARY_SOURCE_FILES
-#     grammar/generated/axlexer.cc
-#     grammar/generated/axparser.cc)
-# endif()
-#
-# set(OPENVDB_AX_AST_INCLUDE_FILES
-#   ast/AST.h
-#   ast/Parse.h
-#   ast/PrintTree.h
-#   ast/Scanners.h
-#   ast/Tokens.h
-#   ast/Visitor.h
-# )
-#
-# set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
-#   codegen/ComputeGenerator.h
-#   codegen/ConstantFolding.h
-#   codegen/FunctionRegistry.h
-#   codegen/Functions.h
-#   codegen/FunctionTypes.h
-#   codegen/PointComputeGenerator.h
-#   codegen/PointLeafLocalData.h
-#   codegen/String.h
-#   codegen/SymbolTable.h
-#   codegen/Types.h
-#   codegen/Utils.h
-#   codegen/VolumeComputeGenerator.h
-#   math/OpenSimplexNoise.h
-# )
-#
-# set(OPENVDB_AX_COMPILER_INCLUDE_FILES
-#   compiler/AttributeRegistry.h
-#   compiler/Compiler.h
-#   compiler/CompilerOptions.h
-#   compiler/CustomData.h
-#   compiler/Logger.h
-#   compiler/PointExecutable.h
-#   compiler/VolumeExecutable.h
-# )
-#
-# # @todo CMake >= 3.12, use an object library to consolidate shared/static
-# # builds. There are limitations with earlier versions of CMake when used with
-# # imported targets.
-#
-# if(OPENVDB_AX_SHARED)
-#   add_library(openvdb_ax_shared SHARED ${OPENVDB_AX_LIBRARY_SOURCE_FILES})
-#   if(OPENVDB_BUILD_AX_GRAMMAR)
-#     add_dependencies(openvdb_ax_shared openvdb_ax_grammar)
-#   endif()
-# endif()
-#
-# if(OPENVDB_AX_STATIC)
-#   add_library(openvdb_ax_static STATIC ${OPENVDB_AX_LIBRARY_SOURCE_FILES})
-#   if(OPENVDB_BUILD_AX_GRAMMAR)
-#     add_dependencies(openvdb_ax_static openvdb_ax_grammar)
-#   endif()
-# endif()
-#
-# # Alias either the shared or static library to the generic OpenVDB
-# # target. Dependent components should use this target to build against
-# # such that they are always able to find a valid build of OpenVDB
-#
-# if(OPENVDB_AX_SHARED)
-#   add_library(openvdb_ax ALIAS openvdb_ax_shared)
-# else()
-#   add_library(openvdb_ax ALIAS openvdb_ax_static)
-# endif()
-#
-# # Configure shared settings
-#
-# set(OPENVDB_AX_CORE_DEPENDENT_LIBS
-#   ${OPENVDB_LIB}
-#   ${LLVM_LIBS}
-# )
-#
-# set(OPENVDB_AX_PUBLIC_DEFINES ${LLVM_DEFINITIONS})
-# set(OPENVDB_AX_PRIVATE_DEFINES "")
-# set(OPENVDB_AX_PUBLIC_OPTIONS "")
-#
-# if(NOT LLVM_ENABLE_ASSERTIONS)
-#   # If no asserts in LLVM, build the address sanitiser build with -DNDEBUG
-#   # otherwise we get a missing symbol error from LLVM:
-#   #  undefined reference to `llvm::cfg::Update<llvm::BasicBlock*>::dump() const'
-#   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-#     "$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:NDEBUG>")
-# endif()
-# if(NOT LLVM_ENABLE_RTTI)
-#   # If llvm has been built without rtti, disable the vptr sanitizer for AX
-#   list(APPEND OPENVDB_AX_PUBLIC_OPTIONS
-#     "$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-sanitize=vptr>")
-# endif()
-#
-# if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-#   # TBB can't determine libstdc++ version if Clang is in use. This causes issues
-#   # with any TBB container using features from C++11 and greater (such as
-#   # tbb::concurrent_vector::emplace_back, used in the VolumeExecutable)
-#   # https://github.com/01org/tbb/issues/22
-#   # https://www.threadingbuildingblocks.org/docs/help/reference/appendices/known_issues/linux_os.html
-#   # https://www.threadingbuildingblocks.org/docs/help/reference/environment/feature_macros.html
-#   string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
-#   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-#     -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
-# endif()
-#
-# if(USE_NEW_PASS_MANAGER)
-#   list(APPEND OPENVDB_AX_PRIVATE_DEFINES -DUSE_NEW_PASS_MANAGER)
-# endif()
-#
-# ##########################################################################
-#
-# # Configure static build
-#
-# if(OPENVDB_AX_STATIC)
-#   target_compile_definitions(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
-#   target_compile_definitions(openvdb_ax_static PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
-#   target_compile_options(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
-#   target_include_directories(openvdb_ax_static PUBLIC ../)
-#   target_include_directories(openvdb_ax_static
-#     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
-#   )
-#
-#   if(OPENVDB_BUILD_AX_GRAMMAR)
-#     target_include_directories(openvdb_ax_static
-#       PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
-#     )
-#     target_compile_definitions(openvdb_ax_static
-#       PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
-#     )
-#   endif()
-#
-#   set_target_properties(openvdb_ax_static
-#     PROPERTIES OUTPUT_NAME openvdb_ax
-#   )
-#
-#   target_link_libraries(openvdb_ax_static PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
-# endif()
-#
-# # Configure shared build
-#
-# if(OPENVDB_AX_SHARED)
-#   target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
-#   target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
-#   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
-#   target_include_directories(openvdb_ax_shared PUBLIC ../)
-#   target_include_directories(openvdb_ax_shared
-#     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
-#   )
-#
-#   if(OPENVDB_BUILD_AX_GRAMMAR)
-#     target_include_directories(openvdb_ax_shared
-#       PRIVATE ${OPENVDB_AX_GRAMMAR_DIR}
-#     )
-#     target_compile_definitions(openvdb_ax_shared
-#       PRIVATE -DOPENVDB_AX_REGENERATE_GRAMMAR
-#     )
-#   endif()
-#
-#   set_target_properties(
-#     openvdb_ax_shared
-#     PROPERTIES
-#       OUTPUT_NAME openvdb_ax
-#       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
-#       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
-#     )
-#
-#   if(OPENVDB_ENABLE_RPATH)
-#     # @todo There is probably a better way to do this for imported targets
-#     list(APPEND RPATHS
-#       ${Boost_LIBRARY_DIRS}
-#       ${IlmBase_LIBRARY_DIRS}
-#       ${Log4cplus_LIBRARY_DIRS}
-#       ${Blosc_LIBRARY_DIRS}
-#       ${Tbb_LIBRARY_DIRS}
-#       ${LLVM_LIBRARY_DIRS}
-#     )
-#     list(REMOVE_DUPLICATES RPATHS)
-#     set_target_properties(openvdb_ax_shared
-#       PROPERTIES INSTALL_RPATH "${RPATHS}"
-#     )
-#   endif()
-#
-#   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
-# endif()
-#
-# install(FILES ax.h Exceptions.h DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/)
-# install(FILES ${OPENVDB_AX_AST_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/ast)
-# install(FILES ${OPENVDB_AX_CODEGEN_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/codegen)
-# install(FILES ${OPENVDB_AX_COMPILER_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb_ax/compiler)
-#
-# if(OPENVDB_AX_STATIC)
-#   install(TARGETS openvdb_ax_static
-#     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-#     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#   )
-# endif()
-#
-# if(OPENVDB_AX_SHARED)
-#   install(TARGETS openvdb_ax_shared
-#     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
-#     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#     ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-#   )
-# endif()
+###############################################################################
+# Options
+###############################################################################
+if(NANOVDB_BUILD_TOOLS)
+  add_subdirectory(cmd)
+endif()
+
+if(NANOVDB_BUILD_UNITTESTS)
+  add_subdirectory(unittest)
+endif()
+
+if(NANOVDB_BUILD_EXAMPLES)
+  add_subdirectory(examples)
+endif()
+
+if(NANOVDB_BUILD_DOCS)
+  add_subdirectory(docs)
+endif()
