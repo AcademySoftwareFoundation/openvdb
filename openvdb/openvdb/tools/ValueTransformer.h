@@ -254,7 +254,6 @@ struct SumOp {
     inline void operator()(ValueType& v) const { v += val; }
 };
 
-
 template<>
 struct SumOp<bool> {
     using ValueType = bool;
@@ -268,6 +267,14 @@ struct MultOp {
     const ValueType val;
     MultOp(const ValueType& v): val(v) {}
     inline void operator()(ValueType& v) const { v *= val; }
+};
+
+template<>
+struct MultOp<bool> {
+    using ValueType = bool;
+    const ValueType val;
+    MultOp(const ValueType& v): val(v) {}
+    inline void operator()(ValueType& v) const { v = v && val; }
 };
 
 }
