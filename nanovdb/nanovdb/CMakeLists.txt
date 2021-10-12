@@ -60,7 +60,7 @@ endif()
 option(NANOVDB_BUILD_EXAMPLES "Build examples" ON)
 option(NANOVDB_BUILD_BENCHMARK "Build benchmark" ON)
 # option(NANOVDB_BUILD_DOCS "Build docs" OFF)
-# option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
+option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 # option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 
 # option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" ON)
@@ -87,6 +87,9 @@ if(NANOVDB_USE_CUDA AND NOT USE_EMSCRIPTEN_TOOLCHAIN)
 
     set(CMAKE_CUDA_FLAGS
         "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo")
+
+    # TODO: double check this with Ken
+    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
 
     # find NVRTC library.
     find_library(
