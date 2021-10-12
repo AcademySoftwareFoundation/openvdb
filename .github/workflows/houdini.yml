@@ -23,7 +23,7 @@ on:
       - 'pendingchanges/**'
       - '**.md'
   schedule:
-    # run this workflow every day at 7am UTC
+    # run this workflow every day 7am UTC
     - cron:  '0 7 * * *'
   workflow_dispatch:
 
