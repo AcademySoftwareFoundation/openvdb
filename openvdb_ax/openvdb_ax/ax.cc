@@ -36,6 +36,7 @@ void run(const char* ax, openvdb::GridBase& grid)
     //        necessarily equate to compilable code
     const openvdb::ax::ast::Tree::ConstPtr
         ast = openvdb::ax::ast::parse(ax, logger);
+    if (!ast) return;
 
     if (grid.isType<points::PointDataGrid>()) {
         // Compile for Point support and produce an executable
@@ -81,6 +82,8 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
     //        necessarily equate to compilable code
     const openvdb::ax::ast::Tree::ConstPtr
         ast = openvdb::ax::ast::parse(ax, logger);
+    if (!ast) return;
+
     if (points) {
         // Compile for Point support and produce an executable
         // @note  Throws compiler errors on invalid code. On success, returns
