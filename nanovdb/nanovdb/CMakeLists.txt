@@ -12,20 +12,6 @@ project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
-# option(OPENVDB_AX_SHARED "Build dynamically linked version of the ax library." ON)
-# option(OPENVDB_AX_STATIC "Build statically linked version of the ax library." ON)
-#
-# option(OPENVDB_BUILD_AX_GRAMMAR [=[
-# Rebuild the AX grammar using flex/bison. This only necessary if you are
-# altering the frontend AX language, typically only a developer option. ]=] OFF)
-# option(USE_NEW_PASS_MANAGER [=[
-# Enable the new Optimization Pass Manager. This is a developer option.]=] OFF)
-#
-# mark_as_advanced(
-#   USE_NEW_PASS_MANAGER
-#   OPENVDB_BUILD_AX_GRAMMAR
-# )
-
 ###############################################################################
 
 message(STATUS "----------------------------------------------------")
