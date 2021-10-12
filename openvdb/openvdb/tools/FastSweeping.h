@@ -40,6 +40,7 @@
 #include <tbb/enumerable_thread_specific.h>
 #include <tbb/task_group.h>
 
+#include <openvdb/Platform.h>
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
