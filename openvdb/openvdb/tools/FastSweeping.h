@@ -29,17 +29,6 @@
 
 //#define BENCHMARK_FAST_SWEEPING
 
-#include <type_traits>// for static_assert
-#include <cmath>
-#include <limits>
-#include <deque>
-#include <unordered_map>
-#include <utility>// for std::make_pair
-
-#include <tbb/parallel_for.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_group.h>
-
 #include <openvdb/Platform.h>
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
@@ -52,6 +41,17 @@
 #ifdef BENCHMARK_FAST_SWEEPING
 #include <openvdb/util/CpuTimer.h>
 #endif
+
+#include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_group.h>
+
+#include <type_traits>// for static_assert
+#include <cmath>
+#include <limits>
+#include <deque>
+#include <unordered_map>
+#include <utility>// for std::make_pair
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
