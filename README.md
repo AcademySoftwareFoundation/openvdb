@@ -120,3 +120,14 @@ cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -A x64 ..
 cmake --build . --parallel 4 --config Release --target install
 ```
+##### Installing and building OpenVDB via vcpkg
+
+You can also download and install OpenVDB using the [vcpkg](https://github.com/Microsoft/vcpkg) dependency manager:
+```
+git clone https://github.com/Microsoft/vcpkg.git
+cd vcpkg
+./bootstrap-vcpkg.sh
+./vcpkg integrate install
+vcpkg install openvdb
+```
+The OpenVDB port in vcpkg is kept up to date by Microsoft team members and community contributors. If the version is out of date, please [create an issue or pull request](https://github.com/Microsoft/vcpkg) on the vcpkg repository.
