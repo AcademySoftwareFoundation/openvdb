@@ -65,7 +65,6 @@ function(_ADD_EXAMPLE)
     message(WARNING " - CUDA required to build ${EXAMPLE_NAME}. Skipping.")
     return()
   endif()
-  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
 
   add_executable(${EXAMPLE_NAME} ${EXAMPLE_SOURCE_FILES}
                                  ${EXAMPLE_SOURCE_CUDA_FILES}
@@ -129,7 +128,6 @@ function(_ADD_EXAMPLE_OPENVDB)
     message(WARNING " - CUDA required to build ${EXAMPLE_NAME}. Skipping.")
     return()
   endif()
-  add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
 
   # configure OpenVDB
   find_package(OpenVDB)
