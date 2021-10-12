@@ -81,7 +81,7 @@ option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 
-option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library" OFF)
+option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library" ON)
 
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
