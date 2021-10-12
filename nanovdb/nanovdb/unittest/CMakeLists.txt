@@ -53,12 +53,11 @@ target_link_libraries(testNanoVDB PRIVATE nanovdb
 
 add_test(NanoVDB_unit_test testNanoVDB)
 
-# ---------------------------------------------------------------
+# -----------------------------------------------------------------------------
 
 if(NOT (TBB_FOUND AND OpenVDB_FOUND))
   message(WARNING " - OpenVDB required to build OpenVDB unit tests. Skipping.")
 else()
-
   set(UNITTEST_OPENVDB_SOURCE_FILES "TestOpenVDB.cpp")
 
   set_source_files_properties(${UNITTEST_OPENVDB_SOURCE_FILES}
@@ -86,6 +85,3 @@ else()
 
   add_test(OpenVDB_unit_test testOpenVDB)
 endif()
-
-# ---------------------------------------------------------------
-
