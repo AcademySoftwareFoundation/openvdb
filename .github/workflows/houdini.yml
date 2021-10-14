@@ -9,6 +9,7 @@ on:
       - 'pr/**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
@@ -18,6 +19,7 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'pendingchanges/**'
