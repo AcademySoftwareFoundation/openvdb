@@ -92,11 +92,7 @@ All meetings of the TSC are open to participation by any member of the OpenVDB c
 
 ## Current TSC members
 
-* Ken Museth, Chair / NVIDIA
-* Andre Pradhana, DreamWorks
-* Jeff Lait, SideFX
-* Nick Avramoussis, WETA
-* Dan Bailey, ILM
+[See the list of maintainers.](MAINTAINERS.md)
 
 # Release Process
 
