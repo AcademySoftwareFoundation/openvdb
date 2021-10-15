@@ -264,6 +264,12 @@ struct FunctionTraits<R(&)(Args...)> : public FunctionTraits<R(Args...)> {};
 template<typename R, typename... Args>
 struct FunctionTraits<R(*)(Args...)> : public FunctionTraits<R(Args...)> {};
 
+template<typename R, typename... Args>
+struct FunctionTraits<R(Args...) noexcept> : public FunctionTraits<R(Args...)> {};
+
+template<typename R, typename... Args>
+struct FunctionTraits<R(*)(Args...) noexcept> : public FunctionTraits<R(Args...)> {};
+
 template<typename ReturnT, typename ...Args>
 struct FunctionTraits<ReturnT(Args...)>
 {
