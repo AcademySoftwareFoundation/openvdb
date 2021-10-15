@@ -264,11 +264,16 @@ struct FunctionTraits<R(&)(Args...)> : public FunctionTraits<R(Args...)> {};
 template<typename R, typename... Args>
 struct FunctionTraits<R(*)(Args...)> : public FunctionTraits<R(Args...)> {};
 
+// Only enable noexcept signatures from C++17 onwards when it is actually
+// respected. Otherwise the compiler ignores it and we get duplicating
+// definitions for FunctionTraits specializations.
+#if __cplusplus >= 201703L
 template<typename R, typename... Args>
 struct FunctionTraits<R(Args...) noexcept> : public FunctionTraits<R(Args...)> {};
 
 template<typename R, typename... Args>
 struct FunctionTraits<R(*)(Args...) noexcept> : public FunctionTraits<R(Args...)> {};
+#endif
 
 template<typename ReturnT, typename ...Args>
 struct FunctionTraits<ReturnT(Args...)>
