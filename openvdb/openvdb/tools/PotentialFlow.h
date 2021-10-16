@@ -396,6 +396,9 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_POTENTIALFLOW
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr computePotentialFlow(\
@@ -403,7 +406,6 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_POTENTIALFLOW
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

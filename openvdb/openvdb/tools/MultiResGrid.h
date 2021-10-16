@@ -952,13 +952,15 @@ struct MultiResGrid<TreeType>::ProlongateOp
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_MULTIRESGRID
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     class MultiResGrid<TreeT>
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_MULTIRESGRID
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

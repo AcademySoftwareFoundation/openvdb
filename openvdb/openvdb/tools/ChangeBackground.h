@@ -248,6 +248,9 @@ changeLevelSetBackground(
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_CHANGEBACKGROUND
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void changeBackground(TreeT&, const TreeT::ValueType&, bool, size_t)
@@ -279,7 +282,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_CHANGEBACKGROUND
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

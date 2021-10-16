@@ -135,13 +135,15 @@ transformVectors(GridType& grid, const Mat4d& mat)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_VECTORTRANSFORMER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void transformVectors(Grid<TreeT>&, const Mat4d&)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_VECTORTRANSFORMER
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

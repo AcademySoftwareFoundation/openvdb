@@ -2601,6 +2601,9 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETUTIL
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void sdfToFogVolume(Grid<TreeT>&, TreeT::ValueType)
@@ -2673,7 +2676,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_LEVELSETUTIL
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

@@ -234,13 +234,15 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETSPHERE
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr createLevelSetSphere<Grid<TreeT>>(float, const openvdb::Vec3f&, float, float, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_LEVELSETSPHERE
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

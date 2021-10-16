@@ -262,13 +262,15 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_TOPOLOGYTOLEVELSET
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::ValueConverter<float>::Type::Ptr topologyToLevelSet(const Grid<TreeT>&, int, int, int, int)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_TOPOLOGYTOLEVELSET
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

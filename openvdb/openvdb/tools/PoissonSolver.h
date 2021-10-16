@@ -851,13 +851,15 @@ solveWithBoundaryConditionsAndPreconditioner(
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_POISSONSOLVER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     TreeT::Ptr solve(const TreeT&, math::pcg::State&, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_POISSONSOLVER
 
 } // namespace poisson
 } // namespace tools

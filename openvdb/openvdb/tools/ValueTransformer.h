@@ -693,6 +693,9 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_VALUETRANSFORMER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void setValueOnMin(TreeT&, const Coord&, const TreeT::ValueType&)
@@ -714,7 +717,6 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_VALUETRANSFORMER
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

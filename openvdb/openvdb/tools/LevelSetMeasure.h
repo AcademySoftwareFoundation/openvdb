@@ -551,6 +551,9 @@ levelSetGenus(const GridT& grid)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETMEASURE
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Real levelSetArea(const Grid<TreeT>&, bool)
@@ -572,7 +575,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_LEVELSETMEASURE
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

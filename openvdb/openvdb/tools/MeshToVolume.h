@@ -4243,6 +4243,9 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_MESHTOVOLUME
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, \
@@ -4303,7 +4306,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_MESHTOVOLUME
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

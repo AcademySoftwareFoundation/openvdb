@@ -1043,6 +1043,9 @@ GridResampler::transformBBox(
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_GRIDTRANSFORMER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void resampleToMatch<PointSampler>(const Grid<TreeT>&, Grid<TreeT>&)
@@ -1059,7 +1062,6 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_GRIDTRANSFORMER
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

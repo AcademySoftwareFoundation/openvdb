@@ -570,6 +570,9 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_CLIP
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr clip(const Grid<TreeT>&, const BBoxd&, bool)
@@ -586,7 +589,6 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_CLIP
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

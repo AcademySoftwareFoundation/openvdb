@@ -114,13 +114,15 @@ interiorMask(const GridType& grid, const double isovalue)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_MASK
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::ValueConverter<bool>::Type::Ptr interiorMask(const Grid<TreeT>&, const double)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_MASK
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

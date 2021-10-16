@@ -401,6 +401,9 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_PRUNE
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void prune(TreeT&, TreeT::ValueType, bool, size_t)
@@ -432,7 +435,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_PRUNE
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

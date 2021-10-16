@@ -280,6 +280,9 @@ signedFloodFill(TreeOrLeafManagerT& tree,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_SIGNEDFLOODFILL
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void signedFloodFill(TreeT&, bool, size_t, Index)
@@ -301,7 +304,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_SIGNEDFLOODFILL
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

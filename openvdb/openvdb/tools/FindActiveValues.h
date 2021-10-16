@@ -708,6 +708,9 @@ activeTiles(const TreeT& tree, const CoordBBox &bbox)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_FINDACTIVEVALUES
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     bool anyActiveValues(const TreeT&, const CoordBBox&)
@@ -739,7 +742,6 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_FINDACTIVEVALUES
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

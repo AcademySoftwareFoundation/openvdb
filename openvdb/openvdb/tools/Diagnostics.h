@@ -1336,6 +1336,9 @@ uniqueInactiveValues(const GridType& grid,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_DIAGNOSTICS
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     std::string checkLevelSet(const Grid<TreeT>&, size_t)
@@ -1352,7 +1355,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_DIAGNOSTICS
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

@@ -997,6 +997,9 @@ compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_COMPOSITE
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void csgUnion(TreeT&, TreeT&, bool)
@@ -1108,7 +1111,6 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_COMPOSITE
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

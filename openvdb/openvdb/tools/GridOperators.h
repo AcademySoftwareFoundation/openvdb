@@ -1086,6 +1086,9 @@ normalize(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* in
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_GRIDOPERATORS
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr cpt(const Grid<TreeT>&, bool)
@@ -1127,7 +1130,6 @@ OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_GRIDOPERATORS
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

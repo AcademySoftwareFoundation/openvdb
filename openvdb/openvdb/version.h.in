@@ -133,45 +133,15 @@
 #cmakedefine OPENVDB_USE_ZLIB
 #endif
 
-/* Defines the macro for wrapping a function in an explicit template declaration */
-#define OPENVDB_REAL_TREE_EXTERN_TEMPLATE(Function) @OPENVDB_REAL_TREE_EXTERN_TEMPLATE_DECLARATIONS@
-#define OPENVDB_NUMERIC_TREE_EXTERN_TEMPLATE(Function) @OPENVDB_NUMERIC_TREE_EXTERN_TEMPLATE_DECLARATIONS@
-#define OPENVDB_VEC3_TREE_EXTERN_TEMPLATE(Function) @OPENVDB_VEC3_TREE_EXTERN_TEMPLATE_DECLARATIONS@
-#define OPENVDB_VOLUME_TREE_EXTERN_TEMPLATE(Function) @OPENVDB_VOLUME_TREE_EXTERN_TEMPLATE_DECLARATIONS@
-#define OPENVDB_ALL_TREE_EXTERN_TEMPLATE(Function) @OPENVDB_ALL_TREE_EXTERN_TEMPLATE_DECLARATIONS@
+/* Defines the extern keyword for explicit template declarations. */
+#define OPENVDB_EXTERN extern
 
-/* Defines the macro for wrapping a function in an (optional) explicit template definition */
-#ifdef OPENVDB_INSTANTIATE
-#define OPENVDB_REAL_TREE_TEMPLATE(Function) @OPENVDB_REAL_TREE_TEMPLATE_DECLARATIONS@
-#define OPENVDB_NUMERIC_TREE_TEMPLATE(Function) @OPENVDB_NUMERIC_TREE_TEMPLATE_DECLARATIONS@
-#define OPENVDB_VEC3_TREE_TEMPLATE(Function) @OPENVDB_VEC3_TREE_TEMPLATE_DECLARATIONS@
-#define OPENVDB_VOLUME_TREE_TEMPLATE(Function) @OPENVDB_VOLUME_TREE_TEMPLATE_DECLARATIONS@
-#define OPENVDB_ALL_TREE_TEMPLATE(Function) @OPENVDB_ALL_TREE_TEMPLATE_DECLARATIONS@
-#else
-#define OPENVDB_REAL_TREE_TEMPLATE(Function)
-#define OPENVDB_NUMERIC_TREE_TEMPLATE(Function)
-#define OPENVDB_VEC3_TREE_TEMPLATE(Function)
-#define OPENVDB_VOLUME_TREE_TEMPLATE(Function)
-#define OPENVDB_ALL_TREE_TEMPLATE(Function)
-#endif
-
-/* Defines the macros for an explicit template declaration followed by */
-/* an (optional) explicit template definition */
-#define OPENVDB_REAL_TREE_INSTANTIATE(Function) \
-    OPENVDB_REAL_TREE_EXTERN_TEMPLATE(Function) \
-    OPENVDB_REAL_TREE_TEMPLATE(Function)
-#define OPENVDB_NUMERIC_TREE_INSTANTIATE(Function) \
-    OPENVDB_NUMERIC_TREE_EXTERN_TEMPLATE(Function) \
-    OPENVDB_NUMERIC_TREE_TEMPLATE(Function)
-#define OPENVDB_VEC3_TREE_INSTANTIATE(Function) \
-    OPENVDB_VEC3_TREE_EXTERN_TEMPLATE(Function) \
-    OPENVDB_VEC3_TREE_TEMPLATE(Function)
-#define OPENVDB_VOLUME_TREE_INSTANTIATE(Function) \
-    OPENVDB_VOLUME_TREE_EXTERN_TEMPLATE(Function) \
-    OPENVDB_VOLUME_TREE_TEMPLATE(Function)
-#define OPENVDB_ALL_TREE_INSTANTIATE(Function) \
-    OPENVDB_ALL_TREE_EXTERN_TEMPLATE(Function) \
-    OPENVDB_ALL_TREE_TEMPLATE(Function)
+/* Defines the macros for explicit template instantiations. */
+#define OPENVDB_REAL_TREE_INSTANTIATE(Function)     @OPENVDB_REAL_TREE_INSTANTIATIONS@
+#define OPENVDB_NUMERIC_TREE_INSTANTIATE(Function)  @OPENVDB_NUMERIC_TREE_INSTANTIATIONS@
+#define OPENVDB_VEC3_TREE_INSTANTIATE(Function)     @OPENVDB_VEC3_TREE_INSTANTIATIONS@
+#define OPENVDB_VOLUME_TREE_INSTANTIATE(Function)   @OPENVDB_VOLUME_TREE_INSTANTIATIONS@
+#define OPENVDB_ALL_TREE_INSTANTIATE(Function)      @OPENVDB_ALL_TREE_INSTANTIATIONS@
 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////

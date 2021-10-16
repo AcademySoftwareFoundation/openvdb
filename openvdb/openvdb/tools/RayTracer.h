@@ -1067,6 +1067,9 @@ operator()(const tbb::blocked_range<size_t>& range) const
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_RAYTRACER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
 
 #define _FUNCTION(TreeT) \
     void rayTrace(const Grid<TreeT>&, const BaseShader&, BaseCamera&, size_t, unsigned int, bool)
@@ -1083,7 +1086,6 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
-#endif // OPENVDB_INSTANTIATE_RAYTRACER
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
