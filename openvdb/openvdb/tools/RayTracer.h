@@ -1082,7 +1082,7 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    class VolumeRender<tools::VolumeRayIntersector<Grid<TreeT>>, tools::BoxSampler>
+    class OPENVDB_TEMPLATE_API VolumeRender<tools::VolumeRayIntersector<Grid<TreeT>>, tools::BoxSampler>
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

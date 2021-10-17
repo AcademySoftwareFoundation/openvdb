@@ -1004,7 +1004,7 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 #endif
 
 #define _FUNCTION(TreeT) \
-    class ClosestSurfacePoint<Grid<TreeT>>
+    class OPENVDB_TEMPLATE_API ClosestSurfacePoint<Grid<TreeT>>
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

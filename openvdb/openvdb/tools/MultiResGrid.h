@@ -957,7 +957,7 @@ struct MultiResGrid<TreeType>::ProlongateOp
 #endif
 
 #define _FUNCTION(TreeT) \
-    class MultiResGrid<TreeT>
+    class OPENVDB_TEMPLATE_API MultiResGrid<TreeT>
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
