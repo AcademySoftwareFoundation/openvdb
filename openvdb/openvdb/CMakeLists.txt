@@ -313,8 +313,8 @@ if(USE_EXPLICIT_INSTANTIATION)
     ${OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES}
   )
 
-  # Write all the extern template declarations into strings to inject into version.h
-  # The "Function" itself is an argument provided by the OPENVDB_*_TREE_EXTERN_TEMPLATE macro
+  # Write all the template instantiations into strings to inject into version.h
+  # The "Function" itself is an argument provided by the OPENVDB_*_TREE_INSTANTIATE macros
 
   set(TEMPLATE_STR " \\\n    OPENVDB_EXTERN template OPENVDB_TEMPLATE_API Function")
   foreach(TREE ${OPENVDB_LIBRARY_INSTANTIATION_ALL_TREES})
