@@ -214,15 +214,19 @@ if (OPENVDB_HOUDINI_OPHIDE_POLICY AND NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} STREQ
     "-DOPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_OPHIDE_POLICY}")
 endif()
 
-if(OPENVDB_DSO_NAMES)
-  set(OPENVDB_USE_CUSTOM_DSO_NAMES 1)
-  # if AX SOP is explicitly enabled, also switch on the build variable
-  if (SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES OR USE_AX)
+# If OPENVDB_BUILD_SOP_OpenVDB_AX has not been explicitly set,
+# see if we can enabled the OpenVDB AX SOP
+if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+  if(USE_AX)
     set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+  elseif(OPENVDB_DSO_NAMES)
+    if(SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+    endif()
   endif()
 endif()
 
-if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+if(NOT OPENVDB_DSO_NAMES)
   list(APPEND OPENVDB_DSO_NAMES
     GR_PrimVDBPoints
     SHOP_OpenVDB_Points
@@ -274,19 +278,9 @@ if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     SOP_OpenVDB_Vector_Split
     SOP_OpenVDB_Visualize
     SOP_OpenVDB_Write
-    VRAY_OpenVDB_Points
-  )
-endif()
+    VRAY_OpenVDB_Points)
 
-if(USE_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
-  # Check to see if the AX SOP has been manually disabled
-  if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
-    set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
-  endif()
-endif()
-
-if(OPENVDB_BUILD_SOP_OpenVDB_AX)
-  if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+  if(OPENVDB_BUILD_SOP_OpenVDB_AX)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
   endif()
 endif()
