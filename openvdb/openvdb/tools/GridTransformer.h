@@ -1048,17 +1048,17 @@ GridResampler::transformBBox(
 #endif
 
 #define _FUNCTION(TreeT) \
-    void resampleToMatch<PointSampler>(const Grid<TreeT>&, Grid<TreeT>&)
+    void resampleToMatch<PointSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void resampleToMatch<BoxSampler>(const Grid<TreeT>&, Grid<TreeT>&)
+    void resampleToMatch<BoxSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&)
+    void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

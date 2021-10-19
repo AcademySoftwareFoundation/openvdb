@@ -181,7 +181,7 @@ laplacian(const GridType& grid, bool threaded = true)
 
 template<typename GridType, typename MaskT>
 typename GridType::Ptr
-laplacian(const GridType& grid, const MaskT mask, bool threaded = true)
+laplacian(const GridType& grid, const MaskT& mask, bool threaded = true)
 {
     return laplacian<GridType, MaskT, util::NullInterrupter>(grid, mask, threaded, nullptr);
 }
@@ -1091,42 +1091,82 @@ normalize(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* in
 #endif
 
 #define _FUNCTION(TreeT) \
-    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr cpt(const Grid<TreeT>&, bool)
+    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr cpt(const Grid<TreeT>&, bool, util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr curl(const Grid<TreeT>&, bool)
-OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
-
-#define _FUNCTION(TreeT) \
-    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr divergence(const Grid<TreeT>&, bool)
-OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
-
-#define _FUNCTION(TreeT) \
-    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr gradient(const Grid<TreeT>&, bool)
+    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr cpt(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr laplacian(const Grid<TreeT>&, bool)
-OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
-
-#define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meanCurvature(const Grid<TreeT>&, bool)
-OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
-
-#define _FUNCTION(TreeT) \
-    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr magnitude(const Grid<TreeT>&, bool)
+    Grid<TreeT>::Ptr curl(const Grid<TreeT>&, bool, util::NullInterrupter*)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr normalize(const Grid<TreeT>&, bool)
+    Grid<TreeT>::Ptr curl(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr divergence(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr divergence(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr gradient(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    ScalarToVectorConverter<Grid<TreeT>>::Type::Ptr gradient(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr laplacian(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr laplacian(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr meanCurvature(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr meanCurvature(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr magnitude(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    VectorToScalarConverter<Grid<TreeT>>::Type::Ptr magnitude(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr normalize(const Grid<TreeT>&, bool, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr normalize(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

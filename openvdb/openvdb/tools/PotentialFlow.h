@@ -41,7 +41,7 @@ struct VectorToScalarGrid {
 /// @param grid         source grid to use for computing the mask
 /// @param dilation     dilation in voxels of the source grid to form the new potential flow mask
 template<typename GridT, typename MaskT = typename GridT::template ValueConverter<ValueMask>::Type>
-inline typename MaskT::Ptr
+typename MaskT::Ptr
 createPotentialFlowMask(const GridT& grid, int dilation = 5);
 
 
@@ -55,7 +55,7 @@ createPotentialFlowMask(const GridT& grid, int dilation = 5);
 /// around the collider by supplying an empty boundary Velocity and a
 /// non-zero background velocity.
 template<typename Vec3T, typename GridT, typename MaskT>
-inline typename GridT::template ValueConverter<Vec3T>::Type::Ptr
+typename GridT::template ValueConverter<Vec3T>::Type::Ptr
 createPotentialFlowNeumannVelocities(const GridT& collider, const MaskT& domain,
     const typename GridT::template ValueConverter<Vec3T>::Type::ConstPtr boundaryVelocity,
     const Vec3T& backgroundVelocity);
@@ -73,7 +73,7 @@ createPotentialFlowNeumannVelocities(const GridT& collider, const MaskT& domain,
 /// (minimum error and maximum number of iterations); on output, it gives
 /// the actual termination conditions.
 template<typename Vec3GridT, typename MaskT, typename InterrupterT = util::NullInterrupter>
-inline typename VectorToScalarGrid<Vec3GridT>::Ptr
+typename VectorToScalarGrid<Vec3GridT>::Ptr
 computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann, math::pcg::State& state,
     InterrupterT* interrupter = nullptr);
 
@@ -102,7 +102,7 @@ namespace potential_flow_internal {
 /// @private
 // helper function for retrieving a mask that comprises the outer-most layer of voxels
 template<typename GridT>
-inline typename GridT::TreeType::template ValueConverter<ValueMask>::Type::Ptr
+typename GridT::TreeType::template ValueConverter<ValueMask>::Type::Ptr
 extractOuterVoxelMask(GridT& inGrid)
 {
     using MaskTreeT = typename GridT::TreeType::template ValueConverter<ValueMask>::Type;
@@ -212,7 +212,7 @@ struct SolveBoundaryOp
 ////////////////////////////////////////////////////////////////////////////
 
 template<typename GridT, typename MaskT>
-inline typename MaskT::Ptr
+typename MaskT::Ptr
 createPotentialFlowMask(const GridT& grid, int dilation)
 {
     using MaskTreeT = typename MaskT::TreeType;
@@ -302,7 +302,7 @@ typename GridT::template ValueConverter<Vec3T>::Type::Ptr createPotentialFlowNeu
 
 
 template<typename Vec3GridT, typename MaskT, typename InterrupterT>
-inline typename VectorToScalarGrid<Vec3GridT>::Ptr
+typename VectorToScalarGrid<Vec3GridT>::Ptr
 computeScalarPotential(const MaskT& domain, const Vec3GridT& neumann,
     math::pcg::State& state, InterrupterT* interrupter)
 {
@@ -401,7 +401,24 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr computePotentialFlow(\
+    MaskGrid::Ptr createPotentialFlowMask(const Grid<TreeT>&, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createPotentialFlowNeumannVelocities(const FloatGrid&, const MaskGrid&, \
+        const Grid<TreeT>::ConstPtr, const TreeT::ValueType&)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    VectorToScalarGrid<Grid<TreeT>>::Ptr computeScalarPotential(const MaskGrid&, const Grid<TreeT>&, \
+        math::pcg::State&, util::NullInterrupter*)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr computePotentialFlow( \
         const VectorToScalarGrid<Grid<TreeT>>::Type&, const Grid<TreeT>&, const TreeT::ValueType)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION

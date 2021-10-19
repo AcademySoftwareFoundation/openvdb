@@ -1008,6 +1008,12 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
+#define _FUNCTION(TreeT) \
+    void fillWithSpheres(const Grid<TreeT>&, std::vector<openvdb::Vec4s>&, const Vec2i&, \
+        bool, float, float, float, int, util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

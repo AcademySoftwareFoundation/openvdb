@@ -277,7 +277,7 @@ LevelSetTracker(GridT& grid, InterruptT* interrupt):
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 prune()
 {
@@ -300,7 +300,7 @@ prune()
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 track()
 {
@@ -315,7 +315,7 @@ track()
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 dilate(int iterations)
 {
@@ -337,7 +337,7 @@ dilate(int iterations)
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 erode(int iterations)
 {
@@ -349,7 +349,7 @@ erode(int iterations)
 }
 
 template<typename GridT, typename InterruptT>
-inline bool
+bool
 LevelSetTracker<GridT, InterruptT>::
 resize(Index halfWidth)
 {
@@ -393,7 +393,7 @@ checkInterrupter()
 
 template<typename GridT, typename InterruptT>
 template<typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize(const MaskT* mask)
 {
@@ -416,7 +416,7 @@ normalize(const MaskT* mask)
 
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize1(const MaskT* mask)
 {
@@ -437,7 +437,7 @@ template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize2(const MaskT* mask)
 {
@@ -451,7 +451,7 @@ normalize2(const MaskT* mask)
 
 template<typename GridT, typename InterruptT>
 template<lstrack::TrimMode Trimming>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
 {
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
@@ -674,6 +674,23 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
         }
     }//loop over leafs of the level set
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETTRACKER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API LevelSetTracker<Grid<TreeT>, util::NullInterrupter>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

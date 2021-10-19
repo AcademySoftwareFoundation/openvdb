@@ -3550,9 +3550,7 @@ meshToLevelSet(
     float halfWidth)
 {
     util::NullInterrupter nullInterrupter;
-    std::vector<Vec4I> quads(0);
-    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
-        halfWidth, halfWidth);
+    return meshToLevelSet<GridType>(nullInterrupter, xform, points, triangles, halfWidth);
 }
 
 
@@ -3580,9 +3578,7 @@ meshToLevelSet(
     float halfWidth)
 {
     util::NullInterrupter nullInterrupter;
-    std::vector<Vec3I> triangles(0);
-    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
-        halfWidth, halfWidth);
+    return meshToLevelSet<GridType>(nullInterrupter, xform, points, quads, halfWidth);
 }
 
 
@@ -3611,8 +3607,8 @@ meshToLevelSet(
     float halfWidth)
 {
     util::NullInterrupter nullInterrupter;
-    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
-        halfWidth, halfWidth);
+    return meshToLevelSet<GridType>(
+        nullInterrupter, xform, points, triangles, quads, halfWidth);
 }
 
 
@@ -3642,8 +3638,8 @@ meshToSignedDistanceField(
     float inBandWidth)
 {
     util::NullInterrupter nullInterrupter;
-    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles,
-        quads, exBandWidth, inBandWidth);
+    return meshToSignedDistanceField<GridType>(
+        nullInterrupter, xform, points, triangles, quads, exBandWidth, inBandWidth);
 }
 
 
@@ -3673,8 +3669,8 @@ meshToUnsignedDistanceField(
     float bandWidth)
 {
     util::NullInterrupter nullInterrupter;
-    return doMeshConversion<GridType>(nullInterrupter, xform, points, triangles, quads,
-        bandWidth, bandWidth, true);
+    return meshToUnsignedDistanceField<GridType>(
+        nullInterrupter, xform, points, triangles, quads, bandWidth);
 }
 
 
@@ -4248,44 +4244,51 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, \
-        const openvdb::math::Transform&, float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+    Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
+        const QuadAndTriangleDataAdapter<Vec3s, Vec3I>&, const openvdb::math::Transform&, \
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(const QuadAndTriangleDataAdapter<Vec3s, Vec4I>&, \
-        const openvdb::math::Transform&, float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
+    Grid<TreeT>::Ptr meshToVolume<Grid<TreeT>>(util::NullInterrupter&, \
+        const QuadAndTriangleDataAdapter<Vec3s, Vec4I>&, const openvdb::math::Transform&, \
+        float, float, int, Grid<TreeT>::ValueConverter<Int32>::Type*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(const openvdb::math::Transform&, \
-        const std::vector<Vec3s>&, const std::vector<Vec3I>&, float)
+    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(util::NullInterrupter&, \
+        const openvdb::math::Transform&, const std::vector<Vec3s>&, const std::vector<Vec3I>&, \
+        float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(const openvdb::math::Transform&, \
-        const std::vector<Vec3s>&, const std::vector<Vec4I>&, float)
+    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(util::NullInterrupter&, \
+        const openvdb::math::Transform&, const std::vector<Vec3s>&, const std::vector<Vec4I>&, \
+        float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(const openvdb::math::Transform&, \
-        const std::vector<Vec3s>&, const std::vector<Vec3I>&, const std::vector<Vec4I>&, float)
+    Grid<TreeT>::Ptr meshToLevelSet<Grid<TreeT>>(util::NullInterrupter&, \
+        const openvdb::math::Transform&, const std::vector<Vec3s>&, \
+        const std::vector<Vec3I>&, const std::vector<Vec4I>&, float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToSignedDistanceField<Grid<TreeT>>(const openvdb::math::Transform&, \
-        const std::vector<Vec3s>&, const std::vector<Vec3I>&, const std::vector<Vec4I>&, float, float)
+    Grid<TreeT>::Ptr meshToSignedDistanceField<Grid<TreeT>>(util::NullInterrupter&, \
+        const openvdb::math::Transform&, const std::vector<Vec3s>&, \
+        const std::vector<Vec3I>&, const std::vector<Vec4I>&, float, float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr meshToUnsignedDistanceField<Grid<TreeT>>(const openvdb::math::Transform&, \
-        const std::vector<Vec3s>&, const std::vector<Vec3I>&, const std::vector<Vec4I>&, float)
+    Grid<TreeT>::Ptr meshToUnsignedDistanceField<Grid<TreeT>>(util::NullInterrupter&, \
+        const openvdb::math::Transform&, const std::vector<Vec3s>&, \
+        const std::vector<Vec3I>&, const std::vector<Vec4I>&, float)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

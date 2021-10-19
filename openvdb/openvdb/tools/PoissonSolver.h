@@ -856,7 +856,34 @@ solveWithBoundaryConditionsAndPreconditioner(
 #endif
 
 #define _FUNCTION(TreeT) \
-    TreeT::Ptr solve(const TreeT&, math::pcg::State&, bool)
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const TreeT&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const BoolTree&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::JacobiPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const TreeT&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::JacobiPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const BoolTree&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

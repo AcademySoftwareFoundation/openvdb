@@ -518,7 +518,7 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -572,7 +572,7 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -629,7 +629,7 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -675,7 +675,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 {
     mMask = mask;
@@ -725,7 +725,7 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 /// Private method to perform the task (serial or threaded) and
 /// subsequently swap the leaf buffers.
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
 {
     if (mGrainSize>0) {
@@ -740,7 +740,7 @@ Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
 /// One dimensional convolution of a separable box filter
 template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
 {
     this->wasInterrupted();
@@ -773,7 +773,7 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
 
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
 {
     this->wasInterrupted();
@@ -807,7 +807,7 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
 
 /// Offsets the values by a constant
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType offset)
 {
     this->wasInterrupted();
@@ -844,6 +844,22 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
     }
     return false;
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_FILTER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API Filter<Grid<TreeT>, FloatGrid, util::NullInterrupter>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
 
 
 } // namespace tools

@@ -484,32 +484,38 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetPlatonic<Grid<TreeT>>(int, float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetPlatonic<Grid<TreeT>>(int, float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetTetrahedron<Grid<TreeT>>(float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetTetrahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetCube<Grid<TreeT>>(float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetCube<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetOctahedron<Grid<TreeT>>(float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetOctahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetDodecahedron<Grid<TreeT>>(float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetDodecahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetIcosahedron<Grid<TreeT>>(float, const Vec3f&, float, float)
+    Grid<TreeT>::Ptr createLevelSetIcosahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

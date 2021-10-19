@@ -343,6 +343,12 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr levelSetRebuild(const Grid<TreeT>&, float, float, float, const math::Transform*, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

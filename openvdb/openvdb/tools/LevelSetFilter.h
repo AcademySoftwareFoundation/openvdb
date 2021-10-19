@@ -503,6 +503,23 @@ LevelSetFilter<GridT, MaskT, InterruptT>::Filter::boxImpl(const LeafRange& range
     }
 }
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETFILTER
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API LevelSetFilter<Grid<TreeT>, FloatGrid, util::NullInterrupter>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

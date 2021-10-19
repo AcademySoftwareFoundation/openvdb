@@ -16,7 +16,9 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tools/NodeVisitor.h>
+#include <openvdb/openvdb.h>
 
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -142,7 +144,8 @@ struct TreeToMerge<TreeT>::MaskPtr
         : ptr(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr) { }
     MaskPtr& operator=(const MaskPtr& other)
     {
-        ptr.reset(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr);
+        if (bool(other.ptr))    ptr = std::make_unique<MaskTreeType>(*other.ptr);
+        else                    ptr.reset();
         return *this;
     }
 };
@@ -1446,6 +1449,41 @@ SumMergeOp<TreeT>::background() const
     return *mBackground;
 }
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_INSTANTIATE_MERGE
+#undef OPENVDB_EXTERN
+#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#endif
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API TreeToMerge<TreeT>
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API CsgUnionOrIntersectionOp<TreeT, true>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API CsgUnionOrIntersectionOp<TreeT, false>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API CsgDifferenceOp<TreeT>
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    class OPENVDB_TEMPLATE_API SumMergeOp<TreeT>
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
 
 
 } // namespace tools

@@ -239,7 +239,8 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::Ptr createLevelSetSphere<Grid<TreeT>>(float, const openvdb::Vec3f&, float, float, bool)
+    Grid<TreeT>::Ptr createLevelSetSphere<Grid<TreeT>>(float, const openvdb::Vec3f&, float, float, \
+        util::NullInterrupter*, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 

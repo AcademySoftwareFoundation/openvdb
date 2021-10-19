@@ -267,7 +267,8 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 #endif
 
 #define _FUNCTION(TreeT) \
-    Grid<TreeT>::ValueConverter<float>::Type::Ptr topologyToLevelSet(const Grid<TreeT>&, int, int, int, int)
+    Grid<TreeT>::ValueConverter<float>::Type::Ptr topologyToLevelSet(const Grid<TreeT>&, int, int, int, int, \
+        util::NullInterrupter*)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
