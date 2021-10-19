@@ -12,6 +12,7 @@
 
 #include <openvdb/math/Vec3.h>
 #include <openvdb/Types.h>
+#include <openvdb/util/NullInterrupter.h>
 #include <openvdb/points/PointDataGrid.h>
 
 #include <GA/GA_Attribute.h>
@@ -74,6 +75,16 @@ class Interrupter;
 /// @param  decimalPlaces    for readability, truncate voxel size to this number of decimals
 /// @param  interrupter      a Houdini interrupter
 OPENVDB_HOUDINI_API
+float
+computeVoxelSizeFromHoudini(
+    const GU_Detail& detail,
+    const openvdb::Index pointsPerVoxel,
+    const openvdb::math::Mat4d& matrix,
+    const openvdb::Index decimalPlaces,
+    openvdb::util::NullInterrupter& interrupter);
+
+OPENVDB_HOUDINI_API
+OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
 float
 computeVoxelSizeFromHoudini(
     const GU_Detail& detail,
