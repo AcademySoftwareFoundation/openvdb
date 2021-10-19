@@ -58,7 +58,7 @@ struct MorphingParms {
 class MorphOp
 {
 public:
-    MorphOp(MorphingParms& parms, hvdb::Interrupter& boss)
+    MorphOp(MorphingParms& parms, openvdb::util::NullInterrupter& boss)
         : mParms(&parms)
         , mBoss(&boss)
     {
@@ -68,8 +68,8 @@ public:
     {
         if (mBoss->wasInterrupted()) return;
 
-        openvdb::tools::LevelSetMorphing<openvdb::FloatGrid, hvdb::Interrupter>
-            morph(grid, *(mParms->mTargetGrid), mBoss);
+        openvdb::tools::LevelSetMorphing<openvdb::FloatGrid>
+            morph(grid, *(mParms->mTargetGrid), &mBoss->interrupter());
 
         if (mParms->mMaskGrid) {
             morph.setAlphaMask(*(mParms->mMaskGrid));
@@ -86,7 +86,7 @@ public:
 
 private:
     MorphingParms*     mParms;
-    hvdb::Interrupter* mBoss;
+    openvdb::util::NullInterrupter* mBoss;
 };
 
 } // namespace
@@ -111,7 +111,7 @@ public:
     protected:
         OP_ERROR cookVDBSop(OP_Context&) override;
         OP_ERROR evalMorphingParms(OP_Context&, MorphingParms&);
-        bool processGrids(MorphingParms&, hvdb::Interrupter&);
+        bool processGrids(MorphingParms&, openvdb::util::NullInterrupter&);
     };
 
 protected:
@@ -409,9 +409,9 @@ SOP_OpenVDB_Morph_Level_Set::Cache::cookVDBSop(OP_Context& context)
         MorphingParms parms;
         if (evalMorphingParms(context, parms) >= UT_ERROR_ABORT) return error();
 
-        hvdb::Interrupter boss("Morphing level set");
+        hvdb::HoudiniInterrupter boss("Morphing level set");
 
-        processGrids(parms, boss);
+        processGrids(parms, boss.interrupter());
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "Process was interrupted");
         boss.end();
@@ -525,9 +525,9 @@ SOP_OpenVDB_Morph_Level_Set::Cache::evalMorphingParms(
 
 bool
 SOP_OpenVDB_Morph_Level_Set::Cache::processGrids(
-    MorphingParms& parms, hvdb::Interrupter& boss)
+    MorphingParms& parms, openvdb::util::NullInterrupter& boss)
 {
-    MorphOp op(parms, boss);
+    MorphOp op(parms, boss.interrupter());
 
     std::vector<std::string> skippedGrids, nonLevelSetGrids, narrowBands;
 
