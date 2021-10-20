@@ -644,14 +644,11 @@ euler(const LeafRange& range, ValueType dt,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETMORPH
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API LevelSetMorphing<Grid<TreeT>, util::NullInterrupter>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter>;
 
 
 } // namespace tools

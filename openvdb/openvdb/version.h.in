@@ -133,8 +133,16 @@
 #cmakedefine OPENVDB_USE_ZLIB
 #endif
 
-/* Defines the extern keyword for explicit template declarations. */
-#define OPENVDB_EXTERN extern
+/* Defines the macros for explicit template declarations. */
+#ifdef _WIN32
+    #define OPENVDB_INSTANTIATE extern template __declspec(dllimport)
+    #define OPENVDB_INSTANTIATE_CLASS extern template class __declspec(dllimport)
+    #define OPENVDB_INSTANTIATE_STRUCT extern template struct __declspec(dllimport)
+#else
+    #define OPENVDB_INSTANTIATE extern template
+    #define OPENVDB_INSTANTIATE_CLASS extern template class
+    #define OPENVDB_INSTANTIATE_STRUCT extern template struct
+#endif
 
 /* Defines the macros for explicit template instantiations. */
 #define OPENVDB_REAL_TREE_INSTANTIATE(Function)     @OPENVDB_REAL_TREE_INSTANTIATIONS@

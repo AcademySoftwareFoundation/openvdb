@@ -1456,34 +1456,37 @@ SumMergeOp<TreeT>::background() const
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_MERGE
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API TreeToMerge<TreeT>
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<MaskTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<BoolTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<DoubleTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Int32Tree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Int64Tree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3STree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3DTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3ITree>;
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API CsgUnionOrIntersectionOp<TreeT, true>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<MaskTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<BoolTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<DoubleTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Int32Tree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Int64Tree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3STree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3DTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3ITree>;
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API CsgUnionOrIntersectionOp<TreeT, false>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<FloatTree, true>;
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<DoubleTree, true>;
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API CsgDifferenceOp<TreeT>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<FloatTree, false>;
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<DoubleTree, false>;
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API SumMergeOp<TreeT>
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<DoubleTree>;
 
 
 } // namespace tools

@@ -997,8 +997,7 @@ compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_COMPOSITE
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

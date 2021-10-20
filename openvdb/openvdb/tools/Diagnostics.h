@@ -1336,8 +1336,7 @@ uniqueInactiveValues(const GridType& grid,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_DIAGNOSTICS
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

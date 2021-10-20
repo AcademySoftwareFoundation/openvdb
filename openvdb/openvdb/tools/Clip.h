@@ -570,8 +570,7 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_CLIP
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

@@ -999,14 +999,11 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_VOLUMETOSPHERES
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API ClosestSurfacePoint<Grid<TreeT>>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<FloatGrid>;
+OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<DoubleGrid>;
 
 #define _FUNCTION(TreeT) \
     void fillWithSpheres(const Grid<TreeT>&, std::vector<openvdb::Vec4s>&, const Vec2i&, \

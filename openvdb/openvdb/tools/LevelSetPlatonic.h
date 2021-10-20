@@ -479,8 +479,7 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETPLATONIC
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

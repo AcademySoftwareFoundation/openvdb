@@ -693,8 +693,7 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_VALUETRANSFORMER
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

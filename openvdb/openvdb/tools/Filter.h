@@ -852,14 +852,11 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_FILTER
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API Filter<Grid<TreeT>, FloatGrid, util::NullInterrupter>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_CLASS Filter<FloatGrid, FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS Filter<DoubleGrid, FloatGrid, util::NullInterrupter>;
 
 
 } // namespace tools

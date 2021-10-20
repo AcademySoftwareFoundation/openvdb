@@ -1277,8 +1277,7 @@ inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_MORPHOLOGY
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

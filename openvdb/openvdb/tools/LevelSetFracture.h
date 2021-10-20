@@ -319,14 +319,11 @@ LevelSetFracture<GridType, InterruptType>::process(
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETFRACTURE
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
-#define _FUNCTION(TreeT) \
-    class OPENVDB_TEMPLATE_API LevelSetFracture<Grid<TreeT>, util::NullInterrupter>
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
+OPENVDB_INSTANTIATE_CLASS LevelSetFracture<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetFracture<DoubleGrid, util::NullInterrupter>;
 
 
 } // namespace tools

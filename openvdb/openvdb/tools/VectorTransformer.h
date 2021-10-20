@@ -135,8 +135,7 @@ transformVectors(GridType& grid, const Mat4d& mat)
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_VECTORTRANSFORMER
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

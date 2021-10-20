@@ -329,8 +329,7 @@ levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Tran
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_LEVELSETREBUILD
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \

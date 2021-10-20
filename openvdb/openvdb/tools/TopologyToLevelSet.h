@@ -262,8 +262,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 // Explicit Template Instantiation
 
 #ifdef OPENVDB_INSTANTIATE_TOPOLOGYTOLEVELSET
-#undef OPENVDB_EXTERN
-#define OPENVDB_EXTERN // turn explicit instantiation declarations into definitions
+#include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 #define _FUNCTION(TreeT) \
