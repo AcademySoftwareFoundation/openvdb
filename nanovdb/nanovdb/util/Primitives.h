@@ -37,9 +37,9 @@ namespace nanovdb {
 /// @details The @c ValueT template parameter must be float (default) or double.
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when VoxelT is set to FpN. 
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createLevelSetSphere(ValueT              radius = 100,
@@ -76,9 +76,9 @@ createLevelSetSphere(ValueT              radius = 100,
 /// @details The @c ValueT template parameter must be float (default) or double.
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
-///          argument is only used when VoxelT is set to FpN. 
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+///          argument is only used when VoxelT is set to FpN.
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createFogVolumeSphere(ValueT              radius = 100.0f,
@@ -141,8 +141,8 @@ createPointSphere(int                 pointsPerVoxel = 1,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createLevelSetTorus(ValueT              majorRadius = 100.0f,
@@ -182,8 +182,8 @@ createLevelSetTorus(ValueT              majorRadius = 100.0f,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createFogVolumeTorus(ValueT              majorRadius = 100.0f,
@@ -215,7 +215,7 @@ createFogVolumeTorus(ValueT              majorRadius = 100.0f,
 /// @param buffer         Buffer used for memory allocation by the handle
 //
 /// @details The @c ValueT template parameter must be float (default) or double.
-template<typename ValueT = float, 
+template<typename ValueT = float,
          typename BufferT = HostBuffer>
 inline GridHandle<BufferT>
 createPointTorus(int                 pointsPerVoxel = 1, // half-width of narrow band in voxel units
@@ -250,8 +250,8 @@ createPointTorus(int                 pointsPerVoxel = 1, // half-width of narrow
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createLevelSetBox(ValueT              width = 40.0f,
@@ -293,8 +293,8 @@ createLevelSetBox(ValueT              width = 40.0f,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createFogVolumeBox(ValueT              width = 40.0f,
@@ -331,8 +331,8 @@ createFogVolumeBox(ValueT              width = 40.0f,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createLevelSetOctahedron(ValueT              scale = 100.0f,
@@ -370,8 +370,8 @@ createLevelSetOctahedron(ValueT              scale = 100.0f,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createFogVolumeOctahedron(ValueT              scale = 100.0f,
@@ -409,8 +409,8 @@ createFogVolumeOctahedron(ValueT              scale = 100.0f,
 ///          The @c VoxelT template parameter must be one of the following:
 ///          float (default), double, Fp4, Fp8, Fp16 or FpN. The @c tolerance
 ///          argument is only used when VoxelT is set to FpN.
-template<typename ValueT = float, 
-         typename VoxelT = ValueT, 
+template<typename ValueT = float,
+         typename VoxelT = ValueT,
          typename BufferT = HostBuffer>
 GridHandle<BufferT>
 createLevelSetBBox(ValueT              width = 40.0f,
@@ -813,7 +813,7 @@ initOctahedron(ValueT              scale, // scale of the octahedron in world un
         if (d < ValueT(0)) {
             return Vec3T(x, y - s, z).length();
         } else if (d > s) {
-            return Vec3T(x, y, z - s).length(); 
+            return Vec3T(x, y, z - s).length();
         }
         return Vec3T(x, y - s + d, z - d).length();
     };
@@ -842,7 +842,7 @@ initOctahedron(ValueT              scale, // scale of the octahedron in world un
                 } else if (ValueT(3)*pz < d) {
                     v = sdf(pz, px, py);
                 } else {
-                    v = a * d; 
+                    v = a * d;
                 }
                 d = Abs(v);
                 if (d < halfWidth) { // inside narrow band
@@ -926,7 +926,7 @@ createPointSphere(int                 pointsPerVoxel, // half-width of narrow ba
                   ChecksumMode        cMode, // mode of computation for the checksum
                   const BufferT&      buffer)
 {
-    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5, origin, "dummy", 
+    auto sphereHandle = createLevelSetSphere(radius, center, voxelSize, 0.5, origin, "dummy",
                                              StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(sphereHandle);
     auto* sphereGrid = sphereHandle.template grid<ValueT>();
@@ -1006,7 +1006,7 @@ createPointTorus(int                 pointsPerVoxel, // half-width of narrow ban
                  ChecksumMode        cMode, // mode of computation for the checksum
                  const BufferT&      buffer)
 {
-    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin, 
+    auto torusHandle = createLevelSetTorus(majorRadius, minorRadius, center, voxelSize, 0.5f, origin,
                                            "dummy", StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(torusHandle);
     auto* torusGrid = torusHandle.template grid<ValueT>();
@@ -1058,7 +1058,7 @@ createLevelSetOctahedron(ValueT              scale, // scale of the octahedron i
                          StatsMode           sMode, // mode of computation for the statistics
                          ChecksumMode        cMode, // mode of computation for the checksum
                          float               tolerance,
-                         bool                ditherOn,  
+                         bool                ditherOn,
                          const BufferT&      buffer)
 {
     auto builder = initOctahedron<ValueT, VoxelT>(scale, center, voxelSize, halfWidth, origin);
@@ -1173,7 +1173,7 @@ createPointBox(int                 pointsPerVoxel, // half-width of narrow band 
                ChecksumMode        cMode, // mode of computation for the checksum
                const BufferT&      buffer)
 {
-    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5, origin, "dummy", 
+    auto boxHandle = createLevelSetBox(width, height, depth, center, voxelSize, 0.5, origin, "dummy",
                                        StatsMode::BBox, ChecksumMode::Disable, -1.0f, false, buffer);
     assert(boxHandle);
     auto* boxGrid = boxHandle.template grid<ValueT>();
@@ -1254,7 +1254,7 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
         leafData[i].mMinimum = leafData[i - 1].mMinimum + leafData[i - 1].mMaximum;
     }
     auto& meta = const_cast<GridBlindMetaData&>(dstGrid->blindMetaData(0u));
-    
+
     meta.mElementCount = xyz.size();
     meta.mFlags = 0;
     meta.mDataClass = GridBlindDataClass::AttributeArray;

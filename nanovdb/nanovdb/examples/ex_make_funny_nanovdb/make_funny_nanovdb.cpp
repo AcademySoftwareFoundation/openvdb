@@ -17,8 +17,8 @@ int main()
         auto acc = builder.getAccessor();
         const int size = 500;
         auto func = [&](const nanovdb::Coord &ijk){
-            float v = 40.0f + 50.0f*(cos(ijk[0]*0.1f)*sin(ijk[1]*0.1f) + 
-                                     cos(ijk[1]*0.1f)*sin(ijk[2]*0.1f) + 
+            float v = 40.0f + 50.0f*(cos(ijk[0]*0.1f)*sin(ijk[1]*0.1f) +
+                                     cos(ijk[1]*0.1f)*sin(ijk[2]*0.1f) +
                                      cos(ijk[2]*0.1f)*sin(ijk[0]*0.1f));
             v = nanovdb::Max(v, nanovdb::Vec3f(ijk).length() - size);// CSG intersection with a sphere
             return v > background ? background : v < -background ? -background : v;// clamp value

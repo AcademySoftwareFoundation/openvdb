@@ -47,17 +47,17 @@ public:
     const GridMetaData* gridMetaData() const { return reinterpret_cast<const GridMetaData*>(data()); }
 
     /// @brief Returns the GridType handled by this instance, and GridType::End if empty
-    GridType gridType() const 
-    { 
+    GridType gridType() const
+    {
         const GridMetaData* ptr = this->gridMetaData();
-        return ptr ? ptr->gridType() : GridType::End; 
+        return ptr ? ptr->gridType() : GridType::End;
     }
 
     /// @brief Return the number of grids contained in this buffer
-    uint32_t gridCount() const 
-    { 
+    uint32_t gridCount() const
+    {
         auto *ptr = this->gridMetaData();
-        return ptr ? ptr->gridCount() : 0; 
+        return ptr ? ptr->gridCount() : 0;
     }
 };// GridHandleBase
 
@@ -124,21 +124,21 @@ public:
 
     /// @brief Returns a const pointer to the @a n'th NanoVDB grid encoded in this GridHandle.
     ///
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
     template<typename ValueT>
     const NanoGrid<ValueT>* grid(uint32_t n = 0) const { return this->template getGrid<ValueT>(n); }
 
     /// @brief Returns a pointer to the @a n'th  NanoVDB grid encoded in this GridHandle.
     ///
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
     template<typename ValueT>
     NanoGrid<ValueT>* grid(uint32_t n = 0) { return no_const(this->template getGrid<ValueT>(n)); }
 
     /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
     ///
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
     template<typename ValueT, typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, const NanoGrid<ValueT>*>::type
@@ -146,7 +146,7 @@ public:
 
     /// @brief Return a const pointer to the @a n'th grid encoded in this GridHandle on the device, e.g. GPU
     ///
-    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid 
+    /// @warning Note that the return pointer can be NULL if the GridHandle was not initialized, @a n is invalid
     ///          or if the template parameter does not match the specified grid!
     template<typename ValueT, typename U = BufferT>
     typename std::enable_if<BufferTraits<U>::hasDeviceDual, NanoGrid<ValueT>*>::type

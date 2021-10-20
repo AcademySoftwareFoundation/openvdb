@@ -1,13 +1,13 @@
 # Build instructions {#HowToBuild}
 
 Note that NanoVDB can be built in many different ways, in the sense that its many external dependencies are optional. This includes OpenVDB, TBB, graphics APIs like CUDA, OpenGL, and OpenCL, as well as compression like ZLIB and BLOSC.
-However, since the core data structure in [NanoVDB.h](../include/nanovdb/NanoVDB.h) is self-contained, client code may only depend on this single header file. 
+However, since the core data structure in [NanoVDB.h](../include/nanovdb/NanoVDB.h) is self-contained, client code may only depend on this single header file.
 
 Also, note that if the environment variable `VDB_DATA_PATH` is set to a directory containing the OpenVDB files from [the OpenVDB web site](http://www.openvdb.org/download), they will be used for the unit and the benchmark tests. Else a simple narrow-band level set sphere is used. Set the environment variable `VDB_SCRATCH_PATH` to define the path to where images generated in the benchmark tests are stored (defaults to the build directory).
 
 ### Using CMake:
 
-To explicitly remove a dependency, X, add the argument "-DNANOVDB_USE_X=false" where X = {BLOSC, CUDA, OPENCL, OPENVDB, OPTIX, TBB, ZLIB}. 
+To explicitly remove a dependency, X, add the argument "-DNANOVDB_USE_X=false" where X = {BLOSC, CUDA, OPENCL, OPENVDB, OPTIX, TBB, ZLIB}.
 To see the compiler arguments add "-DCMAKE_VERBOSE_MAKEFILE=true".
 
 By far the simplest way to build the library is to ignore the options entirely:

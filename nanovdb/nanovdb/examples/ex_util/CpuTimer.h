@@ -21,12 +21,12 @@ class CpuTimer
     std::chrono::high_resolution_clock::time_point mStart;
 public:
     CpuTimer() {}
-    void start(const std::string &msg, std::ostream& os = std::cerr) { 
+    void start(const std::string &msg, std::ostream& os = std::cerr) {
         os << msg << " ... " << std::flush;
         mStart = std::chrono::high_resolution_clock::now();
     }
     void restart(const std::string &msg, std::ostream& os = std::cerr) {
-        this->stop(); 
+        this->stop();
         os << msg << " ... " << std::flush;
         mStart = std::chrono::high_resolution_clock::now();
     }

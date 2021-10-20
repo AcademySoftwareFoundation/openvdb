@@ -46,7 +46,7 @@ __global__ void render_kernel(const nanovdb::DenseGrid<float>& grid,
             Vec3T grad(grid.getValue(ijk.offsetBy(1,0,0)) - grid.getValue(ijk.offsetBy(-1,0,0)),
                        grid.getValue(ijk.offsetBy(0,1,0)) - grid.getValue(ijk.offsetBy(0,-1,0)),
                        grid.getValue(ijk.offsetBy(0,0,1)) - grid.getValue(ijk.offsetBy(0,0,-1)));
-#else// first order single-sided difference    
+#else// first order single-sided difference
             Vec3T grad(-v0);
             ijk[0] += 1;
             grad[0] += grid.getValue(ijk);
@@ -88,12 +88,12 @@ extern "C" float launch_kernels(const nanovdb::DenseGridHandle<nanovdb::CudaDevi
 
     // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
     render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
-    
+
     float elapsedTime = 0.0f;
 #ifdef CUDA_TIMING
     cudaEventRecord(stop, stream);
     cudaEventSynchronize(stop);
-    
+
     cudaEventElapsedTime(&elapsedTime, start, stop);
     //printf("DenseGrid: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.image()->size(), elapsedTime);
     cudaError_t errCode = cudaGetLastError();

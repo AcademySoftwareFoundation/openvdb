@@ -14,7 +14,7 @@
 #ifndef NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
 #define NANOVDB_REDUCE_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D 
+#include "Range.h"// for Range1D
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_reduce.h>
@@ -71,7 +71,7 @@ inline T reduce(RangeT range, const T& identity, const FuncT &func, const JoinT 
     return identity;// should never happen
 }
 
-/// @brief Simple wrapper to the function defined above 
+/// @brief Simple wrapper to the function defined above
 template <typename T, typename FuncT, typename JoinT >
 inline T reduce(size_t begin, size_t end, size_t grainSize, const T& identity, const FuncT& func, const JoinT& join)
 {

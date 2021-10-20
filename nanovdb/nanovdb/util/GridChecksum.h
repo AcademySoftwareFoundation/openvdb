@@ -39,7 +39,7 @@ enum class ChecksumMode : uint32_t { Disable = 0,// no computation
 /// @brief Return the (2 x CRC32) checksum of the specified @a grid
 ///
 /// @param grid Grid from which the checksum is computed.
-/// @param mode Defines the mode of computation for the checksum. 
+/// @param mode Defines the mode of computation for the checksum.
 template <typename ValueT>
 uint64_t checksum(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Default);
 
@@ -60,7 +60,7 @@ void updateChecksum(NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::De
 
 /// @brief Return the CRC32 checksum of the raw @a data of @a size
 /// @param data The beginning of the raw data.
-/// @param size Size of the data to bytes! 
+/// @param size Size of the data to bytes!
 inline std::uint_fast32_t crc32(const void *data, size_t size);
 
 /// @brief Return the CRC32 checksum of the content pointed to be the iterator
@@ -72,7 +72,7 @@ std::uint_fast32_t crc32(IterT begin, IterT end);
 
 /// @brief Class that computes the Cyclic Redundancy Check (CRC)
 class CRC32
-{ 
+{
     using ByteT = std::uint_fast8_t;
     using HashT = std::uint_fast32_t;
     HashT mChecksum;
@@ -115,19 +115,19 @@ public:
     }
 };// CRC32
 
-inline std::uint_fast32_t crc32(const void *data, size_t byteSize) 
-{ 
+inline std::uint_fast32_t crc32(const void *data, size_t byteSize)
+{
     CRC32 crc;
     crc(data, byteSize);
-    return crc.checksum(); 
+    return crc.checksum();
 }
 
 template <typename IterT>
-inline std::uint_fast32_t crc32(IterT begin, IterT end) 
-{ 
+inline std::uint_fast32_t crc32(IterT begin, IterT end)
+{
     CRC32 crc;
     crc(begin, end);
-    return crc.checksum(); 
+    return crc.checksum();
 }
 
 /// @brief Class that encapsulates two CRC32 checksums, one for the Grid, Tree and Root node meta data
@@ -148,24 +148,24 @@ public:
     {
         if (mode == ChecksumMode::Partial) mCRC[1] = CRC32::EMPTY;
     }
-    
+
     uint64_t checksum() const { return mChecksum; }
 
     uint32_t crc32(int i) const {assert(i==0 || i==1); return mCRC[i]; }
-    
+
     bool isFull() const { return mCRC[0] != CRC32::EMPTY && mCRC[1] != CRC32::EMPTY; }
 
     bool isEmpty() const { return mChecksum == EMPTY; }
 
     ChecksumMode mode() const
-    { 
+    {
         return mChecksum == EMPTY ? ChecksumMode::Disable :
-               mCRC[1] == CRC32::EMPTY ? ChecksumMode::Partial : ChecksumMode::Full; 
+               mCRC[1] == CRC32::EMPTY ? ChecksumMode::Partial : ChecksumMode::Full;
     }
-    
+
     template <typename ValueT>
     void operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode = ChecksumMode::Full);
-    
+
     bool operator==(const GridChecksum &rhs) const {return mChecksum == rhs.mChecksum;}
     bool operator!=(const GridChecksum &rhs) const {return mChecksum != rhs.mChecksum;}
 };// GridChecksum
@@ -175,7 +175,7 @@ template <typename ValueT>
 void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
 {
     // Validate the assumed memory layout
-#if 1    
+#if 1
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mMagic)    ==  0);
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mChecksum) ==  8);
     NANOVDB_ASSERT(NANOVDB_OFFSETOF(GridData, mVersion)  == 16);
@@ -189,14 +189,14 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
     mChecksum = EMPTY;
 
     if (mode == ChecksumMode::Disable) return;
-    
+
     const auto &tree = grid.tree();
     const auto &root = tree.root();
     CRC32 crc;
 
     // process Grid + Tree + Root but exclude mMagic and mChecksum
     const uint8_t *begin = reinterpret_cast<const uint8_t*>(&grid);
-    const uint8_t *end = begin + grid.memUsage() + tree.memUsage() + root.memUsage(); 
+    const uint8_t *end = begin + grid.memUsage() + tree.memUsage() + root.memUsage();
     crc(begin + offset, end);
 
     mCRC[0] = crc.checksum();
@@ -242,7 +242,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
             local.reset();
         }
     };
-    
+
     forEach(0, tree.nodeCount(2), 1, kernel2);
     forEach(0, tree.nodeCount(1), 1, kernel1);
     forEach(0, tree.nodeCount(0), 8, kernel0);

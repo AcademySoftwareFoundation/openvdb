@@ -6,8 +6,8 @@
 *  [CNanoVDB.h](../CNanoVDB.h) C99 implementation of the core data structure and its access methods.
 *  [PNanoVDB.h](../PNanoVDB.h) C99 implementation of the core data structure and its access methods. Unlike CNanoVDB this version is pointer-less and supports virtually all graphics APIs.
 * [util/GridHandle.h](../util/GridHandle.h) defines a handler for the memory allocated to a NanoVDB grid.
-* [util/IO.h](../util/IO.h) implements I/O support. 
-* [util/OpenToNanoVDB.h](../util/OpenToNanoVDB.h) defines the converter from OpenVDB to NanoVDB and obviously depends on the OpenVDB library (as the only header file). 
+* [util/IO.h](../util/IO.h) implements I/O support.
+* [util/OpenToNanoVDB.h](../util/OpenToNanoVDB.h) defines the converter from OpenVDB to NanoVDB and obviously depends on the OpenVDB library (as the only header file).
 * [Ray.h](../util/Ray.h) Ray class.
 * [HDDA.h](../util/HDDA.h) HDDA related.
 * [SampleFromVoxels.h](../util/SampleFromVoxels.h) interpolation.
@@ -22,7 +22,7 @@ foo@bar:~$ tree
 │   └── util
 │       ├── CSampleFromVoxels.h
 │       ├── CudaDeviceBuffer.h
-|       ├── DitherLUT.h 
+|       ├── DitherLUT.h
 │       ├── ForEach.h
 │       ├── GridBuilder.h
 │       ├── GridChecksum.h

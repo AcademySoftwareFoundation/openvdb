@@ -5,7 +5,7 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief A super lightweight and portable ray-tracing benchmark 
+/// @brief A super lightweight and portable ray-tracing benchmark
 ///        that only depends on NanoVDB (not OpenVDB) and CUDA.
 
 #ifndef _USE_MATH_DEFINES
@@ -78,14 +78,14 @@ int main(int argc, char** argv)
     cudaCheck(cudaStreamCreate(&stream));
 
     auto handle = nanovdb::io::readDense<BufferT>(argv[1]);
-    
+
     const auto* grid = handle.grid<float>();
     if (!grid || !grid->isLevelSet()) {
         std::cerr << "Error loading NanoVDB level set from file" << std::endl;
         return 1;
     }
     handle.deviceUpload(stream, false);
-    std::cout << "\nRay-tracing DenseGrid of size " 
+    std::cout << "\nRay-tracing DenseGrid of size "
               << (grid->gridSize() >> 20) << " MB" << std::endl;
 
     const int   width = 1280, height = 720;
@@ -105,7 +105,7 @@ int main(int argc, char** argv)
     imgHandle.deviceUpload(stream, false);
 
     float elapsedTime = 0.0f;
-    const int maxAngle = 360; 
+    const int maxAngle = 360;
     for (int angle = 0; angle < maxAngle; ++angle) {
         host_camera->update(eye(angle), lookat, up, vfov, aspect);
         cudaCheck(cudaMemcpyAsync(dev_camera, host_camera, sizeof(CameraT), cudaMemcpyHostToDevice, stream));
@@ -124,7 +124,7 @@ int main(int argc, char** argv)
     cudaCheck(cudaFree(host_camera));
     cudaCheck(cudaFree(dev_camera));
 
-    printf("\nRay-traced %i different frames, each with %i rays, in %5.3f ms.\nThis corresponds to an average of %5.3f ms per frame or %5.3f FPS!\n", 
+    printf("\nRay-traced %i different frames, each with %i rays, in %5.3f ms.\nThis corresponds to an average of %5.3f ms per frame or %5.3f FPS!\n",
            maxAngle, imgHandle.image()->size(), elapsedTime, elapsedTime/maxAngle, 1000.0f*maxAngle/elapsedTime);
 
     return 0;

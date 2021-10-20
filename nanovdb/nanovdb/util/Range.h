@@ -34,7 +34,7 @@ using Range3D = Range<3, size_t>;
 // template specialization for Rank = 1
 template <typename T>
 class Range<1, T>
-{   
+{
     T mBegin, mEnd;
     size_t mGrainsize;
     template<int, typename>
@@ -43,10 +43,10 @@ public:
     using const_iterator = T;
     using size_type = size_t;
     Range(const Range&) = default;
-    Range(T begin, T end, size_type grainsize = size_type(1)) 
-        : mBegin(begin), mEnd(end), mGrainsize(grainsize) 
-    { 
-        assert(grainsize > size_type(0)); 
+    Range(T begin, T end, size_type grainsize = size_type(1))
+        : mBegin(begin), mEnd(end), mGrainsize(grainsize)
+    {
+        assert(grainsize > size_type(0));
     }
     /// @brief Split constructor: r[a,b[ -> r[a,b/2[ & this[b/2,b[
     Range(Range &r, Split) : mBegin(r.mBegin), mEnd(r.mEnd), mGrainsize(r.mGrainsize) {
@@ -75,10 +75,10 @@ public:
     using size_type = typename Range<1, T>::size_type;
     Range(const Range<1, T> &rangeRow, const Range<1, T> &rangeCol) : mRange{ rangeRow, rangeCol } {}
     Range(T beginRow, T endRow, size_type grainsizeRow, T beginCol, T endCol, size_type grainsizeCol)
-        : Range( Range<1,T>(beginRow, endRow, grainsizeRow), Range<1,T>(beginCol, endCol, grainsizeCol) ) 
+        : Range( Range<1,T>(beginRow, endRow, grainsizeRow), Range<1,T>(beginCol, endCol, grainsizeCol) )
     {
     }
-    Range(T beginRow, T endRow, T beginCol, T endCol) : Range(Range<1,T>(beginRow, endRow), Range<1,T>(beginCol, endCol) ) 
+    Range(T beginRow, T endRow, T beginCol, T endCol) : Range(Range<1,T>(beginRow, endRow), Range<1,T>(beginCol, endCol) )
     {
     }
     Range(Range &r, Split) : Range(r.mRange[0], r.mRange[1]) {
@@ -106,19 +106,19 @@ class Range<3, T>
 public:
     using size_type = typename Range<1, T>::size_type;
     Range(const Range<1, T> &rangeX, const Range<1, T> &rangeY, const Range<1, T> &rangeZ) : mRange{ rangeX, rangeY, rangeZ } {}
-    Range(T beginX, T endX, size_type grainsizeX, 
+    Range(T beginX, T endX, size_type grainsizeX,
           T beginY, T endY, size_type grainsizeY,
           T beginZ, T endZ, size_type grainsizeZ)
-        : Range( Range<1,T>(beginX, endX, grainsizeX), 
-                 Range<1,T>(beginY, endY, grainsizeY), 
-                 Range<1,T>(beginZ, endZ, grainsizeZ) ) 
+        : Range( Range<1,T>(beginX, endX, grainsizeX),
+                 Range<1,T>(beginY, endY, grainsizeY),
+                 Range<1,T>(beginZ, endZ, grainsizeZ) )
     {
     }
     Range(T beginX, T endX, T beginY, T endY, T beginZ, T endZ)
-        : Range( Range<1,T>(beginX, endX), Range<1,T>(beginY, endY), Range<1,T>(beginZ, endZ) ) 
+        : Range( Range<1,T>(beginX, endX), Range<1,T>(beginY, endY), Range<1,T>(beginZ, endZ) )
     {
     }
-    Range(Range &r, Split) : Range(r.mRange[0], r.mRange[1], r.mRange[2]) 
+    Range(Range &r, Split) : Range(r.mRange[0], r.mRange[1], r.mRange[2])
     {
         assert( r.is_divisible() );// at least one of the three dimensions must be divisible!
         if ( mRange[2].size()*double(mRange[0].grainsize()) < mRange[0].size()*double(mRange[2].grainsize()) ) {
@@ -127,7 +127,7 @@ public:
             } else {
                 r.mRange[0].mEnd = mRange[0].mBegin = mRange[0].middle();
             }
-	    } else {
+        } else {
             if ( mRange[2].size()*double(mRange[1].grainsize()) < mRange[1].size()*double(mRange[2].grainsize()) ) {
                 r.mRange[1].mEnd = mRange[1].mBegin = mRange[1].middle();
             } else {

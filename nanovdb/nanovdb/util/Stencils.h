@@ -7,9 +7,9 @@
 ///
 /// @file Stencils.h
 ///
-/// @brief Defines various finite-difference stencils that allow for the 
-///        computation of gradients of order 1 to 5, mean curvatures, 
-///        gaussian curvatures, principal curvatures, tri-linear interpolation, 
+/// @brief Defines various finite-difference stencils that allow for the
+///        computation of gradients of order 1 to 5, mean curvatures,
+///        gaussian curvatures, principal curvatures, tri-linear interpolation,
 ///        zero-crossing, laplacian, and closest point transform.
 
 #ifndef NANOVDB_STENCILS_HAS_BEEN_INCLUDED
@@ -32,11 +32,11 @@ namespace nanovdb {
 /// where the error is fifth-order in smooth regions: O(dx) <= error <=O(dx^5)
 template<typename ValueType, typename RealT = ValueType>
 __hostdev__ inline ValueType
-WENO5(const ValueType& v1, 
-      const ValueType& v2, 
+WENO5(const ValueType& v1,
+      const ValueType& v2,
       const ValueType& v3,
-      const ValueType& v4, 
-      const ValueType& v5, 
+      const ValueType& v4,
+      const ValueType& v5,
       RealT scale2 = 1.0)// openvdb uses scale2 = 0.01
 {
     static const RealT C = 13.0 / 12.0;
@@ -58,7 +58,7 @@ WENO5(const ValueType& v1,
 // ---------------------------- GodunovsNormSqrd ----------------------------
 
 template <typename RealT>
-__hostdev__ inline RealT 
+__hostdev__ inline RealT
 GodunovsNormSqrd(bool isOutside,
                  RealT dP_xm, RealT dP_xp,
                  RealT dP_ym, RealT dP_yp,
@@ -79,8 +79,8 @@ GodunovsNormSqrd(bool isOutside,
 
 template<typename RealT>
 __hostdev__ inline RealT
-GodunovsNormSqrd(bool isOutside, 
-                 const Vec3<RealT>& gradient_m, 
+GodunovsNormSqrd(bool isOutside,
+                 const Vec3<RealT>& gradient_m,
                  const Vec3<RealT>& gradient_p)
 {
     return GodunovsNormSqrd<RealT>(isOutside,
@@ -390,7 +390,7 @@ public:
         ValueType A = D[0] + (D[1]- D[0]) * v;
         ValueType B = D[2] + (D[3]- D[2]) * v;
         Vec3<ValueType> grad(0, 0, A + (B - A) * u);
- 
+
         D[0] = BaseType::template getValue<0,0,0>() + D[0] * w;
         D[1] = BaseType::template getValue<0,1,0>() + D[1] * w;
         D[2] = BaseType::template getValue<1,0,0>() + D[2] * w;
@@ -784,7 +784,7 @@ public:
     using GridType  = GridT;
     using TreeType  = typename GridT::TreeType;
     using ValueType = typename GridT::ValueType;
-    
+
     static constexpr int SIZE = 19;
 
     __hostdev__ CurvatureStencil(const GridType& grid)

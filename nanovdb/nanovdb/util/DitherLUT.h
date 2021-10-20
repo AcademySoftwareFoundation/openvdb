@@ -47,20 +47,20 @@ SYSwang_inthash(uint32 key)
 
 static void
 ut_initDitherR(float *pattern, float offset,
-	int x, int y, int z, int res, int goalres)
+    int x, int y, int z, int res, int goalres)
 {
     // These offsets are designed to maximize the difference between
     // dither values in nearby voxels within a given 2x2x2 cell, without
     // producing axis-aligned artifacts.  The are organized in row-major
     // order.
-    static const float	theDitherOffset[] = {0,4,6,2,5,1,3,7};
-    static const float	theScale = 0.125F;
-    int			key = (((z << res) + y) << res) + x;
+    static const float  theDitherOffset[] = {0,4,6,2,5,1,3,7};
+    static const float  theScale = 0.125F;
+    int         key = (((z << res) + y) << res) + x;
 
     if (res == goalres)
     {
-	pattern[key] = offset;
-	return;
+    pattern[key] = offset;
+    return;
     }
 
     // Randomly flip (on each axis) the dithering patterns used by the
@@ -74,8 +74,8 @@ ut_initDitherR(float *pattern, float offset,
 
     offset *= theScale;
     for (int i = 0; i < 8; i++)
-	ut_initDitherR(pattern, offset+theDitherOffset[i ^ key]*theScale,
-		x+(i&1), y+((i&2)>>1), z+((i&4)>>2), res+1, goalres);
+    ut_initDitherR(pattern, offset+theDitherOffset[i ^ key]*theScale,
+        x+(i&1), y+((i&2)>>1), z+((i&4)>>2), res+1, goalres);
 }
 
 // This is a compact algorithm that accomplishes essentially the same thing
@@ -85,7 +85,7 @@ static fpreal32 *
 ut_initDitherRecursive(int goalres)
 {
     const int nfloat = 1 << (goalres*3);
-    float	*pattern = new float[nfloat];
+    float   *pattern = new float[nfloat];
     ut_initDitherR(pattern, 1.0F, 0, 0, 0, 0, goalres);
 
     // This has built an even spacing from 1/nfloat to 1.0.

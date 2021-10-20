@@ -31,7 +31,7 @@ bool isValid(const NanoGrid<ValueT> &grid, bool detailed = true, bool verbose = 
 template <typename ValueT>
 class GridValidator
 {
-    using GridT = NanoGrid<ValueT>;   
+    using GridT = NanoGrid<ValueT>;
     inline static void checkTree( const GridT&, std::string&, bool);
     inline static void checkRoot( const GridT&, std::string&, bool);
     inline static void checkNodes(const GridT&, std::string&);
@@ -54,7 +54,7 @@ std::string GridValidator<ValueT>::check(const GridT &grid, bool detailed)
 {
     std::string errorStr;
 
-    // First check the Grid  
+    // First check the Grid
     auto *data = reinterpret_cast<const typename GridT::DataType*>(&grid);
     std::stringstream ss;
     if (data->mMagic != NANOVDB_MAGIC_NUMBER) {
@@ -127,7 +127,7 @@ void GridValidator<ValueT>::checkNodes(const GridT &grid, std::string &errorStr)
     auto &root = grid.tree().root();// note, the root node was already checked
     const uint8_t *minPtr = (const uint8_t*)(&root) + root.memUsage();
     const uint8_t *maxPtr = (const uint8_t*)(&grid) + grid.gridSize();
-    
+
     auto check = [&](const void * ptr, size_t ptrSize) -> bool {
         if ( (const uint8_t *) ptr < minPtr ) {
             errorStr.assign("Invalid node pointer: below lower bound");

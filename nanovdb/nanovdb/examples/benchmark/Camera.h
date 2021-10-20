@@ -20,7 +20,7 @@ template<typename RealT = float, typename Vec3T = Vec3<RealT>, typename RayT = R
 class Camera
 {
     Vec3T            mEye, mW, mU, mV;
-    
+
     __hostdev__ void init(RealT vfov, RealT aspect)
     {
         const RealT halfHeight = RealT(tan(vfov * 3.14159265358979323846 / 360));
@@ -57,7 +57,7 @@ public:
     __hostdev__ RayT getRay(RealT u, RealT v) const {
         auto dir = u * mU + v * mV - mW;
         dir.normalize();
-        return RayT(mEye, dir); 
+        return RayT(mEye, dir);
     }
 
     __hostdev__ const Vec3T& P() const { return mEye; }

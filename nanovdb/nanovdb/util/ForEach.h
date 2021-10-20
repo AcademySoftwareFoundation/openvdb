@@ -14,7 +14,7 @@
 #ifndef NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
 #define NANOVDB_FOREACH_H_HAS_BEEN_INCLUDED
 
-#include "Range.h"// for Range1D 
+#include "Range.h"// for Range1D
 
 #ifdef NANOVDB_USE_TBB
 #include <tbb/parallel_for.h>

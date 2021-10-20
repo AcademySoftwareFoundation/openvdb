@@ -63,7 +63,7 @@ int main(int argc, char* argv[])
     float                    tolerance = -1.0f;
     std::string              gridName;
     std::vector<std::string> fileNames;
-    auto toLowerCase = [](std::string &str) { 
+    auto toLowerCase = [](std::string &str) {
         std::transform(str.begin(), str.end(), str.begin(),[](unsigned char c){return std::tolower(c);});
     };
     for (int i = 1; i < argc; ++i) {
@@ -128,7 +128,7 @@ int main(int argc, char* argv[])
                       std::cerr << "Expected one of the following stats modes: {none, bbox, extrema, all}\n" << std::endl;
                       usage(argv[0]);
                     }
-                } 
+                }
             } else if (arg == "-a" || arg == "--abs-error") {
                 if (i + 1 == argc) {
                     std::cerr << "Expected a float to follow the -a,--abs-error option\n" << std::endl;
@@ -199,7 +199,7 @@ int main(int argc, char* argv[])
     // Hence, NanoVDB grids can be read, converted and written to file one at a time whereas all
     // the OpenVDB grids has to be written to file in a single operation.
 
-    auto openToNano = [&](const openvdb::GridBase::Ptr& base) 
+    auto openToNano = [&](const openvdb::GridBase::Ptr& base)
     {
         if (auto floatGrid = openvdb::GridBase::grid<openvdb::FloatGrid>(base)) {
             switch (qMode) {

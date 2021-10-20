@@ -47,9 +47,9 @@ public:
     /// @brief Return true if the approximate value is within the accepted
     ///        absolute error bounds of the exact value.
     ///
-    /// @details Required member method   
-    bool  operator()(float exact, float approx) const 
-    { 
+    /// @details Required member method
+    bool  operator()(float exact, float approx) const
+    {
         return Abs(exact - approx) <= mTolerance;
     }
 };// AbsDiff
@@ -73,9 +73,9 @@ public:
     /// @brief Return true if the approximate value is within the accepted
     ///        relative error bounds of the exact value.
     ///
-    /// @details Required member method 
-    bool  operator()(float exact, float approx) const 
-    { 
+    /// @details Required member method
+    bool  operator()(float exact, float approx) const
+    {
         return  Abs(exact - approx)/Max(Abs(exact), Abs(approx)) <= mTolerance;
     }
 };// RelDiff
@@ -154,14 +154,14 @@ class GridBuilder
     template<typename T>
     typename std::enable_if<is_same<FpN, typename T::BuildType>::value>::type
     processLeafs(std::vector<T*>&);
-    
+
     template<typename SrcNodeT>
     void processNodes(std::vector<SrcNodeT*>&);
-    
+
     DstRootT* processRoot();
-    
+
     DstTreeT* processTree();
-    
+
     DstGridT* processGrid(const Map&, const std::string&);
 
     template<typename T, typename FlagT>
@@ -173,8 +173,8 @@ class GridBuilder
     setFlag(const T& min, const T& max, FlagT& flag) const;
 
 public:
-    GridBuilder(ValueT background = ValueT(), 
-                GridClass gClass = GridClass::Unknown, 
+    GridBuilder(ValueT background = ValueT(),
+                GridClass gClass = GridClass::Unknown,
                 uint64_t blindDataSize = 0);
 
     ValueAccessor getAccessor() { return ValueAccessor(mRoot); }
@@ -205,10 +205,10 @@ public:
     GridHandle<BufferT> getHandle(double             voxelSize = 1.0,
                                   const Vec3d&       gridOrigin = Vec3d(0),
                                   const std::string& name = "",
-                                  const OracleT&     oracle = OracleT(), 
+                                  const OracleT&     oracle = OracleT(),
                                   const BufferT&     buffer = BufferT());
 
-    /// @brief Return an instance of a GridHandle (invoking move semantics) 
+    /// @brief Return an instance of a GridHandle (invoking move semantics)
     template<typename OracleT = AbsDiff, typename BufferT = HostBuffer>
     GridHandle<BufferT> getHandle(const Map&         map,
                                   const std::string& name = "",
@@ -303,7 +303,7 @@ operator()(const Func& func, const CoordBBox& voxelBBox, ValueT delta)
     for (auto it2 = mRoot.mTable.begin(); it2 != mRoot.mTable.end(); ++it2) {
         if (auto *upper = it2->second.child) {//upper level internal node
             for (auto it1 = upper->mChildMask.beginOn(); it1; ++it1) {
-                auto *lower = upper->mTable[*it1].child;// lower level internal node    
+                auto *lower = upper->mTable[*it1].child;// lower level internal node
                 for (auto it0 = lower->mChildMask.beginOn(); it0; ++it0) {
                     auto *leaf = lower->mTable[*it0].child;// leaf nodes
                     if (leaf->mDstOffset) {
@@ -339,7 +339,7 @@ operator()(const Func& func, const CoordBBox& voxelBBox, ValueT delta)
                     it2->second.child = nullptr;
                     delete upper;
                 }
-            } 
+            }
         }// is child node of the root
     }// loop over root table
 }
@@ -375,7 +375,7 @@ initHandle(const OracleT &oracle, const BufferT& buffer)
                     mArray0.emplace_back(leaf);
                     offset[0] += DstNode0::memUsage();
                 }// loop over leaf nodes
-            }// loop over lower internal nodes 
+            }// loop over lower internal nodes
         }// is child node of the root
     }// loop over root table
 
@@ -391,7 +391,7 @@ initHandle(const OracleT &oracle, const BufferT& buffer)
     mBufferOffsets[7] = GridBlindMetaData::memUsage(mBlindDataSize > 0 ? 1 : 0); // blind data
     mBufferOffsets[8] = mBlindDataSize;// end of buffer
 
-    // Compute the prefixed sum 
+    // Compute the prefixed sum
     for (int i = 2; i < 9; ++i) {
         mBufferOffsets[i] += mBufferOffsets[i - 1];
     }
@@ -508,7 +508,7 @@ void GridBuilder<ValueT, BuildT, StatsT>::
             }// loop over lower internal nodes
         }// is child node of the root
     }// loop over root table
-    
+
     // Note that the bottum-up flood filling is essential
     const ValueT outside = mRoot.mBackground;
     forEach(mArray0, 8, [&](const Range1D& r) {
@@ -765,12 +765,12 @@ GridBuilder<ValueT, BuildT, StatsT>::
             int offset = 0;
             if (is_same<Fp4, BuildT>::value) {// resolved at compile-time
                 for (int j=0; j<128; ++j) {
-                    auto tmp = ArrayT(encode * (*src++ - min) + lut(offset++)); 
+                    auto tmp = ArrayT(encode * (*src++ - min) + lut(offset++));
                     *code++  = ArrayT(encode * (*src++ - min) + lut(offset++)) << 4 | tmp;
-                    tmp      = ArrayT(encode * (*src++ - min) + lut(offset++)); 
+                    tmp      = ArrayT(encode * (*src++ - min) + lut(offset++));
                     *code++  = ArrayT(encode * (*src++ - min) + lut(offset++)) << 4 | tmp;
                 }
-            } else { 
+            } else {
                 for (int j=0; j<128; ++j) {
                     *code++ = ArrayT(encode * (*src++ - min) + lut(offset++));
                     *code++ = ArrayT(encode * (*src++ - min) + lut(offset++));
@@ -792,7 +792,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
     processLeafs(std::vector<T*>& srcLeafs)
 {
     static_assert(is_same<float, ValueT>::value, "Expected ValueT == float");
-    
+
     DitherLUT lut(mDitherOn);
     auto kernel = [&](const Range1D& r) {
         uint8_t* ptr = mBufferPtr + mBufferOffsets[5];
@@ -831,7 +831,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
                     const float encode = 3.0f/(max - min);
                     for (int j=0; j<128; ++j) {
                         auto a = uint8_t(encode * (*src++ - min) + lut(offset++));
-                        a     |= uint8_t(encode * (*src++ - min) + lut(offset++)) << 2; 
+                        a     |= uint8_t(encode * (*src++ - min) + lut(offset++)) << 2;
                         a     |= uint8_t(encode * (*src++ - min) + lut(offset++)) << 4;
                         *dst++ = uint8_t(encode * (*src++ - min) + lut(offset++)) << 6 | a;
                     }
@@ -841,9 +841,9 @@ GridBuilder<ValueT, BuildT, StatsT>::
                     auto *dst = reinterpret_cast<uint8_t*>(data+1);
                     const float encode = 15.0f/(max - min);
                     for (int j=0; j<128; ++j) {
-                        auto a = uint8_t(encode * (*src++ - min) + lut(offset++)); 
+                        auto a = uint8_t(encode * (*src++ - min) + lut(offset++));
                         *dst++ = uint8_t(encode * (*src++ - min) + lut(offset++)) << 4 | a;
-                        a      = uint8_t(encode * (*src++ - min) + lut(offset++)); 
+                        a      = uint8_t(encode * (*src++ - min) + lut(offset++));
                         *dst++ = uint8_t(encode * (*src++ - min) + lut(offset++)) << 4 | a;
                     }
                 }
@@ -939,22 +939,22 @@ NanoTree<BuildT>* GridBuilder<ValueT, BuildT, StatsT>::processTree()
 
     DstNode2 *node2 = mArray2.empty() ? nullptr : reinterpret_cast<DstNode2*>(mBufferPtr + mBufferOffsets[3]);
     data->setFirstNode(node2);
-    
+
     DstNode1 *node1 = mArray1.empty() ? nullptr : reinterpret_cast<DstNode1*>(mBufferPtr + mBufferOffsets[4]);
     data->setFirstNode(node1);
-    
+
     DstNode0 *node0 = mArray0.empty() ? nullptr : reinterpret_cast<DstNode0*>(mBufferPtr + mBufferOffsets[5]);
     data->setFirstNode(node0);
 
     data->mNodeCount[0] = mArray0.size();
     data->mNodeCount[1] = mArray1.size();
     data->mNodeCount[2] = mArray2.size();
-    
+
     // Count number of active leaf level tiles
     data->mTileCount[0] = reduce(mArray1, uint32_t(0), [&](Range1D &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray1[i]->mValueMask.countOn();
         return sum;}, std::plus<uint32_t>());
-    
+
     // Count number of active lower internal node tiles
     data->mTileCount[1] = reduce(mArray2, uint32_t(0), [&](Range1D &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray2[i]->mValueMask.countOn();
@@ -975,7 +975,7 @@ NanoTree<BuildT>* GridBuilder<ValueT, BuildT, StatsT>::processTree()
     data->mVoxelCount += data->mTileCount[0]*DstNode0::NUM_VALUES;
     data->mVoxelCount += data->mTileCount[1]*DstNode1::NUM_VALUES;
     data->mVoxelCount += data->mTileCount[2]*DstNode2::NUM_VALUES;
-   
+
     return dstTree;
 } // GridBuilder::processTree
 
@@ -1001,14 +1001,14 @@ processGrid(const Map&         map,
     data->mBlindMetadataCount = 0;
     data->mGridClass = mGridClass;
     data->mGridType = mapToGridType<BuildT>();
-    
+
     if (!isValid(data->mGridType, data->mGridClass)) {
         std::stringstream ss;
         ss << "Invalid combination of GridType("<<int(data->mGridType)
            << ") and GridClass("<<int(data->mGridClass)<<"). See NanoVDB.h for details!";
         throw std::runtime_error(ss.str());
     }
-    
+
     strncpy(data->mGridName, name.c_str(), GridData::MaxNameSize-1);
     if (name.length() >= GridData::MaxNameSize) {//  currenlty we don't support long grid names
         std::stringstream ss;
@@ -1018,7 +1018,7 @@ processGrid(const Map&         map,
 
     data->mVoxelSize = map.applyMap(Vec3d(1)) - map.applyMap(Vec3d(0));
     data->mMap = map;
-  
+
     if (mBlindDataSize>0) {
         auto *metaData = reinterpret_cast<GridBlindMetaData*>(mBufferPtr + mBufferOffsets[6]);
         data->mBlindMetadataOffset = PtrDiff(metaData, dstGrid);

@@ -22,7 +22,7 @@ unset(OptiX_INSTALL_DIR CACHE)
 
 find_path(OptiX_INSTALL_DIR
   NAMES include/optix.h
-  PATHS 
+  PATHS
   "${OptiX_ROOT}"
   "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.2.0"
   "C:/ProgramData/NVIDIA Corporation/OptiX SDK 7.1.0"

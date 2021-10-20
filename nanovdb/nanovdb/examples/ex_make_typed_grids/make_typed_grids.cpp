@@ -35,7 +35,7 @@ void buildGridForType(std::vector<nanovdb::GridHandle<>>& gridHandles, T const& 
     std::string typeNameStr = typeid(T).name();
 
     try {
-        
+
         nanovdb::GridBuilder<ValueT> builder(bgValue);
         auto                         acc = builder.getAccessor();
 

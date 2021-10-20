@@ -62,7 +62,7 @@ public:
 
     /// @brief Construction from a grid
     NodeManager(GridT &grid);
- 
+
     /// @brief Disallow copy construction
     NodeManager(const NodeManager&) = delete;
 
@@ -114,7 +114,7 @@ public:
 private:
 
     void clear();
-    
+
     GridT*   mGrid;
     TreeT*   mTree;
     RootT*   mRoot;
@@ -145,16 +145,16 @@ NodeManager<GridT>::NodeManager(GridT &grid)
     , mUpper(new Node2*[mNodeCount[2]])
     , mLower(new Node1*[mNodeCount[1]])
     , mLeafs(new Node0*[mNodeCount[0]])
-    
+
 {
-    if (Node0::FIXED_SIZE && Node1::FIXED_SIZE && Node2::FIXED_SIZE &&// resolved at compile-time 
+    if (Node0::FIXED_SIZE && Node1::FIXED_SIZE && Node2::FIXED_SIZE &&// resolved at compile-time
         grid.isBreadthFirst()) {
 #if 1
-            invoke([&](){this->sequential(mLeafs);}, 
+            invoke([&](){this->sequential(mLeafs);},
                    [&](){this->sequential(mLower);},
                    [&](){this->sequential(mUpper);});
-#else       
-            this->sequential(mLeafs); 
+#else
+            this->sequential(mLeafs);
             this->sequential(mLower);
             this->sequential(mUpper);
 #endif
@@ -184,7 +184,7 @@ NodeManager<GridT>::NodeManager(GridT &grid)
 }
 
 template<typename GridT>
-NodeManager<GridT>::NodeManager(NodeManager &&other) 
+NodeManager<GridT>::NodeManager(NodeManager &&other)
     : mGrid(other.mGrid)
     , mTree(other.mTree)
     , mRoot(other.mRoot)
@@ -240,9 +240,9 @@ void NodeManager<GridT>::clear()
 }
 
 template<typename GridT>
-size_t NodeManager<GridT>::memUsage() const 
-{ 
-    return sizeof(*this) + 
+size_t NodeManager<GridT>::memUsage() const
+{
+    return sizeof(*this) +
            mNodeCount[0]*sizeof(Node0*) +
            mNodeCount[1]*sizeof(Node1*) +
            mNodeCount[2]*sizeof(Node2*);
@@ -258,7 +258,7 @@ NodeManager<GridT> createNodeMgr(GridT &grid)
 
 template<typename GridT>
 template <typename T>
-void NodeManager<GridT>::sequential(T **nodes) 
+void NodeManager<GridT>::sequential(T **nodes)
 {
     NANOVDB_ASSERT(mGrid->template isSequential<T>());
     auto *ptr = mTree->template getFirstNode<T>();
@@ -288,7 +288,7 @@ public:
 
     /// @brief Construction from a grid
     LeafManager(GridT &grid);
- 
+
     /// @brief Disallow copy construction
     LeafManager(const LeafManager&) = delete;
 
@@ -322,7 +322,7 @@ public:
     LeafT* operator[](uint32_t i) const { return mLeafs[i]; };
 
 private:
-    
+
     GridT   *mGrid;
     uint32_t mSize;
     LeafT  **mLeafs;
@@ -382,7 +382,7 @@ LeafManager<GridT>& LeafManager<GridT>::operator=(LeafManager &&other)
 {
     mGrid = other.mGrid;
     mSize = other.mSize;
-    delete [] mLeafs; 
+    delete [] mLeafs;
     mLeafs = other.mLeafs;
     other.mGrid = nullptr;
     other.mSize = 0;

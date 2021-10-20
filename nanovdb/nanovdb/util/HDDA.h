@@ -167,10 +167,10 @@ private:
 
 /////////////////////////////////////////// ZeroCrossing ////////////////////////////////////////////
 
-/// @brief returns true if the ray intersects a zero-crossing at the voxel level of the grid in the accessor 
-///        The empty-space ray-marching is performed at all levels of the tree using an 
-///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the closest 
-///        voxel after the intersection point, v contains the grid values at ijk, and t is set to the time of 
+/// @brief returns true if the ray intersects a zero-crossing at the voxel level of the grid in the accessor
+///        The empty-space ray-marching is performed at all levels of the tree using an
+///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the closest
+///        voxel after the intersection point, v contains the grid values at ijk, and t is set to the time of
 ///        the intersection along the ray.
 template<typename RayT, typename AccT>
 inline __hostdev__ bool ZeroCrossing(RayT& ray, AccT& acc, Coord& ijk, typename AccT::ValueType& v, float& t)
@@ -366,9 +366,9 @@ inline __hostdev__ bool ZeroCrossingNode(RayT& ray, const NodeT& node, float v0,
 
 /////////////////////////////////////////// TreeMarcher ////////////////////////////////////////////
 
-/// @brief returns true if the ray intersects an active value at any level of the grid in the accessor. 
-///        The empty-space ray-marching is performed at all levels of the tree using an 
-///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the first 
+/// @brief returns true if the ray intersects an active value at any level of the grid in the accessor.
+///        The empty-space ray-marching is performed at all levels of the tree using an
+///        HDDA. If an intersection is detected, then ijk is updated with the index coordinate of the first
 ///        active voxel or tile, and t is set to the time of its intersection along the ray.
 template<typename RayT, typename AccT>
 inline __hostdev__ bool firstActive(RayT& ray, AccT& acc, Coord &ijk, float& t)

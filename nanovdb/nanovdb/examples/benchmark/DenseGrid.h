@@ -88,7 +88,7 @@ public:
                                                   const Vec3d& p0 = Vec3d(0.0), // origin
                                                   GridClass gridClass = GridClass::Unknown,
                                                   const BufferT& allocator = BufferT());
-    
+
     __hostdev__ DenseGrid(const DenseGrid&) = delete;
     __hostdev__ ~DenseGrid() = delete;
     __hostdev__ DenseGrid& operator=(const DenseGrid&) = delete;
@@ -181,12 +181,12 @@ public:
 
 template<typename ValueT>
 template<typename BufferT>
-DenseGridHandle<BufferT> 
-DenseGrid<ValueT>::create(Coord min, 
+DenseGridHandle<BufferT>
+DenseGrid<ValueT>::create(Coord min,
                           Coord max,
                           double dx, //voxel size
                           const Vec3d& p0, // origin
-                          GridClass gridClass, 
+                          GridClass gridClass,
                           const BufferT& allocator)
 {
     if (dx <= 0) {
@@ -200,12 +200,12 @@ DenseGrid<ValueT>::create(Coord min,
                              (uint64_t(max[2] - min[2]) + TileMask) >> TileLog2};
     const uint64_t size = sizeof(DenseGrid) + sizeof(ValueT)*TileDim*dim[0]*dim[1]*dim[2];
 #else
-    const uint64_t dim[3] = {uint64_t(max[0] - min[0]), 
-                             uint64_t(max[1] - min[1]), 
+    const uint64_t dim[3] = {uint64_t(max[0] - min[0]),
+                             uint64_t(max[1] - min[1]),
                              uint64_t(max[2] - min[2])};
-    const uint64_t size = sizeof(DenseGrid) + sizeof(ValueT)*dim[0]*dim[1]*dim[2];                         
+    const uint64_t size = sizeof(DenseGrid) + sizeof(ValueT)*dim[0]*dim[1]*dim[2];
 #endif
-    
+
     DenseGridHandle<BufferT> handle(allocator.create(size));
     DenseGrid* grid = reinterpret_cast<DenseGrid*>(handle.data());
     grid->mSize = size;
@@ -249,45 +249,45 @@ DenseGrid<ValueT>::create(Coord min,
 }
 
 template<typename ValueT>
-bool DenseGrid<ValueT>::test(const Coord &ijk) const 
-{ 
-    return (ijk[0]>=mIndexBBox[0][0]) && (ijk[0]<=mIndexBBox[1][0]) && 
-           (ijk[1]>=mIndexBBox[0][1]) && (ijk[1]<=mIndexBBox[1][1]) && 
+bool DenseGrid<ValueT>::test(const Coord &ijk) const
+{
+    return (ijk[0]>=mIndexBBox[0][0]) && (ijk[0]<=mIndexBBox[1][0]) &&
+           (ijk[1]>=mIndexBBox[0][1]) && (ijk[1]<=mIndexBBox[1][1]) &&
            (ijk[2]>=mIndexBBox[0][2]) && (ijk[2]<=mIndexBBox[1][2]);
 }
 
 template<typename ValueT>
-uint64_t DenseGrid<ValueT>::coordToOffset(const Coord &ijk) const 
-{ 
+uint64_t DenseGrid<ValueT>::coordToOffset(const Coord &ijk) const
+{
     assert(this->test(ijk));
 #if LOG2_TILE_SIZE > 0
     const uint32_t x = ijk[0] - mIndexBBox[0][0];
     const uint32_t y = ijk[1] - mIndexBBox[0][1];
     const uint32_t z = ijk[2] - mIndexBBox[0][2];
-    return ((mX*(x>>TileLog2) + mY*(y>>TileLog2) + (z>>TileLog2))<<(3*TileLog2)) + 
+    return ((mX*(x>>TileLog2) + mY*(y>>TileLog2) + (z>>TileLog2))<<(3*TileLog2)) +
            ((x&TileMask)<<(2*TileLog2)) + ((y&TileMask)<<TileLog2) + (z&TileMask);
 #else
-    return uint64_t(ijk[0]-mIndexBBox[0][0])*mX + 
-           uint64_t(ijk[1]-mIndexBBox[0][1])*mY + 
+    return uint64_t(ijk[0]-mIndexBBox[0][0])*mX +
+           uint64_t(ijk[1]-mIndexBBox[0][1])*mY +
            uint64_t(ijk[2]-mIndexBBox[0][2]);
 #endif
 }
 
 template<typename ValueT>
-const ValueT& DenseGrid<ValueT>::getValue(const Coord &ijk) const 
-{ 
-    return this->values()[this->coordToOffset(ijk)]; 
+const ValueT& DenseGrid<ValueT>::getValue(const Coord &ijk) const
+{
+    return this->values()[this->coordToOffset(ijk)];
 }
 
 template<typename ValueT>
 void DenseGrid<ValueT>::setValue(const Coord &ijk, const ValueT &value)
-{ 
-    this->values()[this->coordToOffset(ijk)] = value; 
+{
+    this->values()[this->coordToOffset(ijk)] = value;
 }
 
 template<typename ValueT>
 bool DenseGrid<ValueT>::isValidType() const
-{ 
+{
     return std::is_same<float, ValueT>::value ? mGridType == GridType::Float : false;
 }
 
@@ -320,7 +320,7 @@ void writeDense(const DenseGridHandle<BufferT> &handle, const char* fileName)
 }
 
 template<typename BufferT = HostBuffer>
-DenseGridHandle<BufferT> 
+DenseGridHandle<BufferT>
 readDense(const char* fileName, const BufferT& allocator = BufferT())
 {
     std::ifstream is(fileName, std::ios::in | std::ios::binary);
@@ -353,16 +353,16 @@ DenseGridHandle<BufferT> convertToDense(const GridT &grid, const BufferT& alloca
                              (uint64_t(max[2] - min[2]) + TileMask) >> TileLog2};
     const uint64_t size = sizeof(DenseT) + sizeof(ValueT)*TileDim*dim[0]*dim[1]*dim[2];
 #else
-    const uint64_t dim[3] = {uint64_t(max[0] - min[0]), 
-                             uint64_t(max[1] - min[1]), 
+    const uint64_t dim[3] = {uint64_t(max[0] - min[0]),
+                             uint64_t(max[1] - min[1]),
                              uint64_t(max[2] - min[2])};
     const uint64_t size = sizeof(DenseT) + sizeof(ValueT)*dim[0]*dim[1]*dim[2];
 #endif
-    
+
     DenseGridHandle<BufferT> handle( allocator.create(size) );
     auto *dense = reinterpret_cast<DenseT*>(handle.data());
     auto *data = dense->data();
-    
+
     // copy DenseData
     data->mMap = grid.map();
     data->mIndexBBox = grid.indexBBox();
@@ -388,7 +388,7 @@ DenseGridHandle<BufferT> convertToDense(const GridT &grid, const BufferT& alloca
     };
     Range<1,int> range(min[0], max[0]);
 #if 1
-    forEach(range, kernel); 
+    forEach(range, kernel);
 #else
     kernel(range);
 #endif

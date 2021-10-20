@@ -303,7 +303,7 @@ int main(int argc, char* argv[])
                           << std::left << std::setw(w) << "\n\"32^3->16^3->8^3\":" << "Number of nodes at each level of the tree structure from the root to leaf level."
                           << std::left << std::setw(w) << "\n\"# Active tiles\":" << "Number of active tiles at each level of the tree structure from the root to leaf level."
                           << std::left << std::setw(w) << "\n\"Index Bounding Box\":" << "coordinate bounding box of all the active values in a grid. Note that both min and max coordinates are inclusive!"
-                          << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid. Note that min is inclusive and max is exclusive!\n";  
+                          << std::left << std::setw(w) << "\n\"World Bounding Box\":" << "world-space bounding box of all the active values in a grid. Note that min is inclusive and max is exclusive!\n";
                 break;
             default:
                 throw std::runtime_error("Internal error in switch!");

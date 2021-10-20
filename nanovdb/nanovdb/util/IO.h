@@ -112,7 +112,7 @@ inline uint64_t reverseEndianness(uint64_t val)
 struct Header
 {
     uint64_t magic; // 8 bytes
-    Version  version;// 4 bytes version numbers 
+    Version  version;// 4 bytes version numbers
     uint16_t gridCount; // 2 bytes
     Codec    codec; // 2 bytes
     Header(Codec c = Codec::NONE)
@@ -129,7 +129,7 @@ struct Header
 // Grid size on disk               (uint64_t)   |
 // Grid name hash key              (uint64_t)   |
 // Numer of active voxels          (uint64_t)   |
-// Grid type                       (uint32_t)   | 
+// Grid type                       (uint32_t)   |
 // Grid class                      (uint32_t)   |
 // Characters in grid name         (uint32_t)   |
 // AABB in world space             (2*3*double) | one per grid in file
@@ -154,8 +154,8 @@ struct MetaData
     uint32_t    tileCount[3];// 3 x 4 = 12B
     Codec       codec;  // 2B
     uint16_t    padding;// 2B, due to 8B alignment from uint64_t
-    Version     version;// 4B 
-}; // MetaData 
+    Version     version;// 4B
+}; // MetaData
 
 struct GridMetaData : public MetaData
 {

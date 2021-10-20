@@ -92,12 +92,12 @@ extern "C" float launch_kernels(const nanovdb::GridHandle<nanovdb::CudaDeviceBuf
 
     // kernal syntax:  <<<blocks per grid, threads per block, dynamic shared memory per block, stream >>>
     render_kernel<<<numBlocks, threadsPerBlock, 0, stream>>>(*deviceGrid, *camera, *deviceImage);
-    
+
     float elapsedTime = 0.0f;
 #ifdef CUDA_TIMING
     cudaEventRecord(stop, stream);
     cudaEventSynchronize(stop);
-    
+
     cudaEventElapsedTime(&elapsedTime, start, stop);
     //printf("NanoVDB: GPU kernel with %i rays ... completed in %5.3f milliseconds\n", imgHandle.image()->size(), elapsedTime);
     cudaError_t errCode = cudaGetLastError();

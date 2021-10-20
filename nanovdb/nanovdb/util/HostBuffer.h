@@ -6,7 +6,7 @@
 
     @date April 20, 2021
 
-    @brief HostBuffer - a buffer that contains a shared or private bump 
+    @brief HostBuffer - a buffer that contains a shared or private bump
            pool to either externally or internally managed host memory.
 
     @details This HostBuffer can be used in multiple ways, most of which are
@@ -15,12 +15,12 @@
              be shared between multiple buffers or belong to a single buffer.
 
    Example that uses HostBuffer::create inside io::readGrids to create a
-   full self-managed buffer, i.e. not shared and without padding, per grid in the file. 
+   full self-managed buffer, i.e. not shared and without padding, per grid in the file.
    @code
         auto handles = nanovdb::io::readGrids("file.nvdb");
    @endcode
 
-   Example that uses HostBuffer::createFull. Assuming you have a raw pointer 
+   Example that uses HostBuffer::createFull. Assuming you have a raw pointer
    to a NanoVDB grid of unknown type, this examples shows how to create its
    GridHandle which can be used to enquire about the grid type and meta data.
    @code
@@ -32,7 +32,7 @@
 
    Example that uses HostBuffer::createPool for internally managed host memory.
    Suppose you want to read multiple grids in multiple files, but reuse the same
-   fixed sized memory buffer to both avoid memory fragmentation as well as 
+   fixed sized memory buffer to both avoid memory fragmentation as well as
    exceeding the fixed memory ceiling!
    @code
         auto pool = nanovdb::HostBuffer::createPool(1 << 30);// 1 GB memory pool
@@ -44,9 +44,9 @@
         }
    @endcode
 
-   Example that uses HostBuffer::createPool for externally managed host memory. 
-   Note that in this example @c handles are allowed to outlive @c pool since 
-   they internally store a shared pointer to the memory pool. However @c data 
+   Example that uses HostBuffer::createPool for externally managed host memory.
+   Note that in this example @c handles are allowed to outlive @c pool since
+   they internally store a shared pointer to the memory pool. However @c data
    MUST outlive @c handles since the pool does not own its memory in this example.
    @code
         const size_t poolSize = 1 << 30;// 1 GB
@@ -59,8 +59,8 @@
    @endcode
 
    Example that uses HostBuffer::createPool for externally managed host memory.
-   Note that in this example @c handles are allowed to outlive @c pool since 
-   they internally store a shared pointer to the memory pool. However @c array 
+   Note that in this example @c handles are allowed to outlive @c pool since
+   they internally store a shared pointer to the memory pool. However @c array
    MUST outlive @c handles since the pool does not own its memory in this example.
    @code
         const size_t poolSize = 1 << 30;// 1 GB
@@ -98,12 +98,12 @@ struct BufferTraits
 
 // ----------------------------> HostBuffer <--------------------------------------
 
-/// @brief This is a buffer that contains a shared or private pool 
+/// @brief This is a buffer that contains a shared or private pool
 ///        to either externally or internally managed host memory.
 ///
 /// @note  Terminology:
 ///        Pool:   0 = buffer.size() < buffer.poolSize()
-///        Buffer: 0 < buffer.size() < buffer.poolSize() 
+///        Buffer: 0 < buffer.size() < buffer.poolSize()
 ///        Full:   0 < buffer.size() = buffer.poolSize()
 ///        Empty:  0 = buffer.size() = buffer.poolSize()
 class HostBuffer
@@ -147,14 +147,14 @@ public:
     /// @brief Disallow copy assignment operation
     HostBuffer& operator=(const HostBuffer&) = delete;
 
-    /// @brief Return a pool buffer which satisfies: buffer.size == 0, 
+    /// @brief Return a pool buffer which satisfies: buffer.size == 0,
     ///        buffer.poolSize() == poolSize, and buffer.data() == nullptr.
     ///        If data==nullptr, memory for the pool will be allocated.
     ///
     /// @throw If poolSize is zero.
     static HostBuffer createPool(uint64_t poolSize, void *data = nullptr);
-    
-    /// @brief Return a full buffer which satisfies: buffer.size == bufferSize, 
+
+    /// @brief Return a full buffer which satisfies: buffer.size == bufferSize,
     ///        buffer.poolSize() == bufferSize, and buffer.data() == data.
     ///        If data==nullptr, memory for the pool will be allocated.
     ///
@@ -166,7 +166,7 @@ public:
     ///        @c pool == nullptr or @c pool->poolSize() == 0, one is
     ///        created with size @c bufferSize, i.e. a full buffer is returned.
     ///
-    /// @throw If the specified @c pool has insufficientis memory for 
+    /// @throw If the specified @c pool has insufficientis memory for
     ///        the requested buffer size.
     static HostBuffer create(uint64_t bufferSize, const HostBuffer* pool = nullptr);
 
@@ -174,7 +174,7 @@ public:
     ///        the memory is internally allocated.
     void init(uint64_t bufferSize, void *data = nullptr);
 
-    //@{ 
+    //@{
     /// @brief Retuns a pointer to the raw memory buffer managed by this allocator.
     ///
     /// @warning Note that the pointer can be NULL if the allocator was not initialized!
@@ -191,17 +191,17 @@ public:
     /// @brief Returns the size in bytes of the memory pool shared with this instance.
     uint64_t poolSize() const;
 
-    /// @brief Return true if memory is managed (using std::malloc and std:free) by the 
+    /// @brief Return true if memory is managed (using std::malloc and std:free) by the
     ///        shared pool in this buffer. Else memory is assumed to be managed externally.
     bool isManaged() const;
 
-    //@{ 
+    //@{
     /// @brief Returns true if this buffer has no memory associated with it
     bool isEmpty() const { return !mPool || mSize == 0 || mData == nullptr; }
     bool empty() const { return this->isEmpty(); }
     //@}
 
-    /// @brief Return true if this is a pool, i.e. an empty buffer with a nonempty 
+    /// @brief Return true if this is a pool, i.e. an empty buffer with a nonempty
     ///        internal pool, i.e. this->size() == 0 and this->poolSize() != 0
     bool isPool() const { return mSize == 0 && this->poolSize() > 0; }
 
@@ -219,20 +219,20 @@ public:
     /// @warning This method is not thread-safe!
     void reset();
 
-    /// @brief Total number of bytes from the pool currently in use by buffers 
+    /// @brief Total number of bytes from the pool currently in use by buffers
     uint64_t poolUsage() const;
 
     /// @brief resize the pool size. It will attempt to resize the existing
     ///        memory block, but if that fails a deep copy is performed.
     ///        If @c data is not NULL it will be used as new externally
-    ///        managed memory for the pool. All registered buffers are 
+    ///        managed memory for the pool. All registered buffers are
     ///        updated so GridHandle::grid might return a new address (if
     ///        deep copy was performed).
     ///
-    /// @note  This method can be use to resize the memory pool and even 
+    /// @note  This method can be use to resize the memory pool and even
     ///        change it from internally to externally managed memory or vice versa.
     ///
-    /// @throw if @c poolSize is less than this->poolUsage() the used memory 
+    /// @throw if @c poolSize is less than this->poolUsage() the used memory
     ///        or allocations fail.
     void resizePool(uint64_t poolSize, void *data = nullptr);
 
@@ -263,8 +263,8 @@ struct HostBuffer::Pool
     }
 
     /// @brief Custom destructor
-    ~Pool() 
-    { 
+    ~Pool()
+    {
         assert(mRegister.empty());
         if (mManaged) {
             std::free(mData);
@@ -291,9 +291,9 @@ struct HostBuffer::Pool
     {
         if (mFree + size > mData + mSize) {
             std::stringstream ss;
-            ss << "HostBuffer::Pool: insufficient memory\n" 
+            ss << "HostBuffer::Pool: insufficient memory\n"
                << "\tA buffer requested " << size << " bytes from a pool with "
-               << mSize <<" bytes of which\n\t" << (mFree-mData) 
+               << mSize <<" bytes of which\n\t" << (mFree-mData)
                << " bytes are used by " << mRegister.size() << " other buffer(s). "
                << "Pool is " << (mManaged ? "internally" : "externally") << " managed.\n";
             //std::cerr << ss.str();
@@ -335,7 +335,7 @@ struct HostBuffer::Pool
 
     /// @brief Resize this Pool and update registered buffers as needed. If data is no NULL
     ///        it is used as externally managed memory.
-    void resize(uint64_t size, void *data = nullptr) 
+    void resize(uint64_t size, void *data = nullptr)
     {
         const uint64_t memUsage = this->usage();
         if (memUsage > size) {
@@ -366,7 +366,7 @@ struct HostBuffer::Pool
         mManaged = managed;
     }
     /// @brief Return true is all the memory in this pool is in use.
-    bool isFull() const 
+    bool isFull() const
     {
         assert(mFree <= mData + mSize);
         return mSize > 0 ? mFree == mData + mSize : false;
@@ -409,7 +409,7 @@ inline void HostBuffer::init(uint64_t bufferSize, void *data)
     mPool->add(this, bufferSize);
 }
 
-inline HostBuffer& HostBuffer::operator=(HostBuffer&& other) 
+inline HostBuffer& HostBuffer::operator=(HostBuffer&& other)
 {
     if (mPool) {
         mPool->remove(this);
@@ -426,14 +426,14 @@ inline HostBuffer& HostBuffer::operator=(HostBuffer&& other)
     return *this;
 }
 
-inline uint64_t HostBuffer::poolSize() const 
-{ 
-    return mPool ? mPool->mSize : 0u; 
+inline uint64_t HostBuffer::poolSize() const
+{
+    return mPool ? mPool->mSize : 0u;
 }
 
-inline uint64_t HostBuffer::poolUsage() const 
-{ 
-    return mPool ? mPool->usage(): 0u; 
+inline uint64_t HostBuffer::poolUsage() const
+{
+    return mPool ? mPool->usage(): 0u;
 }
 
 inline bool HostBuffer::isManaged() const
@@ -478,12 +478,12 @@ inline HostBuffer HostBuffer::create(uint64_t bufferSize, const HostBuffer* pool
     } else {
        buffer.mPool = pool->mPool;
     }
-    buffer.mPool->add(&buffer, bufferSize);  
+    buffer.mPool->add(&buffer, bufferSize);
     return buffer;
 }
 
-inline void HostBuffer::clear() 
-{ 
+inline void HostBuffer::clear()
+{
     if (mPool) {// remove self from the buffer register in the pool
         mPool->remove(this);
     }

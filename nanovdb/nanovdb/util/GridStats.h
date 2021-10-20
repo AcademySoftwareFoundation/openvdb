@@ -8,7 +8,7 @@
 
     \date August 29, 2020
 
-    \brief Re-computes min/max/avg/var/bbox information for each node in a 
+    \brief Re-computes min/max/avg/var/bbox information for each node in a
            pre-existing NanoVDB grid.
 */
 
@@ -28,7 +28,7 @@
 
 namespace nanovdb {
 
-/// @brief Grid flags which indicate what extra information is present in the grid buffer.
+/// @brief Grid flags which indicate what extra information is present in the grid buffer
 enum class StatsMode : uint32_t {
     Disable = 0,// disable the computation of any type of statistics (obviously the FASTEST!)
     BBox    = 1,// only compute the bbox of active values per node and total activeVoxelCount
@@ -321,7 +321,7 @@ protected:
     double mAvg, mAux;
 
 public:
-    using ValueType = ValueT; 
+    using ValueType = ValueT;
     Stats()
         : BaseT()
         , mSize(0)
@@ -427,14 +427,14 @@ class GridStats
     using RootT  = typename TreeT::Node3; // root
     static_assert(std::is_same<ValueT, typename StatsT::ValueType>::value, "Mismatching type");
     static constexpr bool DO_STATS = StatsT::hasMinMax() ||  StatsT::hasAverage() || StatsT::hasStdDeviation();
-    
+
     ValueT mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
 
     void process( GridT& );// process grid and all tree nodes
     void process( TreeT& );// process Tree, root node and child nodes
     void process( RootT& );// process root node and child nodes
     NodeStats process( Node0& );// process leaf node
-    
+
     template<typename NodeT>
     NodeStats process( NodeT& );// process internal node and child nodes
 
@@ -549,7 +549,7 @@ void GridStats<GridT, StatsT>::process( GridT &grid )
         // of index and world bounding boxes inherited from OpenVDB!
         const Coord min = indexBBox[0];
         const Coord max = indexBBox[1] + Coord(1);
-        
+
         auto& worldBBox = data.mWorldBBox;
         const auto& map = grid.map();
         worldBBox[0] = worldBBox[1] = map.applyMap(Vec3d(min[0], min[1], min[2]));
@@ -624,7 +624,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
 {
     static_assert(is_same<NodeT,Node1>::value || is_same<NodeT,Node2>::value, "Incorrect node type");
     using ChildT = typename NodeT::ChildNodeType;
-    
+
     NodeStats total;
     auto* data = node.data();
 
@@ -640,7 +640,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
             total.bbox[1].maxComponent(ijk + Coord(int32_t(ChildT::DIM) - 1));
         }
     }
-    
+
     // Serial or parallel processing of child nodes
     if (const size_t childCount = data->mChildMask.countOn()) {
 #ifndef NANOVDB_USE_TBB
@@ -659,7 +659,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
                 for(size_t i=r.begin(); i!=r.end(); ++i){
                     local.add( this->process( *childNodes[i] ) );
                 }
-                return local;}, 
+                return local;},
             [](NodeStats a, const NodeStats &b)->NodeStats { return a.add( b ); }
         ));
 #endif
@@ -682,7 +682,7 @@ GridStats<GridT, StatsT>::process(NodeT &node)
 //================================================================================================
 
 template<typename GridT, typename StatsT>
-typename GridStats<GridT, StatsT>::NodeStats 
+typename GridStats<GridT, StatsT>::NodeStats
 GridStats<GridT, StatsT>::process(Node0 &leaf)
 {
     static_assert(Node0::SIZE == 512u, "Invalid size of leaf nodes");
@@ -724,7 +724,7 @@ void gridStats(NanoGrid<BuildT>& grid, StatsMode mode)
         stats(grid);
     } else if (mode == StatsMode::All) {
         GridStats<GridT, Stats<ValueT> > stats;
-        stats(grid); 
+        stats(grid);
     } else {
         throw std::runtime_error("gridStats: Unsupported statistics mode.");
     }

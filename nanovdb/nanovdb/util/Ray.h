@@ -401,7 +401,7 @@ public:
             RealT a = RealT(bbox.min()[i]), b = RealT(bbox.max()[i] + 1);
             if (a >= b) { // empty bounding box
                 return false;
-            } 
+            }
             a = (a - mEye[i]) * mInvDir[i];
             b = (b - mEye[i]) * mInvDir[i];
             if (a > b) {

@@ -101,11 +101,11 @@ protected:
                 available.push_back(fileName);
             }
         }
-        return available;   
+        return available;
     }
 
     static std::vector<std::string> availableLevelSetFiles()
-    { 
+    {
         return TestOpenVDB::availableFiles({
             "dragon",// prioritized list
             "armadillo",
@@ -116,7 +116,7 @@ protected:
             "space",
             "torus_knot_helix",
             "utahteapot"
-        }); 
+        });
     }
 
     static std::vector<std::string> availablePointFiles()
@@ -191,7 +191,7 @@ protected:
         return grid;
     }
 
-    nanovdb::io::Codec getCodec() const 
+    nanovdb::io::Codec getCodec() const
     {
 #if defined(NANOVDB_USE_BLOSC)
         return nanovdb::io::Codec::BLOSC;
@@ -224,7 +224,7 @@ TEST_F(TestOpenVDB, OpenToNanoType)
         EXPECT_NE(ijk2, nanovdb::Coord(1, 2, -4));
         ijk2 = ijk1;
         EXPECT_EQ(ijk2, nanovdb::Coord(1, 2, -4));
-    } 
+    }
     {// Vec3f
         constexpr bool test1 = std::is_same<nanovdb::Vec3f, nanovdb::OpenToNanoType<openvdb::Vec3f>::Type>::value;
         EXPECT_TRUE(test1);
@@ -586,10 +586,10 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Basic1)
         EXPECT_TRUE(dstGrid);
         EXPECT_EQ("", std::string(dstGrid->gridName()));
         EXPECT_EQ((const char*)handle.data(), (const char*)dstGrid);
-        EXPECT_EQ(sizeof(nanovdb::NanoGrid<float>) + 
+        EXPECT_EQ(sizeof(nanovdb::NanoGrid<float>) +
                   (const char*)handle.data(), (const char*)&dstGrid->tree());
-        EXPECT_EQ(sizeof(nanovdb::NanoGrid<float>) + 
-                  sizeof(nanovdb::NanoTree<float>) + 
+        EXPECT_EQ(sizeof(nanovdb::NanoGrid<float>) +
+                  sizeof(nanovdb::NanoTree<float>) +
                   (const char*)handle.data(), (const char*)&dstGrid->tree().root());
         EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
@@ -628,7 +628,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Model)
     EXPECT_EQ(dstGrid->tree().nodeCount(0), mgr.nodeCount(0));
     EXPECT_EQ(dstGrid->tree().nodeCount(1), mgr.nodeCount(1));
     EXPECT_EQ(dstGrid->tree().nodeCount(2), mgr.nodeCount(2));
-    
+
     auto kernel = [&](const openvdb::CoordBBox& bbox) {
         using CoordT = const nanovdb::Coord;
         auto dstAcc = handle.grid<float>()->getAccessor();
@@ -739,12 +739,12 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp4)
             }
         };
         tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel);
-        
+
         nanovdb::io::writeGrid("data/test_fp4.nvdb", handle, this->getCodec());
         handle = nanovdb::io::readGrid("data/test_fp4.nvdb");
         nanoGrid = handle.grid<nanovdb::Fp4>();
         EXPECT_TRUE(nanoGrid);
-        
+
         tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel);
     }
 } // OpenToNanoVDB_Fp4
@@ -792,7 +792,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
         EXPECT_TRUE(dstGrid->isSequential<2>());
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_TRUE(dstGrid->isSequential<0>());
-        
+
         EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
@@ -825,11 +825,11 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp8)
         tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel);
 
         nanovdb::io::writeGrid("data/test_fp8.nvdb", handle, this->getCodec());
-        
+
         handle = nanovdb::io::readGrid("data/test_fp8.nvdb");
         nanoGrid = handle.grid<nanovdb::Fp8>();
         EXPECT_TRUE(nanoGrid);
-        
+
         tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel);
     }
 } // OpenToNanoVDB_Fp8
@@ -878,7 +878,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
         EXPECT_TRUE(dstGrid->isSequential<2>());
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_TRUE(dstGrid->isSequential<0>());
-        
+
         EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
@@ -915,8 +915,8 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_Fp16)
         handle = nanovdb::io::readGrid("data/test_fp16.nvdb");
         nanoGrid = handle.grid<nanovdb::Fp16>();
         EXPECT_TRUE(nanoGrid);
-        
-        tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel); 
+
+        tbb::parallel_for(openGrid->evalActiveVoxelBoundingBox(), kernel);
     }
 } // OpenToNanoVDB_Fp16
 
@@ -963,7 +963,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
         EXPECT_TRUE(dstGrid->isSequential<2>());
         EXPECT_TRUE(dstGrid->isSequential<1>());
         EXPECT_FALSE(dstGrid->isSequential<0>());
-        
+
         EXPECT_EQ(nanovdb::Vec3R(1.0), dstGrid->voxelSize());
         EXPECT_EQ(1.0f, dstGrid->tree().getValue(nanovdb::Coord(1, 2, 3)));
         auto dstAcc = dstGrid->getAccessor();
@@ -1008,7 +1008,7 @@ TEST_F(TestOpenVDB, OpenToNanoVDB_FpN)
         handle = nanovdb::io::readGrid("data/test_fpN.nvdb");
         nanoGrid = handle.grid<nanovdb::FpN>();
         EXPECT_TRUE(nanoGrid);
-        
+
         nanovdb::forEach(openGrid->evalActiveVoxelBoundingBox(), kernel);
     }
 } // OpenToNanoVDB_FpN
@@ -2047,7 +2047,7 @@ TEST_F(TestOpenVDB, LevelSetFiles)
     const auto fileNames = this->availableLevelSetFiles();
     if (fileNames.empty()) {
         std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
-                  << "\tcontaining OpenVDB level set files. They can be downloaded\n" 
+                  << "\tcontaining OpenVDB level set files. They can be downloaded\n"
                   << "\there: https://www.openvdb.org/download/" << std::endl;
         return;
     }
@@ -2107,7 +2107,7 @@ TEST_F(TestOpenVDB, LevelSetFiles)
     EXPECT_FALSE(nanovdb::io::readGrid("data/ls.nvdb", "bunny"));
 
     // test reading existing grid from an existing file
-    { 
+    {
         auto gridName = getGridName(foundModels[0]);
         auto handle = nanovdb::io::readGrid("data/ls.nvdb", gridName);
         EXPECT_TRUE(handle);
@@ -2125,7 +2125,7 @@ TEST_F(TestOpenVDB, FogFiles)
     const auto fileNames = this->availableFogFiles();
     if (fileNames.empty()) {
         std::cout << "\tSet the environment variable \"VDB_DATA_PATH\" to a directory\n"
-                  << "\tcontaining OpenVDB fog volume files. They can be downloaded\n" 
+                  << "\tcontaining OpenVDB fog volume files. They can be downloaded\n"
                   << "\there: https://www.openvdb.org/download/" << std::endl;
         return;
     }
@@ -2178,7 +2178,7 @@ TEST_F(TestOpenVDB, FogFiles)
     EXPECT_FALSE(nanovdb::io::readGrid("data/fog.nvdb", "bunny"));
 
     // test reading existing grid from an existing file
-    { 
+    {
         //const std::string gridName("density");
         auto gridName = getGridName(foundModels[0]);
         auto handle = nanovdb::io::readGrid("data/fog.nvdb", gridName);
@@ -2208,7 +2208,7 @@ TEST_F(TestOpenVDB, PointFiles)
         try {
             openvdb::io::File file(fileName);
             file.open(false); //disable delayed loading
-            
+
             auto srcGrid = openvdb::gridPtrCast<openvdb::points::PointDataGrid>(file.readGrid(file.beginName().gridName()));
             //std::cerr << "Read PointDataGrid named \"" << srcGrid->getName() << "\"" << std::endl;
             EXPECT_TRUE(srcGrid.get());
@@ -2222,7 +2222,7 @@ TEST_F(TestOpenVDB, PointFiles)
             auto handle = nanovdb::openToNanoVDB(*srcGrid);
             //mTimer.restart("Writing NanoVDB grid");
             nanovdb::io::writeGrid(os, handle, this->getCodec());
-    
+
             //mTimer.stop();
             EXPECT_TRUE(handle);
             auto* meta = handle.gridMetaData();
