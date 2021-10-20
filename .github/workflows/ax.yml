@@ -9,6 +9,7 @@ on:
       - 'pr/**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
@@ -19,6 +20,7 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'

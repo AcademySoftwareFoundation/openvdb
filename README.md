@@ -1,7 +1,9 @@
 ![OpenVDB](https://www.openvdb.org/images/openvdb_logo.png)
 
-[![License](https://img.shields.io/github/license/AcademySoftwareFoundation/openvdb)](LICENSE.md)
+[![License](https://img.shields.io/github/license/AcademySoftwareFoundation/openvdb)](LICENSE)
 [![CII Best Practices](https://bestpractices.coreinfrastructure.org/projects/2774/badge)](https://bestpractices.coreinfrastructure.org/projects/2774)
+[![Slack](https://slack.aswf.io/badge.svg)](https://slack.aswf.io/)
+
 
 | Build           | Status |
 | --------------- | ------ |
@@ -9,7 +11,7 @@
 | OpenVDB AX      | [![ax](https://github.com/AcademySoftwareFoundation/openvdb/workflows/ax/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3Aax) |
 
 [Website](https://www.openvdb.org) |
-[Discussion Forum](https://www.openvdb.org/forum) |
+[Discussion Forum](https://github.com/AcademySoftwareFoundation/openvdb/discussions) |
 [Documentation](https://academysoftwarefoundation.github.io/openvdb)
 
 OpenVDB is an open source C++ library comprising a novel hierarchical data structure and a large suite of tools for the efficient storage and manipulation of sparse volumetric data discretized on three-dimensional grids. It was developed by DreamWorks Animation for use in volumetric applications typically encountered in feature film production.

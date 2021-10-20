@@ -84,12 +84,12 @@ given FindModule e.g. `FindBlosc.cmake`:
   path on first runs of CMake (i.e. these variables are not
   [cached](https://cmake.org/cmake/help/latest/command/set.html#set-cache-entry)).
   They are listed in priority order. Note that the prefix is always capitalized.
-   - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
-   directories
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
    find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
+   - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
+   directories
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
    searches.
    - @b XXX_USE_STATIC_LIBS - Only search for static libraries for the given
@@ -153,6 +153,9 @@ for this:
  - If Blosc is disabled, you will not be able to read or use any `.vdb` files
    that were created using blosc compression. This includes OpenVDB files from
    Houdini.
+
+Note however that OpenVDB currently uses a very old version of Blosc (v1.5.0).
+See the note in the [known issues list.](@ref depKnownIssues).
 
 @subsection buildZLibSupport ZLIB Support
 
