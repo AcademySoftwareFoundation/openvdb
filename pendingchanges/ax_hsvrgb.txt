@@ -1,0 +1,3 @@
+Improvements:
+    - Added hsvtogrb() and rgbtohsv() AX helper functions for converting
+    hue, saturation and value inputs to RGB values and vice-versa.

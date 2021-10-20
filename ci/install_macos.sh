@@ -3,7 +3,7 @@
 set -x
 
 brew update
-brew install bash
+brew install bash gnu-getopt # for CI scripts
 brew install cmake
 brew install ilmbase
 brew install openexr@2
@@ -12,6 +12,7 @@ brew install boost-python3 # also installs the dependent python version
 brew install tbb@2020
 brew install zlib
 brew install glfw
+brew install googletest
 brew install jq # for trivial parsing of brew json
 
 # Alias python version installed by boost-python3 to path
@@ -30,3 +31,7 @@ echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
 # Export TBB paths which are no longer installed to /usr/local (as v2020 is deprecated)
 echo "TBB_ROOT=/usr/local/opt/tbb@2020" >> $GITHUB_ENV
 echo "/usr/local/opt/tbb@2020/bin" >> $GITHUB_PATH
+
+# use gnu-getopt
+echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
+

@@ -1,4 +1,0 @@
-Build:
-  - Introduced a OPENVDB_DOXYGEN_INTERNAL CMake variable which is ON by default and removes the majority of internal namespaces from the generated doxygen
-  - Improved the doxygen deprecation listings, folder layouts and fixes issues when using later versions of doxygen
-
