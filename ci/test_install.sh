@@ -8,7 +8,7 @@ set -e
 # the expected VDB installation
 
 cmakelists="
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(TestInstall LANGUAGES CXX)
 find_package(OpenVDB REQUIRED COMPONENTS openvdb)
 add_executable(test_vdb_print \"../openvdb/openvdb/cmd/openvdb_print.cc\")

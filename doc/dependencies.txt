@@ -35,17 +35,17 @@ Reference Platform, but for those that do, their specified versions are
 
 @section depComponents OpenVDB Components
 
-Component               | Requirements                                                                         | Optional
------------------------ | ------------------------------------------------------------------------------------ | --------
-OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::system, Boost::iostream                      | Blosc, ZLib, Log4cplus, IlmBase::Half
-OpenVDB Print           | Core Library dependencies                                                            | -
-OpenVDB LOD             | Core Library dependencies                                                            | -
-OpenVDB Render          | Core Library dependencies, OpenEXR, IlmBase                                          | -
-OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW*                                      | -
-OpenVDB Python          | Core Library dependencies, Python, Boost::python                                     | Boost::numpy, NumPy
-OpenVDB AX              | Core Library dependencies, LLVM                                                      | Bison, Flex
-OpenVDB UnitTests       | Core Library dependencies, GoogleTest                                                | CppUnit**
-OpenVDB Documentation   | Doxygen                                                                              | -
+Component               | Requirements                                                     | Optional
+----------------------- | ---------------------------------------------------------------- | --------
+OpenVDB Core Library    | CMake, C++14 compiler, TBB::tbb, Boost::system, Boost::iostream  | Blosc, ZLib, Log4cplus, IlmBase::Half
+OpenVDB Print           | Core Library dependencies                                        | -
+OpenVDB LOD             | Core Library dependencies                                        | -
+OpenVDB Render          | Core Library dependencies                                        | OpenEXR, IlmBase, libpng
+OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW*                  | -
+OpenVDB Python          | Core Library dependencies, Python, Boost::python                 | Boost::numpy, NumPy
+OpenVDB AX              | Core Library dependencies, LLVM                                  | Bison, Flex
+OpenVDB UnitTests       | Core Library dependencies, GoogleTest                            | CppUnit**
+OpenVDB Documentation   | Doxygen                                                          | -
 
  - @b * GLEW is only required for building the vdb_view binary on Windows.
  - @b ** CppUnit is only required for building the AX unit tests.
@@ -75,6 +75,7 @@ GoogleTest     | 1.8     | Latest      | A unit testing framework module for C++
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5.0   | 1.5.0       | Recommended dependency for improved disk compression              | N       | N*       | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
+libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
 GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
@@ -100,6 +101,12 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
 RuntimeError: FATAL: module compiled as little endian, but detected different endianness at runtime.
 @endcode
 
+ - @b Blosc: OpenVDB currently uses a very old version of blosc (v1.5.0). This
+ is due to issues with compatibility between certain blosc versions. You can
+ [read more about this problem here.](https://www.blosc.org/posts/new-forward-compat-policy/)
+ Using blosc versions equal to or later than 1.14.0 should be forwards
+ compatible but this remains untested.
+
 @section depInstallingDependencies Installing Dependencies
 
 This section details a number of ways to get you up and running with the
@@ -115,8 +122,6 @@ options.
 #!/bin/bash
 # Core library
 apt-get install cmake                   # CMake
-apt-get install libilmbase-dev          # IlmBase
-apt-get install libopenexr-dev          # OpenEXR
 apt-get install libtbb-dev              # TBB
 apt-get install zlibc                   # zlib
 apt-get install libboost-system-dev     # Boost::system
@@ -129,6 +134,9 @@ apt-get install libboost-numpy-dev      # Boost::numpy
 apt-get install python-dev              # Python
 apt-get install python-numpy            # NumPy
 # Optional
+apt-get install libpng-dev              # libpng
+apt-get install libilmbase-dev          # IlmBase
+apt-get install libopenexr-dev          # OpenEXR
 apt-get install liblog4cplus-dev        # Log4cplus
 apt-get install googletest              # GoogleTest
 # vdb_view
@@ -151,8 +159,6 @@ using later versions of blosc. See the
 #!/bin/bash
 # Core library
 brew install cmake                     # CMake
-brew install ilmbase                   # IlmBase
-brew install openexr                   # OpenEXR
 brew install tbb                       # TBB
 brew install zlib                      # zlib
 brew install boost                     # Boost
@@ -167,6 +173,10 @@ brew install gtest                     # GoogleTest
 brew install cppunit                   # CppUnit
 # vdb_view
 brew install glfw                      # GLFW
+# vdb_render
+brew install ilmbase                   # IlmBase
+brew install openexr                   # OpenEXR
+brew install libpng                    # libpng
 # Documentation
 brew install doxygen                   # Doxygen
 @endcode

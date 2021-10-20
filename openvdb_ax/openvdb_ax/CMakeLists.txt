@@ -7,23 +7,24 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBAXCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
 
 option(OPENVDB_AX_SHARED "Build dynamically linked version of the ax library." ON)
 option(OPENVDB_AX_STATIC "Build statically linked version of the ax library." ON)
+
+option(OPENVDB_BUILD_AX_GRAMMAR [=[
+Rebuild the AX grammar using flex/bison. This only necessary if you are
+altering the frontend AX language, typically only a developer option. ]=] OFF)
 option(USE_NEW_PASS_MANAGER [=[
 Enable the new Optimization Pass Manager. This is a developer option.]=] OFF)
 
-if(NOT OPENVDB_AX_SHARED AND NOT OPENVDB_AX_STATIC)
-  message(FATAL_ERROR "Both static and shared ax OpenVDB libraries have been disabled. "
-    "At least one must be enabled when building the ax library."
-  )
-endif()
-
-mark_as_advanced(USE_NEW_PASS_MANAGER)
+mark_as_advanced(
+  USE_NEW_PASS_MANAGER
+  OPENVDB_BUILD_AX_GRAMMAR
+)
 
 #########################################################################
 
@@ -56,14 +57,14 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
     set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -l")
   endif()
 
-  FLEX_TARGET(openvdb_ax_lexer grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
+  flex_target(openvdb_ax_lexer grammar/axlexer.l ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
     COMPILE_FLAGS ${FLEX_COMPILE_FLAGS}
   )
-  BISON_TARGET(openvdb_ax_parser grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
+  bison_target(openvdb_ax_parser grammar/axparser.y ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc
     DEFINES_FILE ${OPENVDB_AX_GRAMMAR_DIR}/axparser.h
     COMPILE_FLAGS ${BISON_COMPILE_FLAGS}
   )
-  ADD_FLEX_BISON_DEPENDENCY(openvdb_ax_lexer openvdb_ax_parser)
+  add_flex_bison_dependency(openvdb_ax_lexer openvdb_ax_parser)
 
   # Add a custom target so the language is only ever generated once
   add_custom_target(openvdb_ax_grammar
@@ -71,6 +72,17 @@ if(OPENVDB_BUILD_AX_GRAMMAR)
     DEPENDS
       ${OPENVDB_AX_GRAMMAR_DIR}/axlexer.cc
       ${OPENVDB_AX_GRAMMAR_DIR}/axparser.cc)
+endif()
+
+if(NOT OPENVDB_AX_SHARED AND NOT OPENVDB_AX_STATIC)
+  # return if OPENVDB_BUILD_AX_GRAMMAR was enabled, allowing for a
+  # single CMake run to configure the AX grammar
+  if(OPENVDB_BUILD_AX_GRAMMAR)
+    return()
+  endif()
+  message(FATAL_ERROR "Both static and shared ax OpenVDB libraries have been disabled. "
+    "At least one must be enabled when building the ax library."
+  )
 endif()
 
 #########################################################################
@@ -297,22 +309,6 @@ if(OPENVDB_AX_SHARED)
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
     )
-
-  if(OPENVDB_ENABLE_RPATH)
-    # @todo There is probably a better way to do this for imported targets
-    list(APPEND RPATHS
-      ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
-      ${Log4cplus_LIBRARY_DIRS}
-      ${Blosc_LIBRARY_DIRS}
-      ${Tbb_LIBRARY_DIRS}
-      ${LLVM_LIBRARY_DIRS}
-    )
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(openvdb_ax_shared
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 endif()

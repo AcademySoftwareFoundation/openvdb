@@ -97,6 +97,7 @@ All meetings of the TSC are open to participation by any member of the OpenVDB c
 * Jeff Lait, SideFX
 * Nick Avramoussis, WETA
 * Dan Bailey, ILM
+* Richard Jones, DNEG
 
 # Release Process
 

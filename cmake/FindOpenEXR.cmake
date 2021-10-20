@@ -93,7 +93,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 include(GNUInstallDirs)
 
 
@@ -107,31 +107,6 @@ if(DISABLE_CMAKE_SEARCH_PATHS)
   set(_FIND_OPENEXR_ADDITIONAL_OPTIONS NO_DEFAULT_PATH)
 endif()
 
-set(_OPENEXR_COMPONENT_LIST
-  IlmImf
-  IlmImfUtil
-)
-
-if(OpenEXR_FIND_COMPONENTS)
-  set(OPENEXR_COMPONENTS_PROVIDED TRUE)
-  set(_IGNORED_COMPONENTS "")
-  foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
-    if(NOT ${COMPONENT} IN_LIST _OPENEXR_COMPONENT_LIST)
-      list(APPEND _IGNORED_COMPONENTS ${COMPONENT})
-    endif()
-  endforeach()
-
-  if(_IGNORED_COMPONENTS)
-    message(STATUS "Ignoring unknown components of OpenEXR:")
-    foreach(COMPONENT ${_IGNORED_COMPONENTS})
-      message(STATUS "  ${COMPONENT}")
-    endforeach()
-    list(REMOVE_ITEM OpenEXR_FIND_COMPONENTS ${_IGNORED_COMPONENTS})
-  endif()
-else()
-  set(OPENEXR_COMPONENTS_PROVIDED FALSE)
-  set(OpenEXR_FIND_COMPONENTS ${_OPENEXR_COMPONENT_LIST})
-endif()
 
 # Set _OPENEXR_ROOT based on a user provided root var. Xxx_ROOT and ENV{Xxx_ROOT}
 # are prioritised over the legacy capitalized XXX_ROOT variables for matching
@@ -197,6 +172,34 @@ if(EXISTS "${OpenEXR_INCLUDE_DIR}/OpenEXRConfig.h")
 
   set(OpenEXR_VERSION ${OpenEXR_VERSION_MAJOR}.${OpenEXR_VERSION_MINOR})
 endif()
+
+if(${OpenEXR_VERSION} VERSION_GREATER_EQUAL 3.0)
+  set(_OPENEXR_COMPONENT_LIST OpenEXR OpenEXRUtil Iex IlmThread)
+else()
+  set(_OPENEXR_COMPONENT_LIST IlmImf IlmImfUtil)
+endif()
+
+if(OpenEXR_FIND_COMPONENTS)
+  set(OPENEXR_COMPONENTS_PROVIDED TRUE)
+  set(_IGNORED_COMPONENTS "")
+  foreach(COMPONENT ${OpenEXR_FIND_COMPONENTS})
+    if(NOT ${COMPONENT} IN_LIST _OPENEXR_COMPONENT_LIST)
+      list(APPEND _IGNORED_COMPONENTS ${COMPONENT})
+    endif()
+  endforeach()
+
+  if(_IGNORED_COMPONENTS)
+    message(STATUS "Ignoring unknown components of OpenEXR:")
+    foreach(COMPONENT ${_IGNORED_COMPONENTS})
+      message(STATUS "  ${COMPONENT}")
+    endforeach()
+    list(REMOVE_ITEM OpenEXR_FIND_COMPONENTS ${_IGNORED_COMPONENTS})
+  endif()
+else()
+  set(OPENEXR_COMPONENTS_PROVIDED FALSE)
+  set(OpenEXR_FIND_COMPONENTS ${_OPENEXR_COMPONENT_LIST})
+endif()
+
 
 # ------------------------------------------------------------------------
 #  Search for OPENEXR lib DIR

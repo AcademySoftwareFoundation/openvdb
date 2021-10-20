@@ -295,26 +295,38 @@ public:
         }
     }
 
+    template <typename Type = unsigned char>
+    std::unique_ptr<Type[]> convertToBitBuffer(const bool alpha = true) const
+    {
+        const size_t totalSize = mSize * (alpha ? 4 : 3);
+        std::unique_ptr<Type[]> buffer(new Type[totalSize]);
+        Type *q = buffer.get();
+        const RGBA* p = this->pixels();
+        size_t n = mSize;
+        while (n--) {
+            *q++ = static_cast<Type>(255.0f*(*p).r);
+            *q++ = static_cast<Type>(255.0f*(*p).g);
+            *q++ = static_cast<Type>(255.0f*(*p).b);
+            if(alpha)
+                *q++ = static_cast<Type>(255.0f*(*p).a);
+            ++p;
+        }
+        return buffer;
+    }
+
     void savePPM(const std::string& fileName)
     {
         std::string name(fileName);
         if (name.find_last_of(".") == std::string::npos) name.append(".ppm");
-
-        std::unique_ptr<unsigned char[]> buffer(new unsigned char[3*mSize]);
-        unsigned char *tmp = buffer.get(), *q = tmp;
-        RGBA* p = mPixels.get();
-        size_t n = mSize;
-        while (n--) {
-            *q++ = static_cast<unsigned char>(255.0f*(*p  ).r);
-            *q++ = static_cast<unsigned char>(255.0f*(*p  ).g);
-            *q++ = static_cast<unsigned char>(255.0f*(*p++).b);
-        }
 
         std::ofstream os(name.c_str(), std::ios_base::binary);
         if (!os.is_open()) {
             std::cerr << "Error opening PPM file \"" << name << "\"" << std::endl;
             return;
         }
+
+        auto buf = this->convertToBitBuffer<unsigned char>(/*alpha=*/false);
+        unsigned char* tmp = buf.get();
 
         os << "P6\n" << mWidth << " " << mHeight << "\n255\n";
         os.write(reinterpret_cast<const char*>(&(*tmp)), 3 * mSize * sizeof(unsigned char));

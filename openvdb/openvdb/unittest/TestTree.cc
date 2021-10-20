@@ -3010,6 +3010,19 @@ TEST_F(TestTree, testRootNode)
             EXPECT_EQ(c1, rootIter.getCoord());
         }
     }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    { // test transient data
+        RootNodeType rootNode(0.0f);
+        EXPECT_EQ(openvdb::Index32(0), rootNode.transientData());
+        rootNode.setTransientData(openvdb::Index32(5));
+        EXPECT_EQ(openvdb::Index32(5), rootNode.transientData());
+        RootNodeType rootNode2(rootNode);
+        EXPECT_EQ(openvdb::Index32(5), rootNode2.transientData());
+        RootNodeType rootNode3 = rootNode;
+        EXPECT_EQ(openvdb::Index32(5), rootNode3.transientData());
+    }
+#endif
 }
 
 TEST_F(TestTree, testInternalNode)
@@ -3104,6 +3117,19 @@ TEST_F(TestTree, testInternalNode)
         EXPECT_TRUE(!internalNode.addChild(child));
         delete child;
     }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    { // test transient data
+        InternalNodeType internalNode(c1, 0.0f);
+        EXPECT_EQ(openvdb::Index32(0), internalNode.transientData());
+        internalNode.setTransientData(openvdb::Index32(5));
+        EXPECT_EQ(openvdb::Index32(5), internalNode.transientData());
+        InternalNodeType internalNode2(internalNode);
+        EXPECT_EQ(openvdb::Index32(5), internalNode2.transientData());
+        InternalNodeType internalNode3 = internalNode;
+        EXPECT_EQ(openvdb::Index32(5), internalNode3.transientData());
+    }
+#endif
 }
 
 // Copyright (c) DreamWorks Animation LLC

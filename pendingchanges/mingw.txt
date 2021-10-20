@@ -1,3 +1,0 @@
-Build:
-  - Build fixes for MinGW on Windows
-  [Contributed by Brecht Sanders]

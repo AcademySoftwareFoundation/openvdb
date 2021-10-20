@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBMaya  LANGUAGES CXX)
 
 
@@ -132,21 +132,6 @@ set_target_properties(openvdb_maya
   PROPERTIES
   OUTPUT_NAME OpenVDB
 )
-
-if(OPENVDB_ENABLE_RPATH)
-  set(RPATHS "")
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-  set_target_properties(openvdb_maya
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
-endif()
 
 #########################################################################
 

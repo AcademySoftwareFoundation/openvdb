@@ -182,6 +182,13 @@ public:
     /// Return the global coordinates for a linear table offset.
     Coord offsetToGlobalCoord(Index n) const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Return the transient data value.
+    Index32 transientData() const { return mTransientData; }
+    /// Set the transient data value.
+    void setTransientData(Index32 transientData) { mTransientData = transientData; }
+#endif
+
     /// Return a string representation of this node.
     std::string str() const;
 
@@ -899,6 +906,10 @@ private:
     NodeMaskType mValueMask;
     /// Global grid index coordinates (x,y,z) of the local origin of this node
     Coord mOrigin;
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    /// Transient data (not serialized)
+    Index32 mTransientData = 0;
+#endif
 }; // end of LeafNode class
 
 
@@ -950,10 +961,13 @@ LeafNode<T, Log2Dim>::LeafNode(PartialCreate, const Coord& xyz, const ValueType&
 
 template<typename T, Index Log2Dim>
 inline
-LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other):
-    mBuffer(other.mBuffer),
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other)
+    : mBuffer(other.mBuffer)
+    , mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -962,9 +976,12 @@ LeafNode<T, Log2Dim>::LeafNode(const LeafNode& other):
 template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
-LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other):
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     struct Local {
         /// @todo Consider using a value conversion functor passed as an argument instead.
@@ -981,10 +998,13 @@ template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
-                               const ValueType& background, TopologyCopy):
-    mBuffer(background),
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+                               const ValueType& background, TopologyCopy)
+    : mBuffer(background)
+    , mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
 }
 
@@ -993,9 +1013,12 @@ template<typename T, Index Log2Dim>
 template<typename OtherValueType>
 inline
 LeafNode<T, Log2Dim>::LeafNode(const LeafNode<OtherValueType, Log2Dim>& other,
-    const ValueType& offValue, const ValueType& onValue, TopologyCopy):
-    mValueMask(other.valueMask()),
-    mOrigin(other.mOrigin)
+    const ValueType& offValue, const ValueType& onValue, TopologyCopy)
+    : mValueMask(other.valueMask())
+    , mOrigin(other.mOrigin)
+#if OPENVDB_ABI_VERSION_NUMBER >= 9
+    , mTransientData(other.mTransientData)
+#endif
 {
     for (Index i = 0; i < SIZE; ++i) {
         mBuffer[i] = (mValueMask.isOn(i) ? onValue : offValue);
