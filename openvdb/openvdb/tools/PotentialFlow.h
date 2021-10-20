@@ -395,14 +395,11 @@ computePotentialFlow(const typename VectorToScalarGrid<Vec3GridT>::Type& potenti
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_POTENTIALFLOW
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
-
-#define _FUNCTION(TreeT) \
-    MaskGrid::Ptr createPotentialFlowMask(const Grid<TreeT>&, int)
-OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
-#undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     Grid<TreeT>::Ptr createPotentialFlowNeumannVelocities(const FloatGrid&, const MaskGrid&, \
@@ -421,6 +418,8 @@ OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
         const VectorToScalarGrid<Grid<TreeT>>::Type&, const Grid<TreeT>&, const TreeT::ValueType)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

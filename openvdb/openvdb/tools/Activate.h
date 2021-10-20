@@ -223,6 +223,8 @@ void deactivate(GridOrTree& gridOrTree,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_ACTIVATE
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -246,6 +248,8 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
     void deactivate(Grid<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, const bool)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

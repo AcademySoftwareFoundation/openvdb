@@ -1042,6 +1042,8 @@ GridResampler::transformBBox(
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_GRIDTRANSFORMER
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1060,6 +1062,8 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
     void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -851,12 +851,16 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_FILTER
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 OPENVDB_INSTANTIATE_CLASS Filter<FloatGrid, FloatGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS Filter<DoubleGrid, FloatGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -569,6 +569,8 @@ clip(const GridType& inGrid, const math::NonlinearFrustumMap& frustumMap, bool k
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_CLIP
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -587,6 +589,8 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
     Grid<TreeT>::Ptr clip_internal::doClip(const Grid<TreeT>&, const MaskGrid&, bool)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

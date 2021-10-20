@@ -233,6 +233,8 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_LEVELSETSPHERE
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -242,6 +244,8 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
         util::NullInterrupter*, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -4238,6 +4238,8 @@ createLevelSetBox(const math::BBox<VecType>& bbox,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_MESHTOVOLUME
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -4307,6 +4309,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     void traceExteriorBoundaries(TreeT&)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

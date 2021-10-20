@@ -1085,6 +1085,8 @@ normalize(const GridType& grid, const MaskT& mask, bool threaded, InterruptT* in
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_GRIDOPERATORS
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1168,6 +1170,8 @@ OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
     Grid<TreeT>::Ptr normalize(const Grid<TreeT>&, const BoolGrid&, bool, util::NullInterrupter*)
 OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

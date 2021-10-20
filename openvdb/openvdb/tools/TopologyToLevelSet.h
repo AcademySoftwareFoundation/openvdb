@@ -261,6 +261,8 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_TOPOLOGYTOLEVELSET
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -270,6 +272,8 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
         util::NullInterrupter*)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

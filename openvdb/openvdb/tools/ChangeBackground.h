@@ -247,6 +247,8 @@ changeLevelSetBackground(
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_CHANGEBACKGROUND
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -280,6 +282,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     void changeAsymmetricLevelSetBackground(tree::LeafManager<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

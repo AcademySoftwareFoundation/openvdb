@@ -692,6 +692,8 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_VALUETRANSFORMER
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -715,6 +717,8 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
     void setValueOnMult(TreeT&, const Coord&, const TreeT::ValueType&)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -1276,6 +1276,8 @@ inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_MORPHOLOGY
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1303,6 +1305,8 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
         const int, const NearestNeighbors, const TilePolicy, const bool)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

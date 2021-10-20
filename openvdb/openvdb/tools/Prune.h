@@ -400,6 +400,8 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_PRUNE
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -433,6 +435,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     void pruneLevelSet(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

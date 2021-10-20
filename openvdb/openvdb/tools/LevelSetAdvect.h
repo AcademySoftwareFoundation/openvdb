@@ -576,12 +576,16 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_LEVELSETADVECT
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<FloatGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<DoubleGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

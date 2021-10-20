@@ -1880,6 +1880,8 @@ maskSdf(const GridT &sdfGrid,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_FASTSWEEPING
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1898,6 +1900,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     Grid<TreeT>::Ptr dilateSdf(const Grid<TreeT>&, int, NearestNeighbors, int, FastSweepingDomain)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

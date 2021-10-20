@@ -328,6 +328,8 @@ levelSetRebuild(const GridType& grid, float iso, float halfVal, const math::Tran
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_LEVELSETREBUILD
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -347,6 +349,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
         util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

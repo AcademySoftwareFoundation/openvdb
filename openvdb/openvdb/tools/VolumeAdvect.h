@@ -543,6 +543,8 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_VOLUMEADVECT
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -557,6 +559,8 @@ OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullIn
 OPENVDB_INSTANTIATE FloatGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<FloatGrid, Sampler<1, false>>(const FloatGrid&, double);
 OPENVDB_INSTANTIATE DoubleGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<DoubleGrid, Sampler<1, false>>(const DoubleGrid&, double);
 OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<Vec3SGrid, Sampler<1, false>>(const Vec3SGrid&, double);
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

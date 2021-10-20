@@ -996,6 +996,8 @@ compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_COMPOSITE
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1109,6 +1111,8 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
     void compReplace(Grid<TreeT>&, const Grid<TreeT>&)
 OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

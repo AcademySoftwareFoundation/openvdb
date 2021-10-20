@@ -850,6 +850,8 @@ solveWithBoundaryConditionsAndPreconditioner(
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_POISSONSOLVER
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -885,6 +887,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
             math::pcg::State&, util::NullInterrupter&, bool)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace poisson

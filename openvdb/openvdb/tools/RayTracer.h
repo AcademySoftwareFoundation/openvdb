@@ -1066,6 +1066,8 @@ operator()(const tbb::blocked_range<size_t>& range) const
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_RAYTRACER
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1082,6 +1084,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 
 OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<FloatGrid>, tools::BoxSampler>;
 OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<DoubleGrid>, tools::BoxSampler>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -643,12 +643,16 @@ euler(const LeafRange& range, ValueType dt,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_LEVELSETMORPH
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
 
 OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<FloatGrid, util::NullInterrupter>;
 OPENVDB_INSTANTIATE_CLASS LevelSetMorphing<DoubleGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

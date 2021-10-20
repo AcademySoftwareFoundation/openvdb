@@ -1455,6 +1455,8 @@ SumMergeOp<TreeT>::background() const
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_MERGE
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1487,6 +1489,8 @@ OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<DoubleTree, false>;
 
 OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<FloatTree>;
 OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<DoubleTree>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

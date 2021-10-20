@@ -998,6 +998,8 @@ ClosestSurfacePoint<GridT>::searchAndReplace(std::vector<Vec3R>& points,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_VOLUMETOSPHERES
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -1010,6 +1012,8 @@ OPENVDB_INSTANTIATE_CLASS ClosestSurfacePoint<DoubleGrid>;
         bool, float, float, float, int, util::NullInterrupter*)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -8,14 +8,8 @@
 #undef OPENVDB_INSTANTIATE_CLASS
 #undef OPENVDB_INSTANTIATE_STRUCT
 
-#ifdef _WIN32
-    #define OPENVDB_INSTANTIATE template __declspec(dllexport)
-    #define OPENVDB_INSTANTIATE_CLASS template class __declspec(dllexport)
-    #define OPENVDB_INSTANTIATE_STRUCT template struct __declspec(dllexport)
-#else
-    #define OPENVDB_INSTANTIATE template
-    #define OPENVDB_INSTANTIATE_CLASS template class
-    #define OPENVDB_INSTANTIATE_STRUCT template struct
-#endif
+#define OPENVDB_INSTANTIATE template OPENVDB_TEMPLATE_EXPORT
+#define OPENVDB_INSTANTIATE_CLASS template class OPENVDB_TEMPLATE_EXPORT
+#define OPENVDB_INSTANTIATE_STRUCT template struct OPENVDB_TEMPLATE_EXPORT
 
 #endif // OPENVDB_UTIL_EXPLICIT_INSTANTIATION_HAS_BEEN_INCLUDED

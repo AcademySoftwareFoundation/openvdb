@@ -2600,6 +2600,8 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_LEVELSETUTIL
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -2674,6 +2676,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     void segmentSDF(const Grid<TreeT>&, std::vector<Grid<TreeT>::Ptr>&)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

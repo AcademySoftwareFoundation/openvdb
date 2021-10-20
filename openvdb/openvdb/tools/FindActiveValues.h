@@ -707,6 +707,8 @@ activeTiles(const TreeT& tree, const CoordBBox &bbox)
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_FINDACTIVEVALUES
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -740,6 +742,8 @@ OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
     std::vector<TileData<TreeT::ValueType>> activeTiles(const TreeT&, const CoordBBox&)
 OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

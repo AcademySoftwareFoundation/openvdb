@@ -279,6 +279,8 @@ signedFloodFill(TreeOrLeafManagerT& tree,
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_SIGNEDFLOODFILL
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -302,6 +304,8 @@ OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
     void signedFloodFillWithValues(tree::LeafManager<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t, Index)
 OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

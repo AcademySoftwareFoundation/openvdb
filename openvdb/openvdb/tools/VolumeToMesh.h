@@ -5264,6 +5264,8 @@ volumeToMesh(
 
 // Explicit Template Instantiation
 
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 #ifdef OPENVDB_INSTANTIATE_VOLUMETOMESH
 #include <openvdb/util/ExplicitInstantiation.h>
 #endif
@@ -5277,6 +5279,8 @@ OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
     void volumeToMesh(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec3I>&, std::vector<Vec4I>&, double, double, bool)
 OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools
