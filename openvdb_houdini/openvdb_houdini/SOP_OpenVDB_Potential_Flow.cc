@@ -371,7 +371,7 @@ SOP_OpenVDB_Potential_Flow::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Computing Potential Flow");
+        hvdb::HoudiniInterrupter boss("Computing Potential Flow");
 
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 

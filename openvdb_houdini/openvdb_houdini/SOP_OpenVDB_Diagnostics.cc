@@ -936,7 +936,7 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
     bool outputMask,
     bool outputPoints,
     GU_Detail& detail,
-    hvdb::Interrupter& interupter,
+    openvdb::util::NullInterrupter& interrupter,
     const GridType* replacementGrid = nullptr)
 {
     using TreeType = typename GridType::TreeType;
@@ -960,12 +960,12 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
 
         if (outputPoints && !mask.empty()) {
 
-            if (interupter.wasInterrupted()) return;
+            if (interrupter.wasInterrupted()) return;
 
             UT_UniquePtr<UT_Vector3[]> points;
             const size_t totalPointCount = getPoints(grid.transform(), mask, points);
 
-            if (interupter.wasInterrupted()) return;
+            if (interrupter.wasInterrupted()) return;
 
             if (totalPointCount > 0) {
                 const GA_Offset startOffset = transferPoints(detail, points, totalPointCount);
@@ -974,20 +974,20 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
                 UT_UniquePtr<ValueType[]> values;
                 getValues(tree, mask, values);
 
-                if (interupter.wasInterrupted()) return;
+                if (interrupter.wasInterrupted()) return;
 
                 transferValues(detail, "input", startOffset, values, totalPointCount);
 
                 if (replacementGrid) {
-                    if (interupter.wasInterrupted()) return;
+                    if (interrupter.wasInterrupted()) return;
                     getValues(replacementGrid->tree(), mask, values);
-                    if (interupter.wasInterrupted()) return;
+                    if (interrupter.wasInterrupted()) return;
                     transferValues(detail, "output", startOffset, values, totalPointCount);
                 }
             }
         }
 
-        if (interupter.wasInterrupted()) return;
+        if (interrupter.wasInterrupted()) return;
 
         if (outputMask && !mask.empty()) {
             maskGrid->setName(gridName + "_mask");
@@ -1003,10 +1003,10 @@ outputMaskAndPoints(const GridType& grid, const std::string& gridName,
 struct TestCollection
 {
     TestCollection(const TestData& test, GU_Detail& detail,
-        hvdb::Interrupter& interupter, UT_ErrorManager* errorManager = nullptr)
+        openvdb::util::NullInterrupter& interrupter, UT_ErrorManager* errorManager = nullptr)
         : mTest(test)
         , mDetail(&detail)
-        , mInterupter(&interupter)
+        , mInterrupter(&interrupter)
         , mErrorManager(errorManager)
         , mMessageStr()
         , mPrimitiveName()
@@ -1091,7 +1091,7 @@ struct TestCollection
             }
         }
 
-        if (mInterupter->wasInterrupted()) return;
+        if (mInterrupter->wasInterrupted()) return;
 
         if (mTest.testUniformBackground
             && (!mTest.respectGridClass || grid.getGridClass() != openvdb::GRID_LEVEL_SET))
@@ -1112,7 +1112,7 @@ struct TestCollection
             }
         }
 
-        if (mInterupter->wasInterrupted()) return;
+        if (mInterrupter->wasInterrupted()) return;
 
 
         if (mTest.testInRange) {
@@ -1136,7 +1136,7 @@ struct TestCollection
         }
 
 
-        if (mInterupter->wasInterrupted()) return;
+        if (mInterrupter->wasInterrupted()) return;
 
 
         // Level Set tests
@@ -1182,7 +1182,7 @@ struct TestCollection
 
             }
 
-            if (mInterupter->wasInterrupted()) return;
+            if (mInterrupter->wasInterrupted()) return;
 
             if (mTest.testMinimumBandWidth) {
 
@@ -1203,13 +1203,13 @@ struct TestCollection
                 }
             }
 
-            if (mInterupter->wasInterrupted()) return;
+            if (mInterrupter->wasInterrupted()) return;
 
             if (mTest.testClosedSurface) {
 
                 if (std::is_floating_point<ValueType>::value) {
                     typename GridType::Ptr levelSet = openvdb::tools::levelSetRebuild(
-                        grid, 0.0f, 2.0f, 2.0f, nullptr, mInterupter);
+                        grid, 0.0f, 2.0f, 2.0f, nullptr, mInterrupter);
 
                     SameSign<TreeType> test(levelSet->tree());
                     if (!visitor.run(VisitorType::TILES_AND_VOXELS,
@@ -1224,7 +1224,7 @@ struct TestCollection
                 }
             }
 
-            if (mInterupter->wasInterrupted()) return;
+            if (mInterrupter->wasInterrupted()) return;
 
 
             if (mTest.testGradientMagnitude) {
@@ -1302,10 +1302,10 @@ struct TestCollection
             mReplacementGrid = replacement;
         }
 
-        if (mInterupter->wasInterrupted()) return;
+        if (mInterrupter->wasInterrupted()) return;
 
         outputMaskAndPoints<GridType>(grid, gridName, idMasks, mTest.useMask, mTest.usePoints,
-            *mDetail, *mInterupter, replacement.get());
+            *mDetail, *mInterrupter, replacement.get());
 
         // log diagnostics info
         mMessageStr += log.str();
@@ -1315,7 +1315,7 @@ struct TestCollection
 private:
     TestData                    mTest;
     GU_Detail           * const mDetail;
-    hvdb::Interrupter   * const mInterupter;
+    openvdb::util::NullInterrupter * const mInterrupter;
     UT_ErrorManager     * const mErrorManager;
     std::string                 mMessageStr, mPrimitiveName;
     int                         mPrimitiveIndex, mGridsFailed;
@@ -1924,9 +1924,9 @@ SOP_OpenVDB_Diagnostics::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Performing diagnostics");
+        hvdb::HoudiniInterrupter boss("Performing diagnostics");
 
-        TestCollection tests(getTestData(time), *gdp, boss, UTgetErrorManager());
+        TestCollection tests(getTestData(time), *gdp, boss.interrupter(), UTgetErrorManager());
 
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", time));
 

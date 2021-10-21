@@ -53,8 +53,8 @@ public:
     {
         typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
 
-        Interrupter interrupter;
-        mTransformer.setInterrupter(interrupter);
+        HoudiniInterrupter interrupter;
+        mTransformer.setInterrupter(interrupter.interrupter());
 
         mTransformer.transformGrid<Sampler, GridType>(inGrid, *outGrid);
     }
@@ -115,8 +115,8 @@ public:
 
         openvdb::tools::GridResampler resampler;
 
-        Interrupter interrupter;
-        resampler.setInterrupter(interrupter);
+        HoudiniInterrupter interrupter;
+        resampler.setInterrupter(interrupter.interrupter());
 
         resampler.transformGrid<Sampler>(mTransformer, inGrid, *outGrid);
     }
@@ -159,8 +159,8 @@ public:
     void operator()(const GridType& inGrid)
     {
         typename GridType::Ptr outGrid = openvdb::gridPtrCast<GridType>(mOutGrid);
-        Interrupter interrupter;
-        openvdb::tools::resampleToMatch<Sampler>(inGrid, *outGrid, interrupter);
+        HoudiniInterrupter interrupter;
+        openvdb::tools::resampleToMatch<Sampler>(inGrid, *outGrid, interrupter.interrupter());
     }
 
 private:

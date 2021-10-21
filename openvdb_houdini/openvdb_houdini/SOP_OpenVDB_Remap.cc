@@ -630,7 +630,7 @@ SOP_OpenVDB_Remap::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Remapping values");
+        hvdb::HoudiniInterrupter boss("Remapping values");
 
         const fpreal inMin = evalFloat("inrange", 0, time);
         const fpreal inMax = evalFloat("inrange", 1, time);

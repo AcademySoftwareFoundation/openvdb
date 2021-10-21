@@ -72,7 +72,7 @@ public:
             std::list<openvdb::GridBase::ConstPtr>&,
             openvdb::tools::VolumeToMesh&,
             const GU_Detail* refGeo,
-            hvdb::Interrupter&,
+            openvdb::util::NullInterrupter&,
             const fpreal time);
     };
 
@@ -356,7 +356,7 @@ SOP_OpenVDB_To_Polygons::updateParmsFlags()
 ////////////////////////////////////////
 
 
-void copyMesh(GU_Detail&, openvdb::tools::VolumeToMesh&, hvdb::Interrupter&,
+void copyMesh(GU_Detail&, openvdb::tools::VolumeToMesh&, openvdb::util::NullInterrupter&,
     const bool usePolygonSoup = true, const char* gridName = nullptr,
     GA_PrimitiveGroup* surfaceGroup = nullptr, GA_PrimitiveGroup* interiorGroup = nullptr,
     GA_PrimitiveGroup* seamGroup = nullptr, GA_PointGroup* seamPointGroup = nullptr);
@@ -366,7 +366,7 @@ void
 copyMesh(
     GU_Detail& detail,
     openvdb::tools::VolumeToMesh& mesher,
-    hvdb::Interrupter&,
+    openvdb::util::NullInterrupter&,
     const bool usePolygonSoup,
     const char* gridName,
     GA_PrimitiveGroup* surfaceGroup,
@@ -575,7 +575,7 @@ SOP_OpenVDB_To_Polygons::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Surfacing VDB primitives");
+        hvdb::HoudiniInterrupter boss("Surfacing VDB primitives");
 
         const GU_Detail* vdbGeo = inputGeo(0);
         if (vdbGeo == nullptr) return error();
@@ -690,9 +690,9 @@ SOP_OpenVDB_To_Polygons::Cache::cookVDBSop(OP_Context& context)
             if (!grids.empty() && !boss.wasInterrupted()) {
 
                 if (grids.front()->isType<openvdb::FloatGrid>()) {
-                    referenceMeshing<openvdb::FloatGrid>(grids, mesher, refGeo, boss, time);
+                    referenceMeshing<openvdb::FloatGrid>(grids, mesher, refGeo, boss.interrupter(), time);
                 } else if (grids.front()->isType<openvdb::DoubleGrid>()) {
-                    referenceMeshing<openvdb::DoubleGrid>(grids, mesher, refGeo, boss, time);
+                    referenceMeshing<openvdb::DoubleGrid>(grids, mesher, refGeo, boss.interrupter(), time);
                 } else {
                     addError(SOP_MESSAGE, "Unsupported grid type.");
                 }
@@ -707,7 +707,7 @@ SOP_OpenVDB_To_Polygons::Cache::cookVDBSop(OP_Context& context)
 
                 hvdb::GEOvdbApply<hvdb::ScalarGridTypes>(**vdbIt, mesher);
 
-                copyMesh(*gdp, mesher, boss, usePolygonSoup,
+                copyMesh(*gdp, mesher, boss.interrupter(), usePolygonSoup,
                     keepVdbName ? vdbIt.getPrimitive()->getGridName() : nullptr);
             }
 
@@ -737,7 +737,7 @@ SOP_OpenVDB_To_Polygons::Cache::referenceMeshing(
     std::list<openvdb::GridBase::ConstPtr>& grids,
     openvdb::tools::VolumeToMesh& mesher,
     const GU_Detail* refGeo,
-    hvdb::Interrupter& boss,
+    openvdb::util::NullInterrupter& boss,
     const fpreal time)
 {
     if (refGeo == nullptr) return;

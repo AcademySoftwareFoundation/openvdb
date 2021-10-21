@@ -241,7 +241,7 @@ namespace {
 template<template<typename GridT, typename MaskType, typename InterruptT> class ToolT>
 struct ToolOp
 {
-    ToolOp(bool t, hvdb::Interrupter& boss, const cvdb::BoolGrid *mask = nullptr)
+    ToolOp(bool t, openvdb::util::NullInterrupter& boss, const cvdb::BoolGrid *mask = nullptr)
         : mMaskGrid(mask)
         , mThreaded(t)
         , mBoss(boss)
@@ -259,11 +259,11 @@ struct ToolOp
             openvdb::tools::resampleToMatch<openvdb::tools::PointSampler>(
                 *mMaskGrid, regionMask, mBoss);
 
-            ToolT<GridType, cvdb::BoolGrid, hvdb::Interrupter> tool(inGrid, regionMask, &mBoss);
+            ToolT<GridType, cvdb::BoolGrid, openvdb::util::NullInterrupter> tool(inGrid, regionMask, &mBoss);
             mOutGrid = tool.process(mThreaded);
 
         } else {
-            ToolT<GridType, cvdb::BoolGrid/*dummy*/, hvdb::Interrupter> tool(inGrid, &mBoss);
+            ToolT<GridType, cvdb::BoolGrid, openvdb::util::NullInterrupter> tool(inGrid, &mBoss);
             mOutGrid = tool.process(mThreaded);
         }
     }
@@ -271,7 +271,7 @@ struct ToolOp
     const cvdb::BoolGrid    *mMaskGrid;
     hvdb::GridPtr           mOutGrid;
     bool                    mThreaded;
-    hvdb::Interrupter&      mBoss;
+    openvdb::util::NullInterrupter&      mBoss;
 };
 
 
@@ -356,7 +356,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
 
         const bool threaded = true;
 
-        hvdb::Interrupter boss(
+        hvdb::HoudiniInterrupter boss(
             (std::string("Computing ") + sOpName[whichOp] + " of VDB grids").c_str());
 
 
@@ -392,7 +392,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
             {
                 case OP_GRADIENT: // gradient of scalar field
                 {
-                    ToolOp<cvdb::tools::Gradient> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Gradient> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -401,7 +401,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_CURVATURE: // mean curvature of scalar field
                 {
-                    ToolOp<cvdb::tools::MeanCurvature> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::MeanCurvature> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -410,7 +410,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_LAPLACIAN: // Laplacian of scalar field
                 {
-                    ToolOp<cvdb::tools::Laplacian> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Laplacian> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -419,7 +419,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_CPT: // closest point transform of scalar level set
                 {
-                    ToolOp<cvdb::tools::Cpt> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Cpt> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::NumericGridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -428,7 +428,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_DIVERGENCE: // divergence of vector field
                 {
-                    ToolOp<cvdb::tools::Divergence> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Divergence> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -437,7 +437,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_CURL: // curl (rotation) of vector field
                 {
-                    ToolOp<cvdb::tools::Curl> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Curl> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -446,7 +446,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_MAGNITUDE: // magnitude of vector field
                 {
-                    ToolOp<cvdb::tools::Magnitude> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Magnitude> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }
@@ -455,7 +455,7 @@ SOP_OpenVDB_Analysis::Cache::cookVDBSop(OP_Context& context)
                 }
                 case OP_NORMALIZE: // normalize vector field
                 {
-                    ToolOp<cvdb::tools::Normalize> op(threaded, boss, maskGrid.get());
+                    ToolOp<cvdb::tools::Normalize> op(threaded, boss.interrupter(), maskGrid.get());
                     if (hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*vdb, op, /*makeUnique=*/false)) {
                         outGrid = op.mOutGrid;
                     }

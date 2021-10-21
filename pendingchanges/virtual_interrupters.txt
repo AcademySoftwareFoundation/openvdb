@@ -1,0 +1,8 @@
+Improvements:
+    The NullInterrupter is now a virtual base class to help reduce compile-time
+    instantiation cost.
+
+Houdini:
+    A new HoudiniInterrupter has been added that derives from the
+    NullInterrupter and the Interrupter is now deprecated. All the SOPs have
+    been updated to use the new HoudiniInterrupter.

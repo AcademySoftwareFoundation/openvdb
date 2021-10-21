@@ -313,7 +313,7 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail& geo, const GA_PrimitiveGroup& g
 
 
 std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* boss)
+convertGeometry(const GU_Detail& geometry, std::string& warning, openvdb::util::NullInterrupter* boss)
 {
     const GU_Detail* geo = &geometry;
     std::unique_ptr<GU_Detail> geoPtr;
@@ -409,6 +409,14 @@ convertGeometry(const GU_Detail& geometry, std::string& warning, Interrupter* bo
     }
 
     return geoPtr;
+}
+
+
+// deprecated
+std::unique_ptr<GU_Detail>
+convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss)
+{
+    return convertGeometry(detail, warning, &boss->interrupter());
 }
 
 

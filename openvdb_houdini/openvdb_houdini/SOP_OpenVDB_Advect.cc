@@ -401,7 +401,7 @@ template<class VelocityGridT>
 class AdvectOp
 {
 public:
-    AdvectOp(AdvectionParms& parms, const VelocityGridT& velGrid, hvdb::Interrupter& boss)
+    AdvectOp(AdvectionParms& parms, const VelocityGridT& velGrid, openvdb::util::NullInterrupter& boss)
         : mParms(parms)
         , mVelGrid(velGrid)
         , mBoss(boss)
@@ -414,7 +414,7 @@ public:
         using FieldT = openvdb::tools::DiscreteField<VelocityGridT, SamplerT>;
         const FieldT field(mVelGrid);
 
-        openvdb::tools::LevelSetAdvection<GridT, FieldT, hvdb::Interrupter>
+        openvdb::tools::LevelSetAdvection<GridT, FieldT>
             advection(grid, field, &mBoss);
 
         advection.setSpatialScheme(mParms.mAdvectSpatial);
@@ -444,17 +444,17 @@ private:
 
     AdvectionParms& mParms;
     const VelocityGridT& mVelGrid;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
 };
 
 
 template<typename VelocityGridT, bool StaggeredVelocity>
 inline bool
-processGrids(GU_Detail* gdp, AdvectionParms& parms, hvdb::Interrupter& boss,
+processGrids(GU_Detail* gdp, AdvectionParms& parms, openvdb::util::NullInterrupter& boss,
     const std::function<void (const std::string&)>& warningCallback)
 {
     using VolumeAdvection =
-        openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity, hvdb::Interrupter>;
+        openvdb::tools::VolumeAdvection<VelocityGridT, StaggeredVelocity>;
     using VelocityGridCPtr = typename VelocityGridT::ConstPtr;
 
     VelocityGridCPtr velGrid = hvdb::Grid::constGrid<VelocityGridT>(parms.mVelocityGrid);
@@ -631,16 +631,16 @@ SOP_OpenVDB_Advect::Cache::cookVDBSop(OP_Context& context)
             }
         }
 
-        hvdb::Interrupter boss("Advecting level set");
+        hvdb::HoudiniInterrupter boss("Advecting level set");
 
         auto warningCallback = [this](const std::string& s) {
             this->addWarning(SOP_MESSAGE, s.c_str());
         };
 
         if (parms.mStaggered) {
-            processGrids<openvdb::Vec3SGrid, true>(gdp, parms, boss, warningCallback);
+            processGrids<openvdb::Vec3SGrid, true>(gdp, parms, boss.interrupter(), warningCallback);
         } else {
-            processGrids<openvdb::Vec3SGrid, false>(gdp, parms, boss, warningCallback);
+            processGrids<openvdb::Vec3SGrid, false>(gdp, parms, boss.interrupter(), warningCallback);
         }
 
         if (boss.wasInterrupted()) addWarning(SOP_MESSAGE, "Process was interrupted");
