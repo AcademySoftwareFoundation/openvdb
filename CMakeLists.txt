@@ -77,11 +77,11 @@ option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
+option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
+
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
-
-option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
@@ -138,7 +138,7 @@ option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" O
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
-option(USE_NANOVDB "Use NANOVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])

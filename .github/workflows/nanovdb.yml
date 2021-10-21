@@ -1,0 +1,74 @@
+
+name: NanoVDB
+
+on:
+  push:
+    branches:
+      - 'master'
+      - 'feature/**'
+      - 'pr/**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'pendingchanges/**'
+      - '**.md'
+  pull_request:
+    branches:
+      - '**'
+    paths-ignore:
+      - 'CHANGES'
+      - 'CODEOWNERS'
+      - 'doc/**'
+      - 'openvdb_ax/**'
+      - 'openvdb_maya/**'
+      - 'openvdb_houdini/**'
+      - 'pendingchanges/**'
+      - '**.md'
+  schedule:
+    # run this workflow every day 7am UTC
+    - cron:  '0 7 * * *'
+  workflow_dispatch:
+    inputs:
+      type:
+        description: 'The type of CI to run (all, mac, linux)'
+        required: true
+        default: 'all'
+
+jobs:
+  linux-nanovdb:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'linux'
+    runs-on: ubuntu-latest
+    name: >
+      linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          - { cxx: g++, build: 'Release' }
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: update_apt
+        run: sudo apt-get update
+      - name: install_deps
+        run: >
+          sudo apt-get -q install -y
+          libboost-dev libboost-system-dev libboost-iostreams-dev
+          libtbb-dev libgtest-dev libblosc-dev
+      - name: install_cuda
+        run: sudo apt-get -q install -y nvidia-cuda-toolkit
+      - name: build
+        run: >
+          ./ci/build.sh -v
+          --build-type=${{ matrix.config.build }}
+          --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+      - name: test
+        run: cd build && ctest -V
