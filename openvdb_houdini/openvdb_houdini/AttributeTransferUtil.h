@@ -12,6 +12,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/math/Proximity.h>
+#include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 
 #include <GA/GA_PageIterator.h>
@@ -1492,7 +1493,7 @@ transferPrimitiveAttributes(
     const GU_Detail& sourceGeo,
     GU_Detail& targetGeo,
     GridType& indexGrid,
-    Interrupter& boss,
+    openvdb::util::NullInterrupter& boss,
     const GA_PrimitiveGroup* primitives = nullptr)
 {
     // Match public primitive attributes
@@ -1571,6 +1572,18 @@ transferPrimitiveAttributes(
 
         }
     }
+}
+
+template<class GridType>
+void
+transferPrimitiveAttributes(
+    const GU_Detail& sourceGeo,
+    GU_Detail& targetGeo,
+    GridType& indexGrid,
+    Interrupter& boss,
+    const GA_PrimitiveGroup* primitives = nullptr)
+{
+    transferPrimitiveAttributes(sourceGeo, targetGeo, indexGrid, boss.interrupter(), primitives);
 }
 
 } // namespace openvdb_houdini

@@ -164,33 +164,43 @@ jobs:
     - name: test
       run: cd build && ctest -V
 
-  # Extra compiler tests for the OpenVDB core library
-  linux-compiler:
+  # Extra compiler tests
+  linux-cxx17:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
     runs-on: ubuntu-20.04
-    name: linux-compiler:${{ matrix.cxx }}
+    name: linux-cxx17:${{ matrix.config.cxx }}
     env:
-      CXX: ${{ matrix.cxx }}
+      CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
-        cxx: ['g++-10', 'clang++-10']
+        config:
+          - { cxx: 'g++-10',     j: '1' }
+          - { cxx: 'clang++-10', j: '2' }
+      fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - name: install_boost
-      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
-    - name: install_tbb
-      run: sudo apt-get -q install -y libtbb-dev
-    - name: install_gtest
-      run: sudo apt-get -q install -y libgtest-dev
+    - name: update_apt
+      run: sudo apt-get update
+    - name: install
+      run: >
+        sudo apt-get -q install -y
+        libboost-dev libboost-system-dev libboost-iostreams-dev libboost-python-dev
+        libglfw3-dev libtbb-dev libgtest-dev libcppunit-dev libglu1-mesa-dev
     - name: build
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DCMAKE_INSTALL_PREFIX=`pwd`\"
+        -j ${{ matrix.config.j }}
+        --components=\"core,python,test,bin,axcore,axbin,axtest\"
+        --cargs=\"
+        -DUSE_BLOSC=OFF
+        -DCMAKE_CXX_STANDARD=17
+        -DOPENVDB_ABI_VERSION_NUMBER=9
+        -DCMAKE_INSTALL_PREFIX=`pwd`
+        \"
     - name: test
       run: cd build && ctest -V
 

@@ -76,13 +76,13 @@ public:
             GA_PrimitiveGroup*,
             const UT_String& newTypeStr,
             const UT_String& newPrecisionStr,
-            hvdb::Interrupter&);
+            openvdb::util::NullInterrupter&);
 
         void convertToPoly(
             fpreal time,
             GA_PrimitiveGroup*,
             bool buildpolysoup,
-            hvdb::Interrupter&);
+            openvdb::util::NullInterrupter&);
 
         template<class GridType>
         void referenceMeshing(
@@ -92,7 +92,7 @@ public:
             openvdb::tools::VolumeToMesh& mesher,
             const GU_Detail* refGeo,
             bool computeNormals,
-            hvdb::Interrupter& boss,
+            openvdb::util::NullInterrupter& boss,
             const fpreal time);
     }; // class Cache
 };
@@ -1015,7 +1015,7 @@ SOP_OpenVDB_Convert::Cache::convertVDBType(
     GA_PrimitiveGroup* group,
     const UT_String& outTypeStr,
     const UT_String& outPrecStr,
-    hvdb::Interrupter& boss)
+    openvdb::util::NullInterrupter& boss)
 {
     GA_RWHandleS name_h(gdp, GA_ATTRIB_PRIMITIVE, "name");
     for (hvdb::VdbPrimIterator it(&dst, group); it; ++it) {
@@ -1059,7 +1059,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
     openvdb::tools::VolumeToMesh& mesher,
     const GU_Detail* refGeo,
     bool computeNormals,
-    hvdb::Interrupter& boss,
+    openvdb::util::NullInterrupter& boss,
     const fpreal time)
 {
     if (refGeo == nullptr) return;
@@ -1093,7 +1093,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
     UT_UniquePtr<GU_Detail> geoPtr;
     if (!refGrid) {
         std::string warningStr;
-        geoPtr = hvdb::convertGeometry(*refGeo, warningStr, &boss);
+        geoPtr = hvdb::convertGeometry(*refGeo, warningStr, &boss.interrupter());
 
         if (geoPtr) {
             refGeo = geoPtr.get();
@@ -1125,7 +1125,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
 
         indexGrid.reset(new IntGridT(0));
 
-        refGrid = openvdb::tools::meshToVolume<GridType>(boss,
+        refGrid = openvdb::tools::meshToVolume<GridType>(boss.interrupter(),
             mesh, *transform, bandWidth, bandWidth, 0, indexGrid.get());
 
         if (sharpenFeatures) edgeData.convert(pointList, primList);
@@ -1255,7 +1255,7 @@ SOP_OpenVDB_Convert::Cache::referenceMeshing(
 
     // Transfer Primitive Attributes
     if (!boss.wasInterrupted() && transferAttributes && refGeo && indexGrid) {
-        hvdb::transferPrimitiveAttributes(*refGeo, *gdp, *indexGrid, boss, surfaceGroup);
+        hvdb::transferPrimitiveAttributes(*refGeo, *gdp, *indexGrid, boss.interrupter(), surfaceGroup);
     }
 
 
@@ -1287,7 +1287,7 @@ SOP_OpenVDB_Convert::Cache::convertToPoly(
     fpreal time,
     GA_PrimitiveGroup *group,
     bool buildpolysoup,
-    hvdb::Interrupter &boss)
+    openvdb::util::NullInterrupter &boss)
 {
     hvdb::VdbPrimCIterator vdbIt(gdp, group);
     if (!vdbIt) {
@@ -1393,10 +1393,10 @@ SOP_OpenVDB_Convert::Cache::convertToPoly(
 
             if (grids.front()->isType<openvdb::FloatGrid>()) {
                 referenceMeshing<openvdb::FloatGrid>(
-                    grids, vdbs, delGroup, mesher, refGeo, computeNormals, boss, time);
+                    grids, vdbs, delGroup, mesher, refGeo, computeNormals, boss.interrupter(), time);
             } else if (grids.front()->isType<openvdb::DoubleGrid>()) {
                 referenceMeshing<openvdb::DoubleGrid>(
-                    grids, vdbs, delGroup, mesher, refGeo, computeNormals, boss, time);
+                    grids, vdbs, delGroup, mesher, refGeo, computeNormals, boss.interrupter(), time);
             } else {
                 addError(SOP_MESSAGE, "Unsupported grid type.");
             }
@@ -1451,7 +1451,7 @@ SOP_OpenVDB_Convert::Cache::cookVDBSop(OP_Context& context)
         GA_PrimitiveGroup* group = parsePrimitiveGroupsCopy(
             evalStdString("group", t).c_str(), GroupCreator(gdp));
 
-        hvdb::Interrupter interrupter("Converting VDBs");
+        hvdb::HoudiniInterrupter interrupter("Converting VDBs");
 
         switch (evalInt("conversion",  0, t))
         {

@@ -68,7 +68,7 @@ public:
             std::list<openvdb::GridBase::Ptr>& grids,
             const GU_Detail* cutterGeo,
             const GU_Detail* pointGeo,
-            hvdb::Interrupter&,
+            openvdb::util::NullInterrupter&,
             const fpreal time);
     }; // class Cache
 
@@ -293,7 +293,7 @@ SOP_OpenVDB_Fracture::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Converting geometry to volume");
+        hvdb::HoudiniInterrupter boss("Converting geometry to volume");
 
         //////////
         // Validate inputs
@@ -305,7 +305,7 @@ SOP_OpenVDB_Fracture::Cache::cookVDBSop(OP_Context& context)
         }
 
         std::string warningStr;
-        auto geoPtr = hvdb::convertGeometry(*cutterGeo, warningStr, &boss);
+        auto geoPtr = hvdb::convertGeometry(*cutterGeo, warningStr, &boss.interrupter());
 
         if (geoPtr) {
             cutterGeo = geoPtr.get();
@@ -365,9 +365,9 @@ SOP_OpenVDB_Fracture::Cache::cookVDBSop(OP_Context& context)
         if (!grids.empty() && !boss.wasInterrupted()) {
 
             if (grids.front()->isType<openvdb::FloatGrid>()) {
-                process<openvdb::FloatGrid>(grids, cutterGeo, pointGeo, boss, time);
+                process<openvdb::FloatGrid>(grids, cutterGeo, pointGeo, boss.interrupter(), time);
             } else if (grids.front()->isType<openvdb::DoubleGrid>()) {
-                process<openvdb::DoubleGrid>(grids, cutterGeo, pointGeo, boss, time);
+                process<openvdb::DoubleGrid>(grids, cutterGeo, pointGeo, boss.interrupter(), time);
             } else {
                 addError(SOP_MESSAGE, "Unsupported grid type");
             }
@@ -404,7 +404,7 @@ SOP_OpenVDB_Fracture::Cache::process(
     std::list<openvdb::GridBase::Ptr>& grids,
     const GU_Detail* cutterGeo,
     const GU_Detail* pointGeo,
-    hvdb::Interrupter& boss,
+    openvdb::util::NullInterrupter& boss,
     const fpreal time)
 {
     GA_PrimitiveGroup* group = nullptr;
@@ -562,7 +562,7 @@ SOP_OpenVDB_Fracture::Cache::process(
     }
 
     // Setup fracture tool
-    openvdb::tools::LevelSetFracture<GridType, hvdb::Interrupter> lsFracture(&boss);
+    openvdb::tools::LevelSetFracture<GridType> lsFracture(&boss);
 
     const bool separatecutters = (pointGeo == nullptr) && bool(evalInt("separatecutters", 0, time));
 

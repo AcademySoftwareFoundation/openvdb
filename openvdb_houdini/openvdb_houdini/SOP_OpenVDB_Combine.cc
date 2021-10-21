@@ -964,7 +964,7 @@ struct SOP_OpenVDB_Combine::CombineOp
     UT_String aGridName, bGridName;
     hvdb::GridCPtr aBaseGrid, bBaseGrid;
     hvdb::GridPtr outGrid;
-    hvdb::Interrupter interrupt;
+    hvdb::HoudiniInterrupter interrupt;
 
     CombineOp(): self(nullptr) {}
 
@@ -1013,7 +1013,7 @@ struct SOP_OpenVDB_Combine::CombineOp
 
             try {
                 dest = openvdb::tools::doLevelSetRebuild(src, /*iso=*/ZERO,
-                    /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &refXform, &interrupt);
+                    /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &refXform, &interrupt.interrupter());
             } catch (openvdb::TypeError&) {
                 self->addWarning(SOP_MESSAGE, ("skipped rebuild of level set grid "
                     + src.getName() + " of type " + src.type()).c_str());
@@ -1028,9 +1028,9 @@ struct SOP_OpenVDB_Combine::CombineOp
             dest->setTransform(refXform.copy());
             using namespace openvdb;
             switch (order) {
-            case 0: tools::resampleToMatch<tools::PointSampler>(src, *dest, interrupt); break;
-            case 1: tools::resampleToMatch<tools::BoxSampler>(src, *dest, interrupt); break;
-            case 2: tools::resampleToMatch<tools::QuadraticSampler>(src, *dest, interrupt); break;
+            case 0: tools::resampleToMatch<tools::PointSampler>(src, *dest, interrupt.interrupter()); break;
+            case 1: tools::resampleToMatch<tools::BoxSampler>(src, *dest, interrupt.interrupter()); break;
+            case 2: tools::resampleToMatch<tools::QuadraticSampler>(src, *dest, interrupt.interrupter()); break;
             }
         }
         return dest;
@@ -1521,7 +1521,7 @@ SOP_OpenVDB_Combine::Cache::combineGrids(
     compOp.bBaseGrid = bGrid;
     compOp.aGridName = aGridName;
     compOp.bGridName = bGridName;
-    compOp.interrupt = hvdb::Interrupter();
+    compOp.interrupt = hvdb::HoudiniInterrupter();
 
     int success = false;
     success = (needA ? aGrid : bGrid)->apply<hvdb::VolumeGridTypes>(compOp);

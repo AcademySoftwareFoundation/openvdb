@@ -397,9 +397,9 @@ SOP_OpenVDB_Filter::updateParmsFlags()
 struct FilterOp
 {
     template <typename GridT>
-    using FilterT = openvdb::tools::Filter<GridT, openvdb::FloatGrid, hvdb::Interrupter>;
+    using FilterT = openvdb::tools::Filter<GridT, openvdb::FloatGrid>;
 
-    FilterOp(const FilterParms& parms, hvdb::Interrupter& interrupt)
+    FilterOp(const FilterParms& parms, openvdb::util::NullInterrupter& interrupt)
         : mParms(parms), mInterrupt(interrupt) {}
 
     template<typename GridT>
@@ -465,7 +465,7 @@ struct FilterOp
     }
 
     const FilterParms& mParms;
-    hvdb::Interrupter& mInterrupt;
+    openvdb::util::NullInterrupter& mInterrupt;
 };
 
 
@@ -527,11 +527,11 @@ OP_ERROR
 SOP_OpenVDB_Filter::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-        hvdb::Interrupter progress("Filtering VDB grids");
+        hvdb::HoudiniInterrupter progress("Filtering VDB grids");
 
         const fpreal now = context.getTime();
         const FilterParms parms = evalFilterParms(now);
-        FilterOp filterOp(parms, progress);
+        FilterOp filterOp(parms, progress.interrupter());
 
         // Get the group of grids to process.
         const GA_PrimitiveGroup* group = matchGroup(*gdp, evalStdString("group", now));

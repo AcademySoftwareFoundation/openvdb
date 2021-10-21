@@ -883,11 +883,24 @@ computeVoxelSizeFromHoudini(const GU_Detail& detail,
                             const uint32_t pointsPerVoxel,
                             const openvdb::math::Mat4d& matrix,
                             const Index decimalPlaces,
-                            hvdb::Interrupter& interrupter)
+                            openvdb::util::NullInterrupter& interrupter)
 {
     HoudiniReadAttribute<openvdb::Vec3R> positions(*(detail.getP()));
     return openvdb::points::computeVoxelSize(
             positions, pointsPerVoxel, matrix, decimalPlaces, &interrupter);
+}
+
+
+// deprecated
+float
+computeVoxelSizeFromHoudini(const GU_Detail& detail,
+                            const openvdb::Index pointsPerVoxel,
+                            const openvdb::math::Mat4d& matrix,
+                            const openvdb::Index decimalPlaces,
+                            Interrupter& interrupter)
+{
+    return computeVoxelSizeFromHoudini(detail, pointsPerVoxel, matrix, decimalPlaces,
+        interrupter.interrupter());
 }
 
 

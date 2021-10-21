@@ -1011,9 +1011,9 @@ SOP_OpenVDB_Create::createMaskGrid(const GU_PrimVDB* refVdb,
     cvdb::MaskGrid::Ptr resampledMaskGrid = cvdb::MaskGrid::create();
     resampledMaskGrid->setTransform(transform);
 
-    hvdb::Interrupter interrupter;
+    hvdb::HoudiniInterrupter interrupter;
     cvdb::tools::resampleToMatch<cvdb::tools::PointSampler>(*maskGrid, *resampledMaskGrid,
-            interrupter);
+            interrupter.interrupter());
 
     return resampledMaskGrid;
 }
