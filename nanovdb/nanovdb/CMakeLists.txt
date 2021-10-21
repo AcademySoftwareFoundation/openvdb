@@ -44,10 +44,6 @@ option(NANOVDB_ALLOW_FETCHCONTENT
 # Configuring CXXFLAGS
 ###############################################################################
 
-add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/bigobj>")
-add_compile_options("$<$<CXX_COMPILER_ID:GNU>:-Wno-invalid-offsetof>")
-add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
-
 if(UNIX)
   # For CMake's find Threads module which brings in pthread - This flag
   # forces the compiler -pthread flag vs -lpthread
@@ -80,8 +76,6 @@ if(NANOVDB_USE_CUDA)
 
   if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
     set(CMAKE_CUDA_ARCHITECTURES 75)
-  else()
-    add_compile_options("$<$<COMPILE_LANGUAGE:CUDA>:-arch=sm_75>")
   endif()
 
   enable_language(CUDA)
@@ -192,6 +186,9 @@ set(NANOVDB_INCLUDE_UTILFILES
 
 add_library(nanovdb INTERFACE)
 target_include_directories(nanovdb INTERFACE ../ . util)
+target_compile_options(nanovdb INTERFACE
+  "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-invalid-offsetof>"
+  "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 
 if(WIN32)
   target_compile_definitions(nanovdb INTERFACE -DNOMINMAX)
@@ -231,6 +228,10 @@ endif()
 
 if(NANOVDB_USE_CUDA)
   target_compile_definitions(nanovdb INTERFACE -DNANOVDB_USE_CUDA)
+  if(NOT CMAKE_CUDA_ARCHITECTURES)
+    target_compile_options(nanovdb INTERFACE
+      "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-arch=sm_75>")
+  endif()
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)
