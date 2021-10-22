@@ -19,13 +19,11 @@ message(STATUS "---------- Configuring NanoVDB Examples ------------")
 message(STATUS "----------------------------------------------------")
 
 ###############################################################################
-
 if(WIN32)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
 
-#set(NANOVDB_INSTALL_EXAMPLEDIR ${CMAKE_INSTALL_PREFIX}/bin/nanovdb_examples)
-set(NANOVDB_LOCAL_EXAMPLEDIR ${PROJECT_BINARY_DIR}/examples)
+set(NANOVDB_LOCAL_EXAMPLEDIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # -----------------------------------------------------------------------------`
 # helper function
