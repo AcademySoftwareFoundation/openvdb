@@ -1,11 +1,8 @@
-# NanoVDB {#NanoVDB}
+# NanoVDB {#NanoVDB_MainPage}
 
-Welcome to the NanoVDB docs.
+Welcome to the NanoVDB documentation page.
 
-* @ref HowToBuild
-* @ref FAQ
-* @ref SourceTree
-* @ref HelloWorld
-
-### Copyright Contributors to the OpenVDB Project
-### SPDX-License-Identifier: MPL-2.0
+* @ref NanoVDB_HowToBuild
+* @ref NanoVDB_FAQ
+* @ref NanoVDB_SourceTree
+* @ref NanoVDB_HelloWorld

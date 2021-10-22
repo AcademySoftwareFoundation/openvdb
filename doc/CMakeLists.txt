@@ -85,11 +85,13 @@ set(DOXYGEN_FULL_PATH_NAMES YES)
 set(DOXYGEN_STRIP_FROM_PATH
   "${CMAKE_SOURCE_DIR}/openvdb"
   "${CMAKE_SOURCE_DIR}/openvdb_ax"
+  "${CMAKE_SOURCE_DIR}/nanovdb"
   "${CMAKE_SOURCE_DIR}/openvdb_houdini"
   "${CMAKE_SOURCE_DIR}")
 set(DOXYGEN_STRIP_FROM_INC_PATH
   "${CMAKE_SOURCE_DIR}/openvdb"
   "${CMAKE_SOURCE_DIR}/openvdb_ax"
+  "${CMAKE_SOURCE_DIR}/nanovdb"
   "${CMAKE_SOURCE_DIR}/openvdb_houdini")
 
 # Shows which source files generated the respected doxygen docs
@@ -232,10 +234,33 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     doc/nanovdb/HowToBuild.md
     doc/nanovdb/HelloWorld.md
     nanovdb/nanovdb
-    nanovdb/nanovdb/cmd
-    nanovdb/nanovdb/examples
+    nanovdb/nanovdb/util
+    nanovdb/nanovdb/cmd/convert
+    nanovdb/nanovdb/cmd/print
+    nanovdb/nanovdb/cmd/validate
+    nanovdb/nanovdb/examples/benchmark
+    nanovdb/nanovdb/examples/ex_bump_pool_buffer
+    nanovdb/nanovdb/examples/ex_collide_level_set
+    nanovdb/nanovdb/examples/ex_make_custom_nanovdb
+    nanovdb/nanovdb/examples/ex_make_funny_nanovdb
+    nanovdb/nanovdb/examples/ex_make_nanovdb_sphere
+    nanovdb/nanovdb/examples/ex_make_typed_grids
+    nanovdb/nanovdb/examples/ex_map_pool_buffer
+    nanovdb/nanovdb/examples/ex_modify_nanovdb_thrust
+    nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb
+    nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_accessor
+    nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_accessor/openvdb_to_nanovdb_accessor.cpp
+    nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_cuda
+    nanovdb/nanovdb/examples/ex_raytrace_fog_volume
+    nanovdb/nanovdb/examples/ex_raytrace_level_set
+    nanovdb/nanovdb/examples/ex_read_nanovdb_sphere
+    nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor
+    nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor_cuda
+    nanovdb/nanovdb/examples/ex_util
+    nanovdb/nanovdb/examples/ex_vox_to_nanovdb
+    nanovdb/nanovdb/examples/ex_write_nanovdb_grids
     nanovdb/nanovdb/unittest
-    nanovdb/nanovdb/util)
+    )
 endif()
 
 set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)

@@ -52,7 +52,7 @@ See the @subpage houdini "Houdini Cookbook" for help on implementing Houdini nod
 @endif
 
 @if NANOVDB
-See @subpage NanoVDB "NanoVDB" for the NanoVDB documentation.
+See @subpage NanoVDB_MainPage "NanoVDB" for the NanoVDB documentation.
 @endif
 
 Contributors, please familiarize yourselves with our
