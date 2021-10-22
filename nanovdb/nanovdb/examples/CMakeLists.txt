@@ -19,11 +19,10 @@ message(STATUS "---------- Configuring NanoVDB Examples ------------")
 message(STATUS "----------------------------------------------------")
 
 ###############################################################################
+
 if(WIN32)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
-
-set(NANOVDB_LOCAL_EXAMPLEDIR ${CMAKE_CURRENT_BINARY_DIR})
 
 # -----------------------------------------------------------------------------`
 # helper function
@@ -68,13 +67,10 @@ function(NANOVDB_EXAMPLE)
     ${EXAMPLE_SOURCE_CUDA_FILES}
     ${EXAMPLE_HEADER_FILES})
 
-  target_include_directories(${EXAMPLE_NAME} PUBLIC
-    ex_util
-    ${CUDA_INCLUDE_DIRECTORY})
+  target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util)
+  target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb)
 
-  target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb ${CUDA_LIBRARIES})
-
-  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${NANOVDB_LOCAL_EXAMPLEDIR})
+  install(TARGETS ${EXAMPLE_NAME} DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
 endfunction()
 
 # -----------------------------------------------------------------------
@@ -108,4 +104,4 @@ endif()
 
 # many of the sample projects depend on a data directory. This allows Debug
 # launching from the cmake binary working directory.
-file(MAKE_DIRECTORY "${NANOVDB_LOCAL_EXAMPLEDIR}/data")
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")

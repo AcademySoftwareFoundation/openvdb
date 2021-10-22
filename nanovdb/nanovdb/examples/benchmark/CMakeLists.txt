@@ -56,6 +56,6 @@ add_executable(benchmark ${BENCHMARK_SOURCES})
 target_include_directories(benchmark PUBLIC ${CUDA_INCLUDE_DIRECTORY})
 target_link_libraries(benchmark PRIVATE nanovdb GTest::GTest GTest::Main)
 
-install(TARGETS benchmark DESTINATION examples)
+install(TARGETS benchmark DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
 
 # ---------------------------------------------------------------

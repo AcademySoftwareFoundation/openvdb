@@ -47,4 +47,5 @@ endif()
 add_executable(nanovdb_test_openvdb "TestOpenVDB.cpp")
 target_link_libraries(nanovdb_test_openvdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_openvdb_unit_test nanovdb_test_openvdb)
+
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")

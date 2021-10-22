@@ -54,19 +54,9 @@ endif()
 #------------------------------------------------------------------------------
 if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
   find_package(GTest)
-  if(GTEST_FOUND)
-    set(NANOVDB_GTEST "GTest::GTest" "GTest::Main")
-  else()
+  if(NOT GTEST_FOUND)
     message(WARNING "GTest required to build NanoVDB unit test or NanoVDB bencmarks.")
   endif()
-endif()
-
-if(USE_EMSCRIPTEN_TOOLCHAIN)
-  set(NANOVDB_USE_TBB OFF)
-  set(NANOVDB_USE_ZLIB OFF)
-  set(NANOVDB_USE_BLOSC OFF)
-  set(NANOVDB_USE_OPENVDB OFF)
-  set(NANOVDB_USE_CUDA OFF)
 endif()
 
 #------------------------------------------------------------------------------
@@ -87,11 +77,6 @@ if(NANOVDB_USE_CUDA)
 
   set(CMAKE_CUDA_FLAGS "${NANOVDB_CUDA_EXTENDED_LAMBDA} -use_fast_math -lineinfo ${CMAKE_CUDA_FLAGS}")
 
-  # find NVRTC library.
-  find_library(
-    CUDA_nvrtc_LIBRARY nvrtc "${CUDA_TOOLKIT_ROOT_DIR}/lib/x64"
-    "${CUDA_TOOLKIT_ROOT_DIR}/lib64" "${CUDA_TOOLKIT_ROOT_DIR}/lib/Win32")
-
   # workaround for win32 bug when nvcc "--keep" is used.
   if(WIN32)
     if(NANOVDB_CUDA_KEEP_PTX)
@@ -100,10 +85,6 @@ if(NANOVDB_USE_CUDA)
           " --source-in-ptx --keep ${CMAKE_CUDA_FLAGS_RELEASE}")
     endif()
   endif()
-
-  #set(CUDA_LINK_LIBRARY ${CUDA_LIBRARIES})
-  #set(CUDA_INCLUDE_DIRECTORY ${CUDA_INCLUDE_DIRS})
-  #set(NVRTC_LINK_LIBRARY ${CUDA_nvrtc_LIBRARY})
 endif()
 
 #-------------------------------------------------------------------------------
