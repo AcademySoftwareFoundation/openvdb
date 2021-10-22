@@ -78,6 +78,7 @@ option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
+option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
 
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
@@ -146,7 +147,6 @@ set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
 The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
 cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
 NOT the number of TU's ]=])
-
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -435,7 +435,8 @@ if(NOT (
     OPENVDB_BUILD_UNITTESTS OR
     OPENVDB_BUILD_HOUDINI_PLUGIN OR
     OPENVDB_BUILD_HOUDINI_ABITESTS OR
-    OPENVDB_BUILD_MAYA_PLUGIN)
+    OPENVDB_BUILD_MAYA_PLUGIN OR
+    OPENVDB_BUILD_NANOVDB)
   )
   return()
 endif()
@@ -486,7 +487,6 @@ endif()
 # @todo  add definitions for Intel.
 
 set(HAS_AVAILABLE_WARNINGS FALSE)
-
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
   if(CMAKE_CXX_COMPILER_VERSION VERSION_LESS MINIMUM_CLANG_VERSION)
     message(FATAL_ERROR "Insufficient clang++ version. Minimum required is "
@@ -655,7 +655,7 @@ endif()
 
 # Configure OpenVDB Library and ABI versions
 
-if(NOT OPENVDB_BUILD_CORE)
+if(NOT OPENVDB_BUILD_CORE AND (NOT USE_NANOVDB OR NANOVDB_USE_OPENVDB))
   # Find VDB installation and determine lib/abi versions. This resets the
   # version and ABI numbers
   find_package(OpenVDB REQUIRED)
