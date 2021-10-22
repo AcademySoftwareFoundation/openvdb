@@ -10,7 +10,15 @@
 cmake_minimum_required(VERSION 3.15)
 project(NanoVDBBenchmark LANGUAGES CXX)
 
-# -----------------------------------------------------------------------
+include(GNUInstallDirs)
+
+###############################################################################
+
+message(STATUS "----------------------------------------------------")
+message(STATUS "---------- Configuring NanoVDB Benchmark -----------")
+message(STATUS "----------------------------------------------------")
+
+###############################################################################
 if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
