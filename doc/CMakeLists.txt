@@ -249,7 +249,6 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     nanovdb/nanovdb/examples/ex_modify_nanovdb_thrust
     nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb
     nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_accessor
-    nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_accessor/openvdb_to_nanovdb_accessor.cpp
     nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_cuda
     nanovdb/nanovdb/examples/ex_raytrace_fog_volume
     nanovdb/nanovdb/examples/ex_raytrace_level_set
@@ -259,8 +258,7 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     nanovdb/nanovdb/examples/ex_util
     nanovdb/nanovdb/examples/ex_vox_to_nanovdb
     nanovdb/nanovdb/examples/ex_write_nanovdb_grids
-    nanovdb/nanovdb/unittest
-    )
+    nanovdb/nanovdb/unittest)
 endif()
 
 set(DOXYGEN_VERBATIM_VARS DOXYGEN_ALIASES DOXYGEN_PREDEFINED)
