@@ -154,8 +154,8 @@ for this:
    that were created using blosc compression. This includes OpenVDB files from
    Houdini.
 
-Note however that OpenVDB currently uses a very old version of Blosc (v1.5.0).
-See the note in the [known issues list.](@ref depKnownIssues).
+See the note in the [known issues list](@ref depKnownIssues) regarding supported
+versions of blosc.
 
 @subsection buildZLibSupport ZLIB Support
 
