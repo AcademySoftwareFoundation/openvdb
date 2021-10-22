@@ -10,11 +10,8 @@
 #include <vector>
 #include <limits.h> // CHAR_BIT
 #include <algorithm> // for std::is_sorted
-#define _USE_MATH_DEFINES
 #include <cmath>
 #include <cstdlib>
-
-#include "gtest/gtest.h"
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/GridBuilder.h>
@@ -44,6 +41,7 @@
 #include "pnanovdb_validate_strides.h"
 #endif
 
+#include <gtest/gtest.h>
 
 
 namespace nanovdb {// this namespace is required by gtest
@@ -1759,7 +1757,8 @@ TYPED_TEST(TestOffsets, NanoVDB)
     //std::cerr << "Alignment = " << ALIGNMENT << " sizeof(ValueType) = " << sizeof(ValueType) << std::endl;
     {// check memory layout of RootData
         using DataT = typename nanovdb::NanoRoot<ValueType>::DataType;
-        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        bool test = nanovdb::is_same<StatsT, typename DataT::StatsT>::value;
+        EXPECT_TRUE(test);
         int offsets[] = {
             NANOVDB_OFFSETOF(DataT, mBBox),
             NANOVDB_OFFSETOF(DataT, mTableSize),
@@ -1794,7 +1793,8 @@ TYPED_TEST(TestOffsets, NanoVDB)
     }
     {// check  memory layout of upper internal nodes
         using DataT = typename nanovdb::NanoUpper<ValueType>::DataType;
-        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        bool test = nanovdb::is_same<StatsT, typename DataT::StatsT>::value;
+        EXPECT_TRUE(test);
         int offsets[] = {
             NANOVDB_OFFSETOF(DataT, mBBox),
             NANOVDB_OFFSETOF(DataT, mFlags),
@@ -1836,7 +1836,8 @@ TYPED_TEST(TestOffsets, NanoVDB)
     }
     {// check  memory lower of upper internal nodes
         using DataT = typename nanovdb::NanoLower<ValueType>::DataType;
-        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::StatsT>::value));
+        bool test = nanovdb::is_same<StatsT, typename DataT::StatsT>::value;
+        EXPECT_TRUE(test);
         int offsets[] = {
             NANOVDB_OFFSETOF(DataT, mBBox),
             NANOVDB_OFFSETOF(DataT, mFlags),
@@ -1878,7 +1879,8 @@ TYPED_TEST(TestOffsets, NanoVDB)
     }
     {// check  memory of leaf nodes
         using DataT = typename nanovdb::LeafNode<ValueType>::DataType;
-        EXPECT_TRUE((nanovdb::is_same<StatsT, typename DataT::FloatType>::value));
+        bool test = nanovdb::is_same<StatsT, typename DataT::FloatType>::value;
+        EXPECT_TRUE(test);
         int offsets[] = {
             NANOVDB_OFFSETOF(DataT, mBBoxMin),
             NANOVDB_OFFSETOF(DataT, mBBoxDif),

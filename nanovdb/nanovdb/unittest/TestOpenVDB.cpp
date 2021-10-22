@@ -5,11 +5,7 @@
 #include <cstdlib>
 #include <sstream> // for std::stringstream
 #include <cstdio>// for FILE
-
-#define _USE_MATH_DEFINES
 #include <cmath>
-
-#include "gtest/gtest.h"
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/OpenToNanoVDB.h>
@@ -20,8 +16,11 @@
 #include <nanovdb/util/GridBuilder.h>
 #include <nanovdb/util/Ray.h>
 #include <nanovdb/util/HDDA.h>
+
+#if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
 #include <nanovdb/CNanoVDB.h>
 #include <nanovdb/util/CSampleFromVoxels.h>
+#endif
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
@@ -34,6 +33,8 @@
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_invoke.h>
+
+#include <gtest/gtest.h>
 
 namespace nanovdb {// this namespace is required by gtest
 inline std::ostream&
@@ -1373,7 +1374,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
     EXPECT_EQ( 0UL, positions.size() );// verify that we found all the input points
 } // PointDataGridRandom
 
-#if 1
+#if !defined(_MSC_VER)
 // Disabled due to error compiling CNanoVDB on some compilers due to zero-sized arrays.
 // So we should probably disable on those compilers, rather than
 // on all platforms...

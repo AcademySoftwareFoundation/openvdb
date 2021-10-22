@@ -19,6 +19,7 @@ message(STATUS "---------- Configuring NanoVDB Benchmark -----------")
 message(STATUS "----------------------------------------------------")
 
 ###############################################################################
+
 if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
@@ -57,5 +58,3 @@ target_include_directories(benchmark PUBLIC ${CUDA_INCLUDE_DIRECTORY})
 target_link_libraries(benchmark PRIVATE nanovdb GTest::GTest GTest::Main)
 
 install(TARGETS benchmark DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)
-
-# ---------------------------------------------------------------

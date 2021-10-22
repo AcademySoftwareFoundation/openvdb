@@ -40,8 +40,10 @@ option(NANOVDB_ALLOW_FETCHCONTENT
   "Allow FetchContent to download missing dependencies" OFF)
 
 ###############################################################################
-# Configuring CXXFLAGS
-###############################################################################
+
+# Add our cmake modules
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/../../cmake")
 
 if(UNIX)
   # For CMake's find Threads module which brings in pthread - This flag
@@ -50,21 +52,19 @@ if(UNIX)
   find_package(Threads REQUIRED)
 endif()
 
-#------------------------------------------------------------------------------
 if(NANOVDB_BUILD_UNITTESTS OR NANOVDB_BUILD_BENCHMARK)
-  find_package(GTest)
-  if(NOT GTEST_FOUND)
-    message(WARNING "GTest required to build NanoVDB unit test or NanoVDB bencmarks.")
-  endif()
+  find_package(GTest REQUIRED)
 endif()
 
-#------------------------------------------------------------------------------
 if(NANOVDB_USE_CUDA)
   set(CMAKE_CUDA_STANDARD 11)
   set(CMAKE_CUDA_STANDARD_REQUIRED ON)
 
   if(CMAKE_VERSION VERSION_GREATER_EQUAL 3.18)
-    set(CMAKE_CUDA_ARCHITECTURES 75)
+    # Allow the user to provide CMAKE_CUDA_ARCHITECTURES
+    if(NOT DEFINED CMAKE_CUDA_ARCHITECTURES)
+      set(CMAKE_CUDA_ARCHITECTURES 75)
+    endif()
   endif()
 
   enable_language(CUDA)
@@ -86,7 +86,6 @@ if(NANOVDB_USE_CUDA)
   endif()
 endif()
 
-#-------------------------------------------------------------------------------
 if(NANOVDB_USE_OPENVDB)
   if(NOT OPENVDB_BUILD_CORE)
     find_package(OpenVDB REQUIRED)
@@ -107,7 +106,6 @@ if(NANOVDB_USE_ZLIB AND NOT TARGET ZLIB::ZLIB)
   find_package(ZLIB REQUIRED)
 endif()
 
-#-------------------------------------------------------------------------------
 if(NANOVDB_USE_MAGICAVOXEL)
   if(NANOVDB_ALLOW_FETCHCONTENT)
     if(NOT ogt_POPULATED)
@@ -165,13 +163,13 @@ set(NANOVDB_INCLUDE_UTILFILES
 )
 
 add_library(nanovdb INTERFACE)
-target_include_directories(nanovdb INTERFACE ../ . util)
+target_include_directories(nanovdb INTERFACE ../)
 target_compile_options(nanovdb INTERFACE
   "$<$<COMPILE_LANG_AND_ID:CXX,GNU>:-Wno-invalid-offsetof>"
   "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
 
 if(WIN32)
-  target_compile_definitions(nanovdb INTERFACE -DNOMINMAX)
+  target_compile_definitions(nanovdb INTERFACE -DNOMINMAX -D_USE_MATH_DEFINES)
 endif()
 
 if(NANOVDB_USE_INTRINSICS)

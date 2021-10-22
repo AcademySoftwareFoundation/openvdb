@@ -26,7 +26,7 @@ if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
 endif()
 
 # -----------------------------------------------------------------------------
-# nanovdb_convert
+
 if(NOT NANOVDB_USE_OPENVDB)
   message(WARNING " - OpenVDB required to build nanovdb_convert. Skipping.")
 else()
@@ -36,13 +36,13 @@ else()
 endif()
 
 # -----------------------------------------------------------------------------
-# nanovdb_print
+
 add_executable(nanovdb_print print/nanovdb_print.cpp)
 target_link_libraries(nanovdb_print PRIVATE nanovdb)
 install(TARGETS nanovdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # -----------------------------------------------------------------------------
-# nanovdb_validate
+
 add_executable(nanovdb_validate validate/nanovdb_validate.cpp)
 target_link_libraries(nanovdb_validate PRIVATE nanovdb)
 install(TARGETS nanovdb_validate RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

@@ -34,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: 'The type of CI to run (all, mac, linux)'
+        description: 'The type of CI to run (all, linux, win)'
         required: true
         default: 'all'
 
@@ -52,7 +52,10 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: g++, build: 'Release' }
+          - { cxx: g++,     build: 'Release' }
+          - { cxx: g++,     build: 'Debug' }
+          - { cxx: clang++, build: 'Release' }
+          - { cxx: clang++, build: 'Debug' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -72,3 +75,74 @@ jobs:
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
       - name: test
         run: cd build && sudo ctest -V
+
+  windows-nanovdb:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'win'
+    runs-on: windows-2019
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      visual_studio: "Visual Studio 16 2019"
+      cuda: "11.0.3"
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          #- { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          #- { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
+          #- { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - name: path
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: install_cuda
+      shell: powershell
+      run: .\ci\install_windows_cuda.ps1
+    - name: install_deps
+      shell: bash
+      run: |
+        vcpkg update
+        vcpkg install zlib tbb gtest blosc boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+    - name: build
+      shell: bash
+      run: >
+        ./ci/build.sh -v
+        --config=Release
+        --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+        --cargs=\'${{ matrix.config.cmake }} -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+    - name: test
+      shell: bash
+      run: cd build && ctest -V
+
+#  macos-nanovdb:
+#    if: |
+#      github.event_name != 'workflow_dispatch' ||
+#      github.event.inputs.type == 'all' ||
+#      github.event.inputs.type == 'mac'
+#    runs-on: macos-latest
+#    env:
+#      CXX: clang++
+#    steps:
+#      - uses: actions/checkout@v2
+#      - name: install_deps
+#        run: ./ci/install_macos.sh
+#      - name: install_cuda
+#        run: |
+#          brew tap homebrew/cask-drivers
+#          brew install nvidia-cuda-toolkit
+#      - name: build
+#        run: >
+#          ./ci/build.sh -v
+#          --build-type=Release
+#          --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+#      - name: test
+#        run: cd build && ctest -V
