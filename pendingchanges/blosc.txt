@@ -1,2 +1,0 @@
-Build:
-    - Bumped the new blosc version future minimum to 1.17.0
