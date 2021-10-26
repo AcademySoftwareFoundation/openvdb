@@ -30,19 +30,19 @@ endif()
 if(NOT NANOVDB_USE_OPENVDB)
   message(WARNING " - OpenVDB required to build nanovdb_convert. Skipping.")
 else()
-  add_executable(nanovdb_convert convert/nanovdb_convert.cpp)
+  add_executable(nanovdb_convert convert/nanovdb_convert.cc)
   target_link_libraries(nanovdb_convert PRIVATE nanovdb)
   install(TARGETS nanovdb_convert RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 endif()
 
 # -----------------------------------------------------------------------------
-
-add_executable(nanovdb_print print/nanovdb_print.cpp)
+# nanovdb_print
+add_executable(nanovdb_print print/nanovdb_print.cc)
 target_link_libraries(nanovdb_print PRIVATE nanovdb)
 install(TARGETS nanovdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # -----------------------------------------------------------------------------
-
-add_executable(nanovdb_validate validate/nanovdb_validate.cpp)
+# nanovdb_validate
+add_executable(nanovdb_validate validate/nanovdb_validate.cc)
 target_link_libraries(nanovdb_validate PRIVATE nanovdb)
 install(TARGETS nanovdb_validate RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
