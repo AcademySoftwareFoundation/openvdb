@@ -36,13 +36,13 @@ endif()
 # launching from the cmake binary working directory.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
-set(BENCHMARK_SOURCES Benchmark.cpp Camera.h Image.h)
+set(BENCHMARK_SOURCES Benchmark.cc Camera.h Image.h)
 
 if(NANOVDB_USE_CUDA)
   list(APPEND BENCHMARK_SOURCES BenchKernels_nano.cu)
 
-  add_executable(benchmark_nano Benchmark_nano.cpp BenchKernels_nano.cu)
-  add_executable(benchmark_dense Benchmark_dense.cpp BenchKernels_dense.cu)
+  add_executable(benchmark_nano Benchmark_nano.cc BenchKernels_nano.cu)
+  add_executable(benchmark_dense Benchmark_dense.cc BenchKernels_dense.cu)
 
   target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY})
   target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY})

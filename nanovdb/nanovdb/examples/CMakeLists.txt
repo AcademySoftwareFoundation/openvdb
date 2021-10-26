@@ -46,8 +46,8 @@ function(NANOVDB_EXAMPLE)
 
   file(GLOB EXAMPLE_SOURCE_FILES
     ${EXAMPLE_ROOT}/*.c
-    ${EXAMPLE_ROOT}/*.cpp
-    ${EXAMPLE_ROOT}/*.cc)
+    ${EXAMPLE_ROOT}/*.cc
+    ${EXAMPLE_ROOT}/*.cpp)
 
   file(GLOB EXAMPLE_SOURCE_CUDA_FILES ${EXAMPLE_ROOT}/*.cu)
 
