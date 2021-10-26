@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file   nanovdb_print.cpp
+    \file   nanovdb_print.cc
 
     \author Ken Museth
 

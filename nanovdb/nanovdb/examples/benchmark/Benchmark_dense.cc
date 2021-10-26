@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark_nano.cpp
+/// @file Benchmark_nano.cc
 ///
 /// @author Ken Museth
 ///

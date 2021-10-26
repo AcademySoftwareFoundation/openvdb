@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark.cpp
+/// @file Benchmark.cc
 ///
 /// @author Ken Museth
 ///

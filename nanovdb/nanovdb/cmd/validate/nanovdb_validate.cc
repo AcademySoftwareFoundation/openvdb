@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /*!
-    \file   nanovdb_validate.cpp
+    \file   nanovdb_validate.cc
 
     \author Ken Museth
 
