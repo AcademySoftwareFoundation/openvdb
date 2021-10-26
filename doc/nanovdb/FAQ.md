@@ -34,8 +34,4 @@
 
 * **Are there known issues with NanoVDB?**
 
-  While the are currently no known bugs, there are certainly lots of room for improvements and enhancements. If you have issues or ideas for new feature in NanoVDB please let us know, e.g email ken.museth@gmail.com.
-
-* **Is NanoVDB production-ready?**
-
-  While NanoVDB is still a beta release, it is stable and useful enough to be used in production environments. In fact, NanoVDB is already part of commercial software like Houdini version 18.5. The only aspect of NanoVDB that is still considered volatile is the .nvdb file format. The reason is simply that in this file format NanoVDB grids are encoded exactly the same way out-of-core as in-core. Consequently, any changes in the in-memory representation of NanoVDB grids will also change the .nvdb file format. We typically capture this with a bump of the major version number, e.g. 1.3.4 -> 2.0.0. So for now we do not recommend using the NanoVDB file format for long-time storage, though it works great for temporary caching!
+  While the are currently no known bugs, there are certainly lots of room for improvements and enhancements. If you have issues or ideas for new feature in NanoVDB please let us know, e.g by submitting a [Github issue](https://github.com/AcademySoftwareFoundation/openvdb/issues).
