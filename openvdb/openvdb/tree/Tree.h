@@ -10,7 +10,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
-#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage()
+#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMaxValues()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Platform.h>
@@ -361,7 +361,7 @@ public:
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
-    void evalMinMax(ValueType &min, ValueType &max) const;
+    void evalMinMax(ValueType &min, ValueType &max) const { tools::minMaxValues(*this, min, max); }
 
     Index64 memUsage() const override { return tools::memUsage(*this); }
 
@@ -2018,23 +2018,6 @@ Tree<RootNodeType>::evalLeafDim(Coord& dim) const
     bool notEmpty = this->evalLeafBoundingBox(bbox);
     dim = bbox.extents();
     return notEmpty;
-}
-
-
-template<typename RootNodeType>
-inline void
-Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
-{
-    /// @todo optimize
-    minVal = maxVal = zeroVal<ValueType>();
-    if (ValueOnCIter iter = this->cbeginValueOn()) {
-        minVal = maxVal = *iter;
-        for (++iter; iter; ++iter) {
-            const ValueType& val = *iter;
-            if (math::cwiseLessThan(val, minVal)) minVal = val;
-            if (math::cwiseGreaterThan(val, maxVal)) maxVal = val;
-        }
-    }
 }
 
 

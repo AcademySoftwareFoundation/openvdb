@@ -62,6 +62,10 @@ Index64 countActiveTiles(const TreeT& tree, bool threaded = true);
 template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
 
+/// @brief Return the minimum and maximum active values in this tree.
+template <typename TreeT, typename ValueType>
+void minMaxValues(const TreeT& tree, ValueType& minVal, ValueType& maxVal, bool threaded = true);
+
 
 ////////////////////////////////////////
 
@@ -316,6 +320,52 @@ struct MemUsageOp
     openvdb::Index64 count{0};
 }; // struct MemUsageOp
 
+/// @brief A DynamicNodeManager operator to find the minimum and maximum active values in this tree.
+template<typename TreeType, typename ValueType>
+struct MinMaxValuesOp
+{
+    explicit MinMaxValuesOp()
+    : min(std::numeric_limits<ValueType>::max())
+    , max(std::numeric_limits<ValueType>::min())
+    {
+    }
+
+    MinMaxValuesOp(const MinMaxValuesOp& other, tbb::split)
+    : min(other.min)
+    , max(other.max)
+    {
+    }
+
+    template <typename LeafNodeType>
+    bool operator()(LeafNodeType& leaf, size_t)
+    {
+        for (auto iter = leaf.cbeginValueOn(); iter; ++iter) {
+            const ValueType val = *iter;
+
+            if (math::cwiseLessThan(val, min))
+                min = val;
+
+            if (math::cwiseGreaterThan(val, max))
+                max = val;
+        }
+
+        return true;
+    }
+
+    bool join(const MinMaxValuesOp& other)
+    {
+        if (math::cwiseLessThan(other.min, min))
+            min = other.min;
+
+        if (math::cwiseGreaterThan(other.max, max))
+            max = other.max;
+
+        return true;
+    }
+
+    ValueType min, max;
+}; // struct MinMaxValuesOp
+
 } // namespace count_internal
 
 /// @endcond
@@ -411,6 +461,17 @@ Index64 memUsage(const TreeT& tree, bool threaded)
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);
     nodeManager.reduceTopDown(op, threaded);
     return op.count + sizeof(tree);
+}
+
+template <typename TreeT, typename ValueType>
+void minMaxValues(const TreeT& tree, ValueType& minVal, ValueType& maxVal, bool threaded)
+{
+    count_internal::MinMaxValuesOp<TreeT, ValueType> op;
+    tree::DynamicNodeManager<const TreeT> nodeManager(tree);
+    nodeManager.reduceTopDown(op, threaded);
+
+    minVal = op.min;
+    maxVal = op.max;
 }
 
 
