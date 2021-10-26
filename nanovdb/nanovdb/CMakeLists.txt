@@ -31,6 +31,7 @@ option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
 option(NANOVDB_CUDA_KEEP_PTX "Keep CUDA PTX" OFF)
 
+option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
 option(NANOVDB_USE_BLOSC "Build with BLOSC support" ${USE_BLOSC})
 option(NANOVDB_USE_ZLIB "Build with ZLIB support" ${USE_ZLIB})
 option(NANOVDB_USE_TBB "Build with TBB support" ${USE_TBB})
@@ -87,8 +88,8 @@ if(NANOVDB_USE_CUDA)
 endif()
 
 if(NANOVDB_USE_OPENVDB)
-  if(NOT OPENVDB_BUILD_CORE)
-    find_package(OpenVDB REQUIRED)
+  if(NOT OPENVDB_BUILD_CORE AND NOT TARGET OpenVDB::openvdb)
+    find_package(OpenVDB REQUIRED COMPONENTS openvdb)
     # disable the shared libs that OpenVDB's cmake switches ON.
     set(BUILD_SHARED_LIBS OFF)
   endif()

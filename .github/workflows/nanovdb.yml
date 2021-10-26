@@ -73,6 +73,7 @@ jobs:
           sudo ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+          --cargs=\'-DNANOVDB_USE_CUDA=ON -DNANOVDB_USE_OPENVDB=ON\'
       - name: test
         run: cd build && sudo ctest -V
 
@@ -118,7 +119,11 @@ jobs:
         ./ci/build.sh -v
         --config=Release
         --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-        --cargs=\'${{ matrix.config.cmake }} -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+        --cargs=\'${{ matrix.config.cmake }}
+        -DNANOVDB_USE_CUDA=ON
+        -DNANOVDB_USE_OPENVDB=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
     - name: test
       shell: bash
       run: cd build && ctest -V
