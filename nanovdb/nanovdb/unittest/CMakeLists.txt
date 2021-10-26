@@ -33,7 +33,7 @@ endif()
 
 # -----------------------------------------------------------------------------
 
-add_executable(nanovdb_test_nanovdb "TestNanoVDB.cpp")
+add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
 target_link_libraries(nanovdb_test_nanovdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_unit_test nanovdb_test_nanovdb)
 
@@ -44,7 +44,7 @@ if(NOT (NANOVDB_USE_TBB AND NANOVDB_USE_OPENVDB))
   return()
 endif()
 
-add_executable(nanovdb_test_openvdb "TestOpenVDB.cpp")
+add_executable(nanovdb_test_openvdb "TestOpenVDB.cc")
 target_link_libraries(nanovdb_test_openvdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_openvdb_unit_test nanovdb_test_openvdb)
 
