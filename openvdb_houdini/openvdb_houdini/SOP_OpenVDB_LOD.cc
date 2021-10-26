@@ -212,7 +212,7 @@ struct MultiResGridFractionalOp
 template<openvdb::Index Order>
 struct MultiResGridRangeOp
 {
-    MultiResGridRangeOp(float start_, float end_, float step_, hvdb::Interrupter& boss_)
+    MultiResGridRangeOp(float start_, float end_, float step_, openvdb::util::NullInterrupter& boss_)
         : start(start_), end(end_), step(step_), outputGrids(), boss(&boss_)
     {}
 
@@ -249,7 +249,7 @@ struct MultiResGridRangeOp
     }
     const float start, end, step;
     std::vector<hvdb::GridPtr> outputGrids;
-    hvdb::Interrupter * const boss;
+    openvdb::util::NullInterrupter * const boss;
 };
 
 struct MultiResGridIntegerOp
@@ -308,7 +308,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
 
         std::vector<std::string> skipped;
 
-        hvdb::Interrupter boss("Creating VDB LoD pyramid");
+        hvdb::HoudiniInterrupter boss("Creating VDB LoD pyramid");
         GA_RWHandleS name_h(gdp, GA_ATTRIB_PRIMITIVE, "name");
 
         const auto lodMode = evalInt("lod", 0, 0);
@@ -351,7 +351,7 @@ SOP_OpenVDB_LOD::Cache::cookVDBSop(OP_Context& context)
                 return error();
             }
 
-            MultiResGridRangeOp<1> op( start, end, step, boss );
+            MultiResGridRangeOp<1> op( start, end, step, boss.interrupter() );
             for (hvdb::VdbPrimIterator it(gdp, group); it; ++it) {
 
                 if (boss.wasInterrupted()) return error();

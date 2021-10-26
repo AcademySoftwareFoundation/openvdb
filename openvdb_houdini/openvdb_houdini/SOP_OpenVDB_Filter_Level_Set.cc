@@ -335,7 +335,7 @@ public:
         OP_ERROR cookVDBSop(OP_Context&) override;
 
     private:
-        using BossT = hvdb::Interrupter;
+        using BossT = openvdb::util::NullInterrupter;
 
         OP_ERROR evalFilterParms(OP_Context&, FilterParms&);
 
@@ -807,7 +807,7 @@ SOP_OpenVDB_Filter_Level_Set::Cache::cookVDBSop(
     OP_Context& context)
 {
     try {
-        BossT boss("Processing level sets");
+        hvdb::HoudiniInterrupter boss("Processing level sets");
 
         const fpreal time = context.getTime();
 
@@ -838,13 +838,13 @@ SOP_OpenVDB_Filter_Level_Set::Cache::cookVDBSop(
             // Appply filters
 
             bool wasFiltered = applyFilters<openvdb::FloatGrid>(
-                *it, filterParms, boss, context, *gdp, verbose);
+                *it, filterParms, boss.interrupter(), context, *gdp, verbose);
 
             if (boss.wasInterrupted()) break;
 
             if (!wasFiltered) {
                 wasFiltered = applyFilters<openvdb::DoubleGrid>(
-                    *it, filterParms, boss, context, *gdp, verbose);
+                    *it, filterParms, boss.interrupter(), context, *gdp, verbose);
             }
 
             if (boss.wasInterrupted()) break;

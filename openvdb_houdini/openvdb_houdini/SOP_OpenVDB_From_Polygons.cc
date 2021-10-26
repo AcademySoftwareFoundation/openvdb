@@ -735,7 +735,7 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Converting geometry to volume");
+        hvdb::HoudiniInterrupter boss("Converting geometry to volume");
 
         //////////
         // Validate the input
@@ -750,7 +750,7 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
 
         // Validate geometry
         std::string warningStr;
-        auto geoPtr = hvdb::convertGeometry(*inputGdp, warningStr, &boss);
+        auto geoPtr = hvdb::convertGeometry(*inputGdp, warningStr, &boss.interrupter());
         if (geoPtr) {
             inputGdp = geoPtr.get();
             if (!warningStr.empty()) addWarning(SOP_MESSAGE, warningStr.c_str());
@@ -880,7 +880,7 @@ SOP_OpenVDB_From_Polygons::Cache::cookVDBSop(OP_Context& context)
         }
 
         openvdb::FloatGrid::Ptr grid = openvdb::tools::meshToVolume<openvdb::FloatGrid>(
-            boss, mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
+            boss.interrupter(), mesh, *transform, exBand, inBand, conversionFlags, primitiveIndexGrid.get());
 
         //////////
         // Output

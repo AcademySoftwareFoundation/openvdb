@@ -37,7 +37,7 @@ namespace
 
 struct SegmentActiveVoxels
 {
-    SegmentActiveVoxels(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter&)
+    SegmentActiveVoxels(GU_Detail& geo, bool visualize, bool appendNumber, openvdb::util::NullInterrupter&)
         : mGeoPt(&geo)
         , mVisualize(visualize)
         , mAppendNumber(appendNumber)
@@ -90,7 +90,7 @@ private:
 
 struct SegmentSDF
 {
-    SegmentSDF(GU_Detail& geo, bool visualize, bool appendNumber, hvdb::Interrupter&)
+    SegmentSDF(GU_Detail& geo, bool visualize, bool appendNumber, openvdb::util::NullInterrupter&)
         : mGeoPt(&geo)
         , mVisualize(visualize)
         , mAppendNumber(appendNumber)
@@ -262,7 +262,7 @@ SOP_OpenVDB_Segment::Cache::cookVDBSop(OP_Context& context)
         const GU_Detail* inputGeoPt = inputGeo(0);
         const GA_PrimitiveGroup *group = nullptr;
 
-        hvdb::Interrupter boss("Segmenting VDBs");
+        hvdb::HoudiniInterrupter boss("Segmenting VDBs");
 
         {
             UT_String str;
@@ -281,8 +281,8 @@ SOP_OpenVDB_Segment::Cache::cookVDBSop(OP_Context& context)
         bool visualize = bool(evalInt("colorsegments", 0, time));
         bool appendNumber = bool(evalInt("appendnumber", 0, time));
 
-        SegmentActiveVoxels segmentActiveVoxels(*gdp, visualize, appendNumber, boss);
-        SegmentSDF segmentSDF(*gdp, visualize, appendNumber, boss);
+        SegmentActiveVoxels segmentActiveVoxels(*gdp, visualize, appendNumber, boss.interrupter());
+        SegmentSDF segmentSDF(*gdp, visualize, appendNumber, boss.interrupter());
 
         for (; vdbIt; ++vdbIt) {
 

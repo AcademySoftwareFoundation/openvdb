@@ -293,14 +293,14 @@ struct MergeOp
     using StringRemapType = std::unordered_map<std::string, std::string>;
 
     SOP_OpenVDB_Merge::Cache* self;
-    hvdb::Interrupter& interrupt;
+    openvdb::util::NullInterrupter& interrupt;
     StringRemapType opRemap;
     std::deque<GU_PrimVDB*> vdbPrims;
     std::deque<const GU_PrimVDB*> constVdbPrims;
     std::deque<GU_PrimVDB*> vdbPrimsToRemove;
     PrimitiveNumberMap primNumbers;
 
-    explicit MergeOp(hvdb::Interrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
+    explicit MergeOp(openvdb::util::NullInterrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
 
     inline std::string getOp(const MergeKey& key) const
     {
@@ -626,9 +626,9 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
         if (collation == "name")                    collationKey = MergeKey::NameClassType;
         else if (collation == "primitive_number")   collationKey = MergeKey::NumberClassType;
 
-        hvdb::Interrupter boss("Merging VDBs");
+        hvdb::HoudiniInterrupter boss("Merging VDBs");
 
-        MergeOp mergeOp(boss);
+        MergeOp mergeOp(boss.interrupter());
         mergeOp.self = this;
         mergeOp.opRemap["op_sdf"] = evalStdString("op_sdf", mTime);
         mergeOp.opRemap["op_fog"] = evalStdString("op_fog", mTime);

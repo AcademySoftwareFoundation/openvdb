@@ -231,7 +231,6 @@ set(MINIMUM_CXX_STANDARD 14)
 
 # @note  Blosc version is currently treated as exception which must be adhered
 # to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
-# Later versions (including 1.5.4), can be buggy on certain platforms.
 set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
@@ -276,6 +275,7 @@ set(FUTURE_MINIMUM_ICC_VERSION 19)
 # set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
 # set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
 set(FUTURE_MINIMUM_BOOST_VERSION 1.73)
+set(FUTURE_MINIMUM_BLOSC_VERSION 1.17.0)
 set(FUTURE_MINIMUM_TBB_VERSION 2020.2)
 set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
 set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
