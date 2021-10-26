@@ -22,10 +22,10 @@ message(STATUS "----------------------------------------------------")
 # add options
 ###############################################################################
 
+option(NANOVDB_BUILD_TOOLS "Build command-line tools" ON)
 option(NANOVDB_BUILD_UNITTESTS "Build Unit tests" OFF)
 option(NANOVDB_BUILD_EXAMPLES "Build examples" OFF)
 option(NANOVDB_BUILD_BENCHMARK "Build benchmark in examples" OFF)
-option(NANOVDB_BUILD_TOOLS "Build command-line tools" OFF)
 
 option(NANOVDB_USE_INTRINSICS "Build with hardware intrinsics support" OFF)
 option(NANOVDB_USE_CUDA "Build with CUDA support" OFF)
