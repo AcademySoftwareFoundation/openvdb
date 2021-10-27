@@ -3,8 +3,31 @@ OpenVDB Version History
 
 Version 9.0.0 - In development
 
+    Improvements:
+    - Added PNG support to vdb_render which can be enabled with during CMake
+      with -DUSE_PNG=ON.
+
     ABI changes:
     - Added transient data to the RootNode, InternalNode and LeafNode.
+
+    API changes:
+    - StringGrid and StringTrees are deprecated.
+    - The NullInterrupter is now a virtual base class to help reduce
+      compile-time instantiation cost.
+
+    Houdini:
+    - A new HoudiniInterrupter has been added that derives from the
+      NullInterrupter and the Interrupter is now deprecated. All the SOPs have
+      been updated to use the new HoudiniInterrupter.
+
+    Build:
+    - As of this release, VFX Reference Platform 2019 is no longer supported.
+      CMake now issues deprecation warnings for 2020 VFX Reference Platform
+      version dependencies.
+    - Build fixes for OpenVDB AX with C++17 and greater
+    - Bumped the new blosc version future minimum to 1.17.0
+    - OpenEXR is now optional for vdb_render. It can be enabled with
+      -DUSE_EXR=ON.
 
 
 Version 8.2.0 - In development

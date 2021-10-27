@@ -42,17 +42,7 @@ The following provides basic installation examples for the core OpenVDB library.
 apt-get install -y libboost-iostreams-dev
 apt-get install -y libboost-system-dev
 apt-get install -y libtbb-dev
-```
-```
-git clone git@github.com:Blosc/c-blosc.git
-cd c-blosc
-git checkout tags/v1.5.0 -b v1.5.0
-mkdir build
-cd build
-cmake ..
-make -j4
-make install
-cd ../..
+apt-get install -y libblosc-dev
 ```
 
 ##### Building OpenVDB
@@ -70,17 +60,7 @@ make install
 ```
 brew install boost
 brew install tbb
-```
-```
-git clone git@github.com:Blosc/c-blosc.git
-cd c-blosc
-git checkout tags/v1.5.0 -b v1.5.0
-mkdir build
-cd build
-cmake ..
-make -j4
-make install
-cd ../..
+brew install c-blosc
 ```
 ##### Building OpenVDB
 ```

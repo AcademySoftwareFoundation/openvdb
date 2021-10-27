@@ -158,12 +158,24 @@ endif()
 if(USE_BLOSC)
   # Find Blosc libraries
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-  if(Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION)
-    message(WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
-      "There have been reported issues with using later versions of Blosc with OpenVDB. "
-      "OpenVDB has been tested fully against Blosc ${MINIMUM_BLOSC_VERSION}, it is "
-      "recommended that you use this version where possible."
-    )
+  if(Blosc_VERSION)
+    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BLOSC_VERSION)
+      if(${Blosc_VERSION} VERSION_LESS FUTURE_MINIMUM_BLOSC_VERSION)
+        message(DEPRECATION "Support for Blosc versions < ${FUTURE_MINIMUM_BLOSC_VERSION} "
+          "is deprecated and will be removed.")
+      endif()
+    endif()
+    # Print a warning if using of the blosc versions with regression issues
+    # with Blosc 1.5.0 caches.
+    if((Blosc_VERSION VERSION_GREATER_EQUAL 1.11.0 AND
+        Blosc_VERSION VERSION_LESS 1.14.0) OR
+       (Blosc_VERSION VERSION_GREATER_EQUAL 1.16.0 AND
+        Blosc_VERSION VERSION_LESS 1.16.2))
+      message(WARNING "The following Blosc versions are incompatible with the "
+        "recommended builds of OpenVDB: [1.11.0 -> 1.14.0) [1.16.0, 1.16.1]. "
+        "Found Blosc version '${Blosc_VERSION}' which falls in this range. We "
+        "strongly recommend using the new future minimum version '${FUTURE_MINIMUM_BLOSC_VERSION}'")
+    endif()
   endif()
 else()
   message(WARNING "Blosc support is disabled. It is strongly recommended to "

@@ -73,7 +73,7 @@ Python         | 2.7     | 2.7         | The python interpreter and libraries fo
 NumPy          | 1.14.0  | 1.14.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.8     | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
-Blosc          | 1.5.0   | 1.5.0       | Recommended dependency for improved disk compression              | N       | N*       | https://github.com/Blosc/c-blosc/releases
+Blosc          | 1.5.0*  | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
 GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
@@ -81,8 +81,7 @@ OpenGL         | 3.2     | Latest      | Environment for developing portable gra
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 
- - @b * Blosc 1.16 is only available through Homebrew and currently requires
- [manual](@ref depManInstall) installation for 1.5.
+ - @b * See the note in [known issues](@ref depKnownIssues) regarding supported blosc versions.
 
  - @b ** IlmBase/OpenEXR 2.2 is supported as Houdini 18.0 is shipped with
  VFX Reference Platform 2019, except for using older versions of these
@@ -101,11 +100,22 @@ Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++      
 RuntimeError: FATAL: module compiled as little endian, but detected different endianness at runtime.
 @endcode
 
- - @b Blosc: OpenVDB currently uses a very old version of blosc (v1.5.0). This
- is due to issues with compatibility between certain blosc versions. You can
- [read more about this problem here.](https://www.blosc.org/posts/new-forward-compat-policy/)
- Using blosc versions equal to or later than 1.14.0 should be forwards
- compatible but this remains untested.
+ - @b Blosc: OpenVDB has historically used an old version of blosc (1.5.0) to
+ serialize .vdb files. OpenVDB is moving to a new blosc version minimum of 1.17.0.
+ We have tested a range of blosc versions and found that the following versions
+ are NOT compatible with OpenVDB caches written using blosc 1.5.0. Additionally
+ these versions of blosc may generally not be compatible with OpenVDB itself.
+ Avoid using these versions and upgrade to the new minimum of 1.17.0 where
+ possible.
+
+ - All versions from 1.11.0 through to, but excluding, 1.14.0.
+ - Versions 1.16.0 and 1.16.1.
+
+ For more information see:
+
+ - https://www.blosc.org/posts/new-forward-compat-policy/
+ - https://github.com/Blosc/c-blosc/issues/260
+ - https://github.com/Blosc/c-blosc/issues/261
 
 @section depInstallingDependencies Installing Dependencies
 
@@ -114,9 +124,8 @@ required OpenVDB dependencies.
 
 @subsection depUsingAptGet Using UNIX apt-get
 
-@b Note: Blosc and CppUnit are unavailable using apt-get. See the other
-package manager methods or the [manual installation](@ref depManInstall)
-options.
+@b Note:CppUnit is unavailable using apt-get. See the other package manager
+methods or the [manual installation](@ref depManInstall) options.
 
 @code{.sh}
 #!/bin/bash
@@ -126,6 +135,7 @@ apt-get install libtbb-dev              # TBB
 apt-get install zlibc                   # zlib
 apt-get install libboost-system-dev     # Boost::system
 apt-get install libboost-iostreams-dev  # Boost::iostream
+apt-get install libblosc-dev            # Blosc
 # AX
 apt-get install llvm-8-dev              # LLVM
 # Python
@@ -150,11 +160,6 @@ apt-get install doxygen                 # doxygen
 [Homebrew](https://brew.sh/) is a package manager for UNIX systems and is
 an alternative to apt-get or manual installation from source.
 
-@b Note: Homebrew installs blosc 1.16 by default with no option for previous
-versions. OpenVDB recommends Blosc version 1.5 as there are known issues with
-using later versions of blosc. See the
-[manual installation](@ref depManInstall) options.
-
 @code{.sh}
 #!/bin/bash
 # Core library
@@ -162,6 +167,7 @@ brew install cmake                     # CMake
 brew install tbb                       # TBB
 brew install zlib                      # zlib
 brew install boost                     # Boost
+brew install c-blosc                   # blosc
 # AX
 brew install llvm                      # LLVM
 # Python
@@ -187,21 +193,6 @@ Some dependencies may be unavailable using the above package manager methods.
 Below are manual installation methods for these packages. Note that you will
 have to provide your chosen installation locations to the OpenVDB CMake build
 system when building OpenVDB.
-
-@b Blosc
-
-@code{.sh}
-#!/bin/bash
-wget https://github.com/Blosc/c-blosc/archive/v1.5.0.zip
-unzip v1.5.0.zip
-cd c-blosc-1.5.0
-# Install to users home directory - you may customise this location
-mkdir -p $HOME/blosc
-# Requires CMake
-cmake -DCMAKE_INSTALL_PREFIX=$HOME/blosc
-make
-make install
-@endcode
 
 @b CppUnit (for AX Unit Tests)
 
