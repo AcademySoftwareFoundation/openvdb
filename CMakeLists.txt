@@ -73,7 +73,7 @@ option(OPENVDB_BUILD_DOCS "Build the OpenVDB documentation" OFF)
 option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 
-option(OPENVDB_BUILD_AX "Build the OpenVDB AX library" OFF)
+option(OPENVDB_BUILD_AX "Build the OpenVDB AX library. Turns ON if USE_AX is ON." ${USE_AX})
 option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
@@ -83,6 +83,7 @@ option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 cmake_dependent_option(OPENVDB_INSTALL_CMAKE_MODULES
   "Install the provided OpenVDB CMake modules when building the core library"
   ON "OPENVDB_BUILD_CORE" OFF)
+
 option(USE_HOUDINI [=[
 Build the library against a Houdini installation. Turns on automatically if OPENVDB_BUILD_HOUDINI_PLUGIN is enabled.
 When enabled, you do not need to provide dependency locations for TBB, Blosc, IlmBase and OpenEXR. Boost must be
@@ -110,6 +111,8 @@ by OpenVDB is used. If OPENVDB_BUILD_CORE is OFF, CMake attempts to query the lo
 to select the correct half support. You may set this to on to force Imath half to be used if you know it to be
 required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
+option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
+
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
 option(USE_CCACHE "Build using Ccache if found on the path" ON)
@@ -173,6 +176,17 @@ endif()
 
 if(USE_BLOSC AND NOT USE_ZLIB)
   message(WARNING "ZLib can only be disabled if Blosc is also disabled. Enabling ZLib.")
+endif()
+
+if(USE_AX)
+  if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
+    message(FATAL_ERROR "Invalid CMake build configuration:
+      OPENVDB_BUILD_CORE: [ON]
+      OPENVDB_BUILD_AX:   [OFF]
+      USE_AX:             [ON]
+    If you are rebuilding the core library and using sub components, building
+    these sub components must also be enabled (i.e. -DOPENVDB_BUILD_AX=ON).")
+  endif()
 endif()
 
 # Top-level location for all openvdb headers
@@ -659,7 +673,8 @@ message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 
 if(NOT OPENVDB_BUILD_AX AND
    (OPENVDB_BUILD_AX_BINARIES OR
-    OPENVDB_BUILD_AX_UNITTESTS))
+    OPENVDB_BUILD_AX_UNITTESTS OR
+    USE_AX))
   find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
 endif()
 
