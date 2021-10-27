@@ -171,7 +171,7 @@ private:
 }; // struct ComputeNeumannVelocityOp
 
 
-// initalizes the boundary conditions for use in the Poisson Solver
+// initializes the boundary conditions for use in the Poisson Solver
 template<typename Vec3GridT, typename MaskT>
 struct SolveBoundaryOp
 {

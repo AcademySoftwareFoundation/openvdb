@@ -110,7 +110,7 @@ public:
     /// layer at a time. Normally we recommend using the resize method below
     /// which internally calls dilate (or erode) with the correct
     /// number of @a iterations to achieve the desired half voxel width
-    /// of the narrow band (3 is recomended for most level set applications).
+    /// of the narrow band (3 is recommended for most level set applications).
     ///
     /// @note Since many level set applications perform
     /// interface-tracking, which in turn rebuilds the narrow-band
