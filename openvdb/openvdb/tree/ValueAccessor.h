@@ -154,7 +154,7 @@ protected:
 /// @param _TreeType    the type of the tree to be accessed [required]
 /// @param IsSafe       if IsSafe = false then the ValueAccessor will
 ///                     not register itself with the tree from which
-///                     it is consturcted (see warning).
+///                     it is constructed (see warning).
 /// @param CacheLevels  the number of nodes to be cached, starting from the leaf level
 ///                     and not including the root (i.e., CacheLevels < DEPTH),
 ///                     and defaulting to all non-root nodes
@@ -1235,7 +1235,7 @@ public:
     /// Return the number of cache levels employed by this ValueAccessor
     static Index numCacheLevels() { return 1; }
 
-    /// Asignment operator
+    /// Assignment operator
     ValueAccessor1& operator=(const ValueAccessor1& other)
     {
         if (&other != this) {
@@ -1612,7 +1612,7 @@ public:
     /// Return the number of cache levels employed by this ValueAccessor
     static Index numCacheLevels() { return 2; }
 
-    /// Asignment operator
+    /// Assignment operator
     ValueAccessor2& operator=(const ValueAccessor2& other)
     {
         if (&other != this) {
@@ -2101,7 +2101,7 @@ public:
     /// Copy constructor
     ValueAccessor3(const ValueAccessor3& other) : BaseT(other) { this->copy(other); }
 
-    /// Asignment operator
+    /// Assignment operator
     ValueAccessor3& operator=(const ValueAccessor3& other)
     {
         if (&other != this) {

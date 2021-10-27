@@ -247,7 +247,7 @@ public:
     /// @return The level of this node
     /// @details Level 0 is by definition the level of the leaf nodes
     static Index getLevel() { return LEVEL; }
-    /// @brief Populated an stil::vector with the dimension of all the
+    /// @brief Populated an std::vector with the dimension of all the
     /// nodes in the branch starting with this node.
     static void getNodeLog2Dims(std::vector<Index>& dims);
     /// @return The dimension of the child nodes of this node.
@@ -320,7 +320,7 @@ public:
     /// @param state     Is updated with the state of all values IF method
     ///                  returns @c true. Else the value is undefined!
     /// @param tolerance The tolerance used to determine if values are
-    ///                  approximatly constant.
+    ///                  approximately constant.
     ///
     /// @note This method also returns @c false if this node contains any child nodes.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
@@ -534,7 +534,7 @@ public:
     ///
     /// @note This operation can delete branches in this grid if they
     /// overlap with inactive tiles in the other grid. Likewise active
-    /// voxels can be turned into unactive voxels resulting in leaf
+    /// voxels can be turned into inactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
     /// subsequently call prune.
     template<typename OtherChildNodeType>
@@ -551,7 +551,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherChildNodeType>
     void topologyDifference(const InternalNode<OtherChildNodeType, Log2Dim>& other,
                             const ValueType& background);
@@ -572,7 +572,7 @@ public:
     /// information for all active tiles and leaf nodes in this node.
     /// An additional level argument is provided for each callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
