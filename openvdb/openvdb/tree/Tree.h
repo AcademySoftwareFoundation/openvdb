@@ -701,7 +701,7 @@ public:
     ///
     /// @note This operation can delete branches in this grid if they
     /// overlap with inactive tiles in the other grid. Likewise active
-    /// voxels can be turned into unactive voxels resulting in leaf
+    /// voxels can be turned into inactive voxels resulting in leaf
     /// nodes with no active values. Thus, it is recommended to
     /// subsequently call tools::pruneInactive.
     template<typename OtherRootNodeType>
