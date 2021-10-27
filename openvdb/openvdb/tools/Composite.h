@@ -603,7 +603,7 @@ template <typename LeafT>
 using LeafPairList = std::vector<std::pair<LeafT*, LeafT*>>;
 
 /// Transfers leaf nodes from a source tree into a
-/// desitnation tree, unless it already exists in the destination tree
+/// destination tree, unless it already exists in the destination tree
 /// in which case pointers to both leaf nodes are added to a list for
 /// subsequent compositing operations.
 template <typename TreeT>
@@ -626,7 +626,7 @@ inline void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
     }
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<
@@ -652,7 +652,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
    });
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<
@@ -673,7 +673,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT)
     });
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<

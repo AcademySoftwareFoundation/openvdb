@@ -692,7 +692,7 @@ struct MultiResGrid<TreeType>::MaskOp
         // Create Mask of restruction performed on fineTree
         MaskT mask(fineTree, false, true, TopologyCopy() );
 
-        // Muli-threaded dilation which also linearizes the tree to leaf nodes
+        // Multi-threaded dilation which also linearizes the tree to leaf nodes
         tools::dilateActiveValues(mask, 1, NN_FACE_EDGE_VERTEX, EXPAND_TILES);
 
         // Restriction by injection using thread-local storage of coarse tree masks

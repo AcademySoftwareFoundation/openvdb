@@ -36,7 +36,7 @@ namespace tools {
 namespace Scheme {
     /// @brief Numerical advections schemes.
     enum SemiLagrangian { SEMI, MID, RK3, RK4, MAC, BFECC };
-    /// @brief Flux-limiters employed to stabalize the second-order
+    /// @brief Flux-limiters employed to stabilize the second-order
     /// advection schemes MacCormack and BFECC.
     enum Limiter { NO_LIMITER, CLAMP, REVERT };
 }
@@ -49,7 +49,7 @@ namespace Scheme {
 ///
 /// @note  Optionally a limiter can be combined with the higher-order
 ///        integration schemes MacCormack and BFECC. There are two
-///        types of limiters (CLAMP and REVERT) that supress
+///        types of limiters (CLAMP and REVERT) that suppress
 ///        non-physical oscillations by means of either claminging or
 ///        reverting to a first-order schemes when the function is not
 ///        bounded by the cell values used for tri-linear interpolation.
@@ -201,7 +201,7 @@ public:
     ///
     /// @warning If the VolumeSamplerT is of higher order than one
     ///          (i.e. tri-linear interpolation) instabilities are
-    ///          known to occure. To suppress those monotonicity
+    ///          known to occur. To suppress those monotonicity
     ///          constrains or flux-limiters need to be applies.
     ///
     /// @throw RuntimeError if @a inGrid does not have uniform voxels.
@@ -246,7 +246,7 @@ public:
     ///
     /// @warning If the VolumeSamplerT is of higher order the one
     ///          (i.e. tri-linear interpolation) instabilities are
-    ///          known to occure. To suppress those monotonicity
+    ///          known to occur. To suppress those monotonicity
     ///          constrains or flux-limiters need to be applies.
     ///
     /// @throw RuntimeError if @a inGrid is not aligned with @a mask

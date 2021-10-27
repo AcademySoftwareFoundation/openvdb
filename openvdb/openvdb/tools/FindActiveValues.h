@@ -224,7 +224,7 @@ private:
 
     AccT mAcc;
     std::vector<TileDataT> mRootTiles;// cache bbox of child nodes (faster to cache than access RootNode)
-    std::vector<RootChild> mRootNodes;// cache bbox of acive tiles (faster to cache than access RootNode)
+    std::vector<RootChild> mRootNodes;// cache bbox of active tiles (faster to cache than access RootNode)
 
 };// FindActiveValues class
 
@@ -619,7 +619,7 @@ struct TileData
     /// @brief Constructor from a parent node and the linear offset to one of its tiles
     ///
     /// @warning This is an expert-only method since it assumes the linear offset to be valid,
-    ///          i.e. within the rand of the dimention of the parent node and NOT corresponding
+    ///          i.e. within the rand of the dimension of the parent node and NOT corresponding
     ///          to a child node.
     template <typename ParentNodeT>
     TileData(const ParentNodeT &parent, Index childIdx)

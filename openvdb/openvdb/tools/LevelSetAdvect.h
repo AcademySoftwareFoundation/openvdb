@@ -136,7 +136,7 @@ public:
     size_t advect(ValueType time0, ValueType time1);
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetAdvection(const LevelSetAdvection&);// not implemented
     LevelSetAdvection& operator=(const LevelSetAdvection&);// not implemented
 

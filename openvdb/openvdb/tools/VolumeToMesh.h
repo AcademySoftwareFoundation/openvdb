@@ -205,7 +205,7 @@ struct VolumeToMesh
     ///         subsequent fragments.)
     ///
     /// @note   Attributes from the original asset such as uv coordinates, normals etc.
-    ///         are typically transfered to polygons that are marked with the
+    ///         are typically transferred to polygons that are marked with the
     ///         @c POLYFLAG_EXTERIOR flag. Polygons that are not marked with this flag
     ///         are interior to reference surface and might need projected UV coordinates
     ///         or a different material. Polygons marked as @c POLYFLAG_FRACTURE_SEAM can
