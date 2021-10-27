@@ -10,6 +10,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
+#include <openvdb/math/Stats.h>
 #include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMaxValues()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
@@ -361,7 +362,7 @@ public:
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
-    void evalMinMax(ValueType &min, ValueType &max) const { tools::minMaxValues(*this, min, max); }
+    void evalMinMax(ValueType &min, ValueType &max) const;
 
     Index64 memUsage() const override { return tools::memUsage(*this); }
 
@@ -2018,6 +2019,17 @@ Tree<RootNodeType>::evalLeafDim(Coord& dim) const
     bool notEmpty = this->evalLeafBoundingBox(bbox);
     dim = bbox.extents();
     return notEmpty;
+}
+
+
+template<typename RootNodeType>
+inline void
+Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
+{
+    const math::MinMax<ValueType> minmax = tools::minMax(*this);
+    
+    minVal = minmax.min();
+    maxVal = minmax.max();
 }
 
 
