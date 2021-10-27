@@ -44,17 +44,31 @@ if(NANOVDB_USE_CUDA)
   add_executable(benchmark_nano Benchmark_nano.cc BenchKernels_nano.cu)
   add_executable(benchmark_dense Benchmark_dense.cc BenchKernels_dense.cu)
 
-  target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY})
-  target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY})
+  target_link_libraries(benchmark_nano PRIVATE nanovdb)
+  target_link_libraries(benchmark_dense PRIVATE nanovdb)
 
-  target_link_libraries(benchmark_nano PRIVATE nanovdb ${CUDA_LIBRARIES})
-  target_link_libraries(benchmark_dense PRIVATE nanovdb ${CUDA_LIBRARIES})
+  # Propagate MSVC Runtime from the OpenVDB library (if VDB_MSVC_RUNTIME_SELECTION
+  # has been set then we're building and linking against OpenVDB, see the root
+  # NanoVDB CMakeLists.txt)
+  if(VDB_MSVC_RUNTIME_SELECTION)
+    set_target_properties(benchmark_nano PROPERTIES
+      MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+    set_target_properties(benchmark_dense PROPERTIES
+      MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+  endif()
 endif()
 
 # -----------------------------------------------------------------------
 
 add_executable(benchmark ${BENCHMARK_SOURCES})
-target_include_directories(benchmark PUBLIC ${CUDA_INCLUDE_DIRECTORY})
 target_link_libraries(benchmark PRIVATE nanovdb GTest::GTest GTest::Main)
+
+# Propagate MSVC Runtime from the OpenVDB library (if VDB_MSVC_RUNTIME_SELECTION
+# has been set then we're building and linking against OpenVDB, see the root
+# NanoVDB CMakeLists.txt)
+if(VDB_MSVC_RUNTIME_SELECTION)
+  set_target_properties(benchmark PROPERTIES
+    MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+endif()
 
 install(TARGETS benchmark DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)

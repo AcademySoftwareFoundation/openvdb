@@ -67,6 +67,14 @@ function(NANOVDB_EXAMPLE)
     ${EXAMPLE_SOURCE_CUDA_FILES}
     ${EXAMPLE_HEADER_FILES})
 
+  # Propagate MSVC Runtime from the OpenVDB library (if VDB_MSVC_RUNTIME_SELECTION
+  # has been set then we're building and linking against OpenVDB, see the root
+  # NanoVDB CMakeLists.txt)
+  if(VDB_MSVC_RUNTIME_SELECTION)
+    set_target_properties(${EXAMPLE_NAME} PROPERTIES
+      MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+  endif()
+
   target_include_directories(${EXAMPLE_NAME} PUBLIC ex_util)
   target_link_libraries(${EXAMPLE_NAME} PRIVATE nanovdb)
 

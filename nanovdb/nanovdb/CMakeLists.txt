@@ -117,6 +117,16 @@ if(NANOVDB_USE_CUDA)
           " --source-in-ptx --keep ${CMAKE_CUDA_FLAGS_RELEASE}")
     endif()
   endif()
+
+  if(MSVC)
+    # If a CMAKE_MSVC_RUNTIME_LIBRARY has not been provided and we're building
+    # against openvdb, match the CRT that openvdb has been built against. This
+    # setting is automatically propagated to CXX files but not CUDA sources, so
+    # the VDB_MSVC_RUNTIME_SELECTION variables is used on targets with .cu files
+    if(NOT CMAKE_MSVC_RUNTIME_LIBRARY AND NANOVDB_USE_OPENVDB AND OPENVDB_BUILD_CORE)
+      get_target_property(VDB_MSVC_RUNTIME_SELECTION openvdb MSVC_RUNTIME_LIBRARY)
+    endif()
+  endif()
 endif()
 
 if(NANOVDB_USE_OPENVDB)
