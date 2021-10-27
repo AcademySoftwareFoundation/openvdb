@@ -430,12 +430,11 @@ unset(_OPENVDB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES)
 #  Cache and set OPENVDB_FOUND
 # ------------------------------------------------------------------------
 include(FindPackageHandleStandardArgs)
-# nanovdb is headers-only, no lib component
 find_package_handle_standard_args(OpenVDB
   FOUND_VAR OpenVDB_FOUND
   REQUIRED_VARS
     OpenVDB_INCLUDE_DIR
-    # OpenVDB_LIB_COMPONENTS
+    OpenVDB_LIB_COMPONENTS
   VERSION_VAR OpenVDB_VERSION
   HANDLE_COMPONENTS
 )
