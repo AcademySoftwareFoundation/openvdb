@@ -34,7 +34,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: 'The type of CI to run (all, linux, win)'
+        description: 'The type of CI to run (all, linux, win, mac)'
         required: true
         default: 'all'
 
@@ -128,26 +128,32 @@ jobs:
       shell: bash
       run: cd build && ctest -V
 
-#  macos-nanovdb:
-#    if: |
-#      github.event_name != 'workflow_dispatch' ||
-#      github.event.inputs.type == 'all' ||
-#      github.event.inputs.type == 'mac'
-#    runs-on: macos-latest
-#    env:
-#      CXX: clang++
-#    steps:
-#      - uses: actions/checkout@v2
-#      - name: install_deps
-#        run: ./ci/install_macos.sh
-#      - name: install_cuda
-#        run: |
-#          brew tap homebrew/cask-drivers
-#          brew install nvidia-cuda-toolkit
-#      - name: build
-#        run: >
-#          ./ci/build.sh -v
-#          --build-type=Release
-#          --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-#      - name: test
-#        run: cd build && ctest -V
+  macos-nanovdb:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'mac'
+    runs-on: ${{ matrix.config.runner }}
+    env:
+      CXX: ${{ matrix.config.cxx }}
+    strategy:
+      matrix:
+        config:
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Debug'   }
+      fail-fast: false
+    steps:
+      - uses: actions/checkout@v2
+      - name: install_deps
+        run: ./ci/install_macos.sh
+      - name: install
+        shell: bash
+        run: ./ci/install_blosc.sh 1.5.0
+      - name: build
+        run: >
+          ./ci/build.sh -v
+          --build-type=${{ matrix.config.build }}
+          --components=core,nano,nanotest,nanoexam,nanobench,nanotool
+          --cargs=\'-DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
+      - name: test
+        run: cd build && ctest -V
