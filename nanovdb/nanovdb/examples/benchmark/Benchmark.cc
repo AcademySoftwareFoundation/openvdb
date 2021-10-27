@@ -661,7 +661,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
 #if defined(NANOVDB_USE_OPENVDB)
     auto handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
 #else
-    auto handle = nanovdb::createLevelSetTorus<float, BufferT>(100.0f, 50.0f);
+    auto handle = nanovdb::createLevelSetTorus<float, float, BufferT>(100.0f, 50.0f);
 #endif
     //auto        handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
     const auto* grid = handle.grid<float>();
