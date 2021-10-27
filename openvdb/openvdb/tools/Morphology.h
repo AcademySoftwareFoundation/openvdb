@@ -24,6 +24,7 @@
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/tree/LeafManager.h"
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>

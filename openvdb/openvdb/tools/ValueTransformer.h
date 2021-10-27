@@ -700,22 +700,22 @@ accumulate(const IterT& iter, XformOp& op, bool threaded)
 
 #define _FUNCTION(TreeT) \
     void setValueOnMin(TreeT&, const Coord&, const TreeT::ValueType&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void setValueOnMax(TreeT&, const Coord&, const TreeT::ValueType&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void setValueOnSum(TreeT&, const Coord&, const TreeT::ValueType&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void setValueOnMult(TreeT&, const Coord&, const TreeT::ValueType&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION

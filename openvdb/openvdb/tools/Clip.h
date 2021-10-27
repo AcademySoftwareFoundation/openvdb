@@ -13,6 +13,7 @@
 #include <openvdb/math/Math.h> // for math::isNegative()
 #include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/points/PointDataGrid.h>
 #include "GridTransformer.h" // for tools::resampleToMatch()
 #include "Prune.h"
 #include <tbb/blocked_range.h>

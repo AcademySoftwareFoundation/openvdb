@@ -715,32 +715,32 @@ activeTiles(const TreeT& tree, const CoordBBox &bbox)
 
 #define _FUNCTION(TreeT) \
     bool anyActiveValues(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     bool anyActiveVoxels(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     bool anyActiveTiles(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     bool noActiveValues(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     Index64 countActiveValues(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     std::vector<TileData<TreeT::ValueType>> activeTiles(const TreeT&, const CoordBBox&)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION

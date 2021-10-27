@@ -408,22 +408,22 @@ pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 
 #define _FUNCTION(TreeT) \
     void prune(TreeT&, TreeT::ValueType, bool, size_t)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void pruneTiles(TreeT&, TreeT::ValueType, bool, size_t)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void pruneInactive(TreeT&, bool, size_t)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \
     void pruneInactiveWithValue(TreeT&, const TreeT::ValueType&, bool, size_t)
-OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #define _FUNCTION(TreeT) \

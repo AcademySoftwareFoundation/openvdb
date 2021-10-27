@@ -21,6 +21,7 @@
 #include <openvdb/math/FiniteDifference.h> // for math::BiasedGradientScheme
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <tbb/task_group.h>
 #include <algorithm> // for std::min(), std::max()
 #include <vector>

@@ -16,6 +16,7 @@
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 
 
 namespace openvdb {
