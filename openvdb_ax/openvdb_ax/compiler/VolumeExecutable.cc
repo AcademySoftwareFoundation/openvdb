@@ -695,7 +695,7 @@ private:
 
     /// Kernel Leaf parent exec methods for different ValueTypes
 
-    /// @brief  Default kernel execution for all values types except bools and stirngs
+    /// @brief  Default kernel execution for all values types except bools and strings
     template <typename NodeT, typename std::enable_if<
         !std::is_same<typename NodeT::ValueType, bool>::value &&
         !std::is_same<typename NodeT::ValueType, std::string>::value
@@ -962,8 +962,8 @@ inline void run(GridT& grid, OpData& data, const VolumeExecutable& E)
 
     if (data.mTreeLevelMin == 0) {
         // It's significantly faster to process leaf nodes using a leaf manager
-        // so process them first. Additionally, procesisng tiles can generate
-        // new leaf nodes if actile tile streaming is enabled and we don't want
+        // so process them first. Additionally, processing tiles can generate
+        // new leaf nodes if active tile streaming is enabled and we don't want
         // to process them twice!
         if (threadOtherOps) {
             tasks.run([&]() {

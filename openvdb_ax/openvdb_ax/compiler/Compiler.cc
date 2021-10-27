@@ -40,7 +40,7 @@
 #include <llvm/Target/TargetOptions.h>
 
 // @note  As of adding support for LLVM 5.0 we not longer explicitly
-// perform standrd compiler passes (-std-compile-opts) based on the changes
+// perform standard compiler passes (-std-compile-opts) based on the changes
 // to the opt binary in the llvm codebase (tools/opt.cpp). We also no
 // longer explicitly perform:
 //  - llvm::createStripSymbolsPass()
@@ -356,7 +356,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
     ///   provides two signatures for updating global mappings, one which takes a void* and
     ///   another which takes a uint64_t address. When providing function mappings,
     ///   it is potentially unsafe to cast pointers-to-functions to pointers-to-objects
-    ///   as they are not guaranteed to have the same size on some (albiet non "standard")
+    ///   as they are not guaranteed to have the same size on some (albeit non "standard")
     ///   platforms. getMangledName is protected, so a copy exists here to allows us to
     ///   call the uint64_t method.
     /// @note  This is only caught by -pendantic so this work around may be overkill
@@ -438,7 +438,7 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
     // This can occur if lazy functions don't initialize their dependencies properly.
     // @todo  Really we should just loop through the module functions to begin with
     //  to init engine mappings - it would probably be faster but we'd have to do
-    //  some string manip and it would assume function names have been set up
+    //  some string manipulation and it would assume function names have been set up
     //  correctly
     const auto& list = module.getFunctionList();
     for (const auto& F : list) {
