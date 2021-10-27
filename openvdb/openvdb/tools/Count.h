@@ -336,10 +336,10 @@ struct MinMaxValuesOp
     {
     }
 
-    template <typename LeafNodeType>
-    bool operator()(LeafNodeType& leaf, size_t)
+    template <typename NodeType>
+    bool operator()(NodeType& node, size_t)
     {
-        for (auto iter = leaf.cbeginValueOn(); iter; ++iter) {
+        for (auto iter = node.cbeginValueOn(); iter; ++iter) {
             const ValueType val = *iter;
 
             if (math::cwiseLessThan(val, min))
