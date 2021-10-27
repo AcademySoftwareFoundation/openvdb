@@ -40,6 +40,38 @@ option(NANOVDB_USE_MAGICAVOXEL "Build with MagicaVoxel support" OFF)
 option(NANOVDB_ALLOW_FETCHCONTENT
   "Allow FetchContent to download missing dependencies" OFF)
 
+
+###############################################################################
+
+# sanitize user input
+
+if(NANOVDB_USE_OPENVDB)
+  if(NOT NANOVDB_USE_TBB)
+    message(FATAL_ERROR "Invalid CMake build configuration:
+      NANOVDB_USE_OPENVDB : [ON]
+      NANOVDB_USE_TBB     : [OFF]
+    If you are linking NanoVDB against OpenVDB, then you
+    need to use TBB, (i.e. -DNANOVDB_USE_TBB=ON).")
+  endif()
+
+  if(NOT NANOVDB_USE_BLOSC)
+    message(FATAL_ERROR "Invalid CMake build configuration:
+      NANOVDB_USE_OPENVDB : [ON]
+      NANOVDB_USE_BLOSC   : [OFF]
+    If you are linking NanoVDB against OpenVDB, then you
+    need to use TBB, (i.e. -DNANOVDB_USE_BLOSC=ON).")
+  endif()
+
+  if(NOT NANOVDB_USE_ZLIB)
+    message(FATAL_ERROR "Invalid CMake build configuration:
+      NANOVDB_USE_OPENVDB : [ON]
+      NANOVDB_USE_ZLIB    : [OFF]
+    If you are linking NanoVDB against OpenVDB, then you
+    need to use TBB, (i.e. -DNANOVDB_USE_ZLIB=ON).")
+  endif()
+endif()
+
+
 ###############################################################################
 
 # Add our cmake modules
