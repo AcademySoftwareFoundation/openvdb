@@ -177,23 +177,23 @@ public:
     explicit HoudiniInterrupter(const char* title = nullptr):
         mUTI{UTgetInterrupt()}, mRunning{false}, mTitle{title ? title : ""}
     {}
-    ~HoudiniInterrupter() final { if (mRunning) this->end(); }
+    ~HoudiniInterrupter() override final { if (mRunning) this->end(); }
 
     HoudiniInterrupter(const HoudiniInterrupter&) = default;
     HoudiniInterrupter& operator=(const HoudiniInterrupter&) = default;
 
     /// @brief Signal the start of an interruptible operation.
     /// @param name  an optional descriptive name for the operation
-    void start(const char* name = nullptr) final {
+    void start(const char* name = nullptr) override final {
         if (!mRunning) { mRunning = true; mUTI->opStart(name ? name : mTitle.c_str()); }
     }
     /// Signal the end of an interruptible operation.
-    void end() final { if (mRunning) { mUTI->opEnd(); mRunning = false; } }
+    void end() override final { if (mRunning) { mUTI->opEnd(); mRunning = false; } }
 
     /// @brief Check if an interruptible operation should be aborted.
     /// @param percent  an optional (when >= 0) percentage indicating
     ///     the fraction of the operation that has been completed
-    bool wasInterrupted(int percent=-1) final { return mUTI->opInterrupt(percent); }
+    bool wasInterrupted(int percent=-1) override final { return mUTI->opInterrupt(percent); }
 
 private:
     UT_Interrupt* mUTI;

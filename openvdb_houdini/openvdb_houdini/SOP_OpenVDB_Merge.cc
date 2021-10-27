@@ -31,11 +31,11 @@ namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 
-class SOP_OpenVDB_Merge: public hvdb::SOP_NodeVDB
+class SOP_OpenVDB_Merge final : public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Merge(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Merge() final {}
+    ~SOP_OpenVDB_Merge() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -44,7 +44,7 @@ public:
     public:
         fpreal getTime() const { return mTime; }
     protected:
-        OP_ERROR cookVDBSop(OP_Context&) override final;
+        OP_ERROR cookVDBSop(OP_Context&) override;
     private:
         fpreal mTime = 0.0;
     };
