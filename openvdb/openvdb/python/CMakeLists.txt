@@ -39,6 +39,16 @@ else()
   set(OPENVDB_LIB openvdb)
 endif()
 
+if(USE_AX)
+  # Link the python module against openvdb_ax
+  if(NOT OPENVDB_BUILD_AX)
+    find_package(OpenVDB REQUIRED openvdb_ax)
+    set(OPENVDB_AX_LIB OpenVDB::openvdb_ax)
+  else()
+    set(OPENVDB_AX_LIB openvdb_ax)
+  endif()
+endif()
+
 # Small function which mimics basic output (bar components) of
 # FindPackageHandleStandardArgs. This is required as we want to ensure
 # the minimum python version is MINIMUM_PYTHON_VERSION - however this cannot
@@ -241,6 +251,10 @@ if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
 endif()
 if(USE_NUMPY)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
+endif()
+if(USE_AX)
+  target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
+  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
 
 set(PYTHON_PUBLIC_INCLUDE_NAMES
