@@ -63,7 +63,7 @@ struct PointKernel
     static std::string getDefaultName();
 };
 
-/// @brief  An additonal function built by the PointComputeGenerator.
+/// @brief  An additional function built by the PointComputeGenerator.
 ///         Currently both compute and compute range functions have the same
 ///         signature
 struct PointRangeKernel : public PointKernel

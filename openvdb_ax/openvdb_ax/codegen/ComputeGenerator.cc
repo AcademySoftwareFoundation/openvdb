@@ -983,7 +983,7 @@ bool ComputeGenerator::visit(const ast::DeclareLocal* node)
 
 
     // do this to ensure all AST nodes are visited
-    // shouldnt ever fail
+    // shouldn't ever fail
     if (this->traverse(node->local())) {
         value = mValues.top(); mValues.pop();
     }

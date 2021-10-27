@@ -297,7 +297,7 @@ llvmArithmeticConversion(const llvm::Type* const sourceType,
 }
 
 /// @brief  Returns a BinaryFunction representing the corresponding instruction to
-///         peform on two scalar values, relative to a provided operator token. Note that
+///         perform on two scalar values, relative to a provided operator token. Note that
 ///         not all operations are supported on floating point types! If the token is not
 ///         supported, or the llvm type is not a scalar type, throws an error.
 /// @note   Various default arguments are bound to provide a simple function call
