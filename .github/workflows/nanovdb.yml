@@ -157,3 +157,24 @@ jobs:
           --cargs=\'-DNANOVDB_USE_CUDA=OFF -DNANOVDB_USE_OPENVDB=ON\'
       - name: test
         run: cd build && ctest -V
+
+  nanovdb-lite:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'linux'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - name: install_gtest
+        run: |
+          sudo apt-get update
+          sudo apt-get -q install -y libgtest-dev
+      - name: build_and_test
+        run: |
+          cd nanovdb/nanovdb
+          sudo mkdir .build
+          cd .build
+          sudo cmake -DNANOVDB_BUILD_UNITTESTS=ON ../
+          sudo make -j2 install
+          sudo ctest -V

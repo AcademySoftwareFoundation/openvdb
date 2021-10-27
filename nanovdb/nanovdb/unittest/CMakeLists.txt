@@ -31,6 +31,8 @@ if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
 
+file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
+
 # -----------------------------------------------------------------------------
 
 add_executable(nanovdb_test_nanovdb "TestNanoVDB.cc")
@@ -47,5 +49,3 @@ endif()
 add_executable(nanovdb_test_openvdb "TestOpenVDB.cc")
 target_link_libraries(nanovdb_test_openvdb PRIVATE nanovdb GTest::GTest GTest::Main)
 add_test(nanovdb_openvdb_unit_test nanovdb_test_openvdb)
-
-file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
