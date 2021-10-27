@@ -2721,14 +2721,14 @@ TEST_F(TestNanoVDB, GridBuilder_Fp4)
                 EXPECT_NEAR(nanoAcc.getValue(p), sphere(p), tolerance);
             }
         };
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
         nanovdb::io::writeGrid("data/sphere_fp4.nvdb", handle);
         handle = nanovdb::io::readGrid("data/sphere_fp4.nvdb");
         nanoGrid = handle.grid<VoxelT>();
         EXPECT_TRUE(nanoGrid);
 
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_Fp4
 
@@ -2822,14 +2822,14 @@ TEST_F(TestNanoVDB, GridBuilder_Fp8)
                 EXPECT_NEAR(nanoAcc.getValue(p), sphere(p), tolerance);
             }
         };
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
         nanovdb::io::writeGrid("data/sphere_fp8.nvdb", handle);
         handle = nanovdb::io::readGrid("data/sphere_fp8.nvdb");
         nanoGrid = handle.grid<VoxelT>();
         EXPECT_TRUE(nanoGrid);
 
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_Fp8
 
@@ -2923,14 +2923,14 @@ TEST_F(TestNanoVDB, GridBuilder_Fp16)
                 EXPECT_NEAR(nanoAcc.getValue(p), sphere(p), tolerance);
             }
         };
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
         nanovdb::io::writeGrid("data/sphere_fp16.nvdb", handle);
         handle = nanovdb::io::readGrid("data/sphere_fp16.nvdb");
         nanoGrid = handle.grid<VoxelT>();
         EXPECT_TRUE(nanoGrid);
 
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_Fp16
 
@@ -3093,14 +3093,14 @@ TEST_F(TestNanoVDB, GridBuilder_FpN_Sphere)
                 EXPECT_NEAR(nanoAcc.getValue(p), sphere(p), tolerance);
             }
         };
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
 
         nanovdb::io::writeGrid("data/sphere_fpN.nvdb", handle);
         handle = nanovdb::io::readGrid("data/sphere_fpN.nvdb");
         nanoGrid = handle.grid<VoxelT>();
         EXPECT_TRUE(nanoGrid);
 
-        tbb::parallel_for(nanoGrid->indexBBox(), kernel);
+        nanovdb::forEach(nanoGrid->indexBBox(), kernel);
     }
 } // GridBuilder_FpN_Sphere
 
