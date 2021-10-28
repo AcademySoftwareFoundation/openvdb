@@ -335,6 +335,8 @@ if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
   set(OPENVDB_HOUDINI_ABI 6)
 elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
+elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 19.0)
+  set(OPENVDB_HOUDINI_ABI 8)
 else()
   message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=8, "
     "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
