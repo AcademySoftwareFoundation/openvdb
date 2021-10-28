@@ -522,12 +522,13 @@ endif()
 # Configure SIMD. AVX implies SSE 4.2.
 
 if(OPENVDB_SIMD STREQUAL "AVX")
-  add_compile_options(-mavx -msse4.2)
-  add_definitions(-DOPENVDB_USE_AVX)
-  add_definitions(-DOPENVDB_USE_SSE42)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-mavx>")
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
+  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_AVX>")
+  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
 elseif(OPENVDB_SIMD STREQUAL "SSE42")
-  add_compile_options(-msse4.2)
-  add_definitions(-DOPENVDB_USE_SSE42)
+  add_compile_options("$<$<COMPILE_LANGUAGE:CXX>:-msse4.2>")
+  add_compile_definitions("$<$<COMPILE_LANGUAGE:CXX>:OPENVDB_USE_SSE42>")
 endif()
 
 #########################################################################
