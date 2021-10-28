@@ -243,7 +243,7 @@ void variableDependencies(const ast::Variable& var,
                 for (size_t i = 0; i < call->children(); ++i) {
                     collectNodeTypes<ListT>(*call->child(i), vars);
                 }
-                // only append dependencies here if they havent already been visited
+                // only append dependencies here if they haven't already been visited
                 // due to recursion issues
                 for (const ast::Variable* dep : vars) {
                     // make sure the dep doesn't already exist in the container, otherwise

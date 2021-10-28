@@ -50,7 +50,7 @@ public:
         /// @param name      The name of the access
         /// @param type      The typename of the access
         /// @param readsFrom  Whether the access is read from
-        /// @param writesTo   Whether the access is writte to
+        /// @param writesTo   Whether the access is written to
         AccessData(const Name& name,
             const ast::tokens::CoreType type,
             const bool readsFrom,
