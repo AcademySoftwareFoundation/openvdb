@@ -312,6 +312,24 @@ LevelSetFracture<GridType, InterruptType>::process(
     }
 }
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETFRACTURE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS LevelSetFracture<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetFracture<DoubleGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

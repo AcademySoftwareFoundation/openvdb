@@ -24,6 +24,7 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/tools/Interpolation.h>
+#include <openvdb/openvdb.h>
 #include <deque>
 #include <iostream>
 #include <fstream>
@@ -44,22 +45,22 @@ class BaseShader;
 
 /// @brief Ray-trace a volume.
 template<typename GridT>
-inline void rayTrace(const GridT&,
-                     const BaseShader&,
-                     BaseCamera&,
-                     size_t pixelSamples = 1,
-                     unsigned int seed = 0,
-                     bool threaded = true);
+void rayTrace(const GridT&,
+              const BaseShader&,
+              BaseCamera&,
+              size_t pixelSamples = 1,
+              unsigned int seed = 0,
+              bool threaded = true);
 
 /// @brief Ray-trace a volume using a given ray intersector.
 template<typename GridT, typename IntersectorT>
-inline void rayTrace(const GridT&,
-                     const IntersectorT&,
-                     const BaseShader&,
-                     BaseCamera&,
-                     size_t pixelSamples = 1,
-                     unsigned int seed = 0,
-                     bool threaded = true);
+void rayTrace(const GridT&,
+              const IntersectorT&,
+              const BaseShader&,
+              BaseCamera&,
+              size_t pixelSamples = 1,
+              unsigned int seed = 0,
+              bool threaded = true);
 
 
 ///////////////////////////////LEVEL SET RAY TRACER ///////////////////////////////////////
@@ -746,12 +747,12 @@ private:
 //////////////////////////////////////// RAYTRACER ////////////////////////////////////////
 
 template<typename GridT>
-inline void rayTrace(const GridT& grid,
-                     const BaseShader& shader,
-                     BaseCamera& camera,
-                     size_t pixelSamples,
-                     unsigned int seed,
-                     bool threaded)
+void rayTrace(const GridT& grid,
+              const BaseShader& shader,
+              BaseCamera& camera,
+              size_t pixelSamples,
+              unsigned int seed,
+              bool threaded)
 {
     LevelSetRayTracer<GridT, tools::LevelSetRayIntersector<GridT> >
         tracer(grid, shader, camera, pixelSamples, seed);
@@ -760,13 +761,13 @@ inline void rayTrace(const GridT& grid,
 
 
 template<typename GridT, typename IntersectorT>
-inline void rayTrace(const GridT&,
-                     const IntersectorT& inter,
-                     const BaseShader& shader,
-                     BaseCamera& camera,
-                     size_t pixelSamples,
-                     unsigned int seed,
-                     bool threaded)
+void rayTrace(const GridT&,
+              const IntersectorT& inter,
+              const BaseShader& shader,
+              BaseCamera& camera,
+              size_t pixelSamples,
+              unsigned int seed,
+              bool threaded)
 {
     LevelSetRayTracer<GridT, IntersectorT> tracer(inter, shader, camera, pixelSamples, seed);
     tracer.render(threaded);
@@ -1058,6 +1059,34 @@ operator()(const tbb::blocked_range<size_t>& range) const
      }//Horizontal pixel scan
    }//Vertical pixel scan
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_RAYTRACER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void rayTrace(const Grid<TreeT>&, const BaseShader&, BaseCamera&, size_t, unsigned int, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void rayTrace(const Grid<TreeT>&, const tools::LevelSetRayIntersector<Grid<TreeT>>&, const BaseShader&, BaseCamera&, size_t, unsigned int, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<FloatGrid>, tools::BoxSampler>;
+OPENVDB_INSTANTIATE_CLASS VolumeRender<tools::VolumeRayIntersector<DoubleGrid>, tools::BoxSampler>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

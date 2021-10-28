@@ -13,6 +13,7 @@
 #include <openvdb/math/Math.h> // for isNegative and negative
 #include <openvdb/Types.h>
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/openvdb.h>
 #include <algorithm> // for std::nth_element()
 #include <type_traits>
 
@@ -34,7 +35,7 @@ namespace tools {
 /// @param threaded   enable or disable threading (threading is enabled by default)
 /// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
-inline void
+void
 prune(TreeT& tree,
       typename TreeT::ValueType tolerance = zeroVal<typename TreeT::ValueType>(),
       bool threaded = true,
@@ -50,7 +51,7 @@ prune(TreeT& tree,
 /// @param threaded   enable or disable threading (threading is enabled by default)
 /// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
-inline void
+void
 pruneTiles(TreeT& tree,
            typename TreeT::ValueType tolerance = zeroVal<typename TreeT::ValueType>(),
            bool threaded = true,
@@ -64,7 +65,7 @@ pruneTiles(TreeT& tree,
 /// @param threaded   enable or disable threading (threading is enabled by default)
 /// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
-inline void
+void
 pruneInactive(TreeT& tree, bool threaded = true, size_t grainSize = 1);
 
 
@@ -76,7 +77,7 @@ pruneInactive(TreeT& tree, bool threaded = true, size_t grainSize = 1);
 /// @param threaded   enable or disable threading (threading is enabled by default)
 /// @param grainSize  used to control the threading granularity (default is 1)
 template<typename TreeT>
-inline void
+void
 pruneInactiveWithValue(
     TreeT& tree,
     const typename TreeT::ValueType& value,
@@ -97,7 +98,7 @@ pruneInactiveWithValue(
 ///
 /// @throw ValueError if the background of the @a tree is negative (as defined by math::isNegative)
 template<typename TreeT>
-inline void
+void
 pruneLevelSet(TreeT& tree,
               bool threaded = true,
               size_t grainSize = 1);
@@ -120,7 +121,7 @@ pruneLevelSet(TreeT& tree,
 /// @throw ValueError if @a outsideWidth is negative or @a insideWidth is
 /// not negative (as defined by math::isNegative).
 template<typename TreeT>
-inline void
+void
 pruneLevelSet(TreeT& tree,
               const typename TreeT::ValueType& outsideWidth,
               const typename TreeT::ValueType& insideWidth,
@@ -330,7 +331,7 @@ private:
 
 
 template<typename TreeT>
-inline void
+void
 prune(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
@@ -340,7 +341,7 @@ prune(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSiz
 
 
 template<typename TreeT>
-inline void
+void
 pruneTiles(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-3> nodes(tree);
@@ -350,7 +351,7 @@ pruneTiles(TreeT& tree, typename TreeT::ValueType tol, bool threaded, size_t gra
 
 
 template<typename TreeT>
-inline void
+void
 pruneInactive(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
@@ -360,7 +361,7 @@ pruneInactive(TreeT& tree, bool threaded, size_t grainSize)
 
 
 template<typename TreeT>
-inline void
+void
 pruneInactiveWithValue(TreeT& tree, const typename TreeT::ValueType& v,
     bool threaded, size_t grainSize)
 {
@@ -371,7 +372,7 @@ pruneInactiveWithValue(TreeT& tree, const typename TreeT::ValueType& v,
 
 
 template<typename TreeT>
-inline void
+void
 pruneLevelSet(TreeT& tree,
               const typename TreeT::ValueType& outside,
               const typename TreeT::ValueType& inside,
@@ -385,13 +386,58 @@ pruneLevelSet(TreeT& tree,
 
 
 template<typename TreeT>
-inline void
+void
 pruneLevelSet(TreeT& tree, bool threaded, size_t grainSize)
 {
     tree::NodeManager<TreeT, TreeT::DEPTH-2> nodes(tree);
     LevelSetPruneOp<TreeT> op(tree);
     nodes.foreachBottomUp(op, threaded, grainSize);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_PRUNE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void prune(TreeT&, TreeT::ValueType, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void pruneTiles(TreeT&, TreeT::ValueType, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void pruneInactive(TreeT&, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void pruneInactiveWithValue(TreeT&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void pruneLevelSet(TreeT&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void pruneLevelSet(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

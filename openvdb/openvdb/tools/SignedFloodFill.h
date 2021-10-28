@@ -15,6 +15,7 @@
 #include <openvdb/Types.h> // for Index typedef
 #include <openvdb/math/Math.h> // for math::negative
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/openvdb.h>
 #include <map>
 #include <type_traits>
 
@@ -40,7 +41,7 @@ namespace tools {
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating-point.
 template<typename TreeOrLeafManagerT>
-inline void
+void
 signedFloodFill(TreeOrLeafManagerT& tree, bool threaded = true,
     size_t grainSize = 1, Index minLevel = 0);
 
@@ -64,7 +65,7 @@ signedFloodFill(TreeOrLeafManagerT& tree, bool threaded = true,
 ///
 /// @throw TypeError if the ValueType of @a tree is not floating-point.
 template<typename TreeOrLeafManagerT>
-inline void
+void
 signedFloodFillWithValues(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& outsideWidth,
@@ -248,7 +249,7 @@ doSignedFloodFill(TreeOrLeafManagerT&,
 
 // If the narrow-band is symmetric and unchanged
 template <typename TreeOrLeafManagerT>
-inline void
+void
 signedFloodFillWithValues(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& outsideValue,
@@ -262,7 +263,7 @@ signedFloodFillWithValues(
 
 
 template <typename TreeOrLeafManagerT>
-inline void
+void
 signedFloodFill(TreeOrLeafManagerT& tree,
                 bool threaded,
                 size_t grainSize,
@@ -271,6 +272,41 @@ signedFloodFill(TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType v = tree.root().background();
     doSignedFloodFill(tree, v, math::negative(v), threaded, grainSize, minLevel);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_SIGNEDFLOODFILL
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void signedFloodFill(TreeT&, bool, size_t, Index)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void signedFloodFill(tree::LeafManager<TreeT>&, bool, size_t, Index)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void signedFloodFillWithValues(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t, Index)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void signedFloodFillWithValues(tree::LeafManager<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t, Index)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

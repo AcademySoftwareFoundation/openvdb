@@ -9,6 +9,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Vec3.h>
+#include <openvdb/openvdb.h>
 #include "ValueTransformer.h" // for tools::foreach()
 #include <type_traits>
 
@@ -22,7 +23,7 @@ namespace tools {
 /// in accordance with the grid's vector type (covariant, contravariant, etc.).
 /// @throw TypeError if the grid is not vector-valued
 template<typename GridType>
-inline void
+void
 transformVectors(GridType&, const Mat4d&);
 
 
@@ -121,11 +122,31 @@ doTransformVectors(GridType& grid, const Mat4d& mat)
 
 
 template<typename GridType>
-inline void
+void
 transformVectors(GridType& grid, const Mat4d& mat)
 {
     doTransformVectors<GridType>(grid, mat);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_VECTORTRANSFORMER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void transformVectors(Grid<TreeT>&, const Mat4d&)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

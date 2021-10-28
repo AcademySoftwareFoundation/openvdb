@@ -16,6 +16,7 @@
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()
 #include "SignedFloodFill.h" // for signedFloodFill
 #include "Prune.h" // for pruneLevelSet
+#include <openvdb/openvdb.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
 #include <cmath>
@@ -50,7 +51,7 @@ namespace tools {
 /// tools::resampleToMatch<tools::QuadraticSampler>(*src, *dest, interrupter);
 /// @endcode
 template<typename Sampler, typename Interrupter, typename GridType>
-inline void
+void
 resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrupter);
 
 /// @brief Resample an input grid into an output grid of the same type such that,
@@ -75,7 +76,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
 /// tools::resampleToMatch<tools::QuadraticSampler>(*src, *dest);
 /// @endcode
 template<typename Sampler, typename GridType>
-inline void
+void
 resampleToMatch(const GridType& inGrid, GridType& outGrid);
 
 
@@ -278,7 +279,7 @@ enum { DECOMP_INVALID = 0, DECOMP_VALID = 1, DECOMP_UNIQUE = 2 };
 /// be decomposed, DECOMP_UNIQUE if the matrix has a unique decomposition,
 /// DECOMP_VALID otherwise
 template<typename T>
-inline int
+int
 decompose(const math::Mat4<T>& m, math::Vec3<T>& scale,
     math::Vec3<T>& rotate, math::Vec3<T>& translate)
 {
@@ -428,7 +429,7 @@ private:
 ///
 /// @warning Do not use this function to scale or shear a level set grid.
 template<typename Sampler, typename Interrupter, typename GridType>
-inline void
+void
 doResampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrupter)
 {
     ABTransform xform(inGrid.transform(), outGrid.transform());
@@ -481,7 +482,7 @@ struct HalfWidthOp<bool> {
 
 
 template<typename Sampler, typename Interrupter, typename GridType>
-inline void
+void
 resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrupter)
 {
     if (inGrid.getGridClass() == GRID_LEVEL_SET) {
@@ -526,7 +527,7 @@ resampleToMatch(const GridType& inGrid, GridType& outGrid, Interrupter& interrup
 
 
 template<typename Sampler, typename GridType>
-inline void
+void
 resampleToMatch(const GridType& inGrid, GridType& outGrid)
 {
     util::NullInterrupter interrupter;
@@ -1034,6 +1035,41 @@ GridResampler::transformBBox(
         }
     }
 } // GridResampler::transformBBox()
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_GRIDTRANSFORMER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void resampleToMatch<PointSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void resampleToMatch<BoxSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

@@ -1,0 +1,4 @@
+Improvements:
+    Explicit template instantiation has been enabled by default for most of the
+    tools. This pre-compiles template instantiations into the core library to
+    reduce the time spent compiling code in downstream libraries or applications.

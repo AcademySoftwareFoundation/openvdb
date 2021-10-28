@@ -537,6 +537,32 @@ struct VolumeAdvection<VelocityGridT, StaggeredVelocity, InterrupterType>::Advec
     const VolumeAdvection*    mParent;
 };// end of private member class Advect
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_VOLUMEADVECT
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>;
+
+OPENVDB_INSTANTIATE FloatGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<FloatGrid, Sampler<1, false>>(const FloatGrid&, double);
+OPENVDB_INSTANTIATE DoubleGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<DoubleGrid, Sampler<1, false>>(const DoubleGrid&, double);
+OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, true, util::NullInterrupter>::advect<Vec3SGrid, Sampler<1, false>>(const Vec3SGrid&, double);
+
+OPENVDB_INSTANTIATE FloatGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<FloatGrid, Sampler<1, false>>(const FloatGrid&, double);
+OPENVDB_INSTANTIATE DoubleGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<DoubleGrid, Sampler<1, false>>(const DoubleGrid&, double);
+OPENVDB_INSTANTIATE Vec3SGrid::Ptr VolumeAdvection<Vec3SGrid, false, util::NullInterrupter>::advect<Vec3SGrid, Sampler<1, false>>(const Vec3SGrid&, double);
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb

@@ -23,6 +23,8 @@
 #include "openvdb/Grid.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/tree/LeafManager.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 
 #include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -103,7 +105,7 @@ enum TilePolicy { IGNORE_TILES, EXPAND_TILES, PRESERVE_TILES };
 ///                      (see above for details)
 /// @param threaded      Whether to multi-thread execution
 template<typename TreeOrLeafManagerT>
-inline void dilateActiveValues(TreeOrLeafManagerT& tree,
+void dilateActiveValues(TreeOrLeafManagerT& tree,
     const int iterations = 1,
     const NearestNeighbors nn = NN_FACE,
     const TilePolicy mode = PRESERVE_TILES,
@@ -134,7 +136,7 @@ inline void dilateActiveValues(TreeOrLeafManagerT& tree,
 ///                      (see above for details)
 /// @param threaded      Whether to multi-thread execution
 template<typename TreeOrLeafManagerT>
-inline void erodeActiveValues(TreeOrLeafManagerT& tree,
+void erodeActiveValues(TreeOrLeafManagerT& tree,
     const int iterations = 1,
     const NearestNeighbors nn = NN_FACE,
     const TilePolicy mode = PRESERVE_TILES,
@@ -1050,7 +1052,7 @@ struct Adapter<openvdb::tree::LeafManager<T>> {
 /// @endcond
 
 template<typename TreeOrLeafManagerT>
-inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
+void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
                    const int iterations,
                    const NearestNeighbors nn,
                    const TilePolicy mode,
@@ -1127,7 +1129,7 @@ inline void dilateActiveValues(TreeOrLeafManagerT& treeOrLeafM,
 
 
 template<typename TreeOrLeafManagerT>
-inline void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
+void erodeActiveValues(TreeOrLeafManagerT& treeOrLeafM,
                       const int iterations,
                       const NearestNeighbors nn,
                       const TilePolicy mode,
@@ -1268,6 +1270,45 @@ inline void erodeVoxels(tree::LeafManager<TreeType>& manager,
     tools::pruneLevelSet(manager.tree()); // matches old behaviour
 }
 //@}
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_MORPHOLOGY
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void dilateActiveValues(TreeT&, \
+        const int, const NearestNeighbors, const TilePolicy, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void dilateActiveValues(tree::LeafManager<TreeT>&, \
+        const int, const NearestNeighbors, const TilePolicy, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void erodeActiveValues(TreeT&, \
+        const int, const NearestNeighbors, const TilePolicy, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void erodeActiveValues(tree::LeafManager<TreeT>&, \
+        const int, const NearestNeighbors, const TilePolicy, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

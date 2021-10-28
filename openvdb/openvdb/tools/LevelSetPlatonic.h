@@ -20,6 +20,7 @@
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/openvdb.h>
 #include <type_traits>
 #include <vector>
 
@@ -470,6 +471,57 @@ createLevelSetPlatonic(int faceCount,float scale, const Vec3f& center,
 
     return grid;
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETPLATONIC
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetPlatonic<Grid<TreeT>>(int, float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetTetrahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetCube<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetOctahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetDodecahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetIcosahedron<Grid<TreeT>>(float, const Vec3f&, float, float, \
+        util::NullInterrupter*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

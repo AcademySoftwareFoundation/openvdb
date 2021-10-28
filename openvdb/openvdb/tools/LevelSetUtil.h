@@ -16,6 +16,8 @@
 
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -72,7 +74,7 @@ inline typename GridType::ValueType lsutilGridZero()
 ///                        (automatically clamped if greater than the interior
 ///                        narrow band width)
 template<class GridType>
-inline void
+void
 sdfToFogVolume(
     GridType& grid,
     typename GridType::ValueType cutoffDistance = lsutilGridMax<GridType>());
@@ -89,7 +91,7 @@ sdfToFogVolume(
 /// @param isovalue             Threshold below which values are considered part of the
 ///                             interior region.
 template<class GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 sdfInteriorMask(
     const GridOrTreeType& volume,
     typename GridOrTreeType::ValueType isovalue = lsutilGridZero<GridOrTreeType>());
@@ -116,7 +118,7 @@ sdfInteriorMask(
 ///                     previous example only the walls and cap are returned and the interior
 ///                     cavity will be ignored.
 template<typename GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 extractEnclosedRegion(
     const GridOrTreeType& volume,
     typename GridOrTreeType::ValueType isovalue = lsutilGridZero<GridOrTreeType>(),
@@ -130,7 +132,7 @@ extractEnclosedRegion(
 /// @param volume       Signed distance field / level set volume.
 /// @param isovalue     The crossing point that is considered the surface.
 template<typename GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 extractIsosurfaceMask(const GridOrTreeType& volume, typename GridOrTreeType::ValueType isovalue);
 
 
@@ -140,7 +142,7 @@ extractIsosurfaceMask(const GridOrTreeType& volume, typename GridOrTreeType::Val
 /// @param masks    Output set of disjoint active topology masks sorted in descending order
 ///                 based on the active voxel count.
 template<typename GridOrTreeType>
-inline void
+void
 extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks);
 
@@ -153,7 +155,7 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 /// @param segments     Output set of disjoint active topology components sorted in
 ///                     descending order based on the active voxel count.
 template<typename GridOrTreeType>
-inline void
+void
 segmentActiveVoxels(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::Ptr>& segments);
 
@@ -167,7 +169,7 @@ segmentActiveVoxels(const GridOrTreeType& volume,
 /// @param segments     Output set of disjoint SDF surfaces found in @a volume sorted in
 ///                     descending order based on the surface intersecting voxel count.
 template<typename GridOrTreeType>
-inline void
+void
 segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Ptr>& segments);
 
 
@@ -946,7 +948,7 @@ private:
 /// @brief Constructs a memory light char tree that represents the exterior region with @c +1
 ///        and the interior regions with @c -1.
 template <class TreeType>
-inline typename TreeType::template ValueConverter<char>::Type::Ptr
+typename TreeType::template ValueConverter<char>::Type::Ptr
 computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType isovalue,
     const typename TreeType::template ValueConverter<bool>::Type* fillMask)
 {
@@ -1065,7 +1067,7 @@ computeEnclosedRegionMask(const TreeType& tree, typename TreeType::ValueType iso
 
 
 template <class TreeType>
-inline typename TreeType::template ValueConverter<bool>::Type::Ptr
+typename TreeType::template ValueConverter<bool>::Type::Ptr
 computeInteriorMask(const TreeType& tree, typename TreeType::ValueType iso)
 {
     using ValueType = typename TreeType::ValueType;
@@ -1289,7 +1291,7 @@ struct NodeMaskSegment
 
 
 template<typename NodeType>
-inline void
+void
 nodeMaskSegmentation(const NodeType& node,
     std::vector<typename NodeMaskSegment<NodeType>::Ptr>& segments)
 {
@@ -2153,7 +2155,7 @@ struct GridOrTreeConstructor<Grid<TreeType> >
 
 
 template <class GridType>
-inline void
+void
 sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
 {
     using ValueType = typename GridType::ValueType;
@@ -2269,7 +2271,7 @@ sdfToFogVolume(GridType& grid, typename GridType::ValueType cutoffDistance)
 
 
 template <class GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 sdfInteriorMask(const GridOrTreeType& volume, typename GridOrTreeType::ValueType isovalue)
 {
     using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
@@ -2284,7 +2286,7 @@ sdfInteriorMask(const GridOrTreeType& volume, typename GridOrTreeType::ValueType
 
 
 template<typename GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 extractEnclosedRegion(const GridOrTreeType& volume,
     typename GridOrTreeType::ValueType isovalue,
     const typename TreeAdapter<GridOrTreeType>::TreeType::template ValueConverter<bool>::Type*
@@ -2309,7 +2311,7 @@ extractEnclosedRegion(const GridOrTreeType& volume,
 
 
 template<typename GridOrTreeType>
-inline typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
+typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr
 extractIsosurfaceMask(const GridOrTreeType& volume, typename GridOrTreeType::ValueType isovalue)
 {
     using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
@@ -2333,7 +2335,7 @@ extractIsosurfaceMask(const GridOrTreeType& volume, typename GridOrTreeType::Val
 
 
 template<typename GridOrTreeType>
-inline void
+void
 extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr>& masks)
 {
@@ -2341,6 +2343,7 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
     using BoolTreeType = typename TreeType::template ValueConverter<bool>::Type;
     using BoolTreePtrType = typename BoolTreeType::Ptr;
     using BoolLeafNodeType = typename BoolTreeType::LeafNodeType;
+    using BoolGridOrTreePtrType = typename GridOrTreeType::template ValueConverter<bool>::Type::Ptr;
 
     using NodeMaskSegmentType = level_set_util_internal::NodeMaskSegment<BoolLeafNodeType>;
     using NodeMaskSegmentPtrType = typename NodeMaskSegmentType::Ptr;
@@ -2475,14 +2478,14 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
         }
 
         tbb::parallel_for(tbb::blocked_range<size_t>(0, segmentCount),
-            level_set_util_internal::ComputeActiveVoxelCount<BoolTreePtrType>(
+            level_set_util_internal::ComputeActiveVoxelCount<BoolGridOrTreePtrType>(
                 masks, voxelCountArray.get()));
 
         size_t *begin = segmentOrderArray.get();
         tbb::parallel_sort(begin, begin + masks.size(), level_set_util_internal::GreaterCount(
             voxelCountArray.get()));
 
-        std::vector<BoolTreePtrType> orderedMasks;
+        std::vector<BoolGridOrTreePtrType> orderedMasks;
         orderedMasks.reserve(masks.size());
 
         for (size_t n = 0; n < segmentCount; ++n) {
@@ -2496,7 +2499,7 @@ extractActiveVoxelSegmentMasks(const GridOrTreeType& volume,
 
 
 template<typename GridOrTreeType>
-inline void
+void
 segmentActiveVoxels(const GridOrTreeType& volume,
     std::vector<typename GridOrTreeType::Ptr>& segments)
 {
@@ -2545,7 +2548,7 @@ segmentActiveVoxels(const GridOrTreeType& volume,
 
 
 template<typename GridOrTreeType>
-inline void
+void
 segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Ptr>& segments)
 {
     using TreeType = typename TreeAdapter<GridOrTreeType>::TreeType;
@@ -2591,6 +2594,92 @@ segmentSDF(const GridOrTreeType& volume, std::vector<typename GridOrTreeType::Pt
                 volume, segment));
     }
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETUTIL
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void sdfToFogVolume(Grid<TreeT>&, TreeT::ValueType)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::ValueConverter<bool>::Type::Ptr sdfInteriorMask(const TreeT&, TreeT::ValueType)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::ValueConverter<bool>::Type::Ptr sdfInteriorMask(const Grid<TreeT>&, TreeT::ValueType)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::ValueConverter<bool>::Type::Ptr extractEnclosedRegion(\
+        const TreeT&, TreeT::ValueType, \
+        const TreeAdapter<TreeT>::TreeType::ValueConverter<bool>::Type*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::ValueConverter<bool>::Type::Ptr extractEnclosedRegion(\
+        const Grid<TreeT>&, TreeT::ValueType, \
+        const TreeAdapter<Grid<TreeT>>::TreeType::ValueConverter<bool>::Type*)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::ValueConverter<bool>::Type::Ptr extractIsosurfaceMask(const TreeT&, TreeT::ValueType)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::ValueConverter<bool>::Type::Ptr extractIsosurfaceMask(const Grid<TreeT>&, TreeT::ValueType)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void extractActiveVoxelSegmentMasks(\
+        const TreeT&, std::vector<TreeT::ValueConverter<bool>::Type::Ptr>&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void extractActiveVoxelSegmentMasks(\
+        const Grid<TreeT>&, std::vector<Grid<TreeT>::ValueConverter<bool>::Type::Ptr>&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void segmentActiveVoxels(const TreeT&, std::vector<TreeT::Ptr>&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void segmentActiveVoxels(const Grid<TreeT>&, std::vector<Grid<TreeT>::Ptr>&)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void segmentSDF(const TreeT&, std::vector<TreeT::Ptr>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void segmentSDF(const Grid<TreeT>&, std::vector<Grid<TreeT>::Ptr>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

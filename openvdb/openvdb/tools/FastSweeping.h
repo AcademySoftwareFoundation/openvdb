@@ -29,27 +29,29 @@
 
 //#define BENCHMARK_FAST_SWEEPING
 
+#include <openvdb/Platform.h>
+#include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
+#include <openvdb/math/Stencils.h> // for GradStencil
+#include <openvdb/tree/LeafManager.h>
+#include "LevelSetUtil.h"
+#include "Morphology.h"
+#include <openvdb/openvdb.h>
+
+#include "Statistics.h"
+#ifdef BENCHMARK_FAST_SWEEPING
+#include <openvdb/util/CpuTimer.h>
+#endif
+
+#include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_group.h>
+
 #include <type_traits>// for static_assert
 #include <cmath>
 #include <limits>
 #include <deque>
 #include <unordered_map>
 #include <utility>// for std::make_pair
-
-#include <tbb/parallel_for.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_group.h>
-
-#include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
-#include <openvdb/math/Stencils.h> // for GradStencil
-#include <openvdb/tree/LeafManager.h>
-#include "LevelSetUtil.h"
-#include "Morphology.h"
-
-#include "Statistics.h"
-#ifdef BENCHMARK_FAST_SWEEPING
-#include <openvdb/util/CpuTimer.h>
-#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -1871,6 +1873,36 @@ maskSdf(const GridT &sdfGrid,
     if (fs.initMask(sdfGrid, mask, ignoreActiveTiles)) fs.sweep(nIter);
     return fs.sdfGrid();
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_FASTSWEEPING
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr fogToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr sdfToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr dilateSdf(const Grid<TreeT>&, int, NearestNeighbors, int, FastSweepingDomain)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

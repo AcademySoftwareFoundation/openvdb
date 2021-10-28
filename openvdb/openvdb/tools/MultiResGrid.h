@@ -38,6 +38,7 @@
 #include "Prune.h"
 #include "SignedFloodFill.h"
 #include "ValueTransformer.h"
+#include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>
@@ -943,6 +944,24 @@ struct MultiResGrid<TreeType>::ProlongateOp
         return ValueType(0.125) * v;
     }
 };// ProlongateOp
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_MULTIRESGRID
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS MultiResGrid<FloatTree>;
+OPENVDB_INSTANTIATE_CLASS MultiResGrid<DoubleTree>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

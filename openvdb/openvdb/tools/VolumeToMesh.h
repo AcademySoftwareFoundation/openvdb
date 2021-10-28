@@ -14,6 +14,7 @@
 #include <openvdb/math/Operators.h> // for ISGradient
 #include <openvdb/tree/ValueAccessor.h>
 #include <openvdb/util/Util.h> // for INVALID_IDX
+#include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
@@ -49,7 +50,7 @@ namespace tools {
 ///
 /// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
-inline void
+void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -70,7 +71,7 @@ volumeToMesh(
 ///
 /// @throw TypeError if @a grid does not have a scalar value type
 template<typename GridType>
-inline void
+void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -5231,7 +5232,7 @@ doVolumeToMesh(
 
 
 template<typename GridType>
-inline void
+void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -5246,7 +5247,7 @@ volumeToMesh(
 
 
 template<typename GridType>
-inline void
+void
 volumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
@@ -5256,6 +5257,31 @@ volumeToMesh(
     std::vector<Vec3I> triangles;
     doVolumeToMesh(grid, points, triangles, quads, isovalue, 0.0, true);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_VOLUMETOMESH
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void volumeToMesh(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec4I>&, double)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void volumeToMesh(const Grid<TreeT>&, std::vector<Vec3s>&, std::vector<Vec3I>&, std::vector<Vec4I>&, double, double, bool)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

@@ -20,6 +20,8 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/FiniteDifference.h> // for math::BiasedGradientScheme
 #include <openvdb/util/NullInterrupter.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <tbb/task_group.h>
 #include <algorithm> // for std::min(), std::max()
 #include <vector>
@@ -44,7 +46,7 @@ namespace tools {
 /// @param dilation        Number of voxels to expand the active voxel region.
 /// @param smoothingSteps  Number of smoothing interations.
 template<typename GridT>
-inline typename GridT::template ValueConverter<float>::Type::Ptr
+typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
     int smoothingSteps = 0);
 
@@ -63,7 +65,7 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 /// @param smoothingSteps  Number of smoothing interations.
 /// @param interrupt       Optional object adhering to the util::NullInterrupter interface.
 template<typename GridT, typename InterrupterT>
-inline typename GridT::template ValueConverter<float>::Type::Ptr
+typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
     int smoothingSteps = 0, InterrupterT* interrupt = nullptr);
 
@@ -188,7 +190,7 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
 /// @endcond
 
 template<typename GridT, typename InterrupterT>
-inline typename GridT::template ValueConverter<float>::Type::Ptr
+typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilation,
     int smoothingSteps, InterrupterT* interrupt)
 {
@@ -247,12 +249,32 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
 
 
 template<typename GridT>
-inline typename GridT::template ValueConverter<float>::Type::Ptr
+typename GridT::template ValueConverter<float>::Type::Ptr
 topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilation, int smoothingSteps)
 {
     util::NullInterrupter interrupt;
     return topologyToLevelSet(grid, halfWidth, closingSteps, dilation, smoothingSteps, &interrupt);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_TOPOLOGYTOLEVELSET
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::ValueConverter<float>::Type::Ptr topologyToLevelSet(const Grid<TreeT>&, int, int, int, int, \
+        util::NullInterrupter*)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools
