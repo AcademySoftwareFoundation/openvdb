@@ -15,6 +15,7 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isExactlyEqual()
+#include <openvdb/openvdb.h>
 #include "Merge.h"
 #include "ValueTransformer.h" // for transformValues()
 #include "Prune.h"// for prune
@@ -37,58 +38,58 @@ namespace tools {
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
 template<typename GridOrTreeT>
-inline void csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 /// @brief Given two level set grids, replace the A grid with the intersection of A and B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
 template<typename GridOrTreeT>
-inline void csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 /// @brief Given two level set grids, replace the A grid with the difference A / B.
 /// @throw ValueError if the background value of either grid is not greater than zero.
 /// @note This operation always leaves the B grid empty.
 template<typename GridOrTreeT>
-inline void csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
+void csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune = true);
 
 /// @brief  Threaded CSG union operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG union of the @a and @b level set inputs.
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
+typename GridOrTreeT::Ptr csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 /// @brief  Threaded CSG intersection operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG intersection of the @a and @b level set inputs.
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
+typename GridOrTreeT::Ptr csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 /// @brief  Threaded CSG difference operation that produces a new grid or tree from
 ///         immutable inputs.
 /// @return The CSG difference of the @a and @b level set inputs.
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b);
+typename GridOrTreeT::Ptr csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b);
 
 /// @brief Given grids A and B, compute max(a, b) per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT>
-inline void compMax(GridOrTreeT& a, GridOrTreeT& b);
+void compMax(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute min(a, b) per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT>
-inline void compMin(GridOrTreeT& a, GridOrTreeT& b);
+void compMin(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a + b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT>
-inline void compSum(GridOrTreeT& a, GridOrTreeT& b);
+void compSum(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a * b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT>
-inline void compMul(GridOrTreeT& a, GridOrTreeT& b);
+void compMul(GridOrTreeT& a, GridOrTreeT& b);
 /// @brief Given grids A and B, compute a / b per voxel (using sparse traversal).
 /// Store the result in the A grid and leave the B grid empty.
 template<typename GridOrTreeT>
-inline void compDiv(GridOrTreeT& a, GridOrTreeT& b);
+void compDiv(GridOrTreeT& a, GridOrTreeT& b);
 
 /// Copy the active voxels of B into A.
 template<typename GridOrTreeT>
-inline void compReplace(GridOrTreeT& a, const GridOrTreeT& b);
+void compReplace(GridOrTreeT& a, const GridOrTreeT& b);
 
 
 ////////////////////////////////////////
@@ -548,7 +549,7 @@ private:
 
 
 template<CSGOperation Operation, typename TreeType>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 doCSGCopy(const TreeType& lhs, const TreeType& rhs)
 {
     BuildPrimarySegment<TreeType, Operation> primary(lhs, rhs);
@@ -603,11 +604,11 @@ template <typename LeafT>
 using LeafPairList = std::vector<std::pair<LeafT*, LeafT*>>;
 
 /// Transfers leaf nodes from a source tree into a
-/// desitnation tree, unless it already exists in the destination tree
+/// destination tree, unless it already exists in the destination tree
 /// in which case pointers to both leaf nodes are added to a list for
 /// subsequent compositing operations.
 template <typename TreeT>
-inline void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
+void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
                               LeafPairList<typename TreeT::LeafNodeType> &overlapping)
 {
     using LeafT = typename TreeT::LeafNodeType;
@@ -626,7 +627,7 @@ inline void transferLeafNodes(TreeT &srcTree, TreeT &dstTree,
     }
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<
@@ -652,7 +653,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op)
    });
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<
@@ -673,7 +674,7 @@ doCompActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT)
     });
 }
 
-/// Template specailization of compActiveLeafVoxels
+/// Template specialization of compActiveLeafVoxels
 template <typename TreeT, typename OpT>
 inline
 typename std::enable_if<
@@ -714,7 +715,7 @@ struct CopyOp
 };
 
 template <typename TreeT>
-inline void validateLevelSet(const TreeT& tree, const std::string& gridName = std::string(""))
+void validateLevelSet(const TreeT& tree, const std::string& gridName = std::string(""))
 {
     using ValueT = typename TreeT::ValueType;
     const ValueT zero = zeroVal<ValueT>();
@@ -740,7 +741,7 @@ inline void validateLevelSet(const TreeT& tree, const std::string& gridName = st
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compMax(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -756,7 +757,7 @@ compMax(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compMin(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -772,7 +773,7 @@ compMin(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compSum(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -787,7 +788,7 @@ compSum(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -802,7 +803,7 @@ compMul(GridOrTreeT& aTree, GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compDiv(GridOrTreeT& aTree, GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -847,7 +848,7 @@ struct CompReplaceOp
 
 
 template<typename GridOrTreeT>
-inline void
+void
 compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -873,7 +874,7 @@ compReplace(GridOrTreeT& aTree, const GridOrTreeT& bTree)
 
 
 template<typename GridOrTreeT>
-inline void
+void
 csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -888,7 +889,7 @@ csgUnion(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 }
 
 template<typename GridOrTreeT>
-inline void
+void
 csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -903,7 +904,7 @@ csgIntersection(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 }
 
 template<typename GridOrTreeT>
-inline void
+void
 csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -919,7 +920,7 @@ csgDifference(GridOrTreeT& a, GridOrTreeT& b, bool prune)
 
 
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr
+typename GridOrTreeT::Ptr
 csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -933,7 +934,7 @@ csgUnionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 
 
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr
+typename GridOrTreeT::Ptr
 csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -947,7 +948,7 @@ csgIntersectionCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 
 
 template<typename GridOrTreeT>
-inline typename GridOrTreeT::Ptr
+typename GridOrTreeT::Ptr
 csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 {
     using Adapter = TreeAdapter<GridOrTreeT>;
@@ -983,11 +984,135 @@ csgDifferenceCopy(const GridOrTreeT& a, const GridOrTreeT& b)
 /// @warning This function only operated on leaf node values,
 ///          i.e. tile values are ignored.
 template<typename TreeT, typename OpT = composite::CopyOp<TreeT> >
-inline void
+void
 compActiveLeafVoxels(TreeT &srcTree, TreeT &dstTree, OpT op = composite::CopyOp<TreeT>())
 {
     composite::doCompActiveLeafVoxels<TreeT, OpT>(srcTree, dstTree, op);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_COMPOSITE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void csgUnion(TreeT&, TreeT&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void csgUnion(Grid<TreeT>&, Grid<TreeT>&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void csgIntersection(TreeT&, TreeT&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void csgIntersection(Grid<TreeT>&, Grid<TreeT>&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void csgDifference(TreeT&, TreeT&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void csgDifference(Grid<TreeT>&, Grid<TreeT>&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr csgUnionCopy(const TreeT&, const TreeT&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr csgUnionCopy(const Grid<TreeT>&, const Grid<TreeT>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr csgIntersectionCopy(const TreeT&, const TreeT&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr csgIntersectionCopy(const Grid<TreeT>&, const Grid<TreeT>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr csgDifferenceCopy(const TreeT&, const TreeT&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr csgDifferenceCopy(const Grid<TreeT>&, const Grid<TreeT>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compMax(TreeT&, TreeT&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compMax(Grid<TreeT>&, Grid<TreeT>&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compMin(TreeT&, TreeT&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compMin(Grid<TreeT>&, Grid<TreeT>&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compSum(TreeT&, TreeT&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compSum(Grid<TreeT>&, Grid<TreeT>&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compDiv(TreeT&, TreeT&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compDiv(Grid<TreeT>&, Grid<TreeT>&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compReplace(TreeT&, const TreeT&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void compReplace(Grid<TreeT>&, const Grid<TreeT>&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

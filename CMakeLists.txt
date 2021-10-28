@@ -117,6 +117,7 @@ to select the correct half support. You may set this to on to force Imath half t
 required.]=] ${USE_EXR})
 option(USE_PNG "Use PNG while building openvdb components." OFF)
 option(USE_AX "Use OpenVDB AX while building openvdb components." ${OPENVDB_BUILD_AX})
+option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
 
 cmake_dependent_option(OPENVDB_DISABLE_BOOST_IMPLICIT_LINKING
   "Disable the implicit linking of Boost libraries on Windows" ON "WIN32" OFF)
@@ -141,7 +142,9 @@ option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" O
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
 option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
-option(USE_NANOVDB "Use NanoVDB while building openvdb components." ${OPENVDB_BUILD_NANOVDB})
+option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes and methods against a
+pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
+the compilation of all dependent code by bypassing the expensive template instantation." ON)
 
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])

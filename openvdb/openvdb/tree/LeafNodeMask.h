@@ -440,7 +440,7 @@ public:
     /// Return @c true if all of this node's values are inactive.
     bool isInactive() const { return mBuffer.mData.isOff(); }
 
-    /// @brief no-op since for this temaplte specialization voxel
+    /// @brief no-op since for this template specialization voxel
     /// values and states are indistinguishable.
     void resetBackground(bool, bool) {}
 
@@ -474,7 +474,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherType>
     void topologyIntersection(const LeafNode<OtherType, Log2Dim>& other, const bool&);
 
@@ -507,7 +507,7 @@ public:
     /// @brief Calls the templated functor BBoxOp with bounding box information.
     /// An additional level argument is provided to the callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);

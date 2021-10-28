@@ -9,6 +9,7 @@
 #define OPENVDB_TOOLS_MASK_HAS_BEEN_INCLUDED
 
 #include <openvdb/Grid.h>
+#include <openvdb/openvdb.h>
 #include "LevelSetUtil.h" // for tools::sdfInteriorMask()
 #include <type_traits> // for std::enable_if, std::is_floating_point
 
@@ -25,7 +26,7 @@ namespace tools {
 /// @param isovalue  for a level set grid, the isovalue that defines the grid's interior
 /// @sa tools::sdfInteriorMask()
 template<typename GridType>
-inline typename GridType::template ValueConverter<bool>::Type::Ptr
+typename GridType::template ValueConverter<bool>::Type::Ptr
 interiorMask(const GridType& grid, const double isovalue = 0.0);
 
 
@@ -100,7 +101,7 @@ doInteriorMask(const GridType& grid, const double isovalue)
 
 
 template<typename GridType>
-inline typename GridType::template ValueConverter<bool>::Type::Ptr
+typename GridType::template ValueConverter<bool>::Type::Ptr
 interiorMask(const GridType& grid, const double isovalue)
 {
     return mask_internal::doInteriorMask(grid, isovalue);
@@ -108,6 +109,23 @@ interiorMask(const GridType& grid, const double isovalue)
 
 
 ////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_MASK
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::ValueConverter<bool>::Type::Ptr interiorMask(const Grid<TreeT>&, const double)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

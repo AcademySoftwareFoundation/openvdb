@@ -228,6 +228,20 @@
     #endif
 #endif
 
+/// Helper macros for explicit template instantiation
+#if defined(_WIN32) && defined(OPENVDB_DLL)
+    #ifdef OPENVDB_PRIVATE
+        #define OPENVDB_TEMPLATE_EXPORT OPENVDB_EXPORT
+        #define OPENVDB_TEMPLATE_IMPORT
+    #else
+        #define OPENVDB_TEMPLATE_EXPORT
+        #define OPENVDB_TEMPLATE_IMPORT OPENVDB_IMPORT
+    #endif
+#else
+    #define OPENVDB_TEMPLATE_IMPORT
+    #define OPENVDB_TEMPLATE_EXPORT
+#endif
+
 /// All classes and public free standing functions must be explicitly marked
 /// as \<lib\>_API to be exported. The \<lib\>_PRIVATE macros are defined when
 /// building that particular library.
