@@ -55,25 +55,39 @@ endif()
 # be provided to find_package(Python) with differing major versions. e.g.
 # calls to find_package(Python 2.7) fails if python3 is found on the system.
 function(OPENVDB_CHECK_PYTHON_VERSION)
-  set(_PY_VERSION ${ARGV0})
-  set(_PY_PATH ${ARGV1})
-  if(NOT _PY_VERSION)
-    message(FATAL_ERROR "Could NOT find Python (Required is at least version "
-      "\"${MINIMUM_PYTHON_VERSION}\")"
+  set(PY_TARGET ${ARGV0})
+  set(PY_TARGET_VERSION ${ARGV1})
+  set(PY_TARGET_INCLUDES ${ARGV2})
+  set(MIN_VERSION ${ARGV3})
+  set(FUTURE_MIN_VERSION ${ARGV4})
+
+  if(NOT TARGET ${PY_TARGET})
+    message(FATAL_ERROR "Could NOT find ${PY_TARGET} (Required is at least version "
+      "\"${MIN_VERSION}\")"
     )
-  elseif(_PY_VERSION VERSION_LESS MINIMUM_PYTHON_VERSION)
-    message(FATAL_ERROR "Could NOT find Python: Found unsuitable version \"${_PY_VERSION}\""
-      "but required is at least \"${MINIMUM_PYTHON_VERSION}\" (found ${_PY_PATH})"
-    )
-  else()
-    message(STATUS "Found Python: ${_PY_PATH}) (found suitable version \"${_PY_VERSION}\", "
-      "minimum required is \"${MINIMUM_PYTHON_VERSION}\")"
-    )
+  endif()
+
+  if(PY_TARGET_VERSION AND MIN_VERSION)
+    if(PY_TARGET_VERSION VERSION_LESS MIN_VERSION)
+      message(FATAL_ERROR "Could NOT find ${PY_TARGET}: Found unsuitable version "
+        "\"${PY_TARGET_VERSION}\" but required is at least \"${MIN_VERSION}\" (found ${PY_TARGET_INCLUDES})"
+      )
+    endif()
+  endif()
+
+  message(STATUS "Found ${PY_TARGET}: ${PY_TARGET_INCLUDES}) (found suitable "
+    "version \"${PY_TARGET_VERSION}\", minimum required is \"${MIN_VERSION}\")"
+  )
+
+  if(OPENVDB_FUTURE_DEPRECATION AND PY_TARGET_VERSION AND FUTURE_MIN_VERSION)
+    if(PY_TARGET_VERSION VERSION_LESS FUTURE_MIN_VERSION)
+      message(DEPRECATION "Support for ${PY_TARGET} versions < ${FUTURE_MIN_VERSION} "
+        "is deprecated and will be removed.")
+    endif()
   endif()
 endfunction()
 
 # Configure Python and Numpy. Note that:
-#  - find_package(Python NumPy) requires CMake >= 3.14
 #  - find_package(Python Development) target Python::Module requires CMake >= 3.15
 #  - find_package(Python Development.Module) requires CMake >= 3.18
 # To ensure consistent versions between components Interpreter, Compiler,
@@ -85,38 +99,30 @@ endfunction()
 set(OPENVDB_PYTHON_DEPS)
 set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
-    list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
+if(USE_NUMPY)
+  list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS NumPy)
+endif()
+
+# Make sure find_package(Python) is only ever invoked once with all required components
+find_package(Python COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+
+openvdb_check_python_version(Python::Module
+  "${Python_VERSION}"
+  "${Python_INCLUDE_DIRS}"
+  "${MINIMUM_PYTHON_VERSION}"
+  "${FUTURE_MINIMUM_PYTHON_VERSION}")
+list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
 
 if(USE_NUMPY)
-  find_package(Python QUIET COMPONENTS NumPy)
-  if(NOT TARGET Python::NumPy)
-      message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
-        "\"${MINIMUM_NUMPY_VERSION}\")"
-      )
-  elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
-    message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
-      "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
-    )
-  else()
-    message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
-      "version \"${Python_NumPy_VERSION}\", minimum required is "
-      "\"${MINIMUM_NUMPY_VERSION}\")"
-    )
-  endif()
+  openvdb_check_python_version(Python::NumPy
+    "${Python_NumPy_VERSION}"
+    "${Python_NumPy_INCLUDE_DIRS}"
+    "${MINIMUM_NUMPY_VERSION}"
+    "${FUTURE_MINIMUM_NUMPY_VERSION}")
   list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-endif()
-
-if(USE_NUMPY)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_NUMPY_VERSION)
-    if(Python_NumPy_VERSION VERSION_LESS FUTURE_MINIMUM_NUMPY_VERSION)
-      message(DEPRECATION "Support for NumPy versions < ${FUTURE_MINIMUM_NUMPY_VERSION} "
-        "is deprecated and will be removed.")
-    endif()
-  endif()
 endif()
 
 if(TARGET openvdb_shared AND NOT Boost_USE_STATIC_LIBS)
@@ -228,17 +234,6 @@ if(UNIX)
   set_target_properties(pyopenvdb PROPERTIES SUFFIX ".so") # must be .so (not .dylib)
 elseif(WIN32)
   set_target_properties(pyopenvdb PROPERTIES SUFFIX ".pyd") # .pyd on windows
-endif()
-
-if(TARGET Python::Module)
-  list(APPEND OPENVDB_PYTHON_DEPS Python::Module)
-else()
-  if(APPLE)
-    target_include_directories(pyopenvdb SYSTEM PUBLIC ${Python_INCLUDE_DIRS})
-    target_link_options(pyopenvdb PUBLIC -undefined dynamic_lookup)
-  else()
-    list(APPEND OPENVDB_PYTHON_DEPS Python::Python)
-  endif()
 endif()
 
 target_link_libraries(pyopenvdb PUBLIC
