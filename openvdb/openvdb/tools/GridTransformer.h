@@ -1060,7 +1060,12 @@ OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
 
 #define _FUNCTION(TreeT) \
     void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
-OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+OPENVDB_NUMERIC_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void resampleToMatch<QuadraticSampler>(const Grid<TreeT>&, Grid<TreeT>&, util::NullInterrupter&)
+OPENVDB_VEC3_TREE_INSTANTIATE(_FUNCTION)
 #undef _FUNCTION
 
 #endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
