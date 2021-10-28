@@ -662,6 +662,13 @@ SOP_OpenVDB_Extrapolate::Cache::process(
                 return false;
             }
 
+            // no-operation if dilation is < 1
+            if (parms.mDilate < 1) {
+                std::string msg = "Expand SDF narrow-band with dilate value < 1 results in no-op.";
+                addMessage(SOP_MESSAGE, msg.c_str());
+                return false;
+            }
+
             const NearestNeighbors nn =
                 (parms.mPattern == "NN18") ? NN_FACE_EDGE : ((parms.mPattern == "NN26") ? NN_FACE_EDGE_VERTEX : NN_FACE);
             parms.mNewFSGrid = dilateSdf(*fsGrid, parms.mDilate, nn, parms.mNSweeps, parms.mSweepingDomain);
