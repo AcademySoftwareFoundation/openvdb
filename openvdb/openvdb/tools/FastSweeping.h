@@ -441,7 +441,7 @@ maskSdf(const GridT &sdfGrid,
 /// @brief Computes signed distance values from an initial iso-surface and
 ///        optionally performs velocity extension at the same time. This is
 ///        done by means of a novel sparse and parallel fast sweeping
-///        algorithm based on a first order Godonov's scheme.
+///        algorithm based on a first order Godunov's scheme.
 ///
 ///        Solves: @f$|\nabla \phi|^2 = 1 @f$
 ///
@@ -454,7 +454,7 @@ class FastSweeping
 {
     static_assert(std::is_floating_point<typename SdfGridT::ValueType>::value,
                   "FastSweeping requires SdfGridT to have floating-point values");
-    // Defined types related to the signed disntance (or fog) grid
+    // Defined types related to the signed distance (or fog) grid
     using SdfValueT = typename SdfGridT::ValueType;
     using SdfTreeT = typename SdfGridT::TreeType;
     using SdfAccT  = tree::ValueAccessor<SdfTreeT, false>;//don't register accessors
@@ -1584,7 +1584,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
             const LeafSliceArray& leafSliceArray = mVoxelSliceMap[voxelSliceIndex];
 
-            // Solves Godonov's scheme: [x-d1]^2 + [x-d2]^2  + [x-d3]^2 = h^2
+            // Solves Godunov's scheme: [x-d1]^2 + [x-d2]^2  + [x-d3]^2 = h^2
             // where [X] = (X>0?X:0) and ai=min(di+1,di-1)
             for (size_t i = range.begin(); i < range.end(); ++i) {
 

@@ -208,7 +208,7 @@ DEFINE_LLVM_FP_INTRINSIC(ceil, "Computes the smallest integer value not less tha
 DEFINE_LLVM_FP_INTRINSIC(round, "Computes the nearest integer value to arg (in floating-point format),"
     " rounding halfway cases away from zero.")
 
-// pow created explicitly as it takes two arguments and performs slighlty different
+// pow created explicitly as it takes two arguments and performs slightly different
 // calls for integer exponents
 
 inline FunctionGroup::UniquePtr llvm_pow(const FunctionOptions& op)

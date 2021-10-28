@@ -22,7 +22,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace ax {
 
-/// @note Implementation for initialize, isInitialized and unitialized
+/// @note Implementation for initialize, isInitialized and uninitialized
 ///       reamins in compiler/Compiler.cc
 
 void run(const char* ax, openvdb::GridBase& grid)

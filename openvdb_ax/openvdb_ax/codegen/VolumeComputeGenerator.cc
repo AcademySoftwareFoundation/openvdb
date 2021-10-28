@@ -206,7 +206,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
         assert(args.size() == 6);
         llvm::Value* isc = args[1]; // index space coord
         llvm::Value* wi = args[4]; // write index
-        llvm::Value* wa = args[5]; // write_acccessor
+        llvm::Value* wa = args[5]; // write_accessor
 
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::LLVMContext& C = B.getContext();
