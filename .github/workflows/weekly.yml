@@ -121,8 +121,14 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components="core,axcore,test,axtest"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF ${{ matrix.config.cmake }}\"
+        --components="core,test,nano,nanotest,axcore,axtest"
+        --cargs=\"
+        -DOPENVDB_CORE_STATIC=OFF
+        -DOPENVDB_AX_STATIC=OFF
+        -DNANOVDB_USE_OPENVDB=ON
+        -DCMAKE_INSTALL_PREFIX=`pwd`
+        ${{ matrix.config.cmake }}
+        \"
     - name: test
       run: cd build && ctest -V
 
