@@ -70,10 +70,14 @@ jobs:
         run: sudo apt-get -q install -y nvidia-cuda-toolkit
       - name: build
         run: >
-          sudo ./ci/build.sh -v
+          ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
           --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-          --cargs=\'-DNANOVDB_USE_CUDA=ON -DNANOVDB_USE_OPENVDB=ON\'
+          --cargs=\'
+          -DNANOVDB_USE_CUDA=ON
+          -DNANOVDB_USE_OPENVDB=ON
+          -DCMAKE_INSTALL_PREFIX=`pwd`
+          \'
       - name: test
         run: cd build && sudo ctest -V
 
