@@ -211,7 +211,9 @@ TEST_F(TestNanoVDB, Version)
         ss << NANOVDB_MAJOR_VERSION_NUMBER << "."
            << NANOVDB_MINOR_VERSION_NUMBER << "."
            << NANOVDB_PATCH_VERSION_NUMBER;
-        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        auto c_str = v.c_str();
+        EXPECT_EQ(ss.str(), std::string(c_str));
+        std::free(const_cast<char*>(c_str));
         //std::cerr << v.c_str() << std::endl;
     }
     {// detailed constructor
@@ -224,7 +226,9 @@ TEST_F(TestNanoVDB, Version)
         EXPECT_EQ(patch, v.getPatch());
         std::stringstream ss;
         ss << major << "." << minor << "." << patch;
-        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        auto c_str = v.c_str();
+        EXPECT_EQ(ss.str(), std::string(c_str));
+        std::free(const_cast<char*>(c_str));
         //std::cerr << v.c_str() << std::endl;
     }
     {// smallest possible version number
@@ -237,7 +241,9 @@ TEST_F(TestNanoVDB, Version)
         EXPECT_EQ(patch, v.getPatch());
         std::stringstream ss;
         ss << major << "." << minor << "." << patch;
-        EXPECT_EQ(ss.str(), std::string(v.c_str()) );
+        auto c_str = v.c_str();
+        EXPECT_EQ(ss.str(), std::string(c_str));
+        std::free(const_cast<char*>(c_str));
         //std::cerr << "version.data = " << v.id() << std::endl;
     }
     {// test comparison operators
