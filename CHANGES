@@ -19,6 +19,8 @@ Version 9.0.0 - In development
     - A new HoudiniInterrupter has been added that derives from the
       NullInterrupter and the Interrupter is now deprecated. All the SOPs have
       been updated to use the new HoudiniInterrupter.
+    - Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band
+      level-set with a dilation value of 0, which will result in no operation.
 
     Build:
     - As of this release, VFX Reference Platform 2019 is no longer supported.
