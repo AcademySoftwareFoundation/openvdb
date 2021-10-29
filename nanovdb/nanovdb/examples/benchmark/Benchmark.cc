@@ -206,7 +206,7 @@ TEST_F(Benchmark, Ray)
         EXPECT_EQ(ray(1.5)[1], 4); //higher y component of intersection
 
         ray.reset(eye, dir, t0, t1);
-        // intersects the lower edge anlong the z-axis of the box
+        // intersects the lower edge along the z-axis of the box
         EXPECT_TRUE( ray.clip(BBoxT(Vec3T(1.5, 2.0, 2.0), Vec3T(4.5, 4.0, 6.0))) );
         EXPECT_EQ(0.5, ray.t0());
         EXPECT_EQ(0.5, ray.t1());

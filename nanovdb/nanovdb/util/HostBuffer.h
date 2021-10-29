@@ -166,7 +166,7 @@ public:
     ///        @c pool == nullptr or @c pool->poolSize() == 0, one is
     ///        created with size @c bufferSize, i.e. a full buffer is returned.
     ///
-    /// @throw If the specified @c pool has insufficientis memory for
+    /// @throw If the specified @c pool has insufficient memory for
     ///        the requested buffer size.
     static HostBuffer create(uint64_t bufferSize, const HostBuffer* pool = nullptr);
 

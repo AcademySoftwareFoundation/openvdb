@@ -1180,7 +1180,7 @@ TEST_F(TestOpenVDB, PointDataGridBasic)
         return positions.end();
     };
 
-    // The VDB Point-Partioner is used when bucketing points and requires a
+    // The VDB Point-Partitioner is used when bucketing points and requires a
     // specific interface. For convenience, we use the PointAttributeVector
     // wrapper around an stl vector wrapper here, however it is also possible to
     // write one for a custom data structure in order to match the interface
@@ -1291,7 +1291,7 @@ TEST_F(TestOpenVDB, PointDataGridRandom)
     }
     EXPECT_EQ( pointCount, positions.size() );
 
-    // The VDB Point-Partioner is used when bucketing points and requires a
+    // The VDB Point-Partitioner is used when bucketing points and requires a
     // specific interface. For convenience, we use the PointAttributeVector
     // wrapper around an stl vector wrapper here, however it is also possible to
     // write one for a custom data structure in order to match the interface

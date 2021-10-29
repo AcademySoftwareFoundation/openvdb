@@ -5,7 +5,7 @@
 ///
 /// @author Ken Museth
 ///
-/// @brief Hierachical Digital Differential Analyzers specialized for VDB.
+/// @brief Hierarchical Digital Differential Analyzers specialized for VDB.
 
 #ifndef NANOVDB_HDDA_H_HAS_BEEN_INCLUDED
 #define NANOVDB_HDDA_H_HAS_BEEN_INCLUDED

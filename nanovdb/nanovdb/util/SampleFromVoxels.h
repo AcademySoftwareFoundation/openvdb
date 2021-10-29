@@ -77,7 +77,7 @@ __hostdev__ inline CoordT Floor(Vec3T<double>& xyz)
 
 // ------------------------------> NearestNeighborSampler <--------------------------------------
 
-/// @brief Neigherest neighbor, i.e. zero order, interpolator with caching
+/// @brief Nearest neighbor, i.e. zero order, interpolator with caching
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 0, true>
 {
@@ -107,7 +107,7 @@ private:
     mutable ValueT    mVal; // private cache
 }; // SampleFromVoxels<TreeOrAccT, 0, true>
 
-/// @brief Neigherest neighbor, i.e. zero order, interpolator without caching
+/// @brief Nearest neighbor, i.e. zero order, interpolator without caching
 template<typename TreeOrAccT>
 class SampleFromVoxels<TreeOrAccT, 0, false>
 {
