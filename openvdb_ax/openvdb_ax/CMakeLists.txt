@@ -229,12 +229,12 @@ if(NOT LLVM_ENABLE_ASSERTIONS)
   # otherwise we get a missing symbol error from LLVM:
   #  undefined reference to `llvm::cfg::Update<llvm::BasicBlock*>::dump() const'
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-    "$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:NDEBUG>")
+    "$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:NDEBUG>")
 endif()
 if(NOT LLVM_ENABLE_RTTI)
   # If llvm has been built without rtti, disable the vptr sanitizer for AX
   list(APPEND OPENVDB_AX_PUBLIC_OPTIONS
-    "$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-sanitize=vptr>")
+    "$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-sanitize=vptr>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
