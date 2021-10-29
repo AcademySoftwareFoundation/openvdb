@@ -101,3 +101,49 @@ cd build
 cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -DVCPKG_TARGET_TRIPLET=x64-windows -A x64 ..
 cmake --build . --parallel 4 --config Release --target install
 ```
+
+#### Building NanoVDB
+
+**First example: building NanoVDB and OpenVDB core**
+
+NanoVDB is now a module of the larger OpenVDB project. A user can build both libraries together. This will build the OpenVDB core library, install the NanoVDB header files, and build the NanoVDB command-line tools in the `build/nanovdb/cmd` directory. From the 'root' OpenVDB project directory (change the dependency paths to match your environment):
+  ```console
+  foo@bar:~$ mkdir build
+  foo@bar:~$ cd build
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ make -j 4 && make install
+  ```
+Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overriden by passing on `-DNANOVDB_USE_OPENVDB=OFF`. The `Boost` library is included because it is a requirement for building OpenVDB.
+
+In general, CMake will try to find every optional dependency when a user opts to add an additional dependency. Be sure to check the CMake log to see what dependencies were **not** found.
+
+**Second example: NanoVDB with no dependencies**
+
+From the 'root' OpenVDB project directory:
+  ```console
+  foo@bar:~$ mkdir build
+  foo@bar:~$ cd build
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DNANOVDB_USE_TBB=OFF -DNANOVDB_USE_BLOSC=OFF -DNANOVDB_USE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ make -j 4 && make install
+  ```
+
+Another option is to build it from the NanoVDB directory itself, which is much simpler:
+  ```console
+  foo@bar:~$ cd nanovdb/nanovdb
+  foo@bar:~$ mkdir build
+  foo@bar:~$ cd build
+  foo@bar:~$ cmake .. -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ make -j 4 && make install
+  ```
+Both options will install the NanoVDB header files to the `/install/path` as well as building `nanovdb_print` and `nanovdb_validate` executable. The path where these executables are installed will be different: in the first option they will be under `build/nanovdb/cmd` directory; whilst in the second option they will be under the `build/cmd/` directory.
+
+**Third example: build 'everything' in NanoVDB along with OpenVDB core**
+
+From the root OpenVDB directory:
+  ```console
+  foo@bar:~$ mkdir build
+  foo@bar:~$ cd build
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ make -j 4 && make install
+  ```
+Note that if you already have the correct version of OpenVDB pre-installed, you can configure CMake to link against that library by passing the arguments `-DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_ROOT=/path/to/openvdb` when invoking `cmake`.
