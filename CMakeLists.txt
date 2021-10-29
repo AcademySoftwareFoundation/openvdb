@@ -78,7 +78,6 @@ option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
-option(NANOVDB_USE_OPENVDB "Build with OpenVDB support" OFF)
 
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
@@ -553,8 +552,19 @@ if(USE_STATIC_DEPENDENCIES)
 endif()
 
 # Configure OpenVDB Library and ABI versions
+set(NEEDS_OPENVDB OFF)
 
-if(NOT OPENVDB_BUILD_CORE AND (NOT USE_NANOVDB OR NANOVDB_USE_OPENVDB))
+if(OPENVDB_BUILD_AX OR
+   OPENVDB_BUILD_BINARIES OR
+   OPENVDB_BUILD_UNITTESTS OR
+   OPENVDB_BUILD_HOUDINI_PLUGIN OR
+   OPENVDB_BUILD_MAYA_PLUGIN OR
+   OPENVDB_BUILD_PYTHON_MODULE OR
+   OPENVDB_BUILD_HOUDINI_ABITESTS)
+  set(NEEDS_OPENVDB ON)
+endif()
+
+if(NOT OPENVDB_BUILD_CORE AND NEEDS_OPENVDB)
   # Find VDB installation and determine lib/abi versions. This resets the
   # version and ABI numbers
   find_package(OpenVDB REQUIRED)
