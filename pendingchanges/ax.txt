@@ -1,5 +1,0 @@
-Improvements:
-    - Added a python binding for OpenVDB AX which allows you to invoke accelerated AX code from the python module.
-
-Bug fixes:
-    - Fixed a bug where ax::run() would crash if it could not parse a single statement.
