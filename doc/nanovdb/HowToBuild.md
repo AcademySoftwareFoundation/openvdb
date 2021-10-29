@@ -25,7 +25,15 @@ In general, CMake will try to find every optional dependency when a user opts to
 
 ## Second example: NanoVDB with no dependencies
 
-The simplest way is to build it from the NanoVDB directory itself:
+From the 'root' OpenVDB project directory:
+  ```console
+  foo@bar:~$ mkdir build
+  foo@bar:~$ cd build
+  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DNANOVDB_USE_TBB=OFF -DNANOVDB_USE_BLOSC=OFF -DNANOVDB_USE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/install/path
+  foo@bar:~$ make -j 4 && make install
+  ```
+
+Another option is to build it from the NanoVDB directory itself, which is much simpler:
   ```console
   foo@bar:~$ cd nanovdb/nanovdb
   foo@bar:~$ mkdir build
@@ -33,7 +41,7 @@ The simplest way is to build it from the NanoVDB directory itself:
   foo@bar:~$ cmake .. -DCMAKE_INSTALL_PREFIX=/install/path
   foo@bar:~$ make -j 4 && make install
   ```
-This will install the NanoVDB header files to the `/install/path` as well as building `nanovdb_print` and `nanovdb_validate` executable.
+Both options will install the NanoVDB header files to the `/install/path` as well as building `nanovdb_print` and `nanovdb_validate` executable. The path where these executables are installed will be different: in the first option they will be under `build/nanovdb/cmd` directory; whilst in the second option they will be under the `build/cmd/` directory.
 
 ## Third example: build 'everything' in NanoVDB along with OpenVDB core
 
