@@ -114,7 +114,7 @@ public:
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors. The method also takes a value of the center
     /// element of the stencil, assuming it is already known.
-    /// @param ijk Index coordinates of stnecil center
+    /// @param ijk Index coordinates of stencil center
     /// @param centerValue Value of the center element of the stencil
     __hostdev__ inline void moveTo(const Coord& ijk, const ValueType& centerValue)
     {

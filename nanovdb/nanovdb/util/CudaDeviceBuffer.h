@@ -119,12 +119,12 @@ public:
     uint8_t* data() const { return mCpuData; }
     uint8_t* deviceData() const { return mGpuData; }
 
-    /// @brief Copy grid from the CPU/host to the GPU/device. If @c sync is false the memory copy is asyncronous!
+    /// @brief Copy grid from the CPU/host to the GPU/device. If @c sync is false the memory copy is asynchronous!
     ///
     /// @note This will allocate memory on the GPU/device if it is not already allocated
     void deviceUpload(void* stream = 0, bool sync = true) const;
 
-    /// @brief Copy grid from the GPU/device to the CPU/host. If @c sync is false the memory copy is asyncronous!
+    /// @brief Copy grid from the GPU/device to the CPU/host. If @c sync is false the memory copy is asynchronous!
     void deviceDownload(void* stream = 0, bool sync = true) const;
 
     /// @brief Returns the size in bytes of the raw memory buffer managed by this allocator.

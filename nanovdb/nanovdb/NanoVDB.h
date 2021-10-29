@@ -908,7 +908,7 @@ public:
     /// @warning The argument is assumed to be 0, 1, or 2.
     __hostdev__ ValueType& operator[](IndexType i) { return mVec[i]; }
 
-   /// @brief Assigenemt operator that works with openvdb::Coord
+   /// @brief Assignment operator that works with openvdb::Coord
    template <typename CoordT>
     __hostdev__ Coord& operator=(const CoordT &other)
     {
@@ -3066,7 +3066,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
 
     ValueT mMinimum; // typically 4B
     ValueT mMaximum; // typically 4B
-    StatsT mAverage; // typically 4B,  average of all the active values in this node and its child nodes
+    StatsT mAverage; // typically 4B, average of all the active values in this node and its child nodes
     StatsT mStdDevi; // typically 4B, standard deviation of all the active values in this node and its child nodes
     alignas(32) Tile mTable[1u << (3 * LOG2DIM)]; // sizeof(ValueT) x (16*16*16 or 32*32*32)
 
@@ -3115,7 +3115,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) InternalData
     ~InternalData() = delete;
 }; // InternalData
 
-/// @brief Interal nodes of a VDB treedim(),
+/// @brief Internal nodes of a VDB treedim(),
 template<typename ChildT, uint32_t Log2Dim = ChildT::LOG2DIM + 1>
 class InternalNode : private InternalData<ChildT, Log2Dim>
 {
@@ -3266,7 +3266,7 @@ private:
     template<typename, uint32_t>
     friend class InternalNode;
 
-    /// @biref Private read access method used by the ReadAccessor
+    /// @brief Private read access method used by the ReadAccessor
     template<typename AccT>
     __hostdev__ ValueType getValueAndCache(const CoordType& ijk, const AccT& acc) const
     {

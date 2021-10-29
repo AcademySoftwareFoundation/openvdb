@@ -463,7 +463,7 @@ createPointBox(int                 pointsPerVoxel = 1, // half-width of narrow b
 /// @brief Given an input NanoVDB voxel grid this methods returns a GridHandle to another NanoVDB
 ///        PointDataGrid with points scattered in the active leaf voxels of in input grid.
 ///
-/// @param srcGrid        Const input grid used to determine the active voxels to scatter point intp
+/// @param srcGrid        Const input grid used to determine the active voxels to scatter points into
 /// @param pointsPerVoxel Number of point per voxel on on the surface
 /// @param name           Name of the grid
 /// @param mode           Mode of computation for the checksum.

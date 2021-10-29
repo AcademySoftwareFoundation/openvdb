@@ -118,7 +118,7 @@ int main()
 NVCC requires the CUDA kernel to be defined in [a separate .cu file](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor_cuda/read_nanovdb_sphere_accessor_cuda.cu):
 
 ```cpp
-#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
+#include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessible on both the host and device
 #include <stdio.h> // for printf
 
 // This is called by the host only

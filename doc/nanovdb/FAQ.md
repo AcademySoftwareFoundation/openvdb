@@ -6,7 +6,7 @@
 
   **What graphics API does NanoVDB support?**
 
-  We have tested NanoVDB with CUDA, OpenCL, OpenGL, DirectX 12, OptiX, HLSL, and GLSL. We are also working on adding support for WebGL.
+  We have tested NanoVDB with CUDA, OpenCL, OpenGL, DirectX 12, OptiX, Vulkan, HLSL, and GLSL. We are also working on adding support for WebGL.
 
 * **What are the advantages of NanoVDB?**
 
@@ -14,7 +14,7 @@
 
 * **What are the limitations of NanoVDB?**
 
-  Other than the fact that NanoVDB obviously lacks many of the features and tools of OpenVDB, the most important limitation of NanoVDB is the fact that it *assumes the topology of the tree structure to be static*. Thus, it is possible to modify the values in a NanoVDB grid, but not its topology.
+  Other than the fact that NanoVDB obviously lacks many of the features and tools of OpenVDB, the most important limitation of NanoVDB is the fact that it *assumes the topology of the tree structure to be static*. Thus, it is possible to modify the values in a NanoVDB grid, but not its topology, e.g. see [modify_nanovdb_thrust.cu](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_modify_nanovdb_thrust/modify_nanovdb_thrust.cu).
 
 * **Does NanoVDB work on the CPU as well as the GPU?**
 
