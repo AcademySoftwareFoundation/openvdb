@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: PointSample.h File Reference</title>
+<title>OpenVDB: openvdb/points/PointSample.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_c9229911bfd1cba3327f6b216c5f36b0.html">points</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_c9229911bfd1cba3327f6b216c5f36b0.html">points</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -98,8 +98,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <p>Sample a VDB Grid onto a VDB Points attribute.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &lt;<a class="el" href="NullInterrupter_8h_source.html">openvdb/util/NullInterrupter.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Interpolation_8h_source.html">openvdb/tools/Interpolation.h</a>&gt;</code><br />
+<div class="textblock"><code>#include &quot;<a class="el" href="NullInterrupter_8h_source.html">openvdb/util/NullInterrupter.h</a>&quot;</code><br />
+<code>#include &quot;openvdb/thread/Threading.h&quot;</code><br />
+<code>#include &quot;<a class="el" href="Interpolation_8h_source.html">openvdb/tools/Interpolation.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="PointDataGrid_8h_source.html">PointDataGrid.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="PointAttribute_8h_source.html">PointAttribute.h</a>&quot;</code><br />
 <code>#include &lt;sstream&gt;</code><br />
@@ -109,79 +110,37 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1SampleWithRounding.html">SampleWithRounding</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1points_1_1SampleWithRounding.html">SampleWithRounding</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1DummySampleType.html">DummySampleType</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes.html">CompatibleTypes&lt; FromType, ToType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_f8e290c898c9929b0a3fc0d65755c2e2.html">CompatibleTypes&lt;                  T, T &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_528186a0454b554d5b6f305971480806.html">CompatibleTypes&lt;                  T, math::Vec2&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_1676bd65fbc9d04f4c8d9e025738bc74.html">CompatibleTypes&lt;                  T, math::Vec3&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_afe042d9f9e482ad742fc8a90b9481f7.html">CompatibleTypes&lt;                  T, math::Vec4&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_eeb6c7805b6849bd449543bb51136890.html">CompatibleTypes&lt;                  math::Vec2&lt; T &gt;, math::Vec2&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_747eda7914dac0874ad17e73697c83ea.html">CompatibleTypes&lt;                  math::Vec3&lt; T &gt;, math::Vec3&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_c7165c7f6be86f1d4e36a47109107fe3.html">CompatibleTypes&lt;                  math::Vec4&lt; T &gt;, math::Vec4&lt; T &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_02093470910d18d726066d14ff01eb76.html">CompatibleTypes&lt;                  math::Vec2&lt; T0 &gt;, math::Vec2&lt; T1 &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_ff7ef23d7113a94bd01ac0eab927cb4e.html">CompatibleTypes&lt;                  math::Vec3&lt; T0 &gt;, math::Vec3&lt; T1 &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_bde544d7893569424bba6536b125f815.html">CompatibleTypes&lt;                  math::Vec4&lt; T0 &gt;, math::Vec4&lt; T1 &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1CompatibleTypes_3_01_01_01_01_01_0f03733751154a18f283d2f12894e6c0.html">CompatibleTypes&lt;                  ValueMask, T &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1SamplerTraits.html">SamplerTraits&lt; T &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1SamplerTraits_3_01tools_1_1Sampler_3_01T0_00_01T1_01_4_01_4.html">SamplerTraits&lt; tools::Sampler&lt; T0, T1 &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1SampleWithRoundingOp.html">SampleWithRoundingOp&lt; ValueT, SamplerT, AccessorT, Round, Compatible &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1SampleWithRoundingOp_3_01ValueT_0bf26b0e1bbc6bb2168337a1320933691.html">SampleWithRoundingOp&lt; ValueT, SamplerT, AccessorT, true, true &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1SampleWithRoundingOp_3_01ValueT_036934f5b9c33b6928a1b0e6a053b0801.html">SampleWithRoundingOp&lt; ValueT, SamplerT, AccessorT, false, true &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1PointDataSampler.html">PointDataSampler&lt; PointDataGridT, SamplerT, FilterT, InterrupterT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1AppendAttributeOp.html">AppendAttributeOp&lt; PointDataGridT, ValueT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__sample__internal_1_1AppendAttributeOp_3_01PointDataGridT_00_01DummySampleType_01_4.html">AppendAttributeOp&lt; PointDataGridT, DummySampleType &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1points_1_1DummySampleType.html">DummySampleType</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1points"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html">openvdb::v8_1::points</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1points_1_1point__sample__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__sample__internal.html">openvdb::v8_1::points::point_sample_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1points"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html">openvdb::v9_0::points</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:ae7b556e743b5d3b8b336c75252264d96"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename SourceGridT , typename FilterT  = NullFilter, typename InterrupterT  = util::NullInterrupter&gt; </td></tr>
-<tr class="memitem:ae7b556e743b5d3b8b336c75252264d96"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#ae7b556e743b5d3b8b336c75252264d96">pointSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
-<tr class="memdesc:ae7b556e743b5d3b8b336c75252264d96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs closest point sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#ae7b556e743b5d3b8b336c75252264d96">More...</a><br /></td></tr>
+<tr class="memitem:ae7b556e743b5d3b8b336c75252264d96"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#ae7b556e743b5d3b8b336c75252264d96">pointSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
+<tr class="memdesc:ae7b556e743b5d3b8b336c75252264d96"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs closest point sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#ae7b556e743b5d3b8b336c75252264d96">More...</a><br /></td></tr>
 <tr class="separator:ae7b556e743b5d3b8b336c75252264d96"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename SourceGridT , typename FilterT  = NullFilter, typename InterrupterT  = util::NullInterrupter&gt; </td></tr>
-<tr class="memitem:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#aa41bddc5c1099d146cee05b0dc3eb6ff">boxSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
-<tr class="memdesc:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs tri-linear sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#aa41bddc5c1099d146cee05b0dc3eb6ff">More...</a><br /></td></tr>
+<tr class="memitem:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#aa41bddc5c1099d146cee05b0dc3eb6ff">boxSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
+<tr class="memdesc:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs tri-linear sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#aa41bddc5c1099d146cee05b0dc3eb6ff">More...</a><br /></td></tr>
 <tr class="separator:aa41bddc5c1099d146cee05b0dc3eb6ff"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename SourceGridT , typename FilterT  = NullFilter, typename InterrupterT  = util::NullInterrupter&gt; </td></tr>
-<tr class="memitem:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#ad694b6c2cdbcd760f327fe3fb36ae936">quadraticSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
-<tr class="memdesc:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs tri-quadratic sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#ad694b6c2cdbcd760f327fe3fb36ae936">More...</a><br /></td></tr>
+<tr class="memitem:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#ad694b6c2cdbcd760f327fe3fb36ae936">quadraticSample</a> (PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute=&quot;&quot;, const FilterT &amp;filter=NullFilter(), InterrupterT *const interrupter=nullptr)</td></tr>
+<tr class="memdesc:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs tri-quadratic sampling from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#ad694b6c2cdbcd760f327fe3fb36ae936">More...</a><br /></td></tr>
 <tr class="separator:ad694b6c2cdbcd760f327fe3fb36ae936"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5ff8951f375ddac4b685e72f486489d3"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename SourceGridT , typename TargetValueT  = DummySampleType, typename SamplerT  = SampleWithRounding, typename FilterT  = NullFilter, typename InterrupterT  = util::NullInterrupter&gt; </td></tr>
-<tr class="memitem:a5ff8951f375ddac4b685e72f486489d3"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#a5ff8951f375ddac4b685e72f486489d3">sampleGrid</a> (size_t order, PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute, const FilterT &amp;filter=NullFilter(), const SamplerT &amp;sampler=SampleWithRounding(), InterrupterT *const interrupter=nullptr, const bool threaded=true)</td></tr>
-<tr class="memdesc:a5ff8951f375ddac4b685e72f486489d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs sampling and conversion from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#a5ff8951f375ddac4b685e72f486489d3">More...</a><br /></td></tr>
+<tr class="memitem:a5ff8951f375ddac4b685e72f486489d3"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a5ff8951f375ddac4b685e72f486489d3">sampleGrid</a> (size_t order, PointDataGridT &amp;points, const SourceGridT &amp;sourceGrid, const Name &amp;targetAttribute, const FilterT &amp;filter=NullFilter(), const SamplerT &amp;sampler=SampleWithRounding(), InterrupterT *const interrupter=nullptr, const bool threaded=true)</td></tr>
+<tr class="memdesc:a5ff8951f375ddac4b685e72f486489d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs sampling and conversion from a VDB grid onto a VDB Points attribute.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#a5ff8951f375ddac4b685e72f486489d3">More...</a><br /></td></tr>
 <tr class="separator:a5ff8951f375ddac4b685e72f486489d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

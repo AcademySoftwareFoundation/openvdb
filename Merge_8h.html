@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Merge.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Merge.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -102,8 +102,10 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;<a class="el" href="openvdb_2Exceptions_8h_source.html">openvdb/Exceptions.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="NodeManager_8h_source.html">openvdb/tree/NodeManager.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_2openvdb_2tree_2NodeManager_8h_source.html">openvdb/tree/NodeManager.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="NodeVisitor_8h_source.html">openvdb/tools/NodeVisitor.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
+<code>#include &lt;memory&gt;</code><br />
 <code>#include &lt;unordered_map&gt;</code><br />
 <code>#include &lt;unordered_set&gt;</code><br />
 </div>
@@ -111,53 +113,41 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge.html">TreeToMerge&lt; TreeT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience class that contains a pointer to a tree to be stolen or deep copied depending on the tag dispatch class used and a subset of methods to retrieve data from the tree.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge.html">TreeToMerge&lt; TreeT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convenience class that contains a pointer to a tree to be stolen or deep copied depending on the tag dispatch class used and a subset of methods to retrieve data from the tree.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge_1_1MaskPtr.html">TreeToMerge&lt; TreeT &gt;::MaskPtr</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper around unique_ptr that deep-copies mask on copy construction.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge_1_1MaskPtr.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge_1_1MaskPtr.html">TreeToMerge&lt; TreeT &gt;::MaskPtr</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper around unique_ptr that deep-copies mask on copy construction.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge_1_1MaskPtr.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge_1_1MaskUnionOp.html">TreeToMerge&lt; TreeT &gt;::MaskUnionOp</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator used to generate a mask of the input tree, but with dense leaf nodes replaced with active tiles for compactness.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1TreeToMerge_1_1MaskUnionOp.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge_1_1MaskUnionOp.html">TreeToMerge&lt; TreeT &gt;::MaskUnionOp</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator used to generate a mask of the input tree, but with dense leaf nodes replaced with active tiles for compactness.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1TreeToMerge_1_1MaskUnionOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CsgUnionOrIntersectionOp.html">CsgUnionOrIntersectionOp&lt; TreeT, Union &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge trees using a CSG union or intersection.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CsgUnionOrIntersectionOp.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CsgUnionOrIntersectionOp.html">CsgUnionOrIntersectionOp&lt; TreeT, Union &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge trees using a CSG union or intersection.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CsgUnionOrIntersectionOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CsgDifferenceOp.html">CsgDifferenceOp&lt; TreeT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge two trees using a CSG difference.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CsgDifferenceOp.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CsgDifferenceOp.html">CsgDifferenceOp&lt; TreeT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge two trees using a CSG difference.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CsgDifferenceOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1SumMergeOp.html">SumMergeOp&lt; TreeT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge trees using a sum operation.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1SumMergeOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1merge__internal_1_1UnallocatedBuffer.html">UnallocatedBuffer&lt; BufferT, ValueT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1merge__internal_1_1UnallocatedBuffer_3_01BufferT_00_01bool_01_4.html">UnallocatedBuffer&lt; BufferT, bool &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1merge__internal_1_1Dispatch.html">Dispatch&lt; LEVEL &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1merge__internal_1_1Dispatch_3_010_01_4.html">Dispatch&lt; 0 &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1merge__internal_1_1ApplyTileToNodeOp.html">ApplyTileToNodeOp&lt; TreeT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1SumMergeOp.html">SumMergeOp&lt; TreeT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">DynamicNodeManager operator to merge trees using a sum operation.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1SumMergeOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1merge__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1merge__internal.html">openvdb::v8_1::tools::merge_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
 Typedefs</h2></td></tr>
 <tr class="memitem:aa2bd678647ee7c097628900599ecd911"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:aa2bd678647ee7c097628900599ecd911"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aa2bd678647ee7c097628900599ecd911">CsgUnionOp</a> = CsgUnionOrIntersectionOp&lt; TreeT, true &gt;</td></tr>
+<tr class="memitem:aa2bd678647ee7c097628900599ecd911"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aa2bd678647ee7c097628900599ecd911">CsgUnionOp</a> = CsgUnionOrIntersectionOp&lt; TreeT, true &gt;</td></tr>
 <tr class="separator:aa2bd678647ee7c097628900599ecd911"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a15acb14744ad597506ab2c876df1e3c0"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:a15acb14744ad597506ab2c876df1e3c0"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a15acb14744ad597506ab2c876df1e3c0">CsgIntersectionOp</a> = CsgUnionOrIntersectionOp&lt; TreeT, false &gt;</td></tr>
+<tr class="memitem:a15acb14744ad597506ab2c876df1e3c0"><td class="memTemplItemLeft" align="right" valign="top">using&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a15acb14744ad597506ab2c876df1e3c0">CsgIntersectionOp</a> = CsgUnionOrIntersectionOp&lt; TreeT, false &gt;</td></tr>
 <tr class="separator:a15acb14744ad597506ab2c876df1e3c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

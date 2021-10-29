@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -96,21 +96,15 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 
-<p>Wrapper class that adapts a Houdini <code>UT_Interrupt</code> object for use with OpenVDB library routines.  
+<p>Deprecated wrapper class with the same interface as <a class="el" href="classopenvdb__houdini_1_1HoudiniInterrupter.html" title="Wrapper class that adapts a Houdini UT_Interrupt object for use with OpenVDB library routines...">HoudiniInterrupter</a>, however it does not derive from openvdb::util::NullInterrupter. Intended for backwards-compatibility only.  
  <a href="classopenvdb__houdini_1_1Interrupter.html#details">More...</a></p>
 
-<p><code>#include &lt;<a class="el" href="openvdb__houdini_2openvdb__houdini_2Utils_8h_source.html">Utils.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="openvdb__houdini_2openvdb__houdini_2Utils_8h_source.html">openvdb_houdini/Utils.h</a>&gt;</code></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:a084a468f68411b9dc51301968cc38a2d"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#a084a468f68411b9dc51301968cc38a2d">Interrupter</a> (const char *title=nullptr)</td></tr>
 <tr class="separator:a084a468f68411b9dc51301968cc38a2d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab98fcc9e9301dd9e3c8b50320dcaa8c0"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#ab98fcc9e9301dd9e3c8b50320dcaa8c0">~Interrupter</a> ()</td></tr>
-<tr class="separator:ab98fcc9e9301dd9e3c8b50320dcaa8c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adabc791f906e3693df91a6b6ab85fb9c"><td class="memItemLeft" align="right" valign="top">&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#adabc791f906e3693df91a6b6ab85fb9c">Interrupter</a> (const <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;)=default</td></tr>
-<tr class="separator:adabc791f906e3693df91a6b6ab85fb9c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab3cbb4a8d53c4bc49ae89c1d684331d6"><td class="memItemLeft" align="right" valign="top"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#ab3cbb4a8d53c4bc49ae89c1d684331d6">operator=</a> (const <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;)=default</td></tr>
-<tr class="separator:ab3cbb4a8d53c4bc49ae89c1d684331d6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aea6bbebfeaddd66a43f93a10a1d5c780"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#aea6bbebfeaddd66a43f93a10a1d5c780">start</a> (const char *name=nullptr)</td></tr>
 <tr class="memdesc:aea6bbebfeaddd66a43f93a10a1d5c780"><td class="mdescLeft">&#160;</td><td class="mdescRight">Signal the start of an interruptible operation.  <a href="#aea6bbebfeaddd66a43f93a10a1d5c780">More...</a><br /></td></tr>
 <tr class="separator:aea6bbebfeaddd66a43f93a10a1d5c780"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -120,10 +114,12 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aa48f7d2cdbf6265fdac605a80f0ffa83"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#aa48f7d2cdbf6265fdac605a80f0ffa83">wasInterrupted</a> (int percent=-1)</td></tr>
 <tr class="memdesc:aa48f7d2cdbf6265fdac605a80f0ffa83"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check if an interruptible operation should be aborted.  <a href="#aa48f7d2cdbf6265fdac605a80f0ffa83">More...</a><br /></td></tr>
 <tr class="separator:aa48f7d2cdbf6265fdac605a80f0ffa83"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a55ba177f4c87002b233ab7f3b1fd094c"><td class="memItemLeft" align="right" valign="top">openvdb::util::NullInterrupter &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html#a55ba177f4c87002b233ab7f3b1fd094c">interrupter</a> ()</td></tr>
+<tr class="memdesc:a55ba177f4c87002b233ab7f3b1fd094c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a reference to the base class of the stored interrupter.  <a href="#a55ba177f4c87002b233ab7f3b1fd094c">More...</a><br /></td></tr>
+<tr class="separator:a55ba177f4c87002b233ab7f3b1fd094c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>Wrapper class that adapts a Houdini <code>UT_Interrupt</code> object for use with OpenVDB library routines. </p>
-<dl class="section see"><dt>See also</dt><dd><a class="el" href="NullInterrupter_8h.html">openvdb/util/NullInterrupter.h</a> </dd></dl>
+<div class="textblock"><p>Deprecated wrapper class with the same interface as <a class="el" href="classopenvdb__houdini_1_1HoudiniInterrupter.html" title="Wrapper class that adapts a Houdini UT_Interrupt object for use with OpenVDB library routines...">HoudiniInterrupter</a>, however it does not derive from openvdb::util::NullInterrupter. Intended for backwards-compatibility only. </p>
 </div><h2 class="groupheader">Constructor &amp; Destructor Documentation</h2>
 <a class="anchor" id="a084a468f68411b9dc51301968cc38a2d"></a>
 <div class="memitem">
@@ -146,53 +142,7 @@ Public Member Functions</h2></td></tr>
   </tr>
 </table>
 </div><div class="memdoc">
-
-</div>
-</div>
-<a class="anchor" id="ab98fcc9e9301dd9e3c8b50320dcaa8c0"></a>
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname">~<a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> </td>
-          <td>(</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
-
-</div>
-</div>
-<a class="anchor" id="adabc791f906e3693df91a6b6ab85fb9c"></a>
-<div class="memitem">
-<div class="memproto">
-<table class="mlabels">
-  <tr>
-  <td class="mlabels-left">
-      <table class="memname">
-        <tr>
-          <td class="memname"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> </td>
-          <td>(</td>
-          <td class="paramtype">const <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;&#160;</td>
-          <td class="paramname"></td><td>)</td>
-          <td></td>
-        </tr>
-      </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">default</span></span>  </td>
-  </tr>
-</table>
-</div><div class="memdoc">
+<dl class="deprecated"><dt><b><a class="el" href="deprecated.html#_deprecated000035">Deprecated:</a></b></dt><dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter" </dd></dl>
 
 </div>
 </div>
@@ -222,7 +172,7 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="ab3cbb4a8d53c4bc49ae89c1d684331d6"></a>
+<a class="anchor" id="a55ba177f4c87002b233ab7f3b1fd094c"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
@@ -230,19 +180,20 @@ Public Member Functions</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a>&amp; operator= </td>
+          <td class="memname">openvdb::util::NullInterrupter&amp; interrupter </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;&#160;</td>
           <td class="paramname"></td><td>)</td>
           <td></td>
         </tr>
       </table>
   </td>
   <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">default</span></span>  </td>
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
   </tr>
 </table>
 </div><div class="memdoc">
+
+<p>Return a reference to the base class of the stored interrupter. </p>
 
 </div>
 </div>
@@ -310,9 +261,6 @@ Public Member Functions</h2></td></tr>
 
 </div>
 </div>
-<hr/>The documentation for this class was generated from the following file:<ul>
-<li><a class="el" href="openvdb__houdini_2openvdb__houdini_2Utils_8h_source.html">openvdb_houdini/openvdb_houdini/Utils.h</a></li>
-</ul>
 </div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Count.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Count.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,12 +83,11 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
@@ -99,46 +98,53 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Functions to count tiles, nodes or voxels in a grid.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;openvdb/version.h&gt;</code><br />
-<code>#include &lt;<a class="el" href="NodeManager_8h_source.html">openvdb/tree/NodeManager.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_2openvdb_2tree_2NodeManager_8h_source.html">openvdb/tree/NodeManager.h</a>&gt;</code><br />
 </div>
 <p><a href="Count_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
-Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1ActiveVoxelCountOp.html">ActiveVoxelCountOp&lt; TreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A DynamicNodeManager operator to count active voxels in a tree.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1ActiveVoxelCountOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1ActiveVoxelCountBBoxOp.html">ActiveVoxelCountBBoxOp&lt; TreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A DynamicNodeManager operator to count active voxels in a tree that fall within a provided bounding box.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1ActiveVoxelCountBBoxOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1MemUsageOp.html">MemUsageOp&lt; TreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">A DynamicNodeManager operator to sum the number of bytes of memory used.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1count__internal_1_1MemUsageOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1count__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1count__internal.html">openvdb::v8_1::tools::count_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a9cbb0a8d7e0521cc4165bb7e2d1081d3">countActiveVoxels</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
-<tr class="memdesc:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels in the tree.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a9cbb0a8d7e0521cc4165bb7e2d1081d3">More...</a><br /></td></tr>
+<tr class="memitem:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a9cbb0a8d7e0521cc4165bb7e2d1081d3">countActiveVoxels</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels in the tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a9cbb0a8d7e0521cc4165bb7e2d1081d3">More...</a><br /></td></tr>
 <tr class="separator:a9cbb0a8d7e0521cc4165bb7e2d1081d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a98cf0abafb6bb3dbaeefcd10f319aa71">countActiveVoxels</a> (const TreeT &amp;tree, const CoordBBox &amp;bbox, bool threaded=true)</td></tr>
-<tr class="memdesc:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels in the tree that intersects a bounding box.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a98cf0abafb6bb3dbaeefcd10f319aa71">More...</a><br /></td></tr>
+<tr class="memitem:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a98cf0abafb6bb3dbaeefcd10f319aa71">countActiveVoxels</a> (const TreeT &amp;tree, const CoordBBox &amp;bbox, bool threaded=true)</td></tr>
+<tr class="memdesc:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels in the tree that intersects a bounding box.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a98cf0abafb6bb3dbaeefcd10f319aa71">More...</a><br /></td></tr>
 <tr class="separator:a98cf0abafb6bb3dbaeefcd10f319aa71"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a073b47486ac79130a4de5210a44cc022"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:a073b47486ac79130a4de5210a44cc022"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a073b47486ac79130a4de5210a44cc022">countActiveLeafVoxels</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:a073b47486ac79130a4de5210a44cc022"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels stored in leaf nodes.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a073b47486ac79130a4de5210a44cc022">More...</a><br /></td></tr>
+<tr class="separator:a073b47486ac79130a4de5210a44cc022"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaec2cca19ae239e38c2424709547eac5"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:aaec2cca19ae239e38c2424709547eac5"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aaec2cca19ae239e38c2424709547eac5">countActiveLeafVoxels</a> (const TreeT &amp;tree, const CoordBBox &amp;bbox, bool threaded=true)</td></tr>
+<tr class="memdesc:aaec2cca19ae239e38c2424709547eac5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active voxels stored in leaf nodes that intersects a bounding box.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#aaec2cca19ae239e38c2424709547eac5">More...</a><br /></td></tr>
+<tr class="separator:aaec2cca19ae239e38c2424709547eac5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4d6ddf0e0a760645d2590f9b2be1c4de"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:a4d6ddf0e0a760645d2590f9b2be1c4de"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4d6ddf0e0a760645d2590f9b2be1c4de">countInactiveVoxels</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:a4d6ddf0e0a760645d2590f9b2be1c4de"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of inactive voxels in the tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4d6ddf0e0a760645d2590f9b2be1c4de">More...</a><br /></td></tr>
+<tr class="separator:a4d6ddf0e0a760645d2590f9b2be1c4de"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae97f0db6ef147e3f02a5ebec9f360e3d"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:ae97f0db6ef147e3f02a5ebec9f360e3d"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae97f0db6ef147e3f02a5ebec9f360e3d">countInactiveLeafVoxels</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:ae97f0db6ef147e3f02a5ebec9f360e3d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of inactive voxels stored in leaf nodes.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae97f0db6ef147e3f02a5ebec9f360e3d">More...</a><br /></td></tr>
+<tr class="separator:ae97f0db6ef147e3f02a5ebec9f360e3d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af3ce5e60836ad5cd560c698266e2104b"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:af3ce5e60836ad5cd560c698266e2104b"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#af3ce5e60836ad5cd560c698266e2104b">countActiveTiles</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:af3ce5e60836ad5cd560c698266e2104b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total number of active tiles in the tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#af3ce5e60836ad5cd560c698266e2104b">More...</a><br /></td></tr>
+<tr class="separator:af3ce5e60836ad5cd560c698266e2104b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad03704a13261822b75a2d5385bffbf41"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:ad03704a13261822b75a2d5385bffbf41"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad03704a13261822b75a2d5385bffbf41">memUsage</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
-<tr class="memdesc:ad03704a13261822b75a2d5385bffbf41"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total amount of memory in bytes occupied by this tree.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad03704a13261822b75a2d5385bffbf41">More...</a><br /></td></tr>
+<tr class="memitem:ad03704a13261822b75a2d5385bffbf41"><td class="memTemplItemLeft" align="right" valign="top">Index64&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ad03704a13261822b75a2d5385bffbf41">memUsage</a> (const TreeT &amp;tree, bool threaded=true)</td></tr>
+<tr class="memdesc:ad03704a13261822b75a2d5385bffbf41"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return the total amount of memory in bytes occupied by this tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ad03704a13261822b75a2d5385bffbf41">More...</a><br /></td></tr>
 <tr class="separator:ad03704a13261822b75a2d5385bffbf41"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

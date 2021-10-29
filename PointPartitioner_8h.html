@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: PointPartitioner.h File Reference</title>
+<title>OpenVDB: openvdb/tools/PointPartitioner.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,15 +83,14 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
-<a href="#typedef-members">Typedefs</a> &#124;
-<a href="#func-members">Functions</a>  </div>
+<a href="#typedef-members">Typedefs</a>  </div>
   <div class="headertitle">
 <div class="title">PointPartitioner.h File Reference</div>  </div>
 </div><!--header-->
@@ -103,7 +102,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;<a class="el" href="Transform_8h_source.html">openvdb/math/Transform.h</a>&gt;</code><br />
 <code>#include &lt;tbb/blocked_range.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_for.h&gt;</code><br />
-<code>#include &lt;tbb/task_scheduler_init.h&gt;</code><br />
+<code>#include &lt;tbb/task_arena.h&gt;</code><br />
 <code>#include &lt;algorithm&gt;</code><br />
 <code>#include &lt;cmath&gt;</code><br />
 <code>#include &lt;deque&gt;</code><br />
@@ -116,52 +115,24 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1PointPartitioner.html">PointPartitioner&lt; PointIndexType, BucketLog2Dim &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1PointPartitioner.html">PointPartitioner&lt; PointIndexType, BucketLog2Dim &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1PointPartitioner_1_1IndexIterator.html">PointPartitioner&lt; PointIndexType, BucketLog2Dim &gt;::IndexIterator</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1ComputePointOrderOp.html">ComputePointOrderOp&lt; PointIndexType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1CreateOrderedPointIndexArrayOp.html">CreateOrderedPointIndexArrayOp&lt; PointIndexType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1VoxelOrderOp.html">VoxelOrderOp&lt; PointIndexType, BucketLog2Dim &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1Array.html">Array&lt; T &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1MoveSegmentDataOp.html">MoveSegmentDataOp&lt; PointIndexType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1MergeBinsOp.html">MergeBinsOp&lt; PointIndexType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1BinPointIndicesOp.html">BinPointIndicesOp&lt; PointArray, PointIndexType, VoxelOffsetType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal_1_1OrderSegmentsOp.html">OrderSegmentsOp&lt; PointIndexType &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1PointPartitioner_1_1IndexIterator.html">PointPartitioner&lt; PointIndexType, BucketLog2Dim &gt;::IndexIterator</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal.html">openvdb::v8_1::tools::point_partitioner_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
 Typedefs</h2></td></tr>
-<tr class="memitem:a52bc789f19484fd8102225765173f548"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a52bc789f19484fd8102225765173f548">UInt32PointPartitioner</a> = PointPartitioner&lt; uint32_t, 3 &gt;</td></tr>
+<tr class="memitem:a52bc789f19484fd8102225765173f548"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a52bc789f19484fd8102225765173f548">UInt32PointPartitioner</a> = PointPartitioner&lt; uint32_t, 3 &gt;</td></tr>
 <tr class="separator:a52bc789f19484fd8102225765173f548"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
-Functions</h2></td></tr>
-<tr class="memitem:af9d08d6809f8cebe05b7dfb924ebe335"><td class="memTemplParams" colspan="2">template&lt;typename PointIndexType , typename VoxelOffsetType , typename PointArray &gt; </td></tr>
-<tr class="memitem:af9d08d6809f8cebe05b7dfb924ebe335"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal.html#af9d08d6809f8cebe05b7dfb924ebe335">binAndSegment</a> (const <a class="el" href="interfacePointArray.html">PointArray</a> &amp;points, const math::Transform &amp;xform, std::unique_ptr&lt; typename Array&lt; PointIndexType &gt;::Ptr[]&gt; &amp;indexSegments, std::unique_ptr&lt; typename Array&lt; PointIndexType &gt;::Ptr[]&gt; &amp;offsetSegments, std::vector&lt; Coord &gt; &amp;coords, const Index binLog2Dim, const Index bucketLog2Dim, VoxelOffsetType *voxelOffsets=nullptr, bool cellCenteredTransform=true)</td></tr>
-<tr class="memdesc:af9d08d6809f8cebe05b7dfb924ebe335"><td class="mdescLeft">&#160;</td><td class="mdescRight">Segment points using one level of least significant digit radix bins.  <a href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal.html#af9d08d6809f8cebe05b7dfb924ebe335">More...</a><br /></td></tr>
-<tr class="separator:af9d08d6809f8cebe05b7dfb924ebe335"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad13f044b1d35682746865433e97ffa6c"><td class="memTemplParams" colspan="2">template&lt;typename PointIndexType , typename VoxelOffsetType , typename PointArray &gt; </td></tr>
-<tr class="memitem:ad13f044b1d35682746865433e97ffa6c"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1point__partitioner__internal.html#ad13f044b1d35682746865433e97ffa6c">partition</a> (const <a class="el" href="interfacePointArray.html">PointArray</a> &amp;points, const math::Transform &amp;xform, const Index bucketLog2Dim, std::unique_ptr&lt; PointIndexType[]&gt; &amp;pointIndices, std::unique_ptr&lt; PointIndexType[]&gt; &amp;pageOffsets, std::unique_ptr&lt; Coord[]&gt; &amp;pageCoordinates, PointIndexType &amp;pageCount, std::unique_ptr&lt; VoxelOffsetType[]&gt; &amp;voxelOffsets, bool recordVoxelOffsets, bool cellCenteredTransform)</td></tr>
-<tr class="separator:ad13f044b1d35682746865433e97ffa6c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Spatially partitions points using a parallel radix-based sorting algorithm. </p>

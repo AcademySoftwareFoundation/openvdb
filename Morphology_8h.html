@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Morphology.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Morphology.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -106,7 +106,9 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &quot;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="ValueAccessor_8h_source.html">openvdb/tree/ValueAccessor.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&quot;</code><br />
-<code>#include &lt;tbb/task_scheduler_init.h&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="PointDataGrid_8h_source.html">openvdb/points/PointDataGrid.h</a>&gt;</code><br />
+<code>#include &lt;tbb/task_arena.h&gt;</code><br />
 <code>#include &lt;tbb/enumerable_thread_specific.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_for.h&gt;</code><br />
 <code>#include &lt;type_traits&gt;</code><br />
@@ -116,78 +118,71 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1morphology_1_1Morphology.html">Morphology&lt; TreeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilation/Erosion operations over a Trees leaf level voxel topology.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1morphology_1_1Morphology.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1morphology_1_1Morphology.html">Morphology&lt; TreeType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilation/Erosion operations over a Trees leaf level voxel topology.  <a href="classopenvdb_1_1v9__0_1_1tools_1_1morphology_1_1Morphology.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1morphology_1_1Morphology_1_1NodeMaskOp.html">Morphology&lt; TreeType &gt;::NodeMaskOp</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Node Mask dilation/erosion operations for individual leaf nodes on a given tree. The leaf node may optionally belong to a different tree than the provided accessor, which will have the effect of dilating the leaf node mask into a different tree, or eroding the node mask based on corresponding neighbours in a different tree.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1morphology_1_1Morphology_1_1NodeMaskOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1morph__internal_1_1Adapter.html">Adapter&lt; T &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1morph__internal_1_1Adapter_3_01openvdb_1_1tree_1_1LeafManager_3_01T_01_4_01_4.html">Adapter&lt; openvdb::tree::LeafManager&lt; T &gt; &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1morphology_1_1Morphology_1_1NodeMaskOp.html">Morphology&lt; TreeType &gt;::NodeMaskOp</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Node Mask dilation/erosion operations for individual leaf nodes on a given tree. The leaf node may optionally belong to a different tree than the provided accessor, which will have the effect of dilating the leaf node mask into a different tree, or eroding the node mask based on corresponding neighbors in a different tree.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1morphology_1_1Morphology_1_1NodeMaskOp.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1morphology"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1morphology.html">openvdb::v8_1::tools::morphology</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1morph__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1morph__internal.html">openvdb::v8_1::tools::morph_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools_1_1morphology"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1morphology.html">openvdb::v9_0::tools::morphology</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
 Enumerations</h2></td></tr>
-<tr class="memitem:a31d3cd59d1264144ae21e5250166cfc2"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2">NearestNeighbors</a> { <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a8b7234ad92f6feba2725d890a38fdd59">NN_FACE</a> = 6, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a6d84698cb77f59ae061433cbb1313bbf">NN_FACE_EDGE</a> = 18, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a2cbda8f22b738858b06cb668117278ee">NN_FACE_EDGE_VERTEX</a> = 26
- }<tr class="memdesc:a31d3cd59d1264144ae21e5250166cfc2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Voxel topology of nearest neighbors.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2">More...</a><br /></td></tr>
+<tr class="memitem:a31d3cd59d1264144ae21e5250166cfc2"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2">NearestNeighbors</a> { <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a8b7234ad92f6feba2725d890a38fdd59">NN_FACE</a> = 6, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a6d84698cb77f59ae061433cbb1313bbf">NN_FACE_EDGE</a> = 18, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a2cbda8f22b738858b06cb668117278ee">NN_FACE_EDGE_VERTEX</a> = 26
+ }<tr class="memdesc:a31d3cd59d1264144ae21e5250166cfc2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Voxel topology of nearest neighbors.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2">More...</a><br /></td></tr>
 </td></tr>
 <tr class="separator:a31d3cd59d1264144ae21e5250166cfc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac7a17ca003c7f18f411cab4e8b4f6e74"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74">TilePolicy</a> { <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab6e5cc3f7167ba290c413016ae105d99">IGNORE_TILES</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab3c4d64060dcfe7f0949fb11f8ad789c">EXPAND_TILES</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab963e977b12771992aceaf779527c26f">PRESERVE_TILES</a>
- }<tr class="memdesc:ac7a17ca003c7f18f411cab4e8b4f6e74"><td class="mdescLeft">&#160;</td><td class="mdescRight">Different policies when dilating trees with active tiles.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74">More...</a><br /></td></tr>
+<tr class="memitem:ac7a17ca003c7f18f411cab4e8b4f6e74"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74">TilePolicy</a> { <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab6e5cc3f7167ba290c413016ae105d99">IGNORE_TILES</a>, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab3c4d64060dcfe7f0949fb11f8ad789c">EXPAND_TILES</a>, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74ab963e977b12771992aceaf779527c26f">PRESERVE_TILES</a>
+ }<tr class="memdesc:ac7a17ca003c7f18f411cab4e8b4f6e74"><td class="mdescLeft">&#160;</td><td class="mdescRight">Different policies when dilating trees with active tiles.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac7a17ca003c7f18f411cab4e8b4f6e74">More...</a><br /></td></tr>
 </td></tr>
 <tr class="separator:ac7a17ca003c7f18f411cab4e8b4f6e74"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a7eeeface33ebfe532fc9a4675e79afec"><td class="memTemplParams" colspan="2">template&lt;typename TreeOrLeafManagerT &gt; </td></tr>
-<tr class="memitem:a7eeeface33ebfe532fc9a4675e79afec"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">dilateActiveValues</a> (TreeOrLeafManagerT &amp;tree, const int iterations=1, const NearestNeighbors nn=NN_FACE, const TilePolicy mode=PRESERVE_TILES, const bool threaded=true)</td></tr>
-<tr class="memdesc:a7eeeface33ebfe532fc9a4675e79afec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all active values (i.e. both voxels and tiles) in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">More...</a><br /></td></tr>
+<tr class="memitem:a7eeeface33ebfe532fc9a4675e79afec"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">dilateActiveValues</a> (TreeOrLeafManagerT &amp;tree, const int iterations=1, const NearestNeighbors nn=NN_FACE, const TilePolicy mode=PRESERVE_TILES, const bool threaded=true)</td></tr>
+<tr class="memdesc:a7eeeface33ebfe532fc9a4675e79afec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all active values (i.e. both voxels and tiles) in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7eeeface33ebfe532fc9a4675e79afec">More...</a><br /></td></tr>
 <tr class="separator:a7eeeface33ebfe532fc9a4675e79afec"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6872c2dd6da764c5600bd8ad2a126060"><td class="memTemplParams" colspan="2">template&lt;typename TreeOrLeafManagerT &gt; </td></tr>
-<tr class="memitem:a6872c2dd6da764c5600bd8ad2a126060"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">erodeActiveValues</a> (TreeOrLeafManagerT &amp;tree, const int iterations=1, const NearestNeighbors nn=NN_FACE, const TilePolicy mode=PRESERVE_TILES, const bool threaded=true)</td></tr>
-<tr class="memdesc:a6872c2dd6da764c5600bd8ad2a126060"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically erode all active values (i.e. both voxels and tiles) in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">More...</a><br /></td></tr>
+<tr class="memitem:a6872c2dd6da764c5600bd8ad2a126060"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">erodeActiveValues</a> (TreeOrLeafManagerT &amp;tree, const int iterations=1, const NearestNeighbors nn=NN_FACE, const TilePolicy mode=PRESERVE_TILES, const bool threaded=true)</td></tr>
+<tr class="memdesc:a6872c2dd6da764c5600bd8ad2a126060"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically erode all active values (i.e. both voxels and tiles) in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6872c2dd6da764c5600bd8ad2a126060">More...</a><br /></td></tr>
 <tr class="separator:a6872c2dd6da764c5600bd8ad2a126060"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad53cd579b2612d3060a6c330f50c00b0"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:ad53cd579b2612d3060a6c330f50c00b0"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; TreeT, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type &gt;::value, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type * &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1morphology.html#ad53cd579b2612d3060a6c330f50c00b0">getMaskTree</a> (TreeT &amp;tree)</td></tr>
-<tr class="separator:ad53cd579b2612d3060a6c330f50c00b0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab3c2fa4154b619b93f19769c807b1161"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:ab3c2fa4154b619b93f19769c807b1161"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt;!std::is_same&lt; TreeT, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type &gt;::value, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type * &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1morphology.html#ab3c2fa4154b619b93f19769c807b1161">getMaskTree</a> (TreeT &amp;)</td></tr>
-<tr class="separator:ab3c2fa4154b619b93f19769c807b1161"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a08f09525e549272a545d9ceb1adf33c2"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
-<tr class="memitem:a08f09525e549272a545d9ceb1adf33c2"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a08f09525e549272a545d9ceb1adf33c2">dilateVoxels</a> (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
-<tr class="memdesc:a08f09525e549272a545d9ceb1adf33c2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all leaf-level active voxels in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a08f09525e549272a545d9ceb1adf33c2">More...</a><br /></td></tr>
-<tr class="separator:a08f09525e549272a545d9ceb1adf33c2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3e9cb84787d01d74465215a893e4f3d4"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
-<tr class="memitem:a3e9cb84787d01d74465215a893e4f3d4"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a3e9cb84787d01d74465215a893e4f3d4">dilateVoxels</a> (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
-<tr class="memdesc:a3e9cb84787d01d74465215a893e4f3d4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all leaf-level active voxels in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a3e9cb84787d01d74465215a893e4f3d4">More...</a><br /></td></tr>
-<tr class="separator:a3e9cb84787d01d74465215a893e4f3d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af380f1ff87a232cbb928a9adfa93c3b3"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:af380f1ff87a232cbb928a9adfa93c3b3"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; TreeT, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type * &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1morphology.html#af380f1ff87a232cbb928a9adfa93c3b3">getMaskTree</a> (TreeT &amp;tree)</td></tr>
+<tr class="separator:af380f1ff87a232cbb928a9adfa93c3b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae6c628e8522e3210291fa3a4176c9b70"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
+<tr class="memitem:ae6c628e8522e3210291fa3a4176c9b70"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt;!std::is_same&lt; TreeT, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, typename TreeT::template ValueConverter&lt; ValueMask &gt;::Type * &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1morphology.html#ae6c628e8522e3210291fa3a4176c9b70">getMaskTree</a> (TreeT &amp;)</td></tr>
+<tr class="separator:ae6c628e8522e3210291fa3a4176c9b70"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abd0cb4570a4d759b3faa18c8077db0f5"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
+<tr class="memitem:abd0cb4570a4d759b3faa18c8077db0f5"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#abd0cb4570a4d759b3faa18c8077db0f5">dilateVoxels</a> (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
+<tr class="memdesc:abd0cb4570a4d759b3faa18c8077db0f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all leaf-level active voxels in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#abd0cb4570a4d759b3faa18c8077db0f5">More...</a><br /></td></tr>
+<tr class="separator:abd0cb4570a4d759b3faa18c8077db0f5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a947c5dd104ea8629b784421585e271bf"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
+<tr class="memitem:a947c5dd104ea8629b784421585e271bf"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a947c5dd104ea8629b784421585e271bf">dilateVoxels</a> (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
+<tr class="memdesc:a947c5dd104ea8629b784421585e271bf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically dilate all leaf-level active voxels in a tree using one of three nearest neighbor connectivity patterns.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a947c5dd104ea8629b784421585e271bf">More...</a><br /></td></tr>
+<tr class="separator:a947c5dd104ea8629b784421585e271bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader"></div></td></tr>
-<tr class="memitem:ae8c7d7198e3135ed99058e88f2b008a8"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
-<tr class="memitem:ae8c7d7198e3135ed99058e88f2b008a8"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae8c7d7198e3135ed99058e88f2b008a8">erodeVoxels</a> (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
-<tr class="memdesc:ae8c7d7198e3135ed99058e88f2b008a8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically erode all leaf-level active voxels in the given tree.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae8c7d7198e3135ed99058e88f2b008a8">More...</a><br /></td></tr>
-<tr class="separator:ae8c7d7198e3135ed99058e88f2b008a8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa9cbd295a6275d2847326d30b4d41370"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
-<tr class="memitem:aa9cbd295a6275d2847326d30b4d41370"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aa9cbd295a6275d2847326d30b4d41370">erodeVoxels</a> (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
-<tr class="memdesc:aa9cbd295a6275d2847326d30b4d41370"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically erode all leaf-level active voxels in the given tree.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aa9cbd295a6275d2847326d30b4d41370">More...</a><br /></td></tr>
-<tr class="separator:aa9cbd295a6275d2847326d30b4d41370"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8a81af07bb6e0afe83d3c8822f4068d0"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
+<tr class="memitem:a8a81af07bb6e0afe83d3c8822f4068d0"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a8a81af07bb6e0afe83d3c8822f4068d0">erodeVoxels</a> (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
+<tr class="memdesc:a8a81af07bb6e0afe83d3c8822f4068d0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Topologically erode all leaf-level active voxels in the given tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a8a81af07bb6e0afe83d3c8822f4068d0">More...</a><br /></td></tr>
+<tr class="separator:a8a81af07bb6e0afe83d3c8822f4068d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeb77ffcca142890f207bc9740d16ccab"><td class="memTemplParams" colspan="2">template&lt;typename TreeType &gt; </td></tr>
+<tr class="memitem:aeb77ffcca142890f207bc9740d16ccab"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aeb77ffcca142890f207bc9740d16ccab">erodeVoxels</a> (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</td></tr>
+<tr class="separator:aeb77ffcca142890f207bc9740d16ccab"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Implementation of morphological dilation and erosion. </p>

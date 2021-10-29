@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: PointMask.h File Reference</title>
+<title>OpenVDB: openvdb/points/PointMask.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_c9229911bfd1cba3327f6b216c5f36b0.html">points</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_c9229911bfd1cba3327f6b216c5f36b0.html">points</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -110,55 +110,32 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1NullDeformer.html">NullDeformer</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">No-op deformer (adheres to the deformer interface documented in <a class="el" href="PointMove_8h.html" title="Ability to move VDB Points using a custom deformer. ">PointMove.h</a>)  <a href="structopenvdb_1_1v8__1_1_1points_1_1NullDeformer.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1points_1_1NullDeformer.html">NullDeformer</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">No-op deformer (adheres to the deformer interface documented in <a class="el" href="PointMove_8h.html" title="Ability to move VDB Points using a custom deformer. ">PointMove.h</a>)  <a href="structopenvdb_1_1v9__0_1_1points_1_1NullDeformer.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1DeformerTraits.html">DeformerTraits&lt; DeformerT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deformer Traits for optionally configuring deformers to be applied in index-space. The default is world-space.  <a href="structopenvdb_1_1v8__1_1_1points_1_1DeformerTraits.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1GridCombinerOp.html">GridCombinerOp&lt; GridT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Combines multiple grids into one by stealing leaf nodes and summing voxel values This class is designed to work with thread local storage containers such as tbb::combinable.  <a href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1GridCombinerOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1PointsToScalarOp.html">PointsToScalarOp&lt; GridT, PointDataGridT, FilterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute scalar grid from PointDataGrid while evaluating the point filter.  <a href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1PointsToScalarOp.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1PointsToTransformedScalarOp.html">PointsToTransformedScalarOp&lt; GridT, PointDataGridT, FilterT, DeformerT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute scalar grid from PointDataGrid using a different transform and while evaluating the point filter.  <a href="structopenvdb_1_1v8__1_1_1points_1_1point__mask__internal_1_1PointsToTransformedScalarOp.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1points_1_1DeformerTraits.html">DeformerTraits&lt; DeformerT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deformer Traits for optionally configuring deformers to be applied in index-space. The default is world-space.  <a href="structopenvdb_1_1v9__0_1_1points_1_1DeformerTraits.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1points"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html">openvdb::v8_1::points</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal.html">openvdb::v8_1::points::point_mask_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1points"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html">openvdb::v9_0::points</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a0203fc05b3068cb3d0cb5b3140225254"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename MaskT  = typename PointDataGridT::template ValueConverter&lt;bool&gt;::Type, typename FilterT  = NullFilter&gt; </td></tr>
-<tr class="memitem:a0203fc05b3068cb3d0cb5b3140225254"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; typename MaskT::ValueType, bool &gt;::value, typename MaskT::Ptr &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#a0203fc05b3068cb3d0cb5b3140225254">convertPointsToMask</a> (const PointDataGridT &amp;grid, const FilterT &amp;filter=NullFilter(), bool threaded=true)</td></tr>
-<tr class="memdesc:a0203fc05b3068cb3d0cb5b3140225254"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a Mask <a class="el" href="classopenvdb_1_1v8__1_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> from a Point Data <a class="el" href="classopenvdb_1_1v8__1_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a>.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#a0203fc05b3068cb3d0cb5b3140225254">More...</a><br /></td></tr>
+<tr class="memitem:a0203fc05b3068cb3d0cb5b3140225254"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; typename MaskT::ValueType, bool &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, typename MaskT::Ptr &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a0203fc05b3068cb3d0cb5b3140225254">convertPointsToMask</a> (const PointDataGridT &amp;grid, const FilterT &amp;filter=NullFilter(), bool threaded=true)</td></tr>
+<tr class="memdesc:a0203fc05b3068cb3d0cb5b3140225254"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a Mask <a class="el" href="classopenvdb_1_1v9__0_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> from a Point Data <a class="el" href="classopenvdb_1_1v9__0_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a>.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#a0203fc05b3068cb3d0cb5b3140225254">More...</a><br /></td></tr>
 <tr class="separator:a0203fc05b3068cb3d0cb5b3140225254"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="memTemplParams" colspan="2">template&lt;typename PointDataGridT , typename MaskT  = typename PointDataGridT::template ValueConverter&lt;bool&gt;::Type, typename FilterT  = NullFilter&gt; </td></tr>
-<tr class="memitem:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; typename MaskT::ValueType, bool &gt;::value, typename MaskT::Ptr &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points.html#adfdf43efd3cbc67e8d781bd3d06fb85f">convertPointsToMask</a> (const PointDataGridT &amp;grid, const openvdb::math::Transform &amp;transform, const FilterT &amp;filter=NullFilter(), bool threaded=true)</td></tr>
-<tr class="memdesc:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a Mask <a class="el" href="classopenvdb_1_1v8__1_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> from a Point Data <a class="el" href="classopenvdb_1_1v8__1_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> using a new transform.  <a href="namespaceopenvdb_1_1v8__1_1_1points.html#adfdf43efd3cbc67e8d781bd3d06fb85f">More...</a><br /></td></tr>
+<tr class="memitem:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_same&lt; typename MaskT::ValueType, bool &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, typename MaskT::Ptr &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#adfdf43efd3cbc67e8d781bd3d06fb85f">convertPointsToMask</a> (const PointDataGridT &amp;grid, const openvdb::math::Transform &amp;transform, const FilterT &amp;filter=NullFilter(), bool threaded=true)</td></tr>
+<tr class="memdesc:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extract a Mask <a class="el" href="classopenvdb_1_1v9__0_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> from a Point Data <a class="el" href="classopenvdb_1_1v9__0_1_1Grid.html" title="Container class that associates a tree with a transform and metadata. ">Grid</a> using a new transform.  <a href="namespaceopenvdb_1_1v9__0_1_1points.html#adfdf43efd3cbc67e8d781bd3d06fb85f">More...</a><br /></td></tr>
 <tr class="separator:adfdf43efd3cbc67e8d781bd3d06fb85f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a563b7af10fa33002848a53276dc75cfe"><td class="memTemplParams" colspan="2">template&lt;typename LeafT &gt; </td></tr>
-<tr class="memitem:a563b7af10fa33002848a53276dc75cfe"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal.html#a563b7af10fa33002848a53276dc75cfe">voxelSum</a> (LeafT &amp;leaf, const Index offset, const typename LeafT::ValueType &amp;value)</td></tr>
-<tr class="separator:a563b7af10fa33002848a53276dc75cfe"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a37359923fd3bf3fe0039ed39dc08e9d9"><td class="memTemplParams" colspan="2">template&lt;typename T , Index Log2Dim&gt; </td></tr>
-<tr class="memitem:a37359923fd3bf3fe0039ed39dc08e9d9"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal.html#a37359923fd3bf3fe0039ed39dc08e9d9">voxelSum</a> (PointDataLeafNode&lt; T, Log2Dim &gt; &amp;leaf, const Index offset, const typename PointDataLeafNode&lt; T, Log2Dim &gt;::ValueType &amp;value)</td></tr>
-<tr class="separator:a37359923fd3bf3fe0039ed39dc08e9d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ace3181dd411172ae9a15945bbdf61def"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointDataGridT , typename FilterT &gt; </td></tr>
-<tr class="memitem:ace3181dd411172ae9a15945bbdf61def"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal.html#ace3181dd411172ae9a15945bbdf61def">convertPointsToScalar</a> (const PointDataGridT &amp;points, const FilterT &amp;filter, bool threaded=true)</td></tr>
-<tr class="separator:ace3181dd411172ae9a15945bbdf61def"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a29bf014a4c6f2820688871ed599b5a11"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename PointDataGridT , typename FilterT , typename DeformerT &gt; </td></tr>
-<tr class="memitem:a29bf014a4c6f2820688871ed599b5a11"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1points_1_1point__mask__internal.html#a29bf014a4c6f2820688871ed599b5a11">convertPointsToScalar</a> (PointDataGridT &amp;points, const openvdb::math::Transform &amp;transform, const FilterT &amp;filter, const DeformerT &amp;deformer, bool threaded=true)</td></tr>
-<tr class="separator:a29bf014a4c6f2820688871ed599b5a11"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Methods for extracting masks from VDB Point grids. </p>

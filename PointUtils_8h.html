@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: PointUtils.h File Reference</title>
+<title>OpenVDB: openvdb_houdini/PointUtils.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_60bcacab2bfd72b99b26da6ca86c8b61.html">openvdb_houdini</a></li><li class="navelem"><a class="el" href="dir_66b08b56d8300cb83cc30c8cb78a7ea4.html">openvdb_houdini</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_66b08b56d8300cb83cc30c8cb78a7ea4.html">openvdb_houdini</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -102,6 +102,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;<a class="el" href="Vec3_8h_source.html">openvdb/math/Vec3.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="NullInterrupter_8h_source.html">openvdb/util/NullInterrupter.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="PointDataGrid_8h_source.html">openvdb/points/PointDataGrid.h</a>&gt;</code><br />
 <code>#include &lt;GA/GA_Attribute.h&gt;</code><br />
 <code>#include &lt;GU/GU_Detail.h&gt;</code><br />
@@ -131,7 +132,7 @@ Typedefs</h2></td></tr>
 <tr class="separator:a8eddad2a12898b5ef4753a6deb0f6d72"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b73be2dee21d683c568861f97af79be"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a6b73be2dee21d683c568861f97af79be">OffsetPairListPtr</a> = std::shared_ptr&lt; OffsetPairList &gt;</td></tr>
 <tr class="separator:a6b73be2dee21d683c568861f97af79be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> = std::map&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt; int, bool &gt;&gt;</td></tr>
+<tr class="memitem:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> = std::map&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt; int, bool &gt;&gt;</td></tr>
 <tr class="separator:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a79fbab88ceaa44f883fcbac621d95497"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> = std::function&lt; void(const std::string &amp;)&gt;</td></tr>
 <tr class="separator:a79fbab88ceaa44f883fcbac621d95497"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -152,8 +153,10 @@ Enumerations</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, Interrupter &amp;interrupter)</td></tr>
-<tr class="memdesc:a445794e1fb98c62ff2dc2d44543d2a50"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute a voxel size from a Houdini detail.  <a href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">More...</a><br /></td></tr>
+<tr class="memitem:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4d8d8d608e2c410c3f7c877f00c09bf7">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, openvdb::util::NullInterrupter &amp;interrupter)</td></tr>
+<tr class="memdesc:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute a voxel size from a Houdini detail.  <a href="namespaceopenvdb__houdini.html#a4d8d8d608e2c410c3f7c877f00c09bf7">More...</a><br /></td></tr>
+<tr class="separator:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, Interrupter &amp;interrupter)</td></tr>
 <tr class="separator:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a05721796af49b93cfb43bc7c6fd1ad28"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> openvdb::points::PointDataGrid::Ptr&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a05721796af49b93cfb43bc7c6fd1ad28">convertHoudiniToPointDataGrid</a> (const GU_Detail &amp;detail, const int compression, const AttributeInfoMap &amp;attributes, const openvdb::math::Transform &amp;transform, const WarnFunc &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:a05721796af49b93cfb43bc7c6fd1ad28"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert a Houdini detail into a VDB Points grid.  <a href="namespaceopenvdb__houdini.html#a05721796af49b93cfb43bc7c6fd1ad28">More...</a><br /></td></tr>
@@ -164,7 +167,7 @@ Functions</h2></td></tr>
 <tr class="memitem:afb088fb094891262d16e7a9ea902397c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#afb088fb094891262d16e7a9ea902397c">populateMetadataFromHoudini</a> (openvdb::points::PointDataGrid &amp;grid, const GU_Detail &amp;detail, const WarnFunc &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:afb088fb094891262d16e7a9ea902397c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Populate VDB Points grid metadata from Houdini detail attributes.  <a href="namespaceopenvdb__houdini.html#afb088fb094891262d16e7a9ea902397c">More...</a><br /></td></tr>
 <tr class="separator:afb088fb094891262d16e7a9ea902397c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc574eeb728e244ed01fc97dc3181f43"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acc574eeb728e244ed01fc97dc3181f43">convertMetadataToHoudini</a> (GU_Detail &amp;detail, const <a class="el" href="classopenvdb_1_1v8__1_1_1MetaMap.html">openvdb::MetaMap</a> &amp;metaMap, const WarnFunc &amp;warnings=[](const std::string &amp;){})</td></tr>
+<tr class="memitem:acc574eeb728e244ed01fc97dc3181f43"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acc574eeb728e244ed01fc97dc3181f43">convertMetadataToHoudini</a> (GU_Detail &amp;detail, const <a class="el" href="classopenvdb_1_1v9__0_1_1MetaMap.html">openvdb::MetaMap</a> &amp;metaMap, const WarnFunc &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:acc574eeb728e244ed01fc97dc3181f43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert VDB Points grid metadata into Houdini detail attributes.  <a href="namespaceopenvdb__houdini.html#acc574eeb728e244ed01fc97dc3181f43">More...</a><br /></td></tr>
 <tr class="separator:acc574eeb728e244ed01fc97dc3181f43"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0d5061e9d615441833013e48a4a52fef"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> int16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0d5061e9d615441833013e48a4a52fef">attributeTupleSize</a> (const GA_Attribute *const attribute)</td></tr>
@@ -173,7 +176,7 @@ Functions</h2></td></tr>
 <tr class="memitem:a47d29e093386972ae4985bcc2edfb148"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> GA_Storage&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a47d29e093386972ae4985bcc2edfb148">attributeStorageType</a> (const GA_Attribute *const attribute)</td></tr>
 <tr class="memdesc:a47d29e093386972ae4985bcc2edfb148"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns supported Storage types for conversion from GA_Attribute.  <a href="namespaceopenvdb__houdini.html#a47d29e093386972ae4985bcc2edfb148">More...</a><br /></td></tr>
 <tr class="separator:a47d29e093386972ae4985bcc2edfb148"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a66a8bc4c4fdbce8d07cb1a311f0c96b8">pointDataGridSpecificInfoText</a> (std::ostream &amp;, const <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;)</td></tr>
+<tr class="memitem:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a66a8bc4c4fdbce8d07cb1a311f0c96b8">pointDataGridSpecificInfoText</a> (std::ostream &amp;, const <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a> &amp;)</td></tr>
 <tr class="memdesc:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">If the given grid is a PointDataGrid, add node specific info text to the stream provided. This is used to populate the MMB window in Houdini versions 15 and earlier, as well as the Operator Information Window.  <a href="namespaceopenvdb__houdini.html#a66a8bc4c4fdbce8d07cb1a311f0c96b8">More...</a><br /></td></tr>
 <tr class="separator:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3051145d787399abca79bb8825bd40bb"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a3051145d787399abca79bb8825bd40bb">collectPointInfo</a> (const openvdb::points::PointDataGrid &amp;grid, std::string &amp;countStr, std::string &amp;groupStr, std::string &amp;attributeStr)</td></tr>

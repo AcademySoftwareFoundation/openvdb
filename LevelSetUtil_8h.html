@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: LevelSetUtil.h File Reference</title>
+<title>OpenVDB: openvdb/tools/LevelSetUtil.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,12 +83,11 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
@@ -102,6 +101,8 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &quot;<a class="el" href="SignedFloodFill_8h_source.html">SignedFloodFill.h</a>&quot;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="PointDataGrid_8h_source.html">openvdb/points/PointDataGrid.h</a>&gt;</code><br />
 <code>#include &lt;tbb/blocked_range.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_for.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_reduce.h&gt;</code><br />
@@ -117,109 +118,49 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div>
 <p><a href="LevelSetUtil_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
-Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1MaskInteriorVoxels.html">MaskInteriorVoxels&lt; LeafNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1MaskInteriorTiles.html">MaskInteriorTiles&lt; TreeType, InternalNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1PopulateTree.html">PopulateTree&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1LabelBoundaryVoxels.html">LabelBoundaryVoxels&lt; LeafNodeType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Negative active values are set <code>0</code>, everything else is set to <code>1</code>.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1LabelBoundaryVoxels.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FlipRegionSign.html">FlipRegionSign&lt; LeafNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FindMinVoxelValue.html">FindMinVoxelValue&lt; LeafNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FindMinTileValue.html">FindMinTileValue&lt; InternalNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1SDFVoxelsToFogVolume.html">SDFVoxelsToFogVolume&lt; LeafNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1SDFTilesToFogVolume.html">SDFTilesToFogVolume&lt; TreeType, InternalNodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FillMaskBoundary.html">FillMaskBoundary&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1MaskIsovalueCrossingVoxels.html">MaskIsovalueCrossingVoxels&lt; InputTreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1NodeMaskSegment.html">NodeMaskSegment&lt; NodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1SegmentNodeMask.html">SegmentNodeMask&lt; NodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ConnectNodeMaskSegments.html">ConnectNodeMaskSegments&lt; TreeType, NodeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1MaskSegmentGroup.html">MaskSegmentGroup&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ExpandLeafNodeRegion.html">ExpandLeafNodeRegion&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FillLeafNodeVoxels.html">FillLeafNodeVoxels&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ExpandNarrowbandMask.html">ExpandNarrowbandMask&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1FloodFillSign.html">FloodFillSign&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1MaskedCopy.html">MaskedCopy&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ComputeActiveVoxelCount.html">ComputeActiveVoxelCount&lt; VolumePtrType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1GreaterCount.html">GreaterCount</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1GridOrTreeConstructor.html">GridOrTreeConstructor&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1GridOrTreeConstructor_3_01Grid_3_01TreeType_01_4_01_4.html">GridOrTreeConstructor&lt; Grid&lt; TreeType &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal.html">openvdb::v8_1::tools::level_set_util_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
-<tr class="memitem:aad82d1b0039598209bc21cd9aa4511a0"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
-<tr class="memitem:aad82d1b0039598209bc21cd9aa4511a0"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aad82d1b0039598209bc21cd9aa4511a0">sdfToFogVolume</a> (GridType &amp;grid, typename GridType::ValueType cutoffDistance=lsutilGridMax&lt; GridType &gt;())</td></tr>
-<tr class="memdesc:aad82d1b0039598209bc21cd9aa4511a0"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to convert a sparse level set/SDF into a sparse fog volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aad82d1b0039598209bc21cd9aa4511a0">More...</a><br /></td></tr>
-<tr class="separator:aad82d1b0039598209bc21cd9aa4511a0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3fc3816b2b9f3c1827dfea25aa942297"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
+<tr class="memitem:a3fc3816b2b9f3c1827dfea25aa942297"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3fc3816b2b9f3c1827dfea25aa942297">sdfToFogVolume</a> (GridType &amp;grid, typename GridType::ValueType cutoffDistance=lsutilGridMax&lt; GridType &gt;())</td></tr>
+<tr class="memdesc:a3fc3816b2b9f3c1827dfea25aa942297"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to convert a sparse level set/SDF into a sparse fog volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3fc3816b2b9f3c1827dfea25aa942297">More...</a><br /></td></tr>
+<tr class="separator:a3fc3816b2b9f3c1827dfea25aa942297"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a59b83096927350f3324cba935be37717"><td class="memTemplParams" colspan="2">template&lt;class GridOrTreeType &gt; </td></tr>
-<tr class="memitem:a59b83096927350f3324cba935be37717"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a59b83096927350f3324cba935be37717">sdfInteriorMask</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue=lsutilGridZero&lt; GridOrTreeType &gt;())</td></tr>
-<tr class="memdesc:a59b83096927350f3324cba935be37717"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to construct a boolean mask that represents interior regions in a signed distance field.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a59b83096927350f3324cba935be37717">More...</a><br /></td></tr>
+<tr class="memitem:a59b83096927350f3324cba935be37717"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a59b83096927350f3324cba935be37717">sdfInteriorMask</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue=lsutilGridZero&lt; GridOrTreeType &gt;())</td></tr>
+<tr class="memdesc:a59b83096927350f3324cba935be37717"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to construct a boolean mask that represents interior regions in a signed distance field.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a59b83096927350f3324cba935be37717">More...</a><br /></td></tr>
 <tr class="separator:a59b83096927350f3324cba935be37717"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeType &gt; </td></tr>
-<tr class="memitem:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1a3ef894d7a7eaf47a03d2508d2d95d3">extractEnclosedRegion</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue=lsutilGridZero&lt; GridOrTreeType &gt;(), const typename TreeAdapter&lt; GridOrTreeType &gt;::TreeType::template ValueConverter&lt; bool &gt;::Type *fillMask=nullptr)</td></tr>
-<tr class="memdesc:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extracts the interior regions of a signed distance field and topologically enclosed (watertight) regions of value greater than the <em>isovalue</em> (cavities) that can arise as the result of CSG union operations between different shapes where at least one of the shapes has a concavity that is capped.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1a3ef894d7a7eaf47a03d2508d2d95d3">More...</a><br /></td></tr>
+<tr class="memitem:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1a3ef894d7a7eaf47a03d2508d2d95d3">extractEnclosedRegion</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue=lsutilGridZero&lt; GridOrTreeType &gt;(), const typename TreeAdapter&lt; GridOrTreeType &gt;::TreeType::template ValueConverter&lt; bool &gt;::Type *fillMask=nullptr)</td></tr>
+<tr class="memdesc:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Extracts the interior regions of a signed distance field and topologically enclosed (watertight) regions of value greater than the <em>isovalue</em> (cavities) that can arise as the result of CSG union operations between different shapes where at least one of the shapes has a concavity that is capped.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1a3ef894d7a7eaf47a03d2508d2d95d3">More...</a><br /></td></tr>
 <tr class="separator:a1a3ef894d7a7eaf47a03d2508d2d95d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeType &gt; </td></tr>
-<tr class="memitem:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a39bfe53eeb50b4ffdc96c90af7e1de1b">extractIsosurfaceMask</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue)</td></tr>
-<tr class="memdesc:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a mask of the voxels that intersect the implicit surface with the given <em>isovalue</em>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a39bfe53eeb50b4ffdc96c90af7e1de1b">More...</a><br /></td></tr>
+<tr class="memitem:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a39bfe53eeb50b4ffdc96c90af7e1de1b">extractIsosurfaceMask</a> (const GridOrTreeType &amp;volume, typename GridOrTreeType::ValueType isovalue)</td></tr>
+<tr class="memdesc:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a mask of the voxels that intersect the implicit surface with the given <em>isovalue</em>.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a39bfe53eeb50b4ffdc96c90af7e1de1b">More...</a><br /></td></tr>
 <tr class="separator:a39bfe53eeb50b4ffdc96c90af7e1de1b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeType &gt; </td></tr>
-<tr class="memitem:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6">extractActiveVoxelSegmentMasks</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr &gt; &amp;masks)</td></tr>
-<tr class="memdesc:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a mask for each connected component of the given grid's active voxels.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6">More...</a><br /></td></tr>
+<tr class="memitem:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6">extractActiveVoxelSegmentMasks</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::template ValueConverter&lt; bool &gt;::Type::Ptr &gt; &amp;masks)</td></tr>
+<tr class="memdesc:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return a mask for each connected component of the given grid's active voxels.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3b522dd56a467487d4b16d0f1d16c0d6">More...</a><br /></td></tr>
 <tr class="separator:a3b522dd56a467487d4b16d0f1d16c0d6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeType &gt; </td></tr>
-<tr class="memitem:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1cc2d4f60d561afd2fb248e386ca67d8">segmentActiveVoxels</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::Ptr &gt; &amp;segments)</td></tr>
-<tr class="memdesc:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Separates disjoint active topology components into distinct grids or trees.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1cc2d4f60d561afd2fb248e386ca67d8">More...</a><br /></td></tr>
+<tr class="memitem:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1cc2d4f60d561afd2fb248e386ca67d8">segmentActiveVoxels</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::Ptr &gt; &amp;segments)</td></tr>
+<tr class="memdesc:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Separates disjoint active topology components into distinct grids or trees.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1cc2d4f60d561afd2fb248e386ca67d8">More...</a><br /></td></tr>
 <tr class="separator:a1cc2d4f60d561afd2fb248e386ca67d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeType &gt; </td></tr>
-<tr class="memitem:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac9f4df82ed92eb746d439ce4721ea8a5">segmentSDF</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::Ptr &gt; &amp;segments)</td></tr>
-<tr class="memdesc:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Separates disjoint SDF surfaces into distinct grids or trees.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac9f4df82ed92eb746d439ce4721ea8a5">More...</a><br /></td></tr>
+<tr class="memitem:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac9f4df82ed92eb746d439ce4721ea8a5">segmentSDF</a> (const GridOrTreeType &amp;volume, std::vector&lt; typename GridOrTreeType::Ptr &gt; &amp;segments)</td></tr>
+<tr class="memdesc:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Separates disjoint SDF surfaces into distinct grids or trees.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac9f4df82ed92eb746d439ce4721ea8a5">More...</a><br /></td></tr>
 <tr class="separator:ac9f4df82ed92eb746d439ce4721ea8a5"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1b8ac9dea9c9dafdc8cd54a2c913d8df"><td class="memTemplParams" colspan="2">template&lt;class TreeType &gt; </td></tr>
-<tr class="memitem:a1b8ac9dea9c9dafdc8cd54a2c913d8df"><td class="memTemplItemLeft" align="right" valign="top">TreeType::template ValueConverter&lt; char &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal.html#a1b8ac9dea9c9dafdc8cd54a2c913d8df">computeEnclosedRegionMask</a> (const TreeType &amp;tree, typename TreeType::ValueType isovalue, const typename TreeType::template ValueConverter&lt; bool &gt;::Type *fillMask)</td></tr>
-<tr class="memdesc:a1b8ac9dea9c9dafdc8cd54a2c913d8df"><td class="mdescLeft">&#160;</td><td class="mdescRight">Constructs a memory light char tree that represents the exterior region with <code>+1</code> and the interior regions with <code>-1</code>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal.html#a1b8ac9dea9c9dafdc8cd54a2c913d8df">More...</a><br /></td></tr>
-<tr class="separator:a1b8ac9dea9c9dafdc8cd54a2c913d8df"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a68c5d159bf516eb4cffd54d3ea1cfc41"><td class="memTemplParams" colspan="2">template&lt;class TreeType &gt; </td></tr>
-<tr class="memitem:a68c5d159bf516eb4cffd54d3ea1cfc41"><td class="memTemplItemLeft" align="right" valign="top">TreeType::template ValueConverter&lt; bool &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal.html#a68c5d159bf516eb4cffd54d3ea1cfc41">computeInteriorMask</a> (const TreeType &amp;tree, typename TreeType::ValueType iso)</td></tr>
-<tr class="separator:a68c5d159bf516eb4cffd54d3ea1cfc41"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a67f87456536b419c3d98c01026b27323"><td class="memTemplParams" colspan="2">template&lt;typename NodeType &gt; </td></tr>
-<tr class="memitem:a67f87456536b419c3d98c01026b27323"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal.html#a67f87456536b419c3d98c01026b27323">nodeMaskSegmentation</a> (const NodeType &amp;node, std::vector&lt; typename NodeMaskSegment&lt; NodeType &gt;::Ptr &gt; &amp;segments)</td></tr>
-<tr class="separator:a67f87456536b419c3d98c01026b27323"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6576f02407aec458ac96a8acbefa7eb5"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
+<tr class="memitem:a6576f02407aec458ac96a8acbefa7eb5"><td class="memTemplItemLeft" align="right" valign="top">OPENVDB_DOCS_INTERNAL void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6576f02407aec458ac96a8acbefa7eb5">sdfToFogVolume</a> (GridType &amp;grid, typename GridType::ValueType cutoffDistance)</td></tr>
+<tr class="memdesc:a6576f02407aec458ac96a8acbefa7eb5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to convert a sparse level set/SDF into a sparse fog volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6576f02407aec458ac96a8acbefa7eb5">More...</a><br /></td></tr>
+<tr class="separator:a6576f02407aec458ac96a8acbefa7eb5"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Miscellaneous utility methods that operate primarily or exclusively on level set grids. </p>

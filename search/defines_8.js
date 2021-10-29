@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['use_5fhits',['USE_HITS',['../RayTracer_8h.html#afdd8a9f63fc84bda1998204d8bb3b3ea',1,'RayTracer.h']]]
+  ['log2_5ftile_5fsize',['LOG2_TILE_SIZE',['../DenseGrid_8h.html#af64e12103beac0897bcccd10e034cfd3',1,'DenseGrid.h']]]
 ];

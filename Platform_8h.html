@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Platform.h File Reference</title>
+<title>OpenVDB: openvdb/Platform.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -125,8 +125,12 @@ Macros</h2></td></tr>
 <tr class="separator:a4f7375e7791cade4ae486a8ebb68056f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac13c11880cf8b8dd311a72e5a05b295d"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#ac13c11880cf8b8dd311a72e5a05b295d">OPENVDB_NO_TYPE_CONVERSION_WARNING_END</a></td></tr>
 <tr class="separator:ac13c11880cf8b8dd311a72e5a05b295d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae90ddc631630096e31703b376e7bc04d"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#ae90ddc631630096e31703b376e7bc04d">OPENVDB_TEMPLATE_IMPORT</a></td></tr>
+<tr class="memdesc:ae90ddc631630096e31703b376e7bc04d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper macros for defining library symbol visibility.  <a href="#ae90ddc631630096e31703b376e7bc04d">More...</a><br /></td></tr>
+<tr class="separator:ae90ddc631630096e31703b376e7bc04d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac696e2eebc7f22c46fdcf87f8ecebd8c"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#ac696e2eebc7f22c46fdcf87f8ecebd8c">OPENVDB_TEMPLATE_EXPORT</a></td></tr>
+<tr class="separator:ac696e2eebc7f22c46fdcf87f8ecebd8c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a78ead02913edfee18be9d5982b788611"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#a78ead02913edfee18be9d5982b788611">OPENVDB_API</a>&#160;&#160;&#160;OPENVDB_IMPORT</td></tr>
-<tr class="memdesc:a78ead02913edfee18be9d5982b788611"><td class="mdescLeft">&#160;</td><td class="mdescRight">Helper macros for defining library symbol visibility.  <a href="#a78ead02913edfee18be9d5982b788611">More...</a><br /></td></tr>
 <tr class="separator:a78ead02913edfee18be9d5982b788611"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a88b26daa45bbdd69d6bb12f9c7bfa3b2"><td class="memItemLeft" align="right" valign="top">#define&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a>&#160;&#160;&#160;OPENVDB_IMPORT</td></tr>
 <tr class="separator:a88b26daa45bbdd69d6bb12f9c7bfa3b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -178,8 +182,6 @@ Macros</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
-
-<p>Helper macros for defining library symbol visibility. </p>
 <p>All classes and public free standing functions must be explicitly marked as &lt;lib&gt;_API to be exported. The &lt;lib&gt;_PRIVATE macros are defined when building that particular library. </p>
 
 </div>
@@ -535,6 +537,33 @@ Macros</h2></td></tr>
         </tr>
       </table>
 </div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ac696e2eebc7f22c46fdcf87f8ecebd8c"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define OPENVDB_TEMPLATE_EXPORT</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="ae90ddc631630096e31703b376e7bc04d"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">#define OPENVDB_TEMPLATE_IMPORT</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Helper macros for defining library symbol visibility. </p>
+<p>Helper macros for explicit template instantiation </p>
 
 </div>
 </div>

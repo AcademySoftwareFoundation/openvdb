@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -82,14 +82,74 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 <div class="textblock"><dl class="reflist">
-<dt><a class="anchor" id="_deprecated000001"></a>Member <a class="el" href="classhoudini__utils_1_1ParmFactory.html#a1a7a9b83f049b8e088854e4da4531322">ParmFactory::setChoiceList</a>  (PRM_ChoiceListType typ, const std::vector&lt; std::string &gt; &amp;items, bool paired=false)</dt>
+<dt><a class="anchor" id="_deprecated000003"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html#a4f5b2edc026d484e67845304799be94b">AttributeArray::compress</a>  ()=0</dt>
+<dd>"Previously this compressed the attribute array, now it does nothing"  </dd>
+<dt><a class="anchor" id="_deprecated000001"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html#a1b37dff09f57d7a55c9f352f6ddb87a6">AttributeArray::copyUncompressed</a>  () const =0</dt>
+<dd>"In-memory compression no longer supported, use AttributeArray::copy() instead"  </dd>
+<dt><a class="anchor" id="_deprecated000004"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html#a7949cc4dfe4d3403eb12b336a908ff24">AttributeArray::decompress</a>  ()=0</dt>
+<dd>"Previously this uncompressed the attribute array, now it does nothing"  </dd>
+<dt><a class="anchor" id="_deprecated000002"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html#a3502caeeca360c3f41a2b136acd6d8e3">AttributeArray::set</a>  (const Index n, const <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html" title="Base class for storing attribute data. ">AttributeArray</a> &amp;sourceArray, const Index sourceIndex)=0</dt>
+<dd>"Use copyValues() with source-target index pairs"  </dd>
+<dt><a class="anchor" id="_deprecated000010"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1FindActiveValues.html#aa1251675c2810e194921bfca3c68759e">FindActiveValues&lt; TreeT &gt;::any</a>  (const CoordBBox &amp;bbox, bool useAccessor=false) const </dt>
+<dd>"Use anyActiveValues() instead"  </dd>
+<dt><a class="anchor" id="_deprecated000011"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1FindActiveValues.html#a077523f7b4512a08192eb778a02ea5fc">FindActiveValues&lt; TreeT &gt;::none</a>  (const CoordBBox &amp;bbox, bool useAccessor=false) const </dt>
+<dd>"Use noActiveValues() instead"  </dd>
+<dt><a class="anchor" id="_deprecated000035"></a>Member <a class="el" href="classopenvdb__houdini_1_1Interrupter.html#a084a468f68411b9dc51301968cc38a2d">Interrupter::Interrupter</a>  (const char *title=nullptr)</dt>
+<dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter"  </dd>
+<dt><a class="anchor" id="_deprecated000016"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1LeafManager.html#a33a3cd99c0b9c78e1f6da3d9a36fdaff">LeafManager&lt; TreeT &gt;::getNodes</a>  (ArrayT &amp;array)</dt>
+<dd>"Use Tree::getNodes()"  </dd>
+<dt><a class="anchor" id="_deprecated000017"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1LeafManager.html#ab4dda98f1a46783cb8638ef4a17462c0">LeafManager&lt; TreeT &gt;::getNodes</a>  (ArrayT &amp;array) const </dt>
+<dd>"Use Tree::getNodes()"  </dd>
+<dt><a class="anchor" id="_deprecated000013"></a>Member <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a947c5dd104ea8629b784421585e271bf">openvdb::v9_0::tools::dilateVoxels</a>  (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</dt>
+<dd>"Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour"  </dd>
+<dt><a class="anchor" id="_deprecated000012"></a>Member <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#abd0cb4570a4d759b3faa18c8077db0f5">openvdb::v9_0::tools::dilateVoxels</a>  (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</dt>
+<dd>"Switch to tools::dilateActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour"  </dd>
+<dt><a class="anchor" id="_deprecated000015"></a>Member <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aeb77ffcca142890f207bc9740d16ccab">openvdb::v9_0::tools::erodeVoxels</a>  (tree::LeafManager&lt; TreeType &gt; &amp;manager, int iterations=1, NearestNeighbors nn=NN_FACE)</dt>
+<dd>"Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour"  </dd>
+<dt><a class="anchor" id="_deprecated000014"></a>Member <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a8a81af07bb6e0afe83d3c8822f4068d0">openvdb::v9_0::tools::erodeVoxels</a>  (TreeType &amp;tree, int iterations=1, NearestNeighbors nn=NN_FACE)</dt>
+<dd>"Switch to tools::erodeActiveValues. Use tools::IGNORE_TILES to maintain same (but perhaps unintended) behaviour"  </dd>
+<dt><a class="anchor" id="_deprecated000031"></a>Member <a class="el" href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">openvdb_houdini::computeVoxelSizeFromHoudini</a>  (const GU_Detail &amp;detail, const openvdb::Index pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const openvdb::Index decimalPlaces, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html" title="Deprecated wrapper class with the same interface as HoudiniInterrupter, however it does not derive fr...">Interrupter</a> &amp;interrupter)</dt>
+<dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter"  </dd>
+<dt><a class="anchor" id="_deprecated000028"></a>Member <a class="el" href="namespaceopenvdb__houdini.html#a5eedf901d4896255416c71bcda5efb17">openvdb_houdini::convertGeometry</a>  (const GU_Detail &amp;detail, std::string &amp;warning, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html" title="Deprecated wrapper class with the same interface as HoudiniInterrupter, however it does not derive fr...">Interrupter</a> *boss)</dt>
+<dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter"  </dd>
+<dt><a class="anchor" id="_deprecated000027"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1util_1_1PagedArray.html#aafda3d7e372dc7bcbb6d4177b9fbee3f">PagedArray&lt; ValueT, Log2PageSize &gt;::push_back</a>  (const ValueType &amp;value)</dt>
+<dd></dd>
+<dt><a class="anchor" id="_deprecated000029"></a>Member <a class="el" href="classhoudini__utils_1_1ParmFactory.html#a1a7a9b83f049b8e088854e4da4531322">ParmFactory::setChoiceList</a>  (PRM_ChoiceListType typ, const std::vector&lt; std::string &gt; &amp;items, bool paired=false)</dt>
 <dd>Use <a class="el" href="classhoudini__utils_1_1ParmFactory.html#a0a055447000f9014bb8d42e0e00977da" title="Specify a menu type and a list of token, label, token, label,... pairs for this parameter. ">setChoiceListItems()</a> instead. Using unpaired items may mean less typing now, but it prevents you from reordering or deleting entries later.  </dd>
-<dt><a class="anchor" id="_deprecated000002"></a>Member <a class="el" href="classhoudini__utils_1_1ParmFactory.html#ad73eafcf1527fbda10bc0dd90248209b">ParmFactory::setChoiceList</a>  (PRM_ChoiceListType typ, const char *const *items, bool paired=false)</dt>
+<dt><a class="anchor" id="_deprecated000030"></a>Member <a class="el" href="classhoudini__utils_1_1ParmFactory.html#ad73eafcf1527fbda10bc0dd90248209b">ParmFactory::setChoiceList</a>  (PRM_ChoiceListType typ, const char *const *items, bool paired=false)</dt>
 <dd>Use <a class="el" href="classhoudini__utils_1_1ParmFactory.html#a0a055447000f9014bb8d42e0e00977da" title="Specify a menu type and a list of token, label, token, label,... pairs for this parameter. ">setChoiceListItems()</a> instead. Using unpaired items may mean less typing now, but it prevents you from reordering or deleting entries later.  </dd>
-<dt><a class="anchor" id="_deprecated000003"></a>Member <a class="el" href="classopenvdb__houdini_1_1SOP__NodeVDB.html#a52c0359cc6745b7385f2f71279c371c6">SOP_NodeVDB::duplicateSourceStealable</a>  (const unsigned index, OP_Context &amp;context, GU_Detail **pgdp, GU_DetailHandle &amp;gdh, bool clean=true)</dt>
+<dt><a class="anchor" id="_deprecated000032"></a>Member <a class="el" href="classopenvdb__houdini_1_1SOP__NodeVDB.html#a52c0359cc6745b7385f2f71279c371c6">SOP_NodeVDB::duplicateSourceStealable</a>  (const unsigned index, OP_Context &amp;context, GU_Detail **pgdp, GU_DetailHandle &amp;gdh, bool clean=true)</dt>
 <dd>verbification renders this redundant  </dd>
-<dt><a class="anchor" id="_deprecated000004"></a>Member <a class="el" href="classopenvdb__houdini_1_1SOP__NodeVDB.html#a0f80e8352baf2cec821477aa15cdea04">SOP_NodeVDB::duplicateSourceStealable</a>  (const unsigned index, OP_Context &amp;context)</dt>
-<dd>verbification renders this redundant </dd>
+<dt><a class="anchor" id="_deprecated000033"></a>Member <a class="el" href="classopenvdb__houdini_1_1SOP__NodeVDB.html#a0f80e8352baf2cec821477aa15cdea04">SOP_NodeVDB::duplicateSourceStealable</a>  (const unsigned index, OP_Context &amp;context)</dt>
+<dd>verbification renders this redundant  </dd>
+<dt><a class="anchor" id="_deprecated000021"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#ae3bfd775ca5152411cc28fa5f6d95ea3">Tree&lt; _RootNodeType &gt;::visit</a>  (VisitorOp &amp;op) const </dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000022"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a085768d7b5762ac5be343ba82fe666a6">Tree&lt; _RootNodeType &gt;::visit</a>  (const VisitorOp &amp;op) const </dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000019"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a92fa8714e1d4021da4f150b5e24385a0">Tree&lt; _RootNodeType &gt;::visit</a>  (VisitorOp &amp;op)</dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000020"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#ab5edcc00e9c808a70cf54f70d1c6cf1c">Tree&lt; _RootNodeType &gt;::visit</a>  (const VisitorOp &amp;op)</dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000024"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#ada17792f9a96a8fd4f9dd881840a036b">Tree&lt; _RootNodeType &gt;::visit2</a>  (OtherTreeType &amp;other, const VisitorOp &amp;op)</dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000025"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a0746c8bcd8bbb9b38e4296eb5a61acf0">Tree&lt; _RootNodeType &gt;::visit2</a>  (OtherTreeType &amp;other, VisitorOp &amp;op) const </dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000023"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a3a669237d39f3536882fd6c16fb32fde">Tree&lt; _RootNodeType &gt;::visit2</a>  (OtherTreeType &amp;other, VisitorOp &amp;op)</dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000026"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a741d508246ebbff1b95bea8134b49304">Tree&lt; _RootNodeType &gt;::visit2</a>  (OtherTreeType &amp;other, const VisitorOp &amp;op) const </dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000018"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#afd30b68bce6aa6ec6de2441d995a5f56">Tree&lt; _RootNodeType &gt;::visitActiveBBox</a>  (BBoxOp &amp;op) const </dt>
+<dd>"Use tools::visitNodesDepthFirst or DynamicNodeManager instead"  </dd>
+<dt><a class="anchor" id="_deprecated000008"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html#aeb1b2324796ecb495cb7d90d5c5ec785">TypedAttributeArray&lt; ValueType_, Codec_ &gt;::compress</a>  () override</dt>
+<dd>"Previously this compressed the attribute array, now it does nothing"  </dd>
+<dt><a class="anchor" id="_deprecated000006"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html#af247b4c966132d3a559faf34d6b44205">TypedAttributeArray&lt; ValueType_, Codec_ &gt;::copyUncompressed</a>  () const override</dt>
+<dd>"In-memory compression no longer supported, use AttributeArray::copy() instead"  </dd>
+<dt><a class="anchor" id="_deprecated000009"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html#ae6ef63e4a369f6730d5ec519809fe185">TypedAttributeArray&lt; ValueType_, Codec_ &gt;::decompress</a>  () override</dt>
+<dd>"Previously this uncompressed the attribute array, now it does nothing"  </dd>
+<dt><a class="anchor" id="_deprecated000007"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html#adaa7fa4cdd1221ce7ee3fc8b6288fcaf">TypedAttributeArray&lt; ValueType_, Codec_ &gt;::set</a>  (const Index n, const <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1AttributeArray.html" title="Base class for storing attribute data. ">AttributeArray</a> &amp;sourceArray, const Index sourceIndex) override</dt>
+<dd>"Use copyValues() with source-target index pairs"  </dd>
+<dt><a class="anchor" id="_deprecated000005"></a>Member <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html#a039c2e9821e6e69b1938e782b765f490">TypedAttributeArray&lt; ValueType_, Codec_ &gt;::TypedAttributeArray</a>  (const <a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1TypedAttributeArray.html" title="Typed class for storing attribute data. ">TypedAttributeArray</a> &amp;, bool)</dt>
+<dd>"Use copy-constructor without unused bool parameter" </dd>
 </dl>
 </div></div><!-- contents -->
 <!-- start footer part -->

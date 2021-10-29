@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -92,25 +92,22 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Convert polygonal meshes that consist of quads and/or triangles into signed or unsigned distance field volumes.  
  <a href="interfaceMeshDataAdapter.html#details">More...</a></p>
 
-<p><code>#include &lt;<a class="el" href="MeshToVolume_8h_source.html">MeshToVolume.h</a>&gt;</code></p>
+<p><code>#include &lt;<a class="el" href="MeshToVolume_8h_source.html">openvdb/tools/MeshToVolume.h</a>&gt;</code></p>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Convert polygonal meshes that consist of quads and/or triangles into signed or unsigned distance field volumes. </p>
 <dl class="section note"><dt>Note</dt><dd>Requires a closed surface but not necessarily a manifold surface. Supports surfaces with self intersections and degenerate faces and is independent of mesh surface normals.</dd></dl>
-<p>Expected interface for the <a class="el" href="interfaceMeshDataAdapter.html" title="Convert polygonal meshes that consist of quads and/or triangles into signed or unsigned distance fiel...">MeshDataAdapter</a> class </p><div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code" href="interfaceMeshDataAdapter.html">MeshDataAdapter</a> {</div><div class="line">  <span class="keywordtype">size_t</span> polygonCount() <span class="keyword">const</span>;        <span class="comment">// Total number of polygons</span></div><div class="line">  <span class="keywordtype">size_t</span> <a class="code" href="namespaceopenvdb_1_1v8__1_1_1points.html#a8dbfd50108bbe665a6e1a0607335a5df">pointCount</a>() <span class="keyword">const</span>;          <span class="comment">// Total number of points</span></div><div class="line">  <span class="keywordtype">size_t</span> vertexCount(<span class="keywordtype">size_t</span> n) <span class="keyword">const</span>; <span class="comment">// Vertex count for polygon n</span></div><div class="line"></div><div class="line">  <span class="comment">// Return position pos in local grid index space for polygon n and vertex v</span></div><div class="line">  <span class="keywordtype">void</span> getIndexSpacePoint(<span class="keywordtype">size_t</span> n, <span class="keywordtype">size_t</span> v, <a class="code" href="namespaceopenvdb_1_1v8__1_1_1math.html#a98d94999010cb92dfb5f652c353d1d82">openvdb::Vec3d</a>&amp; pos) <span class="keyword">const</span>;</div><div class="line">};</div></div><!-- fragment --><dl class="params"><dt>Parameters</dt><dd>
+<p>Expected interface for the <a class="el" href="interfaceMeshDataAdapter.html" title="Convert polygonal meshes that consist of quads and/or triangles into signed or unsigned distance fiel...">MeshDataAdapter</a> class </p><div class="fragment"><div class="line"><span class="keyword">struct </span><a class="code" href="interfaceMeshDataAdapter.html">MeshDataAdapter</a> {</div><div class="line">  <span class="keywordtype">size_t</span> polygonCount() <span class="keyword">const</span>;        <span class="comment">// Total number of polygons</span></div><div class="line">  <span class="keywordtype">size_t</span> <a class="code" href="namespaceopenvdb_1_1v9__0_1_1points.html#a8dbfd50108bbe665a6e1a0607335a5df">pointCount</a>() <span class="keyword">const</span>;          <span class="comment">// Total number of points</span></div><div class="line">  <span class="keywordtype">size_t</span> vertexCount(<span class="keywordtype">size_t</span> n) <span class="keyword">const</span>; <span class="comment">// Vertex count for polygon n</span></div><div class="line"></div><div class="line">  <span class="comment">// Return position pos in local grid index space for polygon n and vertex v</span></div><div class="line">  <span class="keywordtype">void</span> getIndexSpacePoint(<span class="keywordtype">size_t</span> n, <span class="keywordtype">size_t</span> v, openvdb::Vec3d&amp; pos) <span class="keyword">const</span>;</div><div class="line">};</div></div><!-- fragment --><dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">mesh</td><td>mesh data access class that conforms to the <a class="el" href="interfaceMeshDataAdapter.html" title="Convert polygonal meshes that consist of quads and/or triangles into signed or unsigned distance fiel...">MeshDataAdapter</a> interface </td></tr>
     <tr><td class="paramname">transform</td><td>world-to-index-space transform </td></tr>
     <tr><td class="paramname">exteriorBandWidth</td><td>exterior narrow band width in voxel units </td></tr>
-    <tr><td class="paramname">interiorBandWidth</td><td>interior narrow band width in voxel units (set to <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a5f16766bff85d9c17429a43bd490343c">std::numeric_limits&lt;float&gt;::max()</a> to fill object interior with distance values) </td></tr>
+    <tr><td class="paramname">interiorBandWidth</td><td>interior narrow band width in voxel units (set to <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#af102709567b92b0c0bf370c1c3a918e4">std::numeric_limits&lt;float&gt;::max()</a> to fill object interior with distance values) </td></tr>
     <tr><td class="paramname">flags</td><td>optional conversion flags defined in <code>MeshToVolumeFlags</code> </td></tr>
     <tr><td class="paramname">polygonIndexGrid</td><td>optional grid output that will contain the closest-polygon index for each voxel in the narrow band region </td></tr>
   </table>
   </dd>
 </dl>
-</div><hr/>The documentation for this interface was generated from the following file:<ul>
-<li><a class="el" href="MeshToVolume_8h_source.html">MeshToVolume.h</a></li>
-</ul>
-</div><!-- contents -->
+</div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>
 Generated by &#160;<a href="http://www.doxygen.org/index.html">

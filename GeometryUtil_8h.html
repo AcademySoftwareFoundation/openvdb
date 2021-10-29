@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: GeometryUtil.h File Reference</title>
+<title>OpenVDB: openvdb_houdini/GeometryUtil.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_60bcacab2bfd72b99b26da6ca86c8b61.html">openvdb_houdini</a></li><li class="navelem"><a class="el" href="dir_66b08b56d8300cb83cc30c8cb78a7ea4.html">openvdb_houdini</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_66b08b56d8300cb83cc30c8cb78a7ea4.html">openvdb_houdini</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -101,6 +101,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <div class="textblock"><code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="MeshToVolume_8h_source.html">openvdb/tools/MeshToVolume.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="NullInterrupter_8h_source.html">openvdb/util/NullInterrupter.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Util_8h_source.html">openvdb/util/Util.h</a>&gt;</code><br />
 <code>#include &lt;GU/GU_Detail.h&gt;</code><br />
 <code>#include &lt;algorithm&gt;</code><br />
@@ -144,9 +145,11 @@ Functions</h2></td></tr>
 <tr class="memitem:a52e21ebad81748cee8e71b4082a41bf7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a52e21ebad81748cee8e71b4082a41bf7">pointInPrimGroup</a> (GA_Offset ptnOffset, GU_Detail &amp;, const GA_PrimitiveGroup &amp;)</td></tr>
 <tr class="memdesc:a52e21ebad81748cee8e71b4082a41bf7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return <code>true</code> if the point at the given offset is referenced by primitives from a certain primitive group.  <a href="namespaceopenvdb__houdini.html#a52e21ebad81748cee8e71b4082a41bf7">More...</a><br /></td></tr>
 <tr class="separator:a52e21ebad81748cee8e71b4082a41bf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0bf1469338cde2747d5a67188b043b5e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0bf1469338cde2747d5a67188b043b5e">convertGeometry</a> (const GU_Detail &amp;, std::string &amp;warning, Interrupter *)</td></tr>
-<tr class="memdesc:a0bf1469338cde2747d5a67188b043b5e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert geometry to quads and triangles.  <a href="namespaceopenvdb__houdini.html#a0bf1469338cde2747d5a67188b043b5e">More...</a><br /></td></tr>
-<tr class="separator:a0bf1469338cde2747d5a67188b043b5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afa67a606a910e3dda6250bccc52b1bec"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#afa67a606a910e3dda6250bccc52b1bec">convertGeometry</a> (const GU_Detail &amp;, std::string &amp;warning, openvdb::util::NullInterrupter *)</td></tr>
+<tr class="memdesc:afa67a606a910e3dda6250bccc52b1bec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert geometry to quads and triangles.  <a href="namespaceopenvdb__houdini.html#afa67a606a910e3dda6250bccc52b1bec">More...</a><br /></td></tr>
+<tr class="separator:afa67a606a910e3dda6250bccc52b1bec"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5eedf901d4896255416c71bcda5efb17"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a5eedf901d4896255416c71bcda5efb17">convertGeometry</a> (const GU_Detail &amp;detail, std::string &amp;warning, Interrupter *boss)</td></tr>
+<tr class="separator:a5eedf901d4896255416c71bcda5efb17"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Utility methods and tools for geometry processing. </p>

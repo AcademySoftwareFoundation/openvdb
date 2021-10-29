@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['zyxiterator',['ZYXIterator',['../classopenvdb_1_1v8__1_1_1math_1_1CoordBBox.html#ac35c5d0446c91eb05eae7586725f1beb',1,'openvdb::v8_1::math::CoordBBox']]]
+  ['xyziterator',['XYZIterator',['../classopenvdb_1_1v9__0_1_1math_1_1CoordBBox.html#a994bd12f7cfbe3bfd5bae502fd9db72a',1,'openvdb::v9_0::math::CoordBBox']]]
 ];

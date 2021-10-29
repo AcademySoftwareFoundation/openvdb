@@ -14,8 +14,5 @@ var searchData=
   ['axcplusplus_2etxt',['axcplusplus.txt',['../axcplusplus_8txt.html',1,'']]],
   ['axexamples_2etxt',['axexamples.txt',['../axexamples_8txt.html',1,'']]],
   ['axfunctionlist_2etxt',['axfunctionlist.txt',['../axfunctionlist_8txt.html',1,'']]],
-  ['axparser_2eh',['axparser.h',['../axparser_8h.html',1,'']]],
-  ['doc_2etxt',['doc.txt',['../ax_2doc_8txt.html',1,'']]],
-  ['exceptions_2eh',['Exceptions.h',['../ax_2openvdb__ax_2Exceptions_8h.html',1,'']]],
-  ['types_2eh',['Types.h',['../ax_2openvdb__ax_2codegen_2Types_8h.html',1,'']]]
+  ['axparser_2eh',['axparser.h',['../axparser_8h.html',1,'']]]
 ];

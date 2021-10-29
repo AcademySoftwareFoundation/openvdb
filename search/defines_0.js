@@ -1,9 +1,5 @@
 var searchData=
 [
-  ['axdebug',['AXDEBUG',['../axparser_8h.html#a300839708281753dc3437c5adefe00cf',1,'axparser.h']]],
-  ['axltype_5fis_5fdeclared',['AXLTYPE_IS_DECLARED',['../axparser_8h.html#ac7bd7b60b0dd9bf87af098bd15635f5a',1,'axparser.h']]],
-  ['axltype_5fis_5ftrivial',['AXLTYPE_IS_TRIVIAL',['../axparser_8h.html#acd33bc24b6adba7a471fdad1c4564c56',1,'axparser.h']]],
-  ['axstype_5fis_5fdeclared',['AXSTYPE_IS_DECLARED',['../axparser_8h.html#a79f97aeec4789c9fa1c3d8aa0717992f',1,'axparser.h']]],
-  ['axstype_5fis_5ftrivial',['AXSTYPE_IS_TRIVIAL',['../axparser_8h.html#aac0163d2ba1fed3aa85d2b2743cce8b3',1,'axparser.h']]],
-  ['axtokentype',['AXTOKENTYPE',['../axparser_8h.html#a9d0e59db19b9a1c9088852ed8d5563c9',1,'axparser.h']]]
+  ['_5f_5fhostdev_5f_5f',['__hostdev__',['../NanoVDB_8h.html#a551e5ea2539324048f4b47c00ab67d55',1,'__hostdev__():&#160;NanoVDB.h'],['../SampleFromVoxels_8h.html#a551e5ea2539324048f4b47c00ab67d55',1,'__hostdev__():&#160;SampleFromVoxels.h']]],
+  ['_5fmat',['_mat',['../VoxToNanoVDB_8h.html#a85ad93fa5b6f842534371a41bc59a048',1,'_mat():&#160;VoxToNanoVDB.h'],['../VoxToNanoVDB_8h.html#a189105b04e9db1f8742e2420e3884157',1,'_mat():&#160;VoxToNanoVDB.h']]]
 ];

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Composite.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Composite.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,14 +83,13 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
-<a href="#enum-members">Enumerations</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
 <div class="title">Composite.h File Reference</div>  </div>
@@ -104,6 +103,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
 <code>#include &quot;<a class="el" href="Merge_8h_source.html">Merge.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="ValueTransformer_8h_source.html">ValueTransformer.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Prune_8h_source.html">Prune.h</a>&quot;</code><br />
@@ -112,7 +112,6 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;tbb/parallel_for.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_reduce.h&gt;</code><br />
 <code>#include &lt;tbb/task_group.h&gt;</code><br />
-<code>#include &lt;tbb/task_scheduler_init.h&gt;</code><br />
 <code>#include &lt;type_traits&gt;</code><br />
 <code>#include &lt;functional&gt;</code><br />
 </div>
@@ -120,116 +119,94 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1composite_1_1BuildPrimarySegment.html">BuildPrimarySegment&lt; TreeType, Operation &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1composite_1_1BuildSecondarySegment.html">BuildSecondarySegment&lt; TreeType, Operation &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1composite_1_1GridOrTreeConstructor.html">GridOrTreeConstructor&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1composite_1_1GridOrTreeConstructor_3_01Grid_3_01TreeType_01_4_01_4.html">GridOrTreeConstructor&lt; Grid&lt; TreeType &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CompReplaceOp.html">CompReplaceOp&lt; TreeT &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CompReplaceOp.html">CompReplaceOp&lt; TreeT &gt;</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1composite"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html">openvdb::v8_1::tools::composite</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools_1_1composite"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html">openvdb::v9_0::tools::composite</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
-Enumerations</h2></td></tr>
-<tr class="memitem:a7fa595becbbe84c7cfbb4417a626029c"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a7fa595becbbe84c7cfbb4417a626029c">CSGOperation</a> { <a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a7fa595becbbe84c7cfbb4417a626029cac9ae7ac7304d79020e991c57c6f9c8be">CSG_UNION</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a7fa595becbbe84c7cfbb4417a626029cad05ec992438b543b367f312b6bbf8f38">CSG_INTERSECTION</a>, 
-<a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a7fa595becbbe84c7cfbb4417a626029ca77fbcc466df7541014c11fb771f99544">CSG_DIFFERENCE</a>
- }</td></tr>
-<tr class="separator:a7fa595becbbe84c7cfbb4417a626029c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a003db10da0696d7e120eff0477bc782c"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a003db10da0696d7e120eff0477bc782c"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a003db10da0696d7e120eff0477bc782c">csgUnion</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
-<tr class="memdesc:a003db10da0696d7e120eff0477bc782c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the union of A and B.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a003db10da0696d7e120eff0477bc782c">More...</a><br /></td></tr>
+<tr class="memitem:a003db10da0696d7e120eff0477bc782c"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a003db10da0696d7e120eff0477bc782c">csgUnion</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
+<tr class="memdesc:a003db10da0696d7e120eff0477bc782c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the union of A and B.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a003db10da0696d7e120eff0477bc782c">More...</a><br /></td></tr>
 <tr class="separator:a003db10da0696d7e120eff0477bc782c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7de3e11a37615c24f9c5e50bdc2a06e7">csgIntersection</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
-<tr class="memdesc:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the intersection of A and B.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7de3e11a37615c24f9c5e50bdc2a06e7">More...</a><br /></td></tr>
+<tr class="memitem:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7de3e11a37615c24f9c5e50bdc2a06e7">csgIntersection</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
+<tr class="memdesc:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the intersection of A and B.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7de3e11a37615c24f9c5e50bdc2a06e7">More...</a><br /></td></tr>
 <tr class="separator:a7de3e11a37615c24f9c5e50bdc2a06e7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1e2d62ce38b1969798cdc45baf2c9df3">csgDifference</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
-<tr class="memdesc:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the difference A / B.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a1e2d62ce38b1969798cdc45baf2c9df3">More...</a><br /></td></tr>
+<tr class="memitem:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1e2d62ce38b1969798cdc45baf2c9df3">csgDifference</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b, bool prune=true)</td></tr>
+<tr class="memdesc:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given two level set grids, replace the A grid with the difference A / B.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a1e2d62ce38b1969798cdc45baf2c9df3">More...</a><br /></td></tr>
 <tr class="separator:a1e2d62ce38b1969798cdc45baf2c9df3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a99a3bda1cab85509556b73d1467a004f"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a99a3bda1cab85509556b73d1467a004f"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a99a3bda1cab85509556b73d1467a004f">csgUnionCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:a99a3bda1cab85509556b73d1467a004f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG union operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a99a3bda1cab85509556b73d1467a004f">More...</a><br /></td></tr>
+<tr class="memitem:a99a3bda1cab85509556b73d1467a004f"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a99a3bda1cab85509556b73d1467a004f">csgUnionCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:a99a3bda1cab85509556b73d1467a004f"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG union operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a99a3bda1cab85509556b73d1467a004f">More...</a><br /></td></tr>
 <tr class="separator:a99a3bda1cab85509556b73d1467a004f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:add41b6c432f26145649e640fa76dc25d"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:add41b6c432f26145649e640fa76dc25d"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#add41b6c432f26145649e640fa76dc25d">csgIntersectionCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:add41b6c432f26145649e640fa76dc25d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG intersection operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#add41b6c432f26145649e640fa76dc25d">More...</a><br /></td></tr>
+<tr class="memitem:add41b6c432f26145649e640fa76dc25d"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#add41b6c432f26145649e640fa76dc25d">csgIntersectionCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:add41b6c432f26145649e640fa76dc25d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG intersection operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#add41b6c432f26145649e640fa76dc25d">More...</a><br /></td></tr>
 <tr class="separator:add41b6c432f26145649e640fa76dc25d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7029f32f9814fd95e23d202c37b8da5b"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a7029f32f9814fd95e23d202c37b8da5b"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7029f32f9814fd95e23d202c37b8da5b">csgDifferenceCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:a7029f32f9814fd95e23d202c37b8da5b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG difference operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a7029f32f9814fd95e23d202c37b8da5b">More...</a><br /></td></tr>
+<tr class="memitem:a7029f32f9814fd95e23d202c37b8da5b"><td class="memTemplItemLeft" align="right" valign="top">GridOrTreeT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7029f32f9814fd95e23d202c37b8da5b">csgDifferenceCopy</a> (const GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:a7029f32f9814fd95e23d202c37b8da5b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded CSG difference operation that produces a new grid or tree from immutable inputs.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a7029f32f9814fd95e23d202c37b8da5b">More...</a><br /></td></tr>
 <tr class="separator:a7029f32f9814fd95e23d202c37b8da5b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab89a5ef4e61074f401e72aef834afda1"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:ab89a5ef4e61074f401e72aef834afda1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab89a5ef4e61074f401e72aef834afda1">compMax</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:ab89a5ef4e61074f401e72aef834afda1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute max(a, b) per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab89a5ef4e61074f401e72aef834afda1">More...</a><br /></td></tr>
+<tr class="memitem:ab89a5ef4e61074f401e72aef834afda1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab89a5ef4e61074f401e72aef834afda1">compMax</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:ab89a5ef4e61074f401e72aef834afda1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute max(a, b) per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab89a5ef4e61074f401e72aef834afda1">More...</a><br /></td></tr>
 <tr class="separator:ab89a5ef4e61074f401e72aef834afda1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad0f06ce463a63898a09fea378ac6912e"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:ad0f06ce463a63898a09fea378ac6912e"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad0f06ce463a63898a09fea378ac6912e">compMin</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:ad0f06ce463a63898a09fea378ac6912e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute min(a, b) per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad0f06ce463a63898a09fea378ac6912e">More...</a><br /></td></tr>
+<tr class="memitem:ad0f06ce463a63898a09fea378ac6912e"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ad0f06ce463a63898a09fea378ac6912e">compMin</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:ad0f06ce463a63898a09fea378ac6912e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute min(a, b) per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ad0f06ce463a63898a09fea378ac6912e">More...</a><br /></td></tr>
 <tr class="separator:ad0f06ce463a63898a09fea378ac6912e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab3e57293906eddd0c42c4df3e64cc800"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:ab3e57293906eddd0c42c4df3e64cc800"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab3e57293906eddd0c42c4df3e64cc800">compSum</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:ab3e57293906eddd0c42c4df3e64cc800"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a + b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab3e57293906eddd0c42c4df3e64cc800">More...</a><br /></td></tr>
+<tr class="memitem:ab3e57293906eddd0c42c4df3e64cc800"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab3e57293906eddd0c42c4df3e64cc800">compSum</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:ab3e57293906eddd0c42c4df3e64cc800"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a + b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab3e57293906eddd0c42c4df3e64cc800">More...</a><br /></td></tr>
 <tr class="separator:ab3e57293906eddd0c42c4df3e64cc800"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abdd7d6918702cd795e831789812c9ac1"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:abdd7d6918702cd795e831789812c9ac1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#abdd7d6918702cd795e831789812c9ac1">compMul</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:abdd7d6918702cd795e831789812c9ac1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a * b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#abdd7d6918702cd795e831789812c9ac1">More...</a><br /></td></tr>
+<tr class="memitem:abdd7d6918702cd795e831789812c9ac1"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#abdd7d6918702cd795e831789812c9ac1">compMul</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:abdd7d6918702cd795e831789812c9ac1"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a * b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#abdd7d6918702cd795e831789812c9ac1">More...</a><br /></td></tr>
 <tr class="separator:abdd7d6918702cd795e831789812c9ac1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a001d3e901a369bb50ed1b4e78e57b303"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a001d3e901a369bb50ed1b4e78e57b303"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a001d3e901a369bb50ed1b4e78e57b303">compDiv</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:a001d3e901a369bb50ed1b4e78e57b303"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a / b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a001d3e901a369bb50ed1b4e78e57b303">More...</a><br /></td></tr>
+<tr class="memitem:a001d3e901a369bb50ed1b4e78e57b303"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a001d3e901a369bb50ed1b4e78e57b303">compDiv</a> (GridOrTreeT &amp;a, GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:a001d3e901a369bb50ed1b4e78e57b303"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given grids A and B, compute a / b per voxel (using sparse traversal). Store the result in the A grid and leave the B grid empty.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a001d3e901a369bb50ed1b4e78e57b303">More...</a><br /></td></tr>
 <tr class="separator:a001d3e901a369bb50ed1b4e78e57b303"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="memTemplParams" colspan="2">template&lt;typename GridOrTreeT &gt; </td></tr>
-<tr class="memitem:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a0a7784bcd2c95e7b015e6fc2c3c9d5d9">compReplace</a> (GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
-<tr class="memdesc:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy the active voxels of B into A.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a0a7784bcd2c95e7b015e6fc2c3c9d5d9">More...</a><br /></td></tr>
+<tr class="memitem:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a0a7784bcd2c95e7b015e6fc2c3c9d5d9">compReplace</a> (GridOrTreeT &amp;a, const GridOrTreeT &amp;b)</td></tr>
+<tr class="memdesc:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Copy the active voxels of B into A.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a0a7784bcd2c95e7b015e6fc2c3c9d5d9">More...</a><br /></td></tr>
 <tr class="separator:a0a7784bcd2c95e7b015e6fc2c3c9d5d9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acd26c9d63364141f1b222bb2f7d08a02"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:acd26c9d63364141f1b222bb2f7d08a02"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt;!VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#acd26c9d63364141f1b222bb2f7d08a02">min</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:acd26c9d63364141f1b222bb2f7d08a02"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5f16766bff85d9c17429a43bd490343c"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a5f16766bff85d9c17429a43bd490343c"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt;!VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a5f16766bff85d9c17429a43bd490343c">max</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:a5f16766bff85d9c17429a43bd490343c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afeda15f6dfdf93715bf77e8eb1d1399d"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:afeda15f6dfdf93715bf77e8eb1d1399d"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt; VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#afeda15f6dfdf93715bf77e8eb1d1399d">min</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:afeda15f6dfdf93715bf77e8eb1d1399d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af8b84c195a9b8e04e0b5f1ce495c9e0b"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:af8b84c195a9b8e04e0b5f1ce495c9e0b"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt; VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#af8b84c195a9b8e04e0b5f1ce495c9e0b">max</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:af8b84c195a9b8e04e0b5f1ce495c9e0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab7e3c13e94183b66b15cf94c7a5702aa"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:ab7e3c13e94183b66b15cf94c7a5702aa"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt;!std::is_integral&lt; T &gt;::value, T &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#ab7e3c13e94183b66b15cf94c7a5702aa">divide</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:ab7e3c13e94183b66b15cf94c7a5702aa"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a09cb1e649c8b58e4c820dbfaf64762a6"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
-<tr class="memitem:a09cb1e649c8b58e4c820dbfaf64762a6"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_integral&lt; T &gt;::value, T &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a09cb1e649c8b58e4c820dbfaf64762a6">divide</a> (const T &amp;a, const T &amp;b)</td></tr>
-<tr class="separator:a09cb1e649c8b58e4c820dbfaf64762a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a8a372dbb258b7517ac2706b7d79dc232"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a8a372dbb258b7517ac2706b7d79dc232">divide</a> (bool a, bool)</td></tr>
-<tr class="separator:a8a372dbb258b7517ac2706b7d79dc232"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af757590751a20e5476f46e4c2c8a9d7d"><td class="memTemplParams" colspan="2">template&lt;CSGOperation Operation, typename TreeType &gt; </td></tr>
-<tr class="memitem:af757590751a20e5476f46e4c2c8a9d7d"><td class="memTemplItemLeft" align="right" valign="top">TreeType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#af757590751a20e5476f46e4c2c8a9d7d">doCSGCopy</a> (const TreeType &amp;lhs, const TreeType &amp;rhs)</td></tr>
-<tr class="separator:af757590751a20e5476f46e4c2c8a9d7d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a904e686fa2446cfd087dc00ed1ba2afd"><td class="memTemplParams" colspan="2">template&lt;typename TreeT &gt; </td></tr>
-<tr class="memitem:a904e686fa2446cfd087dc00ed1ba2afd"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1composite.html#a904e686fa2446cfd087dc00ed1ba2afd">validateLevelSet</a> (const TreeT &amp;tree, const std::string &amp;gridName=std::string(&quot;&quot;))</td></tr>
-<tr class="separator:a904e686fa2446cfd087dc00ed1ba2afd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a41988aa35acaa84e9b6b0aaf3dca7a71"><td class="memTemplParams" colspan="2">template&lt;typename TreeT , typename OpT  = composite::CopyOp&lt;TreeT&gt;&gt; </td></tr>
-<tr class="memitem:a41988aa35acaa84e9b6b0aaf3dca7a71"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a41988aa35acaa84e9b6b0aaf3dca7a71">compActiveLeafVoxels</a> (TreeT &amp;srcTree, TreeT &amp;dstTree, OpT op=composite::CopyOp&lt; TreeT &gt;())</td></tr>
-<tr class="memdesc:a41988aa35acaa84e9b6b0aaf3dca7a71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Composite the active values in leaf nodes, i.e. active voxels, of a source tree into a destination tree.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a41988aa35acaa84e9b6b0aaf3dca7a71">More...</a><br /></td></tr>
-<tr class="separator:a41988aa35acaa84e9b6b0aaf3dca7a71"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af5d803a1fe07de378e8195ecc4a42a70"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:af5d803a1fe07de378e8195ecc4a42a70"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt;!VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#af5d803a1fe07de378e8195ecc4a42a70">min</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:af5d803a1fe07de378e8195ecc4a42a70"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af102709567b92b0c0bf370c1c3a918e4"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:af102709567b92b0c0bf370c1c3a918e4"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt;!VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#af102709567b92b0c0bf370c1c3a918e4">max</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:af102709567b92b0c0bf370c1c3a918e4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3014de5fbca7be366ebaf4416d7b861d"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:a3014de5fbca7be366ebaf4416d7b861d"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt; VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#a3014de5fbca7be366ebaf4416d7b861d">min</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:a3014de5fbca7be366ebaf4416d7b861d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5b16cf5a76ccb87118b7cf6f728d65ef"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:a5b16cf5a76ccb87118b7cf6f728d65ef"><td class="memTemplItemLeft" align="right" valign="top">const std::enable_if&lt; VecTraits&lt; T &gt;::IsVec, T &gt;::type &amp;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#a5b16cf5a76ccb87118b7cf6f728d65ef">max</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:a5b16cf5a76ccb87118b7cf6f728d65ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae04b3acf001055e9ca96371d9252b1ef"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:ae04b3acf001055e9ca96371d9252b1ef"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt;!std::is_integral&lt; T &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, T &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#ae04b3acf001055e9ca96371d9252b1ef">divide</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:ae04b3acf001055e9ca96371d9252b1ef"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a84a763a98f757b9cd1e6e1f2da5767fc"><td class="memTemplParams" colspan="2">template&lt;typename T &gt; </td></tr>
+<tr class="memitem:a84a763a98f757b9cd1e6e1f2da5767fc"><td class="memTemplItemLeft" align="right" valign="top">std::enable_if&lt; std::is_integral&lt; T &gt;::<a class="el" href="GridBuilder_8h.html#a0bd8e8b76a16eb8c0d32d42313755c8e">value</a>, T &gt;::type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#a84a763a98f757b9cd1e6e1f2da5767fc">divide</a> (const T &amp;a, const T &amp;b)</td></tr>
+<tr class="separator:a84a763a98f757b9cd1e6e1f2da5767fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac7564affde4e2cec1f45602e9a1007bd"><td class="memItemLeft" align="right" valign="top">bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools_1_1composite.html#ac7564affde4e2cec1f45602e9a1007bd">divide</a> (bool a, bool)</td></tr>
+<tr class="separator:ac7564affde4e2cec1f45602e9a1007bd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4c964ad95c28d6e37f46db3ef2bf7447"><td class="memTemplParams" colspan="2">template&lt;typename TreeT , typename OpT  = composite::CopyOp&lt;TreeT&gt;&gt; </td></tr>
+<tr class="memitem:a4c964ad95c28d6e37f46db3ef2bf7447"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4c964ad95c28d6e37f46db3ef2bf7447">compActiveLeafVoxels</a> (TreeT &amp;srcTree, TreeT &amp;dstTree, OpT op=composite::CopyOp&lt; TreeT &gt;())</td></tr>
+<tr class="memdesc:a4c964ad95c28d6e37f46db3ef2bf7447"><td class="mdescLeft">&#160;</td><td class="mdescRight">Composite the active values in leaf nodes, i.e. active voxels, of a source tree into a destination tree.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4c964ad95c28d6e37f46db3ef2bf7447">More...</a><br /></td></tr>
+<tr class="separator:a4c964ad95c28d6e37f46db3ef2bf7447"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Functions to efficiently perform various compositing operations on grids. </p>

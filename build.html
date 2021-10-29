@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -133,8 +133,8 @@ Locating Dependencies</h2>
 </ul>
 <ul>
 <li><b>Inputs</b> - The following variables can be used to help drive the search path on first runs of CMake (i.e. these variables are not <a href="https://cmake.org/cmake/help/latest/command/set.html#set-cache-entry">cached</a>). They are listed in priority order. Note that the prefix is always capitalized.<ul>
-<li><b>XXX_INCLUDEDIR</b> / <b>XXX_LIBRARYDIR</b> - Preferred include and library directories</li>
 <li><b>Xxx_ROOT</b> - Preferred installation prefix. The given dependency is expected to follow a folder structure <code>Xxx_ROOT/include</code> and <code>Xxx_ROOT/lib</code> exist. Note that unlike the above, this is the case matching name of the find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.</li>
+<li><b>XXX_INCLUDEDIR</b> / <b>XXX_LIBRARYDIR</b> - Preferred include and library directories</li>
 <li><b>SYSTEM_LIBRARY_PATHS</b> - A list of paths appended to all include and lib searches.</li>
 <li><b>XXX_USE_STATIC_LIBS</b> - Only search for static libraries for the given dependency. If OFF, the shared library is prioritized, falling back to the static library. This is OFF by default.</li>
 <li><b>DISABLE_CMAKE_SEARCH_PATHS</b> - The above variables are custom to the OpenVDB project. CMake itself implements its own search system to try and find the given libraries and packages. When ON, this variable disables CMake's inbuilt search, guaranteeing that only the above user provided paths are searched. See <a href="https://cmake.org/cmake/help/latest/command/find_package.html#search-procedure">CMakes Search Procedure</a> for more information. This is OFF by default (and thus CMake's search is enabled).</li>
@@ -166,6 +166,7 @@ Blosc Support</h2>
 <li>Blosc produces significantly smaller <code>.vdb</code> files</li>
 <li>If Blosc is disabled, you will not be able to read or use any <code>.vdb</code> files that were created using blosc compression. This includes OpenVDB files from Houdini.</li>
 </ul>
+<p>See the note in the <a class="el" href="dependencies.html#depKnownIssues">known issues list</a> regarding supported versions of blosc.</p>
 <h2><a class="anchor" id="buildZLibSupport"></a>
 ZLIB Support</h2>
 <p>ZLIB is an optional dependency of all OpenVDB components. The documented build steps below treat ZLib as a required dependency.</p>
@@ -360,7 +361,7 @@ Building With OpenVDB</h1>
 <p>The following assumes that OpenVDB was installed with <code>OPENVDB_BUILD_CORE=ON</code> and <code>OPENVDB_INSTALL_CMAKE_MODULES=ON</code>. Don't worry if you didn't specify these options directly, they both default to <code>ON</code>. This ensures that OpenVDB has installed the required CMake modules that your application will need to use.</p>
 <p><b>Note:</b> Typically, projects provide a <b>Config-file</b> rather than a <b>Find-module</b> for downstream use. OpenVDB currently provides a <b>Find-module</b>. This may change in the future. Further information <a href="https://cmake.org/cmake/help/latest/manual/cmake-packages.7.html#using-packages">here</a>.</p>
 <p>You can add the below CMake snippet to your main <code>CMakeLists.txt</code> to bring in OpenVDB as a dependency:</p>
-<div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;cmake_minimum_required(VERSION 3.12)</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;list(APPEND CMAKE_MODULE_PATH &quot;/location/of/openvdb/install/lib/cmake/OpenVDB&quot;)</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;find_package(OpenVDB REQUIRED)</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;target_link_libraries(myapp OpenVDB::openvdb)</div></div><!-- fragment --><p><code>myapp</code> in the above is a CMake target, usually created with <code>add_library()</code> or <code>add_executable()</code>. You can optionally provide <code>CMAKE_MODULE_PATH</code> as a <code>-D</code> argument to the cmake command line instead of specifying it in your <code>CMakeLists.txt</code>.</p>
+<div class="fragment"><div class="line"><a name="l00001"></a><span class="lineno">    1</span>&#160;cmake_minimum_required(VERSION 3.15)</div><div class="line"><a name="l00002"></a><span class="lineno">    2</span>&#160;list(APPEND CMAKE_MODULE_PATH &quot;/location/of/openvdb/install/lib/cmake/OpenVDB&quot;)</div><div class="line"><a name="l00003"></a><span class="lineno">    3</span>&#160;find_package(OpenVDB REQUIRED)</div><div class="line"><a name="l00004"></a><span class="lineno">    4</span>&#160;target_link_libraries(myapp OpenVDB::openvdb)</div></div><!-- fragment --><p><code>myapp</code> in the above is a CMake target, usually created with <code>add_library()</code> or <code>add_executable()</code>. You can optionally provide <code>CMAKE_MODULE_PATH</code> as a <code>-D</code> argument to the cmake command line instead of specifying it in your <code>CMakeLists.txt</code>.</p>
 <p>Note that the <code>FindOpenVDB.cmake</code> module relies on the other <code>FindModules</code> provided in the OpenVDB installation to find it's own dependencies. This may require you to provide additional dependency locations for OpenVDB's dependencies. See <a class="el" href="build.html#buildDependencies">Locating Dependencies</a> or the below troubleshooting for more information. </p><hr/>
 <h1><a class="anchor" id="buildTroubleshooting"></a>
 Troubleshooting</h1>

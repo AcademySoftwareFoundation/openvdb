@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -125,8 +125,11 @@ Classes</h2></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1GT__GEOPrimCollectVDB.html">GT_GEOPrimCollectVDB</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1HoudiniInterrupter.html">HoudiniInterrupter</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper class that adapts a Houdini <code>UT_Interrupt</code> object for use with OpenVDB library routines.  <a href="classopenvdb__houdini_1_1HoudiniInterrupter.html#details">More...</a><br /></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Wrapper class that adapts a Houdini <code>UT_Interrupt</code> object for use with OpenVDB library routines.  <a href="classopenvdb__houdini_1_1Interrupter.html#details">More...</a><br /></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Deprecated wrapper class with the same interface as <a class="el" href="classopenvdb__houdini_1_1HoudiniInterrupter.html" title="Wrapper class that adapts a Houdini UT_Interrupt object for use with OpenVDB library routines...">HoudiniInterrupter</a>, however it does not derive from openvdb::util::NullInterrupter. Intended for backwards-compatibility only.  <a href="classopenvdb__houdini_1_1Interrupter.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb__houdini_1_1MeshAttrTransfer.html">MeshAttrTransfer</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -177,31 +180,31 @@ Typedefs</h2></td></tr>
 <tr class="separator:a8eddad2a12898b5ef4753a6deb0f6d72"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b73be2dee21d683c568861f97af79be"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a6b73be2dee21d683c568861f97af79be">OffsetPairListPtr</a> = std::shared_ptr&lt; <a class="el" href="namespaceopenvdb__houdini.html#a8eddad2a12898b5ef4753a6deb0f6d72">OffsetPairList</a> &gt;</td></tr>
 <tr class="separator:a6b73be2dee21d683c568861f97af79be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> = std::map&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt; int, bool &gt;&gt;</td></tr>
+<tr class="memitem:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> = std::map&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt; int, bool &gt;&gt;</td></tr>
 <tr class="separator:aec01bcad62d407c590ecbfbccf08c9f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a79fbab88ceaa44f883fcbac621d95497"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> = std::function&lt; void(const std::string &amp;)&gt;</td></tr>
 <tr class="separator:a79fbab88ceaa44f883fcbac621d95497"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab68e398333046373641f36c9d3ba33d0"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ab68e398333046373641f36c9d3ba33d0">Grid</a> = <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a></td></tr>
+<tr class="memitem:ab68e398333046373641f36c9d3ba33d0"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ab68e398333046373641f36c9d3ba33d0">Grid</a> = <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a></td></tr>
 <tr class="separator:ab68e398333046373641f36c9d3ba33d0"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a50a182da6cbbd72a2deb7f635b080497"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a50a182da6cbbd72a2deb7f635b080497">GridPtr</a> = <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html#ad98d7556003ccc2ef810f87d97159de4">openvdb::GridBase::Ptr</a></td></tr>
+<tr class="memitem:a50a182da6cbbd72a2deb7f635b080497"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a50a182da6cbbd72a2deb7f635b080497">GridPtr</a> = <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html#ad98d7556003ccc2ef810f87d97159de4">openvdb::GridBase::Ptr</a></td></tr>
 <tr class="separator:a50a182da6cbbd72a2deb7f635b080497"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeef18e4a0d7d224bd08b85e31d069edb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aeef18e4a0d7d224bd08b85e31d069edb">GridCPtr</a> = <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html#a4bd7d2423b89e25df1275764f6b6413f">openvdb::GridBase::ConstPtr</a></td></tr>
+<tr class="memitem:aeef18e4a0d7d224bd08b85e31d069edb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aeef18e4a0d7d224bd08b85e31d069edb">GridCPtr</a> = <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html#a4bd7d2423b89e25df1275764f6b6413f">openvdb::GridBase::ConstPtr</a></td></tr>
 <tr class="separator:aeef18e4a0d7d224bd08b85e31d069edb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa7ca3bf9c57eaaffe3f8d86098f4657f"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aa7ca3bf9c57eaaffe3f8d86098f4657f">GridRef</a> = <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;</td></tr>
+<tr class="memitem:aa7ca3bf9c57eaaffe3f8d86098f4657f"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aa7ca3bf9c57eaaffe3f8d86098f4657f">GridRef</a> = <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a> &amp;</td></tr>
 <tr class="separator:aa7ca3bf9c57eaaffe3f8d86098f4657f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a85343540a012d58d443cf442d08c747b"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a85343540a012d58d443cf442d08c747b">GridCRef</a> = const <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;</td></tr>
+<tr class="memitem:a85343540a012d58d443cf442d08c747b"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a85343540a012d58d443cf442d08c747b">GridCRef</a> = const <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a> &amp;</td></tr>
 <tr class="separator:a85343540a012d58d443cf442d08c747b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a023d4885c1409ba63ea673566bae990f"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a023d4885c1409ba63ea673566bae990f">ScalarGridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a44c7484144fab7fb2c436e938e2d87ce">openvdb::BoolGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a> &gt;</td></tr>
+<tr class="memitem:a023d4885c1409ba63ea673566bae990f"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a023d4885c1409ba63ea673566bae990f">ScalarGridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a44c7484144fab7fb2c436e938e2d87ce">openvdb::BoolGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a> &gt;</td></tr>
 <tr class="separator:a023d4885c1409ba63ea673566bae990f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad07cd0b238837c1618657629f3efbc35"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ad07cd0b238837c1618657629f3efbc35">NumericGridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a> &gt;</td></tr>
+<tr class="memitem:ad07cd0b238837c1618657629f3efbc35"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ad07cd0b238837c1618657629f3efbc35">NumericGridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a> &gt;</td></tr>
 <tr class="separator:ad07cd0b238837c1618657629f3efbc35"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaaf3aa012aedefd727b3f140edb3e0b7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aaaf3aa012aedefd727b3f140edb3e0b7">RealGridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a> &gt;</td></tr>
+<tr class="memitem:aaaf3aa012aedefd727b3f140edb3e0b7"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aaaf3aa012aedefd727b3f140edb3e0b7">RealGridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a> &gt;</td></tr>
 <tr class="separator:aaaf3aa012aedefd727b3f140edb3e0b7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b089f00ba284613b6c3ebf52f3ae2cb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a77ff1a3a38ec99a56b4d99a15a2970bf">openvdb::Vec3SGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a4047846203d0b9bcb5b7c0d3a6c7164f">openvdb::Vec3DGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a667cf1ae46101764bb15844228daef4d">openvdb::Vec3IGrid</a> &gt;</td></tr>
+<tr class="memitem:a4b089f00ba284613b6c3ebf52f3ae2cb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a77ff1a3a38ec99a56b4d99a15a2970bf">openvdb::Vec3SGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a4047846203d0b9bcb5b7c0d3a6c7164f">openvdb::Vec3DGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a667cf1ae46101764bb15844228daef4d">openvdb::Vec3IGrid</a> &gt;</td></tr>
 <tr class="separator:a4b089f00ba284613b6c3ebf52f3ae2cb"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a18b291981c25c5b543df8fa83fadbba3"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a18b291981c25c5b543df8fa83fadbba3">PointGridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; openvdb::points::PointDataGrid &gt;</td></tr>
+<tr class="memitem:a18b291981c25c5b543df8fa83fadbba3"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a18b291981c25c5b543df8fa83fadbba3">PointGridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; openvdb::points::PointDataGrid &gt;</td></tr>
 <tr class="separator:a18b291981c25c5b543df8fa83fadbba3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac5933947e7aacf67e748b95d037e5ccb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ac5933947e7aacf67e748b95d037e5ccb">VolumeGridTypes</a> = <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html#ac827f965b7c116214aef55fee9e0fa36">ScalarGridTypes::Append</a>&lt; <a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> &gt;</td></tr>
+<tr class="memitem:ac5933947e7aacf67e748b95d037e5ccb"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ac5933947e7aacf67e748b95d037e5ccb">VolumeGridTypes</a> = <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html#ac827f965b7c116214aef55fee9e0fa36">ScalarGridTypes::Append</a>&lt; <a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> &gt;</td></tr>
 <tr class="separator:ac5933947e7aacf67e748b95d037e5ccb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6e5ca76819ebbbafadf3616429b62b3f"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a6e5ca76819ebbbafadf3616429b62b3f">AllGridTypes</a> = VolumeGridTypes::Append&lt; <a class="el" href="namespaceopenvdb__houdini.html#a18b291981c25c5b543df8fa83fadbba3">PointGridTypes</a> &gt;</td></tr>
 <tr class="separator:a6e5ca76819ebbbafadf3616429b62b3f"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -229,10 +232,10 @@ Functions</h2></td></tr>
 <tr class="memitem:a0e5a4804a1f83935db359f706bdbd062"><td class="memTemplItemLeft" align="right" valign="top">float&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0e5a4804a1f83935db359f706bdbd062">evalAttr&lt; float &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int idx)</td></tr>
 <tr class="separator:a0e5a4804a1f83935db359f706bdbd062"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4952af1e2b695318a4c0cbaf03c590da"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a4952af1e2b695318a4c0cbaf03c590da"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4952af1e2b695318a4c0cbaf03c590da">evalAttr&lt; openvdb::Int32 &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int idx)</td></tr>
+<tr class="memitem:a4952af1e2b695318a4c0cbaf03c590da"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4952af1e2b695318a4c0cbaf03c590da">evalAttr&lt; openvdb::Int32 &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int idx)</td></tr>
 <tr class="separator:a4952af1e2b695318a4c0cbaf03c590da"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad894878f244848fdbc83a61ab66f7b8e"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ad894878f244848fdbc83a61ab66f7b8e"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ad894878f244848fdbc83a61ab66f7b8e">evalAttr&lt; openvdb::Int64 &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int idx)</td></tr>
+<tr class="memitem:ad894878f244848fdbc83a61ab66f7b8e"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ad894878f244848fdbc83a61ab66f7b8e">evalAttr&lt; openvdb::Int64 &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int idx)</td></tr>
 <tr class="separator:ad894878f244848fdbc83a61ab66f7b8e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ad6dbf9ec19fe32eac932dab35eb13623"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
 <tr class="memitem:ad6dbf9ec19fe32eac932dab35eb13623"><td class="memTemplItemLeft" align="right" valign="top">openvdb::Vec3i&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ad6dbf9ec19fe32eac932dab35eb13623">evalAttr&lt; openvdb::Vec3i &gt;</a> (const GA_Attribute *atr, const GA_AIFTuple *aif, GA_Offset off, int)</td></tr>
@@ -248,10 +251,10 @@ Functions</h2></td></tr>
 <tr class="memdesc:a14881ae65cf249d0814b01ebd92ba371"><td class="mdescLeft">&#160;</td><td class="mdescRight">Combine different value types.  <a href="#a14881ae65cf249d0814b01ebd92ba371">More...</a><br /></td></tr>
 <tr class="separator:a14881ae65cf249d0814b01ebd92ba371"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0cb7d87ff2e494052ed88dabf1b6bb62"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a0cb7d87ff2e494052ed88dabf1b6bb62"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0cb7d87ff2e494052ed88dabf1b6bb62">combine</a> (const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v0, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v1, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v2, const openvdb::Vec3d &amp;w)</td></tr>
+<tr class="memitem:a0cb7d87ff2e494052ed88dabf1b6bb62"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0cb7d87ff2e494052ed88dabf1b6bb62">combine</a> (const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v0, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v1, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;v2, const openvdb::Vec3d &amp;w)</td></tr>
 <tr class="separator:a0cb7d87ff2e494052ed88dabf1b6bb62"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6f94b571e4ba3d9da0cef6e14e98557e"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:a6f94b571e4ba3d9da0cef6e14e98557e"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a6f94b571e4ba3d9da0cef6e14e98557e">combine</a> (const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v0, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v1, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v2, const openvdb::Vec3d &amp;w)</td></tr>
+<tr class="memitem:a6f94b571e4ba3d9da0cef6e14e98557e"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a6f94b571e4ba3d9da0cef6e14e98557e">combine</a> (const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v0, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v1, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;v2, const openvdb::Vec3d &amp;w)</td></tr>
 <tr class="separator:a6f94b571e4ba3d9da0cef6e14e98557e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa7500a716020670de083137f42bdcd8f"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
 <tr class="memitem:aa7500a716020670de083137f42bdcd8f"><td class="memTemplItemLeft" align="right" valign="top">openvdb::Vec3i&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aa7500a716020670de083137f42bdcd8f">combine</a> (const openvdb::Vec3i &amp;v0, const openvdb::Vec3i &amp;v1, const openvdb::Vec3i &amp;v2, const openvdb::Vec3d &amp;w)</td></tr>
@@ -270,10 +273,10 @@ Functions</h2></td></tr>
 <tr class="memitem:aa3fc11d6dafbf01ce92dc9cfd9fb1c54"><td class="memTemplItemLeft" align="right" valign="top">float&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#aa3fc11d6dafbf01ce92dc9cfd9fb1c54">evalAttrDefault&lt; float &gt;</a> (const GA_Defaults &amp;defaults, int)</td></tr>
 <tr class="separator:aa3fc11d6dafbf01ce92dc9cfd9fb1c54"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acca5ef249f39696d0edcdb034026e13a"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:acca5ef249f39696d0edcdb034026e13a"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acca5ef249f39696d0edcdb034026e13a">evalAttrDefault&lt; openvdb::Int32 &gt;</a> (const GA_Defaults &amp;defaults, int idx)</td></tr>
+<tr class="memitem:acca5ef249f39696d0edcdb034026e13a"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acca5ef249f39696d0edcdb034026e13a">evalAttrDefault&lt; openvdb::Int32 &gt;</a> (const GA_Defaults &amp;defaults, int idx)</td></tr>
 <tr class="separator:acca5ef249f39696d0edcdb034026e13a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae8cd0a168b9a9f8b2f7742b293cab9e1"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
-<tr class="memitem:ae8cd0a168b9a9f8b2f7742b293cab9e1"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ae8cd0a168b9a9f8b2f7742b293cab9e1">evalAttrDefault&lt; openvdb::Int64 &gt;</a> (const GA_Defaults &amp;defaults, int idx)</td></tr>
+<tr class="memitem:ae8cd0a168b9a9f8b2f7742b293cab9e1"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a>&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#ae8cd0a168b9a9f8b2f7742b293cab9e1">evalAttrDefault&lt; openvdb::Int64 &gt;</a> (const GA_Defaults &amp;defaults, int idx)</td></tr>
 <tr class="separator:ae8cd0a168b9a9f8b2f7742b293cab9e1"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a458eaef75f2ff8e12c06c8b025586ce3"><td class="memTemplParams" colspan="2">template&lt;&gt; </td></tr>
 <tr class="memitem:a458eaef75f2ff8e12c06c8b025586ce3"><td class="memTemplItemLeft" align="right" valign="top">openvdb::Vec3i&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a458eaef75f2ff8e12c06c8b025586ce3">evalAttrDefault&lt; openvdb::Vec3i &gt;</a> (const GA_Defaults &amp;defaults, int)</td></tr>
@@ -308,6 +311,9 @@ Functions</h2></td></tr>
 <tr class="separator:a05596bbdb2309456d45d36f7dde1528a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af09924c389b228491738f2b86fff85c0"><td class="memItemLeft" align="right" valign="top">GA_Offset&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#af09924c389b228491738f2b86fff85c0">findClosestPrimitiveToPoint</a> (const GU_Detail &amp;geo, std::vector&lt; GA_Index &gt; &amp;primitives, const openvdb::Vec3d &amp;p, GA_Offset &amp;vert0, GA_Offset &amp;vert1, GA_Offset &amp;vert2, openvdb::Vec3d &amp;uvw)</td></tr>
 <tr class="separator:af09924c389b228491738f2b86fff85c0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0354aa3537d8941415d76578a6d4c503"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
+<tr class="memitem:a0354aa3537d8941415d76578a6d4c503"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0354aa3537d8941415d76578a6d4c503">transferPrimitiveAttributes</a> (const GU_Detail &amp;sourceGeo, GU_Detail &amp;targetGeo, GridType &amp;indexGrid, openvdb::util::NullInterrupter &amp;boss, const GA_PrimitiveGroup *primitives=nullptr)</td></tr>
+<tr class="separator:a0354aa3537d8941415d76578a6d4c503"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2183f98e7b4c9ba8614b9e3f24c8f1b3"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
 <tr class="memitem:a2183f98e7b4c9ba8614b9e3f24c8f1b3"><td class="memTemplItemLeft" align="right" valign="top">void&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a2183f98e7b4c9ba8614b9e3f24c8f1b3">transferPrimitiveAttributes</a> (const GU_Detail &amp;sourceGeo, GU_Detail &amp;targetGeo, GridType &amp;indexGrid, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;boss, const GA_PrimitiveGroup *primitives=nullptr)</td></tr>
 <tr class="separator:a2183f98e7b4c9ba8614b9e3f24c8f1b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -320,11 +326,15 @@ Functions</h2></td></tr>
 <tr class="memitem:a52e21ebad81748cee8e71b4082a41bf7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> bool&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a52e21ebad81748cee8e71b4082a41bf7">pointInPrimGroup</a> (GA_Offset ptnOffset, GU_Detail &amp;, const GA_PrimitiveGroup &amp;)</td></tr>
 <tr class="memdesc:a52e21ebad81748cee8e71b4082a41bf7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Return <code>true</code> if the point at the given offset is referenced by primitives from a certain primitive group.  <a href="#a52e21ebad81748cee8e71b4082a41bf7">More...</a><br /></td></tr>
 <tr class="separator:a52e21ebad81748cee8e71b4082a41bf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a0bf1469338cde2747d5a67188b043b5e"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0bf1469338cde2747d5a67188b043b5e">convertGeometry</a> (const GU_Detail &amp;, std::string &amp;warning, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> *)</td></tr>
-<tr class="memdesc:a0bf1469338cde2747d5a67188b043b5e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert geometry to quads and triangles.  <a href="#a0bf1469338cde2747d5a67188b043b5e">More...</a><br /></td></tr>
-<tr class="separator:a0bf1469338cde2747d5a67188b043b5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;interrupter)</td></tr>
-<tr class="memdesc:a445794e1fb98c62ff2dc2d44543d2a50"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute a voxel size from a Houdini detail.  <a href="#a445794e1fb98c62ff2dc2d44543d2a50">More...</a><br /></td></tr>
+<tr class="memitem:afa67a606a910e3dda6250bccc52b1bec"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#afa67a606a910e3dda6250bccc52b1bec">convertGeometry</a> (const GU_Detail &amp;, std::string &amp;warning, openvdb::util::NullInterrupter *)</td></tr>
+<tr class="memdesc:afa67a606a910e3dda6250bccc52b1bec"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert geometry to quads and triangles.  <a href="#afa67a606a910e3dda6250bccc52b1bec">More...</a><br /></td></tr>
+<tr class="separator:afa67a606a910e3dda6250bccc52b1bec"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5eedf901d4896255416c71bcda5efb17"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt; GU_Detail &gt;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a5eedf901d4896255416c71bcda5efb17">convertGeometry</a> (const GU_Detail &amp;detail, std::string &amp;warning, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> *boss)</td></tr>
+<tr class="separator:a5eedf901d4896255416c71bcda5efb17"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a4d8d8d608e2c410c3f7c877f00c09bf7">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, openvdb::util::NullInterrupter &amp;interrupter)</td></tr>
+<tr class="memdesc:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Compute a voxel size from a Houdini detail.  <a href="#a4d8d8d608e2c410c3f7c877f00c09bf7">More...</a><br /></td></tr>
+<tr class="separator:a4d8d8d608e2c410c3f7c877f00c09bf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a445794e1fb98c62ff2dc2d44543d2a50">computeVoxelSizeFromHoudini</a> (const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> pointsPerVoxel, const openvdb::math::Mat4d &amp;matrix, const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a> decimalPlaces, <a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;interrupter)</td></tr>
 <tr class="separator:a445794e1fb98c62ff2dc2d44543d2a50"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a05721796af49b93cfb43bc7c6fd1ad28"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> openvdb::points::PointDataGrid::Ptr&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a05721796af49b93cfb43bc7c6fd1ad28">convertHoudiniToPointDataGrid</a> (const GU_Detail &amp;detail, const int compression, const <a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> &amp;attributes, const openvdb::math::Transform &amp;transform, const <a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:a05721796af49b93cfb43bc7c6fd1ad28"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert a Houdini detail into a VDB Points grid.  <a href="#a05721796af49b93cfb43bc7c6fd1ad28">More...</a><br /></td></tr>
@@ -335,7 +345,7 @@ Functions</h2></td></tr>
 <tr class="memitem:afb088fb094891262d16e7a9ea902397c"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#afb088fb094891262d16e7a9ea902397c">populateMetadataFromHoudini</a> (openvdb::points::PointDataGrid &amp;grid, const GU_Detail &amp;detail, const <a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:afb088fb094891262d16e7a9ea902397c"><td class="mdescLeft">&#160;</td><td class="mdescRight">Populate VDB Points grid metadata from Houdini detail attributes.  <a href="#afb088fb094891262d16e7a9ea902397c">More...</a><br /></td></tr>
 <tr class="separator:afb088fb094891262d16e7a9ea902397c"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acc574eeb728e244ed01fc97dc3181f43"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acc574eeb728e244ed01fc97dc3181f43">convertMetadataToHoudini</a> (GU_Detail &amp;detail, const <a class="el" href="classopenvdb_1_1v8__1_1_1MetaMap.html">openvdb::MetaMap</a> &amp;metaMap, const <a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> &amp;warnings=[](const std::string &amp;){})</td></tr>
+<tr class="memitem:acc574eeb728e244ed01fc97dc3181f43"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#acc574eeb728e244ed01fc97dc3181f43">convertMetadataToHoudini</a> (GU_Detail &amp;detail, const <a class="el" href="classopenvdb_1_1v9__0_1_1MetaMap.html">openvdb::MetaMap</a> &amp;metaMap, const <a class="el" href="namespaceopenvdb__houdini.html#a79fbab88ceaa44f883fcbac621d95497">WarnFunc</a> &amp;warnings=[](const std::string &amp;){})</td></tr>
 <tr class="memdesc:acc574eeb728e244ed01fc97dc3181f43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Convert VDB Points grid metadata into Houdini detail attributes.  <a href="#acc574eeb728e244ed01fc97dc3181f43">More...</a><br /></td></tr>
 <tr class="separator:acc574eeb728e244ed01fc97dc3181f43"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0d5061e9d615441833013e48a4a52fef"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> int16_t&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a0d5061e9d615441833013e48a4a52fef">attributeTupleSize</a> (const GA_Attribute *const attribute)</td></tr>
@@ -344,7 +354,7 @@ Functions</h2></td></tr>
 <tr class="memitem:a47d29e093386972ae4985bcc2edfb148"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> GA_Storage&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a47d29e093386972ae4985bcc2edfb148">attributeStorageType</a> (const GA_Attribute *const attribute)</td></tr>
 <tr class="memdesc:a47d29e093386972ae4985bcc2edfb148"><td class="mdescLeft">&#160;</td><td class="mdescRight">Returns supported Storage types for conversion from GA_Attribute.  <a href="#a47d29e093386972ae4985bcc2edfb148">More...</a><br /></td></tr>
 <tr class="separator:a47d29e093386972ae4985bcc2edfb148"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a66a8bc4c4fdbce8d07cb1a311f0c96b8">pointDataGridSpecificInfoText</a> (std::ostream &amp;, const <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;)</td></tr>
+<tr class="memitem:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a66a8bc4c4fdbce8d07cb1a311f0c96b8">pointDataGridSpecificInfoText</a> (std::ostream &amp;, const <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a> &amp;)</td></tr>
 <tr class="memdesc:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">If the given grid is a PointDataGrid, add node specific info text to the stream provided. This is used to populate the MMB window in Houdini versions 15 and earlier, as well as the Operator Information Window.  <a href="#a66a8bc4c4fdbce8d07cb1a311f0c96b8">More...</a><br /></td></tr>
 <tr class="separator:a66a8bc4c4fdbce8d07cb1a311f0c96b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3051145d787399abca79bb8825bd40bb"><td class="memItemLeft" align="right" valign="top"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb__houdini.html#a3051145d787399abca79bb8825bd40bb">collectPointInfo</a> (const openvdb::points::PointDataGrid &amp;grid, std::string &amp;countStr, std::string &amp;groupStr, std::string &amp;attributeStr)</td></tr>
@@ -427,7 +437,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> =  std::map&lt;<a class="el" href="namespaceopenvdb_1_1v8__1.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt;int, bool&gt;&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aec01bcad62d407c590ecbfbccf08c9f4">AttributeInfoMap</a> =  std::map&lt;<a class="el" href="namespaceopenvdb_1_1v9__0.html#a019c188253c90cf2d0b1d6bf710190f4">openvdb::Name</a>, std::pair&lt;int, bool&gt;&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -439,7 +449,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ab68e398333046373641f36c9d3ba33d0">Grid</a> =  <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a></td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ab68e398333046373641f36c9d3ba33d0">Grid</a> =  <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -451,7 +461,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aeef18e4a0d7d224bd08b85e31d069edb">GridCPtr</a> =  <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html#a4bd7d2423b89e25df1275764f6b6413f">openvdb::GridBase::ConstPtr</a></td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aeef18e4a0d7d224bd08b85e31d069edb">GridCPtr</a> =  <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html#a4bd7d2423b89e25df1275764f6b6413f">openvdb::GridBase::ConstPtr</a></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -463,7 +473,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a85343540a012d58d443cf442d08c747b">GridCRef</a> =  const <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a>&amp;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a85343540a012d58d443cf442d08c747b">GridCRef</a> =  const <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a>&amp;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -475,7 +485,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a50a182da6cbbd72a2deb7f635b080497">GridPtr</a> =  <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html#ad98d7556003ccc2ef810f87d97159de4">openvdb::GridBase::Ptr</a></td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a50a182da6cbbd72a2deb7f635b080497">GridPtr</a> =  <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html#ad98d7556003ccc2ef810f87d97159de4">openvdb::GridBase::Ptr</a></td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -487,7 +497,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aa7ca3bf9c57eaaffe3f8d86098f4657f">GridRef</a> =  <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a>&amp;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aa7ca3bf9c57eaaffe3f8d86098f4657f">GridRef</a> =  <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a>&amp;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -499,7 +509,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ad07cd0b238837c1618657629f3efbc35">NumericGridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a>&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ad07cd0b238837c1618657629f3efbc35">NumericGridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a>&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -571,7 +581,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a18b291981c25c5b543df8fa83fadbba3">PointGridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; openvdb::points::PointDataGrid&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a18b291981c25c5b543df8fa83fadbba3">PointGridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; openvdb::points::PointDataGrid&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -583,7 +593,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aaaf3aa012aedefd727b3f140edb3e0b7">RealGridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#aaaf3aa012aedefd727b3f140edb3e0b7">RealGridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -595,7 +605,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a023d4885c1409ba63ea673566bae990f">ScalarGridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a44c7484144fab7fb2c436e938e2d87ce">openvdb::BoolGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a>&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a023d4885c1409ba63ea673566bae990f">ScalarGridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a44c7484144fab7fb2c436e938e2d87ce">openvdb::BoolGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a2ae45d4df056c7d0d936a496fec925ee">openvdb::FloatGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ae4044ab7ef1bfe752d228fe84ecd996e">openvdb::DoubleGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad5315505f8bc162f1d371ea1d8beb559">openvdb::Int32Grid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a6dac52fd0c0a5f0eb9ccac0050b951f9">openvdb::Int64Grid</a>&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -607,7 +617,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a77ff1a3a38ec99a56b4d99a15a2970bf">openvdb::Vec3SGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a4047846203d0b9bcb5b7c0d3a6c7164f">openvdb::Vec3DGrid</a>, <a class="el" href="namespaceopenvdb_1_1v8__1.html#a667cf1ae46101764bb15844228daef4d">openvdb::Vec3IGrid</a>&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html">openvdb::TypeList</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a77ff1a3a38ec99a56b4d99a15a2970bf">openvdb::Vec3SGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a4047846203d0b9bcb5b7c0d3a6c7164f">openvdb::Vec3DGrid</a>, <a class="el" href="namespaceopenvdb_1_1v9__0.html#a667cf1ae46101764bb15844228daef4d">openvdb::Vec3IGrid</a>&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -619,7 +629,7 @@ Variables</h2></td></tr>
 <div class="memproto">
       <table class="memname">
         <tr>
-          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ac5933947e7aacf67e748b95d037e5ccb">VolumeGridTypes</a> =  <a class="el" href="structopenvdb_1_1v8__1_1_1TypeList.html#ac827f965b7c116214aef55fee9e0fa36">ScalarGridTypes::Append</a>&lt;<a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a>&gt;</td>
+          <td class="memname">using <a class="el" href="namespaceopenvdb__houdini.html#ac5933947e7aacf67e748b95d037e5ccb">VolumeGridTypes</a> =  <a class="el" href="structopenvdb_1_1v9__0_1_1TypeList.html#ac827f965b7c116214aef55fee9e0fa36">ScalarGridTypes::Append</a>&lt;<a class="el" href="namespaceopenvdb__houdini.html#a4b089f00ba284613b6c3ebf52f3ae2cb">Vec3GridTypes</a>&gt;</td>
         </tr>
       </table>
 </div><div class="memdoc">
@@ -808,21 +818,21 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> openvdb_houdini::combine </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> openvdb_houdini::combine </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
           <td class="paramname"><em>v0</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
           <td class="paramname"><em>v1</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &amp;&#160;</td>
           <td class="paramname"><em>v2</em>, </td>
         </tr>
         <tr>
@@ -854,21 +864,21 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> openvdb_houdini::combine </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> openvdb_houdini::combine </td>
           <td>(</td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
           <td class="paramname"><em>v0</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
           <td class="paramname"><em>v1</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &amp;&#160;</td>
           <td class="paramname"><em>v2</em>, </td>
         </tr>
         <tr>
@@ -1030,7 +1040,7 @@ Variables</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="a445794e1fb98c62ff2dc2d44543d2a50"></a>
+<a class="anchor" id="a4d8d8d608e2c410c3f7c877f00c09bf7"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -1043,7 +1053,7 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
           <td class="paramname"><em>pointsPerVoxel</em>, </td>
         </tr>
         <tr>
@@ -1055,13 +1065,13 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v8__1.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
           <td class="paramname"><em>decimalPlaces</em>, </td>
         </tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;&#160;</td>
+          <td class="paramtype">openvdb::util::NullInterrupter &amp;&#160;</td>
           <td class="paramname"><em>interrupter</em>&#160;</td>
         </tr>
         <tr>
@@ -1086,7 +1096,52 @@ Variables</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="a0bf1469338cde2747d5a67188b043b5e"></a>
+<a class="anchor" id="a445794e1fb98c62ff2dc2d44543d2a50"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> float openvdb_houdini::computeVoxelSizeFromHoudini </td>
+          <td>(</td>
+          <td class="paramtype">const GU_Detail &amp;&#160;</td>
+          <td class="paramname"><em>detail</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
+          <td class="paramname"><em>pointsPerVoxel</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const openvdb::math::Mat4d &amp;&#160;</td>
+          <td class="paramname"><em>matrix</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const <a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">openvdb::Index</a>&#160;</td>
+          <td class="paramname"><em>decimalPlaces</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> &amp;&#160;</td>
+          <td class="paramname"><em>interrupter</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="deprecated"><dt><b><a class="el" href="deprecated.html#_deprecated000031">Deprecated:</a></b></dt><dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter" </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="afa67a606a910e3dda6250bccc52b1bec"></a>
 <div class="memitem">
 <div class="memproto">
       <table class="memname">
@@ -1105,7 +1160,7 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> *&#160;</td>
+          <td class="paramtype">openvdb::util::NullInterrupter *&#160;</td>
           <td class="paramname">&#160;</td>
         </tr>
         <tr>
@@ -1118,6 +1173,39 @@ Variables</h2></td></tr>
 
 <p>Convert geometry to quads and triangles. </p>
 <dl class="section return"><dt>Returns</dt><dd>a pointer to a new GU_Detail object if the geometry was converted or subdivided, otherwise a null pointer </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a5eedf901d4896255416c71bcda5efb17"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="Platform_8h.html#a88b26daa45bbdd69d6bb12f9c7bfa3b2">OPENVDB_HOUDINI_API</a> std::unique_ptr&lt;GU_Detail&gt; openvdb_houdini::convertGeometry </td>
+          <td>(</td>
+          <td class="paramtype">const GU_Detail &amp;&#160;</td>
+          <td class="paramname"><em>detail</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">std::string &amp;&#160;</td>
+          <td class="paramname"><em>warning</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype"><a class="el" href="classopenvdb__houdini_1_1Interrupter.html">Interrupter</a> *&#160;</td>
+          <td class="paramname"><em>boss</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="deprecated"><dt><b><a class="el" href="deprecated.html#_deprecated000028">Deprecated:</a></b></dt><dd>"openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter" </dd></dl>
 
 </div>
 </div>
@@ -1190,7 +1278,7 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="classopenvdb_1_1v8__1_1_1MetaMap.html">openvdb::MetaMap</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="classopenvdb_1_1v9__0_1_1MetaMap.html">openvdb::MetaMap</a> &amp;&#160;</td>
           <td class="paramname"><em>metaMap</em>, </td>
         </tr>
         <tr>
@@ -1513,7 +1601,7 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> <a class="el" href="namespaceopenvdb__houdini.html#a19e09dfd72ebf3234ebfae3e1f6c9954">openvdb_houdini::evalAttr</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &gt; </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> <a class="el" href="namespaceopenvdb__houdini.html#a19e09dfd72ebf3234ebfae3e1f6c9954">openvdb_houdini::evalAttr</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &gt; </td>
           <td>(</td>
           <td class="paramtype">const GA_Attribute *&#160;</td>
           <td class="paramname"><em>atr</em>, </td>
@@ -1559,7 +1647,7 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> <a class="el" href="namespaceopenvdb__houdini.html#a19e09dfd72ebf3234ebfae3e1f6c9954">openvdb_houdini::evalAttr</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &gt; </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> <a class="el" href="namespaceopenvdb__houdini.html#a19e09dfd72ebf3234ebfae3e1f6c9954">openvdb_houdini::evalAttr</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &gt; </td>
           <td>(</td>
           <td class="paramtype">const GA_Attribute *&#160;</td>
           <td class="paramname"><em>atr</em>, </td>
@@ -1813,7 +1901,7 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> <a class="el" href="namespaceopenvdb__houdini.html#a4d73dda0b29a74820d94f60a2adc26c0">openvdb_houdini::evalAttrDefault</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &gt; </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> <a class="el" href="namespaceopenvdb__houdini.html#a4d73dda0b29a74820d94f60a2adc26c0">openvdb_houdini::evalAttrDefault</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac524bdfeb5d781872485d9321c881920">openvdb::Int32</a> &gt; </td>
           <td>(</td>
           <td class="paramtype">const GA_Defaults &amp;&#160;</td>
           <td class="paramname"><em>defaults</em>, </td>
@@ -1847,7 +1935,7 @@ Variables</h2></td></tr>
   <td class="mlabels-left">
       <table class="memname">
         <tr>
-          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> <a class="el" href="namespaceopenvdb__houdini.html#a4d73dda0b29a74820d94f60a2adc26c0">openvdb_houdini::evalAttrDefault</a>&lt; <a class="el" href="namespaceopenvdb_1_1v8__1.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &gt; </td>
+          <td class="memname"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> <a class="el" href="namespaceopenvdb__houdini.html#a4d73dda0b29a74820d94f60a2adc26c0">openvdb_houdini::evalAttrDefault</a>&lt; <a class="el" href="namespaceopenvdb_1_1v9__0.html#a51b4c1b67123dbb4903672fa753e6dd1">openvdb::Int64</a> &gt; </td>
           <td>(</td>
           <td class="paramtype">const GA_Defaults &amp;&#160;</td>
           <td class="paramname"><em>defaults</em>, </td>
@@ -2547,7 +2635,7 @@ Variables</h2></td></tr>
         <tr>
           <td class="paramkey"></td>
           <td></td>
-          <td class="paramtype">const <a class="el" href="classopenvdb_1_1v8__1_1_1GridBase.html">openvdb::GridBase</a> &amp;&#160;</td>
+          <td class="paramtype">const <a class="el" href="classopenvdb_1_1v9__0_1_1GridBase.html">openvdb::GridBase</a> &amp;&#160;</td>
           <td class="paramname">&#160;</td>
         </tr>
         <tr>
@@ -2738,12 +2826,61 @@ Variables</h2></td></tr>
 
 </div>
 </div>
-<a class="anchor" id="a2183f98e7b4c9ba8614b9e3f24c8f1b3"></a>
+<a class="anchor" id="a0354aa3537d8941415d76578a6d4c503"></a>
 <div class="memitem">
 <div class="memproto">
 <table class="mlabels">
   <tr>
   <td class="mlabels-left">
+      <table class="memname">
+        <tr>
+          <td class="memname">void openvdb_houdini::transferPrimitiveAttributes </td>
+          <td>(</td>
+          <td class="paramtype">const GU_Detail &amp;&#160;</td>
+          <td class="paramname"><em>sourceGeo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">GU_Detail &amp;&#160;</td>
+          <td class="paramname"><em>targetGeo</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">GridType &amp;&#160;</td>
+          <td class="paramname"><em>indexGrid</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">openvdb::util::NullInterrupter &amp;&#160;</td>
+          <td class="paramname"><em>boss</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const GA_PrimitiveGroup *&#160;</td>
+          <td class="paramname"><em>primitives</em> = <code>nullptr</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+  </td>
+  <td class="mlabels-right">
+<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
+  </tr>
+</table>
+</div><div class="memdoc">
+
+</div>
+</div>
+<a class="anchor" id="a2183f98e7b4c9ba8614b9e3f24c8f1b3"></a>
+<div class="memitem">
+<div class="memproto">
       <table class="memname">
         <tr>
           <td class="memname">void openvdb_houdini::transferPrimitiveAttributes </td>
@@ -2781,11 +2918,6 @@ Variables</h2></td></tr>
           <td></td><td></td>
         </tr>
       </table>
-  </td>
-  <td class="mlabels-right">
-<span class="mlabels"><span class="mlabel">inline</span></span>  </td>
-  </tr>
-</table>
 </div><div class="memdoc">
 
 </div>

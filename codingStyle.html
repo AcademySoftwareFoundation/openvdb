@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -198,7 +198,7 @@ Global Functions</h2>
 <h2><a class="anchor" id="sBooleans"></a>
 Booleans</h2>
 <ol type="1">
-<li>When naming boolean functions and variables, use names that read as a condition (e.g., <code>if (grid.empty())</code>, <code>if (<a class="el" href="namespaceopenvdb_1_1v8__1_1_1math.html#adc07bc6cd2366f7315926f08c530b48b" title="Determine if a matrix is invertible. ">matrix.isInvertible()</a>)</code>).</li>
+<li>When naming boolean functions and variables, use names that read as a condition (e.g., <code>if (grid.empty())</code>, <code>if (<a class="el" href="namespaceopenvdb_1_1v9__0_1_1math.html#a54c07267016408c001adee7c6aa62587" title="Determine if a matrix is invertible. ">matrix.isInvertible()</a>)</code>).</li>
 </ol>
 <h1><a class="anchor" id="sPractices"></a>
 Practices</h1>
@@ -207,7 +207,7 @@ General</h2>
 <ol type="1">
 <li>Code must compile without any warning messages at the default warning level.</li>
 <li>Prefer the C++ Standard Library to the C Standard Library.</li>
-<li>Restrict variables to the smallest scopes possible, and avoid defining local variables before giving them values. Prefer declarations inside conditionals: <code>if (Grid::Ptr grid = <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac43068080f663736cfc10a62c6a0827f" title="Create a new grid of type GridType with a given background value. ">createGrid()</a>) { ... }</code> instead of <code>Grid::Ptr grid = <a class="el" href="namespaceopenvdb_1_1v8__1.html#ac43068080f663736cfc10a62c6a0827f" title="Create a new grid of type GridType with a given background value. ">createGrid()</a>; if (grid) { ... }</code></li>
+<li>Restrict variables to the smallest scopes possible, and avoid defining local variables before giving them values. Prefer declarations inside conditionals: <code>if (Grid::Ptr grid = <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac43068080f663736cfc10a62c6a0827f" title="Create a new grid of type GridType with a given background value. ">createGrid()</a>) { ... }</code> instead of <code>Grid::Ptr grid = <a class="el" href="namespaceopenvdb_1_1v9__0.html#ac43068080f663736cfc10a62c6a0827f" title="Create a new grid of type GridType with a given background value. ">createGrid()</a>; if (grid) { ... }</code></li>
 <li>For new files, be sure to use the right license boilerplate per our license policy.</li>
 </ol>
 <h2><a class="anchor" id="sFormatting"></a>

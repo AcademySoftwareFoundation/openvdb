@@ -1,14 +1,16 @@
 var searchData=
 [
-  ['edgedata',['EdgeData',['../structopenvdb_1_1v8__1_1_1tools_1_1MeshToVoxelEdgeData_1_1EdgeData.html',1,'openvdb::v8_1::tools::MeshToVoxelEdgeData']]],
-  ['enrightfield',['EnrightField',['../classopenvdb_1_1v8__1_1_1tools_1_1EnrightField.html',1,'openvdb::v8_1::tools']]],
-  ['erodeop',['ErodeOp',['../structopenvdb_1_1v8__1_1_1tools_1_1ttls__internal_1_1ErodeOp.html',1,'openvdb::v8_1::tools::ttls_internal']]],
-  ['exception',['Exception',['../classopenvdb_1_1v8__1_1_1Exception.html',1,'openvdb::v8_1']]],
-  ['expandleafnoderegion',['ExpandLeafNodeRegion',['../structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ExpandLeafNodeRegion.html',1,'openvdb::v8_1::tools::level_set_util_internal']]],
-  ['expandnarrowband',['ExpandNarrowband',['../structopenvdb_1_1v8__1_1_1tools_1_1mesh__to__volume__internal_1_1ExpandNarrowband.html',1,'openvdb::v8_1::tools::mesh_to_volume_internal']]],
-  ['expandnarrowbandmask',['ExpandNarrowbandMask',['../structopenvdb_1_1v8__1_1_1tools_1_1level__set__util__internal_1_1ExpandNarrowbandMask.html',1,'openvdb::v8_1::tools::level_set_util_internal']]],
-  ['expression',['Expression',['../structopenvdb_1_1v8__1_1_1ax_1_1ast_1_1Expression.html',1,'openvdb::v8_1::ax::ast']]],
-  ['externalvariable',['ExternalVariable',['../structopenvdb_1_1v8__1_1_1ax_1_1ast_1_1ExternalVariable.html',1,'openvdb::v8_1::ax::ast']]],
-  ['extractall',['ExtractAll',['../structopenvdb_1_1v8__1_1_1tools_1_1ExtractAll.html',1,'openvdb::v8_1::tools']]],
-  ['extrema',['Extrema',['../classopenvdb_1_1v8__1_1_1math_1_1Extrema.html',1,'openvdb::v8_1::math']]]
+  ['edgedata',['EdgeData',['../structopenvdb_1_1v9__0_1_1tools_1_1MeshToVoxelEdgeData_1_1EdgeData.html',1,'openvdb::v9_0::tools::MeshToVoxelEdgeData']]],
+  ['enable_5fif',['enable_if',['../structnanovdb_1_1enable__if.html',1,'nanovdb']]],
+  ['enable_5fif_3c_20true_2c_20t_20_3e',['enable_if&lt; true, T &gt;',['../structnanovdb_1_1enable__if_3_01true_00_01T_01_4.html',1,'nanovdb']]],
+  ['enrightfield',['EnrightField',['../classopenvdb_1_1v9__0_1_1tools_1_1EnrightField.html',1,'openvdb::v9_0::tools']]],
+  ['exception',['Exception',['../classopenvdb_1_1v9__0_1_1Exception.html',1,'openvdb::v9_0']]],
+  ['expression',['Expression',['../structopenvdb_1_1v9__0_1_1ax_1_1ast_1_1Expression.html',1,'openvdb::v9_0::ax::ast']]],
+  ['externalvariable',['ExternalVariable',['../structopenvdb_1_1v9__0_1_1ax_1_1ast_1_1ExternalVariable.html',1,'openvdb::v9_0::ax::ast']]],
+  ['extractall',['ExtractAll',['../structopenvdb_1_1v9__0_1_1tools_1_1ExtractAll.html',1,'openvdb::v9_0::tools']]],
+  ['extrema',['Extrema',['../classopenvdb_1_1v9__0_1_1math_1_1Extrema.html',1,'openvdb::v9_0::math']]],
+  ['extrema',['Extrema',['../classnanovdb_1_1Extrema.html',1,'nanovdb']]],
+  ['extrema_3c_20valuet_2c_200_20_3e',['Extrema&lt; ValueT, 0 &gt;',['../classnanovdb_1_1Extrema_3_01ValueT_00_010_01_4.html',1,'nanovdb']]],
+  ['extrema_3c_20valuet_2c_201_20_3e',['Extrema&lt; ValueT, 1 &gt;',['../classnanovdb_1_1Extrema.html',1,'nanovdb']]],
+  ['extrema_3c_20vect_2c_201_20_3e',['Extrema&lt; VecT, 1 &gt;',['../classnanovdb_1_1Extrema_3_01VecT_00_011_01_4.html',1,'nanovdb']]]
 ];

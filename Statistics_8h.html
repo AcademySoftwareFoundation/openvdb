@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Statistics.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Statistics.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,12 +83,11 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
@@ -96,7 +95,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div><!--header-->
 <div class="contents">
 
-<p>Functions to efficiently compute histograms, extremas (min/max) and statistics (mean, variance, etc.) of grid values.  
+<p>Functions to efficiently compute histograms, extrema (min/max) and statistics (mean, variance, etc.) of grid values.  
 <a href="#details">More...</a></p>
 <div class="textblock"><code>#include &lt;<a class="el" href="openvdb_2Types_8h_source.html">openvdb/Types.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="openvdb_2Exceptions_8h_source.html">openvdb/Exceptions.h</a>&gt;</code><br />
@@ -105,71 +104,48 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div>
 <p><a href="Statistics_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
-Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1IterTraits.html">IterTraits&lt; IterT, AuxT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1IterTraits_3_01tree_1_1TreeValueIteratorBac7cf3d6a62e4bf3e8bb5e51632d761b8.html">IterTraits&lt; tree::TreeValueIteratorBase&lt; TreeT, ValueIterT &gt; &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1GetValImpl.html">GetValImpl&lt; T, IsVector &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1GetValImpl_3_01T_00_01false_01_4.html">GetValImpl&lt; T, false &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1GetValImpl_3_01T_00_01true_01_4.html">GetValImpl&lt; T, true &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1GetVal.html">GetVal&lt; IterT, StatsT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1StatsOp.html">StatsOp&lt; IterT, ValueOp, StatsT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1HistOp.html">HistOp&lt; IterT, ValueOp &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1stats__internal_1_1MathOp.html">MathOp&lt; IterT, OpT, StatsT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1stats__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1stats__internal.html">openvdb::v8_1::tools::stats_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a705b035d27c69d566009424697c36a65"><td class="memTemplParams" colspan="2">template&lt;typename IterT &gt; </td></tr>
-<tr class="memitem:a705b035d27c69d566009424697c36a65"><td class="memTemplItemLeft" align="right" valign="top">math::Histogram&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a705b035d27c69d566009424697c36a65">histogram</a> (const IterT &amp;iter, double minVal, double maxVal, size_t numBins=10, bool threaded=true)</td></tr>
-<tr class="memdesc:a705b035d27c69d566009424697c36a65"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute a histogram of the values of the voxels that are visited, or iterate over a vector-valued grid and compute a histogram of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a705b035d27c69d566009424697c36a65">More...</a><br /></td></tr>
+<tr class="memitem:a705b035d27c69d566009424697c36a65"><td class="memTemplItemLeft" align="right" valign="top">math::Histogram&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a705b035d27c69d566009424697c36a65">histogram</a> (const IterT &amp;iter, double minVal, double maxVal, size_t numBins=10, bool threaded=true)</td></tr>
+<tr class="memdesc:a705b035d27c69d566009424697c36a65"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute a histogram of the values of the voxels that are visited, or iterate over a vector-valued grid and compute a histogram of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a705b035d27c69d566009424697c36a65">More...</a><br /></td></tr>
 <tr class="separator:a705b035d27c69d566009424697c36a65"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ac6aea86a2df380225a3b3c8553efe4e3"><td class="memTemplParams" colspan="2">template&lt;typename IterT &gt; </td></tr>
-<tr class="memitem:ac6aea86a2df380225a3b3c8553efe4e3"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac6aea86a2df380225a3b3c8553efe4e3">extrema</a> (const IterT &amp;iter, bool threaded=true)</td></tr>
-<tr class="memdesc:ac6aea86a2df380225a3b3c8553efe4e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute extrema (min/max) of the values of the voxels that are visited, or iterate over a vector-valued grid and compute extrema of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac6aea86a2df380225a3b3c8553efe4e3">More...</a><br /></td></tr>
+<tr class="memitem:ac6aea86a2df380225a3b3c8553efe4e3"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac6aea86a2df380225a3b3c8553efe4e3">extrema</a> (const IterT &amp;iter, bool threaded=true)</td></tr>
+<tr class="memdesc:ac6aea86a2df380225a3b3c8553efe4e3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute extrema (min/max) of the values of the voxels that are visited, or iterate over a vector-valued grid and compute extrema of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac6aea86a2df380225a3b3c8553efe4e3">More...</a><br /></td></tr>
 <tr class="separator:ac6aea86a2df380225a3b3c8553efe4e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="memTemplParams" colspan="2">template&lt;typename IterT &gt; </td></tr>
-<tr class="memitem:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a0298e9e5b5b3a443d321bd24825f1d5a">statistics</a> (const IterT &amp;iter, bool threaded=true)</td></tr>
-<tr class="memdesc:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute statistics (mean, variance, etc.) of the values of the voxels that are visited, or iterate over a vector-valued grid and compute statistics of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a0298e9e5b5b3a443d321bd24825f1d5a">More...</a><br /></td></tr>
+<tr class="memitem:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a0298e9e5b5b3a443d321bd24825f1d5a">statistics</a> (const IterT &amp;iter, bool threaded=true)</td></tr>
+<tr class="memdesc:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a scalar grid and compute statistics (mean, variance, etc.) of the values of the voxels that are visited, or iterate over a vector-valued grid and compute statistics of the magnitudes of the vectors.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a0298e9e5b5b3a443d321bd24825f1d5a">More...</a><br /></td></tr>
 <tr class="separator:a0298e9e5b5b3a443d321bd24825f1d5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aafcd95f6d9da81e339aab75465ee4e22"><td class="memTemplParams" colspan="2">template&lt;typename IterT , typename ValueOp &gt; </td></tr>
-<tr class="memitem:aafcd95f6d9da81e339aab75465ee4e22"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aafcd95f6d9da81e339aab75465ee4e22">extrema</a> (const IterT &amp;iter, const ValueOp &amp;op, bool threaded)</td></tr>
-<tr class="memdesc:aafcd95f6d9da81e339aab75465ee4e22"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute extrema (min/max) of the values produced by applying the given functor at each voxel that is visited.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aafcd95f6d9da81e339aab75465ee4e22">More...</a><br /></td></tr>
+<tr class="memitem:aafcd95f6d9da81e339aab75465ee4e22"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aafcd95f6d9da81e339aab75465ee4e22">extrema</a> (const IterT &amp;iter, const ValueOp &amp;op, bool threaded)</td></tr>
+<tr class="memdesc:aafcd95f6d9da81e339aab75465ee4e22"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute extrema (min/max) of the values produced by applying the given functor at each voxel that is visited.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#aafcd95f6d9da81e339aab75465ee4e22">More...</a><br /></td></tr>
 <tr class="separator:aafcd95f6d9da81e339aab75465ee4e22"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="memTemplParams" colspan="2">template&lt;typename IterT , typename ValueOp &gt; </td></tr>
-<tr class="memitem:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ada341f0cb3d7e02cb30f563ae58d77b8">statistics</a> (const IterT &amp;iter, const ValueOp &amp;op, bool threaded)</td></tr>
-<tr class="memdesc:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute statistics (mean, variance, etc.) of the values produced by applying the given functor at each voxel that is visited.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ada341f0cb3d7e02cb30f563ae58d77b8">More...</a><br /></td></tr>
+<tr class="memitem:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ada341f0cb3d7e02cb30f563ae58d77b8">statistics</a> (const IterT &amp;iter, const ValueOp &amp;op, bool threaded)</td></tr>
+<tr class="memdesc:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute statistics (mean, variance, etc.) of the values produced by applying the given functor at each voxel that is visited.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ada341f0cb3d7e02cb30f563ae58d77b8">More...</a><br /></td></tr>
 <tr class="separator:ada341f0cb3d7e02cb30f563ae58d77b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="memTemplParams" colspan="2">template&lt;typename OperatorT , typename IterT &gt; </td></tr>
-<tr class="memitem:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a35876c2d474f3ed28fc6a6aa4b4f5678">opStatistics</a> (const IterT &amp;iter, const OperatorT &amp;op=OperatorT(), bool threaded=true)</td></tr>
-<tr class="memdesc:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute statistics (mean, variance, etc.) of the values produced by applying a given operator (see <a class="el" href="Operators_8h.html">math/Operators.h</a>) at each voxel that is visited.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a35876c2d474f3ed28fc6a6aa4b4f5678">More...</a><br /></td></tr>
+<tr class="memitem:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="memTemplItemLeft" align="right" valign="top">math::Stats&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a35876c2d474f3ed28fc6a6aa4b4f5678">opStatistics</a> (const IterT &amp;iter, const OperatorT &amp;op=OperatorT(), bool threaded=true)</td></tr>
+<tr class="memdesc:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="mdescLeft">&#160;</td><td class="mdescRight">Iterate over a grid and compute statistics (mean, variance, etc.) of the values produced by applying a given operator (see <a class="el" href="Operators_8h.html">math/Operators.h</a>) at each voxel that is visited.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a35876c2d474f3ed28fc6a6aa4b4f5678">More...</a><br /></td></tr>
 <tr class="separator:a35876c2d474f3ed28fc6a6aa4b4f5678"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="memTemplParams" colspan="2">template&lt;typename OperatorT , typename IterT &gt; </td></tr>
-<tr class="memitem:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab4a308e2e6c2d283bfafb3bd80c8ca43">opExtrema</a> (const IterT &amp;iter, const OperatorT &amp;op=OperatorT(), bool threaded=true)</td></tr>
-<tr class="memdesc:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Same as opStatistics except it returns a <a class="el" href="classopenvdb_1_1v8__1_1_1math_1_1Extrema.html" title="This class computes the minimum and maximum values of a population of floating-point values...">math::Extrema</a> vs a <a class="el" href="classopenvdb_1_1v8__1_1_1math_1_1Stats.html" title="This class computes statistics (minimum value, maximum value, mean, variance and standard deviation) ...">math::Stats</a>.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab4a308e2e6c2d283bfafb3bd80c8ca43">More...</a><br /></td></tr>
+<tr class="memitem:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="memTemplItemLeft" align="right" valign="top">math::Extrema&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab4a308e2e6c2d283bfafb3bd80c8ca43">opExtrema</a> (const IterT &amp;iter, const OperatorT &amp;op=OperatorT(), bool threaded=true)</td></tr>
+<tr class="memdesc:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="mdescLeft">&#160;</td><td class="mdescRight">Same as opStatistics except it returns a <a class="el" href="classopenvdb_1_1v9__0_1_1math_1_1Extrema.html" title="This class computes the minimum and maximum values of a population of floating-point values...">math::Extrema</a> vs a <a class="el" href="classopenvdb_1_1v9__0_1_1math_1_1Stats.html" title="This class computes statistics (minimum value, maximum value, mean, variance and standard deviation) ...">math::Stats</a>.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab4a308e2e6c2d283bfafb3bd80c8ca43">More...</a><br /></td></tr>
 <tr class="separator:ab4a308e2e6c2d283bfafb3bd80c8ca43"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
-<div class="textblock"><p>Functions to efficiently compute histograms, extremas (min/max) and statistics (mean, variance, etc.) of grid values. </p>
+<div class="textblock"><p>Functions to efficiently compute histograms, extrema (min/max) and statistics (mean, variance, etc.) of grid values. </p>
 </div></div><!-- contents -->
 <!-- start footer part -->
 <hr class="footer"/><address class="footer"><small>

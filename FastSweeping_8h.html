@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: FastSweeping.h File Reference</title>
+<title>OpenVDB: openvdb/tools/FastSweeping.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,13 +83,14 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
 <a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
+<a href="#enum-members">Enumerations</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
 <div class="title">FastSweeping.h File Reference</div>  </div>
@@ -98,94 +99,105 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <p>Defined the six functions {fog,sdf}To{Sdf,Ext,SdfAndExt} in addition to the two functions maskSdf and dilateSdf. Sdf denotes a signed-distance field (i.e. negative values are inside), fog is a scalar fog volume (i.e. higher values are inside), and Ext is a field (of arbitrary type) that is extended off the iso-surface. All these functions are implemented with the methods in the class named FastSweeping.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &lt;type_traits&gt;</code><br />
+<div class="textblock"><code>#include &lt;<a class="el" href="Platform_8h_source.html">openvdb/Platform.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_2openvdb_2math_2Stencils_8h_source.html">openvdb/math/Stencils.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
+<code>#include &quot;<a class="el" href="LevelSetUtil_8h_source.html">LevelSetUtil.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="Morphology_8h_source.html">Morphology.h</a>&quot;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
+<code>#include &quot;<a class="el" href="Statistics_8h_source.html">Statistics.h</a>&quot;</code><br />
+<code>#include &lt;tbb/parallel_for.h&gt;</code><br />
+<code>#include &lt;tbb/enumerable_thread_specific.h&gt;</code><br />
+<code>#include &lt;tbb/task_group.h&gt;</code><br />
+<code>#include &lt;type_traits&gt;</code><br />
 <code>#include &lt;cmath&gt;</code><br />
 <code>#include &lt;limits&gt;</code><br />
 <code>#include &lt;deque&gt;</code><br />
 <code>#include &lt;unordered_map&gt;</code><br />
 <code>#include &lt;utility&gt;</code><br />
-<code>#include &lt;tbb/parallel_for.h&gt;</code><br />
-<code>#include &lt;tbb/enumerable_thread_specific.h&gt;</code><br />
-<code>#include &lt;tbb/task_group.h&gt;</code><br />
-<code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Stencils_8h_source.html">openvdb/math/Stencils.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
-<code>#include &quot;<a class="el" href="LevelSetUtil_8h_source.html">LevelSetUtil.h</a>&quot;</code><br />
-<code>#include &quot;<a class="el" href="Morphology_8h_source.html">Morphology.h</a>&quot;</code><br />
-<code>#include &quot;<a class="el" href="Statistics_8h_source.html">Statistics.h</a>&quot;</code><br />
 </div>
 <p><a href="FastSweeping_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1FastSweeping.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes signed distance values from an initial iso-surface and optionally performs velocty extension at the same time. This is done by means of a novel sparse and parallel fast sweeping algorithm based on a first order Goudonov's scheme.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1FastSweeping.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1FastSweeping.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes signed distance values from an initial iso-surface and optionally performs velocity extension at the same time. This is done by means of a novel sparse and parallel fast sweeping algorithm based on a first order Godunov's scheme.  <a href="classopenvdb_1_1v9__0_1_1tools_1_1FastSweeping.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1MinMaxKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::MinMaxKernel</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1MinMaxKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::MinMaxKernel</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1DilateKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::DilateKernel</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Private class of <a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1FastSweeping.html" title="Computes signed distance values from an initial iso-surface and optionally performs velocty extension...">FastSweeping</a> to perform multi-threaded initialization.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1DilateKernel.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1DilateKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::DilateKernel</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Private class of <a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1FastSweeping.html" title="Computes signed distance values from an initial iso-surface and optionally performs velocity extensio...">FastSweeping</a> to perform multi-threaded initialization.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1DilateKernel.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1InitSdf.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::InitSdf</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1InitSdf.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::InitSdf</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1SweepingKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::SweepingKernel</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Private class of <a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1FastSweeping.html" title="Computes signed distance values from an initial iso-surface and optionally performs velocty extension...">FastSweeping</a> to perform concurrent fast sweeping in two directions.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1SweepingKernel.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1SweepingKernel.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::SweepingKernel</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Private class of <a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1FastSweeping.html" title="Computes signed distance values from an initial iso-surface and optionally performs velocity extensio...">FastSweeping</a> to perform concurrent fast sweeping in two directions.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1SweepingKernel.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1FastSweeping_1_1SweepingKernel_1_1NN.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::SweepingKernel::NN</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1SweepingKernel_1_1NN.html">FastSweeping&lt; SdfGridT, ExtValueT &gt;::SweepingKernel::NN</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="enum-members"></a>
+Enumerations</h2></td></tr>
+<tr class="memitem:a6416fa916f48d91455ce7bad5b0a33bf"><td class="memItemLeft" align="right" valign="top">enum &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bf">FastSweepingDomain</a> { <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bfa3203264a0a3fd2d90d15ee76eeb62f40">SWEEP_ALL</a>, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bfa245516447de3b999aeb0a36124ca6b70">SWEEP_GREATER_THAN_ISOVALUE</a>, 
+<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bfa38b255d809f149cd5ae87b46c45905e6">SWEEP_LESS_THAN_ISOVALUE</a>
+ }<tr class="memdesc:a6416fa916f48d91455ce7bad5b0a33bf"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fast Sweeping update mode. This is useful to determine narrow-band extension or field extension in one side of a signed distance field.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bf">More...</a><br /></td></tr>
+</td></tr>
+<tr class="separator:a6416fa916f48d91455ce7bad5b0a33bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="memTemplParams" colspan="2">template&lt;typename GridT &gt; </td></tr>
-<tr class="memitem:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a09b0661a0aaa5a3b5badaf557459dcc8">fogToSdf</a> (const GridT &amp;fogGrid, typename GridT::ValueType isoValue, int nIter=1)</td></tr>
-<tr class="memdesc:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a scalar fog volume into a signed distance function. Active input voxels with scalar values above the given isoValue will have NEGATIVE distance values on output, i.e. they are assumed to be INSIDE the iso-surface.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a09b0661a0aaa5a3b5badaf557459dcc8">More...</a><br /></td></tr>
+<tr class="memitem:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a09b0661a0aaa5a3b5badaf557459dcc8">fogToSdf</a> (const GridT &amp;fogGrid, typename GridT::ValueType isoValue, int nIter=1)</td></tr>
+<tr class="memdesc:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Converts a scalar fog volume into a signed distance function. Active input voxels with scalar values above the given isoValue will have NEGATIVE distance values on output, i.e. they are assumed to be INSIDE the iso-surface.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a09b0661a0aaa5a3b5badaf557459dcc8">More...</a><br /></td></tr>
 <tr class="separator:a09b0661a0aaa5a3b5badaf557459dcc8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="memTemplParams" colspan="2">template&lt;typename GridT &gt; </td></tr>
-<tr class="memitem:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a5ec6859a45f6b4fa6c0beb9687eabacd">sdfToSdf</a> (const GridT &amp;sdfGrid, typename GridT::ValueType isoValue=0, int nIter=1)</td></tr>
-<tr class="memdesc:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given an existing approximate SDF it solves the Eikonal equation for all its active voxels. Active input voxels with a signed distance value above the given isoValue will have POSITIVE distance values on output, i.e. they are assumed to be OUTSIDE the iso-surface.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a5ec6859a45f6b4fa6c0beb9687eabacd">More...</a><br /></td></tr>
+<tr class="memitem:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a5ec6859a45f6b4fa6c0beb9687eabacd">sdfToSdf</a> (const GridT &amp;sdfGrid, typename GridT::ValueType isoValue=0, int nIter=1)</td></tr>
+<tr class="memdesc:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Given an existing approximate SDF it solves the Eikonal equation for all its active voxels. Active input voxels with a signed distance value above the given isoValue will have POSITIVE distance values on output, i.e. they are assumed to be OUTSIDE the iso-surface.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a5ec6859a45f6b4fa6c0beb9687eabacd">More...</a><br /></td></tr>
 <tr class="separator:a5ec6859a45f6b4fa6c0beb9687eabacd"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad3a364ccf87a335cf241e6d90f026744"><td class="memTemplParams" colspan="2">template&lt;typename FogGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
-<tr class="memitem:ad3a364ccf87a335cf241e6d90f026744"><td class="memTemplItemLeft" align="right" valign="top">FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad3a364ccf87a335cf241e6d90f026744">fogToExt</a> (const FogGridT &amp;fogGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename FogGridT::ValueType isoValue, int nIter=1)</td></tr>
-<tr class="memdesc:ad3a364ccf87a335cf241e6d90f026744"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the extension of a field, defined by the specified functor, off an iso-surface from an input FOG volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ad3a364ccf87a335cf241e6d90f026744">More...</a><br /></td></tr>
-<tr class="separator:ad3a364ccf87a335cf241e6d90f026744"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:af526ceb32611842d0772829987968ede"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
-<tr class="memitem:af526ceb32611842d0772829987968ede"><td class="memTemplItemLeft" align="right" valign="top">SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#af526ceb32611842d0772829987968ede">sdfToExt</a> (const SdfGridT &amp;sdfGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue=0, int nIter=1)</td></tr>
-<tr class="memdesc:af526ceb32611842d0772829987968ede"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the extension of a scalar field, defined by the specified functor, off an iso-surface from an input SDF volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#af526ceb32611842d0772829987968ede">More...</a><br /></td></tr>
-<tr class="separator:af526ceb32611842d0772829987968ede"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac3fa3d058b61aff63b0ce92fd718da48"><td class="memTemplParams" colspan="2">template&lt;typename FogGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
-<tr class="memitem:ac3fa3d058b61aff63b0ce92fd718da48"><td class="memTemplItemLeft" align="right" valign="top">std::pair&lt; typename FogGridT::Ptr, typename FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac3fa3d058b61aff63b0ce92fd718da48">fogToSdfAndExt</a> (const FogGridT &amp;fogGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename FogGridT::ValueType isoValue, int nIter=1)</td></tr>
-<tr class="memdesc:ac3fa3d058b61aff63b0ce92fd718da48"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the signed distance field and the extension of a scalar field, defined by the specified functor, off an iso-surface from an input FOG volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ac3fa3d058b61aff63b0ce92fd718da48">More...</a><br /></td></tr>
-<tr class="separator:ac3fa3d058b61aff63b0ce92fd718da48"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6b430d0d5e79eaa7c822b7ec72d45fb7"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
-<tr class="memitem:a6b430d0d5e79eaa7c822b7ec72d45fb7"><td class="memTemplItemLeft" align="right" valign="top">std::pair&lt; typename SdfGridT::Ptr, typename SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6b430d0d5e79eaa7c822b7ec72d45fb7">sdfToSdfAndExt</a> (const SdfGridT &amp;sdfGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue=0, int nIter=1)</td></tr>
-<tr class="memdesc:a6b430d0d5e79eaa7c822b7ec72d45fb7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the signed distance field and the extension of a scalar field, defined by the specified functor, off an iso-surface from an input SDF volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a6b430d0d5e79eaa7c822b7ec72d45fb7">More...</a><br /></td></tr>
-<tr class="separator:a6b430d0d5e79eaa7c822b7ec72d45fb7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a697de92ff0bec5d6b6ada6fdb3966af7"><td class="memTemplParams" colspan="2">template&lt;typename GridT &gt; </td></tr>
-<tr class="memitem:a697de92ff0bec5d6b6ada6fdb3966af7"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a697de92ff0bec5d6b6ada6fdb3966af7">dilateSdf</a> (const GridT &amp;sdfGrid, int dilation, NearestNeighbors nn=NN_FACE, int nIter=1)</td></tr>
-<tr class="memdesc:a697de92ff0bec5d6b6ada6fdb3966af7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilates an existing signed distance field by a specified number of voxels.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a697de92ff0bec5d6b6ada6fdb3966af7">More...</a><br /></td></tr>
-<tr class="separator:a697de92ff0bec5d6b6ada6fdb3966af7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab8ed1bbf2e2647988fbc7eed71bed073"><td class="memTemplParams" colspan="2">template&lt;typename FogGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
+<tr class="memitem:ab8ed1bbf2e2647988fbc7eed71bed073"><td class="memTemplItemLeft" align="right" valign="top">FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab8ed1bbf2e2647988fbc7eed71bed073">fogToExt</a> (const FogGridT &amp;fogGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename FogGridT::ValueType isoValue, int nIter=1, FastSweepingDomain mode=FastSweepingDomain::SWEEP_ALL, const typename FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::ConstPtr extGrid=nullptr)</td></tr>
+<tr class="memdesc:ab8ed1bbf2e2647988fbc7eed71bed073"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the extension of a field (scalar, vector, or int are supported), defined by the specified functor, off an iso-surface from an input FOG volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab8ed1bbf2e2647988fbc7eed71bed073">More...</a><br /></td></tr>
+<tr class="separator:ab8ed1bbf2e2647988fbc7eed71bed073"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a261355af9c7381d14e7a03e3d83fde6a"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
+<tr class="memitem:a261355af9c7381d14e7a03e3d83fde6a"><td class="memTemplItemLeft" align="right" valign="top">SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a261355af9c7381d14e7a03e3d83fde6a">sdfToExt</a> (const SdfGridT &amp;sdfGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue=0, int nIter=1, FastSweepingDomain mode=FastSweepingDomain::SWEEP_ALL, const typename SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::ConstPtr extGrid=nullptr)</td></tr>
+<tr class="memdesc:a261355af9c7381d14e7a03e3d83fde6a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the extension of a field (scalar, vector, or int are supported), defined by the specified functor, off an iso-surface from an input SDF volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a261355af9c7381d14e7a03e3d83fde6a">More...</a><br /></td></tr>
+<tr class="separator:a261355af9c7381d14e7a03e3d83fde6a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8e07459625611ff0d4f386f601aa1e3e"><td class="memTemplParams" colspan="2">template&lt;typename FogGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
+<tr class="memitem:a8e07459625611ff0d4f386f601aa1e3e"><td class="memTemplItemLeft" align="right" valign="top">std::pair&lt; typename FogGridT::Ptr, typename FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a8e07459625611ff0d4f386f601aa1e3e">fogToSdfAndExt</a> (const FogGridT &amp;fogGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename FogGridT::ValueType isoValue, int nIter=1, FastSweepingDomain mode=FastSweepingDomain::SWEEP_ALL, const typename FogGridT::template ValueConverter&lt; ExtValueT &gt;::Type::ConstPtr extGrid=nullptr)</td></tr>
+<tr class="memdesc:a8e07459625611ff0d4f386f601aa1e3e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the signed distance field and the extension of a field (scalar, vector, or int are supported), defined by the specified functor, off an iso-surface from an input FOG volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a8e07459625611ff0d4f386f601aa1e3e">More...</a><br /></td></tr>
+<tr class="separator:a8e07459625611ff0d4f386f601aa1e3e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a27d97ccaebf36560da30e5c9c5389d48"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename ExtOpT , typename ExtValueT &gt; </td></tr>
+<tr class="memitem:a27d97ccaebf36560da30e5c9c5389d48"><td class="memTemplItemLeft" align="right" valign="top">std::pair&lt; typename SdfGridT::Ptr, typename SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a27d97ccaebf36560da30e5c9c5389d48">sdfToSdfAndExt</a> (const SdfGridT &amp;sdfGrid, const ExtOpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue=0, int nIter=1, FastSweepingDomain mode=FastSweepingDomain::SWEEP_ALL, const typename SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::ConstPtr extGrid=nullptr)</td></tr>
+<tr class="memdesc:a27d97ccaebf36560da30e5c9c5389d48"><td class="mdescLeft">&#160;</td><td class="mdescRight">Computes the signed distance field and the extension of a field (scalar, vector, or int are supported), defined by the specified functor, off an iso-surface from an input SDF volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a27d97ccaebf36560da30e5c9c5389d48">More...</a><br /></td></tr>
+<tr class="separator:a27d97ccaebf36560da30e5c9c5389d48"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memTemplParams" colspan="2">template&lt;typename GridT &gt; </td></tr>
+<tr class="memitem:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3ae8e943f814b22fa057d8e4e4f82e30">dilateSdf</a> (const GridT &amp;sdfGrid, int dilation, NearestNeighbors nn=NN_FACE, int nIter=1, FastSweepingDomain mode=FastSweepingDomain::SWEEP_ALL)</td></tr>
+<tr class="memdesc:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilates an existing signed distance field by a specified number of voxels.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3ae8e943f814b22fa057d8e4e4f82e30">More...</a><br /></td></tr>
+<tr class="separator:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa310f2f224f5b386b70dd8645b39b133"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename MaskTreeT &gt; </td></tr>
-<tr class="memitem:aa310f2f224f5b386b70dd8645b39b133"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aa310f2f224f5b386b70dd8645b39b133">maskSdf</a> (const GridT &amp;sdfGrid, const Grid&lt; MaskTreeT &gt; &amp;mask, bool ignoreActiveTiles=false, int nIter=1)</td></tr>
-<tr class="memdesc:aa310f2f224f5b386b70dd8645b39b133"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fills mask by extending an existing signed distance field into the active values of this input ree of arbitrary value type.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aa310f2f224f5b386b70dd8645b39b133">More...</a><br /></td></tr>
+<tr class="memitem:aa310f2f224f5b386b70dd8645b39b133"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aa310f2f224f5b386b70dd8645b39b133">maskSdf</a> (const GridT &amp;sdfGrid, const Grid&lt; MaskTreeT &gt; &amp;mask, bool ignoreActiveTiles=false, int nIter=1)</td></tr>
+<tr class="memdesc:aa310f2f224f5b386b70dd8645b39b133"><td class="mdescLeft">&#160;</td><td class="mdescRight">Fills mask by extending an existing signed distance field into the active values of this input ree of arbitrary value type.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#aa310f2f224f5b386b70dd8645b39b133">More...</a><br /></td></tr>
 <tr class="separator:aa310f2f224f5b386b70dd8645b39b133"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaaa8aa9763261f78ffa905b115a4287b"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename OpT , typename ExtValueT &gt; </td></tr>
-<tr class="memitem:aaaa8aa9763261f78ffa905b115a4287b"><td class="memTemplItemLeft" align="right" valign="top">SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aaaa8aa9763261f78ffa905b115a4287b">sdfToExt</a> (const SdfGridT &amp;sdfGrid, const OpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue, int nIter)</td></tr>
-<tr class="separator:aaaa8aa9763261f78ffa905b115a4287b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac76d2bf0b95accefc8ab318484da2205"><td class="memTemplParams" colspan="2">template&lt;typename SdfGridT , typename OpT , typename ExtValueT &gt; </td></tr>
+<tr class="memitem:ac76d2bf0b95accefc8ab318484da2205"><td class="memTemplItemLeft" align="right" valign="top">SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ac76d2bf0b95accefc8ab318484da2205">sdfToExt</a> (const SdfGridT &amp;sdfGrid, const OpT &amp;op, const ExtValueT &amp;background, typename SdfGridT::ValueType isoValue, int nIter, FastSweepingDomain mode, const typename SdfGridT::template ValueConverter&lt; ExtValueT &gt;::Type::ConstPtr extGrid)</td></tr>
+<tr class="separator:ac76d2bf0b95accefc8ab318484da2205"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Defined the six functions {fog,sdf}To{Sdf,Ext,SdfAndExt} in addition to the two functions maskSdf and dilateSdf. Sdf denotes a signed-distance field (i.e. negative values are inside), fog is a scalar fog volume (i.e. higher values are inside), and Ext is a field (of arbitrary type) that is extended off the iso-surface. All these functions are implemented with the methods in the class named FastSweeping. </p>
 <dl class="section author"><dt>Author</dt><dd>Ken Museth</dd></dl>
 <dl class="section note"><dt>Note</dt><dd>Solves the (simplified) Eikonal Eq: <img class="formulaInl" alt="$|\nabla \phi|^2 = 1$" src="form_0.png"/> and performs velocity extension, <img class="formulaInl" alt="$\nabla f\nabla \phi = 0$" src="form_1.png"/>, both by means of the fast sweeping algorithm detailed in: "A Fast Sweeping Method For Eikonal Equations" by H. Zhao, Mathematics of Computation, Vol 74(230), pp 603-627, 2004</dd></dl>
-<p>The algorithm used below for parallel fast sweeping was first publised in: "New Algorithm for Sparse and Parallel Fast Sweeping: Efficient
+<p>The algorithm used below for parallel fast sweeping was first published in: "New Algorithm for Sparse and Parallel Fast Sweeping: Efficient
          Computation of Sparse Distance Fields" by K. Museth, ACM SIGGRAPH Talk, 2017, <a href="http://www.museth.org/Ken/Publications_files/Museth_SIG17.pdf">http://www.museth.org/Ken/Publications_files/Museth_SIG17.pdf</a> </p>
 </div></div><!-- contents -->
 <!-- start footer part -->

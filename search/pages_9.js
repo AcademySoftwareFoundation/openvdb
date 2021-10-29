@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['using_20openvdb_20in_20python',['Using OpenVDB in Python',['../python.html',1,'index']]]
+  ['source_20tree_20structure',['Source tree structure',['../NanoVDB_SourceTree.html',1,'']]]
 ];

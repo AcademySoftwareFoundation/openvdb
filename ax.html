@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -238,7 +238,7 @@ Scalars</h2>
 <dl class="section user"><dt>Integer Overflow and Floating Point Truncation</dt><dd>Scalars may be cast from one type to another, either explicitly using the <a class="el" href="ax.html#axopother">cast</a> operator or implicitly during <a class="el" href="ax.html#axopassignment">assignments</a> or <a class="el" href="ax.html#axopbinarithmetic">binary arthimetic</a> operations (in which case the order of <a class="el" href="ax.html#axtypeprecedence">type precedence</a> is observed). Data can be truncated (converting floats to integrals) or overflow (conversions from integers of larger bit widths to integers of smaller bit widths) depending on the source and target types. See the below examples: </dd></dl>
 <dl class="section user"><dt></dt><dd>This example demonstrates floating point truncation in AX. <div class="fragment"><div class="line"><span class="keywordtype">float</span> a = 1.1f;</div><div class="line"><span class="keywordtype">int</span> b = 5.5f; <span class="comment">// implict conversion from literal 5.5f. &quot;b&quot; is set to 5</span></div><div class="line">b = a; <span class="comment">// implicit conversion from float &quot;a&quot;. &quot;b&quot; is set to 1</span></div></div><!-- fragment --> </dd></dl>
 <dl class="section user"><dt></dt><dd>This example demonstrates integer overflow in AX. <div class="fragment"><div class="line">int64 a = 2147483648l; <span class="comment">// one more than can be held in an int (note the last letter &quot;l&quot;)</span></div><div class="line"><span class="keywordtype">int</span> b = a; <span class="comment">// implicit conversion. &quot;b&quot; is set to -2147483648</span></div></div><!-- fragment --> </dd></dl>
-<dl class="section user"><dt>Infinite and NaN values</dt><dd>Floating point values have two additional intrinsic states; <b><code>inf</code></b> and <b><code>nan</code></b>. These states can occur during invalid floating point arithmetic. AX performs no checks on arithmetic to catch these values. A typical example of both <b><code>inf</code></b> and <b><code>nan</code></b> values are division by zero expressions: <div class="fragment"><div class="line"><span class="keywordtype">float</span> a = 1.0f/0.0f;</div><div class="line"><a class="code" href="namespaceopenvdb_1_1v8__1_1_1ax_1_1ast.html#a776b0b1a1fe663a634b62f53a91766f2">print</a>(a); <span class="comment">// prints &quot;inf&quot;</span></div></div><!-- fragment --> <div class="fragment"><div class="line"><span class="keywordtype">float</span> a = 0.0f/0.0f;</div><div class="line"><a class="code" href="namespaceopenvdb_1_1v8__1_1_1ax_1_1ast.html#a776b0b1a1fe663a634b62f53a91766f2">print</a>(a); <span class="comment">// prints some version of &quot;nan&quot;</span></div></div><!-- fragment --> </dd></dl>
+<dl class="section user"><dt>Infinite and NaN values</dt><dd>Floating point values have two additional intrinsic states; <b><code>inf</code></b> and <b><code>nan</code></b>. These states can occur during invalid floating point arithmetic. AX performs no checks on arithmetic to catch these values. A typical example of both <b><code>inf</code></b> and <b><code>nan</code></b> values are division by zero expressions: <div class="fragment"><div class="line"><span class="keywordtype">float</span> a = 1.0f/0.0f;</div><div class="line"><a class="code" href="namespaceopenvdb_1_1v9__0_1_1ax_1_1ast.html#af16274f1b33f6b6a85c639b546f5f1c7">print</a>(a); <span class="comment">// prints &quot;inf&quot;</span></div></div><!-- fragment --> <div class="fragment"><div class="line"><span class="keywordtype">float</span> a = 0.0f/0.0f;</div><div class="line"><a class="code" href="namespaceopenvdb_1_1v9__0_1_1ax_1_1ast.html#af16274f1b33f6b6a85c639b546f5f1c7">print</a>(a); <span class="comment">// prints some version of &quot;nan&quot;</span></div></div><!-- fragment --> </dd></dl>
 <dl class="section user"><dt></dt><dd>Generally these values are not desired and can cause problems as they propagate throughout your program.</dd></dl>
 </div><h2><a class="anchor" id="axvecmats"></a>
 Vectors / Matrices</h2>
@@ -554,7 +554,7 @@ Arithmetic</h3>
 <tr>
 <td bgcolor="#ffc4c4"><em><code>lhs</code></em> <b><code>&amp;</code></b> <em><code>rhs</code></em>  </td></tr>
 <tr>
-<td bgcolor="#ffc4c4"><em><code>lhs</code></em> <b><code></b>|</code> <em><code>rhs</code></em>  </td></tr>
+<td bgcolor="#ffc4c4"><em><code>lhs</code></em> <b> <code>|</code> </b> <em><code>rhs</code></em>  </td></tr>
 <tr>
 <td bgcolor="#ffc4c4"><em><code>lhs</code></em> <b><code>^</code></b> <em><code>rhs</code></em>  </td></tr>
 <tr>
@@ -565,7 +565,7 @@ Arithmetic</h3>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>These operations only run on <b>integral</b> operands. After <a class="el" href="ax.html#axtypeprecedence">implicit conversion</a>, the result of the binary operation:<ul>
 <li>with the <b><code>&amp;</code></b> (<a class="el" href="ax.html#axtokens">ampersand token</a>) is the result of the logical AND operation on each pair of the corresponding bits of the input operands.</li>
-<li>with the <b><code></b>|</code> (<a class="el" href="ax.html#axtokens">pipe token</a>) is the result of the logical OR operation on each pair of the corresponding bits of the input operands.</li>
+<li>with the <b> <code>|</code> </b> (<a class="el" href="ax.html#axtokens">pipe token</a>) is the result of the logical OR operation on each pair of the corresponding bits of the input operands.</li>
 <li>with the <b><code>^</code></b> (<a class="el" href="ax.html#axtokens">hat token</a>) is the result of the logical XOR operation on each pair of the corresponding bits of the input operands.</li>
 <li>with the <b><code>&lt;&lt;</code></b> (<a class="el" href="ax.html#axtokens">less than tokens</a>) is the value shifted left with zeros shifted in on the right.</li>
 <li>with the <b><code>&gt;&gt;</code></b> (<a class="el" href="ax.html#axtokens">greater than tokens</a>) is the value shifted right with zeros shifted in on the left. </li>
@@ -722,11 +722,11 @@ Container Access</h2>
 <tr>
 <th>Operator Name</th><th>Operator Syntax</th><th>Returns </th></tr>
 <tr style="text-align:left">
-<td>Dot&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>vector</code>&#160;<b></em>.</b>&#160;<em><code>component</code></em>  </td><td>Reference to component <em><code>component</code></em> of <em><code>vector</code></em>   </td></tr>
+<td>Dot&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>vector</code></em>&#160;<b>.</b>&#160;<em><code>component</code></em>  </td><td>Reference to component <em><code>component</code></em> of <em><code>vector</code></em>   </td></tr>
 <tr style="text-align:left">
-<td>Container&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>container</code>&#160;<b></em>[</b>&#160;<em><code>exp</code></em> <b>]</b>  </td><td>Reference to component at index <em><code>exp</code></em> of <em><code>container</code></em>   </td></tr>
+<td>Container&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>container</code></em>&#160;<b>[</b>&#160;<em><code>exp</code></em> <b>]</b>  </td><td>Reference to component at index <em><code>exp</code></em> of <em><code>container</code></em>   </td></tr>
 <tr style="text-align:left">
-<td>Matrix&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>matrix</code>&#160;<b></em>[</b>&#160;<em><code>exp1</code></em>,&#160;<em><code>exp2</code>&#160;<b></em>]</b>  </td><td>Reference to component in row <b><em><code>exp1</code></b></em>, column <b><em><code>exp2</code></b></em>. Also equal to returning a reference to component at index: <b> <em><code></em>[exp1&#160;*&#160;dimension&#160;+&#160;exp2]</code> </b> of <em><code>matrix</code></em> where <em><code>dimension</code></em> is the the size of the matrix  </td></tr>
+<td>Matrix&#160;Component&#160;Access </td><td bgcolor="#ffc4c4"><em><code>matrix</code></em>&#160;<b>[</b>&#160;<em><code>exp1</code></em>,&#160;<em><code>exp2</code></em>&#160;<b>]</b>  </td><td>Reference to component in row <b><em><code>exp1</code></em></b>, column <b><em><code>exp2</code></em></b>. Also equal to returning a reference to component at index: <b><em> <code>[exp1&#160;*&#160;dimension&#160;+&#160;exp2]</code> </em></b> of <em><code>matrix</code></em> where <em><code>dimension</code></em> is the the size of the matrix  </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>As data is stored contiguously for both vectors and matrices, the <b><code>[]</code></b> operator is valid for both types. However the <b>.</b> operator is only valid on vector types, and the <b><code>[,]</code></b> operator is only valid on matrix types. As return values for these operators are references, any modifications through <a class="el" href="ax.html#axopassignment">assignments</a> will update the stored value in the container. </dd></dl>
@@ -736,7 +736,7 @@ Container Access</h2>
 <td bgcolor="#ffc4c4"><em><code>vector</code></em> <b>.</b> <em><code>component</code></em>  </td></tr>
 </table>
 </dd></dl>
-<dl class="section user"><dt></dt><dd>Where component is one of the below supported component letters. It only provides access for the first three elements of any vector (for <b><code>vec2</code></b> types, only the first 2 components are accessible). Accessing a vector using the dot operator is fundamentally the same as using the <b><code></b>[]</code> operator with the corresponding integer index. </dd></dl>
+<dl class="section user"><dt></dt><dd>Where component is one of the below supported component letters. It only provides access for the first three elements of any vector (for <b><code>vec2</code></b> types, only the first 2 components are accessible). Accessing a vector using the dot operator is fundamentally the same as using the <b><code>[]</code></b> operator with the corresponding integer index. </dd></dl>
 <dl class="section user"><dt></dt><dd><div class="fragment"><div class="line">vec4i a = { 6, 7, 8, 9 };</div><div class="line"><span class="keywordtype">int</span> b = a.z; <span class="comment">// get the the third elements value (8)</span></div></div><!-- fragment --> <center> <p class="formulaDsp">
 <img class="formulaDsp" alt="\[ A=\begin{bmatrix} a_{0}\quad a_{1}\quad a_{2} \end{bmatrix} \]" src="form_3.png"/>
 </p>
@@ -758,19 +758,19 @@ Container Access</h2>
 </table>
 </center> </dd></dl>
 <dl class="section user"><dt></dt><dd>This operator can provide more immediately readability when working with expressions that focus on colour or Cartesian coordinate systems. <a class="anchor" id="axvecaccessop"></a></dd></dl>
-<dl class="section user"><dt>[] operator</dt><dd>The <b><code></b>[]</code> operator is valid for both vectors and matrices. It has the form: </dd></dl>
+<dl class="section user"><dt>[] operator</dt><dd>The <b><code>[]</code></b> operator is valid for both vectors and matrices. It has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><em><code>container</code></em> <b>[</b> <em><code>exp</code></em> <b>]</b>  </td></tr>
+<td bgcolor="#ffc4c4"><em><code>container</code></em> <b>[</b><em><code>exp</code></em><b>]</b>  </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd><em><code>exp</code></em> is expected to evaluate to a value which is castable to an integer following the <a class="el" href="ax.html#axopassignment">assignment casting</a> rules and falls within the valid size of the <em><code>container</code></em>. <b>No bounds checking is performed</b>. </dd></dl>
 <dl class="section user"><dt></dt><dd>As matrices are also an array of contigous values, they can be accessed in the same way. This can make some operations much simplier; a typical example being iterating through all matrix elements and performing some logic: </dd></dl>
 <dl class="section user"><dt></dt><dd><div class="fragment"><div class="line">vec3f a = 0;</div><div class="line">a[0] = 1; <span class="comment">// valid</span></div><div class="line">a[<span class="stringliteral">&quot;&quot;</span>] = 1; <span class="comment">// invalid - can&#39;t cast to int</span></div><div class="line">a[1.2f] = 1; <span class="comment">// valid - float exp will be clamped to an int</span></div><div class="line">a[a[0]] = 1; <span class="comment">// valid - use the value of a[0] to index into a</span></div><div class="line"><span class="comment">// assign each element its actual index value i.e. b[5] = 5;</span></div><div class="line">mat4d b;</div><div class="line"><span class="keywordflow">for</span> (<span class="keywordtype">int</span> i = 0; i &lt; 16; ++i) b[i] = i;</div></div><!-- fragment --> <a class="anchor" id="axmataccessop"></a></dd></dl>
-<dl class="section user"><dt>[,] operator</dt><dd>The <b><code></b>[,]</code> operator is only valid for matrices. It has the form: </dd></dl>
+<dl class="section user"><dt>[,] operator</dt><dd>The <b><code>[,]</code></b> operator is only valid for matrices. It has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><em><code>matrix</code></em> <b>[</b> <em><code>exp1</code></em>, <em><code>exp2</code></em> <b>]</b>  </td></tr>
+<td bgcolor="#ffc4c4"><em><code>matrix</code></em> <b>[</b><em><code>exp1</code></em>, <em><code>exp2</code></em><b>]</b>  </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd><em><code>exp1</code></em> and <em><code>exp2</code></em> are expected to evaluate to a value which is castable to an integer following the <a class="el" href="ax.html#axopassignment">assignment casting</a> rules and falls within the valid size of the <em><code>matrix</code></em> dimensions. <b>No bounds checking is performed</b>. In general it is more readable to use this operator when accessing specific elements, where <b><code>exp1</code></b> is the row index and <b><code>exp2</code></b> is the column index. The tables below show the different access patterns for <b><code>3x3</code></b> and <b><code>4x4</code></b> matrices. </dd></dl>
@@ -827,19 +827,19 @@ Other</h2>
 <tr>
 <th>Operator Name</th><th>Operator Syntax</th><th>Returns </th></tr>
 <tr style="text-align:left">
-<td>Call / Explicit Cast </td><td bgcolor="#ffc4c4"><em><code>a</code><b><code></em>(...)</code></b> </td><td>Returns the result of a function call or inbuilt explicit cast  </td></tr>
+<td>Call / Explicit Cast </td><td bgcolor="#ffc4c4"><em><code>a</code></em><b><code>(...)</code></b> </td><td>Returns the result of a function call or inbuilt explicit cast  </td></tr>
 <tr style="text-align:left">
-<td>Comma </td><td bgcolor="#ffc4c4"><em><code>a</code><b></em>,</b>&#160; <em><code>b</code></em>  </td><td>Returns the value of <b><code>b</code></b> after chained evaluation  </td></tr>
+<td>Comma </td><td bgcolor="#ffc4c4"><em><code>a</code></em><b>,</b>&#160; <em><code>b</code></em> </td><td>Returns the value of <b><code>b</code></b> after chained evaluation  </td></tr>
 <tr style="text-align:left">
-<td>Ternary Conditional </td><td bgcolor="#ffc4c4"><em><code>a</code>&#160;<b><code></em>?</code></b>&#160;<em><code>b</code>&#160;<b><code></em>:</code></b> <em><code>c</code></em>  </td><td><b><code>b</code></b> if <b><code>a</code></b> is <b>true</b>, <b><code>c</code></b> otherwise.  </td></tr>
+<td>Ternary Conditional </td><td bgcolor="#ffc4c4"><em><code>a</code></em>&#160;<b><code>?</code></b>&#160;<em><code>b</code></em>&#160;<b><code>:</code></b><em><code>c</code></em> </td><td><b><code>b</code></b> if <b><code>a</code></b> is <b>true</b>, <b><code>c</code></b> otherwise.  </td></tr>
 <tr>
-<td>Vector/Matrix Initializer </td><td bgcolor="#ffc4c4"><b><code>{</code></b>&#160;<em><code>a</em>,&#160;</code><em><code>b&#160;</code><b><code></em>...&#160;}</code></b>  </td><td>Returns a temporary vector or matrix  </td></tr>
+<td>Vector/Matrix Initializer </td><td bgcolor="#ffc4c4"><b><code>{</code></b>&#160;<em> <code>a,&#160;</code></em> <code>b&#160;</code><b><code>...&#160;}</code></b>  </td><td>Returns a temporary vector or matrix  </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt>Call / Explicit Cast</dt><dd>The function call operator provides the ability to invoke functions <b>or</b> invoke a supported explicit cast. It has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><em><code>func</em>(</code><em><code>a</code></em>, <em><code>b</code></em>, <em><code>c</code></em> <code>...)</code> </td></tr>
+<td bgcolor="#ffc4c4"><em> <code>func(a, b, c, ...)</code> </em> </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Where <b><code>func</code></b> is a function name <b>or</b> a valid explicit cast typename. Explicit casts are only supported for <a class="el" href="ax.html#axscalars">scalar types</a>. For example: <div class="fragment"><div class="line"><span class="keywordtype">int</span> a = int(1.1f);</div><div class="line">vec3f b = 1.0f;</div><div class="line">a = int(b.x);</div></div><!-- fragment --> </dd></dl>
@@ -848,7 +848,7 @@ Other</h2>
 <dl class="section user"><dt>Comma</dt><dd>The Comma operator has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><em><code>a</code><b><code></em>,</code> </b><em><code>b</code></em>  </td></tr>
+<td bgcolor="#ffc4c4"><em><code>a</code></em><b><code>,</code> </b><em><code>b</code></em> </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Where <b><code>a</code></b> and <b><code>b</code></b> are expressions. Chained expressions evaluate each expression in syntactical order (first to last), discarding any return value except for the last expression, which is returned from the entire list. Note that although return values for any expression but the last are discarded, their side effects are still applied before subsequent expression are evaluated. For example: <div class="fragment"><div class="line"><span class="keywordtype">int</span> a = 5;</div><div class="line">a-=1, a+=2; <span class="comment">// a = 6</span></div><div class="line">a = a--, ++a; <span class="comment">// exp1: a = a--, exp2: ++a. a = 7</span></div></div><!-- fragment --> </dd></dl>
@@ -856,18 +856,18 @@ Other</h2>
 <a class="anchor" id="axopternary"></a><dl class="section user"><dt>Ternary Conditional</dt><dd>The ternary conditional operator can be thought of as an in-line <a class="el" href="ax.html#axbranching">if-else statement</a> that returns a value, where each of the if/else branches has a single expression that will be returned. It has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><em><code>a</code>&#160;<b><code></em>?</code></b>&#160;<em><code>b</code>&#160;<b><code></em>:</code></b> <em><code>c</code></em>  </td></tr>
+<td bgcolor="#ffc4c4"><em><code>a</code></em>&#160;<b><code>?</code></b>&#160;<em><code>b</code></em>&#160;<b><code>:</code></b><em><code>c</code></em> </td></tr>
 </table>
 Where <b><code>a</code></b> is the condition, evaluated and converted to <b>bool</b>, and <b><code>b</code></b> and <b><code>c</code></b> are expressions of the same or implicit-castable types. <b><code>b</code></b> is evaluated and returned if the condition is <b>true</b>, <b><code>c</code></b> is evaluated and returned if the condition is <b>false</b>. Only the expression out of <b><code>b</code></b> and <b><code>c</code></b> that is returned will be evaluated. Expressions with no return value (a.k.a <b><code>void</code></b>) are supported as long as <b><code>b</code></b> and <b><code>c</code></b> are both of this type. </dd></dl>
-<dl class="section user"><dt></dt><dd>Also supported is the 'Elvis' operator, <b><code>a</code></b> <b><code></b>?</code> <b><code></b>:</code> <b><code>c</code></b> (or <code>?:</code>). Here, <b><code>a</code></b> is evaluated once, and if when converted to <b>bool</b> is <b>true</b>, <b><code>a</code></b> is returned, otherwise <b><code>c</code></b> is evaluated and returned. In this case, <b><code>a</code></b> and <b><code>c</code></b> must be the same or implicit-castable types, and both implicit-castable to <b>bool</b>.</dd></dl>
+<dl class="section user"><dt></dt><dd>Also supported is the 'Elvis' operator, <b><code>a</code> <code>?</code> <code>:</code> <code>c</code></b> (or <code>?:</code>). Here, <b><code>a</code></b> is evaluated once, and if when converted to <b>bool</b> is <b>true</b>, <b><code>a</code></b> is returned, otherwise <b><code>c</code></b> is evaluated and returned. In this case, <b><code>a</code></b> and <b><code>c</code></b> must be the same or implicit-castable types, and both implicit-castable to <b>bool</b>.</dd></dl>
 <a class="anchor" id="axvecmatinit"></a><dl class="section user"><dt>Vector/Matrix Initializer</dt><dd><a class="el" href="ax.html#axvecmats">Vectors and matrices</a> can be represented as local variables (e.g. <b><code>vec3f</code></b>), external attributes or parameters (e.g. <b><code>vec3f@attrib</code></b>) or as temporary values using the vector/matrix initializer syntax. This operator has the form: </dd></dl>
 <dl class="section user"><dt></dt><dd><table class="doxtable">
 <tr>
-<td bgcolor="#ffc4c4"><b><code>{</code></b>&#160;<em><code>a</em>,&#160;</code><em><code>b&#160;</code><b><code></em>...&#160;}</code></b>  </td></tr>
+<td bgcolor="#ffc4c4"><b><code>{</code></b>&#160; <em><code>a,&#160; b&#160;</code></em><b><code>...&#160;}</code></b>  </td></tr>
 </table>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Where <b><code>a</code></b> and <b><code>b</code></b> are expressions returning a scalar value. When this operator is invoked with a specific number of arguments, a vector or matrix is implicitly created with a copy of those arguments which can be assigned to an existing container of matching size. Expression in the operator are evaluated from first to last. This operator is only valid with argument lists of sizes 2, 3, 4, 9 and 16, which implicitly represent <b>vec2, vec3, vec4, mat3,</b> and <b>mat4</b> types respectively. For example: <div class="fragment"><div class="line">vec3f a = { 1.0f, 2.0f, 3.0f }; <span class="comment">// right hand side of assignment creates a vec3f</span></div><div class="line">vec3f b = dot(a, { a[0], 5.0, 6.0 }); <span class="comment">// second argument creates a vec3d</span></div></div><!-- fragment --> </dd></dl>
-<dl class="section note"><dt>Note</dt><dd>In the above examples, the value of <b><code>a</b>[0]</code> is copied into the initializer operator. </dd></dl>
+<dl class="section note"><dt>Note</dt><dd>In the above examples, the value of <b><code>a[0]</code></b> is copied into the initializer operator. </dd></dl>
 <dl class="section user"><dt>Initialization Type</dt><dd>A mixture of arbitrary scalar types can be used in the initializer operator e.g: <div class="fragment"><div class="line">mat3f a = {</div><div class="line">    <span class="keyword">true</span>, 0s, 0,</div><div class="line">    0l, 0.0f, 0.0,</div><div class="line">    <span class="keyword">false</span>, 1, 2</div><div class="line">};</div></div><!-- fragment --> </dd></dl>
 <dl class="section user"><dt></dt><dd>The temporary container evaluates all expressions and uses the <b>highest</b> ranking type (as defined by <a class="el" href="ax.html#axtypeprecedence">arithmetic type precedence</a>) to infer the element type of the container, implicitly casting all other types to that type where necessary. In the above example, the temporary created forms a <b><code>mat3d</code></b>, before being implicitly cast to a <b><code>mat3f</code></b> due to the assignment.</dd></dl>
 </div><h2><a class="anchor" id="axopprecedence"></a>
@@ -998,7 +998,7 @@ Functions</h1>
 <dl class="section user"><dt>Function Execution Context</dt><dd>Some functions depend on the currently processing <a class="el" href="ax.html#axexecutionxcontext">OpenVDB Execution Context</a> to work correctly and will fail if called from an "invalid" context. Specifically, there exists functions which operate on OpenVDB points or OpenVDB volume grids and interact with the point or voxel data. Some of these methods are incompatible for the other grid type (for example, <a class="el" href="axfunctionlist.html#axdeletepoint">deleting a point from a Point Data Grid</a>) and will result in the compilation failure of an AX program if an attempt is made it use them.</dd></dl>
 </div><h2><a class="anchor" id="axuserfunctions"></a>
 User Functions</h2>
-<div style="width:800px;text-align:justify;"><dl class="section user"><dt></dt><dd>User function declarations are not currently supported, but exist on the <a href="https://github.com/dneg/openvdb_ax/blob/master/ROADMAP.md">AX Roadmap</a> as a near future feature.</dd></dl>
+<div style="width:800px;text-align:justify;"><dl class="section user"><dt></dt><dd>User function declarations are not currently supported, but exist on the AX Roadmap as a near future feature.</dd></dl>
 <br />
 <hr/>
 </div><div style="width:800px;text-align:justify;"></div><h1><a class="anchor" id="axvexsupport"></a>

@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Diagnostics.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Diagnostics.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,7 +83,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
@@ -98,12 +98,14 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <p>Various diagnostic tools to identify potential issues with for example narrow-band level sets or fog volumes.  
 <a href="#details">More...</a></p>
-<div class="textblock"><code>#include &lt;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Vec3_8h_source.html">openvdb/math/Vec3.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Stencils_8h_source.html">openvdb/math/Stencils.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="Operators_8h_source.html">openvdb/math/Operators.h</a>&gt;</code><br />
-<code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
+<div class="textblock"><code>#include &quot;<a class="el" href="Grid_8h_source.html">openvdb/Grid.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="Vec3_8h_source.html">openvdb/math/Vec3.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="openvdb_2openvdb_2math_2Stencils_8h_source.html">openvdb/math/Stencils.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="Operators_8h_source.html">openvdb/math/Operators.h</a>&quot;</code><br />
+<code>#include &quot;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&quot;</code><br />
+<code>#include &quot;openvdb/thread/Threading.h&quot;</code><br />
+<code>#include &lt;<a class="el" href="openvdb_8h_source.html">openvdb/openvdb.h</a>&gt;</code><br />
 <code>#include &lt;tbb/blocked_range.h&gt;</code><br />
 <code>#include &lt;tbb/parallel_reduce.h&gt;</code><br />
 <code>#include &lt;cmath&gt;</code><br />
@@ -117,74 +119,68 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
 Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckNan.html">CheckNan&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks NaN values.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckNan.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckNan.html">CheckNan&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks NaN values.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckNan.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckInf.html">CheckInf&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks for infinite values, e.g. 1/0 or -1/0.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckInf.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckInf.html">CheckInf&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks for infinite values, e.g. 1/0 or -1/0.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckInf.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckFinite.html">CheckFinite&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks for both NaN and inf values, i.e. any value that is not finite.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckFinite.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckFinite.html">CheckFinite&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks for both NaN and inf values, i.e. any value that is not finite.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckFinite.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMagnitude.html">CheckMagnitude&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check that the magnitude of a value, a, is close to a fixed magnitude, b, given a fixed tolerance c. That is | |a| - |b| | &lt;= c.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMagnitude.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMagnitude.html">CheckMagnitude&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Check that the magnitude of a value, a, is close to a fixed magnitude, b, given a fixed tolerance c. That is | |a| - |b| | &lt;= c.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMagnitude.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckRange.html">CheckRange&lt; GridT, MinInclusive, MaxInclusive, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a range.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckRange.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckRange.html">CheckRange&lt; GridT, MinInclusive, MaxInclusive, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a range.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckRange.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMin.html">CheckMin&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a minimum.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMin.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMin.html">CheckMin&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a minimum.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMin.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMax.html">CheckMax&lt; GridT, TreeIterT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a maximum.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckMax.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMax.html">CheckMax&lt; GridT, TreeIterT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks a value against a maximum.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckMax.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckNormGrad.html">CheckNormGrad&lt; GridT, TreeIterT, GradScheme &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the norm of the gradient against a range, i.e., |&nabla;&Phi;| &isin; [min, max].  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckNormGrad.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckNormGrad.html">CheckNormGrad&lt; GridT, TreeIterT, GradScheme &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the norm of the gradient against a range, i.e., |&nabla;&Phi;| &isin; [min, max].  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckNormGrad.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckEikonal.html">CheckEikonal&lt; GridT, TreeIterT, StencilT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the norm of the gradient at zero-crossing voxels against a range.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckEikonal.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckEikonal.html">CheckEikonal&lt; GridT, TreeIterT, StencilT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the norm of the gradient at zero-crossing voxels against a range.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckEikonal.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1CheckDivergence.html">CheckDivergence&lt; GridT, TreeIterT, DiffScheme &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the divergence against a range.  <a href="structopenvdb_1_1v8__1_1_1tools_1_1CheckDivergence.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v9__0_1_1tools_1_1CheckDivergence.html">CheckDivergence&lt; GridT, TreeIterT, DiffScheme &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Checks the divergence against a range.  <a href="structopenvdb_1_1v9__0_1_1tools_1_1CheckDivergence.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1Diagnose.html">Diagnose&lt; GridT &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs multithreaded diagnostics of a grid.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1Diagnose.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1Diagnose.html">Diagnose&lt; GridT &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Performs multithreaded diagnostics of a grid.  <a href="classopenvdb_1_1v9__0_1_1tools_1_1Diagnose.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1CheckLevelSet.html">CheckLevelSet&lt; GridType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that performs various types of checks on narrow-band level sets.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1CheckLevelSet.html#details">More...</a><br /></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1CheckLevelSet.html">CheckLevelSet&lt; GridType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that performs various types of checks on narrow-band level sets.  <a href="classopenvdb_1_1v9__0_1_1tools_1_1CheckLevelSet.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1CheckFogVolume.html">CheckFogVolume&lt; GridType &gt;</a></td></tr>
-<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that performs various types of checks on fog volumes.  <a href="classopenvdb_1_1v8__1_1_1tools_1_1CheckFogVolume.html#details">More...</a><br /></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1diagnostics__internal_1_1InactiveVoxelValues.html">InactiveVoxelValues&lt; TreeType &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1diagnostics__internal_1_1InactiveTileValues.html">InactiveTileValues&lt; TreeType &gt;</a></td></tr>
+<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1CheckFogVolume.html">CheckFogVolume&lt; GridType &gt;</a></td></tr>
+<tr class="memdesc:"><td class="mdescLeft">&#160;</td><td class="mdescRight">Class that performs various types of checks on fog volumes.  <a href="classopenvdb_1_1v9__0_1_1tools_1_1CheckFogVolume.html#details">More...</a><br /></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1diagnostics__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1diagnostics__internal.html">openvdb::v8_1::tools::diagnostics_internal</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:ae07091e4e6f1cfb869111d233da6d9b9"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
-<tr class="memitem:ae07091e4e6f1cfb869111d233da6d9b9"><td class="memTemplItemLeft" align="right" valign="top">std::string&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae07091e4e6f1cfb869111d233da6d9b9">checkLevelSet</a> (const GridType &amp;grid, size_t number=9)</td></tr>
-<tr class="memdesc:ae07091e4e6f1cfb869111d233da6d9b9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform checks on a grid to see if it is a valid symmetric, narrow-band level set.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ae07091e4e6f1cfb869111d233da6d9b9">More...</a><br /></td></tr>
+<tr class="memitem:ae07091e4e6f1cfb869111d233da6d9b9"><td class="memTemplItemLeft" align="right" valign="top">std::string&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae07091e4e6f1cfb869111d233da6d9b9">checkLevelSet</a> (const GridType &amp;grid, size_t number=9)</td></tr>
+<tr class="memdesc:ae07091e4e6f1cfb869111d233da6d9b9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform checks on a grid to see if it is a valid symmetric, narrow-band level set.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae07091e4e6f1cfb869111d233da6d9b9">More...</a><br /></td></tr>
 <tr class="separator:ae07091e4e6f1cfb869111d233da6d9b9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab03bd92afef729f144e63f37f417c96d"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
-<tr class="memitem:ab03bd92afef729f144e63f37f417c96d"><td class="memTemplItemLeft" align="right" valign="top">std::string&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab03bd92afef729f144e63f37f417c96d">checkFogVolume</a> (const GridType &amp;grid, size_t number=6)</td></tr>
-<tr class="memdesc:ab03bd92afef729f144e63f37f417c96d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform checks on a grid to see if it is a valid fog volume.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#ab03bd92afef729f144e63f37f417c96d">More...</a><br /></td></tr>
+<tr class="memitem:ab03bd92afef729f144e63f37f417c96d"><td class="memTemplItemLeft" align="right" valign="top">std::string&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab03bd92afef729f144e63f37f417c96d">checkFogVolume</a> (const GridType &amp;grid, size_t number=6)</td></tr>
+<tr class="memdesc:ab03bd92afef729f144e63f37f417c96d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Perform checks on a grid to see if it is a valid fog volume.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#ab03bd92afef729f144e63f37f417c96d">More...</a><br /></td></tr>
 <tr class="separator:ab03bd92afef729f144e63f37f417c96d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a136006bbdda1e616071dba827c34be79"><td class="memTemplParams" colspan="2">template&lt;class GridType &gt; </td></tr>
-<tr class="memitem:a136006bbdda1e616071dba827c34be79"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a136006bbdda1e616071dba827c34be79">uniqueInactiveValues</a> (const GridType &amp;grid, std::vector&lt; typename GridType::ValueType &gt; &amp;values, size_t numValues)</td></tr>
-<tr class="memdesc:a136006bbdda1e616071dba827c34be79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to find unique inactive values.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a136006bbdda1e616071dba827c34be79">More...</a><br /></td></tr>
+<tr class="memitem:a136006bbdda1e616071dba827c34be79"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a136006bbdda1e616071dba827c34be79">uniqueInactiveValues</a> (const GridType &amp;grid, std::vector&lt; typename GridType::ValueType &gt; &amp;values, size_t numValues)</td></tr>
+<tr class="memdesc:a136006bbdda1e616071dba827c34be79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Threaded method to find unique inactive values.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a136006bbdda1e616071dba827c34be79">More...</a><br /></td></tr>
 <tr class="separator:a136006bbdda1e616071dba827c34be79"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>

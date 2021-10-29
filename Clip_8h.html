@@ -4,7 +4,7 @@
 <meta http-equiv="Content-Type" content="text/xhtml;charset=UTF-8"/>
 <meta http-equiv="X-UA-Compatible" content="IE=9"/>
 <meta name="generator" content="Doxygen 1.8.11"/>
-<title>OpenVDB: Clip.h File Reference</title>
+<title>OpenVDB: openvdb/tools/Clip.h File Reference</title>
 <link href="tabs.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="jquery.js"></script>
 <script type="text/javascript" src="dynsections.js"></script>
@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">8.1.1</span>
+   &#160;<span id="projectnumber">9.0.0</span>
    </div>
   </td>
  </tr>
@@ -83,14 +83,12 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 
 <div id="nav-path" class="navpath">
   <ul>
-<li class="navelem"><a class="el" href="dir_280f52b45faa7feb3f4c229d1d8418c8.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
+<li class="navelem"><a class="el" href="dir_5862e09d5e9b1231151ba919eed3a485.html">openvdb</a></li><li class="navelem"><a class="el" href="dir_56dd20a90d91c3ec0f84e02ccf2e754a.html">tools</a></li>  </ul>
 </div>
 </div><!-- top -->
 <div class="header">
   <div class="summary">
-<a href="#nested-classes">Classes</a> &#124;
 <a href="#namespaces">Namespaces</a> &#124;
-<a href="#typedef-members">Typedefs</a> &#124;
 <a href="#func-members">Functions</a>  </div>
   <div class="headertitle">
 <div class="title">Clip.h File Reference</div>  </div>
@@ -103,6 +101,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <code>#include &lt;<a class="el" href="Math_8h_source.html">openvdb/math/Math.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="Maps_8h_source.html">openvdb/math/Maps.h</a>&gt;</code><br />
 <code>#include &lt;<a class="el" href="LeafManager_8h_source.html">openvdb/tree/LeafManager.h</a>&gt;</code><br />
+<code>#include &lt;<a class="el" href="PointDataGrid_8h_source.html">openvdb/points/PointDataGrid.h</a>&gt;</code><br />
 <code>#include &quot;<a class="el" href="GridTransformer_8h_source.html">GridTransformer.h</a>&quot;</code><br />
 <code>#include &quot;<a class="el" href="Prune_8h_source.html">Prune.h</a>&quot;</code><br />
 <code>#include &lt;tbb/blocked_range.h&gt;</code><br />
@@ -112,49 +111,29 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </div>
 <p><a href="Clip_8h_source.html">Go to the source code of this file.</a></p>
 <table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
-Classes</h2></td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1clip__internal_1_1MaskInteriorVoxels.html">MaskInteriorVoxels&lt; TreeT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">class &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v8__1_1_1tools_1_1clip__internal_1_1CopyLeafNodes.html">CopyLeafNodes&lt; TreeT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1clip__internal_1_1BoolSampler.html">BoolSampler</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1clip__internal_1_1ConvertGrid.html">ConvertGrid&lt; FromGridT, ToGridT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:"><td class="memItemLeft" align="right" valign="top">struct &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structopenvdb_1_1v8__1_1_1tools_1_1clip__internal_1_1ConvertGrid_3_01GridT_00_01GridT_01_4.html">ConvertGrid&lt; GridT, GridT &gt;</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="namespaces"></a>
 Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb.html">openvdb</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1.html">openvdb::v8_1</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0.html">openvdb::v9_0</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html">openvdb::v8_1::tools</a></td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1tools"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html">openvdb::v9_0::tools</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:namespaceopenvdb_1_1v8__1_1_1tools_1_1clip__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1clip__internal.html">openvdb::v8_1::tools::clip_internal</a></td></tr>
-<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
-</table><table class="memberdecls">
-<tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="typedef-members"></a>
-Typedefs</h2></td></tr>
-<tr class="memitem:ac4459e4977cb11b9e30cac4fc0467c43"><td class="memItemLeft" align="right" valign="top">using&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools_1_1clip__internal.html#ac4459e4977cb11b9e30cac4fc0467c43">MaskValueType</a> = ValueMask</td></tr>
-<tr class="separator:ac4459e4977cb11b9e30cac4fc0467c43"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="func-members"></a>
 Functions</h2></td></tr>
 <tr class="memitem:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="memTemplParams" colspan="2">template&lt;typename GridType &gt; </td></tr>
-<tr class="memitem:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a9a2667c6fe1ab087fded41b3b3f1fa4b">clip</a> (const GridType &amp;grid, const BBoxd &amp;bbox, bool keepInterior=true)</td></tr>
-<tr class="memdesc:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip the given grid against a world-space bounding box and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a9a2667c6fe1ab087fded41b3b3f1fa4b">More...</a><br /></td></tr>
+<tr class="memitem:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a9a2667c6fe1ab087fded41b3b3f1fa4b">clip</a> (const GridType &amp;grid, const BBoxd &amp;bbox, bool keepInterior=true)</td></tr>
+<tr class="memdesc:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip the given grid against a world-space bounding box and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a9a2667c6fe1ab087fded41b3b3f1fa4b">More...</a><br /></td></tr>
 <tr class="separator:a9a2667c6fe1ab087fded41b3b3f1fa4b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a92b28ca7a4cb9e950e833fac3988a28b"><td class="memTemplParams" colspan="2">template&lt;typename GridType &gt; </td></tr>
-<tr class="memitem:a92b28ca7a4cb9e950e833fac3988a28b"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#a92b28ca7a4cb9e950e833fac3988a28b">clip</a> (const GridType &amp;grid, const math::NonlinearFrustumMap &amp;frustum, bool keepInterior=true)</td></tr>
-<tr class="memdesc:a92b28ca7a4cb9e950e833fac3988a28b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip the given grid against a frustum and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#a92b28ca7a4cb9e950e833fac3988a28b">More...</a><br /></td></tr>
+<tr class="memitem:a92b28ca7a4cb9e950e833fac3988a28b"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a92b28ca7a4cb9e950e833fac3988a28b">clip</a> (const GridType &amp;grid, const math::NonlinearFrustumMap &amp;frustum, bool keepInterior=true)</td></tr>
+<tr class="memdesc:a92b28ca7a4cb9e950e833fac3988a28b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip the given grid against a frustum and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a92b28ca7a4cb9e950e833fac3988a28b">More...</a><br /></td></tr>
 <tr class="separator:a92b28ca7a4cb9e950e833fac3988a28b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aaaa857aee7c0f85f5f88b8e6539c80b8"><td class="memTemplParams" colspan="2">template&lt;typename GridType , typename MaskTreeType &gt; </td></tr>
-<tr class="memitem:aaaa857aee7c0f85f5f88b8e6539c80b8"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v8__1_1_1tools.html#aaaa857aee7c0f85f5f88b8e6539c80b8">clip</a> (const GridType &amp;grid, const Grid&lt; MaskTreeType &gt; &amp;mask, bool keepInterior=true)</td></tr>
-<tr class="memdesc:aaaa857aee7c0f85f5f88b8e6539c80b8"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip a grid against the active voxels of another grid and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v8__1_1_1tools.html#aaaa857aee7c0f85f5f88b8e6539c80b8">More...</a><br /></td></tr>
-<tr class="separator:aaaa857aee7c0f85f5f88b8e6539c80b8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a79a86b8583d93de3e82d89b61d6a42f7"><td class="memTemplParams" colspan="2">template&lt;typename GridType , typename MaskTreeType &gt; </td></tr>
+<tr class="memitem:a79a86b8583d93de3e82d89b61d6a42f7"><td class="memTemplItemLeft" align="right" valign="top">GridType::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a79a86b8583d93de3e82d89b61d6a42f7">clip</a> (const GridType &amp;grid, const Grid&lt; MaskTreeType &gt; &amp;mask, bool keepInterior=true)</td></tr>
+<tr class="memdesc:a79a86b8583d93de3e82d89b61d6a42f7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Clip a grid against the active voxels of another grid and return a new grid containing the result.  <a href="namespaceopenvdb_1_1v9__0_1_1tools.html#a79a86b8583d93de3e82d89b61d6a42f7">More...</a><br /></td></tr>
+<tr class="separator:a79a86b8583d93de3e82d89b61d6a42f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Functions to clip a grid against a bounding box, a camera frustum, or another grid's active voxel topology. </p>
