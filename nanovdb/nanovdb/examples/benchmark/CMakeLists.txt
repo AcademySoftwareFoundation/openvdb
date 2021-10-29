@@ -1,13 +1,32 @@
-# Copyright Contributors to the OpenVDB Project SPDX-License-Identifier: MPL-2.0
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
 
-# -----------------------------------------------------------------------
+  CMake Configuration for NanoVDB Benchmark
+
+#]=======================================================================]
+
+cmake_minimum_required(VERSION 3.15)
+project(NanoVDBBenchmark LANGUAGES CXX)
+
+include(GNUInstallDirs)
+
+###############################################################################
+
+message(STATUS "----------------------------------------------------")
+message(STATUS "---------- Configuring NanoVDB Benchmark -----------")
+message(STATUS "----------------------------------------------------")
+
+###############################################################################
+
 if(WIN32 AND NANOVDB_CUDA_KEEP_PTX)
   file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/x64/Release")
 endif()
 
 # -----------------------------------------------------------------------
 # TODO: Benchmark should probably not require gtest.
-if(NOT (NANOVDB_GTEST))
+if(NOT TARGET GTest::GTest)
   message(WARNING " - GTest required to build benchmark. Skipping.")
   return()
 endif()
@@ -17,64 +36,39 @@ endif()
 # launching from the cmake binary working directory.
 file(MAKE_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}/data")
 
-set(BENCHMARK_SOURCES Benchmark.cpp Camera.h Image.h)
+set(BENCHMARK_SOURCES Benchmark.cc Camera.h Image.h)
 
 if(NANOVDB_USE_CUDA)
-
   list(APPEND BENCHMARK_SOURCES BenchKernels_nano.cu)
 
-  add_executable(benchmark_nano Benchmark_nano.cpp BenchKernels_nano.cu)
-  add_executable(benchmark_dense Benchmark_dense.cpp BenchKernels_dense.cu)
+  add_executable(benchmark_nano Benchmark_nano.cc BenchKernels_nano.cu)
+  add_executable(benchmark_dense Benchmark_dense.cc BenchKernels_dense.cu)
 
-  target_include_directories(benchmark_nano PUBLIC ${CUDA_INCLUDE_DIRECTORY})
-  target_include_directories(benchmark_dense PUBLIC ${CUDA_INCLUDE_DIRECTORY})
+  target_link_libraries(benchmark_nano PRIVATE nanovdb)
+  target_link_libraries(benchmark_dense PRIVATE nanovdb)
 
-  target_link_libraries(
-    benchmark_nano
-    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
-            ${NANOVDB_BLOSC} # optional
-  )
-
-  target_link_libraries(
-    benchmark_dense
-    PRIVATE libnanovdb ${CUDA_LIBRARIES} ${NANOVDB_ZLIB} # optional
-            ${NANOVDB_BLOSC} # optional
-  )
-
-  target_compile_definitions(
-    benchmark_nano
-    PRIVATE "-D${NANOVDB_USE_CUDA_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
-            "-D${NANOVDB_USE_ZLIB_FLAG}")
-
-  target_compile_definitions(
-    benchmark_dense
-    PRIVATE "-D${NANOVDB_USE_CUDA_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
-            "-D${NANOVDB_USE_ZLIB_FLAG}")
-
+  # Propagate MSVC Runtime from the OpenVDB library (if VDB_MSVC_RUNTIME_SELECTION
+  # has been set then we're building and linking against OpenVDB, see the root
+  # NanoVDB CMakeLists.txt)
+  if(VDB_MSVC_RUNTIME_SELECTION)
+    set_target_properties(benchmark_nano PROPERTIES
+      MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+    set_target_properties(benchmark_dense PROPERTIES
+      MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+  endif()
 endif()
 
 # -----------------------------------------------------------------------
+
 add_executable(benchmark ${BENCHMARK_SOURCES})
+target_link_libraries(benchmark PRIVATE nanovdb GTest::GTest GTest::Main)
 
-target_include_directories(benchmark PUBLIC ${TBB_INCLUDE_DIRECTORY}
-                                            ${CUDA_INCLUDE_DIRECTORY})
+# Propagate MSVC Runtime from the OpenVDB library (if VDB_MSVC_RUNTIME_SELECTION
+# has been set then we're building and linking against OpenVDB, see the root
+# NanoVDB CMakeLists.txt)
+if(VDB_MSVC_RUNTIME_SELECTION)
+  set_target_properties(benchmark PROPERTIES
+    MSVC_RUNTIME_LIBRARY ${VDB_MSVC_RUNTIME_SELECTION})
+endif()
 
-target_link_libraries(
-  benchmark
-  PRIVATE libnanovdb
-          ${NANOVDB_GTEST}
-          ${NANOVDB_TBB} # optional
-          ${NANOVDB_OPENVDB} # optional
-          ${NANOVDB_ZLIB} # optional
-          ${NANOVDB_BLOSC} # optional
-)
-
-target_compile_definitions(
-  benchmark
-  PRIVATE "-D${NANOVDB_USE_OPENVDB_FLAG}" "-D${NANOVDB_USE_CUDA_FLAG}"
-          "-D${NANOVDB_USE_TBB_FLAG}" "-D${NANOVDB_USE_BLOSC_FLAG}"
-          "-D${NANOVDB_USE_ZLIB_FLAG}")
-
-install(TARGETS benchmark DESTINATION examples)
-
-# ---------------------------------------------------------------
+install(TARGETS benchmark DESTINATION ${CMAKE_INSTALL_DOCDIR}/examples)

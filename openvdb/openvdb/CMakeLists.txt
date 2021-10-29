@@ -655,7 +655,8 @@ if(OPENVDB_CORE_STATIC)
       # also add it explicitly as a compile option
       set_target_properties(openvdb_static PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-      target_compile_options(openvdb_static PUBLIC "/MT$<$<CONFIG:Debug>:d>")
+      target_compile_options(openvdb_static PUBLIC
+        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
     endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
@@ -690,7 +691,8 @@ if(OPENVDB_CORE_SHARED)
       # also add it explicitly as a compile option
       set_target_properties(openvdb_shared PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-      target_compile_options(openvdb_shared PUBLIC "/MD$<$<CONFIG:Debug>:d>")
+      target_compile_options(openvdb_shared PUBLIC
+        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MD$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 endif()

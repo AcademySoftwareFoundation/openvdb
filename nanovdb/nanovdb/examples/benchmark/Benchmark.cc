@@ -1,17 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark.cpp
+/// @file Benchmark.cc
 ///
 /// @author Ken Museth
 ///
 /// @brief A simple ray-tracing benchmark test.
-
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif
-
-#include "gtest/gtest.h"
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/Ray.h>
@@ -43,6 +37,8 @@
 #include <tbb/parallel_for.h>
 #include <tbb/blocked_range2d.h>
 #endif
+
+#include <gtest/gtest.h>
 
 namespace nanovdb {
 
@@ -665,7 +661,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
 #if defined(NANOVDB_USE_OPENVDB)
     auto handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
 #else
-    auto handle = nanovdb::createLevelSetTorus<float, BufferT>(100.0f, 50.0f);
+    auto handle = nanovdb::createLevelSetTorus<float, float, BufferT>(100.0f, 50.0f);
 #endif
     //auto        handle = nanovdb::io::readGrid<BufferT>("data/test.nvdb");
     const auto* grid = handle.grid<float>();

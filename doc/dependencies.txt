@@ -71,7 +71,7 @@ Bison          | 3.0.0   | 3.0.5       | General-purpose parser generator       
 Flex           | 2.6     | 2.6.4       | Fast lexical analyzer generator                                   | Y       | Y        | https://github.com/westes/flex
 Python         | 2.7     | 2.7         | The python interpreter and libraries for C++/python bindings      | Y       | Y        | https://www.python.org
 NumPy          | 1.14.0  | 1.14.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
-GoogleTest     | 1.8     | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
+GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
 Blosc          | 1.5.0*  | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus

@@ -3,6 +3,9 @@ OpenVDB Version History
 
 Version 9.0.0 - In development
 
+    New features:
+    - NanoVDB, which for the first time offers GPU support for static sparse volumes in OpenVDB.
+
     Improvements:
     - Added PNG support to vdb_render which can be enabled with during CMake
       with -DUSE_PNG=ON.

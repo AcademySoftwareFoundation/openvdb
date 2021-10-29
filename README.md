@@ -5,10 +5,9 @@
 [![Slack](https://slack.aswf.io/badge.svg)](https://slack.aswf.io/)
 
 
-| Build           | Status |
-| --------------- | ------ |
-| OpenVDB         | [![Build](https://github.com/AcademySoftwareFoundation/openvdb/workflows/Build/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3ABuild) |
-| OpenVDB AX      | [![ax](https://github.com/AcademySoftwareFoundation/openvdb/workflows/ax/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions?query=workflow%3Aax) |
+| OpenVDB |   AX   |  Nano  | Houdini |
+| :----:  | :----: | :----: |  :----: |
+| [![core](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/build.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/build.yml) | [![ax](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/ax.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/ax.yml) | [![nano](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/nanovdb.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/nanovdb.yml) | [![hou](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/houdini.yml/badge.svg)](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/houdini.yml) |
 
 [Website](https://www.openvdb.org) |
 [Discussion Forum](https://github.com/AcademySoftwareFoundation/openvdb/discussions) |

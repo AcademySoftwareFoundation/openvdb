@@ -4746,7 +4746,7 @@ public:
         return count;
     }
     /// @brief Return the number of points in the leaf node containing the coordinate @a ijk.
-    ///        If this return value is larger than zero then the iterators @a begin and @end
+    ///        If this return value is larger than zero then the iterators @a begin and @a end
     ///        will point to all the attributes contained within that leaf node.
     __hostdev__ uint64_t leafPoints(const Coord& ijk, const AttT*& begin, const AttT*& end) const
     {

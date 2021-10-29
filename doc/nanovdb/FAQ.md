@@ -1,12 +1,12 @@
-# FAQ {#FAQ}
+# FAQ {#NanoVDB_FAQ}
 
 * **What is NanoVDB?**
 
-  As the name indicates it's a mini-version of the much bigger OpenVDB library, both in terms of functionality and scope. In fact, a stand-alone C++11 implementation of NanoVDB is available in the file [NanoVDB.h](../include/nanovdb/NanoVDB.h) and the C99 equivalent in the files [CNanoVDB.h](../include/cnanovdb/CNanoVDB.h) and [PNanoVDB.h](../include/cnanovdb/PNanoVDB.h). However, NanoVDB offers one major advantage over OpenVDB, namely support for GPUs. In short, NanoVDB is a standalone static-topology implementation of the well-known sparse volumetric VDB data structure. In other words, while values can be modified in a NanoVDB grid its tree topology cannot.
+  As the name indicates it's a mini-version of the much bigger OpenVDB library, both in terms of functionality and scope. In fact, a stand-alone C++11 implementation of NanoVDB is available in the file [NanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/NanoVDB.h) and the C99 equivalent in the files [CNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/CNanoVDB.h), and [PNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/PNanoVDB.h). However, NanoVDB offers one major advantage over OpenVDB, namely support for GPUs. In short, NanoVDB is a standalone static-topology implementation of the well-known sparse volumetric VDB data structure. In other words, while values can be modified in a NanoVDB grid its tree topology cannot.
 
   **What graphics API does NanoVDB support?**
 
-  We have test NanoVDB with CUDA, OpenCL, OpenGL, DirectX 12, OptiX, HLSL, and GLSL. We are also working on adding support for WebGL.
+  We have tested NanoVDB with CUDA, OpenCL, OpenGL, DirectX 12, OptiX, HLSL, and GLSL. We are also working on adding support for WebGL.
 
 * **What are the advantages of NanoVDB?**
 
@@ -26,7 +26,7 @@
 
 * **Does NanoVDB depend on and require CUDA?**
 
-  No, NanoVDB is by design agnostic and works with most graphics APIs, e.g. OpenGL, OpenCL, OptiX, CUDA, HLSL, GLSL, DirectX, and even the CPU! The data structure itself (defined in [NanoVDB.h](../include/nanovdb/NanoVDB.h) and [PNanoVDB.h](../include/nanovdb/PNanoVDB.h)) only depends on C++11 or C99. However, some of the auxiliary math classes are optionally optimized with intrinsic CUDA calls (e.g. fma in Vec3) and some of the [Allocator](../include/nanovdb/Util.h) uses CUDA for explicit memory management. It should be straightforward to replace (or remove) these CUDA dependencies if you so desire.
+  No, NanoVDB is by design agnostic and works with most graphics APIs, e.g. OpenGL, OpenCL, OptiX, CUDA, HLSL, GLSL, DirectX, and even the CPU! The data structure itself (defined in [NanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/NanoVDB.h) and [PNanoVDB.h](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/PNanoVDB.h)) only depends on C++11 or C99. However, some of the auxiliary math classes are optionally optimized with intrinsic CUDA calls (e.g. fma in Vec3) and some of the [Allocator](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/util/CudaDeviceBuffer.h) uses CUDA for explicit memory management. It should be straightforward to replace (or remove) these CUDA dependencies if you so desire.
 
 * **How does the data structure of NanoVDB compare to that of OpenVDB?**
 
@@ -34,15 +34,4 @@
 
 * **Are there known issues with NanoVDB?**
 
-  While the are currently no known bugs, there are certainly lots of room for improvements and enhancements. If you have issues or ideas for new feature in
-  NanoVDB please let us know, e.g email ken.museth@gmail.com.
-
-* **Is NanoVDB production-ready?**
-
-  While NanoVDB is still a beta release, it is stable and useful enough to be used
-  in production environments. In fact, NanoVDB is already part of commercial software
-  like Houdini version 18.5. The only aspect of NanoVDB that is still considered volatile
-  is the .nvdb file format. The reason is simply that in this file format NanoVDB grids are encoded exactly the same way out-of-core as in-core. Consequently, any changes in the in-memory representation of NanoVDB grids will also change the .nvdb file format. We typically capture this with a bump of the major version number, e.g. 1.3.4 -> 2.0.0. So for now we do not recommend using the NanoVDB file format for long-time storage, though it works great for temporary caching!
-
-### Copyright Contributors to the OpenVDB Project
-### SPDX-License-Identifier: MPL-2.0
+  While the are currently no known bugs, there are certainly lots of room for improvements and enhancements. If you have issues or ideas for new feature in NanoVDB please let us know, e.g by submitting a [Github issue](https://github.com/AcademySoftwareFoundation/openvdb/issues).

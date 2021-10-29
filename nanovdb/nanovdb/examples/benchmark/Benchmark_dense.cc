@@ -1,16 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file Benchmark_nano.cpp
+/// @file Benchmark_nano.cc
 ///
 /// @author Ken Museth
 ///
 /// @brief A super lightweight and portable ray-tracing benchmark
 ///        that only depends on NanoVDB (not OpenVDB) and CUDA.
-
-#ifndef _USE_MATH_DEFINES
-#define _USE_MATH_DEFINES
-#endif
 
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/CudaDeviceBuffer.h>

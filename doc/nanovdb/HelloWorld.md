@@ -1,6 +1,6 @@
-# Hello world examples {#HelloWorld}
+# NanoVDB Hello World Examples {#NanoVDB_HelloWorld}
 
-[The first example](../examples/ex_openvdb_to_nanovdb_accessor/openvdb_to_nanovdb_accessor.cpp) shows how to convert an OpenVDB level set sphere into a NanoVDB level set, use accessors to print out multiple values from both grids, and save the NanoVDB grid to file. Note that **this example depends on both OpenVDB and NanoVDB**.
+[The first example](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_openvdb_to_nanovdb_accessor/openvdb_to_nanovdb_accessor.cc) shows how to convert an OpenVDB level set sphere into a NanoVDB level set, use accessors to print out multiple values from both grids, and save the NanoVDB grid to file. Note that **this example depends on both OpenVDB and NanoVDB**.
 
 ```cpp
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
@@ -43,7 +43,7 @@ int main()
 }
 ```
 
-[The second example](../examples/ex_read_nanovdb_sphere_accessor/read_nanovdb_sphere_accessor.cpp) reads a NanoVDB grid from a file (the one saved in the previous example) and prints out multiple values. Note that **this example does not depend on OpenVDB (nor CUDA), only NanoVDB**.
+[The second example](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor/read_nanovdb_sphere_accessor.cc) reads a NanoVDB grid from a file (the one saved in the previous example) and prints out multiple values. Note that **this example does not depend on OpenVDB (nor CUDA), only NanoVDB**.
 
 ```cpp
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
@@ -73,7 +73,7 @@ int main()
 }
 ```
 
-[The third example](../examples/ex_read_nanovdb_sphere_accessor_cuda/read_nanovdb_sphere_accessor_cuda.cpp) reads a NanoVDB grid from a file (the one saved in the first example) and prints out multiple values on both the CPU and GPU. Note that **this example does NOT depend on OpenVDB, only NanoVDB and CUDA**.
+[The third example](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor_cuda/read_nanovdb_sphere_accessor_cuda.cc) reads a NanoVDB grid from a file (the one saved in the first example) and prints out multiple values on both the CPU and GPU. Note that **this example does NOT depend on OpenVDB, only NanoVDB and CUDA**.
 
 ```cpp
 #include <nanovdb/util/IO.h> // this is required to read (and write) NanoVDB files on the host
@@ -115,7 +115,7 @@ int main()
 }
 ```
 
-NVCC requires the CUDA kernel to be defined in [a separate .cu file](../examples/ex_read_nanovdb_sphere_accessor_cuda/read_nanovdb_sphere_accessor_cuda.cu):
+NVCC requires the CUDA kernel to be defined in [a separate .cu file](https://github.com/AcademySoftwareFoundation/openvdb/blob/master/nanovdb/nanovdb/examples/ex_read_nanovdb_sphere_accessor_cuda/read_nanovdb_sphere_accessor_cuda.cu):
 
 ```cpp
 #include <nanovdb/NanoVDB.h> // this defined the core tree data structure of NanoVDB accessable on both the host and device
@@ -152,6 +152,3 @@ extern "C" void launch_kernels(const nanovdb::NanoGrid<float>* deviceGrid,
     cpu_kernel(cpuGrid);
 }
 ```
-
-### Copyright Contributors to the OpenVDB Project
-### SPDX-License-Identifier: MPL-2.0
