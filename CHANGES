@@ -1,6 +1,11 @@
 OpenVDB Version History
 =======================
 
+Version 9.0.1 - In development
+
+    Bug Fixes:
+    - Fixed a range bug in tools/LevelSetSphere. [Contributed by Tommy Hinks]
+
 Version 9.0.0 - October 29, 2021
 
     New features:
