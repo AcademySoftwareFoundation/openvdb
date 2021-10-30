@@ -17,19 +17,21 @@ preserve ABI compatibility it might be necessary to define the macro
 @par
 <BLOCKQUOTE>
 Official release of NanoVDB, which for the first time offers GPU support for
-static sparse volumes in OpenVDB.
+static sparse volumes in OpenVDB. See the
+<A HREF="https://academysoftwarefoundation.github.io/openvdb/NanoVDB_MainPage.html">documentation</A>
+for details.
 </BLOCKQUOTE>
 
 @par
 New features:
 - NanoVDB, which for the first time offers GPU support for static sparse volumes
   in OpenVDB.
-- Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
-  tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
-  multi-threaded counting. The Tree methods now use these implementations.
 
 @par
 Improvements:
+- Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
+  tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
+  multi-threaded counting. The Tree methods now use these implementations.
 - Moved from the deprecated TBB task scheduler to TBB arenas. Various
   methods now respect the TBB arena state they were invoked from.
 - Introduced a new thread/Threading.h header to consolidate calls to
