@@ -417,10 +417,10 @@ inline HostBuffer& HostBuffer::operator=(HostBuffer&& other)
     mPool = other.mPool;
     mSize = other.mSize;
     mData = other.mData;
-    if (mPool) {
+    if (mPool && mSize != 0) {
         mPool->replace(&other, this);
-        other.mPool.reset();
     }
+    other.mPool.reset();
     other.mSize = 0;
     other.mData = nullptr;
     return *this;
