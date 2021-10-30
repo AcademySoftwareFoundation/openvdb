@@ -22,15 +22,18 @@ static sparse volumes in OpenVDB. See the
 for details.
 </BLOCKQUOTE>
 
+@par
 <BLOCKQUOTE>
 Faster build times from support for explicit template instantiation,
 which is enabled by default for most of the tools.
 </BLOCKQUOTE>
 
+@par
 <BLOCKQUOTE>
 Added support for OpenEXR 3. This is contributed by Cary Phillips.
 </BLOCKQUOTE>
 
+@par
 <BLOCKQUOTE>
 Added transient data to the RootNode, InternalNode, and LeafNode.
 </BLOCKQUOTE>
