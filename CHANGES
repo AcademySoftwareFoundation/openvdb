@@ -21,10 +21,10 @@ Version 9.0.0 - October 29, 2021
       hue, saturation and value inputs to RGB values and vice-versa.
     - PointDataGrid conversion can now be performed using 32-bit float arrays.
     - Improved support for size_t grid types on systems where size_t is a
-      unique type
+      unique type.
       [Contributed by Brecht Van Lommel]
     - Add support for dilation in one direction and extending a field in one
-      direction
+      direction in fast sweeping algorithms.
     - Added PNG support to vdb_render which can be enabled with during CMake
       with -DUSE_PNG=ON.
     - Explicit template instantiation has been enabled by default for most of
@@ -39,7 +39,7 @@ Version 9.0.0 - October 29, 2021
       statement.
 
     ABI changes:
-    - Added transient data to the RootNode, InternalNode and LeafNode.
+    - Added transient data to the RootNode, InternalNode, and LeafNode.
 
     API changes:
     - DynamicNodeManager can now set one grain size for threading across leaf nodes
@@ -61,7 +61,7 @@ Version 9.0.0 - October 29, 2021
     - The label for Voxels to Expand is now Expand Voxels to match Houdini.
     - Fix bug to allow VDB LOD SOPs to be chained together.
     - SOP Extrapolate supports dilation in one direction and extending a field
-      in one (domain) direction
+      in one (domain) direction.
     - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
     - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
       color remapping.
@@ -80,21 +80,21 @@ Version 9.0.0 - October 29, 2021
       generated doxygen.
     - Improved the doxygen deprecation listings, folder layouts and fixes
       issues when using later versions of doxygen.
-    - Build fixes for MinGW on Windows
+    - Build fixes for MinGW on Windows.
       [Contributed by Brecht Sanders]
-    - Added support for OpenEXR 3
+    - Added support for OpenEXR 3.
       [Contributed by Cary Phillips]
     - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides
       the ability to customise the VDB namespace.
     - The Python Module now appends the base directory defined by
       Python_SITELIB to the default install path (typically dist-packages
-      or site-packages)
+      or site-packages).
       [Contributed by Ignacio Vizzo]
     - As of this release, VFX Reference Platform 2019 is no longer supported.
       CMake now issues deprecation warnings for 2020 VFX Reference Platform
       version dependencies.
-    - Build fixes for OpenVDB AX with C++17 and greater
-    - Bumped the new blosc version future minimum to 1.17.0
+    - Build fixes for OpenVDB AX with C++17 and greater.
+    - Bumped the new blosc version future minimum to 1.17.0.
     - OpenEXR is now optional for vdb_render. It can be enabled with
       -DUSE_EXR=ON.
 
