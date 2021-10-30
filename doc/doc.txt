@@ -58,6 +58,7 @@ See @subpage NanoVDB_MainPage "NanoVDB" for the NanoVDB documentation.
 Contributors, please familiarize yourselves with our
 @subpage codingStyle "coding standards".
 
+<a href="../code_coverage/index.html">Code Coverage</a>
 
 
 @page overview OpenVDB Overview
