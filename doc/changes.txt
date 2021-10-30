@@ -58,7 +58,7 @@ Improvements:
   type.
   [Contributed by Brecht Van Lommel]
 - Add support for dilation in one direction and extending a field in one
-  direction.
+  direction in fast sweeping algorithms.
 - Added PNG support to vdb_render which can be enabled with during CMake with
   -DUSE_PNG=ON.
 - Explicit template instantiation has been enabled by default for most of the
@@ -157,7 +157,7 @@ Improvements:
   hue, saturation and value inputs to RGB values and vice-versa.
 - PointDataGrid conversion can now be performed using 32-bit float arrays.
 - Improved support for size_t grid types on systems where size_t is a unique
-  type
+  type.
   [Contributed by Brecht Van Lommel]
 - Add support for dilation in one direction and extending a field in one
   direction in fast sweeping algorithms.
@@ -196,14 +196,14 @@ Build:
   generated doxygen.
 - Improved the doxygen deprecation listings, folder layouts and fixes
   issues when using later versions of doxygen.
-- Build fixes for MinGW on Windows
+- Build fixes for MinGW on Windows.
   [Contributed by Brecht Sanders]
-- Added support for OpenEXR 3
+- Added support for OpenEXR 3.
   [Contributed by Cary Phillips]
 - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides the
   ability to customise the VDB namespace.
 - The Python Module now appends the base directory defined by Python_SITELIB
-  to the default install path (typically dist-packages or site-packages)
+  to the default install path (typically dist-packages or site-packages).
   [Contributed by Ignacio Vizzo]
 
 
