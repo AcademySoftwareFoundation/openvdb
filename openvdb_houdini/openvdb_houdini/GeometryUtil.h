@@ -11,6 +11,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/MeshToVolume.h> // for openvdb::tools::MeshToVoxelEdgeData
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h> // for openvdb::util::COORD_OFFSETS
 
 #include <GU/GU_Detail.h>
@@ -75,7 +76,13 @@ pointInPrimGroup(GA_Offset ptnOffset, GU_Detail&, const GA_PrimitiveGroup&);
 /// converted or subdivided, otherwise a null pointer
 OPENVDB_HOUDINI_API
 std::unique_ptr<GU_Detail>
-convertGeometry(const GU_Detail&, std::string& warning, Interrupter*);
+convertGeometry(const GU_Detail&, std::string& warning, openvdb::util::NullInterrupter*);
+
+
+OPENVDB_DEPRECATED_MESSAGE("openvdb_houdini::Interrupter has been deprecated, use openvdb_houdini::HoudiniInterrupter")
+OPENVDB_HOUDINI_API
+std::unique_ptr<GU_Detail>
+convertGeometry(const GU_Detail& detail, std::string& warning, Interrupter* boss);
 
 
 ////////////////////////////////////////

@@ -182,7 +182,7 @@ inline FunctionGroup::UniquePtr axeditgroup(const FunctionOptions& op)
             codegen_internal::PointLeafLocalData* const leafData =
                 static_cast<codegen_internal::PointLeafLocalData*>(leafDataPtr);
 
-            // If we are setting membership and the handle doesnt exist, create in in
+            // If we are setting membership and the handle doesn't exist, create in in
             // the set of new data thats being added
             if (!flag && !leafData->hasGroup(nameStr)) return;
             handle = leafData->getOrInsert(nameStr);

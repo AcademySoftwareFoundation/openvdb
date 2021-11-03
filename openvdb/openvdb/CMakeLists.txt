@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -136,12 +136,17 @@ if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_TBB_VERSION)
 endif()
 
 if(USE_IMATH_HALF)
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
-  if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
-    if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
-      message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
-        "is deprecated and will be removed.")
+  find_package(Imath CONFIG)
+  if (NOT TARGET Imath::Imath)
+    find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
+      if(${IlmBase_VERSION} VERSION_LESS FUTURE_MINIMUM_ILMBASE_VERSION)
+        message(DEPRECATION "Support for IlmBase versions < ${FUTURE_MINIMUM_ILMBASE_VERSION} "
+          "is deprecated and will be removed.")
+      endif()
     endif()
+  else()
+    message(STATUS "Found Imath ${Imath_VERSION}")
   endif()
 endif()
 
@@ -153,12 +158,24 @@ endif()
 if(USE_BLOSC)
   # Find Blosc libraries
   find_package(Blosc ${MINIMUM_BLOSC_VERSION} REQUIRED)
-  if(Blosc_FOUND AND Blosc_VERSION VERSION_GREATER MINIMUM_BLOSC_VERSION)
-    message(WARNING "The version of Blosc located is greater than ${MINIMUM_BLOSC_VERSION}. "
-      "There have been reported issues with using later versions of Blosc with OpenVDB. "
-      "OpenVDB has been tested fully against Blosc ${MINIMUM_BLOSC_VERSION}, it is "
-      "recommended that you use this version where possible."
-    )
+  if(Blosc_VERSION)
+    if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BLOSC_VERSION)
+      if(${Blosc_VERSION} VERSION_LESS FUTURE_MINIMUM_BLOSC_VERSION)
+        message(DEPRECATION "Support for Blosc versions < ${FUTURE_MINIMUM_BLOSC_VERSION} "
+          "is deprecated and will be removed.")
+      endif()
+    endif()
+    # Print a warning if using of the blosc versions with regression issues
+    # with Blosc 1.5.0 caches.
+    if((Blosc_VERSION VERSION_GREATER_EQUAL 1.11.0 AND
+        Blosc_VERSION VERSION_LESS 1.14.0) OR
+       (Blosc_VERSION VERSION_GREATER_EQUAL 1.16.0 AND
+        Blosc_VERSION VERSION_LESS 1.16.2))
+      message(WARNING "The following Blosc versions are incompatible with the "
+        "recommended builds of OpenVDB: [1.11.0 -> 1.14.0) [1.16.0, 1.16.1]. "
+        "Found Blosc version '${Blosc_VERSION}' which falls in this range. We "
+        "strongly recommend using the new future minimum version '${FUTURE_MINIMUM_BLOSC_VERSION}'")
+    endif()
   endif()
 else()
   message(WARNING "Blosc support is disabled. It is strongly recommended to "
@@ -195,7 +212,8 @@ endif()
 set(OPENVDB_CORE_DEPENDENT_LIBS "")
 
 if(USE_IMATH_HALF)
-  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS IlmBase::Half)
+  list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
+    $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)
 endif()
 
 # We then choose to pull in TBB. If building aganst Houdini, TBB should
@@ -264,11 +282,73 @@ if(USE_ZLIB)
     set(OPENVDB_USE_BLOSC 1)
   endif()
 endif()
+if(USE_EXPLICIT_INSTANTIATION)
+  set(OPENVDB_USE_EXPLICIT_INSTANTIATION 1)
+endif()
 
 # Configure VDB version in the form: ("%02x%02x%04x", major, minor, patch)
 math(EXPR OPENVDB_PACKED_VERSION "${OpenVDB_MAJOR_VERSION} << 24")
 math(EXPR OPENVDB_PACKED_VERSION "${OPENVDB_PACKED_VERSION} | ((${OpenVDB_MINOR_VERSION} & 0xFF) << 16)")
 math(EXPR OPENVDB_PACKED_VERSION "${OPENVDB_PACKED_VERSION} | (${OpenVDB_PATCH_VERSION} & 0xFFFF)")
+
+if(Imath_VERSION)
+  set(OPENVDB_IMATH_VERSION ${Imath_VERSION})
+endif()
+
+# Configure explicit instantiation trees and extern template declarations
+if(USE_EXPLICIT_INSTANTIATION)
+  # Define the list of OpenVDB trees for which to use explicit instantiation
+  # @note The tree definition is expected to be available when including openvdb/openvdb.h
+
+  set(OPENVDB_LIBRARY_INSTANTIATION_REAL_TREES
+    FloatTree
+    DoubleTree
+  )
+
+  set(OPENVDB_LIBRARY_INSTANTIATION_NUMERIC_TREES
+    Int32Tree
+    Int64Tree
+    ${OPENVDB_LIBRARY_INSTANTIATION_REAL_TREES}
+  )
+
+  set(OPENVDB_LIBRARY_INSTANTIATION_VEC3_TREES
+    Vec3STree
+    Vec3DTree
+    Vec3ITree
+  )
+
+  set(OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES
+    BoolTree
+    ${OPENVDB_LIBRARY_INSTANTIATION_NUMERIC_TREES}
+    ${OPENVDB_LIBRARY_INSTANTIATION_VEC3_TREES}
+  )
+
+  set(OPENVDB_LIBRARY_INSTANTIATION_ALL_TREES
+    MaskTree
+    points::PointDataTree
+    ${OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES}
+  )
+
+  # Write all the template instantiations into strings to inject into version.h
+  # The "Function" itself is an argument provided by the OPENVDB_*_TREE_INSTANTIATE macros
+
+  set(TEMPLATE_STR " \\\n    OPENVDB_INSTANTIATE Function")
+  foreach(TREE ${OPENVDB_LIBRARY_INSTANTIATION_ALL_TREES})
+    if(${TREE} IN_LIST OPENVDB_LIBRARY_INSTANTIATION_REAL_TREES)
+      string(APPEND OPENVDB_REAL_TREE_INSTANTIATIONS "${TEMPLATE_STR}(${TREE});")
+    endif()
+    if(${TREE} IN_LIST OPENVDB_LIBRARY_INSTANTIATION_NUMERIC_TREES)
+      string(APPEND OPENVDB_NUMERIC_TREE_INSTANTIATIONS "${TEMPLATE_STR}(${TREE});")
+    endif()
+    if(${TREE} IN_LIST OPENVDB_LIBRARY_INSTANTIATION_VEC3_TREES)
+      string(APPEND OPENVDB_VEC3_TREE_INSTANTIATIONS "${TEMPLATE_STR}(${TREE});")
+    endif()
+    if(${TREE} IN_LIST OPENVDB_LIBRARY_INSTANTIATION_VOLUME_TREES)
+      string(APPEND OPENVDB_VOLUME_TREE_INSTANTIATIONS "${TEMPLATE_STR}(${TREE});")
+    endif()
+    string(APPEND OPENVDB_ALL_TREE_INSTANTIATIONS "${TEMPLATE_STR}(${TREE});")
+  endforeach()
+endif()
 
 configure_file(version.h.in openvdb/version.h)
 
@@ -449,6 +529,7 @@ set(OPENVDB_LIBRARY_TREE_INCLUDE_FILES
 
 set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
   util/CpuTimer.h
+  util/ExplicitInstantiation.h
   util/Formats.h
   util/logging.h
   util/MapsUtil.h
@@ -462,6 +543,47 @@ set(OPENVDB_LIBRARY_UTIL_INCLUDE_FILES
 set(OPENVDB_LIBRARY_THREAD_INCLUDE_FILES
   thread/Threading.h
 )
+
+##########################################################################
+
+# Configure auto-generation of explicit template definition translation units
+
+if(USE_EXPLICIT_INSTANTIATION)
+  # Define the list of headers for which to generate new translation units.
+  # Not all the tools headers have instantiations currently, but they are
+  # inexpensive to generate in this case.
+  set(OPENVDB_LIBRARY_INSTANTIATION_HEADERS
+    ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES}
+  )
+
+  # A new source file is generated by CMake for every header
+  # into a new instantiations subdir.
+  file(MAKE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}/instantiations)
+  foreach(HEADER ${OPENVDB_LIBRARY_INSTANTIATION_HEADERS})
+    # String replace to extract the name from the header filepath
+    # "tools/Activate.h" => "Activate"
+    string(REGEX REPLACE "^.*/(.*).h" "\\1" NAME ${HEADER})
+
+    # Make name upper case "Activate" => "ACTIVATE"
+    string(TOUPPER ${NAME} UPPER_NAME)
+
+    # Define the source file location - "<binary_dir>/instantiations/Activate.cc"
+    set(INSTANTIATE_SOURCE "${CMAKE_CURRENT_BINARY_DIR}/instantiations/${NAME}.cc")
+
+    # The auto-generated file holds the instantiate define and the header
+    # which contains all the functions to be explicitly instantiated.
+    file(WRITE ${INSTANTIATE_SOURCE}
+      "#define OPENVDB_INSTANTIATE_${UPPER_NAME}\n"
+      "#include <openvdb/${HEADER}>\n"
+    )
+
+    # Add to the list of library source files
+    # (prepend as instantiations tend to be slow to compile).
+    list(PREPEND OPENVDB_LIBRARY_SOURCE_FILES ${INSTANTIATE_SOURCE})
+  endforeach()
+endif()
+
+##########################################################################
 
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
 # builds. There are limitations with earlier versions of CMake when used with
@@ -496,7 +618,7 @@ list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 if(WIN32)
   if(USE_IMATH_HALF)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
-    if(ILMBASE_USE_STATIC_LIBS OR (${ILMBASE_Half_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+    if(ILMBASE_USE_STATIC_LIBS OR ("${ILMBASE_Half_LIB_TYPE}" STREQUAL STATIC))
       list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -DOPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()
@@ -534,7 +656,8 @@ if(OPENVDB_CORE_STATIC)
       # also add it explicitly as a compile option
       set_target_properties(openvdb_static PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
-      target_compile_options(openvdb_static PUBLIC "/MT$<$<CONFIG:Debug>:d>")
+      target_compile_options(openvdb_static PUBLIC
+        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MT$<$<CONFIG:Debug>:d>>")
     endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
@@ -569,7 +692,8 @@ if(OPENVDB_CORE_SHARED)
       # also add it explicitly as a compile option
       set_target_properties(openvdb_shared PROPERTIES
         MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>DLL")
-      target_compile_options(openvdb_shared PUBLIC "/MD$<$<CONFIG:Debug>:d>")
+      target_compile_options(openvdb_shared PUBLIC
+        "$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MD$<$<CONFIG:Debug>:d>>")
     endif()
   endif()
 endif()

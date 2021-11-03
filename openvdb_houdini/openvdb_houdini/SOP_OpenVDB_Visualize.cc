@@ -686,7 +686,7 @@ struct TreeParms
 class TreeVisualizer
 {
 public:
-    TreeVisualizer(GU_Detail&, const TreeParms&, hvdb::Interrupter* = nullptr);
+    TreeVisualizer(GU_Detail&, const TreeParms&, openvdb::util::NullInterrupter* = nullptr);
 
     // create all the point attributes
     template<typename GridType>
@@ -733,7 +733,7 @@ private:
     std::vector<std::unique_ptr<size_t[]>> mVertexOffsets;
     std::vector<std::unique_ptr<size_t[]>> mPolygonOffsets;
     GU_Detail* mGeo;
-    hvdb::Interrupter* mInterrupter;
+    openvdb::util::NullInterrupter* mInterrupter;
     const openvdb::math::Transform* mXform;
     GA_RWHandleF  mFloatHandle;
     GA_RWHandleI  mInt32Handle;
@@ -808,7 +808,7 @@ bool isIterValid(const IterT& iter, const SlicePlane& slicePlane, openvdb::Int32
 
 
 TreeVisualizer::TreeVisualizer(GU_Detail& geo, const TreeParms& parms,
-    hvdb::Interrupter* interrupter)
+    openvdb::util::NullInterrupter* interrupter)
     : mParms(parms)
     , mGeo(&geo)
     , mInterrupter(interrupter)
@@ -2003,7 +2003,7 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Visualizing VDBs");
+        hvdb::HoudiniInterrupter boss("Visualizing VDBs");
 
         const GU_Detail* refGdp = inputGeo(0);
         if (refGdp == nullptr) return error();
@@ -2081,7 +2081,7 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
 
                 // draw tree topology
                 if (drawTree) {
-                    TreeVisualizer draw(*gdp, treeParms, &boss);
+                    TreeVisualizer draw(*gdp, treeParms, &boss.interrupter());
                     hvdb::GEOvdbApply<hvdb::AllGridTypes>(*vdb, draw);
                 }
 

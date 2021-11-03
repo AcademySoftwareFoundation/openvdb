@@ -14,6 +14,7 @@
 #include <openvdb/math/Math.h> // for isNegative and negative
 #include <openvdb/Types.h> // for Index typedef
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/openvdb.h>
 
 
 namespace openvdb {
@@ -33,7 +34,7 @@ namespace tools {
 /// @param threaded      enable or disable threading  (threading is enabled by default)
 /// @param grainSize     used to control the threading granularity (default is 32)
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& background,
@@ -59,7 +60,7 @@ changeBackground(
 ///
 /// @throw ValueError if @a halfWidth is negative (as defined by math::isNegative)
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeLevelSetBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& halfWidth,
@@ -87,7 +88,7 @@ changeLevelSetBackground(
 /// @throw ValueError if @a outsideWidth is negative or @a insideWidth is
 /// not negative (as defined by math::isNegative)
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeAsymmetricLevelSetBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& outsideWidth,
@@ -199,7 +200,7 @@ private:
 
 
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& background,
@@ -213,7 +214,7 @@ changeBackground(
 
 
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeAsymmetricLevelSetBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& outsideValue,
@@ -229,7 +230,7 @@ changeAsymmetricLevelSetBackground(
 
 // If the narrow-band is symmetric only one background value is required
 template<typename TreeOrLeafManagerT>
-inline void
+void
 changeLevelSetBackground(
     TreeOrLeafManagerT& tree,
     const typename TreeOrLeafManagerT::ValueType& background,
@@ -239,6 +240,51 @@ changeLevelSetBackground(
     changeAsymmetricLevelSetBackground(
         tree, background, math::negative(background), threaded, grainSize);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_CHANGEBACKGROUND
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void changeBackground(TreeT&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void changeBackground(tree::LeafManager<TreeT>&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void changeLevelSetBackground(TreeT&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void changeLevelSetBackground(tree::LeafManager<TreeT>&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void changeAsymmetricLevelSetBackground(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void changeAsymmetricLevelSetBackground(tree::LeafManager<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, bool, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

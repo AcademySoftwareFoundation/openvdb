@@ -26,6 +26,7 @@
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
 #include <openvdb/Types.h>
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/openvdb.h>
 
 #include "Count.h" // tools::countActiveVoxels()
 
@@ -55,7 +56,7 @@ struct TileData;
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
 template<typename TreeT>
-inline bool
+bool
 anyActiveValues(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Returns true if the bounding box intersects any of the active
@@ -71,7 +72,7 @@ anyActiveValues(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active voxels.
 /// @param bbox   index bounding box which is intersected against the active voxels.
 template<typename TreeT>
-inline bool
+bool
 anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Returns true if the bounding box intersects any of the active
@@ -84,7 +85,7 @@ anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active tiles.
 /// @param bbox   index bounding box which is intersected against the active tiles.
 template<typename TreeT>
-inline bool
+bool
 anyActiveTiles(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Returns true if the bounding box intersects none of the active
@@ -97,7 +98,7 @@ anyActiveTiles(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
 template<typename TreeT>
-inline bool
+bool
 noActiveValues(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Returns the number of active values that intersects a bounding box intersects,
@@ -110,7 +111,7 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active values.
 /// @param bbox   index bounding box which is intersected against the active values.
 template<typename TreeT>
-inline Index64
+Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox);
 
 /// @brief Return a vector with bounding boxes that represents all the intersections
@@ -123,7 +124,7 @@ countActiveValues(const TreeT& tree, const CoordBBox &bbox);
 /// @param tree   const tree to be tested for active tiles.
 /// @param bbox   index bounding box which is intersected against the active tiles.
 template<typename TreeT>
-inline std::vector<TileData<typename TreeT::ValueType>>
+std::vector<TileData<typename TreeT::ValueType>>
 activeTiles(const TreeT& tree, const CoordBBox &bbox);
 
 //////////////////////////////////////////////////////////////////////////////////////////
@@ -224,7 +225,7 @@ private:
 
     AccT mAcc;
     std::vector<TileDataT> mRootTiles;// cache bbox of child nodes (faster to cache than access RootNode)
-    std::vector<RootChild> mRootNodes;// cache bbox of acive tiles (faster to cache than access RootNode)
+    std::vector<RootChild> mRootNodes;// cache bbox of active tiles (faster to cache than access RootNode)
 
 };// FindActiveValues class
 
@@ -619,7 +620,7 @@ struct TileData
     /// @brief Constructor from a parent node and the linear offset to one of its tiles
     ///
     /// @warning This is an expert-only method since it assumes the linear offset to be valid,
-    ///          i.e. within the rand of the dimention of the parent node and NOT corresponding
+    ///          i.e. within the rand of the dimension of the parent node and NOT corresponding
     ///          to a child node.
     template <typename ParentNodeT>
     TileData(const ParentNodeT &parent, Index childIdx)
@@ -649,7 +650,7 @@ struct TileData
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline bool
+bool
 anyActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
@@ -658,7 +659,7 @@ anyActiveValues(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline bool
+bool
 anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
@@ -667,7 +668,7 @@ anyActiveVoxels(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline bool
+bool
 anyActiveTiles(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
@@ -676,7 +677,7 @@ anyActiveTiles(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline bool
+bool
 noActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
@@ -685,7 +686,7 @@ noActiveValues(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline Index64
+Index64
 countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 {
     return tools::countActiveVoxels(tree, bbox);
@@ -693,12 +694,57 @@ countActiveValues(const TreeT& tree, const CoordBBox &bbox)
 
 // Implementation of stand-alone function
 template<typename TreeT>
-inline std::vector<TileData<typename TreeT::ValueType>>
+std::vector<TileData<typename TreeT::ValueType>>
 activeTiles(const TreeT& tree, const CoordBBox &bbox)
 {
     FindActiveValues<TreeT> op(tree);
     return op.activeTiles(bbox);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_FINDACTIVEVALUES
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    bool anyActiveValues(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    bool anyActiveVoxels(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    bool anyActiveTiles(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    bool noActiveValues(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Index64 countActiveValues(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    std::vector<TileData<TreeT::ValueType>> activeTiles(const TreeT&, const CoordBBox&)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

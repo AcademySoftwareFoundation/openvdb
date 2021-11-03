@@ -1,7 +1,104 @@
 OpenVDB Version History
 =======================
 
-Version 8.1.1 - In development
+Version 9.0.0 - October 29, 2021
+
+    New features:
+    - NanoVDB, which for the first time offers GPU support for static sparse
+      volumes in OpenVDB.
+
+    Improvements:
+    - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
+      tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
+      multi-threaded counting. The Tree methods now use these implementations.
+    - Moved from the deprecated TBB task scheduler to TBB arenas. Various
+      methods now respect the TBB arena state they were invoked from.
+    - Introduced a new thread/Threading.h header to consolidate calls to
+      third-party threading methods.
+    - Minor performance improvements to dilation calls in fast sweeping
+      algorithms.
+    - Added hsvtogrb() and rgbtohsv() AX helper functions for converting
+      hue, saturation and value inputs to RGB values and vice-versa.
+    - PointDataGrid conversion can now be performed using 32-bit float arrays.
+    - Improved support for size_t grid types on systems where size_t is a
+      unique type.
+      [Contributed by Brecht Van Lommel]
+    - Add support for dilation in one direction and extending a field in one
+      direction in fast sweeping algorithms.
+    - Added PNG support to vdb_render which can be enabled with during CMake
+      with -DUSE_PNG=ON.
+    - Explicit template instantiation has been enabled by default for most of
+      the tools. This pre-compiles template instantiations into the core library
+      to reduce the time spent compiling code in downstream libraries or
+      applications.
+    - Added a python binding for OpenVDB AX which allows you to invoke accelerated
+      AX code from the python module.
+
+    Bug Fixes:
+    - Fixed a bug where ax::run() would crash if it could not parse a single
+      statement.
+
+    ABI changes:
+    - Added transient data to the RootNode, InternalNode, and LeafNode.
+
+    API changes:
+    - DynamicNodeManager can now set one grain size for threading across leaf nodes
+      and another for threading across non-leaf nodes.
+    - StringGrid and StringTrees are deprecated.
+    - The NullInterrupter is now a virtual base class to help reduce
+      compile-time instantiation cost.
+
+    Houdini:
+    - Fix crash in VDB Combine in Copy B mode if the second input has
+      more VDBs than the first.
+    - VDB Vector Merge SOP is now VDB Vector From Scalar SOP to distinguish
+      it from the VDB Merge SOP. It keeps the same internal name so this
+      is merely a label change.
+    - Add option to pass in OPENVDB_DSO_NAMES to CMake to configure which
+      Houdini DSOs are compiled.
+    - VDB Activate SOP now has an option for the expansion pattern to use
+      for dilation.
+    - The label for Voxels to Expand is now Expand Voxels to match Houdini.
+    - Fix bug to allow VDB LOD SOPs to be chained together.
+    - SOP Extrapolate supports dilation in one direction and extending a field
+      in one (domain) direction.
+    - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
+    - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
+      color remapping.
+    - A new HoudiniInterrupter has been added that derives from the
+      NullInterrupter and the Interrupter is now deprecated. All the SOPs have
+      been updated to use the new HoudiniInterrupter.
+    - Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band
+      level-set with a dilation value of 0, which will result in no operation.
+
+    Build:
+    - Added support for TBB 2021.
+    - Enabled the OPENVDB_FUTURE_DEPRECATION variable by default to warn on
+      upcoming deprecations.
+    - Introduced a OPENVDB_DOXYGEN_INTERNAL CMake variable which is ON by
+      default and removes the majority of internal namespaces from the
+      generated doxygen.
+    - Improved the doxygen deprecation listings, folder layouts and fixes
+      issues when using later versions of doxygen.
+    - Build fixes for MinGW on Windows.
+      [Contributed by Brecht Sanders]
+    - Added support for OpenEXR 3.
+      [Contributed by Cary Phillips]
+    - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides
+      the ability to customise the VDB namespace.
+    - The Python Module now appends the base directory defined by
+      Python_SITELIB to the default install path (typically dist-packages
+      or site-packages).
+      [Contributed by Ignacio Vizzo]
+    - As of this release, VFX Reference Platform 2019 is no longer supported.
+      CMake now issues deprecation warnings for 2020 VFX Reference Platform
+      version dependencies.
+    - Build fixes for OpenVDB AX with C++17 and greater.
+    - Bumped the new blosc version future minimum to 1.17.0.
+    - OpenEXR is now optional for vdb_render. It can be enabled with
+      -DUSE_EXR=ON.
+
+Version 8.2.0 - In development
 
     New features:
     - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
@@ -19,8 +116,12 @@ Version 8.1.1 - In development
       hue, saturation and value inputs to RGB values and vice-versa.
     - PointDataGrid conversion can now be performed using 32-bit float arrays.
     - Improved support for size_t grid types on systems where size_t is a
-      unique type
+      unique type.
       [Contributed by Brecht Van Lommel]
+    - Minor performance improvements to dilation calls in fast sweeping
+      algorithms.
+    - Add support for dilation in one direction and extending a field in one
+      direction in fast sweeping algorithms.
 
     API changes:
     - DynamicNodeManager can now set one grain size for threading across leaf nodes
@@ -38,6 +139,11 @@ Version 8.1.1 - In development
       for dilation.
     - The label for Voxels to Expand is now Expand Voxels to match Houdini.
     - Fix bug to allow VDB LOD SOPs to be chained together.
+    - SOP Extrapolate supports dilation in one direction and extending a field
+      in one (domain) direction.
+    - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
+    - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
+      color remapping.
 
     Build:
     - Added support for TBB 2021.
@@ -48,8 +154,16 @@ Version 8.1.1 - In development
       generated doxygen.
     - Improved the doxygen deprecation listings, folder layouts and fixes
       issues when using later versions of doxygen.
-    - Build fixes for MinGW on Windows
+    - Build fixes for MinGW on Windows.
       [Contributed by Brecht Sanders]
+    - Added support for OpenEXR 3.
+      [Contributed by Cary Phillips]
+    - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides
+      the ability to customise the VDB namespace.
+    - The Python Module now appends the base directory defined by
+      Python_SITELIB to the default install path (typically dist-packages
+      or site-packages).
+      [Contributed by Ignacio Vizzo]
 
 
 Version 8.1.0 - June 11, 2021

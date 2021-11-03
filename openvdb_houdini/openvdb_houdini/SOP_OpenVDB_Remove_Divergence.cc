@@ -266,7 +266,7 @@ struct SolverParms {
     int iterations;
     double absoluteError;
     openvdb::math::pcg::State outputState;
-    hvdb::Interrupter* interrupter;
+    openvdb::util::NullInterrupter* interrupter;
 };
 
 
@@ -846,10 +846,10 @@ SOP_OpenVDB_Remove_Divergence::Cache::cookVDBSop(
 
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter interrupter("Removing divergence");
+        hvdb::HoudiniInterrupter interrupter("Removing divergence");
 
         SolverParms parms;
-        parms.interrupter = &interrupter;
+        parms.interrupter = &interrupter.interrupter();
         parms.iterations = (!evalInt("useiterations", 0, time) ?
             DEFAULT_MAX_ITERATIONS : static_cast<int>(evalInt("iterations", 0, time)));
         parms.absoluteError = (!evalInt("usetolerance", 0, time) ?

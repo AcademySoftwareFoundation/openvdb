@@ -60,7 +60,7 @@ struct Converter
     bool worldSpaceUnits;
     std::string outputName, customName;
 
-    Converter(GU_Detail& geo, hvdb::Interrupter& boss)
+    Converter(GU_Detail& geo, openvdb::util::NullInterrupter& boss)
         : bandWidthWorld(0)
         , bandWidthVoxels(3)
         , closingWidth(1)
@@ -94,7 +94,7 @@ struct Converter
 
 private:
     GU_Detail         * const mGeoPt;
-    hvdb::Interrupter * const mBossPt;
+    openvdb::util::NullInterrupter * const mBossPt;
 }; // struct Converter
 
 } // unnamed namespace
@@ -294,11 +294,11 @@ SOP_OpenVDB_Topology_To_Level_Set::Cache::cookVDBSop(
         const GU_Detail* inputGeoPt = inputGeo(0);
         if (inputGeoPt == nullptr) return error();
 
-        hvdb::Interrupter boss;
+        hvdb::HoudiniInterrupter boss;
 
         // Get UI settings
 
-        Converter converter(*gdp, boss);
+        Converter converter(*gdp, boss.interrupter());
         converter.worldSpaceUnits = evalInt("worldspaceunits", 0, time) != 0;
         converter.bandWidthWorld = float(evalFloat("bandwidthws", 0, time));
         converter.bandWidthVoxels = static_cast<int>(evalInt("bandwidth", 0, time));

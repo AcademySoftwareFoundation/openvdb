@@ -40,7 +40,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBHoudini LANGUAGES CXX)
 
 
@@ -214,15 +214,19 @@ if (OPENVDB_HOUDINI_OPHIDE_POLICY AND NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} STREQ
     "-DOPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_OPHIDE_POLICY}")
 endif()
 
-if(OPENVDB_DSO_NAMES)
-  set(OPENVDB_USE_CUSTOM_DSO_NAMES 1)
-  # if AX SOP is explicitly enabled, also switch on the build variable
-  if (SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+# If OPENVDB_BUILD_SOP_OpenVDB_AX has not been explicitly set,
+# see if we can enabled the OpenVDB AX SOP
+if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+  if(USE_AX)
     set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+  elseif(OPENVDB_DSO_NAMES)
+    if(SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+    endif()
   endif()
 endif()
 
-if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+if(NOT OPENVDB_DSO_NAMES)
   list(APPEND OPENVDB_DSO_NAMES
     GR_PrimVDBPoints
     SHOP_OpenVDB_Points
@@ -274,28 +278,9 @@ if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     SOP_OpenVDB_Vector_Split
     SOP_OpenVDB_Visualize
     SOP_OpenVDB_Write
-    VRAY_OpenVDB_Points
-  )
-endif()
+    VRAY_OpenVDB_Points)
 
-if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
-  # Check to see if the AX SOP has been manually disabled
-  if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
-    set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
-  endif()
-endif()
-
-if(OPENVDB_BUILD_SOP_OpenVDB_AX)
-  # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
-  # if OPENVDB_BUILD_CORE is ON, all deps must also be on
-  # openvdb and openvdb_houdini must be either both enabled or disabled.
-  # openvdb and openvdb_ax must be either both enabled or disabled.
-  if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
-    message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
-      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, all sub components must "
-      "be rebuilt for SOP_OpenVDB_AX.")
-  endif()
-  if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+  if(OPENVDB_BUILD_SOP_OpenVDB_AX)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
   endif()
 endif()

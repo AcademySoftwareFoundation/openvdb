@@ -110,7 +110,7 @@ public:
     /// layer at a time. Normally we recommend using the resize method below
     /// which internally calls dilate (or erode) with the correct
     /// number of @a iterations to achieve the desired half voxel width
-    /// of the narrow band (3 is recomended for most level set applications).
+    /// of the narrow band (3 is recommended for most level set applications).
     ///
     /// @note Since many level set applications perform
     /// interface-tracking, which in turn rebuilds the narrow-band
@@ -277,7 +277,7 @@ LevelSetTracker(GridT& grid, InterruptT* interrupt):
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 prune()
 {
@@ -300,7 +300,7 @@ prune()
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 track()
 {
@@ -315,7 +315,7 @@ track()
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 dilate(int iterations)
 {
@@ -337,7 +337,7 @@ dilate(int iterations)
 }
 
 template<typename GridT, typename InterruptT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 erode(int iterations)
 {
@@ -349,7 +349,7 @@ erode(int iterations)
 }
 
 template<typename GridT, typename InterruptT>
-inline bool
+bool
 LevelSetTracker<GridT, InterruptT>::
 resize(Index halfWidth)
 {
@@ -393,7 +393,7 @@ checkInterrupter()
 
 template<typename GridT, typename InterruptT>
 template<typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize(const MaskT* mask)
 {
@@ -416,7 +416,7 @@ normalize(const MaskT* mask)
 
 template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme, typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize1(const MaskT* mask)
 {
@@ -437,7 +437,7 @@ template<typename GridT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme,
          math::TemporalIntegrationScheme TemporalScheme,
          typename MaskT>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::
 normalize2(const MaskT* mask)
 {
@@ -451,7 +451,7 @@ normalize2(const MaskT* mask)
 
 template<typename GridT, typename InterruptT>
 template<lstrack::TrimMode Trimming>
-inline void
+void
 LevelSetTracker<GridT, InterruptT>::Trim<Trimming>::trim()
 {
     OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
@@ -674,6 +674,24 @@ euler(const LeafRange& range, Index phiBuffer, Index resultBuffer)
         }
     }//loop over leafs of the level set
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETTRACKER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS LevelSetTracker<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetTracker<DoubleGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

@@ -31,11 +31,11 @@ namespace hvdb = openvdb_houdini;
 namespace hutil = houdini_utils;
 
 
-class SOP_OpenVDB_Merge: public hvdb::SOP_NodeVDB
+class SOP_OpenVDB_Merge final : public hvdb::SOP_NodeVDB
 {
 public:
     SOP_OpenVDB_Merge(OP_Network*, const char* name, OP_Operator*);
-    ~SOP_OpenVDB_Merge() final {}
+    ~SOP_OpenVDB_Merge() {}
 
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
@@ -44,7 +44,7 @@ public:
     public:
         fpreal getTime() const { return mTime; }
     protected:
-        OP_ERROR cookVDBSop(OP_Context&) override final;
+        OP_ERROR cookVDBSop(OP_Context&) override;
     private:
         fpreal mTime = 0.0;
     };
@@ -293,14 +293,14 @@ struct MergeOp
     using StringRemapType = std::unordered_map<std::string, std::string>;
 
     SOP_OpenVDB_Merge::Cache* self;
-    hvdb::Interrupter& interrupt;
+    openvdb::util::NullInterrupter& interrupt;
     StringRemapType opRemap;
     std::deque<GU_PrimVDB*> vdbPrims;
     std::deque<const GU_PrimVDB*> constVdbPrims;
     std::deque<GU_PrimVDB*> vdbPrimsToRemove;
     PrimitiveNumberMap primNumbers;
 
-    explicit MergeOp(hvdb::Interrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
+    explicit MergeOp(openvdb::util::NullInterrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
 
     inline std::string getOp(const MergeKey& key) const
     {
@@ -626,9 +626,9 @@ SOP_OpenVDB_Merge::Cache::cookVDBSop(OP_Context& context)
         if (collation == "name")                    collationKey = MergeKey::NameClassType;
         else if (collation == "primitive_number")   collationKey = MergeKey::NumberClassType;
 
-        hvdb::Interrupter boss("Merging VDBs");
+        hvdb::HoudiniInterrupter boss("Merging VDBs");
 
-        MergeOp mergeOp(boss);
+        MergeOp mergeOp(boss.interrupter());
         mergeOp.self = this;
         mergeOp.opRemap["op_sdf"] = evalStdString("op_sdf", mTime);
         mergeOp.opRemap["op_fog"] = evalStdString("op_fog", mTime);

@@ -6,10 +6,11 @@
 The current OpenVDB maintainers are:
 
 
-| Name           | Email |
-| -------------- | -----------------
-| Jeff Lait | jlait@sidefx.com
-| Dan Bailey | danbailey@ilm.com
+| Name             | Email |
+| ---------------- | -----------------
+| Jeff Lait        | jlait@sidefx.com
+| Dan Bailey       | danbailey@ilm.com
 | Nick Avramoussis | navramoussis@wetafx.co.nz
-| Ken Museth | ken.museth@gmail.com
-| Andre Pradhana | andre.pradhana@dreamworks.com
+| Ken Museth       | ken.museth@gmail.com
+| Andre Pradhana   | andre.pradhana@dreamworks.com
+| Richard Jones    | rhj@dneg.com

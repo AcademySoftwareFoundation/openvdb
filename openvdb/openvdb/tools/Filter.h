@@ -220,17 +220,17 @@ struct Voxelizer
     using NodeManagerT = tree::NodeManager<TreeT, TreeT::RootNodeType::LEVEL-1>;
     using MaskT = typename TreeT::template ValueConverter<ValueMask>::Type;
 
-    Voxelizer(TreeT& tree, const bool allNeighbours, const size_t grainSize)
+    Voxelizer(TreeT& tree, const bool allNeighbors, const size_t grainSize)
         : mVoxelTopology()
         , mManager(nullptr)
         , mGrainSize(grainSize)
-        , mOp(tree, mVoxelTopology, allNeighbours ? 26 : 6) {}
+        , mOp(tree, mVoxelTopology, allNeighbors ? 26 : 6) {}
 
     /// @brief  Convert tiles to leaf nodes that exist at a particular
     ///         voxel distance away
     /// @param width  distance in voxels to seach for tiles from each leaf
     /// @return  Returns how many search iterations were performed, which
-    ///          also represents how many leaf node neighbours may have been
+    ///          also represents how many leaf node neighbors may have been
     ///          created. Returns 0 if the tree is already entirely voxelized
     int run(const int width)
     {
@@ -265,7 +265,7 @@ private:
         using RootT = typename TreeT::RootNodeType;
 
         CreateVoxelMask(TreeT& tree, MaskT& mask, const size_t NN)
-            : mTree(tree), mVoxelTopology(mask), mNeighbours(NN) {}
+            : mTree(tree), mVoxelTopology(mask), mNeighbors(NN) {}
 
         TreeT& tree() { return mTree; }
 
@@ -278,7 +278,7 @@ private:
             using ChildT = typename RootT::ChildNodeType;
             static constexpr Int32 CHILDDIM = Int32(ChildT::DIM);
             static constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
-            const Tester op(mTree, mNeighbours);
+            const Tester op(mTree, mNeighbors);
 
             auto step =
                 [&](const Coord& ijk,
@@ -371,7 +371,7 @@ private:
             /// lowest level internal node (which contains leaf nodes as children)
             /// each tile is at the leaf level (a single tile represents an 8x8x8
             /// node). CHILDDIM is this case will match the valid of LEAFDIM, as we
-            /// only need to check each tiles immediate neighbours. For higher level
+            /// only need to check each tiles immediate neighbors. For higher level
             /// internal nodes (and the root node) each child tile will have a
             /// significantly larger CHILDDIM than the grid's LEAFDIM. We
             /// consistently probe values along the LEAFDIM stride to ensure no
@@ -379,7 +379,7 @@ private:
 
             if (CHILDDIM == LEAFDIM) {
                 // If the current node is the parent of leaf nodes, search each
-                // neighbour directly and use a flag buffer to test offsets in
+                // neighbor directly and use a flag buffer to test offsets in
                 // this node which need converting to leaf level topology.
                 // This is faster than the more general method which steps across
                 // faces (unecessary due to CHILDDIM == LEAFDIM) and provides
@@ -388,10 +388,10 @@ private:
                 std::vector<char> flags(NodeT::NUM_VALUES, char(0));
                 tbb::parallel_for(tbb::blocked_range<size_t>(0, NodeT::NUM_VALUES),
                     [&](const tbb::blocked_range<size_t>& range) {
-                    const Tester op(mTree, mNeighbours);
+                    const Tester op(mTree, mNeighbors);
                     for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
                         if (node.isValueMaskOn(Index(n))) {
-                            // if index is a tile, search its neighbours
+                            // if index is a tile, search its neighbors
                             const Coord ijk = node.offsetToGlobalCoord(Index(n));
                             flags[n] = op.test(ijk, node.getValue(ijk));
                         }
@@ -406,7 +406,7 @@ private:
             }
             else {
                 // If this is a higher level internal node, we only need to search its
-                // face/edge/vertex neighbours for values which differ or leaf level
+                // face/edge/vertex neighbors for values which differ or leaf level
                 // topology. When a difference is detected, store the coordinate which
                 // needs to be voxelized.
                 // @todo investigate better threaded impl
@@ -415,7 +415,7 @@ private:
                 tbb::parallel_for(tbb::blocked_range<size_t>(0, NodeT::NUM_VALUES),
                     [&](const tbb::blocked_range<size_t>& range)
                 {
-                    const Tester op(mTree, mNeighbours);
+                    const Tester op(mTree, mNeighbors);
                     std::vector<Coord> coords;
 
                     for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
@@ -448,22 +448,22 @@ private:
         struct Tester
         {
             Tester(const TreeT& tree, const size_t NN)
-                : mAcc(tree), mNeighbours(NN) {}
+                : mAcc(tree), mNeighbors(NN) {}
 
             inline bool test(const Coord& ijk,
                 const typename TreeT::ValueType& val) const
             {
                 static constexpr Int32 LEAFDIM = Int32(LeafT::DIM);
                 const Coord* NN = util::COORD_OFFSETS;
-                for (size_t i = 0; i < mNeighbours; ++i, ++NN) {
-                    Coord neighbour(*NN);
-                    neighbour.x() *= LEAFDIM;
-                    neighbour.y() *= LEAFDIM;
-                    neighbour.z() *= LEAFDIM;
-                    neighbour += ijk;
+                for (size_t i = 0; i < mNeighbors; ++i, ++NN) {
+                    Coord neighbor(*NN);
+                    neighbor.x() *= LEAFDIM;
+                    neighbor.y() *= LEAFDIM;
+                    neighbor.z() *= LEAFDIM;
+                    neighbor += ijk;
                     // if a leaf exists, assume its buffer is not constant
-                    if (mAcc.getValue(neighbour) != val ||
-                        mAcc.probeConstLeaf(neighbour)) {
+                    if (mAcc.getValue(neighbor) != val ||
+                        mAcc.probeConstLeaf(neighbor)) {
                         return true;
                     }
                 }
@@ -471,13 +471,13 @@ private:
             }
         private:
             const tree::ValueAccessor<const TreeT> mAcc;
-            const size_t mNeighbours;
+            const size_t mNeighbors;
         };
 
     private:
         TreeT& mTree;
         MaskT& mVoxelTopology;
-        const size_t mNeighbours;
+        const size_t mNeighbors;
     };// CreateVoxelMask
 
 private:
@@ -518,7 +518,7 @@ Filter<GridT, MaskT, InterruptT>::Avg<Axis>::operator()(Coord xyz)
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -531,18 +531,18 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
     std::unique_ptr<filter_internal::Voxelizer<TreeType>> voxelizer;
     if (this->getProcessTiles()) {
         // if performing multiple iterations, also search edge/vertex
-        // neighbours for difference topology.
-        const bool allNeighbours = iterations > 1;
+        // neighbors for difference topology.
+        const bool allNeighbors = iterations > 1;
         // If processing tiles, create a voxelizer and run a single
         // width based search for tiles that need to be voxelized
         voxelizer.reset(new filter_internal::Voxelizer<TreeType>
-            (mGrid->tree(), allNeighbours, mGrainSize));
+            (mGrid->tree(), allNeighbors, mGrainSize));
         if (!voxelizer->run(w)) voxelizer.reset();
     }
 
     LeafManagerType leafs(mGrid->tree(), 1, serial);
 
-    int iter = 1; // num of leaf level neighbour based searches performed
+    int iter = 1; // num of leaf level neighbor based searches performed
     int dist = w; // kernel distance of the current iteration
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i, dist+=w) {
         if (i > 0 && voxelizer) {
@@ -572,7 +572,7 @@ Filter<GridT, MaskT, InterruptT>::mean(int width, int iterations, const MaskType
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -585,19 +585,19 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
     std::unique_ptr<filter_internal::Voxelizer<TreeType>> voxelizer;
     if (this->getProcessTiles()) {
         // if performing multiple iterations, also search edge/vertex
-        // neighbours for difference topology.
-        const bool allNeighbours = iterations > 1;
+        // neighbors for difference topology.
+        const bool allNeighbors = iterations > 1;
         // If processing tiles, create a voxelizer and run a single
         // width based search for tiles that need to be voxelized
         // @note  account for sub iteration due to gaussian filter
         voxelizer.reset(new filter_internal::Voxelizer<TreeType>
-            (mGrid->tree(), allNeighbours, mGrainSize));
+            (mGrid->tree(), allNeighbors, mGrainSize));
         if (!voxelizer->run(w*4)) voxelizer.reset();
     }
 
     LeafManagerType leafs(mGrid->tree(), 1, serial);
 
-    int iter = 1; // num of leaf level neighbour based searches performed
+    int iter = 1; // num of leaf level neighbor based searches performed
     int dist = w*4; // kernel distance of the current iteration
     for (int i=0; i<iterations; ++i, dist+=(w*4)) {
         if (i > 0 && voxelizer) {
@@ -629,7 +629,7 @@ Filter<GridT, MaskT, InterruptT>::gaussian(int width, int iterations, const Mask
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskType* mask)
 {
     if (iterations <= 0) return;
@@ -644,7 +644,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
         // If processing tiles, create a voxelizer and run a single
         // width based search for tiles that need to be voxelized
         voxelizer.reset(new filter_internal::Voxelizer<TreeType>
-            (mGrid->tree(), /*allNeighbours*/true, mGrainSize));
+            (mGrid->tree(), /*allNeighbors*/true, mGrainSize));
         if (!voxelizer->run(w)) voxelizer.reset();
     }
 
@@ -652,7 +652,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
     mTask = std::bind(&Filter::doMedian, std::placeholders::_1, std::placeholders::_2, w);
 
-    int iter = 1; // num of leaf level neighbour based searches performed
+    int iter = 1; // num of leaf level neighbor based searches performed
     int dist = w; // kernel distance of the current iteration
     for (int i=0; i<iterations && !this->wasInterrupted(); ++i, dist+=w) {
         if (i > 0 && voxelizer) {
@@ -675,7 +675,7 @@ Filter<GridT, MaskT, InterruptT>::median(int width, int iterations, const MaskTy
 
 
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 {
     mMask = mask;
@@ -725,7 +725,7 @@ Filter<GridT, MaskT, InterruptT>::offset(ValueType value, const MaskType* mask)
 /// Private method to perform the task (serial or threaded) and
 /// subsequently swap the leaf buffers.
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
 {
     if (mGrainSize>0) {
@@ -740,7 +740,7 @@ Filter<GridT, MaskT, InterruptT>::cook(LeafManagerType& leafs)
 /// One dimensional convolution of a separable box filter
 template<typename GridT, typename MaskT, typename InterruptT>
 template <typename AvgT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
 {
     this->wasInterrupted();
@@ -773,7 +773,7 @@ Filter<GridT, MaskT, InterruptT>::doBox(const RangeType& range, Int32 w)
 
 /// Performs simple but slow median-value diffusion
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
 {
     this->wasInterrupted();
@@ -807,7 +807,7 @@ Filter<GridT, MaskT, InterruptT>::doMedian(const RangeType& range, int width)
 
 /// Offsets the values by a constant
 template<typename GridT, typename MaskT, typename InterruptT>
-inline void
+void
 Filter<GridT, MaskT, InterruptT>::doOffset(const RangeType& range, ValueType offset)
 {
     this->wasInterrupted();
@@ -844,6 +844,23 @@ Filter<GridT, MaskT, InterruptT>::wasInterrupted()
     }
     return false;
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_FILTER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS Filter<FloatGrid, FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS Filter<DoubleGrid, FloatGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

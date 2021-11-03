@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBPython LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -37,6 +37,16 @@ if(NOT OPENVDB_BUILD_CORE)
   set(OPENVDB_LIB OpenVDB::openvdb)
 else()
   set(OPENVDB_LIB openvdb)
+endif()
+
+if(USE_AX)
+  # Link the python module against openvdb_ax
+  if(NOT OPENVDB_BUILD_AX)
+    find_package(OpenVDB REQUIRED openvdb_ax)
+    set(OPENVDB_AX_LIB OpenVDB::openvdb_ax)
+  else()
+    set(OPENVDB_AX_LIB openvdb_ax)
+  endif()
 endif()
 
 # Small function which mimics basic output (bar components) of
@@ -78,37 +88,26 @@ if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
     list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
 
-if(${CMAKE_VERSION} VERSION_LESS 3.14)
-  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
+find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
+OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
 
-  if(USE_NUMPY)
-    # Note: This uses our custom backport in cmake/backports
-    find_package(NumPy ${MINIMUM_NUMPY_VERSION} REQUIRED)
-    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
-  endif()
-else()
-  find_package(Python QUIET COMPONENTS ${OPENVDB_PYTHON_REQUIRED_COMPONENTS})
-  OPENVDB_CHECK_PYTHON_VERSION(${Python_VERSION} ${Python_INCLUDE_DIRS})
-
-  if(USE_NUMPY)
-    find_package(Python QUIET COMPONENTS NumPy)
-    if(NOT TARGET Python::NumPy)
-        message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
-          "\"${MINIMUM_NUMPY_VERSION}\")"
-        )
-    elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
-      message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
-        "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
-      )
-    else()
-      message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
-        "version \"${Python_NumPy_VERSION}\", minimum required is "
+if(USE_NUMPY)
+  find_package(Python QUIET COMPONENTS NumPy)
+  if(NOT TARGET Python::NumPy)
+      message(FATAL_ERROR "Could NOT find NumPy (Required is at least version "
         "\"${MINIMUM_NUMPY_VERSION}\")"
       )
-    endif()
-    list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
+  elseif(Python_NumPy_VERSION VERSION_LESS MINIMUM_NUMPY_VERSION)
+    message(FATAL_ERROR "Could NOT find NumPy: Found unsuitable version \"${Python_NumPy_VERSION}\""
+      "but required is at least \"${MINIMUM_NUMPY_VERSION}\" (found ${Python_NumPy_INCLUDE_DIRS})"
+    )
+  else()
+    message(STATUS "Found NumPy: ${Python_NumPy_INCLUDE_DIRS} (found suitable "
+      "version \"${Python_NumPy_VERSION}\", minimum required is "
+      "\"${MINIMUM_NUMPY_VERSION}\")"
+    )
   endif()
+  list(APPEND OPENVDB_PYTHON_DEPS Python::NumPy)
 endif()
 
 if(USE_NUMPY)
@@ -252,6 +251,10 @@ if(OPENVDB_PYTHON_WRAP_ALL_GRID_TYPES)
 endif()
 if(USE_NUMPY)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_NUMPY")
+endif()
+if(USE_AX)
+  target_link_libraries(pyopenvdb PUBLIC ${OPENVDB_AX_LIB})
+  target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
 
 set(PYTHON_PUBLIC_INCLUDE_NAMES

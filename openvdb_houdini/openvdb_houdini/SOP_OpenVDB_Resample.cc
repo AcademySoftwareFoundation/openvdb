@@ -405,11 +405,11 @@ struct RebuildOp
 
         const ValueT halfWidth = ValueT(grid.background() * (1.0 / grid.voxelSize()[0]));
 
-        hvdb::Interrupter interrupter;
+        hvdb::HoudiniInterrupter interrupter;
         try {
             outGrid = openvdb::tools::doLevelSetRebuild(grid,
                 /*isovalue=*/openvdb::zeroVal<ValueT>(),
-                /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &xform, &interrupter);
+                /*exWidth=*/halfWidth, /*inWidth=*/halfWidth, &xform, &interrupter.interrupter());
         } catch (openvdb::TypeError&) {
             addWarning("skipped rebuild of level set grid " + grid.getName()
                 + " of type " + grid.type());
@@ -627,8 +627,8 @@ SOP_OpenVDB_Resample::Cache::cookVDBSop(OP_Context& context)
                 } else {
                     // Use the resample tool to sample the input grid into the output grid.
 
-                    hvdb::Interrupter interrupter;
-                    xform.setInterrupter(interrupter);
+                    hvdb::HoudiniInterrupter interrupter;
+                    xform.setInterrupter(interrupter.interrupter());
 
                     if (curOrder == 0) {
                         hvdb::GridTransformOp<openvdb::tools::PointSampler> op(outGrid, xform);
