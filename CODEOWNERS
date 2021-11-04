@@ -23,6 +23,9 @@ CHANGES                                                     @kmuseth @apradhana 
 # OpenVDB AX
 /openvdb_ax/                                                @idclip @richhones
 
+# NanoVDB
+/nanovdb/                                                   @kmuseth
+
 # OpenVDB Houdini - Default
 /openvdb_houdini/                                           @kmuseth
 

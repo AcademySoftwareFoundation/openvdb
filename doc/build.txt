@@ -191,6 +191,10 @@ OpenVDB AX Library        | The OpenVDB AX library                              
 OpenVDB AX Binary         | Command line binary for running OpenVDB AX code                        | OPENVDB_BUILD_AX_BINARIES                         | OFF        |
 OpenVDB AX Grammar        | Allows for re-generation of AX grammar, typically not required         | OPENVDB_BUILD_AX_GRAMMAR                          | OFF        |
 OpenVDB AX Unit Tests     | OpenVDB AX's Unit Test suite                                           | OPENVDB_BUILD_AX_UNITTESTS                        | OFF        |
+NanoVDB                   | NanoVDB headers                                                        | OPENVDB_BUILD_NANOVDB                             | OFF        |
+NanoVDB Tools             | NanoVDB command line tools                                             | NANOVDB_BUILD_TOOLS                               | OFF        |
+NanoVDB Examples          | NanoVDB example binaries and benchmarks                                | NANOVDB_BUILD_EXAMPLES / NANOVDB_BUILD_BENCHMARK  | OFF / OFF  |
+NanoVDB Unit Tests        | NanoVDB Unit Test suite                                                | NANOVDB_BUILD_UNITTESTS                           | OFF        |
 Documentation             | The OpenVDB doxygen documentation                                      | OPENVDB_BUILD_DOCS                                | OFF        |
 
 
@@ -236,6 +240,7 @@ DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
 Houdini  | 18.0              | 6           |
 Houdini  | 18.5              | 7           |
+Houdini  | 19.0              | 8           |
 Maya     | 2017              | Any         |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
