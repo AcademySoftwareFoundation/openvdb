@@ -154,7 +154,7 @@ private:
             TreeT &tree = pool.local();
             typename GridT::Accessor acc(tree);
             // Compute signed distances to sphere using leapfrogging in k
-            for (i = r.begin(); i <= r.end(); ++i) {
+            for (i = r.begin(); i != r.end(); ++i) {
                 if (util::wasInterrupted(mInterrupt)) return;
                 const auto x2 = math::Pow2(ValueT(i) - c[0]);
                 for (j = jmin; j <= jmax; ++j) {
