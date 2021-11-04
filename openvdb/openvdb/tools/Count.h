@@ -328,28 +328,38 @@ struct MinMaxValuesOp
     using ValueT = typename TreeType::ValueType;
     
     explicit MinMaxValuesOp()
-    : min(std::numeric_limits<ValueT>::max())
-    , max(std::numeric_limits<ValueT>::min())
+    : min(zeroVal<ValueT>())
+    , max(zeroVal<ValueT>())
+    , seen_value(false)
     {
     }
 
     MinMaxValuesOp(const MinMaxValuesOp& other, tbb::split)
     : min(other.min)
     , max(other.max)
+    , seen_value(other.seen_value)
     {
     }
 
     template <typename NodeType>
     bool operator()(NodeType& node, size_t)
     {
-        for (auto iter = node.cbeginValueOn(); iter; ++iter) {
-            const ValueT val = *iter;
+        if (auto iter = node.cbeginValueOn()) {
+            if(!seen_value) {
+                seen_value = true;
+                min = max = *iter;
+                ++iter;
+            }
+        
+            for (; iter; ++iter) {
+                const ValueT val = *iter;
 
-            if (math::cwiseLessThan(val, min))
-                min = val;
+                if (math::cwiseLessThan(val, min))
+                    min = val;
 
-            if (math::cwiseGreaterThan(val, max))
-                max = val;
+                if (math::cwiseGreaterThan(val, max))
+                    max = val;
+            }
         }
 
         return true;
@@ -362,11 +372,17 @@ struct MinMaxValuesOp
 
         if (math::cwiseGreaterThan(other.max, max))
             max = other.max;
+        
+        seen_value |= other.seen_value;
 
         return true;
     }
-
+    
     ValueT min, max;
+    
+private:
+    
+    bool seen_value;
 }; // struct MinMaxValuesOp
 
 } // namespace count_internal
