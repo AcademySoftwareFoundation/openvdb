@@ -69,7 +69,7 @@ void uninitialize();
 ///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
 ///                  AttributeBindings.h for details.
 void run(const char* ax, openvdb::GridBase& grid,
-         const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings = {});
+         const std::vector<std::pair<std::string, std::string>>& bindings = {});
 
 /// @brief  Run a full AX pipeline (parse, compile and execute) on a vector of
 ///         OpenVDB numerical grids OR a vector of OpenVDB Point Data grids.
@@ -97,7 +97,7 @@ void run(const char* ax, openvdb::GridBase& grid,
 ///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
 ///                  AttributeBindings.h for details.
 void run(const char* ax, openvdb::GridPtrVec& grids,
-         const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings = {});
+         const std::vector<std::pair<std::string, std::string>>& bindings = {});
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME

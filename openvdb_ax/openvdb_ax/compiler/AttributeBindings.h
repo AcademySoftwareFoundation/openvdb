@@ -37,15 +37,12 @@ class AttributeBindings
 {
 public:
 
-    AttributeBindings() {}
-
-    AttributeBindings(const AttributeBindings& other)
-        :  mAXToDataMap(other.mAXToDataMap), mDataToAXMap(other.mDataToAXMap) {}
+    AttributeBindings() = default;
 
     /// @brief Construct a set of attribute bindings from a vector of {ax name, data name} pairs
     /// @param bindings A vector of ax name data name pairs where the first element is the name
     ///        in the AX code, and the second is the name in the context data
-    AttributeBindings(const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings)
+    AttributeBindings(const std::vector<std::pair<std::string, std::string>>& bindings)
     {
         set(bindings);
     }
@@ -54,7 +51,7 @@ public:
     ///        using an initializer list i.e. {{"axname0", "dataname0"}, {"axname1", "dataname0"}}
     /// @param bindings A initializer list of ax name data name pairs where the first element is the
     ///        name in the AX code, and the second is the name in the context data
-    AttributeBindings(const std::initializer_list<std::pair<openvdb::Name, openvdb::Name>>& bindings)
+    AttributeBindings(const std::initializer_list<std::pair<std::string, std::string>>& bindings)
     {
         set(bindings);
     }
@@ -65,7 +62,7 @@ public:
     ///     If another binding exists for the supplied dataname that will be removed.
     /// @param axname The name of the attribute in AX
     /// @param dataname The name of the attribute in the context data
-    inline void set(const Name& axname, const Name& dataname)
+    inline void set(const std::string& axname, const std::string& dataname)
     {
         auto axToData = mAXToDataMap.find(axname);
         if (axToData != mAXToDataMap.end()) {
@@ -90,7 +87,7 @@ public:
     ///     If a data binding exists for any AX name, it will be replaced.
     ///     If another binding exists for the supplied dataname that will be removed.
     /// @param bindings Vector of AX name data name pairs
-    inline void set(const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings) {
+    inline void set(const std::vector<std::pair<std::string, std::string>>& bindings) {
         for (const auto& binding : bindings) {
             this->set(binding.first, binding.second);
         }
@@ -98,7 +95,7 @@ public:
     /// @brief Returns a pointer to the data attribute name string that the input AX attribute name
     ///   is bound to, or nullptr if unbound.
     /// @param axname The name of the attribute in AX
-    inline const Name* dataNameBoundTo(const Name& axname) const
+    inline const std::string* dataNameBoundTo(const std::string& axname) const
     {
         const auto iter = mAXToDataMap.find(axname);
         if (iter != mAXToDataMap.cend()) {
@@ -110,7 +107,7 @@ public:
     /// @brief Returns a pointer to the AX attribute name string that a data attribute name
     ///    is bound to, or nullptr if unbound.
     /// @param name The name of the attribute in the context data
-    inline const Name* axNameBoundTo(const Name& name) const
+    inline const std::string* axNameBoundTo(const std::string& name) const
     {
         const auto iter = mDataToAXMap.find(name);
         if (iter != mDataToAXMap.cend()) {
@@ -121,14 +118,14 @@ public:
 
     /// @brief Returns whether the data attribute has been bound to an AX attribute
     /// @param name The name of the attribute in the context data
-    inline bool isBoundDataName(const Name& name) const
+    inline bool isBoundDataName(const std::string& name) const
     {
         return mDataToAXMap.count(name);
     }
 
     /// @brief Returns whether the AX attribute has been bound to a data attribute
     /// @param name The name of the attribute in AX
-    inline bool isBoundAXName(const Name& name) const
+    inline bool isBoundAXName(const std::string& name) const
     {
         return mAXToDataMap.count(name);
     }

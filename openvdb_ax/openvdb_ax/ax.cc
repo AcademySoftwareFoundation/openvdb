@@ -26,7 +26,7 @@ namespace ax {
 /// @note Implementation for initialize, isInitialized and unitialized
 ///       reamins in compiler/Compiler.cc
 
-void run(const char* ax, openvdb::GridBase& grid, const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings)
+void run(const char* ax, openvdb::GridBase& grid, const std::vector<std::pair<std::string, std::string>>& bindings)
 {
     // Construct a logger that will output errors to cerr and suppress warnings
     openvdb::ax::Logger logger;
@@ -65,7 +65,7 @@ void run(const char* ax, openvdb::GridBase& grid, const std::vector<std::pair<op
     }
 }
 
-void run(const char* ax, openvdb::GridPtrVec& grids, const std::vector<std::pair<openvdb::Name, openvdb::Name>>& bindings)
+void run(const char* ax, openvdb::GridPtrVec& grids, const std::vector<std::pair<std::string, std::string>>& bindings)
 {
     if (grids.empty()) return;
     // Check the type of all grids. If they are all points, run for point data.

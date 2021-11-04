@@ -978,4 +978,25 @@ TestVolumeExecutable::testExecuteBindings()
         CPPUNIT_ASSERT_NO_THROW(executable->execute(v));
         CPPUNIT_ASSERT_EQUAL(1.0f, f2->tree().getValue({0,0,0}));
     }
+
+    // test setting bindings and then resetting some of those bindings on the same executable
+    {
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @a = 2.0f; @c = 3.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        bindings.set("c","b"); // bind c to b
+        bindings.set("a","c"); // bind a to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+
+        bindings.set("a","b"); // bind a to b
+        bindings.set("b","a"); // bind a to b
+        CPPUNIT_ASSERT(!bindings.dataNameBoundTo("c")); // c should be unbound
+        // check that the set call resets c to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        const openvdb::ax::AttributeBindings& bindingsOnExecutable = executable->getAttributeBindings();
+        CPPUNIT_ASSERT(bindingsOnExecutable.isBoundAXName("c"));
+        CPPUNIT_ASSERT_EQUAL(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
+    }
 }
