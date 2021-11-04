@@ -4,7 +4,10 @@ OpenVDB Version History
 Version 9.0.1 - In development
 
     Bug Fixes:
-    - Fixed a range bug in tools/LevelSetSphere. [Contributed by Tommy Hinks]
+    - Fixed a move assignment inconsistency in nanovdb/util/HostBuffer.h.
+      This could potentially be a problem on Windows debug builds.
+    - Fixed a range bug in openvdb/tools/LevelSetSphere.h. This could result 
+      in data races for multi-threaded execution [Reported by Tommy Hinks]
 
 Version 9.0.0 - October 29, 2021
 
