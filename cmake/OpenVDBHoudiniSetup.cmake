@@ -335,12 +335,31 @@ if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
   set(OPENVDB_HOUDINI_ABI 6)
 elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
-elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 19.0)
-  set(OPENVDB_HOUDINI_ABI 8)
 else()
-  message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=8, "
-    "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
-  set(OPENVDB_HOUDINI_ABI 8)
+  find_file(_houdini_openvdb_version_file "openvdb/version.h"
+    PATHS ${HOUDINI_INCLUDE_DIR}
+    NO_DEFAULT_PATH
+    NO_PACKAGE_ROOT_PATH
+    NO_CMAKE_PATH
+    NO_CMAKE_ENVIRONMENT_PATH
+    NO_SYSTEM_ENVIRONMENT_PATH
+    NO_CMAKE_SYSTEM_PATH)
+  if(NOT ${_houdini_openvdb_version_file} EQUAL "_houdini_openvdb_version_file-NOTFOUND")
+    file(STRINGS ${_houdini_openvdb_version_file} _houdini_openvdb_version)
+    foreach(line ${_houdini_openvdb_version})
+      if(line MATCHES "^#define OPENVDB_ABI_VERSION_NUMBER ([0-9]+)$")
+        set(OPENVDB_HOUDINI_ABI ${CMAKE_MATCH_1})
+        break()
+      endif()
+    endforeach()
+    unset(_houdini_openvdb_version)
+  endif()
+  unset(_houdini_openvdb_version_file)
+  if(NOT OPENVDB_HOUDINI_ABI)
+    message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=${OpenVDB_MAJOR_VERSION}, "
+      "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
+    set(OPENVDB_HOUDINI_ABI ${OpenVDB_MAJOR_VERSION})
+  endif()
 endif()
 
 # ------------------------------------------------------------------------
