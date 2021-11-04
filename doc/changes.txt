@@ -23,25 +23,11 @@ for details.
 </BLOCKQUOTE>
 
 @par
-<BLOCKQUOTE>
-Faster build times from support for explicit template instantiation,
-which is enabled by default for most of the tools.
-</BLOCKQUOTE>
-
-@par
-<BLOCKQUOTE>
-Added support for OpenEXR 3. This is contributed by Cary Phillips.
-</BLOCKQUOTE>
-
-@par
-<BLOCKQUOTE>
-Added transient data to the RootNode, InternalNode, and LeafNode.
-</BLOCKQUOTE>
-
-@par
 New features:
-- NanoVDB, which for the first time offers GPU support for static sparse volumes
-  in OpenVDB.
+- Faster build times from support for explicit template instantiation,
+  which is enabled by default for most of the tools.
+- Added support for OpenEXR 3 and TBB 2021.
+- Added transient data to the RootNode, InternalNode, and LeafNode.
 
 @par
 Improvements:

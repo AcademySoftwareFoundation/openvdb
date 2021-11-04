@@ -153,7 +153,7 @@ add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,
 add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-omit-frame-pointer;-g;-O1>")
 add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleClang>>:-fsanitize-address-use-after-scope;-fno-optimize-sibling-calls>")
 # -fsanitize-address-use-after-scope added in GCC 7
-add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<CXX_COMPILER_ID:GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,7.0.0>>:-fsanitize-address-use-after-scope>")
+add_compile_options("$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU>,$<VERSION_GREATER_EQUAL:$<CXX_COMPILER_VERSION>,7.0.0>>:-fsanitize-address-use-after-scope>")
 add_link_options("$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=address>")
 
 # LeakSanitizer

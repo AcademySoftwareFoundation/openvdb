@@ -54,7 +54,7 @@ endif()
 
 set(OpenVDB_MAJOR_VERSION 9)
 set(OpenVDB_MINOR_VERSION 0)
-set(OpenVDB_PATCH_VERSION 0)
+set(OpenVDB_PATCH_VERSION 1)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
@@ -141,7 +141,8 @@ option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
 option(USE_COLORED_OUTPUT "Always produce ANSI-colored output (GNU/Clang only)." OFF)
-option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON)
+cmake_dependent_option(USE_PKGCONFIG "Use pkg-config to search for dependent libraries." ON "NOT WIN32" OFF)
+
 option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported classes and methods against a
 pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
 the compilation of all dependent code by bypassing the expensive template instantation." ON)
@@ -208,9 +209,6 @@ if(USE_AX)
   endif()
 endif()
 
-# Top-level location for all openvdb headers
-set(OPENVDB_INSTALL_INCLUDEDIR "${CMAKE_INSTALL_INCLUDEDIR}/openvdb")
-
 ###### Deprecated options
 
 if(OPENVDB_BUILD_HOUDINI_SOPS)
@@ -245,12 +243,8 @@ mark_as_advanced(
 
 # Configure minimum version requirements - some are treated specially and fall
 # outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
-
 set(MINIMUM_CXX_STANDARD 14)
 
-# @note  Blosc version is currently treated as exception which must be adhered
-# to. The minimum version must be at least 1.5.0. Previous versions are incompatible.
-set(MINIMUM_BLOSC_VERSION 1.5.0)
 # @note  ABI always enforced so the correct deprecation messages are available.
 # OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
 set(MINIMUM_OPENVDB_ABI_VERSION 6)
@@ -270,6 +264,7 @@ if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
   set(MINIMUM_ZLIB_VERSION 1.2.7)
   set(MINIMUM_TBB_VERSION 2019.0)
   set(MINIMUM_LLVM_VERSION 7.0.0)
+  set(MINIMUM_BLOSC_VERSION 1.5.0)
 
   set(MINIMUM_PYTHON_VERSION 2.7) # @warning should be 3.7.x, but H18.5+ can still be used with 2.7.x
   set(MINIMUM_NUMPY_VERSION 1.14.0)
@@ -291,6 +286,7 @@ set(FUTURE_MINIMUM_GCC_VERSION 9.3.1)
 set(FUTURE_MINIMUM_ICC_VERSION 19)
 # set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
 
+# set(FUTURE_MINIMUM_CMAKE_VERSION 3.18)
 # set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
 # set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
 set(FUTURE_MINIMUM_BOOST_VERSION 1.73)
@@ -552,6 +548,7 @@ if(USE_STATIC_DEPENDENCIES)
 endif()
 
 # Configure OpenVDB Library and ABI versions
+
 set(NEEDS_OPENVDB OFF)
 
 if(OPENVDB_BUILD_AX OR

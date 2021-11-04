@@ -1,11 +1,26 @@
 OpenVDB Version History
 =======================
 
+Version 9.0.1 - In development
+
+    Bug Fixes:
+    - Fixed a range bug in tools/LevelSetSphere. [Contributed by Tommy Hinks]
+
 Version 9.0.0 - October 29, 2021
 
+      This version introduces ABI changes relative to older major releases,
+      so to preserve ABI compatibility it might be necessary to define the
+      macro OPENVDB_ABI_VERSION_NUMBER=N, where, for example, N is 7 for
+      Houdini 18.5 and 8 for Houdini 19.0.
+
+      Official release of NanoVDB, which for the first time offers GPU support
+      for static sparse volumes in OpenVDB.
+
     New features:
-    - NanoVDB, which for the first time offers GPU support for static sparse
-      volumes in OpenVDB.
+    - Faster build times from support for explicit template instantiation,
+      which is enabled by default for most of the tools.
+    - Added support for OpenEXR 3 and TBB 2021.
+    - Added transient data to the RootNode, InternalNode, and LeafNode.
 
     Improvements:
     - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),

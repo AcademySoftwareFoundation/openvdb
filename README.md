@@ -33,12 +33,12 @@ OpenVDB welcomes contributions to the OpenVDB project. Please refer to the [cont
 
 ### Developer Quick Start
 
-The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX and various executables, may require additional dependencies. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
+The following provides basic installation examples for the core OpenVDB library. Other components, such as the python module, OpenVDB AX, NanoVDB and various executables, may require additional dependencies. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for help with installations.
 
 #### Linux
 ##### Installing Dependencies (Boost, TBB, Blosc)
 
-```
+```bash
 apt-get install -y libboost-iostreams-dev
 apt-get install -y libboost-system-dev
 apt-get install -y libtbb-dev
@@ -46,31 +46,29 @@ apt-get install -y libblosc-dev
 ```
 
 ##### Building OpenVDB
-```
+```bash
 git clone git@github.com:AcademySoftwareFoundation/openvdb.git
 cd openvdb
 mkdir build
 cd build
 cmake ..
-make -j4
-make install
+make -j4 && make install
 ```
 #### macOS
 ##### Installing Dependencies (Boost, TBB, Blosc)
-```
+```bash
 brew install boost
 brew install tbb
 brew install c-blosc
 ```
 ##### Building OpenVDB
-```
+```bash
 git clone git@github.com:AcademySoftwareFoundation/openvdb.git
 cd openvdb
 mkdir build
 cd build
 cmake ..
-make -j4
-make install
+make -j4 && make install
 ```
 #### Windows
 ##### Installing Dependencies (Boost, TBB, Blosc)
@@ -81,7 +79,7 @@ It is recommended to set the `VCPKG_DEFAULT_TRIPLET` environment variable to
 [Git](https://git-scm.com/downloads), [vcpkg](https://github.com/microsoft/vcpkg)
 and [CMake](https://cmake.org/download/) to be installed.
 
-```
+```bash
 vcpkg install zlib:x64-windows
 vcpkg install blosc:x64-windows
 vcpkg install tbb:x64-windows
@@ -93,7 +91,7 @@ vcpkg install boost-uuid:x64-windows
 vcpkg install boost-interprocess:x64-windows
 ```
 ##### Building OpenVDB
-```
+```bash
 git clone git@github.com:AcademySoftwareFoundation/openvdb.git
 cd openvdb
 mkdir build
@@ -102,48 +100,42 @@ cmake -DCMAKE_TOOLCHAIN_FILE=<PATH_TO_VCPKG>\scripts\buildsystems\vcpkg.cmake -D
 cmake --build . --parallel 4 --config Release --target install
 ```
 
+#### Building OpenVDB AX
+
+OpenVDB AX depends on the core OpenVDB library. See the [build documentation](https://academysoftwarefoundation.github.io/openvdb/build.html) for all available AX component options:
+
+```bash
+git clone git@github.com:AcademySoftwareFoundation/openvdb.git
+cd openvdb
+mkdir build
+cd build
+cmake -DOPENVDB_BUILD_AX=ON ..
+make -j4 && make install
+```
+
 #### Building NanoVDB
 
-**First example: building NanoVDB and OpenVDB core**
+NanoVDB can be built with and without OpenVDB support. To see full build instructions
+see the [NanoVDB build documentation](https://academysoftwarefoundation.github.io/openvdb/NanoVDB_HowToBuild.html)
 
-NanoVDB is now a module of the larger OpenVDB project. A user can build both libraries together. This will build the OpenVDB core library, install the NanoVDB header files, and build the NanoVDB command-line tools in the `build/nanovdb/cmd` directory. From the 'root' OpenVDB project directory (change the dependency paths to match your environment):
-  ```console
-  foo@bar:~$ mkdir build
-  foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DCMAKE_INSTALL_PREFIX=/install/path
-  foo@bar:~$ make -j 4 && make install
-  ```
-Note that the default value of `NANOVDB_USE_OPENVDB` is linked to `OPENVDB_BUILD_CORE` option and can be overriden by passing on `-DNANOVDB_USE_OPENVDB=OFF`. The `Boost` library is included because it is a requirement for building OpenVDB.
+#### Building Without OpenVDB Support
 
-In general, CMake will try to find every optional dependency when a user opts to add an additional dependency. Be sure to check the CMake log to see what dependencies were **not** found.
+```bash
+git clone git@github.com:AcademySoftwareFoundation/openvdb.git
+cd openvdb/nanovdb/nanovdb  # Build from the subdirectory
+mkdir build
+cd build
+cmake ..
+make -j4 && make install
+```
 
-**Second example: NanoVDB with no dependencies**
+#### Building With OpenVDB Support
 
-From the 'root' OpenVDB project directory:
-  ```console
-  foo@bar:~$ mkdir build
-  foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DNANOVDB_USE_TBB=OFF -DNANOVDB_USE_BLOSC=OFF -DNANOVDB_USE_ZLIB=OFF -DCMAKE_INSTALL_PREFIX=/install/path
-  foo@bar:~$ make -j 4 && make install
-  ```
-
-Another option is to build it from the NanoVDB directory itself, which is much simpler:
-  ```console
-  foo@bar:~$ cd nanovdb/nanovdb
-  foo@bar:~$ mkdir build
-  foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DCMAKE_INSTALL_PREFIX=/install/path
-  foo@bar:~$ make -j 4 && make install
-  ```
-Both options will install the NanoVDB header files to the `/install/path` as well as building `nanovdb_print` and `nanovdb_validate` executable. The path where these executables are installed will be different: in the first option they will be under `build/nanovdb/cmd` directory; whilst in the second option they will be under the `build/cmd/` directory.
-
-**Third example: build 'everything' in NanoVDB along with OpenVDB core**
-
-From the root OpenVDB directory:
-  ```console
-  foo@bar:~$ mkdir build
-  foo@bar:~$ cd build
-  foo@bar:~$ cmake .. -DUSE_NANOVDB=ON -DNANOVDB_BUILD_UNITTESTS=ON -DNANOVDB_BUILD_EXAMPLES=ON -DNANOVDB_BUILD_BENCHMARK=ON -DNANOVDB_USE_INTRINSICS=ON -DNANOVDB_USE_CUDA=ON -DNANOVDB_CUDA_KEEP_PTX=ON -DTBB_ROOT=/path/to/tbb -DBOOST_ROOT=/path/to/boost -DBLOSC_ROOT=/path/to/blosc -DGTEST_ROOT=/path/to/gtest -DCMAKE_INSTALL_PREFIX=/install/path
-  foo@bar:~$ make -j 4 && make install
-  ```
-Note that if you already have the correct version of OpenVDB pre-installed, you can configure CMake to link against that library by passing the arguments `-DOPENVDB_BUILD_CORE=OFF -DOPENVDB_BUILD_BINARIES=OFF -DOPENVDB_ROOT=/path/to/openvdb` when invoking `cmake`.
+```bash
+git clone git@github.com:AcademySoftwareFoundation/openvdb.git
+cd openvdb
+mkdir build
+cd build
+cmake -DOPENVDB_BUILD_NANOVDB=ON ..
+make -j4 && make install
+```

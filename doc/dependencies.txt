@@ -44,6 +44,7 @@ OpenVDB Render          | Core Library dependencies                             
 OpenVDB View            | Core Library dependencies, OpenGL, GLFW3, GLEW*                  | -
 OpenVDB Python          | Core Library dependencies, Python, Boost::python                 | Boost::numpy, NumPy
 OpenVDB AX              | Core Library dependencies, LLVM                                  | Bison, Flex
+NanoVDB                 | -                                                                | Core Library, CUDA, TBB, Blosc, ZLib
 OpenVDB UnitTests       | Core Library dependencies, GoogleTest                            | CppUnit**
 OpenVDB Documentation   | Doxygen                                                          | -
 
@@ -73,12 +74,13 @@ Python         | 2.7     | 2.7         | The python interpreter and libraries fo
 NumPy          | 1.14.0  | 1.14.0      | Scientific computing with Python                                  | Y       | Y        | http://www.numpy.org
 GoogleTest     | 1.10    | Latest      | A unit testing framework module for C++                           | Y       | Y        | https://github.com/google/googletest
 CppUnit        | 1.10    | Latest      | A unit testing framework module for C++                           | N       | Y        | https://freedesktop.org/wiki/Software/cppunit
-Blosc          | 1.5.0*  | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
+Blosc          | 1.17.0* | 1.17.0      | Recommended dependency for improved disk compression              | Y       | Y        | https://github.com/Blosc/c-blosc/releases
 Log4cplus      | 1.1.2   | Latest      | An optional dependency for improved OpenVDB Logging               | Y       | Y        | https://github.com/log4cplus/log4cplus
 libpng         | -       | Latest      | Library for manipulating PNG images                               | Y       | Y        | http://www.libpng.org/pub/png/libpng.html
 GLFW           | 3.1     | Latest      | Simple API for OpenGL development                                 | Y       | Y        | https://www.glfw.org
 OpenGL         | 3.2     | Latest      | Environment for developing portable graphics applications         | Y       | Y        | https://www.opengl.org
 GLEW           | 1.0.0   | Latest      | A cross-platform OpenGL extension loading library.                | Y       | Y        | http://glew.sourceforge.net
+CUDA           | -       | Latest      | Parallel computing platform for graphical processing units.       | Y       | N        | https://developer.nvidia.com/cuda-downloads
 Doxygen        | 1.8.8   | 1.8.11      | Documentation generation from C++                                 | Y       | Y        | http://www.doxygen.nl
 
  - @b * See the note in [known issues](@ref depKnownIssues) regarding supported blosc versions.
@@ -153,6 +155,8 @@ apt-get install googletest              # GoogleTest
 apt-get install libglfw3-dev            # GLFW
 # Documentation
 apt-get install doxygen                 # doxygen
+# CUDA for NanoVDB
+apt-get install nvidia-cuda-toolkit     # CUDA
 @endcode
 
 @subsection depUsingHomebrew Using Homebrew
