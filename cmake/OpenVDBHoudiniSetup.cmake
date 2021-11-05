@@ -339,7 +339,7 @@ else()
   find_file(_houdini_openvdb_version_file "openvdb/version.h"
     PATHS ${HOUDINI_INCLUDE_DIR}
     NO_DEFAULT_PATH)
-  if(NOT ${_houdini_openvdb_version_file} EQUAL "_houdini_openvdb_version_file-NOTFOUND")
+  if(NOT ${_houdini_openvdb_version_file})
     file(STRINGS ${_houdini_openvdb_version_file} _houdini_openvdb_version)
     foreach(line ${_houdini_openvdb_version})
       if(line MATCHES "^#define OPENVDB_ABI_VERSION_NUMBER ([0-9]+)$")
