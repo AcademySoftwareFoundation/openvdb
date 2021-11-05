@@ -326,7 +326,7 @@ template<typename TreeType>
 struct MinMaxValuesOp
 {
     using ValueT = typename TreeType::ValueType;
-    
+
     explicit MinMaxValuesOp()
     : min(zeroVal<ValueT>())
     , max(zeroVal<ValueT>())
@@ -350,7 +350,7 @@ struct MinMaxValuesOp
                 min = max = *iter;
                 ++iter;
             }
-        
+
             for (; iter; ++iter) {
                 const ValueT val = *iter;
 
@@ -372,16 +372,16 @@ struct MinMaxValuesOp
 
         if (math::cwiseGreaterThan(other.max, max))
             max = other.max;
-        
+
         seen_value |= other.seen_value;
 
         return true;
     }
-    
+
     ValueT min, max;
-    
+
 private:
-    
+
     bool seen_value;
 }; // struct MinMaxValuesOp
 
@@ -486,7 +486,7 @@ template <typename TreeT>
 math::MinMax<typename TreeT::ValueType> minMax(const TreeT& tree, bool threaded)
 {
     using ValueT = typename TreeT::ValueType;
-    
+
     count_internal::MinMaxValuesOp<TreeT> op;
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);
     nodeManager.reduceTopDown(op, threaded);

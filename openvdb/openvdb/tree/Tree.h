@@ -2027,7 +2027,7 @@ inline void
 Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
 {
     const math::MinMax<ValueType> minmax = tools::minMax(*this);
-    
+
     minVal = minmax.min();
     maxVal = minmax.max();
 }
