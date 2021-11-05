@@ -18,6 +18,7 @@
 #include "openvdb/math/Operators.h"
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/thread/Threading.h"
+#include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>
@@ -1327,6 +1328,36 @@ uniqueInactiveValues(const GridType& grid,
 
     return values.size() <= numValues;
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_DIAGNOSTICS
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    std::string checkLevelSet(const Grid<TreeT>&, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    std::string checkFogVolume(const Grid<TreeT>&, size_t)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    bool uniqueInactiveValues(const Grid<TreeT>&, std::vector<TreeT::ValueType>&, size_t)
+OPENVDB_VOLUME_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

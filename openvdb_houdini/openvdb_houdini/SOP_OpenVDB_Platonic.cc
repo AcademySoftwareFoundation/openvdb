@@ -165,7 +165,7 @@ SOP_OpenVDB_Platonic::Cache::cookVDBSop(OP_Context& context)
 
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Creating VDB platonic solid");
+        hvdb::HoudiniInterrupter boss("Creating VDB platonic solid");
 
         // Read GUI parameters and generate narrow-band level set of sphere
         const float radius = static_cast<float>(evalFloat("scalarRadius", 0, time));
@@ -177,28 +177,28 @@ SOP_OpenVDB_Platonic::Cache::cookVDBSop(OP_Context& context)
         openvdb::FloatGrid::Ptr grid;
         switch (evalInt("solidType", 0, time)) {
         case 0://Sphere
-            grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetSphere<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         case 1:// Tetrahedraon
-            grid = openvdb::tools::createLevelSetTetrahedron<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetTetrahedron<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         case 2:// Cube
-            grid = openvdb::tools::createLevelSetCube<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetCube<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         case 3:// Octahedron
-            grid = openvdb::tools::createLevelSetOctahedron<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetOctahedron<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         case 4:// Dodecahedron
-            grid = openvdb::tools::createLevelSetDodecahedron<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetDodecahedron<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         case 5:// Icosahedron
-            grid = openvdb::tools::createLevelSetIcosahedron<openvdb::FloatGrid, hvdb::Interrupter>
-                (radius, center, voxelSize, halfWidth, &boss);
+            grid = openvdb::tools::createLevelSetIcosahedron<openvdb::FloatGrid>
+                (radius, center, voxelSize, halfWidth, &boss.interrupter());
             break;
         default:
             addError(SOP_MESSAGE, "Illegal shape.");

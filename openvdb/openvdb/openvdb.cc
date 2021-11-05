@@ -28,14 +28,19 @@
         #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error
     #endif
 #endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_7
+    #if OPENVDB_ABI_VERSION_NUMBER == 7
+        #error ABI = 7 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_7 suppresses this error
+    #endif
+#endif
 
 // If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
 // This can be optionally suppressed by defining:
 //   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_FUTURE_ABI_9
-    #if OPENVDB_ABI_VERSION_NUMBER == 9
-        #error ABI = 9 is still in active development and has not been finalized, \
-CMake option OPENVDB_USE_FUTURE_ABI_9 suppresses this error
+#ifndef OPENVDB_USE_FUTURE_ABI_10
+    #if OPENVDB_ABI_VERSION_NUMBER == 10
+        #error ABI = 10 is still in active development and has not been finalized, \
+CMake option OPENVDB_USE_FUTURE_ABI_10 suppresses this error
     #endif
 #endif
 
@@ -97,7 +102,12 @@ initialize()
     DoubleGrid::registerGrid();
     Int32Grid::registerGrid();
     Int64Grid::registerGrid();
+    // @note String grids types are deprecated but we still register them
+    //   as supported serializable types for backward compatibility. This
+    //   will likely be removed in a future major version
+OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     StringGrid::registerGrid();
+OPENVDB_NO_DEPRECATION_WARNING_END
     Vec3IGrid::registerGrid();
     Vec3SGrid::registerGrid();
     Vec3DGrid::registerGrid();

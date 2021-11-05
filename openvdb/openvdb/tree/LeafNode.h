@@ -661,7 +661,7 @@ public:
     ///
     /// @note This operation modifies only active states, not
     /// values. Also note that this operation can result in all voxels
-    /// being inactive so consider subsequnetly calling prune.
+    /// being inactive so consider subsequently calling prune.
     template<typename OtherType>
     void topologyIntersection(const LeafNode<OtherType, Log2Dim>& other, const ValueType&);
 
@@ -695,7 +695,7 @@ public:
     /// information. An additional level argument is provided to the
     /// callback.
     ///
-    /// @note The bounding boxes are guarenteed to be non-overlapping.
+    /// @note The bounding boxes are guaranteed to be non-overlapping.
     template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
 
     template<typename VisitorOp> void visit(VisitorOp&);
@@ -774,7 +774,7 @@ public:
     /// @param state       Is updated with the state of all values IF method
     ///                    returns @c true. Else the value is undefined!
     /// @param tolerance   The tolerance used to determine if values are
-    ///                    approximatly equal to the for value.
+    ///                    approximately equal to the for value.
     bool isConstant(ValueType& firstValue, bool& state,
                     const ValueType& tolerance = zeroVal<ValueType>()) const;
 
@@ -788,7 +788,7 @@ public:
     /// @param state     Is updated with the state of all values IF method
     ///                  returns @c true. Else the value is undefined!
     /// @param tolerance The tolerance used to determine if values are
-    ///                  approximatly constant.
+    ///                  approximately constant.
     bool isConstant(ValueType& minValue, ValueType& maxValue,
                     bool& state, const ValueType& tolerance = zeroVal<ValueType>()) const;
 
@@ -802,7 +802,7 @@ public:
     ///
     /// @note If tmp = this->buffer().data() then the median
     ///       value is computed very efficiently (in place) but
-    ///       the voxel values in this node are re-shuffeled!
+    ///       the voxel values in this node are re-shuffled!
     ///
     /// @warning If tmp != nullptr then it is the responsibility of
     ///          the client code that it points to enough memory to

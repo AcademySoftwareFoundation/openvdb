@@ -9,10 +9,12 @@ on:
       - 'pr/**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
+      - 'nanovdb/**'
       - 'pendingchanges/**'
       - '**.md'
   pull_request:
@@ -20,18 +22,20 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
       - 'openvdb_ax/**'
+      - 'nanovdb/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
-    # run this workflow every day at 7am UTC
-    - cron:  '0 7 * * *'
-    # run this workflow every Monday 00:00 UTC
+    # run this workflow every day at 7am UTC except Monday
+    - cron:  '0 7 * * 0,2-6'
+    # run this workflow Monday 7am UTC
     # warning: This pattern is checked in various places below
-    - cron:  '0 0 * * 1'
+    - cron:  '0 7 * * 1'
   workflow_dispatch:
     inputs:
       type:
@@ -60,18 +64,18 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2019', abi: '6', build: 'Release' }
-          - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Debug'   }
           - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '9', build: 'Release' }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Debug'   }
-          - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
+          - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', abi: '9', build: 'Release' }
           - { cxx: g++,     image: '2021', abi: '8', build: 'Release' }
+          - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
     - name: install_gtest
-      run: ./ci/install_gtest.sh 1.8.0
+      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -81,7 +85,7 @@ jobs:
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2
-      if: contains(github.event.schedule, '0 0 * * 1') || matrix.config.build == 'Release'
+      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
       run: |
         cd build && ctest -V
         cd - && ./ci/test_install.sh
@@ -102,8 +106,10 @@ jobs:
           # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
+          # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
+          # due to disk space constraints
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
@@ -124,97 +130,12 @@ jobs:
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
         --components=\"core,bin,test\"
-        --cargs=\'${{ matrix.config.cmake }} -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+        --cargs=\'${{ matrix.config.cmake }} -DUSE_EXR=ON -DUSE_PNG=ON -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
     - name: test
       shell: bash
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2
-      if: contains(github.event.schedule, '0 0 * * 1') || matrix.config.build == 'Release'
-      run: cd build && ctest -V
-
-  linux-extra:
-    # Extra configuration tests, all run on the ASWF docker images. These run weekly
-    # rather than on PR/merge
-    if: |
-        contains(github.event.schedule, '0 0 * * 1') ||
-        (github.event_name == 'workflow_dispatch' &&
-        (github.event.inputs.type == 'all' ||
-        github.event.inputs.type == 'linux'))
-    runs-on: ubuntu-latest
-    name: linux-extra:${{ matrix.config.name }}
-    container:
-      image: aswf/ci-openvdb:2021
-    env:
-      CXX: clang++
-    strategy:
-      matrix:
-        config:
-          - { name: 'abi8lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF' }
-          - { name: 'abi8half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'abi8sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'abi8avx',  cmake: '-DOPENVDB_SIMD=AVX' }
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v2
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=8 ${{ matrix.config.cmake }}\"
-    - name: test
-      run: cd build && ctest -V
-
-  testabi8gcc10:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04
-    env:
-      CXX: g++-10
-    steps:
-    - uses: actions/checkout@v2
-    - name: install_boost
-      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
-    - name: install_tbb
-      run: sudo apt-get -q install -y libtbb-dev
-    - name: install_gtest
-      run: sudo apt-get -q install -y libgtest-dev
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
-    - name: test
-      run: cd build && ctest -V
-
-  testabi8clang10:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
-    runs-on: ubuntu-20.04
-    env:
-      CXX: clang++-10
-    steps:
-    - uses: actions/checkout@v2
-    - name: install_boost
-      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
-    - name: install_tbb
-      run: sudo apt-get -q install -y libtbb-dev
-    - name: install_gtest
-      run: sudo apt-get -q install -y libgtest-dev
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,test\"
-        --cargs=\"-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DCMAKE_INSTALL_PREFIX=`pwd`\"
-    - name: test
+      if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
       run: cd build && ctest -V
 
   testmacos1015:
@@ -245,33 +166,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=8 -DOPENVDB_SIMD=SSE42\"
-    - name: test
-      shell: bash
-      run: cd build && ctest -V
-
-  testmacos1015_tbb2021:
-    runs-on: macos-10.15
-    env:
-      CXX: clang++
-    steps:
-    - uses: actions/checkout@v2
-    - name: install
-      shell: bash
-      run: |
-        brew update
-        brew install bash gnu-getopt cmake ilmbase openexr@2 boost tbb glfw googletest
-        echo "IlmBase_ROOT=/usr/local/opt/ilmbase" >> $GITHUB_ENV
-        echo "OpenEXR_ROOT=/usr/local/opt/openexr@2" >> $GITHUB_ENV
-        echo "/usr/local/opt/openexr@2/bin" >> $GITHUB_PATH
-        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
-    - name: build
-      shell: bash
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DUSE_BLOSC=OFF -DUSE_ZLIB=OFF\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
       run: cd build && ctest -V

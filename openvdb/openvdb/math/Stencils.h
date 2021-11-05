@@ -1375,17 +1375,19 @@ public:
 
     WenoStencil(const GridType& grid)
         : BaseType(grid, SIZE)
-        , mDx2(ValueType(math::Pow2(grid.voxelSize()[0])))
+        , _mDx2(ValueType(math::Pow2(grid.voxelSize()[0])))
         , mInv2Dx(ValueType(0.5 / grid.voxelSize()[0]))
-        , mInvDx2(ValueType(1.0 / mDx2))
+        , mInvDx2(ValueType(1.0 / _mDx2))
+        , mDx2(static_cast<float>(_mDx2))
     {
     }
 
     WenoStencil(const GridType& grid, Real dx)
         : BaseType(grid, SIZE)
-        , mDx2(ValueType(dx * dx))
+        , _mDx2(ValueType(dx * dx))
         , mInv2Dx(ValueType(0.5 / dx))
-        , mInvDx2(ValueType(1.0 / mDx2))
+        , mInvDx2(ValueType(1.0 / _mDx2))
+        , mDx2(static_cast<float>(_mDx2))
     {
     }
 
@@ -1501,7 +1503,8 @@ private:
     template<typename, typename, bool> friend class BaseStencil; // allow base class to call init()
     using BaseType::mAcc;
     using BaseType::mValues;
-    const ValueType mDx2, mInv2Dx, mInvDx2;
+    const ValueType _mDx2, mInv2Dx, mInvDx2;
+    const float mDx2;
 }; // WenoStencil class
 
 

@@ -40,7 +40,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBHoudini LANGUAGES CXX)
 
 
@@ -202,31 +202,6 @@ target_link_libraries(openvdb_houdini PUBLIC
 
 target_compile_definitions(openvdb_houdini PRIVATE "-DOPENVDB_HOUDINI_PRIVATE")
 
-if(OPENVDB_ENABLE_RPATH)
-  # @todo There is probably a better way to do this for imported targets
-  set(RPATHS "")
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_CORE)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-
-  set_target_properties(openvdb_houdini
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
-endif()
-
-
 set_target_properties(openvdb_houdini
   PROPERTIES
     OUTPUT_NAME openvdb_houdini
@@ -239,15 +214,19 @@ if (OPENVDB_HOUDINI_OPHIDE_POLICY AND NOT ${OPENVDB_HOUDINI_OPHIDE_POLICY} STREQ
     "-DOPENVDB_OPHIDE_POLICY=${OPENVDB_HOUDINI_OPHIDE_POLICY}")
 endif()
 
-if(OPENVDB_DSO_NAMES)
-  set(OPENVDB_USE_CUSTOM_DSO_NAMES 1)
-  # if AX SOP is explicitly enabled, also switch on the build variable
-  if (SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+# If OPENVDB_BUILD_SOP_OpenVDB_AX has not been explicitly set,
+# see if we can enabled the OpenVDB AX SOP
+if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
+  if(USE_AX)
     set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+  elseif(OPENVDB_DSO_NAMES)
+    if(SOP_OpenVDB_AX IN_LIST OPENVDB_DSO_NAMES)
+      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
+    endif()
   endif()
 endif()
 
-if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+if(NOT OPENVDB_DSO_NAMES)
   list(APPEND OPENVDB_DSO_NAMES
     GR_PrimVDBPoints
     SHOP_OpenVDB_Points
@@ -299,28 +278,9 @@ if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
     SOP_OpenVDB_Vector_Split
     SOP_OpenVDB_Visualize
     SOP_OpenVDB_Write
-    VRAY_OpenVDB_Points
-  )
-endif()
+    VRAY_OpenVDB_Points)
 
-if(OPENVDB_BUILD_SOP_OpenVDB_AX)
-  if(OPENVDB_BUILD_AX OR OPENVDB_BUILD_SOP_OpenVDB_AX)
-    # Check to see if the AX SOP has been manually disabled
-    if(NOT DEFINED OPENVDB_BUILD_SOP_OpenVDB_AX)
-      set(OPENVDB_BUILD_SOP_OpenVDB_AX ON)
-    endif()
-  endif()
-
-  # This module relies on 3 libs; openvdb, openvdb_ax and openvdb_houdini.
-  # if OPENVDB_BUILD_CORE is ON, all deps must also be on
-  # openvdb and openvdb_houdini must be either both enabled or disabled.
-  # openvdb and openvdb_ax must be either both enabled or disabled.
-  if(OPENVDB_BUILD_CORE AND NOT OPENVDB_BUILD_AX)
-    message(FATAL_ERROR "Invalid CMake build configuration. OPENVDB_BUILD_CORE is ON, "
-      "but OPENVDB_BUILD_AX is OFF. If rebuilding the core library, sub components must "
-      "also be rebuilt.")
-  endif()
-  if(NOT OPENVDB_USE_CUSTOM_DSO_NAMES)
+  if(OPENVDB_BUILD_SOP_OpenVDB_AX)
     list(APPEND OPENVDB_DSO_NAMES SOP_OpenVDB_AX)
   endif()
 endif()
@@ -357,25 +317,6 @@ foreach(DSO_NAME ${OPENVDB_DSO_NAMES})
     PREFIX ""
     TAGINFO ""
   )
-
-  # Configure rpaths
-  # Encode the path to libopenvdb.so into plugins, and because some
-  # plugins might depend on Houdini libraries that are not linked into
-  # hython (among other tools), encode the Houdini library path as well.
-
-  if(OPENVDB_ENABLE_RPATH)
-    set(RPATHS)
-    if(OPENVDB_BUILD_CORE)
-      list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-    else()
-      list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-    endif()
-    list(APPEND RPATHS ${OPENVDB_HOUDINI_LIB_INSTALL_PREFIX})
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(${DSO_NAME}
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   add_dependencies(openvdb_houdini_dsos ${DSO_NAME})
 endforeach()

@@ -23,7 +23,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace ax {
 
-/// @note Implementation for initialize, isInitialized and unitialized
+/// @note Implementation for initialize, isInitialized and uninitialized
 ///       reamins in compiler/Compiler.cc
 
 void run(const char* ax, openvdb::GridBase& grid, const std::vector<std::pair<std::string, std::string>>& bindings)
@@ -37,6 +37,7 @@ void run(const char* ax, openvdb::GridBase& grid, const std::vector<std::pair<st
     //        necessarily equate to compilable code
     const openvdb::ax::ast::Tree::ConstPtr
         ast = openvdb::ax::ast::parse(ax, logger);
+    if (!ast) return;
 
     if (grid.isType<points::PointDataGrid>()) {
         // Compile for Point support and produce an executable
@@ -87,6 +88,7 @@ void run(const char* ax, openvdb::GridPtrVec& grids, const std::vector<std::pair
     //        necessarily equate to compilable code
     const openvdb::ax::ast::Tree::ConstPtr
         ast = openvdb::ax::ast::parse(ax, logger);
+    if (!ast) return;
 
     if (points) {
         // Compile for Point support and produce an executable

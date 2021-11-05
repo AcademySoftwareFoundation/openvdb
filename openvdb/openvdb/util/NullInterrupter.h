@@ -13,44 +13,41 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace util {
 
-/// @brief Dummy NOOP interrupter class defining interface
+/// @brief Base class for interrupters
 ///
-/// This shows the required interface for the @c InterrupterType template argument
-/// using by several threaded applications (e.g. tools/PointAdvect.h). The host
-/// application calls start() at the beginning of an interruptible operation, end()
-/// at the end of the operation, and wasInterrupted() periodically during the operation.
+/// The host application calls start() at the beginning of an interruptible operation,
+/// end() at the end of the operation, and wasInterrupted() periodically during the
+/// operation.
 /// If any call to wasInterrupted() returns @c true, the operation will be aborted.
-/// @note This Dummy interrupter will NEVER interrupt since wasInterrupted() always
-/// returns false!
+/// @note This interrupter was not virtual in a previous implementation, so it could
+/// be compiled out, however it remains important to not call wasInterrupter() too
+/// frequently so as to balance performance and the ability to interrupt an operation.
 struct NullInterrupter
 {
     /// Default constructor
-    NullInterrupter () {}
+    NullInterrupter() = default;
+    virtual ~NullInterrupter() = default;
     /// Signal the start of an interruptible operation.
     /// @param name  an optional descriptive name for the operation
-    void start(const char* name = nullptr) { (void)name; }
+    virtual void start(const char* /*name*/ = nullptr) { }
     /// Signal the end of an interruptible operation.
-    void end() {}
+    virtual void end() { }
     /// Check if an interruptible operation should be aborted.
     /// @param percent  an optional (when >= 0) percentage indicating
     ///     the fraction of the operation that has been completed
-    /// @note this method is assumed to be thread-safe. The current
-    /// implementation is clearly a NOOP and should compile out during
-    /// optimization!
-    inline bool wasInterrupted(int percent = -1) { (void)percent; return false; }
-};
+    /// @note this method is assumed to be thread-safe.
+    virtual bool wasInterrupted(int /*percent*/ = -1) { return false; }
+    /// Convenience method to return a reference to the base class from a derived class.
+    virtual NullInterrupter& interrupter() final {
+        return static_cast<NullInterrupter&>(*this);
+    }
+}; // struct NullInterrupter
 
-/// This method allows NullInterrupter::wasInterrupted to be compiled
-/// out when client code only has a pointer (vs reference) to the interrupter.
-///
-/// @note This is a free-standing function since C++ doesn't allow for
-/// partial template specialization (in client code of the interrupter).
+/// This method is primarily for backwards-compatibility as the ability to compile out
+/// the call to wasInterrupted() is no longer supported.
 template <typename T>
 inline bool wasInterrupted(T* i, int percent = -1) { return i && i->wasInterrupted(percent); }
 
-/// Specialization for NullInterrupter
-template<>
-inline bool wasInterrupted<util::NullInterrupter>(util::NullInterrupter*, int) { return false; }
 
 } // namespace util
 } // namespace OPENVDB_VERSION_NAME

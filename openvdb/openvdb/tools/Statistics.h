@@ -3,7 +3,7 @@
 //
 /// @file Statistics.h
 ///
-/// @brief Functions to efficiently compute histograms, extremas
+/// @brief Functions to efficiently compute histograms, extrema
 /// (min/max) and statistics (mean, variance, etc.) of grid values
 
 #ifndef OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED

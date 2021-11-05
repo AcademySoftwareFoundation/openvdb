@@ -18,6 +18,7 @@
 #include "openvdb/math/Stencils.h"
 #include "openvdb/util/NullInterrupter.h"
 #include "openvdb/thread/Threading.h"
+#include <openvdb/openvdb.h>
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>
@@ -39,7 +40,7 @@ namespace tools {
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline Real
+Real
 levelSetArea(const GridType& grid, bool useWorldSpace = true);
 
 /// @brief Return the volume of a narrow-band level set surface.
@@ -51,7 +52,7 @@ levelSetArea(const GridType& grid, bool useWorldSpace = true);
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline Real
+Real
 levelSetVolume(const GridType& grid, bool useWorldSpace = true);
 
 /// @brief Return the Euler Characteristics of a narrow-band level set surface (possibly disconnected).
@@ -61,7 +62,7 @@ levelSetVolume(const GridType& grid, bool useWorldSpace = true);
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline int
+int
 levelSetEulerCharacteristic(const GridType& grid);
 
 /// @brief Return the genus of a narrow-band level set surface.
@@ -72,7 +73,7 @@ levelSetEulerCharacteristic(const GridType& grid);
 ///
 /// @throw TypeError if @a grid is not scalar or not floating-point or not a level set or empty.
 template<class GridType>
-inline int
+int
 levelSetGenus(const GridType& grid);
 
 ////////////////////////////////////////////////////////////////////////////////////////
@@ -427,7 +428,7 @@ doLevelSetArea(const GridT&, bool)
 //}
 
 template<class GridT>
-inline Real
+Real
 levelSetArea(const GridT& grid, bool useWorldUnits)
 {
     return doLevelSetArea<GridT>(grid, useWorldUnits);
@@ -460,7 +461,7 @@ doLevelSetVolume(const GridT&, bool)
 //}
 
 template<class GridT>
-inline Real
+Real
 levelSetVolume(const GridT& grid, bool useWorldUnits)
 {
     return doLevelSetVolume<GridT>(grid, useWorldUnits);
@@ -494,7 +495,7 @@ doLevelSetEulerCharacteristic(const GridT&)
 
 
 template<class GridT>
-inline int
+int
 levelSetEulerCharacteristic(const GridT& grid)
 {
     return doLevelSetEulerCharacteristic(grid);
@@ -537,11 +538,49 @@ doLevelSetGenus(const GridT&)
 //}
 
 template<class GridT>
-inline int
+int
 levelSetGenus(const GridT& grid)
 {
     return doLevelSetGenus(grid);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETMEASURE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Real levelSetArea(const Grid<TreeT>&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Real levelSetVolume(const Grid<TreeT>&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    int levelSetEulerCharacteristic(const Grid<TreeT>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    int levelSetGenus(const Grid<TreeT>&)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<FloatGrid, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetMeasure<DoubleGrid, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

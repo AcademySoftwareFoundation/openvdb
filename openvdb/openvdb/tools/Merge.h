@@ -16,7 +16,9 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/NodeManager.h>
 #include <openvdb/tools/NodeVisitor.h>
+#include <openvdb/openvdb.h>
 
+#include <memory>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -142,7 +144,8 @@ struct TreeToMerge<TreeT>::MaskPtr
         : ptr(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr) { }
     MaskPtr& operator=(const MaskPtr& other)
     {
-        ptr.reset(bool(other.ptr) ? std::make_unique<MaskTreeType>(*other.ptr) : nullptr);
+        if (bool(other.ptr))    ptr = std::make_unique<MaskTreeType>(*other.ptr);
+        else                    ptr.reset();
         return *this;
     }
 };
@@ -1446,6 +1449,48 @@ SumMergeOp<TreeT>::background() const
     return *mBackground;
 }
 
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_MERGE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<MaskTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<BoolTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<DoubleTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Int32Tree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Int64Tree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3STree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3DTree>;
+OPENVDB_INSTANTIATE_STRUCT TreeToMerge<Vec3ITree>;
+
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<MaskTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<BoolTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<DoubleTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Int32Tree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Int64Tree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3STree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3DTree>;
+OPENVDB_INSTANTIATE_STRUCT SumMergeOp<Vec3ITree>;
+
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<FloatTree, true>;
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<DoubleTree, true>;
+
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<FloatTree, false>;
+OPENVDB_INSTANTIATE_STRUCT CsgUnionOrIntersectionOp<DoubleTree, false>;
+
+OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<FloatTree>;
+OPENVDB_INSTANTIATE_STRUCT CsgDifferenceOp<DoubleTree>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
 
 
 } // namespace tools

@@ -289,10 +289,10 @@ private:
 };
 
 
-template<typename GridT, typename InterrupterT>
+template<typename GridT>
 inline void
 closestPoints(const GridT& grid, float isovalue, const GU_Detail& gdp,
-    UT_FloatArray& distances, UT_Vector3Array* positions, InterrupterT& boss)
+    UT_FloatArray& distances, UT_Vector3Array* positions, openvdb::util::NullInterrupter& boss)
 {
     std::vector<openvdb::Vec3R> tmpPoints(distances.entries());
 
@@ -391,7 +391,7 @@ SOP_OpenVDB_Ray::Cache::cookVDBSop(OP_Context& context)
     try {
         const fpreal time = context.getTime();
 
-        hvdb::Interrupter boss("Computing VDB ray intersections");
+        hvdb::HoudiniInterrupter boss("Computing VDB ray intersections");
 
         const GU_Detail* vdbGeo = inputGeo(1);
         if (vdbGeo == nullptr) return error();
@@ -452,7 +452,7 @@ SOP_OpenVDB_Ray::Cache::cookVDBSop(OP_Context& context)
                         intersections, keepMaxDist, reverseRays, scale, bias);
                     UTparallelFor(GA_SplittableRange(gdp->getPointRange()), op);
                 } else {
-                    closestPoints(*gridPtr, isovalue, *gdp, distances, &positions, boss);
+                    closestPoints(*gridPtr, isovalue, *gdp, distances, &positions, boss.interrupter());
                 }
 
             } else {

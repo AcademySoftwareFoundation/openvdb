@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBAXBinaries LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -41,28 +41,5 @@ endif()
 set(VDB_AX_SOURCE_FILES openvdb_ax.cc)
 add_executable(vdb_ax ${VDB_AX_SOURCE_FILES})
 target_link_libraries(vdb_ax ${OPENVDB_BINARIES_DEPENDENT_LIBS})
-
-if(OPENVDB_ENABLE_RPATH)
-  set(RPATHS "")
-  # @todo There is probably a better way to do this for imported targets
-  list(APPEND RPATHS
-    ${Boost_LIBRARY_DIRS}
-    ${IlmBase_LIBRARY_DIRS}
-    ${Log4cplus_LIBRARY_DIRS}
-    ${Blosc_LIBRARY_DIRS}
-    ${Tbb_LIBRARY_DIRS}
-  )
-  if(OPENVDB_BUILD_AX)
-    list(APPEND RPATHS ${CMAKE_INSTALL_FULL_LIBDIR})
-  else()
-    list(APPEND RPATHS ${OpenVDB_LIBRARY_DIRS})
-  endif()
-
-  list(REMOVE_DUPLICATES RPATHS)
-  set_target_properties(vdb_ax
-    PROPERTIES INSTALL_RPATH "${RPATHS}"
-  )
-  unset(RPATHS)
-endif()
 
 install(TARGETS vdb_ax RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})

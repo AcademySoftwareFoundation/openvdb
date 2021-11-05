@@ -15,6 +15,8 @@
 #include <openvdb/Grid.h>
 #include <openvdb/math/Math.h> // for isApproxEqual()
 #include <openvdb/tree/NodeManager.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 
 
 namespace openvdb {
@@ -25,7 +27,7 @@ namespace tools {
 /// @brief Mark as active any inactive tiles or voxels in the given grid or tree
 /// whose values are equal to @a value (optionally to within the given @a tolerance).
 template<typename GridOrTree>
-inline void activate(
+void activate(
     GridOrTree&,
     const typename GridOrTree::ValueType& value,
     const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>(),
@@ -36,7 +38,7 @@ inline void activate(
 /// @brief Mark as inactive any active tiles or voxels in the given grid or tree
 /// whose values are equal to @a value (optionally to within the given @a tolerance).
 template<typename GridOrTree>
-inline void deactivate(
+void deactivate(
     GridOrTree&,
     const typename GridOrTree::ValueType& value,
     const typename GridOrTree::ValueType& tolerance = zeroVal<typename GridOrTree::ValueType>(),
@@ -170,8 +172,8 @@ private:
 
 
 template<typename GridOrTree>
-inline void
-activate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
+void activate(GridOrTree& gridOrTree,
+    const typename GridOrTree::ValueType& value,
     const typename GridOrTree::ValueType& tolerance,
     const bool threaded)
 {
@@ -194,8 +196,8 @@ activate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
 
 
 template<typename GridOrTree>
-inline void
-deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
+void deactivate(GridOrTree& gridOrTree,
+    const typename GridOrTree::ValueType& value,
     const typename GridOrTree::ValueType& tolerance,
     const bool threaded)
 {
@@ -215,6 +217,41 @@ deactivate(GridOrTree& gridOrTree, const typename GridOrTree::ValueType& value,
         nodeManager.foreachTopDown(op, threaded);
     }
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_ACTIVATE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    void activate(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void activate(Grid<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void deactivate(TreeT&, const TreeT::ValueType&, const TreeT::ValueType&, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    void deactivate(Grid<TreeT>&, const TreeT::ValueType&, const TreeT::ValueType&, const bool)
+OPENVDB_ALL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

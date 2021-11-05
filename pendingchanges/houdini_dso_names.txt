@@ -1,3 +1,0 @@
-Houdini:
-    - Add option to pass in OPENVDB_DSO_NAMES to CMake to configure which Houdini
-      DSOs are compiled.

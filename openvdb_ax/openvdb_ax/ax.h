@@ -6,7 +6,7 @@
 /// @author Nick Avramoussis
 ///
 /// @brief  Single header include which provides methods for initializing AX and
-///   running a full AX pipeline (pasrsing, compiling and executing) across
+///   running a full AX pipeline (parsing, compiling and executing) across
 ///   standard OpenVDB Grid types.
 ///
 /// @details  These methods wrap the internal components of OpenVDB AX to

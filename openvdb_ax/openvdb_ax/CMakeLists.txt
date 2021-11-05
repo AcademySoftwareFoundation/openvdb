@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 project(OpenVDBAXCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -230,12 +230,12 @@ if(NOT LLVM_ENABLE_ASSERTIONS)
   # otherwise we get a missing symbol error from LLVM:
   #  undefined reference to `llvm::cfg::Update<llvm::BasicBlock*>::dump() const'
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
-    "$<$<AND:$<CONFIG:ASAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:NDEBUG>")
+    "$<$<AND:$<CONFIG:ASAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:NDEBUG>")
 endif()
 if(NOT LLVM_ENABLE_RTTI)
   # If llvm has been built without rtti, disable the vptr sanitizer for AX
   list(APPEND OPENVDB_AX_PUBLIC_OPTIONS
-    "$<$<AND:$<CONFIG:UBSAN>,$<OR:$<CXX_COMPILER_ID:GNU>,$<CXX_COMPILER_ID:Clang>,$<CXX_COMPILER_ID:AppleClang>>>:-fno-sanitize=vptr>")
+    "$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fno-sanitize=vptr>")
 endif()
 
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -310,22 +310,6 @@ if(OPENVDB_AX_SHARED)
       SOVERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}
       VERSION ${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}
     )
-
-  if(OPENVDB_ENABLE_RPATH)
-    # @todo There is probably a better way to do this for imported targets
-    list(APPEND RPATHS
-      ${Boost_LIBRARY_DIRS}
-      ${IlmBase_LIBRARY_DIRS}
-      ${Log4cplus_LIBRARY_DIRS}
-      ${Blosc_LIBRARY_DIRS}
-      ${Tbb_LIBRARY_DIRS}
-      ${LLVM_LIBRARY_DIRS}
-    )
-    list(REMOVE_DUPLICATES RPATHS)
-    set_target_properties(openvdb_ax_shared
-      PROPERTIES INSTALL_RPATH "${RPATHS}"
-    )
-  endif()
 
   target_link_libraries(openvdb_ax_shared PUBLIC ${OPENVDB_AX_CORE_DEPENDENT_LIBS})
 endif()

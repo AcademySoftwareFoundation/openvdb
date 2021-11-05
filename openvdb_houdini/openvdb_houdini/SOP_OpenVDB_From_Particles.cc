@@ -85,7 +85,7 @@ public:
             ParticleList&,
             openvdb::FloatGrid::Ptr,
             openvdb::BoolGrid::Ptr,
-            hvdb::Interrupter&);
+            openvdb::util::NullInterrupter&);
 
         void convertWithAttributes(
             fpreal time,
@@ -93,7 +93,7 @@ public:
             ParticleList&,
             openvdb::FloatGrid::Ptr,
             openvdb::BoolGrid::Ptr,
-            hvdb::Interrupter&);
+            openvdb::util::NullInterrupter&);
 
         int constructGenericAtttributeList(
             fpreal time,
@@ -799,11 +799,11 @@ convertImpl(
     float maxRadius,
     bool velocityTrails,
     float trailRes,
-    hvdb::Interrupter& boss,
+    openvdb::util::NullInterrupter& boss,
     size_t& numTooSmall,
     size_t& numTooLarge)
 {
-    openvdb::tools::ParticlesToLevelSet<GridT, AttrT, hvdb::Interrupter> raster(outGrid, &boss);
+    openvdb::tools::ParticlesToLevelSet<GridT, AttrT> raster(outGrid, &boss);
 
     raster.setRmin(minRadius);
     raster.setRmax(maxRadius);
@@ -850,7 +850,7 @@ SOP_OpenVDB_From_Particles::Cache::convert(
     ParticleList& paList,
     openvdb::FloatGrid::Ptr sdfGrid,
     openvdb::BoolGrid::Ptr maskGrid,
-    hvdb::Interrupter& boss)
+    openvdb::util::NullInterrupter& boss)
 {
     using NoAttrs = void;
 
@@ -884,7 +884,7 @@ SOP_OpenVDB_From_Particles::Cache::convertWithAttributes(
     ParticleList& paList,
     openvdb::FloatGrid::Ptr sdfGrid,
     openvdb::BoolGrid::Ptr maskGrid,
-    hvdb::Interrupter& boss)
+    openvdb::util::NullInterrupter& boss)
 {
     const bool velocityTrails = paList.hasVelocity() && (0 != evalInt("velocitytrails", 0, time));
     const float
@@ -1053,7 +1053,7 @@ OP_ERROR
 SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-        hvdb::Interrupter boss("Creating VDBs from particles");
+        hvdb::HoudiniInterrupter boss("Creating VDBs from particles");
 
         const GU_Detail* ptGeo = inputGeo(0, context);
         const GU_Detail* refGeo = inputGeo(1, context);
@@ -1171,15 +1171,15 @@ SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
                     " named 'v' of type 3fv.");
             }
             if (outputAttributeGrid) {
-                this->convertWithAttributes(time, *ptGeo, paList, sdfGrid, maskGrid, boss);
+                this->convertWithAttributes(time, *ptGeo, paList, sdfGrid, maskGrid, boss.interrupter());
             } else {
-                this->convert(time, paList, sdfGrid, maskGrid, boss);
+                this->convert(time, paList, sdfGrid, maskGrid, boss.interrupter());
             }
         } else {
             pointMaskGrid = GUvdbCreatePointMaskGrid(*transform, *ptGeo);
             if (sdfGrid) {
                 openvdb::FloatGrid::Ptr pointSdfGrid = openvdb::tools::topologyToLevelSet(
-                    *pointMaskGrid, bandWidth, closing, dilation, smoothing, &boss);
+                    *pointMaskGrid, bandWidth, closing, dilation, smoothing, &boss.interrupter());
                 openvdb::tools::csgUnion(*sdfGrid, *pointSdfGrid);
             }
             if (maskGrid) {
@@ -1206,10 +1206,10 @@ SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
             if (offset > 0.0f) {
                 if (doSphereConversion) {
                     paList.setRadiusMult(radiusScale * (1.0 + offset));
-                    this->convert(time, paList, maxGrid, nullptr, boss);
+                    this->convert(time, paList, maxGrid, nullptr, boss.interrupter());
 
                     paList.setRadiusMult(radiusScale * (1.0 - offset));
-                    this->convert(time, paList, minGrid, nullptr, boss);
+                    this->convert(time, paList, minGrid, nullptr, boss.interrupter());
                 } else {
                     if (!pointMaskGrid) {
                         pointMaskGrid = GUvdbCreatePointMaskGrid(*transform, *ptGeo);
@@ -1219,10 +1219,10 @@ SOP_OpenVDB_From_Particles::Cache::cookVDBSop(OP_Context& context)
                     int decrease = int(dx * (1.0 - offset));
 
                     maxGrid = openvdb::tools::topologyToLevelSet(
-                        *pointMaskGrid, bandWidth, closing, increase, smoothing, &boss);
+                        *pointMaskGrid, bandWidth, closing, increase, smoothing, &boss.interrupter());
 
                     minGrid = openvdb::tools::topologyToLevelSet(
-                        *pointMaskGrid, bandWidth, closing, decrease, smoothing, &boss);
+                        *pointMaskGrid, bandWidth, closing, decrease, smoothing, &boss.interrupter());
                 }
             }
 

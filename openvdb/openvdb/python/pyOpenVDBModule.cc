@@ -14,6 +14,10 @@
 #include "pyGrid.h"
 #include "pyutil.h"
 
+#ifdef PY_OPENVDB_USE_AX
+#include <openvdb_ax/ax.h>
+#endif
+
 namespace py = boost::python;
 
 
@@ -544,6 +548,10 @@ py::object readGridMetadataFromFile(const std::string&, const std::string&);
 py::list readAllGridMetadataFromFile(const std::string&);
 void writeToFile(const std::string&, py::object, py::object);
 
+#ifdef PY_OPENVDB_USE_AX
+void axrun(const std::string&, py::object);
+#endif
+
 
 py::object
 readFromFile(const std::string& filename, const std::string& gridName)
@@ -652,6 +660,27 @@ writeToFile(const std::string& filename, py::object gridOrSeqObj, py::object dic
     vdbFile.close();
 }
 
+#ifdef PY_OPENVDB_USE_AX
+void axrun(const std::string& code, py::object gridOrSeqObj)
+{
+    GridPtrVec gridVec;
+    try {
+        GridBase::Ptr base = pyopenvdb::getGridFromPyObject(gridOrSeqObj);
+        gridVec.push_back(base);
+    } catch (openvdb::TypeError&) {
+        for (py::stl_input_iterator<py::object> it(gridOrSeqObj), end; it != end; ++it) {
+            if (GridBase::Ptr base = pyGrid::getGridBaseFromGrid(*it)) {
+                gridVec.push_back(base);
+            }
+        }
+    }
+
+    try { openvdb::ax::run(code.c_str(), gridVec); }
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+    }
+}
+#endif
 
 ////////////////////////////////////////
 
@@ -821,7 +850,9 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 
     // Initialize OpenVDB.
     initialize();
-
+#ifdef PY_OPENVDB_USE_AX
+    openvdb::ax::initialize();
+#endif
     _openvdbmodule::CoordConverter::registerConverter();
 
     _openvdbmodule::VecConverter<Vec2i>::registerConverter();
@@ -877,6 +908,14 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
         (py::arg("filename"), py::arg("gridname")),
         "read(filename, gridname) -> Grid\n\n"
         "Read a single grid from a .vdb file.");
+
+#ifdef PY_OPENVDB_USE_AX
+    py::def("ax",
+        &_openvdbmodule::axrun,
+        (py::arg("code"), py::arg("grids")),
+        "ax(code, grids) -> Grid\n\n"
+        "Run AX code on some VDB grids.");
+#endif
 
     py::def("readAll",
         &_openvdbmodule::readAllFromFile,

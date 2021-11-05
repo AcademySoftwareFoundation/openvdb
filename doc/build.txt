@@ -84,12 +84,12 @@ given FindModule e.g. `FindBlosc.cmake`:
   path on first runs of CMake (i.e. these variables are not
   [cached](https://cmake.org/cmake/help/latest/command/set.html#set-cache-entry)).
   They are listed in priority order. Note that the prefix is always capitalized.
-   - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
-   directories
    - @b Xxx_ROOT - Preferred installation prefix. The given dependency is
    expected to follow a folder structure `Xxx_ROOT/include` and `Xxx_ROOT/lib`
    exist. Note that unlike the above, this is the case matching name of the
    find package .i.e. Blosc_ROOT, IlmBase_ROOT, TBB_ROOT etc.
+   - @b XXX_INCLUDEDIR / @b XXX_LIBRARYDIR - Preferred include and library
+   directories
    - @b SYSTEM_LIBRARY_PATHS - A list of paths appended to all include and lib
    searches.
    - @b XXX_USE_STATIC_LIBS - Only search for static libraries for the given
@@ -154,6 +154,9 @@ for this:
    that were created using blosc compression. This includes OpenVDB files from
    Houdini.
 
+See the note in the [known issues list](@ref depKnownIssues) regarding supported
+versions of blosc.
+
 @subsection buildZLibSupport ZLIB Support
 
 ZLIB is an optional dependency of all OpenVDB components. The documented build
@@ -188,6 +191,10 @@ OpenVDB AX Library        | The OpenVDB AX library                              
 OpenVDB AX Binary         | Command line binary for running OpenVDB AX code                        | OPENVDB_BUILD_AX_BINARIES                         | OFF        |
 OpenVDB AX Grammar        | Allows for re-generation of AX grammar, typically not required         | OPENVDB_BUILD_AX_GRAMMAR                          | OFF        |
 OpenVDB AX Unit Tests     | OpenVDB AX's Unit Test suite                                           | OPENVDB_BUILD_AX_UNITTESTS                        | OFF        |
+NanoVDB                   | NanoVDB headers                                                        | OPENVDB_BUILD_NANOVDB                             | OFF        |
+NanoVDB Tools             | NanoVDB command line tools                                             | NANOVDB_BUILD_TOOLS                               | OFF        |
+NanoVDB Examples          | NanoVDB example binaries and benchmarks                                | NANOVDB_BUILD_EXAMPLES / NANOVDB_BUILD_BENCHMARK  | OFF / OFF  |
+NanoVDB Unit Tests        | NanoVDB Unit Test suite                                                | NANOVDB_BUILD_UNITTESTS                           | OFF        |
 Documentation             | The OpenVDB doxygen documentation                                      | OPENVDB_BUILD_DOCS                                | OFF        |
 
 
@@ -233,6 +240,7 @@ DCC      | Supported Version | OpenVDB ABI |
 -------- | ----------------- | ----------- |
 Houdini  | 18.0              | 6           |
 Houdini  | 18.5              | 7           |
+Houdini  | 19.0              | 8           |
 Maya     | 2017              | Any         |
 Maya     | 2018              | Any         |
 Maya     | 2019              | Any         |
@@ -508,7 +516,7 @@ You can add the below CMake snippet to your main `CMakeLists.txt` to bring in
 OpenVDB as a dependency:
 
 @code{.cmake}
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 list(APPEND CMAKE_MODULE_PATH "/location/of/openvdb/install/lib/cmake/OpenVDB")
 find_package(OpenVDB REQUIRED)
 target_link_libraries(myapp OpenVDB::openvdb)

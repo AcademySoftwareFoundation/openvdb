@@ -136,7 +136,7 @@ public:
     size_t advect(ValueType time0, ValueType time1);
 
 private:
-    // disallow copy construction and copy by assinment!
+    // disallow copy construction and copy by assignment!
     LevelSetAdvection(const LevelSetAdvection&);// not implemented
     LevelSetAdvection& operator=(const LevelSetAdvection&);// not implemented
 
@@ -213,7 +213,7 @@ private:
 
 
 template<typename GridT, typename FieldT, typename InterruptT>
-inline size_t
+size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect(ValueType time0, ValueType time1)
 {
     switch (mSpatialScheme) {
@@ -236,7 +236,7 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect(ValueType time0, ValueType 
 
 template<typename GridT, typename FieldT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme>
-inline size_t
+size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect1(ValueType time0, ValueType time1)
 {
     switch (mTemporalScheme) {
@@ -255,7 +255,7 @@ LevelSetAdvection<GridT, FieldT, InterruptT>::advect1(ValueType time0, ValueType
 
 template<typename GridT, typename FieldT, typename InterruptT>
 template<math::BiasedGradientScheme SpatialScheme, math::TemporalIntegrationScheme TemporalScheme>
-inline size_t
+size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect2(ValueType time0, ValueType time1)
 {
     const math::Transform& trans = mTracker.grid().transform();
@@ -280,7 +280,7 @@ template<
     math::BiasedGradientScheme SpatialScheme,
     math::TemporalIntegrationScheme TemporalScheme,
     typename MapT>
-inline size_t
+size_t
 LevelSetAdvection<GridT, FieldT, InterruptT>::advect3(ValueType time0, ValueType time1)
 {
     Advect<MapT, SpatialScheme, TemporalScheme> tmp(*this);
@@ -482,9 +482,11 @@ sample(const LeafRange& range, ValueType time0, ValueType time1)
     for (typename LeafRange::Iterator leafIter = range.begin(); leafIter; ++leafIter) {
         VectorType* vel = mVelocity + mOffsets[ leafIter.pos() ];
         for (VoxelIterT iter = leafIter->cbeginValueOn(); iter; ++iter, ++vel) {
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
             const VectorType v = Aligned ? field(iter.getCoord(), time0) ://resolved at compile time
                                  field(map.applyMap(iter.getCoord().asVec3d()), time0);
             *vel = isForward ? v : -v;
+            OPENVDB_NO_TYPE_CONVERSION_WARNING_END
         }
     }
 }
@@ -567,6 +569,24 @@ euler(const LeafRange& range, ValueType dt, Index phiBuffer, Index resultBuffer)
         }//loop over active voxels in the leaf of the mask
     }//loop over leafs of the level set
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETADVECT
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<FloatGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
+OPENVDB_INSTANTIATE_CLASS LevelSetAdvection<DoubleGrid, DiscreteField<Vec3SGrid, BoxSampler>, util::NullInterrupter>;
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

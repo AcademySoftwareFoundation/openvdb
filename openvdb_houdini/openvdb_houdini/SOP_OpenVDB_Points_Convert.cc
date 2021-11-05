@@ -579,7 +579,7 @@ OP_ERROR
 SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
 {
     try {
-        hvdb::Interrupter boss{"Converting points"};
+        hvdb::HoudiniInterrupter boss{"Converting points"};
 
         hvdb::WarnFunc warnFunction = [this](const std::string& msg) {
             this->addWarning(SOP_MESSAGE, msg.c_str());
@@ -856,7 +856,7 @@ SOP_OpenVDB_Points_Convert::Cache::cookVDBSop(OP_Context& context)
             const int pointsPerVoxel = static_cast<int>(evalInt("pointspervoxel", 0, time));
             const float voxelSize =
                 hvdb::computeVoxelSizeFromHoudini(*detail, pointsPerVoxel,
-                    matrix, /*rounding*/ 5, boss);
+                    matrix, /*rounding*/ 5, boss.interrupter());
 
             matrix.preScale(Vec3d(voxelSize) / math::getScale(matrix));
             transform = Transform::createLinearTransform(matrix);

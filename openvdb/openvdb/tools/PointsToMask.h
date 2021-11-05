@@ -6,7 +6,7 @@
 /// @file tools/PointsToMask.h
 ///
 /// @brief This tool produces a grid where every voxel that contains a
-/// point is active. It employes thread-local storage for best performance.
+/// point is active. It employs thread-local storage for best performance.
 ///
 /// The @c PointListT template argument below refers to any class
 /// with the following interface (see unittest/TestPointsToMask.cc
@@ -110,7 +110,7 @@ public:
 
     /// @brief Constructor from a grid and optional interrupter
     ///
-    /// @param grid        Grid whoes voxels will have their state activated by points.
+    /// @param grid        Grid whose voxels will have their state activated by points.
     /// @param interrupter Optional interrupter to prematurely terminate execution.
     explicit PointsToMask(GridT& grid, InterrupterT* interrupter = nullptr)
         : mGrid(&grid)

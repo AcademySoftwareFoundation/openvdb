@@ -67,6 +67,7 @@
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "Morphology.h" // for erodeActiveValues
+#include <openvdb/openvdb.h>
 
 
 namespace openvdb {
@@ -96,11 +97,11 @@ using LaplacianMatrix = math::pcg::SparseStencilMatrix<double, 7>;
 /// to Jacobi preconditioning.
 /// @sa solveWithBoundaryConditions
 template<typename TreeType>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solve(const TreeType&, math::pcg::State&, bool staggered = false);
 
 template<typename TreeType, typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solve(const TreeType&, math::pcg::State&, Interrupter&, bool staggered = false);
 //@}
 
@@ -137,7 +138,7 @@ solve(const TreeType&, math::pcg::State&, Interrupter&, bool staggered = false);
 ///
 /// @sa solve
 template<typename TreeType, typename BoundaryOp, typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditions(
     const TreeType&,
     const BoundaryOp&,
@@ -150,7 +151,7 @@ template<
     typename TreeType,
     typename BoundaryOp,
     typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(
     const TreeType&,
     const BoundaryOp&,
@@ -164,7 +165,7 @@ template<
     typename DomainTreeType,
     typename BoundaryOp,
     typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(
     const TreeType&,
     const DomainTreeType&,
@@ -182,13 +183,13 @@ solveWithBoundaryConditionsAndPreconditioner(
 /// @brief Overwrite each active voxel in the given scalar tree
 /// with a sequential index, starting from zero.
 template<typename VIndexTreeType>
-inline void populateIndexTree(VIndexTreeType&);
+void populateIndexTree(VIndexTreeType&);
 
 /// @brief Iterate over the active voxels of the input tree and for each one
 /// assign its index in the iteration sequence to the corresponding voxel
 /// of an integer-valued output tree.
 template<typename TreeType>
-inline typename TreeType::template ValueConverter<VIndex>::Type::Ptr
+typename TreeType::template ValueConverter<VIndex>::Type::Ptr
 createIndexTree(const TreeType&);
 
 
@@ -199,7 +200,7 @@ createIndexTree(const TreeType&);
 /// @param index   a tree of the same configuration as @a source but with
 ///     value type VIndex that maps voxels to elements of the output vector
 template<typename VectorValueType, typename SourceTreeType>
-inline typename math::pcg::Vector<VectorValueType>::Ptr
+typename math::pcg::Vector<VectorValueType>::Ptr
 createVectorFromTree(
     const SourceTreeType& source,
     const typename SourceTreeType::template ValueConverter<VIndex>::Type& index);
@@ -213,7 +214,7 @@ createVectorFromTree(
 /// @param values  a vector of values with which to populate the active voxels of the output tree
 /// @param background  the value for the inactive voxels of the output tree
 template<typename TreeValueType, typename VIndexTreeType, typename VectorValueType>
-inline typename VIndexTreeType::template ValueConverter<TreeValueType>::Type::Ptr
+typename VIndexTreeType::template ValueConverter<TreeValueType>::Type::Ptr
 createTreeFromVector(
     const math::pcg::Vector<VectorValueType>& values,
     const VIndexTreeType& index,
@@ -225,7 +226,7 @@ createTreeFromVector(
 /// @details This construction assumes homogeneous Dirichlet boundary conditions
 /// (exterior grid points are zero).
 template<typename BoolTreeType>
-inline LaplacianMatrix::Ptr
+LaplacianMatrix::Ptr
 createISLaplacian(
     const typename BoolTreeType::template ValueConverter<VIndex>::Type& vectorIndexTree,
     const BoolTreeType& interiorMask,
@@ -252,7 +253,7 @@ createISLaplacian(
 /// provided values: an entry in the given @a source vector corresponding to @ijk and
 /// the weighting coefficient for @ijk in the %Laplacian matrix.
 template<typename BoolTreeType, typename BoundaryOp>
-inline LaplacianMatrix::Ptr
+LaplacianMatrix::Ptr
 createISLaplacianWithBoundaryConditions(
     const typename BoolTreeType::template ValueConverter<VIndex>::Type& vectorIndexTree,
     const BoolTreeType& interiorMask,
@@ -744,7 +745,7 @@ createISLaplacianWithBoundaryConditions(
 
 
 template<typename TreeType>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solve(const TreeType& inTree, math::pcg::State& state, bool staggered)
 {
     util::NullInterrupter interrupter;
@@ -753,7 +754,7 @@ solve(const TreeType& inTree, math::pcg::State& state, bool staggered)
 
 
 template<typename TreeType, typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solve(const TreeType& inTree, math::pcg::State& state, Interrupter& interrupter, bool staggered)
 {
     DirichletBoundaryOp<LaplacianMatrix::ValueType> boundaryOp;
@@ -762,7 +763,7 @@ solve(const TreeType& inTree, math::pcg::State& state, Interrupter& interrupter,
 
 
 template<typename TreeType, typename BoundaryOp, typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditions(const TreeType& inTree, const BoundaryOp& boundaryOp,
     math::pcg::State& state, Interrupter& interrupter, bool staggered)
 {
@@ -777,7 +778,7 @@ template<
     typename TreeType,
     typename BoundaryOp,
     typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(
     const TreeType& inTree,
     const BoundaryOp& boundaryOp,
@@ -795,7 +796,7 @@ template<
     typename DomainTreeType,
     typename BoundaryOp,
     typename Interrupter>
-inline typename TreeType::Ptr
+typename TreeType::Ptr
 solveWithBoundaryConditionsAndPreconditioner(
     const TreeType& inTree,
     const DomainTreeType& domainMask,
@@ -842,6 +843,53 @@ solveWithBoundaryConditionsAndPreconditioner(
     /// @todo if (state.success) ... ?
     return createTreeFromVector<TreeValueT>(*x, *idxTree, /*background=*/zeroVal<TreeValueT>());
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_POISSONSOLVER
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const TreeT&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::IncompleteCholeskyPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const BoolTree&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::JacobiPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const TreeT&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    TreeT::Ptr solveWithBoundaryConditionsAndPreconditioner< \
+        math::pcg::JacobiPreconditioner<LaplacianMatrix>>( \
+            const TreeT&, const BoolTree&, const DirichletBoundaryOp<LaplacianMatrix::ValueType>&, \
+            math::pcg::State&, util::NullInterrupter&, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace poisson
 } // namespace tools

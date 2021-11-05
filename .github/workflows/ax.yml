@@ -9,7 +9,9 @@ on:
       - 'pr/**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
+      - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
       - 'pendingchanges/**'
@@ -19,14 +21,16 @@ on:
       - '**'
     paths-ignore:
       - 'CHANGES'
+      - 'CODEOWNERS'
       - 'doc/**'
+      - 'nanovdb/**'
       - 'openvdb_maya/**'
       - 'openvdb_houdini/**'
       - 'pendingchanges/**'
       - '**.md'
   schedule:
-    # run this workflow every midnight Tuesday
-    - cron:  '0 0 * * 2'
+    # run this workflow every day 7am UTC
+    - cron:  '0 7 * * *'
   workflow_dispatch:
     inputs:
       type:
@@ -35,153 +39,82 @@ on:
         default: 'all'
 
 jobs:
-  linux-ax-vfx:
-    # VFX platform builds for OpenVDB AX
+  linux-ax:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
     runs-on: ubuntu-latest
     name: >
-      linux-ax-vfx:${{ matrix.image }}-
-      cxx:${{ matrix.compiler }}-
-      ${{ matrix.build }}
+      linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
-      image: aswf/ci-openvdb:${{ matrix.image }}
+      image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
-      CXX: ${{ matrix.compiler }}
+      CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
-        image: ['2019-clang8', '2020-clang7', '2021-clang10']
-        compiler: ['clang++']
-        build: ['Release']
-        j: [2]
-        # Extra builds
-        include:
-          - image: '2020-clang7'
-            compiler: 'clang++'
-            build: 'Debug'
-            j: 2
-          - image: '2020-clang7'
-            compiler: 'g++'
-            build: 'Release'
-            # disable parallel builds when using GCC due to memory limits
-            j: 1
-          - image: '2019-clang8'
-            compiler: 'g++'
-            build: 'Release'
-            # disable parallel builds when using GCC due to memory limits
-            j: 1
-          - image: '2021-clang10'
-            compiler: 'g++'
-            build: 'Release'
-            # disable parallel builds when using GCC due to memory limits
-            j: 1
+        config:
+          # Unified
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: build
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.j }}
-          --build-type=${{ matrix.build }}
-          --components="core,axcore,axbin,axtest"
-          --cargs="-DOPENVDB_CXX_STRICT=ON"
-      - name: test
-        run: cd build && ctest -V
-      - name: test_doxygen_examples
-        run: ./ci/extract_test_examples.sh
-
-  linux-ax-standalone-vfx:
-    # VFX platform builds for OpenVDB AX against an existing VDB installation
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'linux'
-    runs-on: ubuntu-latest
-    name: >
-      linux-ax-standalone-vfx:${{ matrix.image }}-
-      cxx:${{ matrix.compiler }}-
-      llvm:${{ matrix.llvm }}-
-      ${{ matrix.build }}
-    container:
-      image: aswf/ci-openvdb:${{ matrix.image }}
-    env:
-      CXX: ${{ matrix.compiler }}
-    strategy:
-      matrix:
-        image: ['2019-clang6', '2019-clang7', '2019-clang8', '2019-clang9', '2020-clang7', '2021-clang10']
-        compiler: ['clang++']
-        build: ['Release']
-        j: [2]
-        # Extra builds
-        include:
-          - image: '2020-clang7'
-            compiler: 'g++'
-            build: 'Release'
-            # disable parallel builds when using GCC due to memory limits
-            j: 1
-          - image: '2020-clang7'
-            compiler: 'clang++'
-            build: 'Debug'
-            j: 2
-      fail-fast: false
-    steps:
-      - uses: actions/checkout@v2
-      - name: vdb
-        run: >
-          ./ci/build.sh -v
-          -j ${{ matrix.j }}
-          --build-type=${{ matrix.build }}
-          --components="core"
-          --cargs="-DOPENVDB_CXX_STRICT=ON"
+          -j ${{ matrix.config.j }}
+          --build-type=${{ matrix.config.build }}
+          --components=${{ matrix.config.components }}
+          --cargs=\"-DOPENVDB_CXX_STRICT=ON -DUSE_EXPLICIT_INSTANTIATION=OFF\"
       - name: clean
+        if: matrix.config.components == 'core'
         run: rm -rf build
       - name: build
+        if: matrix.config.components == 'core'
         run: >
           ./ci/build.sh -v
-          -j ${{ matrix.j }}
-          --build-type=${{ matrix.build }}
+          -j ${{ matrix.config.j }}
+          --build-type=${{ matrix.config.build }}
           --components="axcore,axbin,axtest"
-          --cargs="-DOPENVDB_CXX_STRICT=ON"
+          --cargs=\"-DOPENVDB_CXX_STRICT=ON -DUSE_EXPLICIT_INSTANTIATION=OFF\"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
 
-  macos-core:
+  macos-ax:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-10.15
-    name: macos-cxx:${{ matrix.compiler }}-llvm:${{ matrix.llvm }}-${{ matrix.build }}
+    runs-on: ${{ matrix.config.runner }}
+    name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
-      CXX: ${{ matrix.compiler }}
+      CXX: ${{ matrix.config.cxx }}
     strategy:
       matrix:
-        compiler: ['clang++']
-        build: ['Release']
-        llvm: ['7','8','9','11','12'] #@note llvm10 never got its own brew formula...
-        # Extra builds
-        include:
-          - compiler: 'g++'
-            build: 'Release'
-            llvm: '8'
-          - compiler: 'clang++'
-            build: 'Debug'
-            llvm: '8'
+        config:
+          #@note llvm10 never got its own brew formula...
+          - { runner: 'macos-10.15',  cxx: 'clang++', build: 'Release', llvm: '7'  }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '8'  }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '9'  }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
+          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
       - name: install_deps
-        run: ./ci/install_macos_ax.sh ${{ matrix.llvm }}
+        run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
       - name: build
         run: >
           ./ci/build.sh -v
-          --build-type=${{ matrix.build }}
+          --build-type=${{ matrix.config.build }}
           --components="core,axcore,axbin,axtest"
-          --cargs="-DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.llvm }}/lib/cmake/llvm"
+          --cargs=\"-DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm -DUSE_EXPLICIT_INSTANTIATION=OFF\"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples

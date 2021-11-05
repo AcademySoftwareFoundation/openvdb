@@ -69,7 +69,7 @@ namespace tools {
 ///
 ///     using DenseValueType = float;
 ///
-///     using Index = vdbmath::Coord::ValueType;
+///     using Index = openvdb::Coord::ValueType;
 ///
 ///     Rule(const DenseValueType& value): mMaskValue(value){};
 ///

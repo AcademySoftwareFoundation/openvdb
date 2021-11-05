@@ -75,7 +75,7 @@ may be provided to tell this module where to look.
 # Find the Houdini installation and use Houdini's CMake to initialize
 # the Houdini lib
 
-cmake_minimum_required(VERSION 3.12)
+cmake_minimum_required(VERSION 3.15)
 
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
@@ -144,6 +144,8 @@ elseif(MINIMUM_HOUDINI_VERSION)
     )
   endif()
 endif()
+
+set(Houdini_VERSION_MAJOR_MINOR "${Houdini_VERSION_MAJOR}.${Houdini_VERSION_MINOR}")
 
 find_package(PackageHandleStandardArgs)
 find_package_handle_standard_args(Houdini
@@ -329,14 +331,16 @@ endif()
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-if(Houdini_VERSION VERSION_LESS 17)
-  set(OPENVDB_HOUDINI_ABI 4)
-elseif(Houdini_VERSION VERSION_LESS 18)
-  set(OPENVDB_HOUDINI_ABI 5)
-elseif(Houdini_VERSION VERSION_LESS 18.5)
+if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
   set(OPENVDB_HOUDINI_ABI 6)
-else()
+elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
+elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 19.0)
+  set(OPENVDB_HOUDINI_ABI 8)
+else()
+  message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=8, "
+    "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
+  set(OPENVDB_HOUDINI_ABI 8)
 endif()
 
 # ------------------------------------------------------------------------

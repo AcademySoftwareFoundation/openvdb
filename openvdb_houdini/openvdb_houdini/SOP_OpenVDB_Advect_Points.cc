@@ -262,7 +262,7 @@ class ProjectionOp
 public:
 
     ProjectionOp(const GridType& cptGrid, int cptIterations, GU_Detail& geo,
-        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss)
+        const std::vector<GA_Offset>& offsetsToSkip, openvdb::util::NullInterrupter& boss)
         : mProjector(cptGrid, cptIterations)
         , mGeo(geo)
         , mOffsetsToSkip(offsetsToSkip)
@@ -311,14 +311,14 @@ private:
     ProjectorType mProjector;
     GU_Detail& mGeo;
     const std::vector<GA_Offset>& mOffsetsToSkip;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
 };
 
 
 class Projection
 {
 public:
-    Projection(AdvectionParms& parms, hvdb::Interrupter& boss)
+    Projection(AdvectionParms& parms, openvdb::util::NullInterrupter& boss)
         : mParms(parms)
         , mBoss(boss)
     {
@@ -336,7 +336,7 @@ public:
 
 private:
     AdvectionParms& mParms;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
 };
 
 
@@ -354,7 +354,7 @@ class AdvectionOp
 public:
 
     AdvectionOp(const GridType& velocityGrid, GU_Detail& geo,
-        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss,
+        const std::vector<GA_Offset>& offsetsToSkip, openvdb::util::NullInterrupter& boss,
         double timeStep, GA_ROHandleF traillen, int steps)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(nullptr)
@@ -369,7 +369,7 @@ public:
     }
 
     AdvectionOp(const GridType& velocityGrid, const GridType& cptGrid, GU_Detail& geo,
-        const std::vector<GA_Offset>& offsetsToSkip, hvdb::Interrupter& boss,
+        const std::vector<GA_Offset>& offsetsToSkip, openvdb::util::NullInterrupter& boss,
         double timeStep, int steps, int cptIterations)
         : mVelocityGrid(velocityGrid)
         , mCptGrid(&cptGrid)
@@ -441,7 +441,7 @@ private:
     const GridType* mCptGrid;
     GU_Detail& mGeo;
     const std::vector<GA_Offset>& mOffsetsToSkip;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
     double mTimeStep;
     GA_ROHandleF mTrailLen;
     const int mSteps, mCptIterations;
@@ -451,7 +451,7 @@ private:
 class Advection
 {
 public:
-    Advection(AdvectionParms& parms, hvdb::Interrupter& boss)
+    Advection(AdvectionParms& parms, openvdb::util::NullInterrupter& boss)
         : mParms(parms)
         , mBoss(boss)
     {
@@ -573,7 +573,7 @@ public:
 
 private:
     AdvectionParms&    mParms;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
 };
 
 
@@ -581,7 +581,7 @@ template <typename PointDataGridT>
 class VDBPointsAdvection
 {
 public:
-    VDBPointsAdvection(PointDataGridT& outputGrid, AdvectionParms& parms, hvdb::Interrupter& boss)
+    VDBPointsAdvection(PointDataGridT& outputGrid, AdvectionParms& parms, openvdb::util::NullInterrupter& boss)
         : mOutputGrid(outputGrid)
         , mParms(parms)
         , mBoss(boss)
@@ -608,7 +608,7 @@ public:
 private:
     PointDataGridT&    mOutputGrid;
     AdvectionParms&    mParms;
-    hvdb::Interrupter& mBoss;
+    openvdb::util::NullInterrupter& mBoss;
 };
 
 } // namespace
@@ -959,7 +959,7 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
 
         const bool advectVdbPoints = (0 != evalInt("advectvdbpoints", 0, now));
 
-        hvdb::Interrupter boss("Processing points");
+        hvdb::HoudiniInterrupter boss("Processing points");
 
         if (advectVdbPoints) {
             // build a list of point offsets to skip during Houdini point advection
@@ -997,7 +997,7 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
                     case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
                     {
                         VDBPointsAdvection<openvdb::points::PointDataGrid> advection(
-                            outputGrid, parms, boss);
+                            outputGrid, parms, boss.interrupter());
                         hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, advection);
                         break;
                     }
@@ -1012,13 +1012,13 @@ SOP_OpenVDB_Advect_Points::Cache::cookVDBSop(OP_Context& context)
             case PROPAGATION_TYPE_ADVECTION:
             case PROPAGATION_TYPE_CONSTRAINED_ADVECTION:
             {
-                Advection advection(parms, boss);
+                Advection advection(parms, boss.interrupter());
                 hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, advection);
                 break;
             }
             case PROPAGATION_TYPE_PROJECTION:
             {
-                Projection projection(parms, boss);
+                Projection projection(parms, boss.interrupter());
                 hvdb::GEOvdbApply<hvdb::Vec3GridTypes>(*parms.mVelPrim, projection);
                 break;
             }

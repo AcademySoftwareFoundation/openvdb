@@ -745,7 +745,7 @@ SOP_OpenVDB_AX::Cache::cookVDBSop(OP_Context& context)
         SOP_OpenVDB_AX* self =
             static_cast<SOP_OpenVDB_AX*>(this->cookparms()->getSrcNode());
 
-        hvdb::Interrupter boss("Executing OpenVDB AX");
+        hvdb::HoudiniInterrupter boss("Executing OpenVDB AX");
 
         const fpreal time = context.getTime();
 

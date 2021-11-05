@@ -30,6 +30,10 @@ TestAXRun::singleRun()
     openvdb::FloatGrid f;
     f.setName("a");
     f.tree().setValueOn({0,0,0}, 0.0f);
+
+    // test lexer errors which return an invlid AST
+    openvdb::ax::run("@c = 1.0f", f); // no-semicolon
+
     openvdb::ax::run("@a = 1.0f;", f);
     CPPUNIT_ASSERT_EQUAL(1.0f, f.tree().getValue({0,0,0}));
 
@@ -81,6 +85,10 @@ TestAXRun::multiRun()
         f1->tree().setValueOn({0,0,0}, 0.0f);
         f2->tree().setValueOn({0,0,0}, 0.0f);
         std::vector<openvdb::GridBase::Ptr> v { f1, f2 };
+
+        // test lexer errors which return an invlid AST
+        openvdb::ax::run("@c = 1.0f", v); // no-semicolon
+
         openvdb::ax::run("@a = @b = 1;", v);
         CPPUNIT_ASSERT_EQUAL(1.0f, f1->tree().getValue({0,0,0}));
         CPPUNIT_ASSERT_EQUAL(1.0f, f2->tree().getValue({0,0,0}));

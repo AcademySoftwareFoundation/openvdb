@@ -258,7 +258,7 @@ SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
 
         const float iso = float(evalFloat("isovalue", 0, time));
 
-        hvdb::Interrupter boss("Rebuilding Level Set Grids");
+        hvdb::HoudiniInterrupter boss("Rebuilding Level Set Grids");
 
         std::vector<std::string> skippedGrids;
 
@@ -293,7 +293,7 @@ SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
                 openvdb::FloatGrid& grid = UTvdbGridCast<openvdb::FloatGrid>(vdbPrim->getGrid());
 
                 openvdb::FloatGrid::Ptr newGrid = openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss);
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss.interrupter());
                 newGrid->insertMeta(*grid.copyMeta());
 
                 vdbPrim->setGrid(*newGrid);
@@ -306,7 +306,7 @@ SOP_OpenVDB_Rebuild_Level_Set::Cache::cookVDBSop(
                 openvdb::DoubleGrid& grid = UTvdbGridCast<openvdb::DoubleGrid>(vdbPrim->getGrid());
 
                 openvdb::DoubleGrid::Ptr newGrid = openvdb::tools::levelSetRebuild(
-                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss);
+                    grid, iso, exWidth, inWidth, /*xform=*/nullptr, &boss.interrupter());
                 newGrid->insertMeta(*grid.copyMeta());
 
                 vdbPrim->setGrid(*newGrid);

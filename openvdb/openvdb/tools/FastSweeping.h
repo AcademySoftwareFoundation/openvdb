@@ -19,7 +19,7 @@
 ///          "A Fast Sweeping Method For Eikonal Equations"
 ///          by H. Zhao, Mathematics of Computation, Vol 74(230), pp 603-627, 2004
 ///
-/// @details The algorithm used below for parallel fast sweeping was first publised in:
+/// @details The algorithm used below for parallel fast sweeping was first published in:
 ///          "New Algorithm for Sparse and Parallel Fast Sweeping: Efficient
 ///          Computation of Sparse Distance Fields" by K. Museth, ACM SIGGRAPH Talk,
 ///          2017, http://www.museth.org/Ken/Publications_files/Museth_SIG17.pdf
@@ -29,27 +29,29 @@
 
 //#define BENCHMARK_FAST_SWEEPING
 
+#include <openvdb/Platform.h>
+#include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
+#include <openvdb/math/Stencils.h> // for GradStencil
+#include <openvdb/tree/LeafManager.h>
+#include "LevelSetUtil.h"
+#include "Morphology.h"
+#include <openvdb/openvdb.h>
+
+#include "Statistics.h"
+#ifdef BENCHMARK_FAST_SWEEPING
+#include <openvdb/util/CpuTimer.h>
+#endif
+
+#include <tbb/parallel_for.h>
+#include <tbb/enumerable_thread_specific.h>
+#include <tbb/task_group.h>
+
 #include <type_traits>// for static_assert
 #include <cmath>
 #include <limits>
 #include <deque>
 #include <unordered_map>
 #include <utility>// for std::make_pair
-
-#include <tbb/parallel_for.h>
-#include <tbb/enumerable_thread_specific.h>
-#include <tbb/task_group.h>
-
-#include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
-#include <openvdb/math/Stencils.h> // for GradStencil
-#include <openvdb/tree/LeafManager.h>
-#include "LevelSetUtil.h"
-#include "Morphology.h"
-
-#include "Statistics.h"
-#ifdef BENCHMARK_FAST_SWEEPING
-#include <openvdb/util/CpuTimer.h>
-#endif
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -85,7 +87,7 @@ enum class FastSweepingDomain {
 ///                 Each iteration performs 2^3 = 8 individual sweeps.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbitary range, as long as the it
+///       method accepts a scalar volume with an arbritary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -175,7 +177,7 @@ sdfToSdf(const GridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbitary range, as long as the it
+///       method accepts a scalar volume with an arbritary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grid is identical to that of the input grid, except
@@ -293,7 +295,7 @@ sdfToExt(const SdfGridT &sdfGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbitary range, as long as the it
+///       method accepts a scalar volume with an arbritary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except
@@ -356,7 +358,7 @@ fogToSdfAndExt(const FogGridT &fogGrid,
 ///                 is supplied as an argument for @a mode.
 ///
 /// @note Strictly speaking a fog volume is normalized to the range [0,1] but this
-///       method accepts a scalar volume with an arbitary range, as long as the it
+///       method accepts a scalar volume with an arbritary range, as long as the it
 ///       includes the @a isoValue.
 ///
 /// @details Topology of output grids are identical to that of the input grid, except
@@ -401,7 +403,7 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
 /// @details Topology will change as a result of this dilation. E.g. if
 ///          sdfGrid has a width of 3 and @a dilation = 6 then the grid
 ///          returned by this method is a narrow band signed distance field
-///          with a total vidth of 9 units.
+///          with a total width of 9 units.
 template<typename GridT>
 typename GridT::Ptr
 dilateSdf(const GridT &sdfGrid,
@@ -417,7 +419,7 @@ dilateSdf(const GridT &sdfGrid,
 ///
 /// @param sdfGrid  Input signed distance field to be extended into the mask.
 ///
-/// @param mask     Mask used to idetify the topology of the output SDF.
+/// @param mask     Mask used to identify the topology of the output SDF.
 ///                 Note this mask is assume to overlap with the sdfGrid.
 ///
 /// @param ignoreActiveTiles If false, active tiles in the mask are treated
@@ -437,9 +439,9 @@ maskSdf(const GridT &sdfGrid,
 
 ////////////////////////////////////////////////////////////////////////////////
 /// @brief Computes signed distance values from an initial iso-surface and
-///        optionally performs velocty extension at the same time. This is
+///        optionally performs velocity extension at the same time. This is
 ///        done by means of a novel sparse and parallel fast sweeping
-///        algorithm based on a first order Goudonov's scheme.
+///        algorithm based on a first order Godunov's scheme.
 ///
 ///        Solves: @f$|\nabla \phi|^2 = 1 @f$
 ///
@@ -452,7 +454,7 @@ class FastSweeping
 {
     static_assert(std::is_floating_point<typename SdfGridT::ValueType>::value,
                   "FastSweeping requires SdfGridT to have floating-point values");
-    // Defined types related to the signed disntance (or fog) grid
+    // Defined types related to the signed distance (or fog) grid
     using SdfValueT = typename SdfGridT::ValueType;
     using SdfTreeT = typename SdfGridT::TreeType;
     using SdfAccT  = tree::ValueAccessor<SdfTreeT, false>;//don't register accessors
@@ -520,7 +522,7 @@ public:
     /// @param isInputSdf Used to determine if @a sdfGrid is a sigend distance field (true)
     ///                   or a scalar fog volume (false).
     ///
-    /// @details This, or any of ther other initilization methods, should be called
+    /// @details This, or any of ther other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -568,7 +570,7 @@ public:
     ///                 The opposite convention is implemented when SWEEP_LESS_THAN_ISOVALUE
     ///                 is supplied as an argument for @a mode.
     ///
-    /// @details This, or any of ther other initilization methods, should be called
+    /// @details This, or any of ther other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -582,7 +584,7 @@ public:
                  FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
                  const typename ExtGridT::ConstPtr extGrid = nullptr);
 
-    /// @brief Initializer used when dilating an exsiting signed distance field.
+    /// @brief Initializer used when dilating an existing signed distance field.
     ///
     /// @return True if the initialization succeeded.
     ///
@@ -598,7 +600,7 @@ public:
     ///                 side of the iso-surface, SWEEP_LESS_THAN_ISOVALUE will dilate
     ///                 in the negative side of the iso-surface.
     ///
-    /// @details This, or any of ther other initilization methods, should be called
+    /// @details This, or any of ther other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -608,20 +610,20 @@ public:
                     NearestNeighbors nn = NN_FACE,
                     FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL);
 
-    /// @brief Initializer used for the extamnsion of an exsiting signed distance field
+    /// @brief Initializer used for the extension of an existing signed distance field
     ///        into the active values of an input mask of arbitrary value type.
     ///
     /// @return True if the initialization succeeded.
     ///
     /// @param sdfGrid  Input signed distance field to be extended into the mask.
     ///
-    /// @param mask     Mask used to idetify the topology of the output SDF.
+    /// @param mask     Mask used to identify the topology of the output SDF.
     ///                 Note this mask is assume to overlap with the sdfGrid.
     ///
     /// @param ignoreActiveTiles If false, active tiles in the mask are treated
     ///                 as active voxels. Else they are ignored.
     ///
-    /// @details This, or any of ther other initilization methods, should be called
+    /// @details This, or any of ther other initialization methods, should be called
     ///          before any call to sweep(). Failure to do so will throw a RuntimeError.
     ///
     /// @warning Note, if this method fails, i.e. returns false, a subsequent call
@@ -847,7 +849,7 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
         OPENVDB_THROW(RuntimeError, "FastSweeping: No computing voxels found!");
     }
 
-    // note: SweepingKernel is non copy-constructible, so use a deque instead of a vector
+    // note: Sweeping kernel is non copy-constructible, so use a deque instead of a vector
     std::deque<SweepingKernel> kernels;
     for (int i = 0; i < 4; i++) kernels.emplace_back(*this);
 
@@ -1260,7 +1262,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::InitExt
                     const auto mask = stencil.intersectionMask( isoValue );
                     if (mask.none()) {// no zero-crossing neighbors, most common case
                         sdf[voxelIter.pos()] = isAbove ? above : -above;
-                        // the ext grid already has its active values set to the bakground value
+                        // the ext grid already has its active values set to the background value
                     } else {// compute distance to iso-surface
                         // disable boundary voxels from the mask tree
                         sweepMaskAcc.setValueOff(ijk);
@@ -1374,7 +1376,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::MaskKernel
         auto kernel = [&](LeafT& leaf, size_t /*leafIdx*/) {
             static const SdfValueT Unknown = std::numeric_limits<SdfValueT>::max();
             SdfAccT acc(mSdfGrid->tree());
-            // The following hack is safe due to the topoloyUnion in
+            // The following hack is safe due to the topology union in
             // init and the fact that SdfValueT is known to be a floating point!
             SdfValueT *data = acc.probeLeaf(leaf.origin())->buffer().data();
             for (auto voxelIter = leaf.beginValueOn(); voxelIter; ++voxelIter) {// mask voxels
@@ -1425,7 +1427,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
         // compute the leaf node slices that have active voxels in them
         // the sliding window of the has keys is -14 to 21 (based on an 8x8x8 leaf node
         // and the extrema hash values i-j-k and  i+j+k), but we use a larger mask window here to
-        // easily accomodate any leaf dimension. The mask offset is used to be able to
+        // easily accommodate any leaf dimension. The mask offset is used to be able to
         // store this in a fixed-size byte array
         constexpr int maskOffset = LeafT::DIM * 3;
         constexpr int maskRange = maskOffset * 2;
@@ -1582,7 +1584,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::SweepingKernel
 
             const LeafSliceArray& leafSliceArray = mVoxelSliceMap[voxelSliceIndex];
 
-            // Solves Goudonov's scheme: [x-d1]^2 + [x-d2]^2  + [x-d3]^2 = h^2
+            // Solves Godunov's scheme: [x-d1]^2 + [x-d2]^2  + [x-d3]^2 = h^2
             // where [X] = (X>0?X:0) and ai=min(di+1,di-1)
             for (size_t i = range.begin(); i < range.end(); ++i) {
 
@@ -1871,6 +1873,36 @@ maskSdf(const GridT &sdfGrid,
     if (fs.initMask(sdfGrid, mask, ignoreActiveTiles)) fs.sweep(nIter);
     return fs.sdfGrid();
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_FASTSWEEPING
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr fogToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr sdfToSdf(const Grid<TreeT>&, TreeT::ValueType, int)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr dilateSdf(const Grid<TreeT>&, int, NearestNeighbors, int, FastSweepingDomain)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME

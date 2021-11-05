@@ -17,6 +17,7 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/util/NullInterrupter.h>
 #include "SignedFloodFill.h"
+#include <openvdb/openvdb.h>
 #include <type_traits>
 
 #include <tbb/enumerable_thread_specific.h>
@@ -153,7 +154,7 @@ private:
             TreeT &tree = pool.local();
             typename GridT::Accessor acc(tree);
             // Compute signed distances to sphere using leapfrogging in k
-            for (i = r.begin(); i <= r.end(); ++i) {
+            for (i = r.begin(); i != r.end(); ++i) {
                 if (util::wasInterrupted(mInterrupt)) return;
                 const auto x2 = math::Pow2(ValueT(i) - c[0]);
                 for (j = jmin; j <= jmax; ++j) {
@@ -225,6 +226,27 @@ createLevelSetSphere(float radius, const openvdb::Vec3f& center, float voxelSize
     LevelSetSphere<GridType, InterruptT> factory(ValueT(radius), center, interrupt);
     return factory.getLevelSet(ValueT(voxelSize), ValueT(halfWidth), threaded);
 }
+
+
+////////////////////////////////////////
+
+
+// Explicit Template Instantiation
+
+#ifdef OPENVDB_USE_EXPLICIT_INSTANTIATION
+
+#ifdef OPENVDB_INSTANTIATE_LEVELSETSPHERE
+#include <openvdb/util/ExplicitInstantiation.h>
+#endif
+
+#define _FUNCTION(TreeT) \
+    Grid<TreeT>::Ptr createLevelSetSphere<Grid<TreeT>>(float, const openvdb::Vec3f&, float, float, \
+        util::NullInterrupter*, bool)
+OPENVDB_REAL_TREE_INSTANTIATE(_FUNCTION)
+#undef _FUNCTION
+
+#endif // OPENVDB_USE_EXPLICIT_INSTANTIATION
+
 
 } // namespace tools
 } // namespace OPENVDB_VERSION_NAME
