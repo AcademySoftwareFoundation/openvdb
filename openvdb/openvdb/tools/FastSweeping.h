@@ -381,13 +381,18 @@ sdfToSdfAndExt(const SdfGridT &sdfGrid,
                FastSweepingDomain mode = FastSweepingDomain::SWEEP_ALL,
                const typename SdfGridT::template ValueConverter<ExtValueT>::Type::ConstPtr extGrid = nullptr);
 
-/// @brief Dilates an existing signed distance field by a specified number of voxels
+/// @brief Dilates the narrow band of an existing signed distance field by
+///        a specified number of voxels (like adding "onion-rings").
+///
+/// @note This operation is not to be confused with morphological dilation
+///       of a level set, which is implemented in LevelSetFilter::offset,
+///       and involves actual interface tracking of the narrow band.
 ///
 /// @return A shared pointer to the dilated signed distance field.
 ///
 /// @param sdfGrid  Input signed distance field to be dilated.
 ///
-/// @param dilation Numer of voxels that the input SDF will be dilated.
+/// @param dilation Numer of voxels that the narrow band of the input SDF will be dilated.
 ///
 /// @param nn       Stencil-pattern used for dilation
 ///
