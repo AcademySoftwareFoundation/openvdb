@@ -338,12 +338,7 @@ elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
 else()
   find_file(_houdini_openvdb_version_file "openvdb/version.h"
     PATHS ${HOUDINI_INCLUDE_DIR}
-    NO_DEFAULT_PATH
-    NO_PACKAGE_ROOT_PATH
-    NO_CMAKE_PATH
-    NO_CMAKE_ENVIRONMENT_PATH
-    NO_SYSTEM_ENVIRONMENT_PATH
-    NO_CMAKE_SYSTEM_PATH)
+    NO_DEFAULT_PATH)
   if(NOT ${_houdini_openvdb_version_file} EQUAL "_houdini_openvdb_version_file-NOTFOUND")
     file(STRINGS ${_houdini_openvdb_version_file} _houdini_openvdb_version)
     foreach(line ${_houdini_openvdb_version})
