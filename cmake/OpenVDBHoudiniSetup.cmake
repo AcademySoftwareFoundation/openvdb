@@ -77,6 +77,8 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.15)
 
+# Include utility functions for version information
+include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
 if(DISABLE_CMAKE_SEARCH_PATHS)
@@ -340,14 +342,8 @@ else()
     PATHS ${HOUDINI_INCLUDE_DIR}
     NO_DEFAULT_PATH)
   if(NOT ${_houdini_openvdb_version_file})
-    file(STRINGS ${_houdini_openvdb_version_file} _houdini_openvdb_version)
-    foreach(line ${_houdini_openvdb_version})
-      if(line MATCHES "^#define OPENVDB_ABI_VERSION_NUMBER ([0-9]+)$")
-        set(OPENVDB_HOUDINI_ABI ${CMAKE_MATCH_1})
-        break()
-      endif()
-    endforeach()
-    unset(_houdini_openvdb_version)
+    OPENVDB_VERSION_FROM_HEADER("${_houdini_openvdb_version_file}"
+      ABI OPENVDB_HOUDINI_ABI)
   endif()
   unset(_houdini_openvdb_version_file)
   if(NOT OPENVDB_HOUDINI_ABI)
