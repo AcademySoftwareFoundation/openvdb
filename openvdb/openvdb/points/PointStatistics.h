@@ -11,15 +11,15 @@
 ///   supports arbitrary point filters.
 ///
 
-#ifndef OPENVEB_POINTS_STATISTICS_HAS_BEEN_INCLUDED
-#define OPENVEB_POINTS_STATISTICS_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_STATISTICS_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_STATISTICS_HAS_BEEN_INCLUDED
 
 #include "PointDataGrid.h"
 
-#include "openvdb/openvdb.h"
-#include "openvdb/Types.h"
-#include "openvdb/math/Math.h"
-#include "openvdb/tree/LeafManager.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/tree/LeafManager.h>
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>
@@ -29,17 +29,87 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
 
-/// @brief Evaluates the minimum and maximum active values of a point attribute.
-/// @details  This function sets the arguments min and max to the minimum and
-///   and maximum values of a given point attributes. The ValueType of the
-///   attribute must be copy constructible and support less than and greater
-///   than operators. The ValueType does not need to support zero initialization
-///   or define its own numerical limits. This method will throw only if the
-///   templated ValueType does not match the given attribute. This method will
-///   return true if min and max have been set, false otherwise. The function is
-///   deterministic.
-/// @note  The value type of the min/max calculations must match the value type
-///   of the attribute. For vectors and matrices, this results in per component
+/// @brief Evaluates the minimum and maximum values of a point attribute.
+/// @details Performs parallel reduction by comparing values using their less
+///   than and greater than operators. If the PointDataGrid is empty or the
+///   filter evalutes to empty, zeroVal<ValueT>() is returned for both values.
+/// @note The ValueT of the attribute must be copy constructible. This method
+///   will throw if the templated ValueT does not match the given attribute.
+///   For vectors and matrices, this results in per component comparisons.
+///   See evalExtents for magnitudes or more custom control.
+/// @warning if "P" is provided, the result is undefined.
+/// @param points     the point tree
+/// @param attribute  the attribute to reduce
+/// @param filter     a filter to apply to points
+/// @return min,max value pair
+template <typename ValueT,
+    typename CodecT = UnknownCodec,
+    typename FilterT = NullFilter,
+    typename PointDataTreeT>
+std::pair<ValueT, ValueT>
+evalMinMax(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter = NullFilter());
+
+/// @brief Evaluates the average value of a point attribute.
+/// @details Performs parallel reduction by cumulative moving average. The
+///   reduction arithmetic and return value precision evaluates to:
+///      ConvertElementType<ValueT, double>::Type
+///   which, for POD and VDB math types, is ValueT at double precision. If the
+///   PointDataGrid is empty or the filter evalutes to empty, zeroVal<ValueT>()
+///   is returned.
+/// @note The ConvertElementType of the attribute must be copy constructible,
+///   support the same type + - * operators and * / operators from a double.
+///   This method will throw if ValueT does not match the given attribute. The
+///   function is deterministic.
+/// @warning if "P" is provided, the result is undefined.
+/// @param points     the point tree
+/// @param attribute  the attribute to reduce
+/// @param filter     a filter to apply to points
+/// @return the average value
+template <typename ValueT,
+    typename CodecT = UnknownCodec,
+    typename FilterT = NullFilter,
+    typename PointDataTreeT>
+typename ConvertElementType<ValueT, double>::Type
+evalAverage(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter = NullFilter());
+
+/// @brief Evaluates the total value of a point attribute.
+/// @details Performs parallel reduction by summing all values. The reduction
+///   arithmetic and return value precision evaluates to:
+///      PromoteType<ValueT>::Highest
+///   which, for POD and VDB math types, is ValueT at its highest bit precision.
+///   If the PointDataGrid is empty or the filter evalutes to empty,
+///   zeroVal<ValueT>() is returned.
+/// @note The PromoteType of the attribute must be copy constructible, support
+///   the same type + operator. This method will throw if ValueT does not match
+///   the given attribute. The function is deterministic.
+/// @warning if "P" is provided, the result is undefined.
+/// @param points     the point tree
+/// @param attribute  the attribute to reduce
+/// @param filter     a filter to apply to points
+/// @return the total value
+template <typename ValueT,
+    typename CodecT = UnknownCodec,
+    typename FilterT = NullFilter,
+    typename PointDataTreeT>
+typename PromoteType<ValueT>::Highest
+accumulate(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter = NullFilter());
+
+/// @brief Evaluates the minimum and maximum values of a point attribute and
+///   returns whether the values are valid. Optionally constructs localised
+///   min and max value trees.
+/// @details Performs parallel reduction by comparing values using their less
+///   than and greater than operators. This method will return true if min and
+///   max have been set, false otherwise (when no points existed or a filter
+///   evaluated to empty).
+/// @note The ValueT of the attribute must also be copy constructible. This
+///   method will throw if the templated ValueT does not match the given
+///   attribute. For vectors and matrices, this results in per component
 ///   comparisons. See evalExtents for magnitudes or more custom control.
 /// @warning if "P" is provided, the result is undefined.
 /// @param points     the point tree
@@ -54,84 +124,73 @@ namespace points {
 template <typename ValueT,
     typename CodecT = UnknownCodec,
     typename FilterT = NullFilter,
-    typename PointDataTreeT = points::PointDataTree>
-inline bool evalMinMax(const PointDataTreeT& points,
-        const std::string& attribute,
-        ValueT& min,
-        ValueT& max,
-        const FilterT& filter = NullFilter(),
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree = nullptr,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree = nullptr);
+    typename PointDataTreeT>
+bool evalMinMax(const PointDataTreeT& points,
+    const std::string& attribute,
+    ValueT& min,
+    ValueT& max,
+    const FilterT& filter = NullFilter(),
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree = nullptr,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree = nullptr);
 
-/// @brief Evaluates the average active value of a point attribute.
-/// @details  This function sets the argument average to the double precision
-///   average value of a given point attribute. A specialisation of
-///   ConvertElementType<ValueT, double> must exist. The ConvertedType of the
-///   attribute must be copy constructible, support the same type + - *
-///   operators and * / operators from a double. All arithmetic is performed at
-///   double precision with each sample accumulating a delta from the previous
-///   average. This method will throw only if the templated ValueType does not
-///   match the given attribute. This method will return true if average has
-///   been set, false otherwise. The function is deterministic.
+/// @brief Evaluates the average value of a point attribute and returns whether
+///   the value is valid. Optionally constructs localised average value trees.
+/// @details Performs parallel reduction by cumulative moving average. The
+///   reduction arithmetic and return value precision evaluates to:
+///      ConvertElementType<ValueT, double>::Type
+///   which, for POD and VDB math types, is ValueT at double precision. This
+///   method will return true average has been set, false otherwise (when no
+///   points existed or a filter evaluated to empty).
+/// @note The ConvertElementType of the attribute must be copy constructible,
+///   support the same type + - * operators and * / operators from a double.
+///   This method will throw if ValueT does not match the given attribute. The
+///   function is deterministic.
 /// @warning if "P" is provided, the result is undefined.
 /// @param points     the point tree
 /// @param attribute  the attribute to reduce
 /// @param average    the computed averaged value at double precision
 /// @param filter     a filter to apply to points
-/// @param averageTree  if provided, builds a tiled tree of localised avg
-///   results. By default the type of this tree is the computed double
-///   precision type, however a custom type can be provided.
+/// @param averageTree  if provided, builds a tiled tree of localised avg results.
 /// @return true if average has been set, false otherwise. Can be false if
 ///   no points were processed or if the tree was empty.
 /// @par Example:
 /// @code
 ///    using namespace openvdb;
-///    using namespace openvdb::points;
-///
-///    bool success;
-///
-///    double avg1, avg2;  // scalars always set results as doubles
-///    success = evalAverage<int32_t>(tree, "id", avg1);     // avg of int32_t attribute "id"
-///    success = evalAverage<float>(tree, "density", avg2);  // avg of float attribute "density"
-///
-///    // average points in group "group1"
-///    GroupFilter filter("group1", tree().cbeginLeaf()->attributeSet());
-///    ConvertElementType<Vec3f, double>::Type avg3;    // evaluates to Vec3d
-///    success = evalAverage<Vec3f>(tree, "vel", avg3, filter);
+///    using namespace openvdb::points
 ///
 ///    // average and store per leaf values in a new tree
-///    ConvertElementType<uint8_t, double>::Type avg4;  // evaluates to double
-///    PointDataTree::ValueConverter<decltype(avg4)>::Type avgTree; // double tree of averages
-///    success = evalAverage<uint8_t>(tree, "attrib", avg4, NullFilter(), &avgTree);
+///    ConvertElementType<uint8_t, double>::Type avg;  // evaluates to double
+///    PointDataTree::ValueConverter<decltype(avg)>::Type avgTree; // double tree of averages
+///    bool success = evalAverage<uint8_t>(tree, "attrib", avg, NullFilter(), &avgTree);
 /// @endcode
 template <typename ValueT,
     typename CodecT = UnknownCodec,
     typename FilterT = NullFilter,
-    typename PointDataTreeT = points::PointDataTree,
+    typename PointDataTreeT,
     typename ResultTreeT = typename ConvertElementType<ValueT, double>::Type>
-inline bool evalAverage(const PointDataTreeT& points,
-        const std::string& attribute,
-        typename ConvertElementType<ValueT, double>::Type& average,
-        const FilterT& filter = NullFilter(),
-        typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* averageTree = nullptr);
+bool evalAverage(const PointDataTreeT& points,
+    const std::string& attribute,
+    typename ConvertElementType<ValueT, double>::Type& average,
+    const FilterT& filter = NullFilter(),
+    typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* averageTree = nullptr);
 
-/// @brief Evaluates the total active value of a point attribute.
-/// @details  This function sets the argument total to the total value of a
-///   given point attributes. A specialisation of PromoteType<ValueT> must
-///   exist. The PromoteType of the attribute must be copy constructible,
-///   support the same type + operator. All arithmetic is performed at the
-///   precision of the promoted type. This method will throw only if the
-///   templated ValueType does not match the given attribute. This method will
-///   return true if total has been set, false otherwise. The function is
-///   deterministic.
+/// @brief Evaluates the total value of a point attribute and returns whether
+///   the value is valid. Optionally constructs localised total value trees.
+/// @details Performs parallel reduction by summing all values. The reduction
+///   arithmetic and return value precision evaluates to:
+///      PromoteType<ValueT>::Highest
+///   which, for POD and VDB math types, is ValueT at its highest bit precision.
+///   This method will return true total has been set, false otherwise (when no
+///   points existed or a filter evaluated to empty).
+/// @note The PromoteType of the attribute must be copy constructible, support
+///   the same type + operator. This method will throw if ValueT does not match
+///   the given attribute. The function is deterministic.
 /// @warning if "P" is provided, the result is undefined.
 /// @param points     the point tree
 /// @param attribute  the attribute to reduce
 /// @param total      the computed total value
 /// @param filter     a filter to apply to points
-/// @param totalTree  if provided, builds a tiled tree of localised total
-///   results. By default the type of this tree is the computed promoted value
-///   type, however a custom type can be provided.
+/// @param totalTree  if provided, builds a tiled tree of localised total results.
 /// @return true if total has been set, false otherwise. Can be false if
 ///   no points were processed or if the tree was empty.
 /// @par Example:
@@ -139,34 +198,21 @@ inline bool evalAverage(const PointDataTreeT& points,
 ///    using namespace openvdb;
 ///    using namespace openvdb::points;
 ///
-///    bool success;
-///
-///    PromoteType<int32_t>::Highest total1;  // evaluates to int64_t
-///    success = accumulate<int32_t>(tree, "id", total1);    // total of int32_t attribute "id"
-///
-///    PromoteType<float>::Highest total2;    // evaluates to double
-///    success = accumulate<float>(tree, "density", total2); // total of float attribute "density"
-///
-///    // accumulate points in group "group1"
-///    GroupFilter filter("group1", tree().cbeginLeaf()->attributeSet());
-///    PromoteType<Vec3f>::Highest total3;    // evaluates to Vec3d
-///    success = accumulate<Vec3f>(tree, "vel", total3, filter);
-///
 ///    // accumulate and store per leaf values in a new tree
-///    PromoteType<uint8_t>::Highest total4;  // evaluates to uint64_t
-///    PointDataTree::ValueConverter<decltype(total4)>::Type totalTree; // uint64_t tree of totals
-///    success = accumulate<uint8_t>(tree, "attrib", total4, NullFilter(), &totalTree);
+///    PromoteType<uint8_t>::Highest total;  // evaluates to uint64_t
+///    PointDataTree::ValueConverter<decltype(total)>::Type totalTree; // uint64_t tree of totals
+///    bool success = accumulate<uint8_t>(tree, "attrib", total, NullFilter(), &totalTree);
 /// @endcode
 template <typename ValueT,
     typename CodecT = UnknownCodec,
     typename FilterT = NullFilter,
-    typename PointDataTreeT = points::PointDataTree,
+    typename PointDataTreeT,
     typename ResultTreeT = typename PromoteType<ValueT>::Highest>
-inline bool accumulate(const PointDataTreeT& points,
-        const std::string& attribute,
-        typename PromoteType<ValueT>::Highest& total,
-        const FilterT& filter = NullFilter(),
-        typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* totalTree = nullptr);
+bool accumulate(const PointDataTreeT& points,
+    const std::string& attribute,
+    typename PromoteType<ValueT>::Highest& total,
+    const FilterT& filter = NullFilter(),
+    typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* totalTree = nullptr);
 
 ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////
@@ -289,7 +335,7 @@ template <typename ValueT,
     typename FilterT,
     typename ExtentOp,
     typename PointDataTreeT>
-inline bool evalExtents(const PointDataTreeT& points,
+bool evalExtents(const PointDataTreeT& points,
         const std::string& attribute,
         typename ExtentOp::ExtentT& ext,
         const FilterT& filter,
@@ -323,7 +369,7 @@ inline bool evalExtents(const PointDataTreeT& points,
             for (auto leaf = range.begin(); leaf; ++leaf) {
                 AttributeHandle<ValueT, CodecT> handle(leaf->constAttributeArray(idx));
                 if (handle.size() == 0) continue;
-                if (std::is_same<FilterT, NullFilter>::value) {
+                if (filter.state() == index::ALL) {
                     const size_t size = handle.isUniform() ? 1 : handle.size();
                     ExtentOp op(handle.get(0));
                     for (size_t i = 1; i < size; ++i) {
@@ -388,13 +434,13 @@ template <typename ValueT,
     typename FilterT,
     typename PointDataTreeT,
     typename std::enable_if<ValueTraits<ValueT>::IsVec, int>::type = 0>
-inline bool evalExtents(const PointDataTreeT& points,
-        const std::string& attribute,
-        ValueT& min,
-        ValueT& max,
-        const FilterT& filter,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
+bool evalExtents(const PointDataTreeT& points,
+    const std::string& attribute,
+    ValueT& min,
+    ValueT& max,
+    const FilterT& filter,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
 {
     typename ComponentExtent<ValueT>::ExtentT ext;
     const bool s = evalExtents<ValueT, CodecT, FilterT,
@@ -409,13 +455,13 @@ template <typename ValueT,
     typename FilterT,
     typename PointDataTreeT,
     typename std::enable_if<!ValueTraits<ValueT>::IsVec, int>::type = 0>
-inline bool evalExtents(const PointDataTreeT& points,
-        const std::string& attribute,
-        ValueT& min,
-        ValueT& max,
-        const FilterT& filter,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
+bool evalExtents(const PointDataTreeT& points,
+    const std::string& attribute,
+    ValueT& min,
+    ValueT& max,
+    const FilterT& filter,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
 {
     typename ScalarMinMax<ValueT>::ExtentT ext;
     const bool s = evalExtents<ValueT, CodecT, FilterT,
@@ -431,13 +477,13 @@ template <typename ValueT,
     typename CodecT,
     typename FilterT,
     typename PointDataTreeT>
-inline bool evalMinMax(const PointDataTreeT& points,
-        const std::string& attribute,
-        ValueT& min,
-        ValueT& max,
-        const FilterT& filter,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
-        typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
+bool evalMinMax(const PointDataTreeT& points,
+    const std::string& attribute,
+    ValueT& min,
+    ValueT& max,
+    const FilterT& filter,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* minTree,
+    typename PointDataTreeT::template ValueConverter<ValueT>::Type* maxTree)
 {
     return statistics_internal::evalExtents<ValueT, CodecT, FilterT, PointDataTreeT>
             (points, attribute, min, max, filter, minTree, maxTree);
@@ -448,11 +494,11 @@ template <typename ValueT,
     typename FilterT,
     typename PointDataTreeT,
     typename ResultTreeT>
-inline bool evalAverage(const PointDataTreeT& points,
-        const std::string& attribute,
-        typename ConvertElementType<ValueT, double>::Type& average,
-        const FilterT& filter,
-        typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* averageTree)
+bool evalAverage(const PointDataTreeT& points,
+    const std::string& attribute,
+    typename ConvertElementType<ValueT, double>::Type& average,
+    const FilterT& filter,
+    typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* averageTree)
 {
     using ResultT = typename ConvertElementType<ValueT, double>::Type;
 
@@ -497,7 +543,7 @@ inline bool evalAverage(const PointDataTreeT& points,
                 AttributeHandle<ValueT, CodecT> handle(leaf->constAttributeArray(idx));
                 size_t size = handle.size();
                 if (size == 0) continue;
-                if (std::is_same<FilterT, NullFilter>::value) {
+                if (filter.state() == index::ALL) {
                     std::unique_ptr<Sample> S(new Sample(ResultT(handle.get(0)), 1));
                     if (handle.isUniform()) {
                         S->avg = S->avg / static_cast<double>(size);
@@ -559,11 +605,11 @@ template <typename ValueT,
     typename FilterT,
     typename PointDataTreeT,
     typename ResultTreeT>
-inline bool accumulate(const PointDataTreeT& points,
-        const std::string& attribute,
-        typename PromoteType<ValueT>::Highest& total,
-        const FilterT& filter,
-        typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* totalTree)
+bool accumulate(const PointDataTreeT& points,
+    const std::string& attribute,
+    typename PromoteType<ValueT>::Highest& total,
+    const FilterT& filter,
+    typename PointDataTreeT::template ValueConverter<ResultTreeT>::Type* totalTree)
 {
     using ResultT = typename PromoteType<ValueT>::Highest;
     using ElementT = typename ValueTraits<ResultT>::ElementType;
@@ -585,7 +631,7 @@ inline bool accumulate(const PointDataTreeT& points,
             for (auto leaf = range.begin(); leaf; ++leaf) {
                 AttributeHandle<ValueT, CodecT> handle(leaf->constAttributeArray(idx));
                 if (handle.size() == 0) continue;
-                if (std::is_same<FilterT, NullFilter>::value) {
+                if (filter.state() == index::ALL) {
                     const size_t size = handle.isUniform() ? 1 : handle.size();
                     auto total = ResultT(handle.get(0));
                     for (size_t i = 1; i < size; ++i) {
@@ -643,8 +689,55 @@ inline bool accumulate(const PointDataTreeT& points,
     return true;
 }
 
+template <typename ValueT,
+    typename CodecT,
+    typename FilterT,
+    typename PointDataTreeT>
+std::pair<ValueT, ValueT>
+evalMinMax(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter)
+{
+    std::pair<ValueT, ValueT> results {
+        zeroVal<ValueT>(), zeroVal<ValueT>()
+    };
+    evalMinMax<ValueT, CodecT, FilterT, PointDataTreeT>
+        (points, attribute, results.first, results.second, filter);
+    return results;
+}
+
+template <typename ValueT,
+    typename CodecT,
+    typename FilterT,
+    typename PointDataTreeT>
+typename ConvertElementType<ValueT, double>::Type
+evalAverage(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter)
+{
+    using ConvertedT = typename ConvertElementType<ValueT, double>::Type;
+    ConvertedT result = zeroVal<ConvertedT>();
+    evalAverage<ValueT, CodecT, FilterT, PointDataTreeT>(points, attribute, result, filter);
+    return result;
+}
+
+template <typename ValueT,
+    typename CodecT,
+    typename FilterT,
+    typename PointDataTreeT>
+typename PromoteType<ValueT>::Highest
+accumulate(const PointDataTreeT& points,
+    const std::string& attribute,
+    const FilterT& filter)
+{
+    using PromotedT = typename PromoteType<ValueT>::Highest;
+    PromotedT result = zeroVal<PromotedT>();
+    accumulate<ValueT, CodecT, FilterT, PointDataTreeT>(points, attribute, result, filter);
+    return result;
+}
+
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVEB_POINTS_STATISTICS_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_STATISTICS_HAS_BEEN_INCLUDED

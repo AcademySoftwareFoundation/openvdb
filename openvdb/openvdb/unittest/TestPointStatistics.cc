@@ -27,6 +27,11 @@ TEST_F(TestPointStatistics, testEvalMinMax)
         EXPECT_TRUE(!success);
         EXPECT_EQ(-1.0f, min);
         EXPECT_EQ(-2.0f, max);
+
+        // basic signature returns zeroVal
+        auto int_result = points::evalMinMax<int32_t>(points->tree(), "noop");
+        EXPECT_EQ(int32_t(0), int_result.first);
+        EXPECT_EQ(int32_t(0), int_result.second);
     }
 
     // Test no attribute
@@ -66,6 +71,25 @@ TEST_F(TestPointStatistics, testEvalMinMax)
             .group({0,0,0,0,0,0,0,0}, "empty")
             .voxelsize(1.0)
             .get();
+
+        // test basic signature (int32_t, float, Ve3f)
+        {
+            auto int_result = points::evalMinMax<int32_t>(points->tree(), "inttest1");
+            EXPECT_EQ(int32_t(-3), int_result.first);
+            EXPECT_EQ(int32_t(3), int_result.second);
+
+            auto flt_result = points::evalMinMax<float>(points->tree(), "floattest");
+            EXPECT_EQ(float(-10.2f), flt_result.first);
+            EXPECT_EQ(float(9.5f), flt_result.second);
+
+            auto vec_result = points::evalMinMax<Vec3f>(points->tree(), "vectest");
+            EXPECT_EQ(-0.1f, vec_result.first.x());
+            EXPECT_EQ(-0.5f, vec_result.first.y());
+            EXPECT_EQ(-0.2f, vec_result.first.z());
+            EXPECT_EQ(1.0f, vec_result.second.x());
+            EXPECT_EQ(0.5f, vec_result.second.y());
+            EXPECT_EQ(0.3f, vec_result.second.z());
+        }
 
         // int32_t
         {
@@ -275,6 +299,11 @@ TEST_F(TestPointStatistics, testEvalMinMax)
             EXPECT_EQ(max, 100);
             EXPECT_TRUE(mint.empty());
             EXPECT_TRUE(maxt.empty());
+
+            // basic signature returns zeroVal
+            auto int_result = points::evalMinMax<int32_t>(points->tree(), "inttest1", empty);
+            EXPECT_EQ(int32_t(0), int_result.first);
+            EXPECT_EQ(int32_t(0), int_result.second);
         }
     }
 }
@@ -294,6 +323,10 @@ TEST_F(TestPointStatistics, testEvalAverage)
         const bool success = points::evalAverage<float>(points->tree(), "noop", avg);
         EXPECT_TRUE(!success);
         EXPECT_EQ(-1.0, avg);
+
+        // basic signature returns zeroVal
+        auto float_result = points::evalAverage<float>(points->tree(), "noop");
+        EXPECT_EQ(0.0, float_result);
     }
 
     // Test no attribute
@@ -356,6 +389,20 @@ TEST_F(TestPointStatistics, testEvalAverage)
             .group({0,0,0,0,0,0,0,0}, "empty")
             .voxelsize(1.0)
             .get();
+
+        // test basic signature (int32_t, float, Ve3f)
+        {
+            auto int_result = points::evalAverage<int32_t>(points->tree(), "inttest1");
+            EXPECT_EQ(0.0, int_result);
+
+            auto flt_result = points::evalAverage<float>(points->tree(), "floattest");
+            EXPECT_NEAR(1.075, flt_result, 1e-6);
+
+            auto vec_result = points::evalAverage<Vec3f>(points->tree(), "vectest");
+            EXPECT_NEAR(0.2125, vec_result.x(), 1e-6);
+            EXPECT_NEAR(0.0625, vec_result.y(), 1e-6);
+            EXPECT_NEAR(0.05,   vec_result.z(), 1e-6);
+        }
 
         // int32_t
         {
@@ -503,6 +550,10 @@ TEST_F(TestPointStatistics, testEvalAverage)
             EXPECT_TRUE(!success);
             EXPECT_EQ(avg, 100);
             EXPECT_TRUE(avgt.empty());
+
+            // basic signature returns zeroVal
+            auto float_result = points::evalAverage<float>(points->tree(), "floattest", empty);
+            EXPECT_EQ(0.0, float_result);
         }
     }
 }
@@ -517,6 +568,10 @@ TEST_F(TestPointStatistics, testAccumulate)
         const bool success = points::accumulate<float>(points->tree(), "noop", total);
         EXPECT_TRUE(!success);
         EXPECT_EQ(-1.0f, total);
+
+        // basic signature returns zeroVal
+        auto float_result = points::accumulate<float>(points->tree(), "noop");
+        EXPECT_EQ(0.0, float_result);
     }
 
     // Test no attribute
@@ -554,6 +609,21 @@ TEST_F(TestPointStatistics, testAccumulate)
             .group({0,0,0,0,0,0,0,0}, "empty")
             .voxelsize(1.0)
             .get();
+
+        // test basic signature (int32_t, float, Ve3f)
+        {
+            auto int_result = points::accumulate<int32_t>(points->tree(), "inttest1");
+            EXPECT_EQ(0.0, int_result);
+
+            auto flt_result = points::accumulate<float>(points->tree(), "floattest");
+            EXPECT_NEAR(-4.3+5.1+-1.1+0.0+9.5+-10.2+3.4+6.2, flt_result, 1e-6);
+
+            auto vec_result = points::accumulate<Vec3f>(points->tree(), "vectest");
+            Vec3d r = Vec3d(0.3) + Vec3d(1.0,-0.5,-0.2) + Vec3d(0.2) + Vec3d(0.2, 0.5, 0.1) + Vec3d(-0.1) + Vec3d(0.1);
+            EXPECT_NEAR(r.x(), vec_result.x(), 1e-6);
+            EXPECT_NEAR(r.y(), vec_result.y(), 1e-6);
+            EXPECT_NEAR(r.z(), vec_result.z(), 1e-6);
+        }
 
         // int32_t
         {
@@ -722,6 +792,10 @@ TEST_F(TestPointStatistics, testAccumulate)
             EXPECT_TRUE(!success);
             EXPECT_EQ(total, 100);
             EXPECT_TRUE(totalt.empty());
+
+            // basic signature returns zeroVal
+            auto float_result = points::accumulate<float>(points->tree(), "noop", empty);
+            EXPECT_EQ(0.0, float_result);
         }
     }
 }

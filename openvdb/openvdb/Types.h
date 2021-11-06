@@ -321,12 +321,12 @@ private:
 public:
     static_assert(sizeof(T) <= 8ul, "Unsupported source type for promotion");
 
-#define OPENVDB_TARGET_BITS(L, PROMOTE) \
+#define OPENVDB_TARGET_BITS(SHIFT, PROMOTE) \
         std::max(size_t(8), \
-            std::min(size_t(64), (PROMOTE ? size_t(8)*(sizeof(T)<<L) : \
-                size_t(8)*(sizeof(T)>>L))))
-    template <size_t L = ~0UL> using Promote = typename TypeT<OPENVDB_TARGET_BITS(L, true)>::type;
-    template <size_t L = ~0UL> using Demote = typename TypeT<OPENVDB_TARGET_BITS(L, false)>::type;
+            std::min(size_t(64), (PROMOTE ? size_t(8)*(sizeof(T)<<SHIFT) : \
+                size_t(8)*(sizeof(T)>>SHIFT))))
+    template <size_t Shift = ~0UL> using Promote = typename TypeT<OPENVDB_TARGET_BITS(Shift, true)>::type;
+    template <size_t Shift = ~0UL> using Demote = typename TypeT<OPENVDB_TARGET_BITS(Shift, false)>::type;
 #undef OPENVDB_TARGET_BITS
 
     using Highest = typename TypeT<64ul>::type;
@@ -338,8 +338,8 @@ public:
 template <typename T, template <typename> class ContainerT>
 struct PromoteContainerType
 {
-    template <size_t L = ~0UL> using Promote = ContainerT<typename PromoteType<T>::template Promote<L>>;
-    template <size_t L = ~0UL> using Demote = ContainerT<typename PromoteType<T>::template Demote<L>>;
+    template <size_t Shift = ~0UL> using Promote = ContainerT<typename PromoteType<T>::template Promote<Shift>>;
+    template <size_t Shift = ~0UL> using Demote = ContainerT<typename PromoteType<T>::template Demote<Shift>>;
     using Highest = ContainerT<typename PromoteType<T>::Highest>;
     using Lowest = ContainerT<typename PromoteType<T>::Lowest>;
     using Next = ContainerT<typename PromoteType<T>::Next>;

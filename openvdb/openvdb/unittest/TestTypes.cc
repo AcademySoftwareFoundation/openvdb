@@ -408,6 +408,8 @@ typeSetAsString()
 
 } // anonymous namespace
 
+/// @note  static_assert with no message requires C++17
+#define STATIC_ASSERT(exp) static_assert(exp, "");
 
 TEST_F(TestTypes, testTypeList)
 {
@@ -455,81 +457,80 @@ TEST_F(TestTypes, testTypeList)
     EXPECT_EQ(std::string("bdfl"), typeSetAsString<T13>());
 
     /// Compile time tests of TypeList
-    /// @note  static_assert with no message requires C++17
 
     using IntTypes = TypeList<Int16, Int32, Int64>;
     using EmptyList = TypeList<>;
 
     // Size
-    static_assert(IntTypes::Size == 3, "");
-    static_assert(EmptyList::Size == 0, "");
+    STATIC_ASSERT((IntTypes::Size == 3));
+    STATIC_ASSERT((EmptyList::Size == 0));
 
     // Contains
-    static_assert(IntTypes::Contains<Int16>, "");
-    static_assert(IntTypes::Contains<Int32>, "");
-    static_assert(IntTypes::Contains<Int64>, "");
-    static_assert(!IntTypes::Contains<float>, "");
+    STATIC_ASSERT((IntTypes::Contains<Int16>));
+    STATIC_ASSERT((IntTypes::Contains<Int32>));
+    STATIC_ASSERT((IntTypes::Contains<Int64>));
+    STATIC_ASSERT((!IntTypes::Contains<float>));
 
     // Index
-    static_assert(IntTypes::Index<Int16> == 0, "");
-    static_assert(IntTypes::Index<Int32> == 1, "");
-    static_assert(IntTypes::Index<Int64> == 2, "");
-    static_assert(IntTypes::Index<float> == -1, "");
+    STATIC_ASSERT((IntTypes::Index<Int16> == 0));
+    STATIC_ASSERT((IntTypes::Index<Int32> == 1));
+    STATIC_ASSERT((IntTypes::Index<Int64> == 2));
+    STATIC_ASSERT((IntTypes::Index<float> == -1));
 
     // Get
-    static_assert(std::is_same<IntTypes::Get<0>, Int16>::value, "");
-    static_assert(std::is_same<IntTypes::Get<1>, Int32>::value, "");
-    static_assert(std::is_same<IntTypes::Get<2>, Int64>::value, "");
-    static_assert(std::is_same<IntTypes::Get<3>,  typelist_internal::NullType>::value, "");
-    static_assert(!std::is_same<IntTypes::Get<3>, void>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::Get<0>, Int16>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<1>, Int32>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<2>, Int64>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<3>,  typelist_internal::NullType>::value));
+    STATIC_ASSERT((!std::is_same<IntTypes::Get<3>, void>::value));
 
     // Unique
-    static_assert(std::is_same<IntTypes::Unique<>, IntTypes>::value, "");
-    static_assert(std::is_same<EmptyList::Unique<>, EmptyList>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::Unique<>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Unique<>, EmptyList>::value));
 
     // Front/Back
-    static_assert(std::is_same<IntTypes::Front, Int16>::value, "");
-    static_assert(std::is_same<IntTypes::Back, Int64>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::Front, Int16>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Back, Int64>::value));
 
     // PopFront/PopBack
-    static_assert(std::is_same<IntTypes::PopFront, TypeList<Int32, Int64>>::value, "");
-    static_assert(std::is_same<IntTypes::PopBack, TypeList<Int16, Int32>>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::PopFront, TypeList<Int32, Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::PopBack, TypeList<Int16, Int32>>::value));
 
     // RemoveByIndex
-    static_assert(std::is_same<IntTypes::RemoveByIndex<0,0>, IntTypes::PopFront>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<2,2>, IntTypes::PopBack>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<0,2>, EmptyList>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<0,10>, EmptyList>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,0>, IntTypes::PopFront>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,2>, IntTypes::PopBack>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,2>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,10>, EmptyList>::value));
 
     // invalid indices do nothing
-    static_assert(std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value, "");
-    static_assert(std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value, "");
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value));
 
     //
 
     // Test methods on an empty list
-    static_assert(!EmptyList::Contains<Int16>, "");
-    static_assert(EmptyList::Index<Int16> == -1, "");
-    static_assert(std::is_same<EmptyList::Get<0>, typelist_internal::NullType>::value, "");
-    static_assert(std::is_same<EmptyList::Front, typelist_internal::NullType>::value, "");
-    static_assert(std::is_same<EmptyList::Back, typelist_internal::NullType>::value, "");
-    static_assert(std::is_same<EmptyList::PopFront, EmptyList>::value, "");
-    static_assert(std::is_same<EmptyList::PopBack, EmptyList>::value, "");
-    static_assert(std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value, "");
+    STATIC_ASSERT((!EmptyList::Contains<Int16>));
+    STATIC_ASSERT((EmptyList::Index<Int16> == -1));
+    STATIC_ASSERT((std::is_same<EmptyList::Get<0>, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Front, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Back, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::PopFront, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::PopBack, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value));
 
     //
 
     // Test some methods on lists with duplicate types
     using DuplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
     using DuplicateRealTypes = TypeList<float, float, float, float>;
-    static_assert(DuplicateIntTypes::Size == 4, "");
-    static_assert(DuplicateRealTypes::Size == 4, "");
-    static_assert(DuplicateIntTypes::Index<Int16> == 1, "");
-    static_assert(std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value, "");
-    static_assert(std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value, "");
+    STATIC_ASSERT((DuplicateIntTypes::Size == 4));
+    STATIC_ASSERT((DuplicateRealTypes::Size == 4));
+    STATIC_ASSERT((DuplicateIntTypes::Index<Int16> == 1));
+    STATIC_ASSERT((std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value));
+    STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value));
 
     //
 
@@ -543,9 +544,232 @@ TEST_F(TestTypes, testTypeList)
     using IternalT2 = openvdb::tree::InternalNode<IternalT1, 5>;
     using RootT = openvdb::tree::RootNode<IternalT2>;
 
-    static_assert(std::is_same<NodeChainT::Get<0>, LeafT>::value, "");
-    static_assert(std::is_same<NodeChainT::Get<1>, IternalT1>::value, "");
-    static_assert(std::is_same<NodeChainT::Get<2>, IternalT2>::value, "");
-    static_assert(std::is_same<NodeChainT::Get<3>, RootT>::value, "");
-    static_assert(std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value, "");
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<0>, LeafT>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<1>, IternalT1>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<2>, IternalT2>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<3>, RootT>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value));
+}
+
+TEST_F(TestTypes, testConvertElementType)
+{
+    // Just replaces the type for non VDB math types
+    STATIC_ASSERT((std::is_same<ConvertElementType<float, double>::Type, double>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<float, int32_t>::Type, int32_t>::value));
+
+    // Replaces the element type for VDB Math types
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec2f, int32_t>::Type, Vec2i>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec2i, float>::Type, Vec2f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec2f, float>::Type, Vec2f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec2f, double>::Type, Vec2d>::value));
+
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec3f, int32_t>::Type, Vec3i>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec3f, uint32_t>::Type, math::Vec3ui>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec3i, float>::Type, Vec3f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec3f, float>::Type, Vec3f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec3f, double>::Type, Vec3d>::value));
+
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec4f, int32_t>::Type, Vec4i>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec4i, float>::Type, Vec4f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec4f, float>::Type, Vec4f>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Vec4f, double>::Type, Vec4d>::value));
+
+    STATIC_ASSERT((std::is_same<ConvertElementType<Quats, float>::Type, Quats>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Quats, double>::Type, Quatd>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Quatd, float>::Type, Quats>::value));
+
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat3s, float>::Type, Mat3s>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat3s, double>::Type, Mat3d>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat3d, float>::Type, Mat3s>::value));
+
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat4s, float>::Type, Mat4s>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat4s, double>::Type, Mat4d>::value));
+    STATIC_ASSERT((std::is_same<ConvertElementType<Mat4d, float>::Type, Mat4s>::value));
+}
+
+TEST_F(TestTypes, testPromoteType)
+{
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Lowest, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Previous, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Next, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Highest, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<0>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<1>, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<2>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<3>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Demote<0>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Demote<1>, math::half>::value));
+
+    // floating point types
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Lowest, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Previous, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Next, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Highest, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<0>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<1>, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<2>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Promote<3>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Demote<0>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<math::half>::Demote<1>, math::half>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Lowest, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Previous, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Next, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Highest, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Promote<0>, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Promote<1>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Promote<2>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Demote<0>, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Demote<1>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<float>::Demote<2>, math::half>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Lowest, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Previous, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Next, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Highest, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Promote<0>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Promote<1>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Demote<0>, double>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Demote<1>, float>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Demote<2>, math::half>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<double>::Demote<3>, math::half>::value));
+
+    // int types
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Lowest, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Previous, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Next, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Highest, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Promote<0>, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Promote<1>, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Promote<2>, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Promote<3>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Promote<4>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Demote<0>, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int8_t>::Demote<1>, int8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Lowest, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Previous, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Next, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Highest, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Promote<0>, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Promote<1>, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Promote<2>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Promote<3>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Demote<0>, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Demote<1>, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int16_t>::Demote<2>, int8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Lowest, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Previous, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Next, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Highest, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Promote<0>, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Promote<1>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Promote<2>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Demote<0>, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Demote<1>, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Demote<2>, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int32_t>::Demote<3>, int8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Lowest, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Previous, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Next, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Highest, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Promote<0>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Promote<1>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Demote<0>, int64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Demote<1>, int32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Demote<2>, int16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Demote<3>, int8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<int64_t>::Demote<4>, int8_t>::value));
+
+    // unsigned
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Lowest, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Previous, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Next, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Highest, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Promote<0>, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Promote<1>, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Promote<2>, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Promote<3>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Promote<4>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Demote<0>, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint8_t>::Demote<1>, uint8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Lowest, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Previous, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Next, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Highest, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Promote<0>, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Promote<1>, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Promote<2>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Promote<3>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Demote<0>, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Demote<1>, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint16_t>::Demote<2>, uint8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Lowest, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Previous, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Next, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Highest, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Promote<0>, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Promote<1>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Promote<2>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Demote<0>, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Demote<1>, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Demote<2>, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint32_t>::Demote<3>, uint8_t>::value));
+
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Lowest, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Previous, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Next, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Highest, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Promote<0>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Promote<1>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Demote<0>, uint64_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Demote<1>, uint32_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Demote<2>, uint16_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Demote<3>, uint8_t>::value));
+    STATIC_ASSERT((std::is_same<PromoteType<uint64_t>::Demote<4>, uint8_t>::value));
+
+    // Math types
+#define CHECK_PROMOTED_FLOAT_MATH_TYPE(MATH_TYPE) \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Lowest, math::MATH_TYPE<math::half>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Previous, math::MATH_TYPE<math::half>>::value));  \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Next, math::MATH_TYPE<double>>::value));          \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Highest, math::MATH_TYPE<double>>::value));       \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Promote<0>, math::MATH_TYPE<float>>::value));     \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Promote<1>, math::MATH_TYPE<double>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Promote<2>, math::MATH_TYPE<double>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Demote<0>, math::MATH_TYPE<float>>::value));      \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Demote<1>, math::MATH_TYPE<math::half>>::value)); \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##s>::Demote<2>, math::MATH_TYPE<math::half>>::value));
+
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Quat)
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Vec2)
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Vec3)
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Vec4)
+
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Mat3)
+    CHECK_PROMOTED_FLOAT_MATH_TYPE(Mat4)
+
+#define CHECK_PROMOTED_DOUBLE_MATH_TYPE(MATH_TYPE) \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Lowest, math::MATH_TYPE<math::half>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Previous, math::MATH_TYPE<float>>::value));       \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Next, math::MATH_TYPE<double>>::value));          \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Highest, math::MATH_TYPE<double>>::value));       \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Promote<0>, math::MATH_TYPE<double>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Promote<1>, math::MATH_TYPE<double>>::value));    \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Demote<0>, math::MATH_TYPE<double>>::value));     \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Demote<1>, math::MATH_TYPE<float>>::value));      \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Demote<2>, math::MATH_TYPE<math::half>>::value)); \
+    STATIC_ASSERT((std::is_same<PromoteType<MATH_TYPE##d>::Demote<3>, math::MATH_TYPE<math::half>>::value));
+
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Quat)
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Vec2)
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Vec3)
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Vec4)
+
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat3)
+    CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat4)
 }
