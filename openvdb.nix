@@ -1,6 +1,9 @@
 { nixpkgs, ... }:
 let
-  pkgs = import nixpkgs { system = "x86_64-linux"; };
+  pkgs = import nixpkgs {
+    system = "x86_64-linux";
+    overlays = [ (import ./overlay.nix) ];
+  };
 in
   with pkgs;
   stdenv.mkDerivation {
