@@ -341,7 +341,7 @@ else()
   find_file(_houdini_openvdb_version_file "openvdb/version.h"
     PATHS ${HOUDINI_INCLUDE_DIR}
     NO_DEFAULT_PATH)
-  if(NOT ${_houdini_openvdb_version_file})
+  if(_houdini_openvdb_version_file)
     OPENVDB_VERSION_FROM_HEADER("${_houdini_openvdb_version_file}"
       ABI OPENVDB_HOUDINI_ABI)
   endif()
