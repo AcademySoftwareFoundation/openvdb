@@ -19,7 +19,7 @@ in
   && baseNameOf path != "pendingchanges/*"
   && baseNameOf path != "tsc/*") ./.;
 
-  cmakeFlags =["-DOPENVDB_BUILD_VDB_VIEW=ON -DOPENVDB_BUILD_VDB_RENDER=ON -DOPENVDB_BUILD_VDB_LOD=ON"];
+  cmakeFlags =["-DOPENVDB_BUILD_VDB_VIEW=ON"];
 
   enableParallelBuilding = true;
   nativeBuildInputs = [ cmake pkg-config ];
