@@ -8,7 +8,7 @@ in
   with pkgs;
   stdenv.mkDerivation {
     name = "openvdb";
-    version = "8.0.1";
+    version = "9.0.0";
 
   # https://nixos.org/nix/manual/#builtin-filterSource
   src = builtins.filterSource
