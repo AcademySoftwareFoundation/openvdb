@@ -31,7 +31,7 @@ in
       c-blosc
     ];
 
-    buildInputs = [
+    buildInputs = [ 
       unzip boost175 jemalloc ilmbase
       # for the optional VDB_VIEW binary opengl related dependencies:
       libGL glfw3 x11 libGLU xorg.libXdmcp

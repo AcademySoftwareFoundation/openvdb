@@ -4,51 +4,38 @@ final: prev: {
     version = "2021.4";
 
     src = prev.fetchFromGitHub {
-      #owner = "AcademySoftwareFoundation";
       owner = "oneapi-src";
       repo = "oneTBB";
-      rev = "v${version}";
-      sha256 = "e82d250338d3253b862c96715637870e7cfe408f";
+      rev = "v2021.4.0";
+      sha256 = "eJ/NQ1XkWWlioBu05zbtZ/EwVxCAQzz5pkkKgN4RB0Y=";
     };
 
-    patches = [
-    # Fixes build with Musl.
-    (fetchurl {
-      url = "https://github.com/openembedded/meta-openembedded/raw/39185eb1d1615e919e3ae14ae63b8ed7d3e5d83f/meta-oe/recipes-support/tbb/tbb/GLIBC-PREREQ-is-not-defined-on-musl.patch";
-      sha256 = "gUfXQ9OZQ82qD6brgauBCsKdjLvyHafMc18B+KxZoYs=";
-    })
+    nativeBuildInputs = prev.lib.optionals prev.stdenv.isDarwin [
+      prev.fixDarwinDylibNames
+    ];
 
-    # Fixes build with Musl.
-    (fetchurl {
-      url = "https://github.com/openembedded/meta-openembedded/raw/39185eb1d1615e919e3ae14ae63b8ed7d3e5d83f/meta-oe/recipes-support/tbb/tbb/0001-mallinfo-is-glibc-specific-API-mark-it-so.patch";
-      sha256 = "fhorfqO1hHKZ61uq+yTR7eQ8KYdyLwpM3K7WpwJpV74=";
-    })
-  ];
+    buildInputs = [ ];
 
-  nativeBuildInputs = lib.optionals stdenv.isDarwin [
-    fixDarwinDylibNames
-  ];
+    makeFlags = prev.lib.optionals prev.stdenv.cc.isClang [
+      "compiler=clang"
+    ];
 
-  makeFlags = lib.optionals stdenv.cc.isClang [
-    "compiler=clang"
-  ];
+    enableParallelBuilding = true;
 
-  enableParallelBuilding = true;
+    installPhase = ''
+        runHook preInstall
+        mkdir -p $out/lib
+        cp "build/"*release*"/"*${prev.stdenv.hostPlatform.extensions.sharedLibrary}* $out/lib/
+        mv include $out/
+        rm $out/include/index.html
+        runHook postInstall
+    '';
 
-  installPhase = ''
-    runHook preInstall
-    mkdir -p $out/lib
-    cp "build/"*release*"/"*${stdenv.hostPlatform.extensions.sharedLibrary}* $out/lib/
-    mv include $out/
-    rm $out/include/index.html
-    runHook postInstall
-  '';
-
-  postInstall = let
-    pcTemplate = fetchurl {
-      url = "https://github.com/oneapi-src/oneTBB/raw/master/integration/pkg-config/tbb.pc.in";
-      sha256 = "2pCad9txSpNbzac0vp/VY3x7HNySaYkbH3Rx8LK53pI=";
-    };
+    postInstall = let
+      pcTemplate = prev.fetchurl {
+        url = "https://github.com/oneapi-src/oneTBB/raw/master/integration/pkg-config/tbb.pc.in";
+        sha256 = "2pCad9txSpNbzac0vp/VY3x7HNySaYkbH3Rx8LK53pI=";
+      };
   in ''
     # Generate pkg-config file based on upstream template.
     # It should not be necessary with tbb after 2021.2.
@@ -57,11 +44,11 @@ final: prev: {
       --subst-var-by CMAKE_INSTALL_PREFIX "$out" \
       --subst-var-by CMAKE_INSTALL_LIBDIR "lib" \
       --subst-var-by CMAKE_INSTALL_INCLUDEDIR "include" \
-      --subst-var-by TBB_VERSION "${version}" \
+      --subst-var-by TBB_VERSION 2021.4 \
       --subst-var-by TBB_LIB_NAME "tbb"
   '';
 
-  meta = with lib; {
+  meta = with prev.lib; {
     description = "Intel Thread Building Blocks C++ Library";
     homepage = "http://threadingbuildingblocks.org/";
     license = licenses.asl20;
@@ -76,5 +63,5 @@ final: prev: {
     platforms = platforms.unix;
     maintainers = with maintainers; [ thoughtpolice dizfer ];
   };
-}
+};
 }
