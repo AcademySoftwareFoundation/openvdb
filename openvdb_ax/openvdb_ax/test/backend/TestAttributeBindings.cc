@@ -13,6 +13,7 @@ public:
 
     CPPUNIT_TEST_SUITE(TestAttributeBindings);
     CPPUNIT_TEST(testSet);
+    CPPUNIT_TEST(testSetFromVector);
     CPPUNIT_TEST(testSetFromInitList);
     CPPUNIT_TEST(testSetToExistingAXName);
     CPPUNIT_TEST(testSetToExistingDataName);
@@ -20,6 +21,7 @@ public:
     CPPUNIT_TEST_SUITE_END();
 
     void testSet();
+    void testSetFromVector();
     void testSetFromInitList();
     void testSetToExistingAXName();
     void testSetToExistingDataName();
@@ -40,6 +42,17 @@ TestAttributeBindings::testSet()
     CPPUNIT_ASSERT(bindings.isBoundDataName("b"));
     CPPUNIT_ASSERT_EQUAL(*bindings.dataNameBoundTo("a"), std::string("b"));
     CPPUNIT_ASSERT_EQUAL(*bindings.axNameBoundTo("b"), std::string("a"));
+}
+
+void
+TestAttributeBindings::testSetFromVector()
+{
+    std::vector<std::pair<std::string,std::string>> vec = {{"a", "b"}};
+    openvdb::ax::AttributeBindings bindings0(vec);
+    CPPUNIT_ASSERT(bindings0.isBoundAXName("a"));
+    CPPUNIT_ASSERT(bindings0.isBoundDataName("b"));
+    CPPUNIT_ASSERT_EQUAL(*bindings0.dataNameBoundTo("a"), std::string("b"));
+    CPPUNIT_ASSERT_EQUAL(*bindings0.axNameBoundTo("b"), std::string("a"));
 }
 
 void

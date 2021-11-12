@@ -40,6 +40,14 @@ public:
     AttributeBindings() = default;
 
     /// @brief Construct a set of attribute bindings from a vector of {ax name, data name} pairs
+    /// @param bindings A vector of ax name data name pairs where the first element is the name
+    ///        in the AX code, and the second is the name in the context data
+    AttributeBindings(const std::vector<std::pair<std::string, std::string>>& bindings)
+    {
+        set(bindings);
+    }
+
+    /// @brief Construct a set of attribute bindings from a vector of {ax name, data name} pairs
     ///        using an initializer list i.e. {{"axname0", "dataname0"}, {"axname1", "dataname0"}}
     /// @param bindings A initializer list of ax name data name pairs where the first element is the
     ///        name in the AX code, and the second is the name in the context data
