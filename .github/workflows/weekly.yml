@@ -104,7 +104,7 @@ jobs:
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
       HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
     container:
-      image: aswf/ci-base:2021
+      image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v2
     - name: timestamp
