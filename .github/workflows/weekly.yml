@@ -38,7 +38,7 @@ jobs:
         if: steps.check.outputs.HOUDINI_SECRETS != 'true'
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
-  # download the latest production version of Houdini, strip out headers,
+  # download the latest production version of Houdini 18.5, strip out headers,
   # libraries and binaries required for building OpenVDB and if the build
   # succeeds, put it into the GitHub Actions cache
   linux_houdini18_5:
@@ -58,6 +58,10 @@ jobs:
       image: aswf/ci-base:2020
     steps:
     - uses: actions/checkout@v2
+    - name: timestamp
+      id: timestamp
+      shell: bash
+      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
     - name: download_houdini
       run: ./ci/download_houdini.sh 18.5 ON
     - name: install_houdini
@@ -81,7 +85,56 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v3-houdini18_5-${{ hashFiles('hou/hou.tar.gz') }}
+        key: vdb-v4-houdini18_5-${{ steps.timestamp.outputs.timestamp }}
+
+  # download the latest production version of Houdini 19.0, strip out headers,
+  # libraries and binaries required for building OpenVDB and if the build
+  # succeeds, put it into the GitHub Actions cache
+  linux_houdini19_0:
+    needs: [checksecret]
+    if: |
+      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+      github.repository_owner == 'AcademySoftwareFoundation') &&
+      (github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'houdini')
+    runs-on: ubuntu-latest
+    env:
+      CXX: clang++
+      HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
+      HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
+    container:
+      image: aswf/ci-base:2020
+    steps:
+    - uses: actions/checkout@v2
+    - name: timestamp
+      id: timestamp
+      shell: bash
+      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+    - name: download_houdini
+      run: ./ci/download_houdini.sh 19.0 ON
+    - name: install_houdini
+      run: |
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: build
+      shell: bash
+      run: >
+        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
+        ./ci/build.sh -v
+        --build-type=Release
+        --components="core,hou,bin,python,test,axcore,axbin,axtest"
+        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+    - name: test
+      run: cd build && ctest -V
+    - name: write_houdini_cache
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb-v4-houdini19_0-${{ steps.timestamp.outputs.timestamp }}
 
   #############################################################################
   ################################ Sanitizers #################################
