@@ -69,6 +69,19 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
+    - name: timestamp
+      id: timestamp
+      shell: bash
+      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+    - name: ccache
+      # don't use ccache for debug builds
+      if: matrix.config.build == 'Release'
+      id: ccache
+      uses: actions/cache@v2
+      with:
+        path: /tmp/ccache
+        key: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: linux-vfx-hou${{ matrix.config.hou }}-${{ matrix.config.image }}-${{ matrix.config.cxx }}-
     - name: fetch_houdini
       uses: actions/cache@v2
       with:
@@ -93,6 +106,7 @@ jobs:
       shell: bash
       run: >
         cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
+        CCACHE_DIR=/tmp/ccache
         ./ci/build.sh -v
         -j ${{ matrix.config.j }}
         --build-type=${{ matrix.config.build }}
@@ -100,6 +114,11 @@ jobs:
         --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp -DDISABLE_DEPENDENCY_VERSION_CHECKS=${{ matrix.config.disable_checks }}\"
     - name: test
       run: cd build && ctest -V
+    # Keep ccache light by stripping out any caches not accessed in the last day
+    - name: ccache_clean
+      if: matrix.config.build == 'Release'
+      shell: bash
+      run: CCACHE_DIR=/tmp/ccache ccache --evict-older-than 1d
       # Final check to make sure the cache still exists
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
