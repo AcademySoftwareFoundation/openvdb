@@ -60,6 +60,7 @@ jobs:
       image: aswf/ci-base:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
+      CCACHE_DIR: /tmp/ccache
     strategy:
       matrix:
         config:
@@ -106,7 +107,6 @@ jobs:
       shell: bash
       run: >
         cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
-        CCACHE_DIR=/tmp/ccache
         ./ci/build.sh -v
         -j ${{ matrix.config.j }}
         --build-type=${{ matrix.config.build }}
@@ -118,7 +118,7 @@ jobs:
     - name: ccache_clean
       if: matrix.config.build == 'Release'
       shell: bash
-      run: CCACHE_DIR=/tmp/ccache ccache --evict-older-than 1d
+      run: ccache --evict-older-than 1d
       # Final check to make sure the cache still exists
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"

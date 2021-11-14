@@ -61,6 +61,7 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
+      CCACHE_DIR: /tmp/ccache
     strategy:
       matrix:
         config:
@@ -91,7 +92,6 @@ jobs:
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
-        CCACHE_DIR=/tmp/ccache
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
         --components=\"core,python,bin,test\"
@@ -107,7 +107,7 @@ jobs:
     - name: ccache_clean
       if: matrix.config.build == 'Release'
       shell: bash
-      run: CCACHE_DIR=/tmp/ccache ccache --evict-older-than 1d
+      run: ccache --evict-older-than 1d
 
   windows:
     # Windows CI. Tests static and dynamic builds with MT and MD respectively.
