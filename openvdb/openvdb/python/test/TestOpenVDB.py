@@ -554,9 +554,9 @@ class TestOpenVDB(unittest.TestCase):
 
                 # Copy values from the NumPy array to the grid, marking
                 # background values as inactive and all other values as active.
-                now = time.clock()
+                #now = time.process_time()
                 grid.copyFromArray(arr)
-                elapsed = time.clock() - now
+                #elapsed = time.process_time() - now
                 #print 'copied %d voxels from %s array to %s in %f sec' % (
                 #    arr.shape[0] * arr.shape[1] * arr.shape[2],
                 #    str(arr.dtype) + ('' if isScalarArray else '[]'),
@@ -650,9 +650,9 @@ class TestOpenVDB(unittest.TestCase):
                     continue
 
                 # Copy values from the grid to the NumPy array.
-                now = time.clock()
+                #now = time.process_time()
                 grid.copyToArray(arr)
-                elapsed = time.clock() - now
+                #elapsed = time.process_time() - now
                 #print 'copied %d voxels from %s to %s array in %f sec' % (
                 #    arr.shape[0] * arr.shape[1] * arr.shape[2], grid.__class__.__name__,
                 #    str(arr.dtype) + ('' if isScalarArray else '[]'), elapsed)
