@@ -26,6 +26,14 @@
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/points/PointDelete.h>
 
+// tbb/task_scheduler_init.h was removed in TBB 2021. The best construct to swap
+// to is tbb/global_control (for executables). global_control was only officially
+// added in TBB 2019U4 but exists in 2018 as a preview feature. To avoid more
+// compile time branching (as we still support 2018), we use it in 2018 too by
+// enabling the below define.
+#define TBB_PREVIEW_GLOBAL_CONTROL 1
+#include <tbb/global_control.h>
+
 #include <fstream>
 #include <iostream>
 #include <sstream>
@@ -46,6 +54,7 @@ void usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
     "    --opt level      set an optimization level on the generated IR [NONE, O0, O1, O2, Os, Oz, O3]\n" <<
     "    --werror         set warnings as errors\n" <<
     "    --max-errors n   sets the maximum number of error messages to n, a value of 0 (default) allows all error messages\n" <<
+    "    --threads        number of threads to use, 0 uses all available. default is all.\n" <<
     "    analyze          parse the provided code and enter analysis mode\n" <<
     "      --ast-print       descriptive print the abstract syntax tree generated\n" <<
     "      --re-print        re-interpret print of the provided code after ast traversal\n" <<
@@ -70,6 +79,7 @@ struct ProgOptions
     enum Compilation { All, Points, Volumes };
 
     Mode mMode = Execute;
+    int32_t threads = 0;
 
     // Compilation options
     size_t mMaxErrors = 0;
@@ -321,6 +331,8 @@ main(int argc, char *argv[])
                 loadSnippetFile(argv[i], *opts.mInputCode);
             } else if (parser.check(i, "-v", 0)) {
                 opts.mVerbose = true;
+            } else if (parser.check(i, "--threads")) {
+                opts.threads = atoi(argv[++i]);
             } else if (parser.check(i, "--max-errors")) {
                 opts.mMaxErrors = atoi(argv[++i]);
             } else if (parser.check(i, "--werror", 0)) {
@@ -461,6 +473,12 @@ main(int argc, char *argv[])
     axlog("[INFO] Initializing OpenVDB" << std::flush);
     ScopedInitialize initializer(argc, argv);
     axlog(": " << axtime() << '\n');
+
+    std::unique_ptr<tbb::global_control> control;
+    if (opts.threads > 0) {
+        axlog("[INFO] Initializing thread usage [" << opts.threads << "]\n" << std::flush);
+        control.reset(new tbb::global_control(tbb::global_control::max_allowed_parallelism, opts.threads));
+    }
 
     // read vdb file data for
 
