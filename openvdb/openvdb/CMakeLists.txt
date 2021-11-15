@@ -453,6 +453,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointMove.h
   points/PointSample.h
   points/PointScatter.h
+  points/PointStatistics.h
   points/StreamCompression.h
 )
 
