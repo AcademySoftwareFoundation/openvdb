@@ -51,6 +51,7 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
+      CCACHE_DIR: /tmp/ccache
     strategy:
       matrix:
         config:
@@ -63,6 +64,19 @@ jobs:
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
+      - name: timestamp
+        id: timestamp
+        shell: bash
+        run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+      - name: ccache
+        # don't use ccache for debug builds
+        if: matrix.config.build == 'Release'
+        id: ccache
+        uses: actions/cache@v2
+        with:
+          path: /tmp/ccache
+          key: linux-ax${{ matrix.config.image }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
+          restore-keys: linux-ax${{ matrix.config.image }}-${{ matrix.config.cxx }}-
       - name: build
         run: >
           ./ci/build.sh -v
@@ -85,6 +99,11 @@ jobs:
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
+      # Keep ccache light by stripping out any caches not accessed in the last day
+      - name: ccache_clean
+        if: matrix.config.build == 'Release'
+        shell: bash
+        run: ccache --evict-older-than 1d
 
   macos-ax:
     if: |

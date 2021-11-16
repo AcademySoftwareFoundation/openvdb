@@ -61,6 +61,7 @@ jobs:
       image: aswf/ci-openvdb:${{ matrix.config.image }}
     env:
       CXX: ${{ matrix.config.cxx }}
+      CCACHE_DIR: /tmp/ccache
     strategy:
       matrix:
         config:
@@ -74,6 +75,19 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
+    - name: timestamp
+      id: timestamp
+      shell: bash
+      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+    - name: ccache
+      # don't use ccache for debug builds
+      if: matrix.config.build == 'Release'
+      id: ccache
+      uses: actions/cache@v2
+      with:
+        path: /tmp/ccache
+        key: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-
     - name: install_gtest
       run: ./ci/install_gtest.sh 1.10.0
     - name: build
@@ -89,6 +103,11 @@ jobs:
       run: |
         cd build && ctest -V
         cd - && ./ci/test_install.sh
+    # Keep ccache light by stripping out any caches not accessed in the last day
+    - name: ccache_clean
+      if: matrix.config.build == 'Release'
+      shell: bash
+      run: ccache --evict-older-than 1d
 
   windows:
     # Windows CI. Tests static and dynamic builds with MT and MD respectively.
