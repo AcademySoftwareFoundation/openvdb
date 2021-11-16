@@ -77,6 +77,8 @@ may be provided to tell this module where to look.
 
 cmake_minimum_required(VERSION 3.15)
 
+# Include utility functions for version information
+include(${CMAKE_CURRENT_LIST_DIR}/OpenVDBUtils.cmake)
 
 set(_FIND_HOUDINI_ADDITIONAL_OPTIONS "")
 if(DISABLE_CMAKE_SEARCH_PATHS)
@@ -335,12 +337,20 @@ if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
   set(OPENVDB_HOUDINI_ABI 6)
 elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
-elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 19.0)
-  set(OPENVDB_HOUDINI_ABI 8)
 else()
-  message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=8, "
-    "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
-  set(OPENVDB_HOUDINI_ABI 8)
+  find_file(_houdini_openvdb_version_file "openvdb/version.h"
+    PATHS ${HOUDINI_INCLUDE_DIR}
+    NO_DEFAULT_PATH)
+  if(_houdini_openvdb_version_file)
+    OPENVDB_VERSION_FROM_HEADER("${_houdini_openvdb_version_file}"
+      ABI OPENVDB_HOUDINI_ABI)
+  endif()
+  unset(_houdini_openvdb_version_file)
+  if(NOT OPENVDB_HOUDINI_ABI)
+    message(WARNING "Unknown version of Houdini, assuming OpenVDB ABI=${OpenVDB_MAJOR_VERSION}, "
+      "but if this not correct, the CMake flag -DOPENVDB_HOUDINI_ABI=<N> can override this value.")
+    set(OPENVDB_HOUDINI_ABI ${OpenVDB_MAJOR_VERSION})
+  endif()
 endif()
 
 # ------------------------------------------------------------------------

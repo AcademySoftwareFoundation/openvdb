@@ -461,7 +461,7 @@ if(NOT _OPENVDB_HAS_NEW_VERSION_HEADER)
   endif()
 endif()
 
-if(NOT OpenVDB_FIND_QUIET)
+if(NOT OpenVDB_FIND_QUIETLY)
   if(NOT OpenVDB_ABI)
     message(WARNING "Unable to determine OpenVDB ABI version from OpenVDB "
       "installation. The library major version \"${OpenVDB_MAJOR_VERSION}\" "

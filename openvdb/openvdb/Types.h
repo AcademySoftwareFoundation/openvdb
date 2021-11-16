@@ -276,6 +276,85 @@ struct ValueTraits<T, false>
 };
 
 
+/// @brief Conversion classes for changing the underlying type of VDB types
+/// @{
+template<typename T, typename SubT> struct ConvertElementType { using Type = SubT; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec2<T>, SubT> { using Type = math::Vec2<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec3<T>, SubT> { using Type = math::Vec3<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Vec4<T>, SubT> { using Type = math::Vec4<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Quat<T>, SubT> { using Type = math::Quat<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Mat3<T>, SubT> { using Type = math::Mat3<SubT>; };
+template<typename T, typename SubT> struct ConvertElementType<math::Mat4<T>, SubT> { using Type = math::Mat4<SubT>; };
+/// @}
+
+namespace types_internal
+{
+template <size_t Bits, bool Signed> struct int_t;
+template <> struct int_t<8ul, true>   { using type = int8_t;   };
+template <> struct int_t<16ul, true>  { using type = int16_t;  };
+template <> struct int_t<32ul, true>  { using type = int32_t;  };
+template <> struct int_t<64ul, true>  { using type = int64_t;  };
+template <> struct int_t<8ul, false>  { using type = uint8_t;  };
+template <> struct int_t<16ul, false> { using type = uint16_t; };
+template <> struct int_t<32ul, false> { using type = uint32_t; };
+template <> struct int_t<64ul, false> { using type = uint64_t; };
+
+template <size_t Bits> struct flt_t;
+template <> struct flt_t<16ul> { using type = math::half; };
+template <> struct flt_t<32ul> { using type = float; };
+template <> struct flt_t<64ul> { using type = double; };
+}
+
+/// @brief Promotion classes which provide an interface for elevating and
+///   demoting a scalar or VDB type to a higher or lower precision. Integer
+///   types preserve their sign. Types promotion are only valid between
+///   8 to 64 bits (long doubles are not supported).
+/// @{
+template<typename T>
+struct PromoteType
+{
+private:
+    template <size_t bits>
+    using TypeT = typename std::conditional<std::is_integral<T>::value,
+        types_internal::int_t<bits, std::is_signed<T>::value>,
+        types_internal::flt_t<std::max(size_t(16), bits)>>::type;
+public:
+    static_assert(sizeof(T) <= 8ul, "Unsupported source type for promotion");
+
+#define OPENVDB_TARGET_BITS(SHIFT, PROMOTE) \
+        std::max(size_t(8), \
+            std::min(size_t(64), (PROMOTE ? size_t(8)*(sizeof(T)<<SHIFT) : \
+                size_t(8)*(sizeof(T)>>SHIFT))))
+    template <size_t Shift = ~0UL> using Promote = typename TypeT<OPENVDB_TARGET_BITS(Shift, true)>::type;
+    template <size_t Shift = ~0UL> using Demote = typename TypeT<OPENVDB_TARGET_BITS(Shift, false)>::type;
+#undef OPENVDB_TARGET_BITS
+
+    using Highest = typename TypeT<64ul>::type;
+    using Lowest = typename TypeT<8ul>::type;
+    using Next = Promote<1>;
+    using Previous = Demote<1>;
+};
+
+template <typename T, template <typename> class ContainerT>
+struct PromoteContainerType
+{
+    template <size_t Shift = ~0UL> using Promote = ContainerT<typename PromoteType<T>::template Promote<Shift>>;
+    template <size_t Shift = ~0UL> using Demote = ContainerT<typename PromoteType<T>::template Demote<Shift>>;
+    using Highest = ContainerT<typename PromoteType<T>::Highest>;
+    using Lowest = ContainerT<typename PromoteType<T>::Lowest>;
+    using Next = ContainerT<typename PromoteType<T>::Next>;
+    using Previous = ContainerT<typename PromoteType<T>::Previous>;
+};
+
+template<typename T> struct PromoteType<math::Vec2<T>> : public PromoteContainerType<T, math::Vec2> {};
+template<typename T> struct PromoteType<math::Vec3<T>> : public PromoteContainerType<T, math::Vec3> {};
+template<typename T> struct PromoteType<math::Vec4<T>> : public PromoteContainerType<T, math::Vec4> {};
+template<typename T> struct PromoteType<math::Quat<T>> : public PromoteContainerType<T, math::Quat> {};
+template<typename T> struct PromoteType<math::Mat3<T>> : public PromoteContainerType<T, math::Mat3> {};
+template<typename T> struct PromoteType<math::Mat4<T>> : public PromoteContainerType<T, math::Mat4> {};
+/// @}
+
+
 ////////////////////////////////////////
 
 

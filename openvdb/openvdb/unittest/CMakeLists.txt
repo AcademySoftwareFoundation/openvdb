@@ -148,6 +148,7 @@ else()
     TestPointPartitioner.cc
     TestPointSample.cc
     TestPointScatter.cc
+    TestPointStatistics.cc
     TestPointsToMask.cc
     TestPoissonSolver.cc
     TestPotentialFlow.cc
