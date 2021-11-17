@@ -36,6 +36,7 @@ struct PointExecutable::Settings
     size_t mGrainSize = 1;
     std::string mGroup = "";
     bool mPostDelete = false;
+    AttributeBindings mBindings;
 };
 
 namespace {
@@ -205,6 +206,10 @@ struct PointExecuterDeformer
 };
 
 
+// @note: if we could ensure all descriptors are same we could use the
+// index here instead of looking up the position for every leaf.
+// Currently this could silently give incorrect results if it hits same type
+// attributes, so we look up the position of the attribute explicitly per leaf
 template <typename ValueType>
 inline void
 addAttributeHandleTyped(PointFunctionArguments& args,
@@ -287,6 +292,19 @@ addAttributeHandle(PointFunctionArguments& args,
     }
 }
 
+struct PointAttributeInfo
+{
+    PointAttributeInfo(const std::string& name,
+                       const ast::tokens::CoreType type,
+                       const bool write)
+        : mName(name)
+        , mType(type)
+        , mWrite(write) {}
+    std::string mName;
+    ast::tokens::CoreType mType;
+    bool mWrite;
+};
+
 /// @brief  VDB Points executer for a compiled function pointer
 struct PointExecuterOp
 {
@@ -297,7 +315,7 @@ struct PointExecuterOp
     using GroupFilter = openvdb::points::GroupFilter;
     using GroupIndex = Descriptor::GroupIndex;
 
-    PointExecuterOp(const AttributeRegistry& attributeRegistry,
+    PointExecuterOp(const std::vector<PointAttributeInfo>& attributeInfo,
                const CustomData* const customData,
                const KernelFunctionPtr computeFunction,
                const math::Transform& transform,
@@ -305,7 +323,7 @@ struct PointExecuterOp
                std::vector<PointLeafLocalData::UniquePtr>& leafLocalData,
                const std::string& positionAttribute,
                const std::pair<bool,bool>& positionAccess)
-        : mAttributeRegistry(attributeRegistry)
+        : mAttributeInfo(attributeInfo)
         , mCustomData(customData)
         , mComputeFunction(computeFunction)
         , mTransform(transform)
@@ -342,11 +360,9 @@ struct PointExecuterOp
         PointFunctionArguments args(mComputeFunction, mCustomData, set, leafLocalData.get());
 
         // add attributes based on the order and existence in the attribute registry
-        for (const auto& iter : mAttributeRegistry.data()) {
-            const std::string& name = (iter.name() == "P" ? mPositionAttribute : iter.name());
-            addAttributeHandle(args, leaf, name, iter.type(), iter.writes());
+        for (const auto& iter : mAttributeInfo) {
+            addAttributeHandle(args, leaf, iter.mName, iter.mType, iter.mWrite);
         }
-
         // add groups
         const auto& map = set.descriptor().groupMap();
         if (!map.empty()) {
@@ -423,18 +439,22 @@ struct PointExecuterOp
     }
 
 private:
-    const AttributeRegistry&  mAttributeRegistry;
-    const CustomData* const   mCustomData;
-    const KernelFunctionPtr   mComputeFunction;
-    const math::Transform&    mTransform;
-    const GroupIndex&         mGroupIndex;
+    const std::vector<PointAttributeInfo>&  mAttributeInfo;
+    const CustomData* const            mCustomData;
+    const KernelFunctionPtr            mComputeFunction;
+    const math::Transform&             mTransform;
+    const GroupIndex&                  mGroupIndex;
     std::vector<PointLeafLocalData::UniquePtr>& mLeafLocalData;
-    const std::string&          mPositionAttribute;
-    const std::pair<bool,bool>& mPositionAccess;
+    const std::string&                 mPositionAttribute;
+    const std::pair<bool,bool>&        mPositionAccess;
 };
 
 void processAttributes(points::PointDataGrid& grid,
+                       std::vector<PointAttributeInfo>& attributeInfo,
+                       std::pair<bool,bool>& positionAccess,
+                       std::string& posWS,
                        const AttributeRegistry& registry,
+                       const AttributeBindings& bindings,
                        const bool createMissing,
                        Logger& logger)
 {
@@ -472,16 +492,32 @@ void processAttributes(points::PointDataGrid& grid,
     const auto leafIter = grid.tree().cbeginLeaf();
     assert(leafIter);
 
+    attributeInfo.reserve(registry.data().size());
+
     // append attributes
 
     for (const auto& iter : registry.data()) {
-
-        const std::string& name = iter.name();
+        // get the corresponding point attributes
+        const std::string* nameptr = bindings.dataNameBoundTo(iter.name());
+        if (!nameptr) continue;
+        const std::string& name = *nameptr;
         const points::AttributeSet::Descriptor& desc = leafIter->attributeSet().descriptor();
-        const size_t pos = desc.find(name);
 
+        // handle position separately as we need to create temp storage during executiom
+        if (name == "P") {
+            positionAccess = {iter.reads(), iter.writes()};
+            posWS = desc.uniqueName("__P");
+            points::appendAttribute<openvdb::Vec3f>(grid.tree(), posWS);
+            attributeInfo.emplace_back(posWS, ast::tokens::VEC3F, positionAccess.second);
+            continue;
+        }
+        // add the data name to the attribute info
+        attributeInfo.emplace_back(name, iter.type(), iter.writes());
+
+        const size_t pos = desc.find(name);
         if (!createMissing && pos == points::AttributeSet::INVALID_POS) {
-            logger.error("Attribute \"" + name + "\" does not exist on grid \"" + grid.getName() + "\"");
+            logger.error("Attribute \"" + name + "\" does not exist on grid \"" + grid.getName() + "\"."
+                         + (name != iter.name() ? "[bound to \"" + iter.name() + " \"]" : ""));
             continue;
         }
 
@@ -489,9 +525,9 @@ void processAttributes(points::PointDataGrid& grid,
             const points::AttributeArray* const array = leafIter->attributeSet().getConst(pos);
             assert(array);
             if (array->stride() > 1) {
-                logger.warning("Attribute \"" + name + "\" on grid \"" + grid.getName() + "\" "
-                    "is a strided (array) attribute. Reading or writing to this attribute with @" +
-                    name + " will only access the first element.");
+                logger.warning("Attribute \"" + name + (name != iter.name() ? "\" [bound to \"" + iter.name() + "\"]" : "\"")
+                    + " on grid \"" + grid.getName() + "\"is a strided (array) attribute. "
+                    "Reading or writing to this attribute with @" + name + " will only access the first element.");
             }
 
             const NamePair& type = desc.type(pos);
@@ -501,7 +537,8 @@ void processAttributes(points::PointDataGrid& grid,
             if (typetoken != iter.type() &&
                 !(type.second == "str" && iter.type() == ast::tokens::STRING)) {
                 logger.error("Mismatching attributes types. Attribute \"" + name +
-                    "\" on grid \"" + grid.getName() + "\" exists of type \"" + type.first +
+                    (name != iter.name() ? "\" [bound to \"" + iter.name() + "\"]" : "\"") +
+                    " on grid \"" + grid.getName() + "\" exists of type \"" + type.first +
                     "\" but has been accessed with type \"" +
                     ast::tokens::typeStringFromToken(iter.type()) + "\"");
             }
@@ -535,6 +572,11 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
 
     // parse the AST for known functions which require pre/post processing
     mSettings->mPostDelete = ast::callsFunction(ast, "deletepoint");
+
+    // Set up the default attribute bindings
+    for (const auto& iter : mAttributeRegistry->data()) {
+        mSettings->mBindings.set(iter.name(), iter.name());
+    }
 }
 
 PointExecutable::PointExecutable(const PointExecutable& other)
@@ -543,7 +585,8 @@ PointExecutable::PointExecutable(const PointExecutable& other)
     , mAttributeRegistry(other.mAttributeRegistry)
     , mCustomData(other.mCustomData)
     , mFunctionAddresses(other.mFunctionAddresses)
-    , mSettings(new Settings(*other.mSettings)) {}
+    , mSettings(new Settings(*other.mSettings)) {
+}
 
 PointExecutable::~PointExecutable() {}
 
@@ -568,23 +611,15 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         return;
     }
 
-    // create any missing attributes
-    processAttributes(grid, *mAttributeRegistry, mSettings->mCreateMissing, *logger);
+    // create any missing attributes and handle temp ws position storage
 
-    const std::pair<bool,bool> positionAccess =
-        mAttributeRegistry->accessPattern("P", ast::tokens::VEC3F);
-    const bool usingPosition = positionAccess.first || positionAccess.second;
+    std::pair<bool,bool> positionAccess = {false, false};
+    std::string posWS;
+    std::vector<PointAttributeInfo> attributeInfo;
 
-    // create temporary world space position attribute if P is being accessed
-    // @todo  should avoid actually adding this attribute to the tree as its temporary
-
-    std::string positionAttribute = "P";
-    if (usingPosition /*mAttributeRegistry->isWritable("P", ast::tokens::VEC3F)*/) {
-        const points::AttributeSet::Descriptor& desc =
-            leafIter->attributeSet().descriptor();
-        positionAttribute = desc.uniqueName("__P");
-        points::appendAttribute<openvdb::Vec3f>(grid.tree(), positionAttribute);
-    }
+    processAttributes(grid, attributeInfo, positionAccess, posWS,
+                      *mAttributeRegistry, mSettings->mBindings,
+                      mSettings->mCreateMissing, *logger);
 
     // init the internal dead group if necessary
 
@@ -633,9 +668,8 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     std::vector<PointLeafLocalData::UniquePtr> leafLocalData(leafManager.leafCount());
     const bool threaded = mSettings->mGrainSize > 0;
 
-    PointExecuterOp executerOp(*mAttributeRegistry,
-        mCustomData.get(), compute, transform, groupIndex,
-        leafLocalData, positionAttribute, positionAccess);
+    PointExecuterOp executerOp(attributeInfo, mCustomData.get(), compute, transform,
+        groupIndex, leafLocalData, posWS, positionAccess);
     leafManager.foreach(executerOp, threaded, mSettings->mGrainSize);
 
     // Check to see if any new data has been added and apply it accordingly
@@ -708,18 +742,18 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         // if position is writable, sort the points
         if (usingGroup) {
             openvdb::points::GroupFilter filter(groupIndex);
-            PointExecuterDeformer<openvdb::points::GroupFilter> deformer(positionAttribute, filter);
+            PointExecuterDeformer<openvdb::points::GroupFilter> deformer(posWS, filter);
             openvdb::points::movePoints(grid, deformer);
         }
         else {
-            PointExecuterDeformer<> deformer(positionAttribute);
+            PointExecuterDeformer<> deformer(posWS);
             openvdb::points::movePoints(grid, deformer);
         }
     }
 
-    if (usingPosition) {
+    if (positionAccess.first || positionAccess.second) {
         // remove temporary world space storage
-        points::dropAttribute(grid.tree(), positionAttribute);
+        points::dropAttribute(grid.tree(), posWS);
     }
 
     if (mSettings->mPostDelete) {
@@ -761,6 +795,38 @@ const std::string& PointExecutable::getGroupExecution() const
 {
     return mSettings->mGroup;
 }
+
+void PointExecutable::setAttributeBindings(const AttributeBindings& bindings)
+{
+    //@todo: warn when inferred P, Cd, N etc are bound they default to vec3f
+    for (const auto& binding : bindings.axToDataMap()) {
+        mSettings->mBindings.set(binding.first, binding.second);
+    }
+
+    // check the registry to make sure everything is bound
+    for (const auto& access : mAttributeRegistry->data()) {
+        if (!mSettings->mBindings.isBoundAXName(access.name())) {
+            if (bindings.isBoundDataName(access.name())) {
+                OPENVDB_THROW(AXExecutionError, "AX attribute \"@"
+                    + access.name() + "\" not bound to any point attribute."
+                    " Point attribute \"" + access.name() + "\" bound to \"@"
+                    + *bindings.axNameBoundTo(access.name()) + "\".");
+            }
+            else {
+                // rebind to itself as it may have been unbound
+                // by a previous set call
+                mSettings->mBindings.set(access.name(), access.name());
+            }
+        }
+    }
+}
+
+
+const AttributeBindings& PointExecutable::getAttributeBindings() const
+{
+    return mSettings->mBindings;
+}
+
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME

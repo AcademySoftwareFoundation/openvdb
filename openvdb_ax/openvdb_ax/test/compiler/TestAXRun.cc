@@ -37,6 +37,8 @@ TestAXRun::singleRun()
     openvdb::ax::run("@a = 1.0f;", f);
     CPPUNIT_ASSERT_EQUAL(1.0f, f.tree().getValue({0,0,0}));
 
+    openvdb::ax::run("@b = 2.0f;", f, {{"b", "a"}});
+    CPPUNIT_ASSERT_EQUAL(2.0f, f.tree().getValue({0,0,0}));
     openvdb::math::Transform::Ptr defaultTransform =
         openvdb::math::Transform::createLinearTransform();
     const std::vector<openvdb::Vec3d> singlePointZero = {openvdb::Vec3d::zero()};
@@ -54,6 +56,10 @@ TestAXRun::singleRun()
     CPPUNIT_ASSERT(descriptor.valueType(idx) == openvdb::typeNameAsString<float>());
     openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(idx));
     CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+    openvdb::ax::run("@b = 2.0f;", *points, {{"b","a"}});
+
+    CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
 }
 
 void
@@ -86,6 +92,10 @@ TestAXRun::multiRun()
         openvdb::ax::run("@a = @b = 1;", v);
         CPPUNIT_ASSERT_EQUAL(1.0f, f1->tree().getValue({0,0,0}));
         CPPUNIT_ASSERT_EQUAL(1.0f, f2->tree().getValue({0,0,0}));
+
+        openvdb::ax::run("@c = @d = 2;", v, {{"c","a"}, {"d","b"}});
+        CPPUNIT_ASSERT_EQUAL(2.0f, f1->tree().getValue({0,0,0}));
+        CPPUNIT_ASSERT_EQUAL(2.0f, f2->tree().getValue({0,0,0}));
     }
 
     {
@@ -131,6 +141,17 @@ TestAXRun::multiRun()
         CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
         handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx2));
         CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+        openvdb::ax::run("@c = @d = 2;", v, {{"c","a"}, {"d","b"}});
+        handle = openvdb::points::AttributeHandle<float>(leafIter1->constAttributeArray(idx1));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+        handle = openvdb::points::AttributeHandle<float>(leafIter1->constAttributeArray(idx2));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+
+        handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx1));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
+        handle = openvdb::points::AttributeHandle<float>(leafIter2->constAttributeArray(idx2));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle.get(0));
     }
 }
 

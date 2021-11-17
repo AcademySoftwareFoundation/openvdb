@@ -176,6 +176,7 @@ set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
 )
 
 set(OPENVDB_AX_COMPILER_INCLUDE_FILES
+  compiler/AttributeBindings.h
   compiler/AttributeRegistry.h
   compiler/Compiler.h
   compiler/CompilerOptions.h

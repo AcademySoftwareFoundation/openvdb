@@ -31,6 +31,7 @@ find_package(CppUnit ${MINIMUM_CPPUNIT_VERSION} REQUIRED)
 set(TEST_SOURCE_FILES
   ast/TestScanners.cc
   ast/TestPrinters.cc
+  backend/TestAttributeBindings.cc
   backend/TestComputeGeneratorFailures.cc
   backend/TestFunctionGroup.cc
   backend/TestFunctionRegistry.cc

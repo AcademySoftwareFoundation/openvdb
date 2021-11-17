@@ -14,6 +14,7 @@
 
 #include "CustomData.h"
 #include "AttributeRegistry.h"
+#include "AttributeBindings.h"
 
 #include <openvdb/version.h>
 #include <openvdb/Grid.h>
@@ -244,6 +245,21 @@ public:
 
     /// @return  The tree execution level.
     [[deprecated]] Index getTreeExecutionLevel() const;
+
+    /// @brief  Set attribute bindings.
+    /// @param attributeBindings A map of attribute bindings to expected names on
+    ///   the geometry to be executed over. By default the AX attributes will be
+    ///   bound to volumes of the same name. Supplying bindings
+    ///   for a subset of the attributes will leave the others unchanged.
+    ///   AX attributes can only bind to a single volume and vice versa.
+    ///   However, in a single set call these can be swapped e.g. a -> b and b -> a.
+    ///   When bindings are overriden through subsequent calls to this function,
+    ///   any dangling volumes will be automatically bound by name.
+    ///   To reset these bindings call get function and create a target set of bindings
+    ///   for each attribute of name -> name.
+    void setAttributeBindings(const AttributeBindings& bindings);
+    /// @return  The current attribute bindings map
+    const AttributeBindings& getAttributeBindings() const;
 
     ////////////////////////////////////////////////////////
 

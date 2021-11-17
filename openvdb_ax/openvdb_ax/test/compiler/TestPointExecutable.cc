@@ -22,12 +22,14 @@ public:
     CPPUNIT_TEST(testCreateMissingAttributes);
     CPPUNIT_TEST(testGroupExecution);
     CPPUNIT_TEST(testCompilerCases);
+    CPPUNIT_TEST(testExecuteBindings);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
     void testCreateMissingAttributes();
     void testGroupExecution();
     void testCompilerCases();
+    void testExecuteBindings();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointExecutable);
@@ -298,3 +300,225 @@ TestPointExecutable::testCompilerCases()
     logger.clear();
 }
 
+void
+TestPointExecutable::testExecuteBindings()
+{
+    openvdb::math::Transform::Ptr defaultTransform =
+        openvdb::math::Transform::createLinearTransform();
+    const std::vector<openvdb::Vec3d> singlePointZero = {openvdb::Vec3d::zero()};
+
+    openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
+
+    // binding to different name existing attribute
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::points::appendAttribute<float>(points->tree(), "a");
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b", "a"); // bind @b to attribute a
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+
+        const auto leafIter = points->tree().cbeginLeaf();
+        const auto& descriptor = leafIter->attributeSet().descriptor();
+
+        // check value set via binding is correct
+        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        const size_t aidx = descriptor.find("a");
+        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
+        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+    }
+
+    // binding to existing attribute AND default bind other attribute
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::points::appendAttribute<float>(points->tree(), "a");
+        openvdb::points::appendAttribute<float>(points->tree(), "c");
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @c = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+
+        const auto leafIter = points->tree().cbeginLeaf();
+        const auto& descriptor = leafIter->attributeSet().descriptor();
+
+        // check value set via binding
+        CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor.size());
+        const size_t aidx = descriptor.find("a");
+        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
+        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+        // check value set not using binding
+        const size_t cidx = descriptor.find("c");
+        CPPUNIT_ASSERT(cidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle2(leafIter->constAttributeArray(cidx));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle2.get(0));
+    }
+
+    // bind to created attribute AND not binding to created attribute
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @c = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b", "a"); // bind b to a
+        executable->setAttributeBindings(bindings);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+
+        const auto leafIter = points->tree().cbeginLeaf();
+        const auto& descriptor = leafIter->attributeSet().descriptor();
+
+        // check value set via binding
+        CPPUNIT_ASSERT_EQUAL(size_t(3), descriptor.size());
+        const size_t aidx = descriptor.find("a");
+        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
+        CPPUNIT_ASSERT_EQUAL(1.0f, handle.get(0));
+
+        // check value set not using binding
+        const size_t cidx = descriptor.find("c");
+        CPPUNIT_ASSERT(cidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(cidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle2(leafIter->constAttributeArray(cidx));
+        CPPUNIT_ASSERT_EQUAL(2.0f, handle2.get(0));
+    }
+
+    // binding to non existent attribute, error
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        CPPUNIT_ASSERT_THROW(executable->execute(*points), openvdb::AXExecutionError);
+    }
+
+    // trying to bind to an attribute and use the original attribute name at same time
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        CPPUNIT_ASSERT_THROW(executable->setAttributeBindings(bindings), openvdb::AXExecutionError);
+    }
+
+    // swap ax and data attributes with bindings
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        bindings.set("a","b"); // bind a to b
+
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+    }
+
+
+    // bind P away from world space position to some other float attribute
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("f@P = 1.25f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("P","a"); // bind float a to P
+
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+
+        const auto leafIter = points->tree().cbeginLeaf();
+        const auto& descriptor = leafIter->attributeSet().descriptor();
+
+        // check value set via binding
+        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        const size_t aidx = descriptor.find("a");
+        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<float>());
+        openvdb::points::AttributeHandle<float> handle(leafIter->constAttributeArray(aidx));
+        CPPUNIT_ASSERT_EQUAL(1.25f, handle.get(0));
+    }
+
+    // bind P away from world space position to some other attribute, defaulting to vec3f (as P does)
+    {
+        openvdb::points::PointDataGrid::Ptr
+            points = openvdb::points::createPointDataGrid
+                <openvdb::points::NullCodec, openvdb::points::PointDataGrid>(singlePointZero, *defaultTransform);
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@P = 1.25f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("P","a"); // bind float a to P
+
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(*points));
+
+        const auto leafIter = points->tree().cbeginLeaf();
+        const auto& descriptor = leafIter->attributeSet().descriptor();
+
+        // check value set via binding
+        CPPUNIT_ASSERT_EQUAL(size_t(2), descriptor.size());
+        const size_t aidx = descriptor.find("a");
+        CPPUNIT_ASSERT(aidx != openvdb::points::AttributeSet::INVALID_POS);
+        CPPUNIT_ASSERT(descriptor.valueType(aidx) == openvdb::typeNameAsString<openvdb::Vec3f>());
+        openvdb::points::AttributeHandle<openvdb::Vec3f> handle(leafIter->constAttributeArray(aidx));
+        CPPUNIT_ASSERT_EQUAL(openvdb::Vec3f(1.25f), handle.get(0));
+    }
+
+    // test setting bindings and then resetting some of those bindings on the same executable
+    {
+        openvdb::ax::PointExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::PointExecutable>("@b = 1.0f; @a = 2.0f; @c = 3.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        bindings.set("c","b"); // bind c to b
+        bindings.set("a","c"); // bind a to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+
+        bindings.set("a","b"); // bind a to b
+        bindings.set("b","a"); // bind a to b
+        CPPUNIT_ASSERT(!bindings.dataNameBoundTo("c")); // c should be unbound
+        // check that the set call resets c to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        const openvdb::ax::AttributeBindings& bindingsOnExecutable = executable->getAttributeBindings();
+        CPPUNIT_ASSERT(bindingsOnExecutable.isBoundAXName("c"));
+        CPPUNIT_ASSERT_EQUAL(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
+    }
+}

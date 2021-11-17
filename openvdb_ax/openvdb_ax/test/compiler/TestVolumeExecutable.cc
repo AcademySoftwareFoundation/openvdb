@@ -19,6 +19,7 @@ public:
     CPPUNIT_TEST(testTreeExecutionLevel);
     CPPUNIT_TEST(testActiveTileStreaming);
     CPPUNIT_TEST(testCompilerCases);
+    CPPUNIT_TEST(testExecuteBindings);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
@@ -26,6 +27,7 @@ public:
     void testTreeExecutionLevel();
     void testActiveTileStreaming();
     void testCompilerCases();
+    void testExecuteBindings();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeExecutable);
@@ -872,3 +874,131 @@ TestVolumeExecutable::testCompilerCases()
     logger.clear();
 }
 
+void
+TestVolumeExecutable::testExecuteBindings()
+{
+    openvdb::ax::Compiler::UniquePtr compiler = openvdb::ax::Compiler::create();
+
+    openvdb::ax::AttributeBindings bindings;
+    bindings.set("b", "a"); // bind b to a
+
+    {
+        // multi volumes
+        openvdb::FloatGrid::Ptr f1(new openvdb::FloatGrid);
+        f1->setName("a");
+        f1->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f1 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f;");
+
+        CPPUNIT_ASSERT(executable);
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(v));
+        CPPUNIT_ASSERT_EQUAL(1.0f, f1->tree().getValue({0,0,0}));
+    }
+
+    // binding to existing attribute AND not binding to attribute
+    {
+        openvdb::FloatGrid::Ptr f1(new openvdb::FloatGrid);
+        openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+        f1->setName("a");
+        f2->setName("c");
+        f1->tree().setValueOn({0,0,0}, 0.0f);
+        f2->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f1, f2 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @c = 2.0f;");
+
+        CPPUNIT_ASSERT(executable);
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(v));
+        CPPUNIT_ASSERT_EQUAL(1.0f, f1->tree().getValue({0,0,0}));
+        CPPUNIT_ASSERT_EQUAL(2.0f, f2->tree().getValue({0,0,0}));
+    }
+
+    // binding to new created attribute AND not binding to new created attribute
+    {
+        openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+        f2->setName("c");
+        f2->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f2 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @c = 2.0f;");
+
+        CPPUNIT_ASSERT(executable);
+        executable->setAttributeBindings(bindings);
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(v));
+        CPPUNIT_ASSERT_EQUAL(2.0f, f2->tree().getValue({0,0,0}));
+        CPPUNIT_ASSERT_EQUAL(size_t(2), v.size());
+    }
+
+    // binding to non existent attribute, not creating, error
+    {
+        openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+        f2->setName("c");
+        f2->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f2 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @c = 2.0f;");
+
+        CPPUNIT_ASSERT(executable);
+        executable->setAttributeBindings(bindings);
+        executable->setCreateMissing(false);
+        CPPUNIT_ASSERT_THROW(executable->execute(v), openvdb::AXExecutionError);
+    }
+
+    // trying to bind to an attribute and use the original attribute name at same time
+    {
+        openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+        f2->setName("c");
+        f2->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f2 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @c = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","c"); // bind b to c
+        CPPUNIT_ASSERT_THROW(executable->setAttributeBindings(bindings), openvdb::AXExecutionError);
+   }
+
+    // swap ax and data attributes with bindings
+    {
+        openvdb::FloatGrid::Ptr f2(new openvdb::FloatGrid);
+        f2->setName("c");
+        f2->tree().setValueOn({0,0,0}, 0.0f);
+        std::vector<openvdb::GridBase::Ptr> v { f2 };
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @c = 2.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","c"); // bind b to c
+        bindings.set("c","b"); // bind c to b
+
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        CPPUNIT_ASSERT_NO_THROW(executable->execute(v));
+        CPPUNIT_ASSERT_EQUAL(1.0f, f2->tree().getValue({0,0,0}));
+    }
+
+    // test setting bindings and then resetting some of those bindings on the same executable
+    {
+        openvdb::ax::VolumeExecutable::Ptr executable =
+            compiler->compile<openvdb::ax::VolumeExecutable>("@b = 1.0f; @a = 2.0f; @c = 3.0f;");
+        CPPUNIT_ASSERT(executable);
+        openvdb::ax::AttributeBindings bindings;
+        bindings.set("b","a"); // bind b to a
+        bindings.set("c","b"); // bind c to b
+        bindings.set("a","c"); // bind a to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+
+        bindings.set("a","b"); // bind a to b
+        bindings.set("b","a"); // bind a to b
+        CPPUNIT_ASSERT(!bindings.dataNameBoundTo("c")); // c should be unbound
+        // check that the set call resets c to c
+        CPPUNIT_ASSERT_NO_THROW(executable->setAttributeBindings(bindings));
+        const openvdb::ax::AttributeBindings& bindingsOnExecutable = executable->getAttributeBindings();
+        CPPUNIT_ASSERT(bindingsOnExecutable.isBoundAXName("c"));
+        CPPUNIT_ASSERT_EQUAL(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
+    }
+}

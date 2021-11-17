@@ -25,7 +25,7 @@ namespace ax {
 /// @note Implementation for initialize, isInitialized and uninitialized
 ///       reamins in compiler/Compiler.cc
 
-void run(const char* ax, openvdb::GridBase& grid)
+void run(const char* ax, openvdb::GridBase& grid, const AttributeBindings& bindings)
 {
     // Construct a logger that will output errors to cerr and suppress warnings
     openvdb::ax::Logger logger;
@@ -44,6 +44,9 @@ void run(const char* ax, openvdb::GridBase& grid)
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
             compiler.compile<openvdb::ax::PointExecutable>(*ast, logger);
+
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided points
         // @note  Throws on invalid point inputs such as mismatching types
         exe->execute(static_cast<points::PointDataGrid&>(grid));
@@ -54,13 +57,15 @@ void run(const char* ax, openvdb::GridBase& grid)
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
             compiler.compile<openvdb::ax::VolumeExecutable>(*ast, logger);
+        // Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided numerical grid
         // @note  Throws on invalid grid inputs such as mismatching types
         exe->execute(grid);
     }
 }
 
-void run(const char* ax, openvdb::GridPtrVec& grids)
+void run(const char* ax, openvdb::GridPtrVec& grids, const AttributeBindings& bindings)
 {
     if (grids.empty()) return;
     // Check the type of all grids. If they are all points, run for point data.
@@ -90,6 +95,8 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::PointExecutable::Ptr exe =
             compiler.compile<openvdb::ax::PointExecutable>(*ast, logger);
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided points individually
         // @note  Throws on invalid point inputs such as mismatching types
         for (auto& grid : grids) {
@@ -102,6 +109,8 @@ void run(const char* ax, openvdb::GridPtrVec& grids)
         //        the executable which can be used multiple times on any inputs
         const openvdb::ax::VolumeExecutable::Ptr exe =
             compiler.compile<openvdb::ax::VolumeExecutable>(*ast, logger);
+        //Set the attribute bindings
+        exe->setAttributeBindings(bindings);
         // Execute on the provided volumes
         // @note  Throws on invalid grid inputs such as mismatching types
         exe->execute(grids);
