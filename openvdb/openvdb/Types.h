@@ -626,6 +626,7 @@ struct SwappedCombineOp
         CombineArgs<ValueType> swappedArgs(args.b(), args.a(), args.result(),
             args.bIsActive(), args.aIsActive());
         op(swappedArgs);
+        args.setResultIsActive(swappedArgs.resultIsActive());
     }
 
     CombineOp& op;
