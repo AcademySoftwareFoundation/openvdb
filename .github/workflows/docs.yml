@@ -61,5 +61,9 @@ jobs:
         github.event.inputs.deploy == 'true'
       uses: peaceiris/actions-gh-pages@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
         publish_dir: /usr/local/share/doc/OpenVDB/html
+        destination_dir: documentation/doxygen
+        external_repository: AcademySoftwareFoundation/openvdb-website
+        publish_branch: master
+        commit_message: "doxygen documentation update"
