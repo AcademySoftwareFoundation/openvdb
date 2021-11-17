@@ -67,7 +67,7 @@ class Compiler;
 ///       @sa setGrainSize
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
-class PointExecutable
+class OPENVDB_AX_API PointExecutable
 {
 public:
     using Ptr = std::shared_ptr<PointExecutable>;

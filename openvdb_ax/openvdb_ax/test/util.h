@@ -22,6 +22,7 @@
 #include <utility>
 #include <string>
 #include <type_traits>
+#include <map>
 
 #define ERROR_MSG(Msg, Code) Msg + std::string(": \"") + Code + std::string("\"")
 
@@ -54,6 +55,8 @@ namespace unittest_util
 // be used. Could easily introduce some move semantics to work around this if
 // necessary.
 using CodeTests = std::vector<std::pair<std::string, openvdb::ax::ast::Node::Ptr>>;
+// Ordered map for consistency across platforms
+using ConfigMap = std::map<std::string, std::map<std::string, std::string>>;
 
 //
 

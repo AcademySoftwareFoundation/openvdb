@@ -46,7 +46,7 @@ class FunctionRegistry;
 /// @brief  The compiler class.  This holds an llvm context and set of compiler
 ///   options, and constructs executable objects (e.g. PointExecutable or
 ///   VolumeExecutable) from a syntax tree or snippet of code.
-class Compiler
+class OPENVDB_AX_API Compiler
 {
 public:
 

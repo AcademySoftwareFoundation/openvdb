@@ -340,7 +340,7 @@ jobs:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'mac'
+      github.event.inputs.type == 'ax'
     runs-on: macos-latest
     name: macos-cxx:${{ matrix.config.cxx }}-llvm:${{ matrix.config.llvm }}-${{ matrix.config.build }}
     env:
@@ -366,6 +366,59 @@ jobs:
         run: cd build && ctest -V
       - name: test_doxygen_examples
         run: ./ci/extract_test_examples.sh
+
+  windows-ax:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'ax'
+    runs-on: windows-2019
+    name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
+    env:
+      VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+    strategy:
+      matrix:
+        config:
+          # static build of blosc from vcpkg does not build internal sources.
+          # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
+          # Boost as both shared and static libs are installed.
+          - { vc: 'x64-windows-static', llvm_crt: 'MT',  build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', llvm_crt: 'MTd', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+      fail-fast: false
+    steps:
+    - uses: actions/checkout@v2
+    - name: path
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: llvm
+      shell: bash
+      # If building debug, build llvm with MTd
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm_crt }}
+    - name: install
+      shell: bash
+      run: |
+        vcpkg update
+        vcpkg install zlib tbb cppunit blosc \
+          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+    - name: build
+      shell: bash
+      run: >
+        ./ci/build.sh -v
+        --config=${{ matrix.config.build }}
+        --components=\"core,axcore,axbin,axtest\"
+        --cargs=\'
+        -A x64 -G \"Visual Studio 16 2019\"
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        -DUSE_EXPLICIT_INSTANTIATION=OFF
+        -DLLVM_DIR=${HOME}\llvm_install\lib\cmake\llvm
+        ${{ matrix.config.cmake }}
+        \'
+    - name: test
+      shell: bash
+      run: cd build && ctest -V -C ${{ matrix.config.build }}
 
   #############################################################################
   ################################## Blosc ####################################

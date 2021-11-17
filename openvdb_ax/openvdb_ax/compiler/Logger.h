@@ -51,7 +51,7 @@ namespace ax {
 ///   parsing, to allow resolution of code locations when they are not
 ///   explicitly available. The Logger also stores a pointer to the AST Tree
 ///   that these nodes belong to and the code used to create it.
-class Logger
+class OPENVDB_AX_API Logger
 {
 public:
     using Ptr = std::shared_ptr<Logger>;

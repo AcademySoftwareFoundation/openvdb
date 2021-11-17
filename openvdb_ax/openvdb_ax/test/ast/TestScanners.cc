@@ -417,7 +417,7 @@ void TestScanners::testAttributeDependencyTokens()
     std::vector<std::string> dependencies;
     attributeDependencyTokens(*tree, "b", tokens::CoreType::FLOAT, dependencies);
     // @b should depend on: @a, @e, @f, v@v
-    CPPUNIT_ASSERT_EQUAL(4ul, dependencies.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(4), dependencies.size());
     CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@a"));
     CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@e"));
     CPPUNIT_ASSERT_EQUAL(dependencies[2], std::string("float@f"));
@@ -426,7 +426,7 @@ void TestScanners::testAttributeDependencyTokens()
     // @c should depend on: @a, @c, @d, @e, @f
     dependencies.clear();
     attributeDependencyTokens(*tree, "c", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(5ul, dependencies.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(5), dependencies.size());
     CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@a"));
     CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@c"));
     CPPUNIT_ASSERT_EQUAL(dependencies[2], std::string("float@d"));
@@ -437,14 +437,14 @@ void TestScanners::testAttributeDependencyTokens()
     // @d should depend on: @d, @e
     dependencies.clear();
     attributeDependencyTokens(*tree, "d", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(2ul, dependencies.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(2), dependencies.size());
     CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@d"));
     CPPUNIT_ASSERT_EQUAL(dependencies[1], std::string("float@e"));
 
     // @e should depend on itself
     dependencies.clear();
     attributeDependencyTokens(*tree, "e", tokens::CoreType::FLOAT, dependencies);
-    CPPUNIT_ASSERT_EQUAL(1ul, dependencies.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(1), dependencies.size());
     CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("float@e"));
 
     // @f should depend on nothing
@@ -455,7 +455,7 @@ void TestScanners::testAttributeDependencyTokens()
     // @v should depend on: v@v
     dependencies.clear();
     attributeDependencyTokens(*tree, "v", tokens::CoreType::VEC3F, dependencies);
-    CPPUNIT_ASSERT_EQUAL(1ul, dependencies.size());
+    CPPUNIT_ASSERT_EQUAL(size_t(1), dependencies.size());
     CPPUNIT_ASSERT_EQUAL(dependencies[0], std::string("vec3f@v"));
 }
 
