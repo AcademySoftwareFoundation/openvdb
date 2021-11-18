@@ -1557,12 +1557,11 @@ newSopOperator(OP_OperatorTable* table)
             " to replace incorrect values."));
 
     // { Finite values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_finite", "Finite Values"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_finite", "Finite Values"
         + spacing(35)
     )
         .setCallbackFunc(&validateOperationTestsCB)
         .setDefault(PRMoneDefaults)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip("Verify that all values are finite and non-NaN.")
         .setDocumentation(
             "Verify that all values are finite and non-NaN.\n\n"
@@ -1578,10 +1577,9 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // { Uniform background values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_background", "Uniform Background"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_background", "Uniform Background"
         )
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip("Verify that all inactive voxels are set to the background value.")
         .setDocumentation(
             "Verify that all inactive voxels are set to the background value.\n\n"
@@ -1597,11 +1595,10 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // { Values in range
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_valrange", "Values in Range"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_valrange", "Values in Range"
         + spacing(23)
         )
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip(
             "Verify that all scalar voxel values and vector magnitudes\n"
             "are in the given range.")
@@ -1662,11 +1659,10 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // { Gradient magnitude
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_gradient", "Gradient Magnitude"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_gradient", "Gradient Magnitude"
         + spacing(7)
         )
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip(
             "Verify that the level set gradient has magnitude one everywhere\n"
             "(within a given tolerance).")
@@ -1691,11 +1687,10 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // { Inactive Tiles
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_activetiles", "Inactive Tiles"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_activetiles", "Inactive Tiles"
         + spacing(36)
         )
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip("Verify that level sets have no active tiles.")
         .setDocumentation(
             "Verify that level sets have no active tiles.\n\n"
@@ -1722,11 +1717,10 @@ newSopOperator(OP_OperatorTable* table)
         .setTooltip("Fog Volume specific tests."));
 
     // { Background values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE, "test_backgroundzero", "Background Zero"
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT, "test_backgroundzero", "Background Zero"
         + spacing(17)
         )
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip("Verify that all inactive voxels in fog volumes have value zero.")
         .setDocumentation(
             "Verify that all inactive voxels in fog volumes have value zero.\n\n"
@@ -1742,11 +1736,10 @@ newSopOperator(OP_OperatorTable* table)
     // }
 
     // { Active values
-    parms.add(hutil::ParmFactory(PRM_TOGGLE,
+    parms.add(hutil::ParmFactory(PRM_TOGGLE | PRM_TYPE_JOIN_NEXT,
         // Note: this label currently determines the spacing of the second column of toggles.
         "test_fogvalues", "Active Values in [0, 1]")
         .setCallbackFunc(&validateOperationTestsCB)
-        .setTypeExtended(PRM_TYPE_MENU_JOIN)
         .setTooltip(
             "Verify that all active voxels in fog volumes\n"
             "have values in the range [0, 1].")
