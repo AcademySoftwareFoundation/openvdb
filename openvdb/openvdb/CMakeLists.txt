@@ -58,7 +58,7 @@ if(USE_EXR)
     endif()
   endif()
 else()
-  find_package(IlmBase ${MINIMUM_ILMBASE_VERSION} REQUIRED COMPONENTS Half)
+  find_package(IlmBase REQUIRED COMPONENTS Half)
 endif()
 
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_ILMBASE_VERSION)
