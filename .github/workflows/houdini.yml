@@ -88,7 +88,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v4-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
+        key: dummy-houdini${{ matrix.config.hou }}-${{ steps.timestamp.outputs.timestamp }}
         restore-keys: vdb-v4-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
@@ -120,6 +120,6 @@ jobs:
       if: matrix.config.build == 'Release'
       shell: bash
       run: ccache --evict-older-than 1d
-      # Final check to make sure the cache still exists
-    - name: validate_houdini
-      run: test -f "hou/hou.tar.gz"
+      # Delete the houdini tarball so that this dummy cache occupies no space
+    - name: delete_hou
+      run: rm -f hou/hou.tar.gz
