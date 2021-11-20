@@ -9,6 +9,9 @@ Version 9.0.1 - In development
     - Minor fix to range in openvdb/tools/LevelSetSphere.h. This could result
       in data races for multi-threaded execution (unconfirmed) [Reported by Tommy Hinks]
 
+    New features:
+    - Added support for AMD's HIP API in NanoVDB [Contributed by Blender Foundation]
+
 Version 9.0.0 - October 29, 2021
 
       This version introduces ABI changes relative to older major releases,
