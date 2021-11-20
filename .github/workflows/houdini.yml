@@ -74,7 +74,7 @@ jobs:
       with:
         path: hou
         key: dummy-houdini${{ matrix.config.hou }}-${{ steps.timestamp.outputs.timestamp }}
-        restore-keys: vdb-v4-houdini${{ matrix.config.hou }}-
+        restore-keys: vdb-v5-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
       # Make sure the cache is copied, not moved, as the cache action always posts the cache.
