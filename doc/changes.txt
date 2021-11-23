@@ -126,16 +126,23 @@ Build:
 
 @htmlonly <a name="v8_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.2.0</B> - <I>In development</I>
+<B>Version 8.2.0</B> - <I>November 23, 2021</I>
 
 @par
-New features:
-- Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
-  tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
-  multi-threaded counting. The Tree methods now use these implementations.
+<BLOCKQUOTE>
+Added support for TBB 2021.
+</BLOCKQUOTE>
+
+@par
+<BLOCKQUOTE>
+Added support for OpenEXR 3. This is contributed by Cary Phillips.
+</BLOCKQUOTE>
 
 @par
 Improvements:
+- Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
+  tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
+  multi-threaded counting. The Tree methods now use these implementations.
 - Moved from the deprecated TBB task scheduler to TBB arenas. Various
   methods now respect the TBB arena state they were invoked from.
 - Introduced a new thread/Threading.h header to consolidate calls to
@@ -148,8 +155,9 @@ Improvements:
 - Improved support for size_t grid types on systems where size_t is a unique
   type.
   [Contributed by Brecht Van Lommel]
+- Minor performance improvements to dilation calls in fast sweeping algorithms.
 - Add support for dilation in one direction and extending a field in one
-  direction in fast sweeping algorithms.
+  direction.
 
 @par
 API changes:
@@ -174,6 +182,8 @@ Houdini:
 - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
 - VDB Visualize Tree SOP is now multi-threaded and provides slicing and color
   remapping.
+- Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band
+  level-set with a dilation value of 0, which will result in no operation.
 
 @par
 Build:

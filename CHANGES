@@ -119,14 +119,13 @@ Version 9.0.0 - October 29, 2021
     - OpenEXR is now optional for vdb_render. It can be enabled with
       -DUSE_EXR=ON.
 
-Version 8.2.0 - In development
 
-    New features:
+Version 8.2.0 - November 23, 2021
+
+    Improvements:
     - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
       tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
       multi-threaded counting. The Tree methods now use these implementations.
-
-    Improvements:
     - Moved from the deprecated TBB task scheduler to TBB arenas. Various
       methods now respect the TBB arena state they were invoked from.
     - Introduced a new thread/Threading.h header to consolidate calls to
@@ -142,7 +141,7 @@ Version 8.2.0 - In development
     - Minor performance improvements to dilation calls in fast sweeping
       algorithms.
     - Add support for dilation in one direction and extending a field in one
-      direction in fast sweeping algorithms.
+      direction.
 
     API changes:
     - DynamicNodeManager can now set one grain size for threading across leaf nodes
@@ -165,6 +164,8 @@ Version 8.2.0 - In development
     - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
     - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
       color remapping.
+    - Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band
+      level-set with a dilation value of 0, which will result in no operation.
 
     Build:
     - Added support for TBB 2021.
