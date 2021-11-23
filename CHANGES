@@ -53,6 +53,8 @@ Version 8.2.0 - In development
     - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
     - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
       color remapping.
+    - Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band
+      level-set with a dilation value of 0, which will result in no operation.
 
     Build:
     - Added support for TBB 2021.
