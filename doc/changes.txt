@@ -35,7 +35,7 @@ Improvements:
   [Contributed by Brecht Van Lommel]
 - Minor performance improvements to dilation calls in fast sweeping algorithms.
 - Add support for dilation in one direction and extending a field in one
-  direction.
+  direction in fast sweeping algorithms.
 
 @par
 API changes:
