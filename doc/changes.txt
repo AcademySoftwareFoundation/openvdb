@@ -4,7 +4,7 @@
 
 @htmlonly <a name="v8_2_0_changes"></a>@endhtmlonly
 @par
-<B>Version 8.2.0</B> - <I>November 23, 2021</I>
+<B>Version 8.2.0</B> - <I>November 24, 2021</I>
 
 @par
 <BLOCKQUOTE>
