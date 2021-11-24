@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">9.0.0</span>
+   &#160;<span id="projectnumber">9.0.1</span>
    </div>
   </td>
  </tr>
@@ -111,6 +111,8 @@ Namespaces</h2></td></tr>
 <tr class="memitem:namespaceopenvdb_1_1v9__0_1_1points_1_1point__attribute__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points_1_1point__attribute__internal.html">point_attribute_internal</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:namespaceopenvdb_1_1v9__0_1_1points_1_1point__move__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points_1_1point__move__internal.html">point_move_internal</a></td></tr>
+<tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:namespaceopenvdb_1_1v9__0_1_1points_1_1statistics__internal"><td class="memItemLeft" align="right" valign="top"> &#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points_1_1statistics__internal.html">statistics_internal</a></td></tr>
 <tr class="separator:"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a name="nested-classes"></a>
@@ -461,6 +463,30 @@ Functions</h2></td></tr>
 <tr class="memitem:aea55ad121ac7274e8a5bb844253c695d"><td class="memTemplItemLeft" align="right" valign="top">PointDataGridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#aea55ad121ac7274e8a5bb844253c695d">nonUniformPointScatter</a> (const GridT &amp;grid, const float pointsPerVoxel, const unsigned int seed=0, const float spread=1.0f, InterrupterT *interrupter=nullptr)</td></tr>
 <tr class="memdesc:aea55ad121ac7274e8a5bb844253c695d"><td class="mdescLeft">&#160;</td><td class="mdescRight">Non uniformly scatter points per active voxel. The pointsPerVoxel value is used to weight each grids cell value to compute a fixed number of points for every active voxel. If the computed result is a fractional value, each voxel calculates a delta value of how likely it is to contain an extra point.  <a href="#aea55ad121ac7274e8a5bb844253c695d">More...</a><br /></td></tr>
 <tr class="separator:aea55ad121ac7274e8a5bb844253c695d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7d93f4d68e2eb70dac85a685e9b9522e"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT &gt; </td></tr>
+<tr class="memitem:a7d93f4d68e2eb70dac85a685e9b9522e"><td class="memTemplItemLeft" align="right" valign="top">std::pair&lt; ValueT, ValueT &gt;&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a7d93f4d68e2eb70dac85a685e9b9522e">evalMinMax</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>())</td></tr>
+<tr class="memdesc:a7d93f4d68e2eb70dac85a685e9b9522e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the minimum and maximum values of a point attribute.  <a href="#a7d93f4d68e2eb70dac85a685e9b9522e">More...</a><br /></td></tr>
+<tr class="separator:a7d93f4d68e2eb70dac85a685e9b9522e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abee94dbff950fd1421a1f324bc5b4b2b"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT &gt; </td></tr>
+<tr class="memitem:abee94dbff950fd1421a1f324bc5b4b2b"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html">ConvertElementType</a>&lt; ValueT, double &gt;::Type&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#abee94dbff950fd1421a1f324bc5b4b2b">evalAverage</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>())</td></tr>
+<tr class="memdesc:abee94dbff950fd1421a1f324bc5b4b2b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the average value of a point attribute.  <a href="#abee94dbff950fd1421a1f324bc5b4b2b">More...</a><br /></td></tr>
+<tr class="separator:abee94dbff950fd1421a1f324bc5b4b2b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a4cc9cf4453d1c8ee7aae58fe5efd4040"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT &gt; </td></tr>
+<tr class="memitem:a4cc9cf4453d1c8ee7aae58fe5efd4040"><td class="memTemplItemLeft" align="right" valign="top"><a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html">PromoteType</a>&lt; ValueT &gt;::Highest&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a4cc9cf4453d1c8ee7aae58fe5efd4040">accumulate</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>())</td></tr>
+<tr class="memdesc:a4cc9cf4453d1c8ee7aae58fe5efd4040"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the total value of a point attribute.  <a href="#a4cc9cf4453d1c8ee7aae58fe5efd4040">More...</a><br /></td></tr>
+<tr class="separator:a4cc9cf4453d1c8ee7aae58fe5efd4040"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a44690998e9733ab3498205299864e4a4"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT &gt; </td></tr>
+<tr class="memitem:a44690998e9733ab3498205299864e4a4"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a44690998e9733ab3498205299864e4a4">evalMinMax</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, ValueT &amp;min, ValueT &amp;max, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>(), typename PointDataTreeT::template ValueConverter&lt; ValueT &gt;::Type *minTree=nullptr, typename PointDataTreeT::template ValueConverter&lt; ValueT &gt;::Type *maxTree=nullptr)</td></tr>
+<tr class="memdesc:a44690998e9733ab3498205299864e4a4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the minimum and maximum values of a point attribute and returns whether the values are valid. Optionally constructs localised min and max value trees.  <a href="#a44690998e9733ab3498205299864e4a4">More...</a><br /></td></tr>
+<tr class="separator:a44690998e9733ab3498205299864e4a4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2ca703db5f875505c22c5d2c142441a2"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT , typename ResultTreeT  = typename ConvertElementType&lt;ValueT, double&gt;::Type&gt; </td></tr>
+<tr class="memitem:a2ca703db5f875505c22c5d2c142441a2"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a2ca703db5f875505c22c5d2c142441a2">evalAverage</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, typename <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html">ConvertElementType</a>&lt; ValueT, double &gt;::Type &amp;average, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>(), typename PointDataTreeT::template ValueConverter&lt; ResultTreeT &gt;::Type *averageTree=nullptr)</td></tr>
+<tr class="memdesc:a2ca703db5f875505c22c5d2c142441a2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the average value of a point attribute and returns whether the value is valid. Optionally constructs localised average value trees.  <a href="#a2ca703db5f875505c22c5d2c142441a2">More...</a><br /></td></tr>
+<tr class="separator:a2ca703db5f875505c22c5d2c142441a2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9a92590037c00b856a13e368400575c3"><td class="memTemplParams" colspan="2">template&lt;typename ValueT , typename CodecT  = UnknownCodec, typename FilterT  = NullFilter, typename PointDataTreeT , typename ResultTreeT  = typename PromoteType&lt;ValueT&gt;::Highest&gt; </td></tr>
+<tr class="memitem:a9a92590037c00b856a13e368400575c3"><td class="memTemplItemLeft" align="right" valign="top">bool&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1points.html#a9a92590037c00b856a13e368400575c3">accumulate</a> (const PointDataTreeT &amp;points, const std::string &amp;attribute, typename <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html">PromoteType</a>&lt; ValueT &gt;::Highest &amp;total, const FilterT &amp;filter=<a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>(), typename PointDataTreeT::template ValueConverter&lt; ResultTreeT &gt;::Type *totalTree=nullptr)</td></tr>
+<tr class="memdesc:a9a92590037c00b856a13e368400575c3"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluates the total value of a point attribute and returns whether the value is valid. Optionally constructs localised total value trees.  <a href="#a9a92590037c00b856a13e368400575c3">More...</a><br /></td></tr>
+<tr class="separator:a9a92590037c00b856a13e368400575c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <h2 class="groupheader">Typedef Documentation</h2>
 <a class="anchor" id="a8954944cf980f1f874a6510497568338"></a>
@@ -552,6 +578,111 @@ Functions</h2></td></tr>
 </div>
 </div>
 <h2 class="groupheader">Function Documentation</h2>
+<a class="anchor" id="a4cc9cf4453d1c8ee7aae58fe5efd4040"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html">PromoteType</a>&lt; ValueT &gt;::Highest accumulate </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the total value of a point attribute. </p>
+<p>Performs parallel reduction by summing all values. The reduction arithmetic and return value precision evaluates to: <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html#af1df57fa72e33748fb29c44bbaefdffa">PromoteType&lt;ValueT&gt;::Highest</a> which, for POD and VDB math types, is ValueT at its highest bit precision. If the PointDataGrid is empty or the filter evalutes to empty, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad627481596d49042359f03034a3fe526" title="Return the value of type T that corresponds to zero. ">zeroVal&lt;ValueT&gt;()</a> is returned. </p><dl class="section note"><dt>Note</dt><dd>The <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html" title="Promotion classes which provide an interface for elevating and demoting a scalar or VDB type to a hig...">PromoteType</a> of the attribute must be copy constructible, support the same type + operator. This method will throw if ValueT does not match the given attribute. The function is deterministic. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>the total value </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a9a92590037c00b856a13e368400575c3"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool accumulate </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html">PromoteType</a>&lt; ValueT &gt;::Highest &amp;&#160;</td>
+          <td class="paramname"><em>total</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename PointDataTreeT::template ValueConverter&lt; ResultTreeT &gt;::Type *&#160;</td>
+          <td class="paramname"><em>totalTree</em> = <code>nullptr</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the total value of a point attribute and returns whether the value is valid. Optionally constructs localised total value trees. </p>
+<p>Performs parallel reduction by summing all values. The reduction arithmetic and return value precision evaluates to: <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html#af1df57fa72e33748fb29c44bbaefdffa">PromoteType&lt;ValueT&gt;::Highest</a> which, for POD and VDB math types, is ValueT at its highest bit precision. This method will return true total has been set, false otherwise (when no points existed or a filter evaluated to empty). </p><dl class="section note"><dt>Note</dt><dd>The <a class="el" href="structopenvdb_1_1v9__0_1_1PromoteType.html" title="Promotion classes which provide an interface for elevating and demoting a scalar or VDB type to a hig...">PromoteType</a> of the attribute must be copy constructible, support the same type + operator. This method will throw if ValueT does not match the given attribute. The function is deterministic. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">total</td><td>the computed total value </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+    <tr><td class="paramname">totalTree</td><td>if provided, builds a tiled tree of localised total results. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true if total has been set, false otherwise. Can be false if no points were processed or if the tree was empty. </dd></dl>
+<dl class="section user"><dt>Example:</dt><dd><div class="fragment"><div class="line"><span class="keyword">using namespace </span><a class="code" href="namespaceopenvdb.html">openvdb</a>;</div><div class="line"><span class="keyword">using namespace </span>openvdb::points;</div><div class="line"></div><div class="line"><span class="comment">// accumulate and store per leaf values in a new tree</span></div><div class="line"><a class="code" href="structopenvdb_1_1v9__0_1_1PromoteType.html#af1df57fa72e33748fb29c44bbaefdffa">PromoteType&lt;uint8_t&gt;::Highest</a> total;  <span class="comment">// evaluates to uint64_t</span></div><div class="line"><a class="code" href="structopenvdb_1_1v9__0_1_1tree_1_1Tree_1_1ValueConverter.html#a3391e452092dc3f47fe353a89ba0361e">PointDataTree::ValueConverter&lt;decltype(total)&gt;::Type</a> totalTree; <span class="comment">// uint64_t tree of totals</span></div><div class="line"><span class="keywordtype">bool</span> success = accumulate&lt;uint8_t&gt;(tree, <span class="stringliteral">&quot;attrib&quot;</span>, total, NullFilter(), &amp;totalTree);</div></div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="ab79ffb24dc5aee12a75d1507966164bc"></a>
 <div class="memitem">
 <div class="memproto">
@@ -2114,6 +2245,229 @@ A <code>PointIndexGrid</code> to the points must be supplied to perform this ope
   </table>
   </dd>
 </dl>
+
+</div>
+</div>
+<a class="anchor" id="abee94dbff950fd1421a1f324bc5b4b2b"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname"><a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html">ConvertElementType</a>&lt; ValueT, double &gt;::Type evalAverage </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the average value of a point attribute. </p>
+<p>Performs parallel reduction by cumulative moving average. The reduction arithmetic and return value precision evaluates to: <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html#a801364d20664a6d2df467fcc266ed7c8">ConvertElementType&lt;ValueT, double&gt;::Type</a> which, for POD and VDB math types, is ValueT at double precision. If the PointDataGrid is empty or the filter evalutes to empty, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad627481596d49042359f03034a3fe526" title="Return the value of type T that corresponds to zero. ">zeroVal&lt;ValueT&gt;()</a> is returned. </p><dl class="section note"><dt>Note</dt><dd>The <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html" title="Conversion classes for changing the underlying type of VDB types. ">ConvertElementType</a> of the attribute must be copy constructible, support the same type + - * operators and * / operators from a double. This method will throw if ValueT does not match the given attribute. The function is deterministic. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>the average value </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a2ca703db5f875505c22c5d2c142441a2"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool evalAverage </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html">ConvertElementType</a>&lt; ValueT, double &gt;::Type &amp;&#160;</td>
+          <td class="paramname"><em>average</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename PointDataTreeT::template ValueConverter&lt; ResultTreeT &gt;::Type *&#160;</td>
+          <td class="paramname"><em>averageTree</em> = <code>nullptr</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the average value of a point attribute and returns whether the value is valid. Optionally constructs localised average value trees. </p>
+<p>Performs parallel reduction by cumulative moving average. The reduction arithmetic and return value precision evaluates to: <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html#a801364d20664a6d2df467fcc266ed7c8">ConvertElementType&lt;ValueT, double&gt;::Type</a> which, for POD and VDB math types, is ValueT at double precision. This method will return true average has been set, false otherwise (when no points existed or a filter evaluated to empty). </p><dl class="section note"><dt>Note</dt><dd>The <a class="el" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html" title="Conversion classes for changing the underlying type of VDB types. ">ConvertElementType</a> of the attribute must be copy constructible, support the same type + - * operators and * / operators from a double. This method will throw if ValueT does not match the given attribute. The function is deterministic. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">average</td><td>the computed averaged value at double precision </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+    <tr><td class="paramname">averageTree</td><td>if provided, builds a tiled tree of localised avg results. </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true if average has been set, false otherwise. Can be false if no points were processed or if the tree was empty. </dd></dl>
+<dl class="section user"><dt>Example:</dt><dd><div class="fragment"><div class="line"><span class="keyword">using namespace </span><a class="code" href="namespaceopenvdb.html">openvdb</a>;</div><div class="line"><span class="keyword">using namespace </span>openvdb::points</div><div class="line"></div><div class="line"><span class="comment">// average and store per leaf values in a new tree</span></div><div class="line"><a class="code" href="structopenvdb_1_1v9__0_1_1ConvertElementType.html#a801364d20664a6d2df467fcc266ed7c8">ConvertElementType&lt;uint8_t, double&gt;::Type</a> avg;  <span class="comment">// evaluates to double</span></div><div class="line"><a class="code" href="structopenvdb_1_1v9__0_1_1tree_1_1Tree_1_1ValueConverter.html#a3391e452092dc3f47fe353a89ba0361e">PointDataTree::ValueConverter&lt;decltype(avg)&gt;::Type</a> avgTree; <span class="comment">// double tree of averages</span></div><div class="line"><span class="keywordtype">bool</span> success = evalAverage&lt;uint8_t&gt;(tree, <span class="stringliteral">&quot;attrib&quot;</span>, avg, NullFilter(), &amp;avgTree);</div></div><!-- fragment --> </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a7d93f4d68e2eb70dac85a685e9b9522e"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">std::pair&lt; ValueT, ValueT &gt; evalMinMax </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the minimum and maximum values of a point attribute. </p>
+<p>Performs parallel reduction by comparing values using their less than and greater than operators. If the PointDataGrid is empty or the filter evalutes to empty, <a class="el" href="namespaceopenvdb_1_1v9__0.html#ad627481596d49042359f03034a3fe526" title="Return the value of type T that corresponds to zero. ">zeroVal&lt;ValueT&gt;()</a> is returned for both values. </p><dl class="section note"><dt>Note</dt><dd>The ValueT of the attribute must be copy constructible. This method will throw if the templated ValueT does not match the given attribute. For vectors and matrices, this results in per component comparisons. See evalExtents for magnitudes or more custom control. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>min,max value pair </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="a44690998e9733ab3498205299864e4a4"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">bool evalMinMax </td>
+          <td>(</td>
+          <td class="paramtype">const PointDataTreeT &amp;&#160;</td>
+          <td class="paramname"><em>points</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const std::string &amp;&#160;</td>
+          <td class="paramname"><em>attribute</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ValueT &amp;&#160;</td>
+          <td class="paramname"><em>min</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">ValueT &amp;&#160;</td>
+          <td class="paramname"><em>max</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">const FilterT &amp;&#160;</td>
+          <td class="paramname"><em>filter</em> = <code><a class="el" href="classopenvdb_1_1v9__0_1_1points_1_1NullFilter.html">NullFilter</a>()</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename PointDataTreeT::template ValueConverter&lt; ValueT &gt;::Type *&#160;</td>
+          <td class="paramname"><em>minTree</em> = <code>nullptr</code>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">typename PointDataTreeT::template ValueConverter&lt; ValueT &gt;::Type *&#160;</td>
+          <td class="paramname"><em>maxTree</em> = <code>nullptr</code>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluates the minimum and maximum values of a point attribute and returns whether the values are valid. Optionally constructs localised min and max value trees. </p>
+<p>Performs parallel reduction by comparing values using their less than and greater than operators. This method will return true if min and max have been set, false otherwise (when no points existed or a filter evaluated to empty). </p><dl class="section note"><dt>Note</dt><dd>The ValueT of the attribute must also be copy constructible. This method will throw if the templated ValueT does not match the given attribute. For vectors and matrices, this results in per component comparisons. See evalExtents for magnitudes or more custom control. </dd></dl>
+<dl class="section warning"><dt>Warning</dt><dd>if "P" is provided, the result is undefined. </dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">points</td><td>the point tree </td></tr>
+    <tr><td class="paramname">attribute</td><td>the attribute to reduce </td></tr>
+    <tr><td class="paramname">min</td><td>the computed min value </td></tr>
+    <tr><td class="paramname">max</td><td>the computed max value </td></tr>
+    <tr><td class="paramname">filter</td><td>a filter to apply to points </td></tr>
+    <tr><td class="paramname">minTree</td><td>if provided, builds a tiled tree of localised min results </td></tr>
+    <tr><td class="paramname">maxTree</td><td>if provided, builds a tiled tree of localised max results </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>true if min and max have been set, false otherwise. Can be false if no points were processed or if the tree was empty. </dd></dl>
 
 </div>
 </div>

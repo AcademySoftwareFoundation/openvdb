@@ -19,6 +19,10 @@ var searchData=
   ['floattraits_3c_20t_2c_208_20_3e',['FloatTraits&lt; T, 8 &gt;',['../structnanovdb_1_1FloatTraits_3_01T_00_018_01_4.html',1,'nanovdb']]],
   ['floattraits_3c_20valuemask_2c_201_20_3e',['FloatTraits&lt; ValueMask, 1 &gt;',['../structnanovdb_1_1FloatTraits_3_01ValueMask_00_011_01_4.html',1,'nanovdb']]],
   ['floattraits_3c_20valuet_20_3e',['FloatTraits&lt; ValueT &gt;',['../structnanovdb_1_1FloatTraits.html',1,'nanovdb']]],
+  ['flt_5ft',['flt_t',['../structopenvdb_1_1v9__0_1_1types__internal_1_1flt__t.html',1,'openvdb::v9_0::types_internal']]],
+  ['flt_5ft_3c_2016ul_20_3e',['flt_t&lt; 16ul &gt;',['../structopenvdb_1_1v9__0_1_1types__internal_1_1flt__t_3_0116ul_01_4.html',1,'openvdb::v9_0::types_internal']]],
+  ['flt_5ft_3c_2032ul_20_3e',['flt_t&lt; 32ul &gt;',['../structopenvdb_1_1v9__0_1_1types__internal_1_1flt__t_3_0132ul_01_4.html',1,'openvdb::v9_0::types_internal']]],
+  ['flt_5ft_3c_2064ul_20_3e',['flt_t&lt; 64ul &gt;',['../structopenvdb_1_1v9__0_1_1types__internal_1_1flt__t_3_0164ul_01_4.html',1,'openvdb::v9_0::types_internal']]],
   ['foreachfilterop',['ForeachFilterOp',['../structopenvdb_1_1v9__0_1_1tree_1_1ForeachFilterOp.html',1,'openvdb::v9_0::tree']]],
   ['formattedint',['FormattedInt',['../classopenvdb_1_1v9__0_1_1util_1_1FormattedInt.html',1,'openvdb::v9_0::util']]],
   ['fourthorderdensestencil',['FourthOrderDenseStencil',['../classopenvdb_1_1v9__0_1_1math_1_1FourthOrderDenseStencil.html',1,'openvdb::v9_0::math']]],
@@ -37,10 +41,10 @@ var searchData=
   ['functiontraits_3c_20r_28_2a_29_28args_2e_2e_2e_29_3e',['FunctionTraits&lt; R(*)(Args...)&gt;',['../structopenvdb_1_1v9__0_1_1ax_1_1codegen_1_1FunctionTraits_3_01R_07_5_08_07Args_8_8_8_08_4.html',1,'openvdb::v9_0::ax::codegen']]],
   ['functiontraits_3c_20r_28args_2e_2e_2e_29_3e',['FunctionTraits&lt; R(Args...)&gt;',['../structopenvdb_1_1v9__0_1_1ax_1_1codegen_1_1FunctionTraits.html',1,'openvdb::v9_0::ax::codegen']]],
   ['functiontraits_3c_20returnt_28args_2e_2e_2e_29_3e',['FunctionTraits&lt; ReturnT(Args...)&gt;',['../structopenvdb_1_1v9__0_1_1ax_1_1codegen_1_1FunctionTraits_3_01ReturnT_07Args_8_8_8_08_4.html',1,'openvdb::v9_0::ax::codegen']]],
-  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Laplacian_1_1Functor.html',1,'openvdb::v9_0::tools::Laplacian']]],
+  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Divergence_1_1Functor.html',1,'openvdb::v9_0::tools::Divergence']]],
   ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Magnitude_1_1Functor.html',1,'openvdb::v9_0::tools::Magnitude']]],
-  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1MeanCurvature_1_1Functor.html',1,'openvdb::v9_0::tools::MeanCurvature']]],
-  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Normalize_1_1Functor.html',1,'openvdb::v9_0::tools::Normalize']]],
+  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Laplacian_1_1Functor.html',1,'openvdb::v9_0::tools::Laplacian']]],
   ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Gradient_1_1Functor.html',1,'openvdb::v9_0::tools::Gradient']]],
-  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Divergence_1_1Functor.html',1,'openvdb::v9_0::tools::Divergence']]]
+  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1MeanCurvature_1_1Functor.html',1,'openvdb::v9_0::tools::MeanCurvature']]],
+  ['functor',['Functor',['../structopenvdb_1_1v9__0_1_1tools_1_1Normalize_1_1Functor.html',1,'openvdb::v9_0::tools::Normalize']]]
 ];

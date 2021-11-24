@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">9.0.0</span>
+   &#160;<span id="projectnumber">9.0.1</span>
    </div>
   </td>
  </tr>
@@ -94,20 +94,10 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <p>Official release of NanoVDB, which for the first time offers GPU support for static sparse volumes in OpenVDB. See the <a href="https://academysoftwarefoundation.github.io/openvdb/NanoVDB_MainPage.html">documentation</a> for details. </p>
 </blockquote>
 </dd></dl>
-<dl class="section user"><dt></dt><dd><blockquote class="doxtable">
-<p>Faster build times from support for explicit template instantiation, which is enabled by default for most of the tools. </p>
-</blockquote>
-</dd></dl>
-<dl class="section user"><dt></dt><dd><blockquote class="doxtable">
-<p>Added support for OpenEXR 3. This is contributed by Cary Phillips. </p>
-</blockquote>
-</dd></dl>
-<dl class="section user"><dt></dt><dd><blockquote class="doxtable">
-<p>Added transient data to the RootNode, InternalNode, and LeafNode. </p>
-</blockquote>
-</dd></dl>
 <dl class="section user"><dt></dt><dd>New features:<ul>
-<li>NanoVDB, which for the first time offers GPU support for static sparse volumes in OpenVDB.</li>
+<li>Faster build times from support for explicit template instantiation, which is enabled by default for most of the tools.</li>
+<li>Added support for OpenEXR 3 and TBB 2021.</li>
+<li>Added transient data to the RootNode, InternalNode, and LeafNode.</li>
 </ul>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Improvements:<ul>
@@ -125,7 +115,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 </ul>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Bug Fixes:<ul>
-<li>Fixed a bug where <a class="el" href="namespaceopenvdb_1_1v9__0_1_1ax.html#af5c3a646cfefda0700aee110ea8c6a92" title="Run a full AX pipeline (parse, compile and execute) on a single OpenVDB Grid. ">ax::run()</a> would crash if it could not parse a single statement.</li>
+<li>Fixed a bug where <a class="el" href="namespaceopenvdb_1_1v9__0_1_1ax.html#aa0ff80174a520af129df4e589c8f72ad" title="Run a full AX pipeline (parse, compile and execute) on a single OpenVDB Grid. ">ax::run()</a> would crash if it could not parse a single statement.</li>
 </ul>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>ABI changes:<ul>
@@ -167,18 +157,24 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li>OpenEXR is now optional for vdb_render. It can be enabled with -DUSE_EXR=ON.</li>
 </ul>
 </dd></dl>
-<p> <a name="v8_2_0_changes"></a> </p><dl class="section user"><dt></dt><dd><b>Version 8.2.0</b> - <em>In development</em></dd></dl>
-<dl class="section user"><dt></dt><dd>New features:<ul>
-<li>Added <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a073b47486ac79130a4de5210a44cc022" title="Return the total number of active voxels stored in leaf nodes. ">tools::countActiveLeafVoxels()</a>, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4d6ddf0e0a760645d2590f9b2be1c4de" title="Return the total number of inactive voxels in the tree. ">tools::countInactiveVoxels()</a>, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae97f0db6ef147e3f02a5ebec9f360e3d" title="Return the total number of inactive voxels stored in leaf nodes. ">tools::countInactiveLeafVoxels()</a> and <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a5662e54e5608edc934c09c8bac2ec3ea" title="Return a vector with bounding boxes that represents all the intersections between active tiles in the...">tools::activeTiles()</a> to perform multi-threaded counting. The Tree methods now use these implementations.</li>
-</ul>
+<p> <a name="v8_2_0_changes"></a> </p><dl class="section user"><dt></dt><dd><b>Version 8.2.0</b> - <em>November 24, 2021</em></dd></dl>
+<dl class="section user"><dt></dt><dd><blockquote class="doxtable">
+<p>Added support for TBB 2021. </p>
+</blockquote>
+</dd></dl>
+<dl class="section user"><dt></dt><dd><blockquote class="doxtable">
+<p>Added support for OpenEXR 3. This is contributed by Cary Phillips. </p>
+</blockquote>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Improvements:<ul>
+<li>Added <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a073b47486ac79130a4de5210a44cc022" title="Return the total number of active voxels stored in leaf nodes. ">tools::countActiveLeafVoxels()</a>, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a4d6ddf0e0a760645d2590f9b2be1c4de" title="Return the total number of inactive voxels in the tree. ">tools::countInactiveVoxels()</a>, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#ae97f0db6ef147e3f02a5ebec9f360e3d" title="Return the total number of inactive voxels stored in leaf nodes. ">tools::countInactiveLeafVoxels()</a> and <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a5662e54e5608edc934c09c8bac2ec3ea" title="Return a vector with bounding boxes that represents all the intersections between active tiles in the...">tools::activeTiles()</a> to perform multi-threaded counting. The Tree methods now use these implementations.</li>
 <li>Moved from the deprecated TBB task scheduler to TBB arenas. Various methods now respect the TBB arena state they were invoked from.</li>
 <li>Introduced a new thread/Threading.h header to consolidate calls to third-party threading methods.</li>
 <li>Minor performance improvements to dilation calls in fast sweeping algorithms.</li>
 <li>Added hsvtogrb() and rgbtohsv() AX helper functions for converting hue, saturation and value inputs to RGB values and vice-versa.</li>
 <li>PointDataGrid conversion can now be performed using 32-bit float arrays.</li>
 <li>Improved support for size_t grid types on systems where size_t is a unique type. [Contributed by Brecht Van Lommel]</li>
+<li>Minor performance improvements to dilation calls in fast sweeping algorithms.</li>
 <li>Add support for dilation in one direction and extending a field in one direction in fast sweeping algorithms.</li>
 </ul>
 </dd></dl>
@@ -196,6 +192,7 @@ var searchBox = new SearchBox("searchBox", "search",false,'Search');
 <li>SOP Extrapolate supports dilation in one direction and extending a field in one (domain) direction.</li>
 <li>The default OpenVDB ABI is now 8 for Houdini versions &gt; 18.5.</li>
 <li>VDB Visualize Tree SOP is now multi-threaded and provides slicing and color remapping.</li>
+<li>Add a sanitizer in SOP OpenVDB Extrapolate when expanding a narrow-band level-set with a dilation value of 0, which will result in no operation.</li>
 </ul>
 </dd></dl>
 <dl class="section user"><dt></dt><dd>Build:<ul>

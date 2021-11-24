@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">9.0.0</span>
+   &#160;<span id="projectnumber">9.0.1</span>
    </div>
   </td>
  </tr>
@@ -725,7 +725,7 @@ Functions</h2></td></tr>
 <tr class="separator:a27d97ccaebf36560da30e5c9c5389d48"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memTemplParams" colspan="2">template&lt;typename GridT &gt; </td></tr>
 <tr class="memitem:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a3ae8e943f814b22fa057d8e4e4f82e30">dilateSdf</a> (const GridT &amp;sdfGrid, int dilation, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2">NearestNeighbors</a> nn=<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a31d3cd59d1264144ae21e5250166cfc2a8b7234ad92f6feba2725d890a38fdd59">NN_FACE</a>, int nIter=1, <a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bf">FastSweepingDomain</a> mode=<a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#a6416fa916f48d91455ce7bad5b0a33bfa3203264a0a3fd2d90d15ee76eeb62f40">FastSweepingDomain::SWEEP_ALL</a>)</td></tr>
-<tr class="memdesc:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilates an existing signed distance field by a specified number of voxels.  <a href="#a3ae8e943f814b22fa057d8e4e4f82e30">More...</a><br /></td></tr>
+<tr class="memdesc:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="mdescLeft">&#160;</td><td class="mdescRight">Dilates the narrow band of an existing signed distance field by a specified number of voxels (like adding "onion-rings").  <a href="#a3ae8e943f814b22fa057d8e4e4f82e30">More...</a><br /></td></tr>
 <tr class="separator:a3ae8e943f814b22fa057d8e4e4f82e30"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa310f2f224f5b386b70dd8645b39b133"><td class="memTemplParams" colspan="2">template&lt;typename GridT , typename MaskTreeT &gt; </td></tr>
 <tr class="memitem:aa310f2f224f5b386b70dd8645b39b133"><td class="memTemplItemLeft" align="right" valign="top">GridT::Ptr&#160;</td><td class="memTemplItemRight" valign="bottom"><a class="el" href="namespaceopenvdb_1_1v9__0_1_1tools.html#aa310f2f224f5b386b70dd8645b39b133">maskSdf</a> (const GridT &amp;sdfGrid, const <a class="el" href="classopenvdb_1_1v9__0_1_1Grid.html">Grid</a>&lt; MaskTreeT &gt; &amp;mask, bool ignoreActiveTiles=false, int nIter=1)</td></tr>
@@ -4597,12 +4597,13 @@ The leapfrog algorithm employed in this method is best suited for a single large
       </table>
 </div><div class="memdoc">
 
-<p>Dilates an existing signed distance field by a specified number of voxels. </p>
+<p>Dilates the narrow band of an existing signed distance field by a specified number of voxels (like adding "onion-rings"). </p>
+<dl class="section note"><dt>Note</dt><dd>This operation is not to be confused with morphological dilation of a level set, which is implemented in <a class="el" href="classopenvdb_1_1v9__0_1_1tools_1_1LevelSetFilter.html#ac39f5f86ebd5df29525fec79bdff9f48" title="Offset the level set by the specified (world) distance. ">LevelSetFilter::offset</a>, and involves actual interface tracking of the narrow band.</dd></dl>
 <dl class="section return"><dt>Returns</dt><dd>A shared pointer to the dilated signed distance field.</dd></dl>
 <dl class="params"><dt>Parameters</dt><dd>
   <table class="params">
     <tr><td class="paramname">sdfGrid</td><td>Input signed distance field to be dilated.</td></tr>
-    <tr><td class="paramname">dilation</td><td>Numer of voxels that the input SDF will be dilated.</td></tr>
+    <tr><td class="paramname">dilation</td><td>Numer of voxels that the narrow band of the input SDF will be dilated.</td></tr>
     <tr><td class="paramname">nn</td><td>Stencil-pattern used for dilation</td></tr>
     <tr><td class="paramname">nIter</td><td>Number of iterations of the fast sweeping algorithm. Each iteration performs 2^3 = 8 individual sweeps.</td></tr>
     <tr><td class="paramname">mode</td><td>Determines the direction of the dilation. SWEEP_ALL will dilate in both sides of the signed distance function, SWEEP_GREATER_THAN_ISOVALUE will dilate in the positive side of the iso-surface, SWEEP_LESS_THAN_ISOVALUE will dilate in the negative side of the iso-surface.</td></tr>

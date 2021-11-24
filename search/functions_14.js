@@ -1,6 +1,6 @@
 var searchData=
 [
-  ['u',['U',['../classnanovdb_1_1Camera.html#ac573fe38de7aab9de491d75695d85e08',1,'nanovdb::Camera::U()'],['../classnanovdb_1_1Image.html#a7bd6db39c2e78c06f92a2eab87848962',1,'nanovdb::Image::u()']]],
+  ['u',['u',['../classnanovdb_1_1Image.html#a7bd6db39c2e78c06f92a2eab87848962',1,'nanovdb::Image::u()'],['../classnanovdb_1_1Camera.html#ac573fe38de7aab9de491d75695d85e08',1,'nanovdb::Camera::U()']]],
   ['unallocatedleafcount',['unallocatedLeafCount',['../classopenvdb_1_1v9__0_1_1tree_1_1TreeBase.html#a255785d58ceb9478d5a1a9b2c5669d42',1,'openvdb::v9_0::tree::TreeBase::unallocatedLeafCount()'],['../classopenvdb_1_1v9__0_1_1tree_1_1Tree.html#a30f392f579e3224da5ee99fb427fa55c',1,'openvdb::v9_0::tree::Tree::unallocatedLeafCount()']]],
   ['unaryoperator',['UnaryOperator',['../structopenvdb_1_1v9__0_1_1ax_1_1ast_1_1UnaryOperator.html#a212d085394a25c91b9ba984ff93770ea',1,'openvdb::v9_0::ax::ast::UnaryOperator::UnaryOperator(Expression *expr, const tokens::OperatorToken op)'],['../structopenvdb_1_1v9__0_1_1ax_1_1ast_1_1UnaryOperator.html#a9c63ad931eaf39cb1d468633a4c050d7',1,'openvdb::v9_0::ax::ast::UnaryOperator::UnaryOperator(Expression *expr, const std::string &amp;op)'],['../structopenvdb_1_1v9__0_1_1ax_1_1ast_1_1UnaryOperator.html#a9ee51bcd448ee618e44182767a0bfec5',1,'openvdb::v9_0::ax::ast::UnaryOperator::UnaryOperator(const UnaryOperator &amp;other)']]],
   ['uncompressedbytes',['uncompressedBytes',['../classopenvdb_1_1v9__0_1_1compression_1_1Page.html#a643b82f7ce76a02d02a84a42afbedd22',1,'openvdb::v9_0::compression::Page']]],

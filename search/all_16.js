@@ -1,7 +1,7 @@
 var searchData=
 [
   ['using_20openvdb_20in_20python',['Using OpenVDB in Python',['../python.html',1,'index']]],
-  ['u',['U',['../classnanovdb_1_1Camera.html#ac573fe38de7aab9de491d75695d85e08',1,'nanovdb::Camera::U()'],['../classnanovdb_1_1Image.html#a7bd6db39c2e78c06f92a2eab87848962',1,'nanovdb::Image::u()']]],
+  ['u',['u',['../classnanovdb_1_1Image.html#a7bd6db39c2e78c06f92a2eab87848962',1,'nanovdb::Image::u()'],['../classnanovdb_1_1Camera.html#ac573fe38de7aab9de491d75695d85e08',1,'nanovdb::Camera::U()']]],
   ['uif',['uif',['../unionopenvdb_1_1v9__0_1_1math_1_1internal_1_1half_1_1uif.html',1,'openvdb::v9_0::math::internal::half']]],
   ['uint32',['UInt32',['../namespacenanovdb.html#a4c0dc82510efc445233bd15b340bfeb0ae7956ed7be1c5025a27ed3cb42a396bd',1,'nanovdb']]],
   ['uint32grid',['UInt32Grid',['../namespacenanovdb.html#a94e1a92c88ebc5f570edaaf87d7b478e',1,'nanovdb']]],

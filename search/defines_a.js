@@ -55,6 +55,7 @@ var searchData=
   ['openvdb_5fstart_5fthreadsafe_5fstatic_5faddress',['OPENVDB_START_THREADSAFE_STATIC_ADDRESS',['../Platform_8h.html#aba3a523e76beaaf0d8cc51e8bbdbe8ae',1,'Platform.h']]],
   ['openvdb_5fstart_5fthreadsafe_5fstatic_5freference',['OPENVDB_START_THREADSAFE_STATIC_REFERENCE',['../Platform_8h.html#a116c03460d08a7c8124d77f0025aa5d6',1,'Platform.h']]],
   ['openvdb_5fstart_5fthreadsafe_5fstatic_5fwrite',['OPENVDB_START_THREADSAFE_STATIC_WRITE',['../Platform_8h.html#a7b933d956cd2f602c346ec80f34d7efa',1,'Platform.h']]],
+  ['openvdb_5ftarget_5fbits',['OPENVDB_TARGET_BITS',['../openvdb_2Types_8h.html#a316dac43d38af596402b6e2204476e16',1,'Types.h']]],
   ['openvdb_5ftemplate_5fexport',['OPENVDB_TEMPLATE_EXPORT',['../Platform_8h.html#ac696e2eebc7f22c46fdcf87f8ecebd8c',1,'Platform.h']]],
   ['openvdb_5ftemplate_5fimport',['OPENVDB_TEMPLATE_IMPORT',['../Platform_8h.html#ae90ddc631630096e31703b376e7bc04d',1,'Platform.h']]],
   ['openvdb_5fthreadsafe_5fstatic_5faddress',['OPENVDB_THREADSAFE_STATIC_ADDRESS',['../Platform_8h.html#a4221a82a55c24552c9b9812961654b94',1,'Platform.h']]],

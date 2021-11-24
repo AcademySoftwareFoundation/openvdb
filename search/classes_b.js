@@ -1,7 +1,7 @@
 var searchData=
 [
-  ['laplacian',['Laplacian',['../classopenvdb_1_1v9__0_1_1tools_1_1Laplacian.html',1,'openvdb::v9_0::tools']]],
   ['laplacian',['Laplacian',['../structopenvdb_1_1v9__0_1_1math_1_1Laplacian.html',1,'openvdb::v9_0::math']]],
+  ['laplacian',['Laplacian',['../classopenvdb_1_1v9__0_1_1tools_1_1Laplacian.html',1,'openvdb::v9_0::tools']]],
   ['laplacian_3c_20scalemap_2c_20diffscheme_20_3e',['Laplacian&lt; ScaleMap, DiffScheme &gt;',['../structopenvdb_1_1v9__0_1_1math_1_1Laplacian_3_01ScaleMap_00_01DiffScheme_01_4.html',1,'openvdb::v9_0::math']]],
   ['laplacian_3c_20scaletranslatemap_2c_20diffscheme_20_3e',['Laplacian&lt; ScaleTranslateMap, DiffScheme &gt;',['../structopenvdb_1_1v9__0_1_1math_1_1Laplacian_3_01ScaleTranslateMap_00_01DiffScheme_01_4.html',1,'openvdb::v9_0::math']]],
   ['laplacian_3c_20translationmap_2c_20diffscheme_20_3e',['Laplacian&lt; TranslationMap, DiffScheme &gt;',['../structopenvdb_1_1v9__0_1_1math_1_1Laplacian_3_01TranslationMap_00_01DiffScheme_01_4.html',1,'openvdb::v9_0::math']]],

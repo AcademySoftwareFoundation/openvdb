@@ -1,6 +1,8 @@
 var searchData=
 [
   ['magnitude',['Magnitude',['../classopenvdb_1_1v9__0_1_1tools_1_1Magnitude.html',1,'openvdb::v9_0::tools']]],
+  ['magnitudeextent',['MagnitudeExtent',['../structopenvdb_1_1v9__0_1_1points_1_1statistics__internal_1_1MagnitudeExtent.html',1,'openvdb::v9_0::points::statistics_internal']]],
+  ['magnitudeextent_3c_20vect_2c_20false_20_3e',['MagnitudeExtent&lt; VecT, false &gt;',['../structopenvdb_1_1v9__0_1_1points_1_1statistics__internal_1_1MagnitudeExtent_3_01VecT_00_01false_01_4.html',1,'openvdb::v9_0::points::statistics_internal']]],
   ['make_5findex_5fsequence',['make_index_sequence',['../structcxx14_1_1make__index__sequence.html',1,'cxx14']]],
   ['make_5findex_5fsequence_3c_200_2c_20is_2e_2e_2e_20_3e',['make_index_sequence&lt; 0, Is... &gt;',['../structcxx14_1_1make__index__sequence_3_010_00_01Is_8_8_8_01_4.html',1,'cxx14']]],
   ['map',['Map',['../structnanovdb_1_1Map.html',1,'nanovdb']]],
@@ -43,8 +45,8 @@ var searchData=
   ['meshattrtransfer',['MeshAttrTransfer',['../classopenvdb__houdini_1_1MeshAttrTransfer.html',1,'openvdb_houdini']]],
   ['meshdataadapter',['MeshDataAdapter',['../interfaceMeshDataAdapter.html',1,'']]],
   ['meshtovoxeledgedata',['MeshToVoxelEdgeData',['../classopenvdb_1_1v9__0_1_1tools_1_1MeshToVoxelEdgeData.html',1,'openvdb::v9_0::tools']]],
-  ['metadata',['Metadata',['../classopenvdb_1_1v9__0_1_1Metadata.html',1,'openvdb::v9_0']]],
   ['metadata',['MetaData',['../structnanovdb_1_1io_1_1MetaData.html',1,'nanovdb::io']]],
+  ['metadata',['Metadata',['../classopenvdb_1_1v9__0_1_1Metadata.html',1,'openvdb::v9_0']]],
   ['metamap',['MetaMap',['../classopenvdb_1_1v9__0_1_1MetaMap.html',1,'openvdb::v9_0']]],
   ['minmax',['MinMax',['../classopenvdb_1_1v9__0_1_1math_1_1MinMax.html',1,'openvdb::v9_0::math']]],
   ['minmaxkernel',['MinMaxKernel',['../structopenvdb_1_1v9__0_1_1tools_1_1FastSweeping_1_1MinMaxKernel.html',1,'openvdb::v9_0::tools::FastSweeping']]],

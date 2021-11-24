@@ -24,7 +24,7 @@
  <tr style="height: 56px;">
   <td id="projectalign" style="padding-left: 0.5em;">
    <div id="projectname">OpenVDB
-   &#160;<span id="projectnumber">9.0.0</span>
+   &#160;<span id="projectnumber">9.0.1</span>
    </div>
   </td>
  </tr>
@@ -153,6 +153,11 @@ Public Member Functions</h2></td></tr>
 <tr class="separator:aed913e163e7bdd781632fbd21423d73b"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae8f82f68e810ff3193b9faba2dcce508"><td class="memItemLeft" align="right" valign="top"><a class="el" href="namespaceopenvdb_1_1v9__0.html#a1a68fb76e3d6897fa878760b6bcbda7a">Index</a>&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1VolumeExecutable.html#ae8f82f68e810ff3193b9faba2dcce508">getTreeExecutionLevel</a> () const </td></tr>
 <tr class="separator:ae8f82f68e810ff3193b9faba2dcce508"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afd4fde77c8d382cfa72bf9a0622222c5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1VolumeExecutable.html#afd4fde77c8d382cfa72bf9a0622222c5">setAttributeBindings</a> (const <a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1AttributeBindings.html">AttributeBindings</a> &amp;bindings)</td></tr>
+<tr class="memdesc:afd4fde77c8d382cfa72bf9a0622222c5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Set attribute bindings.  <a href="#afd4fde77c8d382cfa72bf9a0622222c5">More...</a><br /></td></tr>
+<tr class="separator:afd4fde77c8d382cfa72bf9a0622222c5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a396791c4fb41a742a34dab8f5a2312fb"><td class="memItemLeft" align="right" valign="top">const <a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1AttributeBindings.html">AttributeBindings</a> &amp;&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1VolumeExecutable.html#a396791c4fb41a742a34dab8f5a2312fb">getAttributeBindings</a> () const </td></tr>
+<tr class="separator:a396791c4fb41a742a34dab8f5a2312fb"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr><td colspan="2"><div class="groupHeader"></div></td></tr>
 <tr class="memitem:a1a05061e87e8826cb21add59aa5611f5"><td class="memItemLeft" align="right" valign="top">void&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1VolumeExecutable.html#a1a05061e87e8826cb21add59aa5611f5">execute</a> (<a class="el" href="namespaceopenvdb_1_1v9__0.html#a0c9703e6ff5cc9deb6410c53412c22c3">openvdb::GridPtrVec</a> &amp;grids) const </td></tr>
 <tr class="memdesc:a1a05061e87e8826cb21add59aa5611f5"><td class="mdescLeft">&#160;</td><td class="mdescRight">Run this volume executable binary on target volumes.  <a href="#a1a05061e87e8826cb21add59aa5611f5">More...</a><br /></td></tr>
@@ -433,6 +438,22 @@ For more in depth information, see the <a class="el" href="axcplusplus.html#vdba
 
 </div>
 </div>
+<a class="anchor" id="a396791c4fb41a742a34dab8f5a2312fb"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">const <a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1AttributeBindings.html">AttributeBindings</a>&amp; getAttributeBindings </td>
+          <td>(</td>
+          <td class="paramname"></td><td>)</td>
+          <td> const</td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+<dl class="section return"><dt>Returns</dt><dd>The current attribute bindings map </dd></dl>
+
+</div>
+</div>
 <a class="anchor" id="aff7ff8f5fe5c4cac499044795bd075ec"></a>
 <div class="memitem">
 <div class="memproto">
@@ -573,6 +594,30 @@ For more in depth information, see the <a class="el" href="axcplusplus.html#vdba
 
 <p>Set the threading grain sizes used when iterating over nodes in a VDB. </p>
 <p>Two grain sizes are provided, the first of which (g1) is used to determine the chunk size of nodes which are not being streamed (see setActiveTileStream). Leaf node execution always uses this grain size. The default value for g1 is 1 which is typically appropriate for most AX kernels. The second grain size is used when streaming execution over active tiles in a VDB. This execution model differs significantly from typical leaf node execution due to the potential for substantially more memory to be allocated. The default value is 32, which works well for the default configuration of OpenVDB. If streaming is disabled, this value has no effect. </p><dl class="section note"><dt>Note</dt><dd>Setting g1 or g2 to zero has the effect of disabling multi-threading for the respective node executions. Setting both to zero will disable all multi-threading performed by the execute method. </dd></dl>
+
+</div>
+</div>
+<a class="anchor" id="afd4fde77c8d382cfa72bf9a0622222c5"></a>
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">void setAttributeBindings </td>
+          <td>(</td>
+          <td class="paramtype">const <a class="el" href="classopenvdb_1_1v9__0_1_1ax_1_1AttributeBindings.html">AttributeBindings</a> &amp;&#160;</td>
+          <td class="paramname"><em>bindings</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Set attribute bindings. </p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramname">attributeBindings</td><td>A map of attribute bindings to expected names on the geometry to be executed over. By default the AX attributes will be bound to volumes of the same name. Supplying bindings for a subset of the attributes will leave the others unchanged. AX attributes can only bind to a single volume and vice versa. However, in a single set call these can be swapped e.g. a -&gt; b and b -&gt; a. When bindings are overriden through subsequent calls to this function, any dangling volumes will be automatically bound by name. To reset these bindings call get function and create a target set of bindings for each attribute of name -&gt; name. </td></tr>
+  </table>
+  </dd>
+</dl>
 
 </div>
 </div>

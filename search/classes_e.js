@@ -26,8 +26,8 @@ var searchData=
   ['opover',['OpOver',['../structopenvdb_1_1v9__0_1_1tools_1_1ds_1_1OpOver.html',1,'openvdb::v9_0::tools::ds']]],
   ['oppolicy',['OpPolicy',['../classhoudini__utils_1_1OpPolicy.html',1,'houdini_utils']]],
   ['opsub',['OpSub',['../structopenvdb_1_1v9__0_1_1tools_1_1ds_1_1OpSub.html',1,'openvdb::v9_0::tools::ds']]],
-  ['opt',['OpT',['../structopenvdb_1_1v9__0_1_1tools_1_1Magnitude_1_1OpT.html',1,'openvdb::v9_0::tools::Magnitude']]],
   ['opt',['OpT',['../structopenvdb_1_1v9__0_1_1tools_1_1Normalize_1_1OpT.html',1,'openvdb::v9_0::tools::Normalize']]],
+  ['opt',['OpT',['../structopenvdb_1_1v9__0_1_1tools_1_1Magnitude_1_1OpT.html',1,'openvdb::v9_0::tools::Magnitude']]],
   ['orthographiccamera',['OrthographicCamera',['../classopenvdb_1_1v9__0_1_1tools_1_1OrthographicCamera.html',1,'openvdb::v9_0::tools']]],
   ['osnoise',['OSNoise',['../classOSN_1_1OSNoise.html',1,'OSN']]]
 ];
