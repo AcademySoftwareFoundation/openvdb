@@ -120,7 +120,7 @@ Version 9.0.0 - October 29, 2021
       -DUSE_EXR=ON.
 
 
-Version 8.2.0 - November 23, 2021
+Version 8.2.0 - November 24, 2021
 
     Improvements:
     - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
