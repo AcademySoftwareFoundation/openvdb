@@ -141,7 +141,7 @@ Version 8.2.0 - November 24, 2021
     - Minor performance improvements to dilation calls in fast sweeping
       algorithms.
     - Add support for dilation in one direction and extending a field in one
-      direction.
+      direction in fast sweeping algorithms.
 
     API changes:
     - DynamicNodeManager can now set one grain size for threading across leaf nodes
