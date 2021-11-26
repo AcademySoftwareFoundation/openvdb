@@ -102,8 +102,6 @@ jobs:
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.15.0
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >

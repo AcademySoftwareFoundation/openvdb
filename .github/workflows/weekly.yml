@@ -69,8 +69,6 @@ jobs:
         mkdir $HOME/houdini_install
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
@@ -118,8 +116,6 @@ jobs:
         mkdir $HOME/houdini_install
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
@@ -168,8 +164,6 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -212,8 +206,6 @@ jobs:
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
