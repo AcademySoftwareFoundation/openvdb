@@ -245,7 +245,7 @@ llvmFunctionTypeFromSignature(llvm::LLVMContext& C)
 ///               skipped
 /// @param  axTypes Whether to try and convert the llvm::Types provided to
 ///                 AX types. If false, the llvm types are used.
-void
+OPENVDB_AX_API void
 printSignature(std::ostream& os,
                const std::vector<llvm::Type*>& types,
                const llvm::Type* returnType,
@@ -258,7 +258,7 @@ printSignature(std::ostream& os,
 
 /// @brief  The base/abstract representation of an AX function. Derived classes
 ///         must implement the Function::types call to describe their signature.
-struct Function
+struct OPENVDB_AX_API Function
 {
     using Ptr = std::shared_ptr<Function>;
 
@@ -618,7 +618,7 @@ struct CFunction : public CFunctionBase
         "CFunction object has been setup with a pointer return argument. C bindings "
         "cannot return memory locations to LLVM - Consider using a CFunctionSRet.");
 
-    CFunction(const std::string& symbol, const SignatureT function)
+    CFunction(const std::string& symbol, SignatureT* function)
         : CFunctionBase(Traits::N_ARGS, symbol)
         , mFunction(function) {}
 
@@ -666,11 +666,11 @@ struct CFunction : public CFunctionBase
     }
 
 private:
-    const SignatureT* mFunction;
+    SignatureT* mFunction;
 };
 
 /// @brief  The base/abstract definition for an IR function.
-struct IRFunctionBase : public Function
+struct OPENVDB_AX_API IRFunctionBase : public Function
 {
     using Ptr = std::shared_ptr<IRFunctionBase>;
 
@@ -787,7 +787,7 @@ struct IRFunctionSRet : public SRetFunction<SignatureT, IRFunction<SignatureT>>
 };
 
 /// @brief  todo
-struct FunctionGroup
+struct OPENVDB_AX_API FunctionGroup
 {
     using Ptr = std::shared_ptr<FunctionGroup>;
     using UniquePtr = std::unique_ptr<FunctionGroup>;

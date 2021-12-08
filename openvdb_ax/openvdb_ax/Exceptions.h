@@ -22,7 +22,7 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 
 #define OPENVDB_AX_EXCEPTION(_classname) \
-class OPENVDB_API _classname: public Exception \
+class _classname: public Exception \
 { \
 public: \
     _classname() noexcept: Exception( #_classname ) {} \

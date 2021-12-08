@@ -243,11 +243,11 @@ struct AliasTypeMap
 
 /// @brief  Supported aliasing for VDB math types, allowing use in external
 ///         function signatures.
-template <typename T> struct LLVMType<math::Vec2<T>> : public AliasTypeMap<math::Vec2<T>, T[2]> {};
-template <typename T> struct LLVMType<math::Vec3<T>> : public AliasTypeMap<math::Vec3<T>, T[3]> {};
-template <typename T> struct LLVMType<math::Vec4<T>> : public AliasTypeMap<math::Vec4<T>, T[4]> {};
-template <typename T> struct LLVMType<math::Mat3<T>> : public AliasTypeMap<math::Mat3<T>, T[9]> {};
-template <typename T> struct LLVMType<math::Mat4<T>> : public AliasTypeMap<math::Mat4<T>, T[16]> {};
+template <typename T> struct LLVMType<openvdb::math::Vec2<T>> : public AliasTypeMap<openvdb::math::Vec2<T>, T[2]> {};
+template <typename T> struct LLVMType<openvdb::math::Vec3<T>> : public AliasTypeMap<openvdb::math::Vec3<T>, T[3]> {};
+template <typename T> struct LLVMType<openvdb::math::Vec4<T>> : public AliasTypeMap<openvdb::math::Vec4<T>, T[4]> {};
+template <typename T> struct LLVMType<openvdb::math::Mat3<T>> : public AliasTypeMap<openvdb::math::Mat3<T>, T[9]> {};
+template <typename T> struct LLVMType<openvdb::math::Mat4<T>> : public AliasTypeMap<openvdb::math::Mat4<T>, T[16]> {};
 
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
@@ -323,13 +323,13 @@ llvmConstant(const T t, llvm::Type* type)
 /// @param size  The number of bits of the integer type
 /// @param C     The LLVMContext to request the Type from.
 ///
-llvm::IntegerType* llvmIntType(const uint32_t size, llvm::LLVMContext& C);
+OPENVDB_AX_API llvm::IntegerType* llvmIntType(const uint32_t size, llvm::LLVMContext& C);
 
 /// @brief Returns an llvm floating point Type given a requested size and context
 /// @param size  The size of the float to request, i.e. float - 32, double - 64 etc.
 /// @param C     The LLVMContext to request the Type from.
 ///
-llvm::Type* llvmFloatType(const uint32_t size, llvm::LLVMContext& C);
+OPENVDB_AX_API llvm::Type* llvmFloatType(const uint32_t size, llvm::LLVMContext& C);
 
 /// @brief  Returns an llvm type representing a type defined by a string.
 /// @note   For string types, this function returns the element type, not the
@@ -338,14 +338,14 @@ llvm::Type* llvmFloatType(const uint32_t size, llvm::LLVMContext& C);
 /// @param type  The AX token type
 /// @param C     The LLVMContext to request the Type from.
 ///
-llvm::Type* llvmTypeFromToken(const ast::tokens::CoreType& type, llvm::LLVMContext& C);
+OPENVDB_AX_API llvm::Type* llvmTypeFromToken(const ast::tokens::CoreType& type, llvm::LLVMContext& C);
 
 /// @brief  Return a corresponding AX token which represents the given LLVM Type.
 /// @note   If the type does not exist in AX, ast::tokens::UNKNOWN is returned.
 ///         Must not be a nullptr.
 /// @param type  a valid LLVM Type
 ///
-ast::tokens::CoreType tokenFromLLVMType(const llvm::Type* type);
+OPENVDB_AX_API ast::tokens::CoreType tokenFromLLVMType(const llvm::Type* type);
 
 } // namespace codegen
 } // namespace ax

@@ -262,6 +262,19 @@
     #define OPENVDB_HOUDINI_API OPENVDB_IMPORT
 #endif
 
+#ifdef OPENVDB_AX_DLL
+#ifdef OPENVDB_AX_API
+#undef OPENVDB_AX_API
+#endif
+#ifdef OPENVDB_AX_PRIVATE
+    #define OPENVDB_AX_API OPENVDB_EXPORT
+#else
+    #define OPENVDB_AX_API OPENVDB_IMPORT
+#endif
+#else
+#define OPENVDB_AX_API
+#endif // OPENVDB_AX_DLL
+
 #if defined(__ICC)
 
 // Use these defines to bracket a region of code that has safe static accesses.

@@ -30,6 +30,7 @@
 #include <random>
 #include <cmath>
 #include <cstdlib>
+#include <numeric>  // std::iota
 #include <stddef.h>
 #include <stdint.h>
 
@@ -76,7 +77,7 @@ struct SimplexNoise
 ///////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////
 
-#define DEFINE_LLVM_FP_INTRINSIC(Identifier, Doc)                                           \
+#define DEFINE_LLVM_FP_INTRINSIC(Identifier, Doc, UseIR)                                    \
     inline FunctionGroup::UniquePtr llvm_##Identifier(const FunctionOptions& op)            \
     {                                                                                       \
         static auto generate =                                                              \
@@ -87,6 +88,7 @@ struct SimplexNoise
             llvm::Function* function =                                                      \
                 llvm::Intrinsic::getDeclaration(M,                                          \
                     llvm::Intrinsic::Identifier, args[0]->getType());                       \
+            assert(function);                                                               \
             return B.CreateCall(function, args);                                            \
         };                                                                                  \
                                                                                             \
@@ -99,7 +101,8 @@ struct SimplexNoise
             .addFunctionAttribute(llvm::Attribute::NoUnwind)                                \
             .addFunctionAttribute(llvm::Attribute::AlwaysInline)                            \
             .setConstantFold(op.mConstantFoldCBindings)                                     \
-            .setPreferredImpl(op.mPrioritiseIR ? FunctionBuilder::IR : FunctionBuilder::C)  \
+            .setPreferredImpl((UseIR && op.mPrioritiseIR) ?                                 \
+                FunctionBuilder::IR : FunctionBuilder::C)                                   \
             .setDocumentation(Doc)                                                          \
             .get();                                                                         \
     }                                                                                       \
@@ -194,19 +197,27 @@ inline FunctionGroup::UniquePtr axrealloc(const FunctionOptions&)
 
 // Intrinsics
 
-DEFINE_LLVM_FP_INTRINSIC(sqrt, "Computes the square root of arg.")
-DEFINE_LLVM_FP_INTRINSIC(sin, "Computes the sine of arg (measured in radians).")
-DEFINE_LLVM_FP_INTRINSIC(cos, "Computes the cosine of arg (measured in radians).")
-DEFINE_LLVM_FP_INTRINSIC(log, "Computes the natural (base e) logarithm of arg.")
-DEFINE_LLVM_FP_INTRINSIC(log10, "Computes the common (base-10) logarithm of arg.")
-DEFINE_LLVM_FP_INTRINSIC(log2, "Computes the binary (base-2) logarithm of arg.")
-DEFINE_LLVM_FP_INTRINSIC(exp, "Computes e (Euler's number, 2.7182818...) raised to the given power arg.")
-DEFINE_LLVM_FP_INTRINSIC(exp2, "Computes 2 raised to the given power arg.")
-DEFINE_LLVM_FP_INTRINSIC(fabs, "Computes the absolute value of a floating point value arg.")
-DEFINE_LLVM_FP_INTRINSIC(floor, "Computes the largest integer value not greater than arg.")
-DEFINE_LLVM_FP_INTRINSIC(ceil, "Computes the smallest integer value not less than arg.")
+DEFINE_LLVM_FP_INTRINSIC(sqrt, "Computes the square root of arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(sin, "Computes the sine of arg (measured in radians).", true)
+DEFINE_LLVM_FP_INTRINSIC(cos, "Computes the cosine of arg (measured in radians).", true)
+DEFINE_LLVM_FP_INTRINSIC(log, "Computes the natural (base e) logarithm of arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(log10, "Computes the common (base-10) logarithm of arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(exp, "Computes e (Euler's number, 2.7182818...) raised to the given power arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(fabs, "Computes the absolute value of a floating point value arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(floor, "Computes the largest integer value not greater than arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(ceil, "Computes the smallest integer value not less than arg.", true)
 DEFINE_LLVM_FP_INTRINSIC(round, "Computes the nearest integer value to arg (in floating-point format),"
-    " rounding halfway cases away from zero.")
+    " rounding halfway cases away from zero.", true)
+
+// On Windows (or using the Win CRT) log2 and exp2 intrinsics seem to cause a
+// crash. Still yet to track this down. For now use the C bindings.
+#ifdef _MSC_VER
+DEFINE_LLVM_FP_INTRINSIC(log2, "Computes the binary (base-2) logarithm of arg.", false)
+DEFINE_LLVM_FP_INTRINSIC(exp2, "Computes 2 raised to the given power arg.", false)
+#else
+DEFINE_LLVM_FP_INTRINSIC(log2, "Computes the binary (base-2) logarithm of arg.", true)
+DEFINE_LLVM_FP_INTRINSIC(exp2, "Computes 2 raised to the given power arg.", true)
+#endif
 
 // pow created explicitly as it takes two arguments and performs slightly different
 // calls for integer exponents

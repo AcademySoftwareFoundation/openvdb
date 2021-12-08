@@ -1,7 +1,7 @@
 
-int64@testint64 = 2l || 3l;
-int32@testint32 = 2 || 3;
-int16@testint16 = 2 || 3;
 bool@testbool = true || false;
+int16@testint16 = 2 || 3;
+int32@testint32 = 2 || 3;
+int64@testint64 = 2l || 3l;
 double@testdouble = 1.1 || 2.3;
 float@testfloat = 1.1f || 2.3f;

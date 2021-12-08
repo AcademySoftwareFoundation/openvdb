@@ -419,15 +419,6 @@ if(OPENVDB_BUILD_DOCS)
   add_subdirectory(doc)
 endif()
 
-if(WIN32)
-  if(OPENVDB_BUILD_AX OR
-     OPENVDB_BUILD_AX_GRAMMAR OR
-     OPENVDB_BUILD_AX_BINARIES OR
-     OPENVDB_BUILD_AX_UNITTESTS)
-    message(FATAL_ERROR "Currently no support for building OpenVDB AX or the OpenVDB AX grammar on Windows.")
-  endif()
-endif()
-
 if(NOT OPENVDB_BUILD_AX AND OPENVDB_BUILD_AX_GRAMMAR)
   # only re-generate the AX grammar
   set(OPENVDB_AX_SHARED OFF CACHE BOOL "" FORCE)
