@@ -97,7 +97,15 @@ endfunction()
 #   target but this was only added in CMake 3.15. See:
 #      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
-set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+
+# @note  explicitly only search for Development.Module from 3.18 as searching
+#   Development.Embed can cause issues on linux systems where it doesn't exist
+if(${CMAKE_VERSION} VERSION_LESS 3.18)
+  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
+else()
+  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development.Module)
+endif()
+
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)
 endif()
