@@ -11,7 +11,7 @@
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
 #include <openvdb/math/Stats.h>
-#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMaxValues()
+#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Platform.h>
@@ -2083,7 +2083,9 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     ValueType minVal = zeroVal<ValueType>(), maxVal = zeroVal<ValueType>();
     if (verboseLevel > 3) {
         // This forces loading of all non-resident nodes.
-        this->evalMinMax(minVal, maxVal);
+        const math::MinMax<ValueType> extrema = tools::minMax(*this);
+        minVal = extrema.min();
+        maxVal = extrema.max();
     }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7

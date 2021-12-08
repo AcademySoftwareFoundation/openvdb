@@ -6,6 +6,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointCount.h>
 #include <openvdb/points/PointConversion.h>
+#include <openvdb/tools/Count.h>
 #include <openvdb/tools/Morphology.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tree/LeafManager.h>
@@ -1291,12 +1292,7 @@ public:
 
         const TreeType& tree = grid->tree();
 
-        double length = 0.0;
-        {
-            ValueType minVal, maxVal;
-            tree.evalMinMax(minVal, maxVal);
-            length = maxVal.length();
-        }
+        double length = tools::minMax(tree).max().length();
 
         typename BoolTreeT::Ptr mask(new BoolTreeT(false));
         mask->topologyUnion(tree);

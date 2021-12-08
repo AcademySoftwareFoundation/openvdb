@@ -5,6 +5,7 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/Count.h>
 #include <openvdb/tools/Dense.h>
 #include <openvdb/Exceptions.h>
 #ifdef BENCHMARK_TEST
@@ -451,8 +452,13 @@ TestDense::testDense2Sparse()
     float minS, maxS;
     float minP, maxP;
 
-    gridS->evalMinMax(minS, maxS);
-    gridP->evalMinMax(minP, maxP);
+    math::MinMax<float> extrema = tools::minMax(gridS->tree());
+    minS = extrema.min();
+    maxS = extrema.max();
+
+    extrema = tools::minMax(gridP->tree());
+    minP = extrema.min();
+    maxP = extrema.max();
 
     const float tolerance = 0.0001f;
 
@@ -569,8 +575,13 @@ TestDense::testDense2Sparse2()
     float minS, maxS;
     float minP, maxP;
 
-    gridS->evalMinMax(minS, maxS);
-    gridP->evalMinMax(minP, maxP);
+    math::MinMax<float> extrema = tools::minMax(gridS->tree());
+    minS = extrema.min();
+    maxS = extrema.max();
+
+    extrema = tools::minMax(gridP->tree());
+    minP = extrema.min();
+    maxP = extrema.max();
 
     const float tolerance = 0.0001f;
 
