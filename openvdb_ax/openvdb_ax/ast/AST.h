@@ -2359,9 +2359,6 @@ private:
     const Type mValue;
 };
 
-// fwd declaration for backwards compatibility, see Parse.h/.cc for definition
-openvdb::ax::ast::Tree::Ptr parse(const char* code);
-
 } // namespace ast
 } // namespace ax
 

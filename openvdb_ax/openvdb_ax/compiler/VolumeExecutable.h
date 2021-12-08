@@ -73,7 +73,7 @@ class Compiler;
 ///       @sa setActiveTileStreamingGrainSize
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
-class VolumeExecutable
+class OPENVDB_AX_API VolumeExecutable
 {
 public:
     using Ptr = std::shared_ptr<VolumeExecutable>;

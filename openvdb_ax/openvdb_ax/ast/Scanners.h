@@ -34,7 +34,7 @@ namespace ast {
 /// @param type  the type of the attribute to search for. If UNKNOWN, any
 ///              attribute with the given name is checked.
 ///
-bool usesAttribute(const ast::Node& node,
+OPENVDB_AX_API bool usesAttribute(const ast::Node& node,
     const std::string& name,
     const tokens::CoreType type = tokens::UNKNOWN);
 
@@ -46,7 +46,7 @@ bool usesAttribute(const ast::Node& node,
 /// @param type  the type of the attribute to search for. If UNKNOWN, the first
 ///              attribute encountered with the given name is checked.
 ///
-bool writesToAttribute(const ast::Node& node,
+OPENVDB_AX_API bool writesToAttribute(const ast::Node& node,
     const std::string& name,
     const tokens::CoreType type = tokens::UNKNOWN);
 
@@ -55,10 +55,10 @@ bool writesToAttribute(const ast::Node& node,
 /// @param node  The AST to analyze
 /// @param name  the name of the function to search for
 ///
-bool callsFunction(const ast::Node& node, const std::string& name);
+OPENVDB_AX_API bool callsFunction(const ast::Node& node, const std::string& name);
 
 /// @brief todo
-void catalogueVariables(const ast::Node& node,
+OPENVDB_AX_API void catalogueVariables(const ast::Node& node,
         std::vector<const ast::Variable*>* readOnly,
         std::vector<const ast::Variable*>* writeOnly,
         std::vector<const ast::Variable*>* readWrite,
@@ -78,13 +78,13 @@ void catalogueVariables(const ast::Node& node,
 /// @param writeOnly  The unique list of attributes which are only written too
 /// @param readWrite  The unique list of attributes which both read from and written too
 ///
-void catalogueAttributeTokens(const ast::Node& node,
+OPENVDB_AX_API void catalogueAttributeTokens(const ast::Node& node,
         std::vector<std::string>* readOnly,
         std::vector<std::string>* writeOnly,
         std::vector<std::string>* readWrite);
 
 /// @brief  Populate a list of attribute names which the given attribute depends on
-void attributeDependencyTokens(const ast::Tree& tree,
+OPENVDB_AX_API void attributeDependencyTokens(const ast::Tree& tree,
         const std::string& name,
         const tokens::CoreType type,
         std::vector<std::string>& dependencies);
@@ -119,10 +119,10 @@ inline void collectNodeTypes(const ast::Node& node, ContainerType& array);
 
 /// @brief  Flatten the provided AST branch into a linear list using post order traversal
 ///
-void linearize(const ast::Node& node, std::vector<const ast::Node*>& list);
+OPENVDB_AX_API void linearize(const ast::Node& node, std::vector<const ast::Node*>& list);
 
-const ast::Variable* firstUse(const ast::Node& node, const std::string& token);
-const ast::Variable* lastUse(const ast::Node& node, const std::string& token);
+OPENVDB_AX_API const ast::Variable* firstUse(const ast::Node& node, const std::string& token);
+OPENVDB_AX_API const ast::Variable* lastUse(const ast::Node& node, const std::string& token);
 
 
 //////////////////////////////////////////////////////////////////////
