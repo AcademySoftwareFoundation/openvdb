@@ -10,7 +10,6 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
-#include <openvdb/math/Stats.h>
 #include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
@@ -2027,10 +2026,15 @@ template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
 {
-    const math::MinMax<ValueType> minmax = tools::minMax(*this);
-
-    minVal = minmax.min();
-    maxVal = minmax.max();
+    minVal = maxVal = zeroVal<ValueType>();
+    if (ValueOnCIter iter = this->cbeginValueOn()) {
+        minVal = maxVal = *iter;
+        for (++iter; iter; ++iter) {
+            const ValueType& val = *iter;
+            if (math::cwiseLessThan(val, minVal)) minVal = val;
+            if (math::cwiseGreaterThan(val, maxVal)) maxVal = val;
+        }
+    }
 }
 
 
