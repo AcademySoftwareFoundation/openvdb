@@ -362,6 +362,7 @@ public:
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
+    OPENVDB_DEPRECATED_MESSAGE("Switch to tools::minMax. Use threaded = false for serial execution")
     void evalMinMax(ValueType &min, ValueType &max) const;
 
     Index64 memUsage() const override { return tools::memUsage(*this); }
