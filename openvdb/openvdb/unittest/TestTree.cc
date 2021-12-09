@@ -293,10 +293,9 @@ TEST_F(TestTree, testSetValue)
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, tree.getValue(c1));
     EXPECT_EQ(2, int(tree.activeVoxelCount()));
 
-    float minVal = -999.0, maxVal = -999.0;
-    tree.evalMinMax(minVal, maxVal);
-    ASSERT_DOUBLES_EXACTLY_EQUAL(12.0, minVal);
-    ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, maxVal);
+    const openvdb::math::MinMax<float> extrema = openvdb::tools::minMax(tree);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(12.0, extrema.min());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, extrema.max());
 
     tree.setValueOff(c0, background);
 
