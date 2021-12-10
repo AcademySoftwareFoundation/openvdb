@@ -1,0 +1,3 @@
+Improvements:
+ - Added a --thread [n] argument to the vdb_ax binary.
+ - Changed the positional arguments for the vdb_ax binary in execute mode. All positional arguments are now input grids which allows vdb_ax to read multiple files. Output files are specified with -o.
