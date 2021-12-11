@@ -1169,7 +1169,7 @@ AttributeSet::Descriptor::canCompactGroups() const
 }
 
 size_t
-AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
+AttributeSet::Descriptor::nextUnusedGroupOffset(size_t hint) const
 {
     // all group offsets are in use
 
@@ -1210,7 +1210,7 @@ bool
 AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
     size_t& sourceOffset, size_t& targetOffset) const
 {
-    targetOffset = this->unusedGroupOffset();
+    targetOffset = this->nextUnusedGroupOffset();
 
     for (const auto& namePos : mGroupMap) {
 

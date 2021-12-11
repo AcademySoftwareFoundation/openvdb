@@ -1182,9 +1182,9 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
         // no groups
 
         EXPECT_EQ(size_t(CHAR_BIT*2), descriptor.unusedGroups());
-        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset());
-        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(1)));
-        EXPECT_EQ(size_t(5), descriptor.unusedGroupOffset(/*hint=*/size_t(5)));
+        EXPECT_EQ(size_t(0), descriptor.nextUnusedGroupOffset());
+        EXPECT_EQ(size_t(1), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(1)));
+        EXPECT_EQ(size_t(5), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(5)));
         EXPECT_EQ(true, descriptor.canCompactGroups());
         EXPECT_EQ(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1194,9 +1194,9 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
         descriptor.setGroup("test0", size_t(0));
 
         EXPECT_EQ(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset());
+        EXPECT_EQ(size_t(1), descriptor.nextUnusedGroupOffset());
         // hint already in use
-        EXPECT_EQ(size_t(1), descriptor.unusedGroupOffset(/*hint=*/size_t(0)));
+        EXPECT_EQ(size_t(1), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(0)));
         EXPECT_EQ(true, descriptor.canCompactGroups());
         EXPECT_EQ(false,
             descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1208,10 +1208,10 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
         descriptor.setGroup("test7", size_t(7));
 
         EXPECT_EQ(size_t(CHAR_BIT*2-1), descriptor.unusedGroups());
-        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset());
-        EXPECT_EQ(size_t(6), descriptor.unusedGroupOffset(/*hint=*/size_t(6)));
-        EXPECT_EQ(size_t(0), descriptor.unusedGroupOffset(/*hint=*/size_t(7)));
-        EXPECT_EQ(size_t(8), descriptor.unusedGroupOffset(/*hint=*/size_t(8)));
+        EXPECT_EQ(size_t(0), descriptor.nextUnusedGroupOffset());
+        EXPECT_EQ(size_t(6), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(6)));
+        EXPECT_EQ(size_t(0), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(7)));
+        EXPECT_EQ(size_t(8), descriptor.nextUnusedGroupOffset(/*hint=*/size_t(8)));
         EXPECT_EQ(true, descriptor.canCompactGroups());
         // note that requiresGroupMove() is not particularly clever because it
         // blindly recommends moving the group even if it ultimately remains in
@@ -1242,7 +1242,7 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
             // no test7
 
             EXPECT_EQ(size_t(9), descriptor.unusedGroups());
-            EXPECT_EQ(size_t(7), descriptor.unusedGroupOffset());
+            EXPECT_EQ(size_t(7), descriptor.nextUnusedGroupOffset());
             EXPECT_EQ(true, descriptor.canCompactGroups());
             EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1250,7 +1250,7 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
             descriptor.setGroup("test7", size_t(7));
 
             EXPECT_EQ(size_t(8), descriptor.unusedGroups());
-            EXPECT_EQ(size_t(8), descriptor.unusedGroupOffset());
+            EXPECT_EQ(size_t(8), descriptor.nextUnusedGroupOffset());
             EXPECT_EQ(true, descriptor.canCompactGroups());
             EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1258,7 +1258,7 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
             descriptor.setGroup("test8", size_t(8));
 
             EXPECT_EQ(size_t(7), descriptor.unusedGroups());
-            EXPECT_EQ(size_t(9), descriptor.unusedGroupOffset());
+            EXPECT_EQ(size_t(9), descriptor.nextUnusedGroupOffset());
             EXPECT_EQ(false, descriptor.canCompactGroups());
             EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1267,7 +1267,7 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
             descriptor.setGroup("test13", size_t(13));
 
             EXPECT_EQ(size_t(6), descriptor.unusedGroups());
-            EXPECT_EQ(size_t(9), descriptor.unusedGroupOffset());
+            EXPECT_EQ(size_t(9), descriptor.nextUnusedGroupOffset());
             EXPECT_EQ(false, descriptor.canCompactGroups());
             EXPECT_EQ(true,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
@@ -1287,7 +1287,7 @@ TEST_F(TestAttributeSet, testAttributeSetGroups)
                 /*checkValidOffset=*/true), RuntimeError);
 
             EXPECT_EQ(size_t(0), descriptor.unusedGroups());
-            EXPECT_EQ(std::numeric_limits<size_t>::max(), descriptor.unusedGroupOffset());
+            EXPECT_EQ(std::numeric_limits<size_t>::max(), descriptor.nextUnusedGroupOffset());
             EXPECT_EQ(false, descriptor.canCompactGroups());
             EXPECT_EQ(false,
                 descriptor.requiresGroupMove(sourceName, sourceOffset, targetOffset));
