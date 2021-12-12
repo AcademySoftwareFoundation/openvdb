@@ -49,6 +49,8 @@ public:
     using DescriptorPtr         = std::shared_ptr<Descriptor>;
     using DescriptorConstPtr    = std::shared_ptr<const Descriptor>;
 
+    class Info;
+
     //////////
 
     struct Util
@@ -69,7 +71,10 @@ public:
 
     //////////
 
-    AttributeSet();
+    AttributeSet() = default;
+
+    AttributeSet(const Info& info, AttributeSet* attributeSet, Index arrayLength,
+        const AttributeArray::ScopedRegistryLock* lock = nullptr);
 
     /// Construct a new AttributeSet from the given AttributeSet.
     /// @param attributeSet the old attribute set
@@ -221,6 +226,8 @@ public:
     /// updating the array of attributes or the descriptor.
     AttributeArray::Ptr removeAttributeUnsafe(const size_t pos);
 
+    AttributeArray::Ptr stealAttribute(const size_t pos, bool updateDescriptor = true);
+
     /// Drop attributes with @a pos indices (simple method)
     /// Creates a new descriptor for this attribute set
     void dropAttributes(const std::vector<size_t>& pos);
@@ -277,7 +284,7 @@ public:
 private:
     using AttrArrayVec = std::vector<AttributeArray::Ptr>;
 
-    DescriptorPtr mDescr;
+    DescriptorPtr mDescr = std::make_shared<Descriptor>();
     AttrArrayVec  mAttrs;
 }; // class AttributeSet
 
@@ -528,6 +535,49 @@ private:
     future::Container           mFutureContainer;   // occupies 3 reserved slots
     int64_t                     mReserved[5];       // for future use
 }; // class Descriptor
+
+
+////////////////////////////////////////
+
+
+class AttributeSet::Info {
+public:
+    struct Array {
+        Index stride = 1;
+        bool constantStride = true;
+        bool hidden = false;
+        bool transient = false;
+        bool group = false;
+        bool string = false;
+    }; // struct Array
+
+    Info() = default;
+
+    explicit Info(const AttributeSet::Descriptor::Ptr& descriptorPtr);
+
+    explicit Info(const AttributeSet& attributeSet);
+
+    Descriptor& descriptor() { return *mDescriptor; }
+    const Descriptor& descriptor() const { return *mDescriptor; }
+    Descriptor::Ptr descriptorPtr() const { return mDescriptor; }
+    size_t size() const { return mDescriptor->size(); }
+
+    Array& arrayInfo(const Name& name);
+    const Array& arrayInfo(const Name& name) const;
+
+    Array& arrayInfo(size_t idx);
+    const Array& arrayInfo(size_t idx) const;
+
+    void merge(const AttributeSet::Info& attributeInfo);
+
+    /// @brief Print information for debugging
+    void print(std::ostream& os = std::cout) const;
+
+private:
+    Descriptor::Ptr mDescriptor = std::make_shared<Descriptor>();
+    std::vector<Array> mArrayInfo;
+}; // class AttributeSet::Info
+
 
 } // namespace points
 } // namespace OPENVDB_VERSION_NAME
