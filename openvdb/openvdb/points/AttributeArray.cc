@@ -48,6 +48,33 @@ AttributeArray::ScopedRegistryLock::ScopedRegistryLock()
 
 ////////////////////////////////////////
 
+// AttributeArray::BufferAccessor implementation
+
+AttributeArray::BufferAccessor::BufferAccessor(const AttributeArray& _array)
+    : buffer(_array.dataAsByteArray())
+    , bytes(_array.storageTypeSize() * _array.stride())
+    , uniform(_array.isUniform())
+    , array(&_array) { }
+
+void AttributeArray::BufferAccessor::reset()
+{
+    buffer = nullptr;
+    bytes = 0;
+    uniform = true;
+    array = nullptr;
+}
+
+void AttributeArray::BufferAccessor::reset(const AttributeArray& _array)
+{
+    buffer = _array.dataAsByteArray();
+    bytes = _array.storageTypeSize() * _array.stride();
+    uniform = _array.isUniform();
+    array = &_array;
+}
+
+
+////////////////////////////////////////
+
 // AttributeArray implementation
 
 

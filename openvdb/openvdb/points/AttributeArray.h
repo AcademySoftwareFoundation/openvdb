@@ -122,6 +122,29 @@ public:
         ScopedRegistryLock();
     }; // class ScopedRegistryLock
 
+    // Class to store private AttributeArray internals for optimization purposes
+    class OPENVDB_API BufferAccessor
+    {
+    public:
+        using CopyPtr = void (*)(AttributeArray& target, Index targetIndex, const AttributeArray& source, Index sourceIndex);
+
+        const char* buffer = nullptr;
+        size_t bytes = 0;
+        bool uniform = true;
+        const AttributeArray* array = nullptr;
+        CopyPtr copy = nullptr;
+    public:
+        BufferAccessor() = default;
+        BufferAccessor(const AttributeArray& array);
+
+        void reset();
+        void reset(const AttributeArray& array);
+
+        inline bool valid() const { return bool(buffer); }
+
+        friend class AttributeArray;
+    }; // class BufferAccessor
+
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
