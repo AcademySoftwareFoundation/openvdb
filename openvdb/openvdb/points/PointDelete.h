@@ -79,13 +79,12 @@ namespace point_delete_internal {
 
 struct VectorWrapper
 {
-    using T = std::vector<std::pair<Index, Index>>;
+    using T = std::vector<Index>;
 
     VectorWrapper(const T& _data) : data(_data) { }
     operator bool() const { return index < data.size(); }
     VectorWrapper& operator++() { index++; return *this; }
-    Index sourceIndex() const { assert(*this); return data[index].first; }
-    Index targetIndex() const { assert(*this); return data[index].second; }
+    Index sourceIndex() const { assert(*this); return data[index]; }
 
 private:
     const T& data;
@@ -159,13 +158,14 @@ struct DeleteByFilterOp
 
             // now construct new attribute arrays which exclude data from deleted points
 
-            std::vector<std::pair<Index, Index>> indexMapping;
+            std::vector<Index> indexMapping;
             indexMapping.reserve(newSize);
 
             for (auto voxel = leaf->cbeginValueAll(); voxel; ++voxel) {
                 for (auto iter = leaf->beginIndexVoxel(voxel.getCoord(), mFilter);
                      iter; ++iter) {
-                    indexMapping.emplace_back(*iter, attributeIndex++);
+                    indexMapping.emplace_back(*iter);
+                    attributeIndex++;
                 }
                 endOffsets.push_back(static_cast<ValueType>(attributeIndex));
             }

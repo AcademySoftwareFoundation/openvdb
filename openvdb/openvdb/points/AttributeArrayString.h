@@ -150,6 +150,10 @@ inline bool isString(const AttributeArray& array)
 ////////////////////////////////////////
 
 
+// forward declaration for friend relationship
+class StringAttributeWriteHandle;
+
+
 class OPENVDB_API StringAttributeHandle
 {
 public:
@@ -173,6 +177,9 @@ public:
 
     /// @brief Returns a reference to the array held in the Handle.
     const AttributeArray& array() const;
+
+    // declare as friend to provide access to the protected attribute handle
+    friend class StringAttributeWriteHandle;
 
 protected:
     AttributeHandle<Index, StringCodec<false>>    mHandle;
@@ -225,6 +232,53 @@ public:
     /// @brief  Returns whether or not the metadata cache contains a given value.
     /// @param  name Name of the String.
     bool contains(const Name& name) const;
+
+    template<typename IterT>
+    void copyStrings(const std::vector<StringAttributeHandle::UniquePtr>& sourceHandles,
+        const IterT& iter, const std::vector<std::unordered_map<Index, Index>>& sourceRemapping,
+        const std::unique_ptr<Index[]>& sourceGridIndices)
+    {
+        Index targetIndex(0);
+
+        for (IterT it(iter); it; ++it, ++targetIndex) {
+            assert(it.sourceBufferIndex() < sourceHandles.size());
+            const StringAttributeHandle::UniquePtr& sourceHandle =
+                sourceHandles[it.sourceBufferIndex()];
+            if (!sourceHandle)  continue;
+
+            assert(targetIndex < this->size());
+            assert(it.sourceIndex() < sourceHandle->size());
+
+            // retrieve the string index not the string value for remapping and performance
+            Index stringValue = sourceHandle->mHandle.get(it.sourceIndex());
+
+            Index sourceGridIndex = bool(sourceGridIndices) ? sourceGridIndices[it.sourceBufferIndex()] : 0;
+            // perform optional remapping if source grid index is non-zero
+            if (sourceGridIndex > 0) {
+                assert(sourceGridIndex <= sourceRemapping.size());
+                const auto& remaps = sourceRemapping[sourceGridIndex-1];
+                if (!remaps.empty()) {
+                    auto remapIt = remaps.find(stringValue);
+                    if (remapIt != remaps.end()) {
+                        // remapping found, edit string value
+                        stringValue = remapIt->second;
+                    }
+                }
+            }
+
+            mWriteHandle.set(targetIndex, stringValue);
+        }
+    }
+
+    inline void remapStrings(const std::unordered_map<Index, Index>& remapping)
+    {
+        // TODO: use get/set unsafe?
+
+        for (Index i = 0; i < mWriteHandle.size(); i++) {
+            Index index = mHandle.get(i, 0);
+            mWriteHandle.set(i, /*stride*/0, remapping.at(index));
+        }
+    }
 
 private:
     /// Retrieve the index of this string value from the cache

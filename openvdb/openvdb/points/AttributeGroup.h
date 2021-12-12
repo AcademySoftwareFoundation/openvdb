@@ -124,6 +124,24 @@ public:
     /// Compact the existing array to become uniform if all values are identical
     bool compact();
 
+    template<typename IterT>
+    void copyGroups(const std::vector<GroupHandle::UniquePtr>& sourceHandles,
+        const IterT& iter)
+    {
+        Index targetIndex(0);
+
+        for (IterT it(iter); it; ++it, ++targetIndex) {
+            assert(it.sourceBufferIndex() < sourceHandles.size());
+            const GroupHandle::UniquePtr& sourceHandle = sourceHandles[it.sourceBufferIndex()];
+            if (!sourceHandle)  continue;
+
+            assert(targetIndex < this->size());
+            assert(it.sourceIndex() < sourceHandle->size());
+
+            this->setUnsafe(targetIndex, sourceHandle->getUnsafe(it.sourceIndex()));
+        }
+    }
+
 }; // class GroupWriteHandle
 
 
