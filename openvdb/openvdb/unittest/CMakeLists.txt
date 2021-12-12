@@ -139,6 +139,7 @@ else()
     TestPointConversion.cc
     TestPointCount.cc
     TestPointDataLeaf.cc
+    TestPointDataPartitioner.cc
     TestPointDelete.cc
     TestPointGroup.cc
     TestPointIndexGrid.cc
