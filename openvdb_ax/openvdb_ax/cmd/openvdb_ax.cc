@@ -189,7 +189,7 @@ auto usage_analyze(const bool verbose)
         "    --ast-print           print the generated abstract syntax tree\n" <<
         "    --re-print            re-interpret print of the code post ast traversal\n" <<
         "    --reg-print           print the attribute registry (name, types, access, dependencies)\n" <<
-        "    --try-compile <points | volumes> \n" <<
+        "    --try-compile <points | volumes>\n" <<
         "                          attempt to compile code for points, volumes or both if no\n" <<
         "                          option is provided, reporting any failures or success.\n";
     };
@@ -333,12 +333,18 @@ void printFunctions(const bool namesOnly,
         for (; iter != functionMap.cend(); ++iter) {
             if (count == size - 1) break;
             const std::string& name = iter->first;
-            if (count != 0 && pos > maxHelpTextWidth) {
-                os << '\n';
-                pos = 0;
+            if (count != 0) {
+                if (pos > maxHelpTextWidth) {
+                    os << '\n';
+                    pos = 0;
+                }
+                else {
+                    os << ' ';
+                    ++pos;
+                }
             }
-            pos += name.size() + 2; // 2=", "
-            os << name << ',' << ' ';
+            pos += name.size() + 1;
+            os << name << ',';
             ++count;
         }
 

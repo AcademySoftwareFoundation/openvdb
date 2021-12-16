@@ -7,7 +7,7 @@
 #include "Visitor.h"
 
 #include <string>
-#include <unordered_map>
+#include <map>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -394,7 +394,11 @@ void catalogueAttributeTokens(const ast::Node& node,
 
     // fill a single map with the access patterns for all attributes
     // .first = read, .second = write
-    std::unordered_map<std::string, std::pair<bool,bool>> accessmap;
+    // @note  use a map rather than an unordered_map to preserve order
+    //   of the output vectors on different platforms (the AX compiler
+    //   doesn't care about the order but it's reasonable to expect
+    //   an attribute has the same index from one platform to the next).
+    std::map<std::string, std::pair<bool,bool>> accessmap;
 
     auto addAccesses = [&](const std::vector<const ast::Variable*>& vars,
         const bool read,
