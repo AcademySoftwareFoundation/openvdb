@@ -1,0 +1,14 @@
+usage: vdb_ax [analyze] [<args>]
+[analyze] parse the provided code and run analysis:
+
+    Examples:
+         vdb_ax analyze -s "@density += 1;" --try-compile points  // compile code for points
+
+    -s [code], -f [file]  input code as a string or from a file.
+    --ast-print           print the generated abstract syntax tree
+    --re-print            re-interpret print of the code post ast traversal
+    --reg-print           print the attribute registry (name, types, access, dependencies)
+    --try-compile <points | volumes>
+                          attempt to compile code for points, volumes or both if no
+                          option is provided, reporting any failures or success.
+
