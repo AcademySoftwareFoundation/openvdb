@@ -20,6 +20,7 @@
 #include "../compiler/AttributeRegistry.h"
 
 #include <openvdb/version.h>
+#include <openvdb/points/AttributeArray.h>
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
@@ -28,47 +29,137 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace codegen {
 
-/// @brief  The function definition and signature which is built by the
-///         PointComputeGenerator.
-///
-///         The argument structure is as follows:
-///
-///           1) - A void pointer to the CustomData
-///           2) - A void pointer to the leaf AttributeSet
-///           3) - An unsigned integer, representing the leaf relative point
-///                id being executed
-///           4) - A void pointer to a vector of void pointers, representing an
-///                array of attribute handles
-///           5) - A void pointer to a vector of void pointers, representing an
-///                array of group handles
-///           6) - A void pointer to a LeafLocalData object, used to track newly
-///                initialized attributes and arrays
-///
-struct PointKernel
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+inline const std::map<const char*, uint64_t>& EncoderFlags()
 {
-    /// The signature of the generated function
+    static const std::map<const char*, uint64_t> flags {
+        { "uniform", uint64_t(1<<0) },
+        { points::NullCodec::name(), uint64_t(1<<1) },
+        { points::TruncateCodec::name(), uint64_t(1<<2) },
+        { points::FixedPointCodec<false, points::UnitRange>::name(), uint64_t(1<<3) },
+        { points::FixedPointCodec<true, points::UnitRange>::name(), uint64_t(1<<4) },
+        { points::FixedPointCodec<false, points::PositionRange>::name(), uint64_t(1<<5) },
+        { points::FixedPointCodec<true, points::PositionRange>::name(), uint64_t(1<<6) }
+        //{ UnitVecCodec::name(), uint64_t(1<<7) }
+    };
+
+    return flags;
+}
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
+
+struct PointKernelValue
+{
+    // The signature of the generated function
     using Signature =
         void(const void* const,
-             const void* const,
-             uint64_t,
-             void**,
-             void**,
-             void*);
+             const int32_t (*)[3],
+             Index32*, // leaf value buffer
+             bool,     // active
+             uint64_t,  // pindex
+             void**,   // transforms
+             void**,   // values
+             uint64_t*, // flags
+             const void* const, // attribute set
+             void**, // group handles
+             void*);  // leaf data
 
     using FunctionTraitsT = codegen::FunctionTraits<Signature>;
     static const size_t N_ARGS = FunctionTraitsT::N_ARGS;
 
-    /// The argument key names available during code generation
-    static const std::array<std::string, N_ARGS>& argumentKeys();
-    static std::string getDefaultName();
+    static const std::array<const char*, N_ARGS>& argumentKeys();
+    static const char* getDefaultName();
 };
 
-/// @brief  An additional function built by the PointComputeGenerator.
-///         Currently both compute and compute range functions have the same
-///         signature
-struct PointRangeKernel : public PointKernel
+struct PointKernelAttributeArray
 {
-    static std::string getDefaultName();
+    enum ArgKey {
+        kCustomData = 0,
+        kOrigin,
+        kValueBuffer,
+        kActive,
+        kPointIndex,
+        kTransforms,
+        kAttributeBuffers,
+        kAttributeFlags,
+        kAttributeSet,
+        kGroupHandles,
+        kLeafData
+    };
+
+    static inline llvm::Value* getArg(llvm::Function* F, const ArgKey key) {
+        return llvm::cast<llvm::Argument>(F->arg_begin() + static_cast<int>(key));
+    }
+
+    // The signature of the generated function
+    using Signature =
+        void(const void* const,
+             const int32_t (*)[3],
+             Index32*, // leaf value buffer
+             bool,     // active
+             uint64_t,  // pindex
+             void**,   // transforms
+             void**,   // arrays
+             uint64_t*, // flags
+             const void* const, // attribute set
+             void**, // group handles
+             void*);  // leaf data
+
+    using FunctionTraitsT = codegen::FunctionTraits<Signature>;
+    static const size_t N_ARGS = FunctionTraitsT::N_ARGS;
+
+    static const std::array<const char*, N_ARGS>& argumentKeys();
+    static const char* getDefaultName();
+};
+
+struct PointKernelBuffer
+{
+    // The signature of the generated function
+    using Signature =
+        void(const void* const,
+             const int32_t (*)[3],
+             Index32*, // leaf value buffer
+             bool,     // active
+             uint64_t,  // pindex
+             void**,   // transforms
+             void**,   // buffers
+             uint64_t*, // flags
+             const void* const, // attribute set
+             void**, // group handles
+             void*);  // leaf data
+
+    using FunctionTraitsT = codegen::FunctionTraits<Signature>;
+    static const size_t N_ARGS = FunctionTraitsT::N_ARGS;
+
+    static const std::array<const char*, N_ARGS>& argumentKeys();
+    static const char* getDefaultName();
+};
+
+struct PointKernelBufferRange
+{
+    // The signature of the generated function
+    using Signature =
+        void(const void* const,
+             const int32_t (*)[3],
+             Index32*, // leaf value buffer
+             uint64_t*, // active buffer
+             int64_t,  // leaf buffer size (512)
+             uint64_t,  // mode (0 = off, 1 = active, 2 = both)
+             void**,   // transforms
+             void**,   // buffers
+             uint64_t*, // flags
+             const void* const, // attribute set
+             void**, // group handles
+             void*);  // leaf data
+
+    using FunctionTraitsT = codegen::FunctionTraits<Signature>;
+    static const size_t N_ARGS = FunctionTraitsT::N_ARGS;
+
+    static const std::array<const char*, N_ARGS>& argumentKeys();
+    static const char* getDefaultName();
 };
 
 
@@ -103,8 +194,9 @@ struct PointComputeGenerator : public ComputeGenerator
     bool visit(const ast::Attribute*) override;
 
 private:
-    llvm::Value* attributeHandleFromToken(const std::string&);
-    void getAttributeValue(const std::string& globalName, llvm::Value* location);
+    void computePKBR(const AttributeRegistry&);
+    void computePKB(const AttributeRegistry&);
+    void computePKAA(const AttributeRegistry&);
 };
 
 } // namespace namespace codegen_internal

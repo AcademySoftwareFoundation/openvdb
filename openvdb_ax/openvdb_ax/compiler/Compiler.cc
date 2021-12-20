@@ -771,8 +771,8 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     verifyTypedAccesses(*tree, logger);
 
     const std::vector<std::string> functionNames {
-        codegen::PointKernel::getDefaultName(),
-        codegen::PointRangeKernel::getDefaultName()
+        codegen::PointKernelBufferRange::getDefaultName(),
+        codegen::PointKernelAttributeArray::getDefaultName()
     };
 
     return this->compile<PointExecutable, GenT>(*tree, "ax.point.module",
