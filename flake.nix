@@ -1,7 +1,8 @@
 {
   description = "openvdb";
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/733e537a8ad76fd355b6f501127f7d0eb8861775";
+    # pick latest commit from stable branch and test it so no suprises
+    nixpkgs.url = "github:NixOS/nixpkgs/d53978239b265066804a45b7607b010b9cb4c50c";
   };
 
   outputs = inputs: {
