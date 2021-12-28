@@ -418,6 +418,8 @@ foreach(COMPONENT ${TBB_FIND_COMPONENTS})
     set_target_properties(TBB::${COMPONENT} PROPERTIES
       IMPORTED_LINK_INTERFACE_LANGUAGES "CXX"
       IMPORTED_LOCATION "${Tbb_${COMPONENT}_LIBRARY}")
+      
+    target_link_directories(TBB::${COMPONENT} INTERFACE "${Tbb_LIBRARY_DIRS}")
 
     # Release location
     if(EXISTS "${Tbb_${COMPONENT}_LIBRARY_RELEASE}")
