@@ -417,17 +417,7 @@ TestStreamCompression::testPagedStreams()
         ostream.write(reinterpret_cast<const char*>(&values[0]), values.size());
         ostream.flush();
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-        EXPECT_EQ(ss.tellp(), std::streampos(5400));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-        EXPECT_EQ(ss.tellp(), std::streampos(4422));
-#else
-        EXPECT_EQ(ss.tellp(), std::streampos(4452));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
         EXPECT_EQ(ss.tellp(), std::streampos(PageSize+sizeof(int)));
 #endif
 
@@ -450,17 +440,7 @@ TestStreamCompression::testPagedStreams()
 
         istream.read(handle, values.size(), false);
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-        EXPECT_EQ(ss.tellg(), std::streampos(5400));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-        EXPECT_EQ(ss.tellg(), std::streampos(4422));
-#else
-        EXPECT_EQ(ss.tellg(), std::streampos(4452));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
         EXPECT_EQ(ss.tellg(), std::streampos(PageSize+sizeof(int)));
 #endif
 
@@ -543,17 +523,7 @@ TestStreamCompression::testPagedStreams()
 
             ostream.flush();
 
-#ifdef OPENVDB_USE_BLOSC
-#ifdef BLOSC_BACKWARDS_COMPATIBLE
-            EXPECT_EQ(fileout.tellp(), std::streampos(51480));
-#else
-#ifdef BLOSC_HCR_BLOCKSIZE_OPTIMIZATION
-            EXPECT_EQ(fileout.tellp(), std::streampos(42424));
-#else
-            EXPECT_EQ(fileout.tellp(), std::streampos(42724));
-#endif
-#endif
-#else
+#ifndef OPENVDB_USE_BLOSC
             EXPECT_EQ(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
 #endif
 
