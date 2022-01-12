@@ -145,8 +145,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Debug'   }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
