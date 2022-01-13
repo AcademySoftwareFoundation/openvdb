@@ -155,12 +155,12 @@ jobs:
       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
       run: cd build && ctest -V
 
-  testmacos1015:
+  testmacos11:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-10.15
+    runs-on: macos-11
     env:
       CXX: clang++
     steps:

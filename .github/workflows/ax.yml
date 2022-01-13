@@ -119,10 +119,10 @@ jobs:
         config:
           #@note llvm10 never got its own brew formula...
           - { runner: 'macos-10.15',  cxx: 'clang++', build: 'Release', llvm: '7'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '8'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '9'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '8'  }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '9'  }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '11' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '12' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
