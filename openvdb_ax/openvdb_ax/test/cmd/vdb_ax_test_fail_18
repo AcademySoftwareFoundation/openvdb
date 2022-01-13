@@ -1,0 +1,2 @@
+WARNING: position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o
+FATAL: unrecognized positional argument: "file.vdb". use -i and -o for vdb files. See 'vdb_ax --help'

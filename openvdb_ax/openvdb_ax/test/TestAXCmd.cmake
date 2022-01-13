@@ -51,7 +51,7 @@ if(EXISTS ${SPHERE_VDB} AND EXISTS ${TORUS_VDB})
 endif()
 
 set(OUTPUT_DIR ${CMAKE_BINARY_DIR})
-if(UPDATE_BASELINE)
+if(UPDATE_BASELINES)
   set(OUTPUT_DIR ${CMAKE_CURRENT_LIST_DIR}/cmd)
 endif()
 
@@ -179,6 +179,7 @@ run_test(PASS GENERATES_OUTPUT ARGS analyze -f ${CMAKE_CURRENT_LIST_DIR}/snippet
 run_test(PASS GENERATES_OUTPUT ARGS analyze -f ${CMAKE_CURRENT_LIST_DIR}/snippets/loop/forLoop --try-compile)
 run_test(PASS GENERATES_OUTPUT ARGS analyze -f ${CMAKE_CURRENT_LIST_DIR}/snippets/loop/forLoop --try-compile points)
 run_test(PASS GENERATES_OUTPUT ARGS analyze -f ${CMAKE_CURRENT_LIST_DIR}/snippets/loop/forLoop --try-compile volumes)
+run_test(PASS GENERATES_OUTPUT ARGS functions -h)
 run_test(PASS GENERATES_OUTPUT ARGS functions --list log)
 run_test(PASS GENERATES_OUTPUT ARGS functions --list-names)
 
@@ -215,14 +216,6 @@ run_test(PASS ARGS analyze --try-compile points AX "@a+=@b;")
 run_test(PASS ARGS analyze --try-compile volumes AX "@a+=@b;")
 run_test(PASS ARGS functions --list non-existant-function)
 
-if(HAS_DOWNLOAD_VDBS)
-  # @todo  diff these once we have attribute bindings (can't diff the files)
-  #   due to UUID changing
-  run_test(PASS ARGS ${SPHERE_VDB} -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere += 1;")
-  run_test(PASS ARGS ${SPHERE_VDB} ${CMAKE_BINARY_DIR}/tmp.vdb -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
-  run_test(PASS COMMAND ${CMAKE_COMMAND} ARGS -E remove -f ${CMAKE_BINARY_DIR}/tmp.vdb)
-endif()
-
 # These tests should fail and the output should be checked
 
 run_test(FAIL GENERATES_OUTPUT)
@@ -235,6 +228,25 @@ run_test(FAIL GENERATES_OUTPUT ARGS analyze --werror --try-compile --max-errors 
 run_test(FAIL GENERATES_OUTPUT ARGS analyze --werror --try-compile --max-errors 2 AX "int a = 1.0; int a = 1.0;")
 run_test(FAIL GENERATES_OUTPUT ARGS analyze AX "invalid code")
 run_test(FAIL GENERATES_OUTPUT ARGS analyze --try-compile volumes AX "string str; bool a = ingroup(str);")
+run_test(FAIL GENERATES_OUTPUT ARGS analyze analyze AX "@a+=@b;")
+run_test(FAIL GENERATES_OUTPUT ARGS -i file.vdb execute AX "@a+=@b;")
+run_test(FAIL GENERATES_OUTPUT ARGS execute -i file.vdb execute AX "@a+=@b;")
+run_test(FAIL GENERATES_OUTPUT ARGS analyze -i file.vdb AX "@a+=@b;")
+run_test(FAIL GENERATES_OUTPUT ARGS functions)
+run_test(FAIL GENERATES_OUTPUT ARGS functions -i file.vdb)
+run_test(FAIL GENERATES_OUTPUT ARGS file.vdb -o tmp.vdb AX "@ls_sphere += 1;")
+run_test(FAIL GENERATES_OUTPUT ARGS execute file.vdb -o tmp.vdb AX "@ls_sphere += 1;")
+
+# These should come last so that, when enabled, any that GENERATES_OUTPUT don't impact order
+
+if(HAS_DOWNLOAD_VDBS)
+  # @todo  diff these once we have attribute bindings (can't diff the files)
+  #   due to UUID changing
+  run_test(PASS ARGS -i ${SPHERE_VDB} -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere += 1;")
+  run_test(PASS ARGS -i ${SPHERE_VDB} -i ${CMAKE_BINARY_DIR}/tmp.vdb -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
+  run_test(PASS GENERATES_OUTPUT ARGS ${SPHERE_VDB} ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
+  run_test(PASS COMMAND ${CMAKE_COMMAND} ARGS -E remove -f ${CMAKE_BINARY_DIR}/tmp.vdb)
+endif()
 
 # These test fail and output is not checked
 # @todo tests here should be documented as to why the output is not being

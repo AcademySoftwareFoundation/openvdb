@@ -67,6 +67,7 @@ struct ProgOptions
     std::unique_ptr<std::string> mInputCode = nullptr;
     std::vector<std::string> mInputVDBFiles = {};
     std::string mOutputVDBFile = "";
+    bool mCopyFileMeta = false;
     bool mVerbose = false;
     openvdb::ax::CompilerOptions::OptLevel mOptLevel =
         openvdb::ax::CompilerOptions::OptLevel::O3;
@@ -154,13 +155,14 @@ auto usage_execute(const bool verbose)
             "\n";
         }
         os <<
-        "    [a.vdb, b.vdb ... ]   list of input files\n"
-        "    -s [code], -f [file]  input code to execute as a string or from a file.\n" <<
-        "    -o [file.vdb]         write the result to a given vdb file\n" <<
-        "    --opt [level]         optimization level [NONE, O0, O1, O2, Os, Oz, O3 (default)]\n" <<
-        "    --werror              warnings as errors\n" <<
-        "    --max-errors [n]      maximum error messages, 0 (default) allows all error messages\n" <<
-        "    --threads [n]         number of threads to use, 0 (default) uses all available.\n";
+        "    -i [file.vdb]          append an input vdb file to be read\n"
+        "    -s [code], -f [file]   input code to execute as a string or from a file.\n" <<
+        "    -o [file.vdb]          write the result to a given vdb file\n" <<
+        "    --opt [level]          optimization level [NONE, O0, O1, O2, Os, Oz, O3 (default)]\n" <<
+        "    --werror               warnings as errors\n" <<
+        "    --max-errors [n]       maximum error messages, 0 (default) allows all error messages\n" <<
+        "    --threads [n]          number of threads to use, 0 (default) uses all available.\n" <<
+        "    --copy-file-metadata   copy the file level metadata of the first input to the output.\n";
         if (verbose) {
             os << '\n' <<
             "Notes:\n" <<
@@ -415,6 +417,7 @@ main(int argc, char *argv[])
 #define axtime() getTime()
 
     bool multiSnippet = false;
+    bool dashInputHasBeenUsed = false, positionalInputHasBeenUsed = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
@@ -427,11 +430,22 @@ main(int argc, char *argv[])
                 multiSnippet |= static_cast<bool>(opts.mInputCode);
                 opts.mInputCode.reset(new std::string());
                 loadSnippetFile(argv[i], *opts.mInputCode);
+            } else if (parser.check(i, "-i")) {
+                if (positionalInputHasBeenUsed) {
+                    fatal("unrecognized positional argument: \"" + opts.mInputVDBFiles.back() + "\". use -i and -o for vdb files");
+                }
+                dashInputHasBeenUsed = true;
+                opts.mInputVDBFiles.emplace_back(argv[++i]);
             } else if (parser.check(i, "-v", 0)) {
                 opts.mVerbose = true;
             } else if (parser.check(i, "--threads")) {
                 opts.threads = atoi(argv[++i]);
+            } else if (parser.check(i, "--copy-file-metadata", 0)) {
+                opts.mCopyFileMeta = true;
             } else if (parser.check(i, "-o")) {
+                if (positionalInputHasBeenUsed) {
+                    fatal("unrecognized positional argument: \"" + opts.mInputVDBFiles.back() + "\". use -i and -o for vdb files");
+                }
                 opts.mOutputVDBFile = argv[++i];
             } else if (parser.check(i, "--max-errors")) {
                 opts.mMaxErrors = atoi(argv[++i]);
@@ -469,27 +483,33 @@ main(int argc, char *argv[])
                 fatal("\"" + arg + "\" is not a valid option");
             }
         } else if (!arg.empty()) {
+            if (dashInputHasBeenUsed) {
+                fatal("unrecognized positional argument: \"" + arg + "\". use -i and -o for vdb files");
+            }
 
-            bool addToFileList = true;
             if (opts.mMode == ProgOptions::Mode::Default) {
+                bool skip = true;
                 if (arg == "analyze")        opts.mMode = ProgOptions::Analyze;
                 else if (arg == "functions") opts.mMode = ProgOptions::Functions;
-                else if (arg == "execute")   {
+                else if (arg == "execute")   opts.mMode = ProgOptions::Execute;
+                else {
+                    skip = false;
                     opts.mMode = ProgOptions::Execute;
-                    addToFileList = false;
                 }
-                else opts.mMode = ProgOptions::Execute;
-            }
-            else {
-                // if mode has already been set, no more positional arguments are expected
-                // (except for execute which takes in and out)
-                if (opts.mMode != ProgOptions::Mode::Execute) {
-                    fatal("unrecognized positional argument: \"" + arg + "\"");
-                }
+                if (skip) continue;
             }
 
-            if (addToFileList) {
+            // @todo remove positional vdb in/out file arg support
+            if (opts.mInputVDBFiles.empty()) {
+                positionalInputHasBeenUsed = true;
+                OPENVDB_LOG_WARN("position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o");
                 opts.mInputVDBFiles.emplace_back(arg);
+            }
+            else if (opts.mOutputVDBFile.empty()) {
+                opts.mOutputVDBFile = arg;
+            }
+            else {
+                fatal("unrecognized positional argument: \"" + arg + "\"");
             }
         } else {
             usage();
@@ -503,8 +523,11 @@ main(int argc, char *argv[])
     if (opts.mMode == ProgOptions::Mode::Execute) {
         opts.mInitCompile = true;
         if (opts.mInputVDBFiles.empty()) {
-            fatal("no vdb files have been provided.");
+            fatal("no vdb files have been provided");
         }
+    }
+    else if (!opts.mInputVDBFiles.empty()) {
+        fatal(modeString(opts.mMode) + " does not take input vdb files");
     }
 
     if (opts.mVerbose) {
@@ -599,7 +622,7 @@ main(int argc, char *argv[])
                 auto in = file.getGrids();
                 grids.insert(grids.end(), in->begin(), in->end());
                 // choose the first files metadata
-                if (!meta) meta = file.getMetadata();
+                if (opts.mCopyFileMeta && !meta) meta = file.getMetadata();
                 file.close();
                 axlog(": " << axtime() << '\n');
             } catch (openvdb::Exception& e) {
@@ -624,8 +647,11 @@ main(int argc, char *argv[])
             printFunctions(opts.mFunctionNamesOnly,
                 opts.mFunctionSearch,
                 std::cout);
+            return EXIT_SUCCESS;
         }
-        return EXIT_SUCCESS;
+        else {
+            fatal("vdb_ax functions requires a valid option");
+        }
     }
 
     // set up logger
