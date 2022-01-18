@@ -1292,7 +1292,7 @@ public:
 
         const TreeType& tree = grid->tree();
 
-        double length = tools::minMax(tree).max().length();
+        double length = openvdb::tools::minMax(tree).max().length();
 
         typename BoolTreeT::Ptr mask(new BoolTreeT(false));
         mask->topologyUnion(tree);

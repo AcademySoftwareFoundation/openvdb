@@ -505,7 +505,7 @@ template<typename GridType>
 inline py::tuple
 evalMinMax(const GridType& grid)
 {
-    const math::MinMax<typename GridType::ValueType> extrema = evalMinMax(grid.tree());
+    const math::MinMax<typename GridType::ValueType> extrema = tools::minMax(grid.tree());
     return py::make_tuple(extrema.min(), extrema.max());
 }
 
