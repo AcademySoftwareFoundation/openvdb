@@ -10,7 +10,7 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/BBox.h>
-#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage()
+#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include <openvdb/util/Formats.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/Platform.h>
@@ -361,6 +361,7 @@ public:
     Index64 activeTileCount() const override { return tools::countActiveTiles(*this); }
 
     /// Return the minimum and maximum active values in this tree.
+    OPENVDB_DEPRECATED_MESSAGE("Switch to tools::minMax. Use threaded = false for serial execution")
     void evalMinMax(ValueType &min, ValueType &max) const;
 
     Index64 memUsage() const override { return tools::memUsage(*this); }
@@ -2025,7 +2026,6 @@ template<typename RootNodeType>
 inline void
 Tree<RootNodeType>::evalMinMax(ValueType& minVal, ValueType& maxVal) const
 {
-    /// @todo optimize
     minVal = maxVal = zeroVal<ValueType>();
     if (ValueOnCIter iter = this->cbeginValueOn()) {
         minVal = maxVal = *iter;
@@ -2088,7 +2088,9 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     ValueType minVal = zeroVal<ValueType>(), maxVal = zeroVal<ValueType>();
     if (verboseLevel > 3) {
         // This forces loading of all non-resident nodes.
-        this->evalMinMax(minVal, maxVal);
+        const math::MinMax<ValueType> extrema = tools::minMax(*this);
+        minVal = extrema.min();
+        maxVal = extrema.max();
     }
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 7

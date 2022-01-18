@@ -12,6 +12,7 @@
 #define OPENVDB_TOOLS_COUNT_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
+#include <openvdb/math/Stats.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
 
@@ -61,6 +62,10 @@ Index64 countActiveTiles(const TreeT& tree, bool threaded = true);
 /// @brief Return the total amount of memory in bytes occupied by this tree.
 template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
+
+/// @brief Return the minimum and maximum active values in this tree.
+template <typename TreeT>
+math::MinMax<typename TreeT::ValueType> minMax(const TreeT& tree, bool threaded = true);
 
 
 ////////////////////////////////////////
@@ -316,6 +321,70 @@ struct MemUsageOp
     openvdb::Index64 count{0};
 }; // struct MemUsageOp
 
+/// @brief A DynamicNodeManager operator to find the minimum and maximum active values in this tree.
+template<typename TreeType>
+struct MinMaxValuesOp
+{
+    using ValueT = typename TreeType::ValueType;
+
+    explicit MinMaxValuesOp()
+    : min(zeroVal<ValueT>())
+    , max(zeroVal<ValueT>())
+    , seen_value(false)
+    {
+    }
+
+    MinMaxValuesOp(const MinMaxValuesOp& other, tbb::split)
+    : min(other.min)
+    , max(other.max)
+    , seen_value(other.seen_value)
+    {
+    }
+
+    template <typename NodeType>
+    bool operator()(NodeType& node, size_t)
+    {
+        if (auto iter = node.cbeginValueOn()) {
+            if(!seen_value) {
+                seen_value = true;
+                min = max = *iter;
+                ++iter;
+            }
+
+            for (; iter; ++iter) {
+                const ValueT val = *iter;
+
+                if (math::cwiseLessThan(val, min))
+                    min = val;
+
+                if (math::cwiseGreaterThan(val, max))
+                    max = val;
+            }
+        }
+
+        return true;
+    }
+
+    bool join(const MinMaxValuesOp& other)
+    {
+        if (math::cwiseLessThan(other.min, min))
+            min = other.min;
+
+        if (math::cwiseGreaterThan(other.max, max))
+            max = other.max;
+
+        seen_value |= other.seen_value;
+
+        return true;
+    }
+
+    ValueT min, max;
+
+private:
+
+    bool seen_value;
+}; // struct MinMaxValuesOp
+
 } // namespace count_internal
 
 /// @endcond
@@ -411,6 +480,18 @@ Index64 memUsage(const TreeT& tree, bool threaded)
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);
     nodeManager.reduceTopDown(op, threaded);
     return op.count + sizeof(tree);
+}
+
+template <typename TreeT>
+math::MinMax<typename TreeT::ValueType> minMax(const TreeT& tree, bool threaded)
+{
+    using ValueT = typename TreeT::ValueType;
+
+    count_internal::MinMaxValuesOp<TreeT> op;
+    tree::DynamicNodeManager<const TreeT> nodeManager(tree);
+    nodeManager.reduceTopDown(op, threaded);
+
+    return math::MinMax<ValueT>(op.min, op.max);
 }
 
 
