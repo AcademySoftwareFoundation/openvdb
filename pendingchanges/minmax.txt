@@ -1,0 +1,4 @@
+Improvements:
+    - Added tools::minMax() which supports multithreaded evaluation of active
+    minimum and maximum values. Grid::evalMinMax() has been deprecated.
+    [Contributed by Greg Hurst]
