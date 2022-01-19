@@ -64,6 +64,7 @@ template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
 
 /// @brief Return the minimum and maximum active values in this tree.
+/// @note  Returns zeroVal<ValueType> for empty trees.
 template <typename TreeT>
 math::MinMax<typename TreeT::ValueType> minMax(const TreeT& tree, bool threaded = true);
 
