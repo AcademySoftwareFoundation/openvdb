@@ -1,0 +1,2 @@
+WARNING: position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o
+FATAL: analyze does not take input vdb files. See 'vdb_ax --help'

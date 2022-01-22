@@ -1,0 +1,32 @@
+usage: vdb_ax [command] [--help|-h] [-v] [<args>]
+
+CLI utility for processing OpenVDB data using AX. Various commands are supported.
+    -h, --help  print help and exit. [command] -h prints extra information.
+    -v          verbose (print timing and diagnostics)
+
+[execute] read/process/write VDB file/streams (default command):
+    -i [file.vdb]          append an input vdb file to be read
+    -s [code], -f [file]   input code to execute as a string or from a file.
+    -o [file.vdb]          write the result to a given vdb file
+    --opt [level]          optimization level [NONE, O0, O1, O2, Os, Oz, O3 (default)]
+    --werror               warnings as errors
+    --max-errors [n]       maximum error messages, 0 (default) allows all error messages
+    --threads [n]          number of threads to use, 0 (default) uses all available.
+    --copy-file-metadata   copy the file level metadata of the first input to the output.
+
+[analyze] parse the provided code and run analysis:
+    -s [code], -f [file]  input code as a string or from a file.
+    --ast-print           print the generated abstract syntax tree
+    --re-print            re-interpret print of the code post ast traversal
+    --reg-print           print the attribute registry (name, types, access, dependencies)
+    --try-compile <points | volumes>
+                          attempt to compile code for points, volumes or both if no
+                          option is provided, reporting any failures or success.
+
+[functions] query available function information:
+    --list <name>  list all functions, their documentation and their signatures.
+                   optionally only list those whose name includes a provided string.
+    --list-names   list all available functions names only
+
+Email bug reports, questions, discussions to <openvdb-dev@lists.aswf.io>
+and/or open issues at https://github.com/AcademySoftwareFoundation/openvdb.

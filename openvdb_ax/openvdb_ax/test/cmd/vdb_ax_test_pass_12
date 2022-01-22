@@ -1,0 +1,10 @@
+usage: vdb_ax [functions] [<args>]
+[functions] query available function information:
+
+    Examples:
+         vdb_ax functions --list log  // print functions with 'log' in the name
+
+    --list <name>  list all functions, their documentation and their signatures.
+                   optionally only list those whose name includes a provided string.
+    --list-names   list all available functions names only
+

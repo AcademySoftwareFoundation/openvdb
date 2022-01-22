@@ -22,9 +22,18 @@
 
 #include <openvdb/openvdb.h>
 #include <openvdb/version.h>
+#include <openvdb/io/File.h>
 #include <openvdb/util/logging.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/points/PointDelete.h>
+
+// tbb/task_scheduler_init.h was removed in TBB 2021. The best construct to swap
+// to is tbb/global_control (for executables). global_control was only officially
+// added in TBB 2019U4 but exists in 2018 as a preview feature. To avoid more
+// compile time branching (as we still support 2018), we use it in 2018 too by
+// enabling the below define.
+#define TBB_PREVIEW_GLOBAL_CONTROL 1
+#include <tbb/global_control.h>
 
 #include <fstream>
 #include <iostream>
@@ -34,42 +43,21 @@
 
 const char* gProgName = "";
 
-void usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
+void fatal [[noreturn]] (const char* msg = nullptr)
 {
-    std::cerr <<
-    "Usage: " << gProgName << " [input.vdb [output.vdb] | analyze] [-s \"string\" | -f file.txt] [OPTIONS]\n" <<
-    "Which: executes a string or file containing a code snippet on an input.vdb file\n\n" <<
-    "Options:\n" <<
-    "    -s snippet       execute code snippet on the input.vdb file\n" <<
-    "    -f file.txt      execute text file containing a code snippet on the input.vdb file\n" <<
-    "    -v               verbose (print timing and diagnostics)\n" <<
-    "    --opt level      set an optimization level on the generated IR [NONE, O0, O1, O2, Os, Oz, O3]\n" <<
-    "    --werror         set warnings as errors\n" <<
-    "    --max-errors n   sets the maximum number of error messages to n, a value of 0 (default) allows all error messages\n" <<
-    "    analyze          parse the provided code and enter analysis mode\n" <<
-    "      --ast-print       descriptive print the abstract syntax tree generated\n" <<
-    "      --re-print        re-interpret print of the provided code after ast traversal\n" <<
-    "      --reg-print       print the attribute registry (name, types, access, dependencies)\n" <<
-    "      --try-compile [points|volumes] \n" <<
-    "                        attempt to compile the provided code for points or volumes, or both if no\n" <<
-    "                        additional option is provided, reporting any failures or success.\n" <<
-    "    functions        enter function mode to query available function information\n" <<
-    "      --list [name]     list all available functions, their documentation and their signatures.\n" <<
-    "                        optionally only list functions which whose name includes a provided string.\n" <<
-    "      --list-names      list all available functions names only\n" <<
-    "Warning:\n" <<
-    "     Providing the same file-path to both input.vdb and output.vdb arguments will overwrite\n" <<
-    "     the file. If no output file is provided, the input.vdb will be processed but will remain\n" <<
-    "     unchanged on disk (this is useful for testing the success status of code).\n";
-    exit(exitStatus);
+    if (msg) OPENVDB_LOG_FATAL(msg << ". See '" << gProgName << " --help'");
+    std::exit(EXIT_FAILURE);
 }
+
+void fatal [[noreturn]] (const std::string msg) { fatal(msg.c_str()); }
 
 struct ProgOptions
 {
-    enum Mode { Execute, Analyze, Functions };
+    enum Mode { Default, Execute, Analyze, Functions };
     enum Compilation { All, Points, Volumes };
 
-    Mode mMode = Execute;
+    Mode mMode = Default;
+    int32_t threads = 0;
 
     // Compilation options
     size_t mMaxErrors = 0;
@@ -77,8 +65,9 @@ struct ProgOptions
 
     // Execute options
     std::unique_ptr<std::string> mInputCode = nullptr;
-    std::string mInputVDBFile = "";
+    std::vector<std::string> mInputVDBFiles = {};
     std::string mOutputVDBFile = "";
+    bool mCopyFileMeta = false;
     bool mVerbose = false;
     openvdb::ax::CompilerOptions::OptLevel mOptLevel =
         openvdb::ax::CompilerOptions::OptLevel::O3;
@@ -111,8 +100,7 @@ tryCompileStringToCompilation(const std::string& str)
 {
     if (str == "points")   return ProgOptions::Points;
     if (str == "volumes")  return ProgOptions::Volumes;
-    OPENVDB_LOG_FATAL("invalid option given for --try-compile level");
-    usage();
+    fatal("invalid option given for --try-compile level.");
 }
 
 openvdb::ax::CompilerOptions::OptLevel
@@ -125,8 +113,7 @@ optStringToLevel(const std::string& str)
     if (str == "Os")   return openvdb::ax::CompilerOptions::OptLevel::Os;
     if (str == "Oz")   return openvdb::ax::CompilerOptions::OptLevel::Oz;
     if (str == "O3")   return openvdb::ax::CompilerOptions::OptLevel::O3;
-    OPENVDB_LOG_FATAL("invalid option given for --opt level");
-    usage();
+    fatal("invalid option given for --opt level");
 }
 
 inline std::string
@@ -143,13 +130,130 @@ optLevelToString(const openvdb::ax::CompilerOptions::OptLevel level)
     }
 }
 
+template <typename Cb>
+auto operator<<(std::ostream& os, const Cb& cb) -> decltype(cb(os)) { return cb(os); }
+
+auto usage_execute(const bool verbose)
+{
+    return [=](std::ostream& os) -> std::ostream& {
+        os <<
+        "[execute] read/process/write VDB file/streams (default command):\n";
+        if (verbose) {
+            os <<
+            "\n" <<
+            "    This command takes a list of positional arguments which represent VDB files\n" <<
+            "    and runs AX code across their voxel or point values. Unique kernels are built\n" <<
+            "    and run separately for volumes and point grids. All grids are written to the\n" <<
+            "    same output file:\n" <<
+            "\n" <<
+            "         " << gProgName << " density.vdb -s \"@density += 1;\" -o out.vdb       // increment values by 1\n" <<
+            "         " << gProgName << " a.vdb b.vdb c.vdb -s \"@c = @a + @b;\" -o out.vdb  // combine a,b into c\n" <<
+            "         " << gProgName << " points.vdb -s \"@P += v@v * 2;\" -o out.vdb        // move points based on a vector attribute\n" <<
+            "\n" <<
+            "    For more examples and help with syntax, see the AX documentation:\n" <<
+            "      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html\n" <<
+            "\n";
+        }
+        os <<
+        "    -i [file.vdb]          append an input vdb file to be read\n"
+        "    -s [code], -f [file]   input code to execute as a string or from a file.\n" <<
+        "    -o [file.vdb]          write the result to a given vdb file\n" <<
+        "    --opt [level]          optimization level [NONE, O0, O1, O2, Os, Oz, O3 (default)]\n" <<
+        "    --werror               warnings as errors\n" <<
+        "    --max-errors [n]       maximum error messages, 0 (default) allows all error messages\n" <<
+        "    --threads [n]          number of threads to use, 0 (default) uses all available.\n" <<
+        "    --copy-file-metadata   copy the file level metadata of the first input to the output.\n";
+        if (verbose) {
+            os << '\n' <<
+            "Notes:\n" <<
+            "    Providing the same file-path to both in/out arguments will overwrite the\n" <<
+            "    file. If no output is provided, the input will be processed but will remain\n" <<
+            "    unchanged on disk (this is useful for testing the success status of code).\n";
+        }
+        return os;
+    };
+}
+
+auto usage_analyze(const bool verbose)
+{
+    return [=](std::ostream& os) -> std::ostream& {
+        os <<
+        "[analyze] parse the provided code and run analysis:\n";
+        if (verbose) {
+            os <<
+            "\n" <<
+            "    Examples:\n" <<
+            "         " << gProgName << " analyze -s \"@density += 1;\" --try-compile points  // compile code for points\n" <<
+            "\n";
+        }
+        return os <<
+        "    -s [code], -f [file]  input code as a string or from a file.\n" <<
+        "    --ast-print           print the generated abstract syntax tree\n" <<
+        "    --re-print            re-interpret print of the code post ast traversal\n" <<
+        "    --reg-print           print the attribute registry (name, types, access, dependencies)\n" <<
+        "    --try-compile <points | volumes>\n" <<
+        "                          attempt to compile code for points, volumes or both if no\n" <<
+        "                          option is provided, reporting any failures or success.\n";
+    };
+}
+
+auto usage_functions(const bool verbose)
+{
+    return [=](std::ostream& os) -> std::ostream& {
+        os <<
+        "[functions] query available function information:\n";
+        if (verbose) {
+            os <<
+            "\n" <<
+            "    Examples:\n" <<
+            "         " << gProgName << " functions --list log  // print functions with 'log' in the name\n" <<
+            "\n";
+        }
+        return os <<
+        "    --list <name>  list all functions, their documentation and their signatures.\n" <<
+        "                   optionally only list those whose name includes a provided string.\n" <<
+        "    --list-names   list all available functions names only\n";
+    };
+}
+
+void usage [[noreturn]] (int exitStatus = EXIT_FAILURE)
+{
+    std::cerr <<
+    "usage: " << gProgName << " [command] [--help|-h] [-v] [<args>]\n" <<
+    '\n' <<
+    "CLI utility for processing OpenVDB data using AX. Various commands are supported.\n" <<
+    "    -h, --help  print help and exit. [command] -h prints extra information.\n" <<
+    "    -v          verbose (print timing and diagnostics)\n" <<
+    '\n'
+    << usage_execute(false) <<
+    '\n'
+    << usage_analyze(false) <<
+    '\n'
+    << usage_functions(false) <<
+    '\n' <<
+    "Email bug reports, questions, discussions to <openvdb-dev@lists.aswf.io>\n" <<
+    "and/or open issues at https://github.com/AcademySoftwareFoundation/openvdb.\n";
+
+    std::exit(exitStatus);
+}
+
+void usage [[noreturn]] (const ProgOptions::Mode mode, int exitStatus = EXIT_FAILURE)
+{
+    if (mode == ProgOptions::Mode::Default)   usage(exitStatus);
+    std::cerr << "usage: " << gProgName << " [" << modeString(mode) << "] [<args>]\n";
+    if (mode == ProgOptions::Mode::Execute)   std::cerr << usage_execute(true) << std::endl;
+    if (mode == ProgOptions::Mode::Analyze)   std::cerr << usage_analyze(true) << std::endl;
+    if (mode == ProgOptions::Mode::Functions) std::cerr << usage_functions(true) << std::endl;
+    std::exit(exitStatus);
+}
+
 void loadSnippetFile(const std::string& fileName, std::string& textString)
 {
     std::ifstream in(fileName.c_str(), std::ios::in | std::ios::binary);
 
     if (!in) {
         OPENVDB_LOG_FATAL("File Load Error: " << fileName);
-        usage();
+        fatal();
     }
 
     textString =
@@ -170,7 +274,7 @@ struct OptParse
             if (idx + numArgs >= argc) {
                 OPENVDB_LOG_FATAL("option " << name << " requires "
                     << numArgs << " argument" << (numArgs == 1 ? "" : "s"));
-                usage();
+                fatal();
             }
             return true;
         }
@@ -231,12 +335,18 @@ void printFunctions(const bool namesOnly,
         for (; iter != functionMap.cend(); ++iter) {
             if (count == size - 1) break;
             const std::string& name = iter->first;
-            if (count != 0 && pos > maxHelpTextWidth) {
-                os << '\n';
-                pos = 0;
+            if (count != 0) {
+                if (pos > maxHelpTextWidth) {
+                    os << '\n';
+                    pos = 0;
+                }
+                else {
+                    os << ' ';
+                    ++pos;
+                }
             }
-            pos += name.size() + 2; // 2=", "
-            os << name << ',' << ' ';
+            pos += name.size() + 1;
+            os << name << ',';
             ++count;
         }
 
@@ -300,13 +410,14 @@ main(int argc, char *argv[])
         return os.str();
     };
 
-    auto& os = std::cout;
+    auto& os = std::cerr;
 #define axlog(message) \
     { if (opts.mVerbose) os << message; }
 #define axtimer() timer.restart()
 #define axtime() getTime()
 
     bool multiSnippet = false;
+    bool dashInputHasBeenUsed = false, positionalInputHasBeenUsed = false;
     for (int i = 1; i < argc; ++i) {
         std::string arg = argv[i];
         if (arg[0] == '-') {
@@ -319,8 +430,23 @@ main(int argc, char *argv[])
                 multiSnippet |= static_cast<bool>(opts.mInputCode);
                 opts.mInputCode.reset(new std::string());
                 loadSnippetFile(argv[i], *opts.mInputCode);
+            } else if (parser.check(i, "-i")) {
+                if (positionalInputHasBeenUsed) {
+                    fatal("unrecognized positional argument: \"" + opts.mInputVDBFiles.back() + "\". use -i and -o for vdb files");
+                }
+                dashInputHasBeenUsed = true;
+                opts.mInputVDBFiles.emplace_back(argv[++i]);
             } else if (parser.check(i, "-v", 0)) {
                 opts.mVerbose = true;
+            } else if (parser.check(i, "--threads")) {
+                opts.threads = atoi(argv[++i]);
+            } else if (parser.check(i, "--copy-file-metadata", 0)) {
+                opts.mCopyFileMeta = true;
+            } else if (parser.check(i, "-o")) {
+                if (positionalInputHasBeenUsed) {
+                    fatal("unrecognized positional argument: \"" + opts.mInputVDBFiles.back() + "\". use -i and -o for vdb files");
+                }
+                opts.mOutputVDBFile = argv[++i];
             } else if (parser.check(i, "--max-errors")) {
                 opts.mMaxErrors = atoi(argv[++i]);
             } else if (parser.check(i, "--werror", 0)) {
@@ -352,45 +478,56 @@ main(int argc, char *argv[])
                 ++i;
                 opts.mOptLevel = optStringToLevel(argv[i]);
             } else if (arg == "-h" || arg == "-help" || arg == "--help") {
-                usage(EXIT_SUCCESS);
+                usage(opts.mMode, EXIT_SUCCESS);
             } else {
-                OPENVDB_LOG_FATAL("\"" + arg + "\" is not a valid option");
-                usage();
+                fatal("\"" + arg + "\" is not a valid option");
             }
         } else if (!arg.empty()) {
-            // if mode has already been set, no more positional arguments are expected
-            // (except for execute which takes in and out)
-            if (opts.mMode != ProgOptions::Mode::Execute) {
-                OPENVDB_LOG_FATAL("unrecognized positional argument: \"" << arg << "\"");
-                usage();
+            if (dashInputHasBeenUsed) {
+                fatal("unrecognized positional argument: \"" + arg + "\". use -i and -o for vdb files");
             }
 
-            if (arg == "analyze")        opts.mMode = ProgOptions::Analyze;
-            else if (arg == "functions") opts.mMode = ProgOptions::Functions;
-
-            if (opts.mMode == ProgOptions::Mode::Execute) {
-                opts.mInitCompile = true;
-                // execute positional argument setup
-                if (opts.mInputVDBFile.empty()) {
-                    opts.mInputVDBFile = arg;
-                }
-                else if (opts.mOutputVDBFile.empty()) {
-                    opts.mOutputVDBFile = arg;
-                }
+            if (opts.mMode == ProgOptions::Mode::Default) {
+                bool skip = true;
+                if (arg == "analyze")        opts.mMode = ProgOptions::Analyze;
+                else if (arg == "functions") opts.mMode = ProgOptions::Functions;
+                else if (arg == "execute")   opts.mMode = ProgOptions::Execute;
                 else {
-                    OPENVDB_LOG_FATAL("unrecognized positional argument: \"" << arg << "\"");
-                    usage();
+                    skip = false;
+                    opts.mMode = ProgOptions::Execute;
                 }
+                if (skip) continue;
             }
-            else if (!opts.mInputVDBFile.empty() ||
-                !opts.mOutputVDBFile.empty())
-            {
-                OPENVDB_LOG_FATAL("unrecognized positional argument: \"" << arg << "\"");
-                usage();
+
+            // @todo remove positional vdb in/out file arg support
+            if (opts.mInputVDBFiles.empty()) {
+                positionalInputHasBeenUsed = true;
+                OPENVDB_LOG_WARN("position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o");
+                opts.mInputVDBFiles.emplace_back(arg);
+            }
+            else if (opts.mOutputVDBFile.empty()) {
+                opts.mOutputVDBFile = arg;
+            }
+            else {
+                fatal("unrecognized positional argument: \"" + arg + "\"");
             }
         } else {
             usage();
         }
+    }
+
+    if (opts.mMode == ProgOptions::Mode::Default) {
+        opts.mMode = ProgOptions::Mode::Execute;
+    }
+
+    if (opts.mMode == ProgOptions::Mode::Execute) {
+        opts.mInitCompile = true;
+        if (opts.mInputVDBFiles.empty()) {
+            fatal("no vdb files have been provided");
+        }
+    }
+    else if (!opts.mInputVDBFiles.empty()) {
+        fatal(modeString(opts.mMode) + " does not take input vdb files");
     }
 
     if (opts.mVerbose) {
@@ -409,7 +546,12 @@ main(int argc, char *argv[])
         axlog('\n');
 
         if (opts.mMode == ProgOptions::Execute) {
-            axlog("  vdb in  : \"" << opts.mInputVDBFile  << "\"\n");
+            axlog("  vdb in  : \"");
+            for (const auto& in : opts.mInputVDBFiles) {
+                const bool sep = (&in != &opts.mInputVDBFiles.back());
+                axlog(in << (sep ? ", " : ""));
+            }
+            axlog("\"\n");
             axlog("  vdb out : \"" << opts.mOutputVDBFile << "\"\n");
         }
         if (opts.mMode == ProgOptions::Execute ||
@@ -439,8 +581,7 @@ main(int argc, char *argv[])
 
     if (opts.mMode != ProgOptions::Functions) {
         if (!opts.mInputCode) {
-            OPENVDB_LOG_FATAL("expected at least one AX file or a code snippet");
-            usage();
+            fatal("expected at least one AX file or a code snippet");
         }
         if (multiSnippet) {
             OPENVDB_LOG_WARN("multiple code snippets provided, only using last input.");
@@ -448,10 +589,6 @@ main(int argc, char *argv[])
     }
 
     if (opts.mMode == ProgOptions::Execute) {
-        if (opts.mInputVDBFile.empty()) {
-            OPENVDB_LOG_FATAL("expected at least one VDB file or analysis mode");
-            usage();
-        }
         if (opts.mOutputVDBFile.empty()) {
             OPENVDB_LOG_WARN("no output VDB File specified - nothing will be written to disk");
         }
@@ -462,26 +599,37 @@ main(int argc, char *argv[])
     ScopedInitialize initializer(argc, argv);
     axlog(": " << axtime() << '\n');
 
-    // read vdb file data for
+    std::unique_ptr<tbb::global_control> control;
+    if (opts.threads > 0) {
+        axlog("[INFO] Initializing thread usage [" << opts.threads << "]\n" << std::flush);
+        control.reset(new tbb::global_control(tbb::global_control::max_allowed_parallelism, opts.threads));
+    }
 
-    openvdb::GridPtrVecPtr grids;
+    openvdb::GridPtrVec grids;
     openvdb::MetaMap::Ptr meta;
 
     if (opts.mMode == ProgOptions::Execute) {
-        openvdb::io::File file(opts.mInputVDBFile);
-        try {
-            axtimer();
-            axlog("[INFO] Reading VDB data"
-                << (openvdb::io::Archive::isDelayedLoadingEnabled() ?
-                    " (delay-load)" : "") << std::flush);
-            file.open();
-            grids = file.getGrids();
-            meta = file.getMetadata();
-            file.close();
-            axlog(": " << axtime() << '\n');
-        } catch (openvdb::Exception& e) {
-            OPENVDB_LOG_ERROR(e.what() << " (" << opts.mInputVDBFile << ")");
-            return EXIT_FAILURE;
+        // read vdb file data for
+        axlog("[INFO] Reading VDB data"
+            << (openvdb::io::Archive::isDelayedLoadingEnabled() ?
+                " (delay-load)" : "") << '\n');
+        for (const auto& filename : opts.mInputVDBFiles) {
+            openvdb::io::File file(filename);
+            try {
+                axlog("[INFO] | \"" << filename << "\"");
+                axtimer();
+                file.open();
+                auto in = file.getGrids();
+                grids.insert(grids.end(), in->begin(), in->end());
+                // choose the first files metadata
+                if (opts.mCopyFileMeta && !meta) meta = file.getMetadata();
+                file.close();
+                axlog(": " << axtime() << '\n');
+            } catch (openvdb::Exception& e) {
+                axlog('\n');
+                OPENVDB_LOG_ERROR(e.what() << " (" << filename << ")");
+                return EXIT_FAILURE;
+            }
         }
     }
 
@@ -499,8 +647,11 @@ main(int argc, char *argv[])
             printFunctions(opts.mFunctionNamesOnly,
                 opts.mFunctionSearch,
                 std::cout);
+            return EXIT_SUCCESS;
         }
-        return EXIT_SUCCESS;
+        else {
+            fatal("vdb_ax functions requires a valid option");
+        }
     }
 
     // set up logger
@@ -565,11 +716,9 @@ main(int argc, char *argv[])
     // Check what we need to compile for if performing execution
 
     if (opts.mMode == ProgOptions::Execute) {
-        assert(meta);
-        assert(grids);
         bool points = false;
         bool volumes = false;
-        for (auto grid : *grids) {
+        for (auto grid : grids) {
             points |= grid->isType<openvdb::points::PointDataGrid>();
             volumes |= !points;
             if (points && volumes) break;
@@ -602,7 +751,8 @@ main(int argc, char *argv[])
             const bool hasWarning = logs.hasWarning();
             if (psuccess) {
                 axlog("[INFO] | Compilation successful");
-                if (hasWarning) axlog(" with warning(s)\n");
+                if (hasWarning) axlog(" with warning(s)");
+                axlog('\n');
             }
             axlog("[INFO] | " << axtime() << '\n' << std::flush);
         }
@@ -628,7 +778,8 @@ main(int argc, char *argv[])
             const bool hasWarning = logs.hasWarning();
             if (vsuccess) {
                 axlog("[INFO] | Compilation successful");
-                if (hasWarning) axlog(" with warning(s)\n");
+                if (hasWarning) axlog(" with warning(s)");
+                axlog('\n');
             }
             axlog("[INFO] | " << axtime() << '\n' << std::flush);
         }
@@ -656,9 +807,8 @@ main(int argc, char *argv[])
 
         if (pointExe) {
             axlog("[INFO] | Compilation successful");
-            if (logs.hasWarning()) {
-                axlog(" with warning(s)\n");
-            }
+            if (logs.hasWarning()) axlog(" with warning(s)");
+            axlog('\n');
         }
         else {
             if (logs.hasError()) {
@@ -670,13 +820,13 @@ main(int argc, char *argv[])
 
         size_t total = 0, count = 1;
         if (opts.mVerbose) {
-            for (auto grid : *grids) {
+            for (auto grid : grids) {
                 if (!grid->isType<openvdb::points::PointDataGrid>()) continue;
                 ++total;
             }
         }
 
-        for (auto grid : *grids) {
+        for (auto grid :grids) {
             if (!grid->isType<openvdb::points::PointDataGrid>()) continue;
             openvdb::points::PointDataGrid::Ptr points =
                 openvdb::gridPtrCast<openvdb::points::PointDataGrid>(grid);
@@ -719,8 +869,8 @@ main(int argc, char *argv[])
 
         if (volumeExe) {
             axlog("[INFO] | Compilation successful");
-            if (logs.hasWarning()) {
-                axlog(" with warning(s)\n");            }
+            if (logs.hasWarning()) axlog(" with warning(s)");
+            axlog('\n');
         }
         else {
             if (logs.hasError()) {
@@ -733,7 +883,7 @@ main(int argc, char *argv[])
         if (opts.mVerbose) {
             std::vector<const std::string*> names;
             axlog("[INFO] Executing using:\n");
-            for (auto grid : *grids) {
+            for (auto grid : grids) {
                 if (grid->isType<openvdb::points::PointDataGrid>()) continue;
                 axlog("  " << grid->getName() << '\n');
                 axlog("    " << grid->valueType() << '\n');
@@ -742,7 +892,7 @@ main(int argc, char *argv[])
             axlog(std::flush);
         }
 
-        try { volumeExe->execute(*grids); }
+        try { volumeExe->execute(grids); }
         catch (std::exception& e) {
             OPENVDB_LOG_FATAL("Execution error!\nErrors:\n" << e.what());
             return EXIT_FAILURE;
@@ -757,7 +907,8 @@ main(int argc, char *argv[])
         axlog("[INFO] Writing results" << std::flush);
         openvdb::io::File out(opts.mOutputVDBFile);
         try {
-            out.write(*grids, *meta);
+            if (meta) out.write(grids, *meta);
+            else      out.write(grids);
         } catch (openvdb::Exception& e) {
             OPENVDB_LOG_ERROR(e.what() << " (" << out.filename() << ")");
             return EXIT_FAILURE;
