@@ -368,14 +368,20 @@ struct MinMaxValuesOp
 
     bool join(const MinMaxValuesOp& other)
     {
-        if (math::cwiseLessThan(other.min, min))
+        if (!other.seen_value) return true;
+
+        if (!seen_value) {
             min = other.min;
-
-        if (math::cwiseGreaterThan(other.max, max))
             max = other.max;
+        }
+        else {
+            if (math::cwiseLessThan(other.min, min))
+                min = other.min;
+            if (math::cwiseGreaterThan(other.max, max))
+                max = other.max;
+        }
 
-        seen_value |= other.seen_value;
-
+        seen_value = true;
         return true;
     }
 
