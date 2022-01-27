@@ -259,7 +259,7 @@ Package        | Description                                                    
 -------------- | --------------------------------------------------------------- | ------------------ |
 CMake          | Cross-platform family of tools designed to help build software  | All                |
 C++14 Compiler | Matching Houdini compiler and version                           | All                |
-Boost          | Components: system, iostreams, python, thread                   | All                |
+Boost          | Components: iostreams, python, thread                           | All                |
 GoogleTest     | A unit testing framework module for C++                         | Unit Tests         |
 CppUnit        | A unit testing framework module for C++                         | Unit Tests (AX)    |
 GLFW           | Simple API for OpenGL development                               | OpenVDB View       |
@@ -348,7 +348,7 @@ Package        | Description                                                    
 -------------- | ---------------------------------------------------------------   | -------------------------------- |
 CMake          | Cross-platform family of tools designed to help build software    | All                              |
 C++14 Compiler | Matching Houdini compiler and version                             | All                              |
-Boost          | Components: system, iostreams, python, thread                     | All                              |
+Boost          | Components: iostreams, python, thread                             | All                              |
 ZLIB           | Compression library for disk serialization compression            | All                              |
 Blosc          | Recommended dependency for improved disk compression              | All*                             |
 GoogleTest     | A unit testing framework module for C++                           | Unit Tests                       |
