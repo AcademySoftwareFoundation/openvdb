@@ -1,20 +1,12 @@
 OpenVDB Version History
 =======================
 
-Version 9.0.0 - In development
+Version 8.2.0 - November 24, 2021
 
-    ABI changes:
-    - Added transient data to the RootNode, InternalNode and LeafNode.
-
-
-Version 8.2.0 - In development
-
-    New features:
+    Improvements:
     - Added tools::countActiveLeafVoxels(), tools::countInactiveVoxels(),
       tools::countInactiveLeafVoxels() and tools::activeTiles() to perform
       multi-threaded counting. The Tree methods now use these implementations.
-
-    Improvements:
     - Moved from the deprecated TBB task scheduler to TBB arenas. Various
       methods now respect the TBB arena state they were invoked from.
     - Introduced a new thread/Threading.h header to consolidate calls to
@@ -25,12 +17,12 @@ Version 8.2.0 - In development
       hue, saturation and value inputs to RGB values and vice-versa.
     - PointDataGrid conversion can now be performed using 32-bit float arrays.
     - Improved support for size_t grid types on systems where size_t is a
-      unique type
+      unique type.
       [Contributed by Brecht Van Lommel]
     - Minor performance improvements to dilation calls in fast sweeping
-      algorithms
+      algorithms.
     - Add support for dilation in one direction and extending a field in one
-      direction
+      direction in fast sweeping algorithms.
 
     API changes:
     - DynamicNodeManager can now set one grain size for threading across leaf nodes
@@ -49,7 +41,7 @@ Version 8.2.0 - In development
     - The label for Voxels to Expand is now Expand Voxels to match Houdini.
     - Fix bug to allow VDB LOD SOPs to be chained together.
     - SOP Extrapolate supports dilation in one direction and extending a field
-      in one (domain) direction
+      in one (domain) direction.
     - The default OpenVDB ABI is now 8 for Houdini versions > 18.5.
     - VDB Visualize Tree SOP is now multi-threaded and provides slicing and
       color remapping.
@@ -65,16 +57,22 @@ Version 8.2.0 - In development
       generated doxygen.
     - Improved the doxygen deprecation listings, folder layouts and fixes
       issues when using later versions of doxygen.
-    - Build fixes for MinGW on Windows
+    - Build fixes for MinGW on Windows.
       [Contributed by Brecht Sanders]
-    - Added support for OpenEXR 3
+    - Added support for OpenEXR 3.
       [Contributed by Cary Phillips]
     - Added an OPENVDB_NAMESPACE_SUFFIX CMake string option which provides
       the ability to customise the VDB namespace.
     - The Python Module now appends the base directory defined by
       Python_SITELIB to the default install path (typically dist-packages
-      or site-packages)
+      or site-packages).
       [Contributed by Ignacio Vizzo]
+
+
+Version 9.0.0 - In development
+
+    ABI changes:
+    - Added transient data to the RootNode, InternalNode and LeafNode.
 
 
 Version 8.1.0 - June 11, 2021
