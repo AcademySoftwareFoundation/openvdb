@@ -4,11 +4,10 @@
 #ifndef OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_ARCHIVE_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
 #include "Compression.h" // for COMPRESS_ZIP, etc.
-#include <openvdb/Grid.h>
-#include <openvdb/MetaMap.h>
-#include <openvdb/Platform.h>
+#include "../Grid.h"
+#include "../MetaMap.h"
+#include "../Platform.h"
 #include <openvdb/version.h> // for VersionId
 #include <boost/uuid/uuid.hpp>
 #include <cstdint>

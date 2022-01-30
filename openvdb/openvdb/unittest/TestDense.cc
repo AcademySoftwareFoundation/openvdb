@@ -3,13 +3,13 @@
 
 //#define BENCHMARK_TEST
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/Count.h>
-#include <openvdb/tools/Dense.h>
-#include <openvdb/Exceptions.h>
+#include "../openvdb.h"
+#include "../tools/LevelSetSphere.h"
+#include "../tools/Count.h"
+#include "../tools/Dense.h"
+#include "../Exceptions.h"
 #ifdef BENCHMARK_TEST
-#include <openvdb/util/CpuTimer.h>
+#include "../util/CpuTimer.h"
 #endif
 
 #include <gtest/gtest.h>

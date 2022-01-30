@@ -18,7 +18,7 @@
 #include "openvdb/math/Stencils.h"
 #include "openvdb/util/NullInterrupter.h"
 #include "openvdb/thread/Threading.h"
-#include <openvdb/openvdb.h>
+#include "../openvdb.h"
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_sort.h>

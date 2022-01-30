@@ -32,12 +32,12 @@
 #ifndef OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYINTERSECTOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/DDA.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Ray.h>
-#include <openvdb/math/Stencils.h>
-#include <openvdb/Grid.h>
-#include <openvdb/Types.h>
+#include "../math/DDA.h"
+#include "../math/Math.h"
+#include "../math/Ray.h"
+#include "../math/Stencils.h"
+#include "../Grid.h"
+#include "../Types.h"
 #include "Morphology.h"
 #include <iostream>
 #include <type_traits>
