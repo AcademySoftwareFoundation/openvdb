@@ -496,7 +496,7 @@ if(NOT OPENVDB_USE_STATIC_LIBS AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-find_package(Boost REQUIRED COMPONENTS iostreams system)
+find_package(Boost REQUIRED COMPONENTS iostreams)
 
 # Add deps for pyopenvdb
 # @todo track for numpy
@@ -671,10 +671,7 @@ endif()
 # namespaced headers are correctly prioritized. Otherwise other include paths
 # from shared installs (including houdini) may pull in the wrong headers
 
-set(_OPENVDB_VISIBLE_DEPENDENCIES
-  Boost::iostreams
-  Boost::system
-)
+set(_OPENVDB_VISIBLE_DEPENDENCIES Boost::iostreams)
 
 if(OpenVDB_USES_IMATH_HALF)
   list(APPEND _OPENVDB_VISIBLE_DEPENDENCIES $<TARGET_NAME_IF_EXISTS:IlmBase::Half> $<TARGET_NAME_IF_EXISTS:Imath::Imath>)

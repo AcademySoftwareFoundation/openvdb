@@ -117,7 +117,7 @@ if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
+find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
   # The X.Y.Z boost version value isn't available until CMake 3.14
   set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
@@ -250,9 +250,7 @@ endif()
 # if it's in a shared place (like /usr/local) it doesn't accidently pull in
 # other headers.
 
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-  Boost::iostreams
-  Boost::system)
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
