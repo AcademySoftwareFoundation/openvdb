@@ -12,7 +12,7 @@
 #include "../math/BBox.h"
 #include "../tools/Count.h" // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
 #include "../util/Formats.h"
-#include "../util/logging.h:
+#include "../util/logging.h"
 #include "../Platform.h"
 #include "RootNode.h"
 #include "InternalNode.h"
