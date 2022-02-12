@@ -85,7 +85,6 @@ else()
     TestDelayedLoadMetadata.cc
     TestDense.cc
     TestDenseSparseTools.cc
-    TestDepth.cc
     TestDiagnostics.cc
     TestDivergence.cc
     TestDoubleMetadata.cc

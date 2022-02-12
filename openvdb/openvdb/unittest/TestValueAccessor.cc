@@ -31,6 +31,27 @@ using Tree5Type = openvdb::tree::Tree<
     openvdb::tree::LeafNode<ValueType, 3>, 4>, 5>, 5> > >;
 using TreeType = Tree4Type;
 
+// Recursive tree with equal Dim at every level
+template<int Depth, typename NodeT, int Log2Dim>
+struct TreeRecursive;
+
+template<typename NodeT, int Log2Dim>
+struct TreeRecursive<0,NodeT,Log2Dim>
+{
+  using Type = openvdb::tree::Tree< openvdb::tree::RootNode< NodeT > >;
+};
+
+template<int Depth, typename NodeT, int Log2Dim>
+struct TreeRecursive
+{
+  using Type = typename TreeRecursive<Depth-1, openvdb::tree::InternalNode<NodeT, Log2Dim>, Log2Dim>::Type;
+};
+
+template<int Depth, typename ValueT, int Log2Dim>
+struct GridRecursive
+{
+  using Type = typename openvdb::Grid< typename TreeRecursive<Depth, openvdb::tree::LeafNode<ValueT, Log2Dim>, Log2Dim>::Type >;
+};
 
 using namespace openvdb::tree;
 
@@ -105,6 +126,21 @@ public:
     {
         accessorTest<ValueAccessor2<Tree5Type, true, 1,3> >();
         accessorTest<ValueAccessor2<Tree5Type, false, 1,3> >();
+    }
+
+    // function creates empty grid,
+    // adds one default leaf
+    // and checks if the tree empty or not after that
+    template<int Depth, typename ValueT, int Log2Dim>
+    bool check_recursive_grid()
+    {
+        using GridRec = typename GridRecursive<Depth, ValueT, Log2Dim>::Type;
+        GridRec grid(0);
+
+        typename GridRec::Accessor acc = grid.getAccessor();
+        acc.addLeaf( new LeafNode<float,Log2Dim>(openvdb::Coord(0), 0.0f, true) );
+
+        return grid.empty();
     }
 
 protected:
@@ -512,4 +548,31 @@ TEST_F(TestValueAccessor, testGetNode)
         node = acc.getNode<const LeafT>();
         EXPECT_TRUE(node == nullptr);
     }
+}
+
+TEST_F(TestValueAccessor, testRecursiveTree)
+{
+    using namespace openvdb;
+
+    bool is_grid_empty = check_recursive_grid<2,float,1>();
+    EXPECT_TRUE(!is_grid_empty);
+
+    is_grid_empty = check_recursive_grid<3,float,1>();
+    EXPECT_TRUE(!is_grid_empty);
+
+    is_grid_empty = check_recursive_grid<4,float,1>();
+    EXPECT_TRUE(!is_grid_empty);
+
+//    is_grid_empty = check_grid<5,float,1>();
+//    EXPECT_TRUE(!is_grid_empty);
+
+//    is_grid_empty = check_grid<6,float,1>();
+//    EXPECT_TRUE(!is_grid_empty);
+
+//    is_grid_empty = check_grid<7,float,1>();
+//    EXPECT_TRUE(!is_grid_empty);
+
+//    is_grid_empty = check_grid<8,float,1>();
+//    EXPECT_TRUE(!is_grid_empty);
+
 }
