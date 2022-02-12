@@ -604,13 +604,10 @@ public:
     void addLeaf(LeafNodeType* leaf)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't add a node to a const tree");
-        if (NodeType::LEVEL == 0) {
-            mNext.addLeaf(leaf);
-            return;
-        }
-        if (this->isHashed(leaf->origin())) {
+        if (NodeType::LEVEL>0 && this->isHashed(leaf->origin())) {
             assert(mNode);
-            return const_cast<NodeType*>(mNode)->addLeafAndCache(leaf, *mParent);
+            const_cast<NodeType*>(mNode)->addLeafAndCache(leaf, *mParent);
+            return;
         }
         mNext.addLeaf(leaf);
     }
@@ -618,14 +615,11 @@ public:
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't add a tile to a const tree");
-        if (NodeType::LEVEL < level) {
-            mNext.addTile(level, xyz, value, state);
-            return;
-        }
-        if (this->isHashed(xyz)) {
+
+        if (NodeType::LEVEL >= level && this->isHashed(xyz)) {
             assert(mNode);
-            return const_cast<NodeType*>(mNode)->addTileAndCache(
-                level, xyz, value, state, *mParent);
+            const_cast<NodeType*>(mNode)->addTileAndCache(level, xyz, value, state, *mParent);
+            return;
         }
         mNext.addTile(level, xyz, value, state);
     }
