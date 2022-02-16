@@ -298,7 +298,7 @@ struct MergeOp
     StringRemapType opRemap;
     std::deque<GU_PrimVDB*> vdbPrims;
     std::deque<const GU_PrimVDB*> constVdbPrims;
-    UT_ConcurrentVector<GU_PrimVDB *> vdbPrimsToRemove;
+    UT_ConcurrentVector<GU_PrimVDB*> vdbPrimsToRemove;
     PrimitiveNumberMap primNumbers;
 
     explicit MergeOp(openvdb::util::NullInterrupter& _interrupt): self(nullptr), interrupt(_interrupt) { }
