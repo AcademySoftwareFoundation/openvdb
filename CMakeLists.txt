@@ -672,7 +672,7 @@ if(OPENVDB_BUILD_PYTHON_MODULE)
 endif()
 
 if(OPENVDB_BUILD_BINARIES)
-  add_subdirectory(openvdb/openvdb/cmd)
+  add_subdirectory(openvdb_cmd)
 endif()
 
 if(OPENVDB_BUILD_UNITTESTS)
