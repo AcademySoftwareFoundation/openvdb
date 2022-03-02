@@ -79,13 +79,14 @@ namespace vdb_tool {
 
 class Tool
 {
-    static const int mMajor = 9;// incremented for incompatible changes options or file.
-    static const int mMinor = 0;// incremented for new functionality that is backwards-compatible.
-    static const int mPatch = 0;// incremented for backwards-compatible bug fixes.
+    static const int sMajor = 9;// incremented for incompatible changes options or file.
+    static const int sMinor = 0;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = tools::LevelSetFilter<GridT>;
     struct Points;// defined below
+    struct Header;// defined below
  
     mutable util::CpuTimer   mTimer;
     std::string              mCmdName;// name of this command-line tool
@@ -94,10 +95,11 @@ class Tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
 
+    void config();
+
     void read();
     void readGeo( const std::string &fileName);
     void readVDB( const std::string &fileName);
-    void readConf();
 
     void write() const;
     void writeGeo( const std::string &fileName) const;
@@ -184,10 +186,10 @@ public:
     void print_args(std::ostream& os = std::cerr) const;
 
     /// @brief return a string with the current version number of this tool
-    static std::string version() {return std::to_string(mMajor)+"."+std::to_string(mMinor)+"."+std::to_string(mPatch);}
-    static int major() {return mMajor;}
-    static int minor() {return mMinor;}
-    static int patch() {return mPatch;}
+    static std::string version() {return std::to_string(sMajor)+"."+std::to_string(sMinor)+"."+std::to_string(sPatch);}
+    static int major() {return sMajor;}
+    static int minor() {return sMinor;}
+    static int patch() {return sPatch;}
 
 };// Tool class
 
@@ -234,6 +236,26 @@ void Tool::warning(const std::string &msg, std::ostream& os) const
 
 // ==============================================================================================================
 
+/// @brief Private struct for the header of config files
+struct Tool::Header {
+    std::string magic;
+    int major, minor, patch;
+    Header() : magic("vdb_tool"), major(sMajor), minor(sMinor), patch(sPatch) {}
+    Header(const std::string &line) : magic("vdb_tool") {
+      const VecS header = tokenize(line, " .");
+      if (header.size()!=4 || header[0]!=magic ||
+         !is_int(header[1], major) ||
+         !is_int(header[2], minor) ||
+         !is_int(header[3], patch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
+    }
+    std::string str() const {
+      return magic+" "+std::to_string(major)+"."+std::to_string(minor)+"."+std::to_string(patch);
+    }
+    bool isCompatible() const {return major == sMajor;}
+};// Header struct
+
+// ==============================================================================================================
+
 /// @brief Private wrapper struct for points required by particlesToSdf
 struct Tool::Points {
     using PosType = Vec3R;
@@ -251,22 +273,24 @@ void Tool::init()
 
   mParser.addAction(
       "config", "c", "Import and process one or more configuration files",
-    {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"}},
-     [&](){this->readConf();}, [](){}, true); // anonymous options are appended to "files"
+    {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"},
+     {"execute", "true", "{0|1|true|false}", "toggle wether to load and execute the actions in the config file"},
+     {"update", "false", "{0|1|true|false}", "toggle wether to update the version number of the config file"}},
+     [&](){this->config();}, [](){}, 0); // anonymous options are appended to "files"
 
   mParser.addAction(
       "help", "h", "Print documentation for one, multiple or all actions",
     {{"actions", "", "read,write,print,...", "list of actions to document. If the list is empty documentation is printed for all actions"},
      {"exit", "true", "{0|1|true|false}", "toggle wether to terminate after this action or not"},
      {"brief", "false", "{0|1|true|false}", "toggle brief or detailed documentation"}},
-     [](){}, [&](){this->help();}, true); // anonymous options are appended to "actions"
+     [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
     {{"files", "", "{file|stdin}.{obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "{0|1|true|false}", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
-     [](){}, [&](){this->read();}, true);// anonymous options are appended to "files"
+     [](){}, [&](){this->read();}, 0);// anonymous options are appended to "files"
 
   mParser.addAction(
       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
@@ -280,7 +304,7 @@ void Tool::init()
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N,"},// error tolerance for N bits in NVDB
      {"stats", "", "none|bbox|extrema|all", "specify the statistics to compute for NanoVDBs."},
      {"checksum", "", "none|partial|full", "specify the type of checksum to compute for NanoVDBs"}},
-     [](){}, [&](){this->write();}, true);// anonymous options are appended to "files"
+     [](){}, [&](){this->write();}, 0);// anonymous options are appended to "files"
 
   mParser.addAction(
      "clear", "", "Deletes geometry and VDB grids",
@@ -586,7 +610,7 @@ void Tool::init()
      {"scatter", "(1.5,1.5,1.5)", "(1.5,1.5,1.5)", "scattering coefficients for RGB (ignored for level sets)"},
      {"step", "1.0,3.0", "1.0,3.0", "step size in voxels for integration along the primary ray (ignored for level sets)"},
      {"colorgrid", "-1", "-1", "age of a vec3s VDB grid to be used to set material colors"}},
-     [&](){mParser.setDefaults();}, [&](){this->render();}, true);
+     [&](){mParser.setDefaults();}, [&](){this->render();}, 0);
 
   mParser.addAction(
       "print", "p", "prints information to the terminal about the current stack of VDB grids and Geometry", {},
@@ -650,7 +674,7 @@ void Tool::help()
   } catch (const std::exception& e) {
     throw std::invalid_argument(name+": "+e.what());
   }
-}
+}// Tool::help()
 
 // ==============================================================================================================
 
@@ -767,35 +791,52 @@ void Tool::readVDB(const std::string &fileName)
 
 // ==============================================================================================================
 
-void Tool::readConf()
+void Tool::config()
 {
-  assert(mParser.getAction().name == "config");
-  for (auto &fileName : mParser.getVecS("files")) {
-    std::ifstream file(fileName);
-    if (!file.is_open()) throw std::invalid_argument("readConf: unable to open \""+fileName+"\"");
-    if (mParser.verbose>1) std::cerr << "Reading configuration from \"" << fileName << "\"\n";
-    if (mParser.verbose) mTimer.start("Read config");
+    assert(mParser.getAction().name == "config");
+    const bool update  = mParser.getBool("update");
+    const bool execute = mParser.getBool("execute");
     std::string line;
-    if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
-    const VecS header = tokenize(line, " .");
-    if (header.size()!=4 || header[0]!="vdb_tool") throw std::invalid_argument("readConf: incompatible header \""+line+"\" in the file \""+fileName+"\"");
-    if (std::stoi(header[1]) != mMajor) throw std::invalid_argument("readConf: incompatible version \""+header[1]+"\"");
-    std::vector<char*> args({"vdb_tool"});//parser is expecting first argument to the name of the executable
-    while (getline(file, line)) {
-      if (line.empty() || contains("#/%!", line[0])) continue;// skip empty lines and comments
-      VecS tmp = vdb_tool::tokenize(line, " ");
-      tmp[0].insert (0, 1, '-');// first token is an action
-      std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
-        char *c = new char[s.size()+1];
-        std::strcpy(c, s.c_str());
-        return c;
-      });
+    for (auto &fileName : mParser.getVecS("files")) {
+        if (update) {
+            std::fstream file(fileName, std::fstream::in | std::fstream::out);
+            if (!file.is_open() || !getline (file, line)) throw std::invalid_argument("updateConf: failed to open file \""+fileName+"\"");
+            const Header old_header(line), new_header;
+            if (!old_header.isCompatible()) {
+                std::stringstream ss;
+                ss << new_header.str() << std::endl;
+                ss << file.rdbuf();// load the rest of the config file
+                file.clear();
+                file.seekg(0);// rewind to start
+                file << ss.rdbuf();// write back to the config file
+            }
+            file.close();
+        }
+        if (execute) {
+            std::ifstream file(fileName);
+            if (!file.is_open()) throw std::invalid_argument("readConf: unable to open \""+fileName+"\"");
+            if (mParser.verbose>1) std::cerr << "Reading configuration from \"" << fileName << "\"\n";
+            if (mParser.verbose) mTimer.start("Read config");
+            if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
+            Header header(line);
+            if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
+            std::vector<char*> args({&header.magic[0]});//parser is expecting first argument to the name of the executable
+            while (getline(file, line)) {
+                if (line.empty() || contains("#/%!", line[0])) continue;// skip empty lines and comments
+                VecS tmp = vdb_tool::tokenize(line, " ");
+                tmp[0].insert (0, 1, '-');// first token is an action
+                std::transform(tmp.begin(), tmp.end(), std::back_inserter(args), [](const std::string &s){
+                    char *c = new char[s.size()+1];
+                    std::strcpy(c, s.c_str());
+                    return c;
+                });
+            }
+            file.close();
+            mParser.parse(args.size(), args.data());
+            if (mParser.verbose) mTimer.stop();
+        }
     }
-    file.close();
-    mParser.parse(args.size(), args.data());
-    if (mParser.verbose) mTimer.stop();
-  }// loop over file names
-}// Tool::readConf
+}
 
 // ==============================================================================================================
 
@@ -1047,7 +1088,8 @@ void Tool::writeConf(const std::string &fileName) const
   std::ofstream file(fileName);
   if (!file.is_open()) throw std::invalid_argument("writeConf: unable to open \""+fileName+"\"");
   if (mParser.verbose) mTimer.start("Write config");
-  file << "vdb_tool " << this->version() << std::endl;//header
+  const Header header;
+  file << header.str() << std::endl;
   for (auto &a : mParser.actions) if (a.name != "config") a.print(file);// exclude "-config" to avoid infinite loop
   file.close();
   if (mParser.verbose) mTimer.stop();

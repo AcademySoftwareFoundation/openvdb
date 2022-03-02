@@ -98,7 +98,6 @@ public:
     void readPTS(const std::string &fileName);
     void readGEO(const std::string &fileName);
     void readABC(const std::string &fileName);
-    void readUSD(const std::string &fileName);
     void readVDB(const std::string &fileName);
     void readNVDB(const std::string &fileName);
 
@@ -342,7 +341,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 
 void Geometry::read(const std::string &fileName)
 {
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "usd", "vdb", "nvdb"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -359,12 +358,9 @@ void Geometry::read(const std::string &fileName)
         this->readABC(fileName);
         break;
     case 6:
-        this->readUSD(fileName);
-        break;
-    case 7:
         this->readVDB(fileName);
         break;
-    case 8:
+    case 7:
         this->readNVDB(fileName);
         break;
     default:
@@ -671,11 +667,6 @@ void Geometry::readGEO(const std::string &fileName)
         this->read(infile);
     }
 }
-
-void Geometry::readUSD(const std::string &fileName)
-{
-    throw std::runtime_error("USD support has not been implemented yet!");
-}// Geometry::readUSD
 
 // Read vertices from all PointDataGrids in the specified file
 void Geometry::readVDB(const std::string &fileName)

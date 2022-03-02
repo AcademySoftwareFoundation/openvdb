@@ -1,9 +1,9 @@
 # vdb_tool
 
-This repository hosts a command-line tool, dubbed vdb_tool, that can combine any sequence of the of high-level tools available in openvdb.
+This command-line tool, dubbed vdb_tool, that can execute and combine any sequence of the of high-level tools available in openvdb/tools.
 For instance, it can convert a sequence of polygon meshes and particles to level sets, and perform a large number of operations on these
-level set surfaces. It can also generate adaptive polygon meshes from level sets, render images and write particles, meshes or VDBs to disk
-or stream VDBs to stdout so other tools can render them (using pipelining). Currently the following list of actions are supported:
+level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk
+or even stream VDBs to STDOUT so other tools can render them (using pipelining). Currently the following list of actions are supported:
 
 | Action | Description |
 |-------|-------|
@@ -44,8 +44,7 @@ or stream VDBs to stdout so other tools can render them (using pipelining). Curr
 | **expand** | Expand the narrow band of a level set |
 | **resample** | Re-sample a scalar VDB grid |
 | **ls2mesh** | Convert a level set surface into an adaptive polygon mesh surface |
-| **clip** | Clips one VDB grid with another VDB grid |
-| **clear** | Delete cached grids and geometry |
+| **clip** | Clips one VDB grid with another VDB grid or a bbox or frustum |
 | **render**| Render and save an image of a level set or fog VDB |
 | **clear** | Deletes cached VDB grids and geometry from memory |
 | **print** | Print information about the cached geometries and VDBs |
@@ -61,8 +60,8 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | stl | read and write | Binary STL mesh files with triangles |
 | pts | read | ASCII PTS points files with one or more point clouds |
 | abc | optional read | Alembic binary mesh files |
-| nvdb| optional read | NanoVDB file with points |
-| conf| read and write | ASCII configuration file for this tool |
+| nvdb| optional read and write | NanoVDB file with voxels or points |
+| txt | read and write | ASCII configuration file for this tool |
 | ppm | write | Binary PPM image file |
 | png | optional write | Binary PNG image file |
 | jpg | optional write | Binary JPEG image file |
@@ -70,7 +69,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 
 # Terminology
 
-Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "--erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of the expected option "radius". Also note that this tool maintains two lists of primitives, namely geometry (i.e. points and meshes) and VDB volumes (that may contain voxels or points). They can be referenced with "geo=n" and "vdb=n" where the integer "n" refers to "age" of the primitive. That is, "n=0" means the most recent added primitive and "n=1" means the second primitive added to the internal list. So, "-mesh2ls g=1" means convert the second to last geometry (here a polygon mesh) to a level set. If no other VDB grid exists this level set can be referenced as "vdb=0". Thus, "-gauss v=0" means perform a gaussian filter on the most recent level set. By default the most recent geometry, i.e. "g=0, or most recent level set, i.e. "v=0", is selected for processing.
+Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of the expected option "radius". Also note that this tool maintains two lists of primitives, namely geometry (i.e. points and meshes) and VDB volumes (that may contain voxels or points). They can be referenced with "geo=n" and "vdb=n" where the integer "n" refers to "age" of the primitive. That is, "n=0" means the most recent added primitive and "n=1" means the second primitive added to the internal list. So, "-mesh2ls g=1" means convert the second to last geometry (here a polygon mesh) to a level set. If no other VDB grid exists this level set can be referenced as "vdb=0". Thus, "-gauss v=0" means perform a gaussian filter on the most recent level set. By default the most recent geometry, i.e. "g=0, or most recent level set, i.e. "v=0", is selected for processing.
 
 ---
 
@@ -97,7 +96,7 @@ vdb_tool -sphere -write sphere.vdb
 ```
 * Same example but with options to save the file in half-float precision
 ```
-vdb_tool -sphere -write half=true sphere.vdb
+vdb_tool -sphere -write bits=16 sphere.vdb
 ```
 
 * Convert a polygon mesh file into a narrow-band level and save it to a file:
@@ -238,7 +237,7 @@ Arguably the last example is the only application of pipelining that should be u
 - [x] Added global counter "%G"
 - [x] add Tool::savePNG
 - [x] add Tool::saveEXR
-- [x] -platonic faces=4 name=\_DERIVE\_
+- [x] -platonic faces=4
 - [x] -segment vdb=0 keep=0
 - [x] -resample vdb=0[,1] scale=0 translate=0,0,0 order=1[0|2] keep=0
 - [x] add Geometry::readABC
@@ -253,6 +252,9 @@ Arguably the last example is the only application of pipelining that should be u
 - [x] -help read,write,ls2mesh brief=true
 - [x] use openvdb namespace
 - [x] Major revision with Parser.h
+- [x] -read delayed=false file.vdb
+- [x] -clear vdb=1,2,3 geo=*
+- [x] -config update=false execute=true configure.txt
 - [ ] Combine: -min, -max, -sum
 - [ ] -xform (translate and scale grid transforms)
 - [ ] -merge
@@ -260,5 +262,3 @@ Arguably the last example is the only application of pipelining that should be u
 - [ ] -erodeTopology
 - [ ] use cmake
 - [ ] add Geometry::readUSD
-
-Private repository by Ken Museth

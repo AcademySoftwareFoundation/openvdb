@@ -53,7 +53,7 @@ BUILD_RELEASE = $(CC) $(CFLAGS) $(ABI_FLAG) -DNDEBUG -O3
 # Avoid associating these build target with files of the same name
 .PHONY: all clean test
 
-all: release debug test update_version archive
+all: release debug test archive
 
 def: release test
 
@@ -85,15 +85,6 @@ debug/unittest.o: $(DEP) src/unittest.cpp
 
 test: debug/unittest.o
 	$(BUILD_DEBUG)  $(INCLUDES) $(LIBRARY) -o debug/test debug/unittest.o $(LIBS) -lgtest
-
-#########
-
-release/update_version.o: $(DEP) src/update_version.cpp
-	@mkdir -p release
-	$(BUILD_RELEASE) $(INCLUDES) -o release/update_version.o -c src/update_version.cpp
-
-update_version: release/update_version.o
-	$(BUILD_RELEASE)  $(INCLUDES) $(LIBRARY) -o release/update_version release/update_version.o $(LIBS)
 
 #########
 

@@ -7,7 +7,8 @@
 ///
 /// @file Parser.h
 ///
-/// @brief Parser of comman-line arguments and various support classes.
+/// @brief Defines various classes (Parser, Option, Action, Loop) for processing
+///        command-line arguments.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -36,6 +37,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace vdb_tool {
 
 // ==============================================================================================================
+/// @brief This class defines string attributes for options, i.e. arguments for actions
 struct Option {
     std::string name, value, example, documentation;
     inline void append(const std::string &str);
@@ -47,7 +49,7 @@ struct Action {
     std::string            name;// primary name of action, eg "read"
     std::string            alias;// alternate name for action, eg "i"
     std::string            documentation;// documentation e.g. "read", "i", "files", "read files"
-    bool                   anonymous;// append that value of any un-named option to the first option, e.g. files
+    size_t                 anonymous;// index of the option to which the value of un-named option will be appended, e.g. files
     std::vector<Option>    options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
     std::function<void()>  init, run;// callback functions
 
@@ -57,7 +59,7 @@ struct Action {
            std::vector<Option> &&_options,
            std::function<void()> &&_init,
            std::function<void()> &&_run,
-           bool _anonymous = false)
+           size_t _anonymous = -1)
       : name(std::move(_name))
       , alias(std::move(_alias))
       , documentation(std::move(_doc))
@@ -138,7 +140,7 @@ struct Parser {
                    std::vector<Option>   &&options, // list of options for the action
                    std::function<void()> &&parse, // callback function called during parsing
                    std::function<void()> &&run,  // callback function to perform the action
-                   bool anonymous = false)//defines if un-named options are allowed
+                   size_t anonymous = -1)//defines if un-named options are allowed
     {
       available.emplace_back(std::move(name),    std::move(alias), std::move(doc),
                              std::move(options), std::move(parse), std::move(run), anonymous);
@@ -165,10 +167,10 @@ void Action::setOption(const std::string &str)
 {
     const size_t pos = str.find('=');
     if (pos == std::string::npos) {// str has no "=" so append it to the value of the first option
-        if (!anonymous) throw std::invalid_argument(name+": does not recognize default option \""+str+"\"");
-        options[0].append(str);
-    } else if (anonymous && str.compare(0, pos, options[0].name) == 0) {
-        options[0].append(str.substr(pos+1));
+        if (anonymous>=options.size()) throw std::invalid_argument(name+": does not support un-named option \""+str+"\"");
+        options[anonymous].append(str);
+    } else if (anonymous<options.size() && str.compare(0, pos, options[anonymous].name) == 0) {
+        options[anonymous].append(str.substr(pos+1));
     } else {
         for (Option &opt : options) {
             if (opt.name.compare(0, pos, str, 0, pos) != 0) continue;// find first option with partial match
