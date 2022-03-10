@@ -53,11 +53,11 @@ class Geometry
 {
     using PosT  = Vec3f;
     using BBoxT = math::BBox<PosT>;
-    std::vector<PosT>           mVtx;
+    std::vector<PosT>  mVtx;
     std::vector<Vec3I> mTri;
     std::vector<Vec4I> mQuad;
-    mutable BBoxT               mBBox;
-    std::string                 mName;
+    mutable BBoxT      mBBox;
+    std::string        mName;
 
 public:
 
@@ -341,7 +341,7 @@ void Geometry::writeGEO(const std::string &fileName) const
 
 void Geometry::read(const std::string &fileName)
 {
-    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb"})) {
+    switch (findFileExt(fileName, {"obj", "ply", "pts", "stl", "abc", "vdb", "nvdb", "geo"})) {
     case 1:
         this->readOBJ(fileName);
         break;
@@ -362,6 +362,9 @@ void Geometry::read(const std::string &fileName)
         break;
     case 7:
         this->readNVDB(fileName);
+        break;
+    case 8:
+        this->readGEO(fileName);
         break;
     default:
       throw std::invalid_argument("Geometry::read: File \""+fileName+"\" has an invalid extension");

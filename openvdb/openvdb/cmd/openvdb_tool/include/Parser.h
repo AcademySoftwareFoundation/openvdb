@@ -87,7 +87,9 @@ struct Loop {
     char vName, cName;// one character name of loop variable and loop counter, eg. vName=0,10,1 cName=I
     VecS vec;// list of all string values
     size_t pos;// index of the string value in vec
-    Loop(ActIterT it, char a, char b, const VecS &s) : begin(it), vName(a), cName(b), vec(s.begin(), s.end()), pos(0) {}
+    Loop(ActIterT it, char a, char b, const VecS &s) : begin(it), vName(a), cName(b), vec(s.begin(), s.end()), pos(0) {
+        if (vec.empty()) throw std::invalid_argument("Loop: -each does not accept an empty list");
+    }
     Loop(ActIterT it, char a, char b, const VecF &f);
     bool next() { return ++pos < vec.size(); }
     const std::string& value() const {return vec[pos];}
@@ -246,9 +248,9 @@ Parser::Parser(std::vector<Option> &&def)
     );
 
     this->addAction(
-        "for", "", "beginning of for-loop over a user-defined loop variable and range, e.g. i=0,10,1",
-        {{"", "", "i=0,10,1", "define name of loop variable and its range"},
-         {"I", "I", "I", "variable name of the counter associated with the for-loop"}},
+        "for", "", "beginning of for-loop over a user-defined loop variable and range.",
+        {{"", "", "i=0,10,1", "define name of loop variable and its range."},
+         {"I", "I", "I", "variable name of the counter associated with the for-loop."}},
          [&](){++counter; const auto &opt = action_iter->options;
                if (opt[0].name.size() !=1 || !std::isalpha(opt[0].name[0]))  throw std::invalid_argument("for: expected a single alphabetic character for the loop variable, not "+opt[0].name);
                if (opt[1].value.size()!=1 || !std::isalpha(opt[1].value[0])) throw std::invalid_argument("for: expected a single alphabetic character for the loop counter, not "+opt[1].value);
@@ -258,14 +260,14 @@ Parser::Parser(std::vector<Option> &&def)
     );
 
     this->addAction(
-        "each", "", "beginning of each-loop over a user-defined loop variable and list of values, e.g. s=sphere,bunny",
-      {{"", "", "s=foo,bar,...", "defined name of loop variable and list of its values"},
-       {"I", "J", "J", "variable name of the counter associated with the each-loop"}},
+        "each", "", "beginning of each-loop over a user-defined loop variable and list of values.",
+      {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."},
+       {"I", "J", "J", "variable name of the counter associated with the each-loop."}},
        [&](){++counter; const auto &opt = action_iter->options;
              if (opt[1].value.size()!=1 || !std::isalpha(opt[1].value[0])) throw std::invalid_argument("for: expected I=[A-Z], not "+opt[1].value);
              if (opt[0].name == opt[1].value) throw std::invalid_argument("for: loop variable and counter cannot be identical");
              if (opt[0].name == "G"|| opt[1].value == "G") throw std::invalid_argument("for: G is reserved for a global counter");},
-       [&](){this->beginLoop();}
+       [&](){this->beginLoop();}, 0
     );
 
     this->addAction(
@@ -425,7 +427,11 @@ std::string Parser::usage(const Action &action, bool brief) const
 {
     std::stringstream ss;
     const static int w = 17;
-    auto op = [&](const std::string &line, size_t width = 0) {
+    auto op = [&](std::string line, size_t width, bool isSentence) {
+        if (isSentence) {
+            line[0] = std::toupper(line[0]);// capitalize
+            if (line.back()!='.') line.append(1,'.');// punctuate
+        }
         width += w;
         const VecS words = tokenize(line, " ");
         for (size_t i=0, n=width; i<words.size(); ++i) {
@@ -442,19 +448,26 @@ std::string Parser::usage(const Action &action, bool brief) const
     std::string name = "-" + action.name;
     if (action.alias!="") name += ",-" + action.alias;
     ss << std::endl << std::left << std::setw(w) << name;
+    std::string line;
     if (brief) {
-        std::string line;
         for (auto &opt : action.options) line+=opt.name+(opt.name!=""?"=":"")+opt.example+" ";
-        if (line.empty()) line = "this action takes no options";
-        op(line);
+        if (line.empty()) line = "This action takes no options.";
+        op(line, 0, false);
     } else {
-        op(action.documentation);
+        op(action.documentation, 0, true);
         size_t width = 0;
         for (const auto &opt : action.options) width = std::max(width, opt.name.size());
         width += 4;
         for (const auto &opt : action.options) {
-            ss << std::setw(w) << "" << std::setw(width) << ("\""+opt.name+"\": ");
-            op(opt.documentation, width);
+            ss << std::endl << std::setw(w) << "" << std::setw(width);
+            if (opt.name.empty()) {
+                size_t p = opt.example.find('=');
+                ss << opt.example.substr(0, p) << opt.example.substr(p+1);
+            } else {
+                ss << opt.name << opt.example;
+            }
+            ss << std::endl << std::left << std::setw(w+width) << "";
+            op(opt.documentation, width, true);
         }
     }
     return ss.str();

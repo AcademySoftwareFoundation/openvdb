@@ -164,6 +164,11 @@ vdb_tool -sphere -dilate -o stdout.vdb > sphere.vdb
 vdb_tool -sphere -dilate -o stdout.vdb | vdb_view
 ```
 
+* Process files identified by a regex
+```
+vdb_tool -each f=`find ~/dev/data -name '*.vdb'` -i %f -render %2J.exr -end
+```
+
 * View a sequence of animated level sets
 ```
 vdb_tool -sphere d=80 r=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
@@ -255,6 +260,7 @@ Arguably the last example is the only application of pipelining that should be u
 - [x] -read delayed=false file.vdb
 - [x] -clear vdb=1,2,3 geo=*
 - [x] -config update=false execute=true configure.txt
+- [x] -each f= *.vdb
 - [ ] Combine: -min, -max, -sum
 - [ ] -xform (translate and scale grid transforms)
 - [ ] -merge
