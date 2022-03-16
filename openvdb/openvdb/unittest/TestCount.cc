@@ -241,44 +241,64 @@ minMaxTest()
 {
     using ValueT = typename TreeT::ValueType;
 
-    struct Local {
-        static bool isEqual(const ValueT& a, const ValueT& b) {
-            using namespace openvdb; // for operator>()
-            return !(math::Abs(a - b) > zeroVal<ValueT>());
-        }
-    };
-
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
         minusTwo = zero + (-2),
         plusTwo = zero + 2,
-        five = zero + 5;
+        five = zero + 5,
+        ten = zero + 10,
+        twenty = zero + 20;
+
+    static constexpr int64_t DIM = TreeT::LeafNodeType::DIM;
 
     TreeT tree(/*background=*/five);
 
     // No set voxels (defaults to min = max = zero)
     openvdb::math::MinMax<ValueT> extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), zero));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), zero));
+    EXPECT_EQ(zero, extrema.min());
+    EXPECT_EQ(zero, extrema.max());
 
     // Only one set voxel
-    tree.setValue(openvdb::Coord(0, 0, 0), minusTwo);
+    tree.setValue(openvdb::Coord(0), minusTwo);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), minusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(minusTwo, extrema.max());
 
     // Multiple set voxels, single value
-    tree.setValue(openvdb::Coord(10, 10, 10), minusTwo);
+    tree.setValue(openvdb::Coord(DIM), minusTwo);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), minusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(minusTwo, extrema.max());
 
     // Multiple set voxels, multiple values
-    tree.setValue(openvdb::Coord(10, 10, 10), plusTwo);
-    tree.setValue(openvdb::Coord(-10, -10, -10), zero);
+    tree.setValue(openvdb::Coord(DIM), plusTwo);
+    tree.setValue(openvdb::Coord(DIM*2), zero);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), plusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(plusTwo, extrema.max());
+
+    // add some empty leaf nodes to test the join op
+    tree.setValueOnly(openvdb::Coord(DIM*3), ten);
+    tree.setValueOnly(openvdb::Coord(DIM*4),-ten);
+    extrema = openvdb::tools::minMax(tree);
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(plusTwo, extrema.max());
+
+    tree.clear();
+
+    // test tiles
+    using NodeChainT = typename TreeT::RootNodeType::NodeChainType;
+    using ChildT1 = typename NodeChainT::template Get<1>; // Leaf parent
+    using ChildT2 = typename NodeChainT::template Get<2>; // ChildT1 parent
+    tree.addTile(ChildT2::LEVEL, openvdb::Coord(0), -ten, true);
+    tree.addTile(ChildT2::LEVEL, openvdb::Coord(ChildT2::DIM), ten, true);
+    tree.addTile(ChildT1::LEVEL, openvdb::Coord(ChildT2::DIM + ChildT2::DIM), -twenty, false);
+    tree.setValueOnly(openvdb::Coord(-1), twenty);
+    tree.setValue(openvdb::Coord(-2), five);
+
+    extrema = openvdb::tools::minMax(tree);
+    EXPECT_EQ(-ten, extrema.min());
+    EXPECT_EQ( ten, extrema.max());
 }
 
 /// Specialization for boolean trees
