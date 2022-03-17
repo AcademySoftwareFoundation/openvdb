@@ -159,7 +159,6 @@ namespace points {
 /// @param points       the point data grid to rasterize
 /// @param transfer     the transfer scheme
 /// @param filter       optional point filter
-/// @param threaded     whether to multithread
 /// @param interrupter  optional interrupter
 template <typename PointDataTreeOrGridT,
     typename TransferT,
@@ -169,7 +168,6 @@ inline void
 rasterize(const PointDataTreeOrGridT& points,
           TransferT& transfer,
           const FilterT& filter = NullFilter(),
-          const bool threaded = true,
           InterrupterT* interrupter = nullptr);
 
 
@@ -558,7 +556,6 @@ inline void
 rasterize(const PointDataTreeOrGridT& points,
           TransferT& transfer,
           const FilterT& filter,
-          const bool threaded,
           InterrupterT* interrupter)
 {
     using PointTreeT = typename TreeAdapter<PointDataTreeOrGridT>::TreeType;
@@ -572,7 +569,7 @@ rasterize(const PointDataTreeOrGridT& points,
     tree::LeafManager<TreeT> manager(topology);
     transfer_internal::RasterizePoints<TransferT, TreeT, FilterT, InterrupterT>
         raster(tree, transfer, filter, interrupter);
-    manager.foreach(raster, threaded);
+    manager.foreach(raster);
 }
 
 } // namespace points
