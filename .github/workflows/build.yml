@@ -153,7 +153,7 @@ jobs:
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2
       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
-      run: cd build && ctest -V
+      run: cd build && ctest -V -C ${{ matrix.config.build }}
 
   testmacos11:
     if: |
