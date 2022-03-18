@@ -1,10 +1,5 @@
-///////////////////////////////////////////////////////////////////////////
-//
-// Copyright (c) 2017-2020 Double Negative Visual Effects
-//
-///////////////////////////////////////////////////////////////////////////
-
-#include <gtest/gtest.h>
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointAttribute.h>
@@ -12,6 +7,8 @@
 #include <openvdb/points/PointConversion.h>
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/points/PointRasterizeTrilinear.h>
+
+#include <gtest/gtest.h>
 
 using namespace openvdb;
 
