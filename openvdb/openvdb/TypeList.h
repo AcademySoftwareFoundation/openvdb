@@ -351,6 +351,10 @@ template<typename OpT> inline void TSForEachImpl(OpT) {}
 template<typename OpT, typename T, typename... Ts>
 inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
 
+template<template <typename> class OpT> inline void TSForEachImpl() {}
+template<template <typename> class OpT, typename T, typename... Ts>
+inline void TSForEachImpl() { OpT<T>()(); TSForEachImpl<OpT, Ts...>(); }
+
 } // namespace internal
 
 /// @endcond
@@ -498,6 +502,25 @@ struct TypeList
     /// @endcode
     template <size_t First, size_t Last>
     using RemoveByIndex = typename typelist_internal::TSRemoveIndicesImpl<Self, First, Last>::type;
+
+    /// @brief Invoke a templated class operator on each type in this list. Use
+    ///   this method if you only need access to the type for static methods.
+    /// @code
+    /// #include <typeinfo>
+    ///
+    /// template <typename T>
+    /// struct PintTypes() {
+    ///     inline void operator()() { std::cout << typeid(T).name() << std::endl; }
+    /// };
+    ///
+    /// using MyTypes = openvdb::TypeList<int, float, double>;
+    /// MyTypes::foreach<PintTypes>(); // "i, f, d" (exact output is compiler-dependent)
+    /// @endcode
+    ///
+    /// @note OpT must be a templated class. It is created and invoked for each
+    ///   type in this list.
+    template<template <typename> class OpT>
+    static void foreach() { typelist_internal::TSForEachImpl<OpT, Ts...>(); }
 
     /// @brief Invoke a templated, unary functor on a value of each type in this list.
     /// @details Example:

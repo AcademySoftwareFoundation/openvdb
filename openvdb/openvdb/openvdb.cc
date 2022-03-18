@@ -3,9 +3,7 @@
 
 #include "openvdb.h"
 #include "io/DelayedLoadMetadata.h"
-//#ifdef OPENVDB_ENABLE_POINTS
 #include "points/PointDataGrid.h"
-//#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
 
@@ -54,6 +52,11 @@ std::mutex sInitMutex;
 std::atomic<bool> sIsInitialized{false};
 }
 
+/// @todo  Change registerX() methods to simply be register()...
+template <typename GridT> struct RegisterGrid { inline void operator()() { GridT::registerGrid(); } };
+template <typename MetaT> struct RegisterMeta { inline void operator()() { MetaT::registerType(); } };
+template <typename MapT>  struct RegisterMap  { inline void operator()() { MapT::registerMap(); } };
+
 void
 initialize()
 {
@@ -65,65 +68,29 @@ initialize()
 
     // Register metadata.
     Metadata::clearRegistry();
-    BoolMetadata::registerType();
-    DoubleMetadata::registerType();
-    FloatMetadata::registerType();
-    Int32Metadata::registerType();
-    Int64Metadata::registerType();
-    StringMetadata::registerType();
-    Vec2IMetadata::registerType();
-    Vec2SMetadata::registerType();
-    Vec2DMetadata::registerType();
-    Vec3IMetadata::registerType();
-    Vec3SMetadata::registerType();
-    Vec3DMetadata::registerType();
-    Vec4IMetadata::registerType();
-    Vec4SMetadata::registerType();
-    Vec4DMetadata::registerType();
-    Mat4SMetadata::registerType();
-    Mat4DMetadata::registerType();
+    NativeMetaTypes::foreach<RegisterMeta>();
 
     // Register maps
     math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::UnitaryMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
+    NativeMapTypes::foreach<RegisterMap>();
 
     // Register common grid types.
     GridBase::clearRegistry();
-    BoolGrid::registerGrid();
-    MaskGrid::registerGrid();
-    FloatGrid::registerGrid();
-    DoubleGrid::registerGrid();
-    Int32Grid::registerGrid();
-    Int64Grid::registerGrid();
+    NativeGridTypes::foreach<RegisterGrid>();
+
     // @note String grids types are deprecated but we still register them
     //   as supported serializable types for backward compatibility. This
     //   will likely be removed in a future major version
 OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     StringGrid::registerGrid();
 OPENVDB_NO_DEPRECATION_WARNING_END
-    Vec3IGrid::registerGrid();
-    Vec3SGrid::registerGrid();
-    Vec3DGrid::registerGrid();
 
     // Register types associated with point index grids.
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
-    tools::PointIndexGrid::registerGrid();
 
     // Register types associated with point data grids.
-//#ifdef OPENVDB_ENABLE_POINTS
     points::internal::initialize();
-//#endif
-
-    // Register delay load metadata
-    io::DelayedLoadMetadata::registerType();
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();
@@ -166,10 +133,7 @@ __pragma(warning(default:1711))
     Metadata::clearRegistry();
     GridBase::clearRegistry();
     math::MapRegistry::clear();
-
-//#ifdef OPENVDB_ENABLE_POINTS
     points::internal::uninitialize();
-//#endif
 
 #ifdef OPENVDB_USE_BLOSC
     // We don't want to destroy Blosc, because it might have been
