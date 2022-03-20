@@ -303,7 +303,7 @@ inline FunctionGroup::UniquePtr axprfxpt16encode() { return axfxptencode(false, 
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-const CodecTypeMap& Codec::getCodecTypeMap()
+const CodecTypeMap& getCodecTypeMap()
 {
     // Initialise the static codec registry of supported types.
     // This can easily be exposed to users so they can write their own codecs,
@@ -317,11 +317,11 @@ const CodecTypeMap& Codec::getCodecTypeMap()
     //   in a separate change set.
 
     static std::array<Codec::UniquePtr, 5> codecs {
-        std::make_unique<Codec>(std::move(axtrncencode()), std::move(axtrncdecode()), 1<<0),
-        std::make_unique<Codec>(std::move(axufxpt8encode()), std::move(axufxpt8decode()), 1<<1),
-        std::make_unique<Codec>(std::move(axufxpt16encode()), std::move(axufxpt16decode()), 1<<2),
-        std::make_unique<Codec>(std::move(axprfxpt8encode()), std::move(axprfxpt8decode()), 1<<3),
-        std::make_unique<Codec>(std::move(axprfxpt16encode()), std::move(axprfxpt16decode()), 1<<4),
+        std::make_unique<Codec>(axtrncencode(), axtrncdecode(), 1<<0),
+        std::make_unique<Codec>(axufxpt8encode(), axufxpt8decode(), 1<<1),
+        std::make_unique<Codec>(axufxpt16encode(), axufxpt16decode(), 1<<2),
+        std::make_unique<Codec>(axprfxpt8encode(), axprfxpt8decode(), 1<<3),
+        std::make_unique<Codec>(axprfxpt16encode(), axprfxpt16decode(), 1<<4),
     };
 
     static CodecTypeMap map {
@@ -365,7 +365,7 @@ llvm::Type* Codec::findReturnTypeFromArg(const codegen::FunctionGroup* const gro
 
 const Codec* getCodec(const ast::tokens::CoreType type, const std::string& name)
 {
-    const CodecTypeMap& map = Codec::getCodecTypeMap();
+    const CodecTypeMap& map = getCodecTypeMap();
 
     auto typeiter = map.find(type);
     if (typeiter != map.cend()) {
@@ -379,7 +379,7 @@ const Codec* getCodec(const ast::tokens::CoreType type, const std::string& name)
 
 const CodecNameMap* getTypeSupportedCodecs(const ast::tokens::CoreType type)
 {
-    const CodecTypeMap& map = Codec::getCodecTypeMap();
+    const CodecTypeMap& map = getCodecTypeMap();
 
     auto typeiter = map.find(type);
     if (typeiter != map.cend()) {

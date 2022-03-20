@@ -47,7 +47,7 @@ inline const Codec*
 getCodecByCodecName(const std::string& name)
 {
     std::vector<const Codec*> codecs;
-    const auto& map = Codec::getCodecTypeMap();
+    const auto& map = getCodecTypeMap();
     for (const auto& typemap : map) {
         for (const auto& nameToCodec : typemap.second) {
             if (nameToCodec.first == name) {
@@ -67,7 +67,7 @@ void TestCodecs::testRegisteredCodecs()
 
     // Get all unique registered codecs
     std::set<const Codec*> codecs;
-    const auto& map = Codec::getCodecTypeMap();
+    const auto& map = getCodecTypeMap();
 
     for (const auto& typemap : map) {
         for (const auto& nameToCodec : typemap.second) {
@@ -84,8 +84,8 @@ void TestCodecs::testRegisteredCodecs()
 
     std::set<uint32_t> flags;
     for (const Codec* codec : codecs) {
-        CPPUNIT_ASSERT(!flags.count(codec->bit()));
-        flags.insert(codec->bit());
+        CPPUNIT_ASSERT(!flags.count(codec->flag()));
+        flags.insert(codec->flag());
     }
 
     //
@@ -191,8 +191,8 @@ void TestCodecs::testTruncateCodec()
 
     CPPUNIT_ASSERT_EQUAL(halfty,  codec->decodedToEncoded(ast::tokens::CoreType::FLOAT, C));
     CPPUNIT_ASSERT_EQUAL(vhalfty, codec->decodedToEncoded(ast::tokens::CoreType::VEC3F, C));
-    CPPUNIT_ASSERT_EQUAL(floatty,  codec->encodedToDecoded(halfty, C));
-    CPPUNIT_ASSERT_EQUAL(vfloatty, codec->encodedToDecoded(vhalfty, C));
+    CPPUNIT_ASSERT_EQUAL(floatty,  codec->encodedToDecoded(halfty));
+    CPPUNIT_ASSERT_EQUAL(vfloatty, codec->encodedToDecoded(vhalfty));
 
     // JIT the codec and test the IR
 
@@ -216,8 +216,8 @@ void TestCodecs::testTruncateCodec()
 
     const std::vector<float> floatInputs {
         1.0f, 0.0f, -1.0f,
-        0.5f, 0.13454, -0.98781,
-        1.0431e-6, 1.0431e+6, std::numeric_limits<float>::max(),
+        0.5f, 0.13454f, -0.98781f,
+        1.0431e-6f, 1.0431e+6f, std::numeric_limits<float>::max(),
         313.33f, std::numeric_limits<float>::min(), std::numeric_limits<float>::lowest()
     };
 
@@ -269,8 +269,8 @@ void TestCodecs::testTruncateCodec()
 
     const std::vector<HalfTy> halfInputs {
         1.0f, 0.0f, -1.0f,
-        0.5f, 0.13454, -0.98781,
-        1.0431e-6, 1.0431e+6, std::numeric_limits<HalfTy>::max(),
+        0.5f, 0.13454f, -0.98781f,
+        1.0431e-6f, 1.0431e+6f, std::numeric_limits<HalfTy>::max(),
         313.33f, std::numeric_limits<HalfTy>::min(), std::numeric_limits<HalfTy>::lowest()
     };
 
@@ -340,8 +340,8 @@ void TestCodecs::testFxptCodec()
     CPPUNIT_ASSERT(nullptr == codec->decodedToEncoded(ast::tokens::CoreType::STRING, C));
     CPPUNIT_ASSERT_EQUAL(uintty,  codec->decodedToEncoded(ast::tokens::CoreType::FLOAT, C));
     CPPUNIT_ASSERT_EQUAL(vuintty, codec->decodedToEncoded(ast::tokens::CoreType::VEC3F, C));
-    CPPUNIT_ASSERT_EQUAL(floatty,  codec->encodedToDecoded(uintty, C));
-    CPPUNIT_ASSERT_EQUAL(vfloatty, codec->encodedToDecoded(vuintty, C));
+    CPPUNIT_ASSERT_EQUAL(floatty,  codec->encodedToDecoded(uintty));
+    CPPUNIT_ASSERT_EQUAL(vfloatty, codec->encodedToDecoded(vuintty));
 
     // JIT the codec and test the IR
 
@@ -367,8 +367,8 @@ void TestCodecs::testFxptCodec()
 
     const std::vector<float> floatInputs {
         1.0f, 0.0f, -1.0f,
-        0.5f, 0.20024414435034715, -0.98781,
-        1e-3, 0.2f, 0.6f,
+        0.5f, 0.20024414435034715f, -0.98781f,
+        1e-3f, 0.2f, 0.6f,
         0.8f, 1.5f, -1.5f,
         100.0f, std::numeric_limits<float>::lowest(), -100.0f
     };

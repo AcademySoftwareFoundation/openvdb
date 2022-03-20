@@ -341,7 +341,7 @@ decode(llvm::Value* buffer,
         llvm::BasicBlock* els  = llvm::BasicBlock::Create(C, "", self);
 
         llvm::Value* usescodec =
-            B.CreateAnd(flag, LLVMType<uint64_t>::get(C, codec->bit()));
+            B.CreateAnd(flag, LLVMType<uint64_t>::get(C, codec->flag()));
         usescodec = boolComparison(usescodec, B);
         B.CreateCondBr(usescodec, then, els);
 
@@ -416,7 +416,7 @@ encode(llvm::Value* in,
         llvm::BasicBlock* els  = llvm::BasicBlock::Create(C, "", self);
 
         llvm::Value* usescodec =
-            B.CreateAnd(flag, LLVMType<uint64_t>::get(C, codec->bit()));
+            B.CreateAnd(flag, LLVMType<uint64_t>::get(C, codec->flag()));
         usescodec = boolComparison(usescodec, B);
         B.CreateCondBr(usescodec, then, els);
 
@@ -493,7 +493,7 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             // If the value type has supported codecs we have to allocate the
             // expected decoded type that will be stored. Otherwise, decode()
             // will simply extract the value ptr directly from the buffer.
-            llvm::Value* decodedStore;
+            llvm::Value* decodedStore = nullptr;
             const auto* codecs = getTypeSupportedCodecs(data.type());
             if (codecs) decodedStore = insertStaticAlloca(B, llvmTypeFromToken(data.type(), C)); // allocated to prologue
 

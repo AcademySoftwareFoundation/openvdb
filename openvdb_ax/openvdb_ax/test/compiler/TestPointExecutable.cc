@@ -739,7 +739,7 @@ TestPointExecutable::testAttributeCodecs()
         pos.z() += 2.0f;
 
         const math::Coord coord = leafIter->cbeginValueOn().getCoord();
-        pos = defaultTransform->worldToIndex(pos);
+        pos = Vec3f(defaultTransform->worldToIndex(pos));
         pos -= coord.asVec3s();
 
         CPPUNIT_ASSERT_EQUAL(compress(points::FixedPointCodec<true, points::PositionRange>(), pos.x()), handle0.get(0).x());

@@ -22,12 +22,39 @@ using CodecNameMap = std::map<const std::string, const Codec*>;
 using CodecTypeMap = std::map<const ast::tokens::CoreType, CodecNameMap>;
 using Codecs = std::vector<const Codec*>;
 
+/// @brief Get the global codec map
+OPENVDB_AX_API const CodecTypeMap& getCodecTypeMap();
+
+/// @brief Get a specific codec. Returns a nullptr if no codec exists.
+/// @param type  The type the codec encodes
+/// @param name  The name of the codec
+OPENVDB_AX_API const Codec* getCodec(const ast::tokens::CoreType type, const std::string& name);
+
+/// @brief Get a specific set of codecs which encode a given type. Returns a
+///   nullptr if no codec exists.
+/// @param type  The type the codecs encode
+OPENVDB_AX_API const CodecNameMap* getTypeSupportedCodecs(const ast::tokens::CoreType type);
+
 class Codec
 {
 public:
     using UniquePtr = std::unique_ptr<Codec>;
 
-    static const CodecTypeMap& getCodecTypeMap();
+    Codec(codegen::FunctionGroup::UniquePtr encoder,
+        codegen::FunctionGroup::UniquePtr decoder,
+        uint32_t flag)
+    : mEncoder(std::move(encoder))
+    , mDecoder(std::move(decoder))
+    , mFlag(flag) {
+#ifndef NDEBUG
+        assert(!mEncoder->list().empty());
+        assert(!mDecoder->list().empty());
+        assert(mEncoder->list().size() == mDecoder->list().size());
+        for (const auto& F : mEncoder->list()) {
+            assert(F->size() == 1 || F->size() == 2);
+        }
+#endif
+    }
 
     /// @brief  Given a core type supported by the AX frontend, return a llvm
     ///   compatible type which represents how the core type is encoded in
@@ -54,7 +81,7 @@ public:
     ///   or a nullptr.
     /// @return  A llvm type representing the decoded C type. Can be a nullptr
     ///   if this codec does not support the provided core type.
-    llvm::Type* encodedToDecoded(llvm::Type* in, llvm::LLVMContext& C) const
+    llvm::Type* encodedToDecoded(llvm::Type* in) const
     {
         // For each decoder function in this codec, find the one which
         // one takes the provided "in" encoded type and return the type
@@ -66,35 +93,16 @@ public:
 
     const codegen::FunctionGroup* encoder() const { return mEncoder.get(); }
     const codegen::FunctionGroup* decoder() const { return mDecoder.get(); }
-    inline const uint32_t bit() const { return mBit; }
-
-//private:
-    Codec(codegen::FunctionGroup::UniquePtr encoder,
-        codegen::FunctionGroup::UniquePtr decoder,
-        uint32_t bit)
-    : mEncoder(std::move(encoder))
-    , mDecoder(std::move(decoder))
-    , mBit(bit) {
-#ifndef NDEBUG
-        assert(!mEncoder->list().empty());
-        assert(!mDecoder->list().empty());
-        assert(mEncoder->list().size() == mDecoder->list().size());
-        for (const auto& F : mEncoder->list()) {
-            assert(F->size() == 1 || F->size() == 2);
-        }
-#endif
-    }
-
-    llvm::Type* findReturnTypeFromArg(const codegen::FunctionGroup* const, llvm::Type*) const;
+    inline uint32_t flag() const { return mFlag; }
 
 private:
+    llvm::Type* findReturnTypeFromArg(const codegen::FunctionGroup* const, llvm::Type*) const;
+
     const codegen::FunctionGroup::UniquePtr mEncoder;
     const codegen::FunctionGroup::UniquePtr mDecoder;
-    const uint32_t mBit;
+    const uint32_t mFlag;
 };
 
-const Codec* getCodec(const ast::tokens::CoreType type, const std::string& name);
-const CodecNameMap* getTypeSupportedCodecs(const ast::tokens::CoreType type);
 
 } // namespace codegen
 } // namespace ax
