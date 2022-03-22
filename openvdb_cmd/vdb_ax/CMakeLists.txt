@@ -3,22 +3,14 @@
 #
 #[=======================================================================[
 
-  CMake Configuration for OpenVDB AX Binaries
+  CMake Configuration for VDB AX Binary
 
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.15)
-project(OpenVDBAXBinaries LANGUAGES CXX)
+project(VDBAX LANGUAGES CXX)
 
 include(GNUInstallDirs)
-
-#########################################################################
-
-message(STATUS "----------------------------------------------------")
-message(STATUS "---------- Configuring OpenVDBAXBinaries -----------")
-message(STATUS "----------------------------------------------------")
-
-##########################################################################
 
 if(NOT OPENVDB_BUILD_AX)
   set(OPENVDBAX_LIB OpenVDB::openvdb_ax)
@@ -38,8 +30,8 @@ elseif(CONCURRENT_MALLOC STREQUAL "Tbbmalloc")
   list(APPEND OPENVDB_BINARIES_DEPENDENT_LIBS TBB::tbbmalloc)
 endif()
 
-set(VDB_AX_SOURCE_FILES openvdb_ax.cc)
-add_executable(vdb_ax ${VDB_AX_SOURCE_FILES})
+set(SOURCE_FILES main.cc)
+add_executable(vdb_ax ${SOURCE_FILES})
 target_link_libraries(vdb_ax ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
 install(TARGETS vdb_ax RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
