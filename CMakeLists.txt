@@ -74,7 +74,6 @@ option(OPENVDB_BUILD_HOUDINI_PLUGIN "Build the Houdini plugin" OFF)
 option(OPENVDB_BUILD_HOUDINI_ABITESTS "Build the Houdini ABI tests" OFF)
 
 option(OPENVDB_BUILD_AX "Build the OpenVDB AX library. Turns ON if USE_AX is ON." ${USE_AX})
-option(OPENVDB_BUILD_AX_BINARIES "Build the OpenVDB AX command line binary" OFF)
 option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
@@ -432,7 +431,6 @@ if(NOT (
     OPENVDB_BUILD_CORE OR
     OPENVDB_BUILD_BINARIES OR
     OPENVDB_BUILD_AX OR
-    OPENVDB_BUILD_AX_BINARIES OR
     OPENVDB_BUILD_AX_UNITTESTS OR
     OPENVDB_BUILD_PYTHON_MODULE OR
     OPENVDB_BUILD_UNITTESTS OR
@@ -572,7 +570,6 @@ message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 # Locate openvdb_ax if necessary
 
 if(NOT OPENVDB_BUILD_AX AND
-   (OPENVDB_BUILD_AX_BINARIES OR
     OPENVDB_BUILD_AX_UNITTESTS OR
     USE_AX))
   find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
@@ -657,10 +654,6 @@ endif()
 
 if(OPENVDB_BUILD_AX)
   add_subdirectory(openvdb_ax/openvdb_ax)
-endif()
-
-if(OPENVDB_BUILD_AX_BINARIES)
-  add_subdirectory(openvdb_ax/openvdb_ax/cmd)
 endif()
 
 if(OPENVDB_BUILD_AX_UNITTESTS)
