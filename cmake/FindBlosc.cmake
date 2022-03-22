@@ -377,18 +377,8 @@ if(NOT TARGET Blosc::blosc)
       INTERFACE_LINK_DIRECTORIES
          "\$<\$<CONFIG:Release>:${Blosc_RELEASE_LIBRARY_DIRS}>;\$<\$<CONFIG:Debug>:${Blosc_DEBUG_LIBRARY_DIRS}>")
     target_link_libraries(Blosc::blosc INTERFACE
-      $<$<CONFIG:Release>:lz4;snappy;zlib>
-      $<$<CONFIG:Debug>:lz4d;snappyd;zlibd>)
-
-    if(BLOSC_USE_STATIC_LIBS)
-      target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:zstd_static>
-        $<$<CONFIG:Debug>:zstd_staticd>)
-    else()
-      target_link_libraries(Blosc::blosc INTERFACE
-        $<$<CONFIG:Release>:zstd>
-        $<$<CONFIG:Debug>:zstdd>)
-    endif()
+      $<$<CONFIG:Release>:lz4;snappy;zlib;zstd>
+      $<$<CONFIG:Debug>:lz4d;snappyd;zlibd;zstd>)
   endif()
 endif()
 
