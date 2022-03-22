@@ -45,22 +45,22 @@ wget -qO- https://people.sc.fsu.edu/~jburkardt/data/ply/cow.ply | vdb_tool -read
 # non-linear workflows: for and each loops
 ```
 vdb_tool -sphere -sphere c=0.5,0,0 -sphere c=-0.5,0,0 -union -union -debug -o stdout.vdb | vdb_view
-vdb_tool -sphere -for x=-0.5,1,1 -sphere c=%x,0,0 -union -end -o stdout.vdb | vdb_view
-vdb_tool -debug -sphere n=sphere_0 -for x=-0.5,1,1 -sphere n=sphere_%I c=%x,0,0 -union -end -o stdout.vdb | vdb_view
+vdb_tool -sphere -for x=-0.5,1,1 -sphere c={$x},0,0 -union -end -o stdout.vdb | vdb_view
+vdb_tool -debug -sphere n=sphere_0 -for x=-0.5,1,1 -sphere n=sphere_{$#x} c={$x},0,0 -union -end -o stdout.vdb | vdb_view
 ```
 
  # example of double loop
  ```
 vdb_tool -read ~/dev/data/mesh/teapot.ply -mesh2ls -print -render
 vdb_tool -read ~/dev/data/mesh/*.ply -for i=0,2,1 -mesh2ls -end -print
-vdb_tool -for v=0.5,2,0.5 -read ~/dev/data/mesh/teapot.ply -mesh2ls voxel=%v -render test_%v.png -end
-vdb_tool -for v=0.5,2,0.5 -each s=teapot,bunny -read ~/dev/data/mesh/%s.ply -mesh2ls voxel=%v -render %s_%v.png -end -end
+vdb_tool -for v=0.5,2,0.5 -read ~/dev/data/mesh/teapot.ply -mesh2ls voxel={$v} -render test_{$v}.png -end
+vdb_tool -for v=0.5,2,0.5 -each s=teapot,bunny -read ~/dev/data/mesh/{$s}.ply -mesh2ls voxel={$v} -render {$s}_{$v}.png -end -end
 ```
 
 # Enright benchmark test
 ```
 vdb_tool -sphere d=64 r=0.15 c=0.35,0.35,0.35 -enright -render test.jpg
-vdb_tool -sphere d=64 r=0.15 c=0.35,0.35,0.35 -for i=1,10,1 -enright dt=0.1 -render enright_%i.png k=1 -end -o stdout.vdb | vdb_view
+vdb_tool -sphere d=64 r=0.15 c=0.35,0.35,0.35 -for i=1,10,1 -enright dt=0.1 -render enright_{$i}.png k=1 -end -o stdout.vdb | vdb_view
 vdb_tool -sphere d=64 r=0.15 c=0.35,0.35,0.35 -for i=1,10,1 -enright dt=0.1 k=1 -end -o stdout.vdb | vdb_view
 ```
 

@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This example demonstrates how to convert points
 # in an OpenVDB PointDataGrid to a binary ply file.

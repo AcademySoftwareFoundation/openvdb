@@ -17,7 +17,7 @@ Convert a polygon mesh file into to another polygon mesh file
 
 Convert multiple obj files (mesh_{00-09}.obj) into multiple ply files (mesh_{00-09}.ply)
 ```
-./surfacer --for f=0,10,1 --read mesh_%2f.obj --write mesh_%2f.ply -end
+./surfacer --for f=0,10,1 --read mesh_{$f:2:pad0}.obj --write mesh_{$f:2:pad0}.ply -end
 ```
 
 Convert a polygon mesh file into a narrow-band level and save it to a file

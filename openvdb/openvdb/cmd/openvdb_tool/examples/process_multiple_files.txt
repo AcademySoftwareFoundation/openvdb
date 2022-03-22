@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # Define frames over which to iterate. n is the number of frames and s is the stride
 # See the comments associated with the "read" and "write" options below to
@@ -8,7 +8,7 @@ for n=100,110,1
 # Read the multiple frames of the OpenVDB files with points:
 # "..._points.0100.vdb", "..._points.0101.vdb, ending with
 # ""..._points.0109.vdb"
-read /Users/ken/dev/data/vdb/fluid_points.%4n.vdb
+read /Users/ken/dev/data/vdb/fluid_points.{$n:4:pad0}.vdb
 
 # convert vdb point to geometry points
 vdb2points
@@ -27,7 +27,7 @@ dilate radius=1 space=5 time=1
 # spatial discretization is 5'th order WENO
 # temporal discretization is 1'th order TVD-RK
 # width of the filter kernel is 1.0 voxels
-gauss iter=1 space=5 time=1 width=1
+gauss iter=1 space=5 time=1 size=1
 
 # Erode level set
 # radius of erosion is 1.0 voxels
@@ -41,7 +41,7 @@ ls2mesh adapt=0.1
 
 # write polygon mesh to binary ply files:
 # "surface-000.ply", "surface-100.ply, ending with "surface-109.ply"
-write surface-%3n.ply
+write surface-{$n:3:pad0}.ply
 
 # end for loop
 end

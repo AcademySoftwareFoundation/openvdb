@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This example demonstrated how to convert a
 # binary ply mesh file into an ascii obj mesh file.

@@ -79,7 +79,7 @@ namespace vdb_tool {
 
 class Tool
 {
-    static const int sMajor = 9;// incremented for incompatible changes options or file.
+    static const int sMajor =10;// incremented for incompatible changes options or file.
     static const int sMinor = 0;// incremented for new functionality that is backwards-compatible.
     static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
@@ -197,7 +197,7 @@ public:
 
 Tool::Tool(int argc, char *argv[])
     : mTimer(std::cerr)
-    , mCmdName(getFileBase(argv[0]))// name of executable
+    , mCmdName(getBase(argv[0]))// name of executable
     , mParser({{"dim", "256", "256", "default grid resolution along the longest axis"},
                {"voxel", "0.0", "0.01", "default voxel size in world units. A value of zero indicates that dim is used to derive the voxel size."},
                {"width", "3.0", "3.0", "default narrow-band width of level sets in voxel units"},
@@ -634,9 +634,9 @@ void Tool::help()
   assert(name == "help");
   try {
     mParser.printAction();
-    const VecS actions = mParser.getVecS("actions");
-    const bool stop = mParser.getBool("exit");
-    const bool brief = mParser.getBool("brief");
+    const VecS actions = mParser.getVec<std::string>("actions");
+    const bool stop = mParser.get<bool>("exit");
+    const bool brief = mParser.get<bool>("brief");
 
     if (actions.empty()) {
       if (mParser.actions.size()==1) {// ./vdb_tool -help
@@ -693,20 +693,20 @@ std::string Tool::examples() const
 void Tool::clear()
 {
   assert(mParser.getAction().name == "clear");
-  if (mParser.getStr("geo") == "*") {
+  if (mParser.get<std::string>("geo") == "*") {
     mGeom.clear();
   } else {
-    for (int a : mParser.getVecI("geo")) {
+    for (int a : mParser.getVec<int>("geo")) {
       if (mGeom.size()<=a) throw std::invalid_argument("clear: no geometry with age "+std::to_string(a));
       auto it = mGeom.crbegin();
       std::advance(it, a);
       mGeom.erase(std::next(it).base());
     }
   }
-  if (mParser.getStr("vdb")  == "*") {
+  if (mParser.get<std::string>("vdb")  == "*") {
     mGrid.clear();
   } else {
-    for (int a : mParser.getVecI("vdb")) {
+    for (int a : mParser.getVec<int>("vdb")) {
       if (mGrid.size()<=a) throw std::invalid_argument("clear: no vdb with age "+std::to_string(a));
       auto it = mGrid.crbegin();
       std::advance(it, a);
@@ -721,7 +721,7 @@ void Tool::clear()
 void Tool::read()
 {
   assert(mParser.getAction().name == "read");
-  for (auto &fileName : mParser.getVecS("files")) {
+  for (auto &fileName : mParser.getVec<std::string>("files")) {
     switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb"})) {
     case 1:
       this->readGeo(fileName);
@@ -746,7 +746,7 @@ void Tool::readGeo(const std::string &fileName)
   Geometry::Ptr geom(new Geometry());
   geom->read(fileName);
   if (geom->vtxCount()) {
-    geom->setName(getFileBase(fileName));
+    geom->setName(getBase(fileName));
     mGeom.push_back(geom);
   }
   if (mParser.verbose) {
@@ -760,7 +760,7 @@ void Tool::readGeo(const std::string &fileName)
 void Tool::readVDB(const std::string &fileName)
 {
   assert(mParser.getAction().name == "read");
-  const VecS gridNames = mParser.getVecS("grids");
+  const VecS gridNames = mParser.getVec<std::string>("grids");
   if (gridNames.empty()) throw std::invalid_argument("readVDB: no grids names specified");
   GridPtrVecPtr grids;
   if (fileName=="stdin.vdb") {
@@ -771,7 +771,7 @@ void Tool::readVDB(const std::string &fileName)
   } else {
     if (mParser.verbose) mTimer.start("Reading VDB grid(s) from file named \""+fileName+"\"");
     io::File file(fileName);
-    file.open(mParser.getBool("delayed"));
+    file.open(mParser.get<bool>("delayed"));
     grids = file.getGrids();
   }
   const size_t count = mGrid.size();
@@ -794,10 +794,10 @@ void Tool::readVDB(const std::string &fileName)
 void Tool::config()
 {
     assert(mParser.getAction().name == "config");
-    const bool update  = mParser.getBool("update");
-    const bool execute = mParser.getBool("execute");
+    const bool update  = mParser.get<bool>("update");
+    const bool execute = mParser.get<bool>("execute");
     std::string line;
-    for (auto &fileName : mParser.getVecS("files")) {
+    for (auto &fileName : mParser.getVec<std::string>("files")) {
         if (update) {
             std::fstream file(fileName, std::fstream::in | std::fstream::out);
             if (!file.is_open() || !getline (file, line)) throw std::invalid_argument("updateConf: failed to open file \""+fileName+"\"");
@@ -843,7 +843,7 @@ void Tool::config()
 void Tool::write() const
 {
   assert(mParser.getAction().name == "write");
-  for (std::string &fileName : mParser.getVecS("files")) {
+  for (std::string &fileName : mParser.getVec<std::string>("files")) {
     switch (findFileExt(fileName, {"geo,obj,ply,stl", "vdb", "nvdb", "txt"})) {
     case 1:
       this->writeGeo(fileName);
@@ -872,16 +872,16 @@ void Tool::writeVDB(const std::string &fileName) const
   assert(name == "write");
   try {
     mParser.printAction();
-    const std::string age = mParser.getStr("vdb");
-    const std::string codec = to_lower_case(mParser.getStr("codec"));
+    const std::string age = mParser.get<std::string>("vdb");
+    const std::string codec = to_lower_case(mParser.get<std::string>("codec"));
     bool half;
-    switch (mParser.getInt("bits")) {
+    switch (mParser.get<int>("bits")) {
       case 16:
         half = true; break;
       case 32:
         half = false; break;
       default:
-        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.getStr("bits"));
+        throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.get<std::string>("bits"));
     }
     GridPtrVec grids;
     if (age == "*") {
@@ -938,14 +938,14 @@ void Tool::writeNVDB(const std::string &fileName) const
   assert(name == "write");
   try {
     mParser.printAction();
-    const std::string age = mParser.getStr("vdb");
-    const std::string codec_str = to_lower_case(mParser.getStr("codec"));
-    const std::string bits = mParser.getStr("bits");
-    const bool dither = mParser.getBool("dither");
-    const bool absolute = mParser.getBool("absolute");
-    const float tolerance = mParser.getFloat("tolerance");// negative values means derive it from the grid class (eg ls or fog)
-    const std::string stats = mParser.getStr("stats");
-    const std::string checksum = mParser.getStr("checksum");
+    const std::string age = mParser.get<std::string>("vdb");
+    const std::string codec_str = to_lower_case(mParser.get<std::string>("codec"));
+    const std::string bits = mParser.get<std::string>("bits");
+    const bool dither = mParser.get<bool>("dither");
+    const bool absolute = mParser.get<bool>("absolute");
+    const float tolerance = mParser.get<float>("tolerance");// negative values means derive it from the grid class (eg ls or fog)
+    const std::string stats = mParser.get<std::string>("stats");
+    const std::string checksum = mParser.get<std::string>("checksum");
 
     nanovdb::io::Codec codec = nanovdb::io::Codec::NONE;// compression codec for the file
     if (codec_str == "zip") {
@@ -1068,7 +1068,7 @@ void Tool::writeNVDB(const std::string &fileName) const
 void Tool::writeGeo(const std::string &fileName) const
 {
   assert(mParser.getAction().name == "write");
-  const int age = mParser.getInt("geo");
+  const int age = mParser.get<int>("geo");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
   if (mGeom.size()<=age) throw std::invalid_argument("writeGeo: no geometry with age "+std::to_string(age));
   auto it = mGeom.crbegin();
@@ -1103,9 +1103,9 @@ void Tool::vdbToPoints()
   assert(name == "vdb2points");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (mGrid.size()<=age) throw std::invalid_argument("vdbToPoints: no geometry with age "+std::to_string(age));
     auto it = mGrid.crbegin();
     std::advance(it, age);
@@ -1147,11 +1147,11 @@ void Tool::pointsToVdb()
   assert(name == "points2vdb");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("geo");
-    const bool keep = mParser.getBool("keep");
-    const int pointsPerVoxel = mParser.getInt("ppv");
-    const int bits = mParser.getInt("bits");
-    std::string grid_name = mParser.getStr("name");
+    const int age = mParser.get<int>("geo");
+    const bool keep = mParser.get<bool>("keep");
+    const int pointsPerVoxel = mParser.get<int>("ppv");
+    const int bits = mParser.get<int>("bits");
+    std::string grid_name = mParser.get<std::string>("name");
     using GridT = points::PointDataGrid;
     if (mGeom.size()<=age) throw std::invalid_argument("pointsToVdb: no geometry with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("Points to VDB");
@@ -1193,9 +1193,9 @@ void Tool::levelSetToFog()
   assert(name == "ls2fog");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (mGrid.size()<=age) throw std::invalid_argument("levelSetToFog: no VDB with age "+std::to_string(age));
     auto it = mGrid.crbegin();
     std::advance(it, age);
@@ -1222,12 +1222,12 @@ void Tool::isoToLevelSet()
   assert(name == "iso2ls");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const float isoValue = mParser.getFloat("iso");
-    const float voxel = mParser.getFloat("voxel");
-    const float width = mParser.getFloat("width");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const int age = mParser.get<int>("vdb");
+    const float isoValue = mParser.get<float>("iso");
+    const float voxel = mParser.get<float>("voxel");
+    const float width = mParser.get<float>("width");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (mGrid.size()<=age) throw std::invalid_argument(name+": no VDB with age "+std::to_string(age));
     auto it = mGrid.crbegin();
     std::advance(it, age);
@@ -1272,12 +1272,12 @@ void Tool::meshToLevelSet()
   assert(name == "mesh2ls");
   try {
     mParser.printAction();
-    const int dim = mParser.getInt("dim");
-    float voxel = mParser.getFloat("voxel");
-    const float width = mParser.getFloat("width");
-    const int age = mParser.getInt("geo");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const int dim = mParser.get<int>("dim");
+    float voxel = mParser.get<float>("voxel");
+    const float width = mParser.get<float>("width");
+    const int age = mParser.get<int>("geo");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, age);
 
     if (mGeom.size()<=age) throw std::invalid_argument("mesh2ls: no geometry with age "+std::to_string(age));
@@ -1306,13 +1306,13 @@ void Tool::particlesToLevelSet()
   assert(name == "points2ls");
   try {
     mParser.printAction();
-    const int dim = mParser.getInt("dim");
-    float voxel = mParser.getFloat("voxel");
-    const float width = mParser.getFloat("width");
-    const float radius = mParser.getFloat("radius");
-    const int age = mParser.getInt("geo");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const int dim = mParser.get<int>("dim");
+    float voxel = mParser.get<float>("voxel");
+    const float width = mParser.get<float>("width");
+    const float radius = mParser.get<float>("radius");
+    const int age = mParser.get<int>("geo");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, age);
     if (mGeom.size()<=age) throw std::invalid_argument("p2ls: no geometry with age "+std::to_string(age));
     auto it = mGeom.crbegin();
@@ -1384,10 +1384,10 @@ void Tool::offsetLevelSet()
   assert(findMatch(name, {"dilate", "erode", "open", "close"}));
   try {
     mParser.printAction();
-    float radius = mParser.getFloat("radius");
-    const int space = mParser.getInt("space");
-    const int time = mParser.getInt("time");
-    const int age = mParser.getInt("vdb");
+    float radius = mParser.get<float>("radius");
+    const int space = mParser.get<int>("space");
+    const int time = mParser.get<int>("time");
+    const int age = mParser.get<int>("vdb");
     if (radius<0) throw std::invalid_argument("offsetLevelSet: invalid radius");
     if (radius==0) return;
     if (mGrid.size()<=age) throw std::invalid_argument("offsetLevelSet: no grid with age "+std::to_string(age));
@@ -1429,11 +1429,11 @@ void Tool::filterLevelSet()
   assert(findMatch(name, {"gauss", "mean", "median"}));
   try {
     mParser.printAction();
-    const int nIter = mParser.getInt("iter");
-    const int space = mParser.getInt("space");
-    const int time = mParser.getInt("time");
-    const int age = mParser.getInt("vdb");
-    const int size = mParser.getInt("size");
+    const int nIter = mParser.get<int>("iter");
+    const int space = mParser.get<int>("space");
+    const int time = mParser.get<int>("time");
+    const int age = mParser.get<int>("vdb");
+    const int size = mParser.get<int>("size");
     if (size<0) throw std::invalid_argument("filterLevelSet: invalid filter size");
     if (size==0) return;
     if (mGrid.size()<=age) throw std::invalid_argument("filterLevelSet: no grid with age "+std::to_string(age));
@@ -1470,7 +1470,7 @@ void Tool::pruneLevelSet()
   assert(name == "prune");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
+    const int age = mParser.get<int>("vdb");
     if (mGrid.size()<=age) throw std::invalid_argument("pruneLevelSet: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1493,7 +1493,7 @@ void Tool::floodLevelSet()
   assert(name == "flood");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
+    const int age = mParser.get<int>("vdb");
     if (mGrid.size()<=age) throw std::invalid_argument("floodLevelSet: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1516,8 +1516,8 @@ void Tool::compute()
   assert(findMatch(name, {"cpt","div","curl","length","grad","curvature"}));
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     if (mGrid.size()<=age) throw std::invalid_argument("floodLevelSet: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1586,10 +1586,10 @@ void Tool::csg()
   assert(findMatch(name, {"union", "intersection", "difference"}));
   try {
     mParser.printAction();
-    const VecI ij = mParser.getVecI("vdb");
-    const bool keep = mParser.getBool("keep");
-    const bool prune = mParser.getBool("prune");
-    const bool rebuild = mParser.getBool("rebuild");
+    const VecI ij = mParser.getVec<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    const bool prune = mParser.get<bool>("prune");
+    const bool rebuild = mParser.get<bool>("rebuild");
     if (ij.size()!=2) throw std::invalid_argument("csg: expected two vdb ages, but got "+std::to_string(ij.size()));
     if (ij[0] == ij[1]) throw std::invalid_argument("csg: identical inputs: volume1=volume2="+std::to_string(ij[0]));
     if (mGrid.size()<=ij[0]) throw std::invalid_argument("csg: no Level set at volume1="+std::to_string(ij[0]));
@@ -1667,10 +1667,10 @@ void Tool::levelSetToMesh()
   assert(name == "ls2mesh");
   try {
     mParser.printAction();
-    const float adaptivity = mParser.getFloat("adapt");
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const float adaptivity = mParser.get<float>("adapt");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (mGrid.size()<=age) throw std::invalid_argument("levelSetToMesh: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1697,12 +1697,12 @@ void Tool::levelSetSphere()
   assert(name == "sphere");
   try {
     mParser.printAction();
-    const int dim = mParser.getInt("dim");
-    float voxel = mParser.getFloat("voxel");
-    const float radius = mParser.getFloat("radius");
-    const Vec3f center = mParser.getVec3F("center");
-    const float width = mParser.getFloat("width");
-    const std::string grid_name = mParser.getStr("name");
+    const int dim = mParser.get<int>("dim");
+    float voxel = mParser.get<float>("voxel");
+    const float radius = mParser.get<float>("radius");
+    const Vec3f center = mParser.getVec3<float>("center");
+    const float width = mParser.get<float>("width");
+    const std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = 2.0f*radius/(dim - 2.0f*width);
     if (mParser.verbose) mTimer.start("Create sphere");
     GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxel, width);
@@ -1722,13 +1722,13 @@ void Tool::levelSetPlatonic()
   assert(name == "platonic");
   try {
     mParser.printAction();
-    const int dim = mParser.getInt("dim");
-    float voxel = mParser.getFloat("voxel");
-    const int faces = mParser.getInt("faces");
-    const float scale = mParser.getFloat("scale");
-    const Vec3f center = mParser.getVec3F("center");
-    const float width = mParser.getFloat("width");
-    const std::string grid_name = mParser.getStr("name");
+    const int dim = mParser.get<int>("dim");
+    float voxel = mParser.get<float>("voxel");
+    const int faces = mParser.get<int>("faces");
+    const float scale = mParser.get<float>("scale");
+    const Vec3f center = mParser.getVec3<float>("center");
+    const float width = mParser.get<float>("width");
+    const std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = 2.0f*scale/(dim - 2*width);
     std::string shape;
     switch (faces) {// TETRAHEDRON=4, CUBE=6, OCTAHEDRON=8, DODECAHEDRON=12, ICOSAHEDRON=20
@@ -1761,9 +1761,9 @@ void Tool::multires()
   assert(name == "multires");
   try {
     mParser.printAction();
-    const int levels = mParser.getInt("levels");
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
+    const int levels = mParser.get<int>("levels");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     if (mGrid.size()<=age) throw std::invalid_argument("multires: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1792,10 +1792,10 @@ void Tool::expandLevelSet()
   assert(name == "expand");
   try {
     mParser.printAction();
-    const int dilate = mParser.getInt("dilate");
-    const int iter = mParser.getInt("iter");
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
+    const int dilate = mParser.get<int>("dilate");
+    const int iter = mParser.get<int>("iter");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     if (mGrid.size()<=age) throw std::invalid_argument("expandLevelSet: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1820,8 +1820,8 @@ void Tool::segment()
   assert(name == "segment");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     if (mGrid.size()<=age) throw std::invalid_argument("segment: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1855,11 +1855,11 @@ void Tool::resample()
   assert(name == "resample");
   try {
     mParser.printAction();
-    const VecI age = mParser.getVecI("vdb");
-    const float scale = mParser.getFloat("scale");
-    const Vec3d translate = mParser.getVec3D("translate");
-    const int order = mParser.getInt("order");
-    const bool keep = mParser.getBool("keep");
+    const VecI age = mParser.getVec<int>("vdb");
+    const float scale = mParser.get<float>("scale");
+    const Vec3d translate = mParser.getVec3<double>("translate");
+    const int order = mParser.get<int>("order");
+    const bool keep = mParser.get<bool>("keep");
 
     if (age.size()!=1 && age.size()!=2) throw std::invalid_argument("resample: expected one or two arguments to \"vdb\"");
     if (mGrid.size()<=age[0]) throw std::invalid_argument("resample: no grid with age "+std::to_string(age[0]));
@@ -1912,12 +1912,12 @@ void Tool::scatter()
   assert(name == "scatter");
   try {
     mParser.printAction();
-    const Index64 count = mParser.getInt("count");
-    const float density = mParser.getFloat("density");
-    const int pointsPerVoxel = mParser.getInt("ppv");
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
-    std::string grid_name = mParser.getStr("name");
+    const Index64 count = mParser.get<int>("count");
+    const float density = mParser.get<float>("density");
+    const int pointsPerVoxel = mParser.get<int>("ppv");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    std::string grid_name = mParser.get<std::string>("name");
     if (mGrid.size()<=age) throw std::invalid_argument("scatter: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -1966,11 +1966,11 @@ void Tool::enright()
   assert(name == "enright");
   try {
     mParser.printAction();
-    const Vec3d translate = mParser.getVec3D("translate");
-    const float scale = mParser.getFloat("scale");
-    const float dt = mParser.getFloat("dt");
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
+    const Vec3d translate = mParser.getVec3<double>("translate");
+    const float scale = mParser.get<float>("scale");
+    const float dt = mParser.get<float>("dt");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     math::ScaleTranslateMap::Ptr map(new math::ScaleTranslateMap(Vec3d(scale) ,translate));
     const math::Transform xform(map);
     struct LeVequeField {
@@ -2062,13 +2062,13 @@ void Tool::clip()
   assert(name == "clip");
   try {
     mParser.printAction();
-    const int age = mParser.getInt("vdb");
-    const bool keep = mParser.getBool("keep");
-    VecF vec = mParser.getVecF("bbox");
+    const int age = mParser.get<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    VecF vec = mParser.getVec<float>("bbox");
     float tmp;
-    if ((tmp = mParser.getFloat("taper")) > 0.0f) vec.push_back(tmp);
-    if ((tmp = mParser.getFloat("depth")) > 0.0f) vec.push_back(tmp);
-    const int mask = mParser.getInt("mask");
+    if ((tmp = mParser.get<float>("taper")) > 0.0f) vec.push_back(tmp);
+    if ((tmp = mParser.get<float>("depth")) > 0.0f) vec.push_back(tmp);
+    const int mask = mParser.get<int>("mask");
     if (mGrid.size()<=age) throw std::invalid_argument("clip: no grid with age "+std::to_string(age));
     auto it = mGrid.rbegin();
     std::advance(it, age);
@@ -2227,31 +2227,31 @@ void saveEXR(const std::string& filename, const tools::Film& film, const std::st
 void Tool::render()
 {
   assert(mParser.getAction().name == "render");
-  const VecS fileNames = mParser.getVecS("files");
-  const int age = mParser.getInt("vdb");
-  const bool keep = mParser.getBool("keep");
-  const std::string camType = mParser.getStr("camera");
-  const float aperture = mParser.getFloat("aperture");
-  const float focal = mParser.getFloat("focal");
-  const float isovalue = mParser.getFloat("isovalue");
-  const int samples = mParser.getInt("samples");
-  const VecI image = mParser.getVecI("image", "x");
-  Vec3d translate = mParser.getVec3D("translate");
-  const Vec3d rotate = mParser.getVec3D("rotate");
-  Vec3d target = mParser.getVec3D("target");
-  const Vec3d up = mParser.getVec3D("up");
-  const bool lookat = mParser.getBool("lookat");
-  const float znear = mParser.getFloat("near");
-  const float zfar = mParser.getFloat("far");
-  const std::string shader = mParser.getStr("shader");
-  VecF light = mParser.getVecF("light");
-  const float frame = mParser.getFloat("frame");
-  const  float cutoff = mParser.getFloat("cutoff");
-  const float gain = mParser.getFloat("gain");
-  const Vec3f absorb = mParser.getVec3F("absorb");
-  const Vec3f scatter = mParser.getVec3F("scatter");
-  const VecF step = mParser.getVecF("step");
-  const int colorgrid = mParser.getInt("colorgrid");
+  const VecS fileNames = mParser.getVec<std::string>("files");
+  const int age = mParser.get<int>("vdb");
+  const bool keep = mParser.get<bool>("keep");
+  const std::string camType = mParser.get<std::string>("camera");
+  const float aperture = mParser.get<float>("aperture");
+  const float focal = mParser.get<float>("focal");
+  const float isovalue = mParser.get<float>("isovalue");
+  const int samples = mParser.get<int>("samples");
+  const VecI image = mParser.getVec<int>("image", "x");
+  Vec3d translate = mParser.getVec3<double>("translate");
+  const Vec3d rotate = mParser.getVec3<double>("rotate");
+  Vec3d target = mParser.getVec3<double>("target");
+  const Vec3d up = mParser.getVec3<double>("up");
+  const bool lookat = mParser.get<bool>("lookat");
+  const float znear = mParser.get<float>("near");
+  const float zfar = mParser.get<float>("far");
+  const std::string shader = mParser.get<std::string>("shader");
+  VecF light = mParser.getVec<float>("light");
+  const float frame = mParser.get<float>("frame");
+  const  float cutoff = mParser.get<float>("cutoff");
+  const float gain = mParser.get<float>("gain");
+  const Vec3f absorb = mParser.getVec3<float>("absorb");
+  const Vec3f scatter = mParser.getVec3<float>("scatter");
+  const VecF step = mParser.getVec<float>("step");
+  const int colorgrid = mParser.get<int>("colorgrid");
 
   if (light.size()==3) {
     for (int i=0; i<3; ++i) light.push_back(0.7);
@@ -2266,7 +2266,6 @@ void Tool::render()
   if (!grid) throw std::invalid_argument("render: no float with age "+std::to_string(age));
   if (step.size()!=2) throw std::invalid_argument("render: \"step\" option expected 2 values, but got "+std::to_string(step.size()));
 
-  const bool isLevelSet = grid->getGridClass() == GRID_LEVEL_SET;
   tools::Film film(image[0], image[1]);
   const CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
   const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
@@ -2309,9 +2308,6 @@ void Tool::render()
       shaderPtr.reset(new tools::NormalShader<>());
     }
   } else if (shader == "position") {
-    //const CoordBBox bbox = grid->evalActiveVoxelBoundingBox();
-    //const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
-    //const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*(grid->transform().baseMap()));
     if (colorgridPtr) {
       shaderPtr.reset(new tools::PositionShader<Vec3SGrid>(bboxWorld, *colorgridPtr));
     } else {
@@ -2327,7 +2323,7 @@ void Tool::render()
     throw std::invalid_argument("render: unsupported value of shader=\""+shader+"\"");
   }
 
-  if (isLevelSet) {
+  if (grid->getGridClass() == GRID_LEVEL_SET) {
     if (mParser.verbose) mTimer.start("ray-tracing");
     tools::LevelSetRayIntersector<GridT> intersector(*grid, static_cast<GridT::ValueType>(isovalue));
     tools::rayTrace(*grid, intersector, *shaderPtr, *camera, samples, 0, true);
@@ -2356,7 +2352,7 @@ void Tool::render()
 #endif
 
   if (fileNames.empty()) {
-    if (!grid->getName().empty()) fileName = grid->getName() + "." + getFileExt(fileName);
+    if (!grid->getName().empty()) fileName = grid->getName() + "." + getExt(fileName);
   } else {
     fileName = fileNames[0];
   }
@@ -2400,6 +2396,9 @@ void Tool::print(std::ostream& os) const
     os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
     mParser.print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
+    os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
+    mParser.storage.print(os);
+    os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
   if (mParser.verbose>0) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
@@ -2423,6 +2422,7 @@ void Tool::print(std::ostream& os) const
     }
     if (n==0) os << "VDB grid: none\n";
     os << std::setw(80) << std::setfill('=') << "\n\n" << std::endl;
+
   }
 }// Tool::print
 

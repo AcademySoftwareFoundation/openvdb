@@ -48,18 +48,59 @@ inline bool file_exists(const std::string &fileOrPath)
     struct stat buffer;
     return stat(fileOrPath.c_str(), &buffer) == 0;
 }
-
-/// @return the base of a filename, i.e. "base" in "path/base.ext"
-inline std::string getFileBase(const std::string &fileName)
+/// @return the filename, i.e. "base0123.ext" if input is "path/base0123.ext"
+inline std::string getFile(const std::string &str)
 {
-    const size_t start = fileName.find_last_of("/\\") + 1; // valid offset or npos + 1 = 0
-    return fileName.substr(start, fileName.find_last_of(".") - start);
+    return str.substr(str.find_last_of("/\\") + 1);
+}
+
+/// @return the path, i.e. "path" if input is "path/base0123.ext"
+inline std::string getPath(const std::string &str)
+{
+    const size_t pos = str.find_last_of("/\\");
+    return pos >= str.length() ? "." : str.substr(0,pos);
+}
+
+/// @return the name, i.e. "base0123" if input is "path/base0123.ext"
+inline std::string getName(const std::string &str)
+{
+    const size_t start = str.find_last_of("/\\") + 1; // valid offset or npos + 1 = 0
+    return str.substr(start, str.find_last_of(".") - start);
+}
+
+/// @return the base, i.e. "base0123.ext" if input is "path/base0123.ext"
+inline std::string getBase(const std::string &str)
+{
+    const std::string name = getName(str);
+    return name.substr(0, name.find_last_not_of("0123456789")+1);
+}
+
+/// @return the file number, i.e. "0123" if input is "path/base0123.ext"
+inline std::string getNumber(const std::string &str)
+{
+    const std::string name = getName(str);
+    const size_t pos = name.find_first_of("0123456789");
+    return name.substr(pos, name.find_last_of("0123456789") + 1 - pos);
+}
+
+/// @return the file extension, i.e. "ext" if input is "path/base0123.ext"
+inline std::string getExt(const std::string &str)
+{
+    const size_t pos = str.find_last_of('.');
+    return pos >= str.length() ? "" : str.substr(pos + 1);
 }
 
 /// @brief Turns all characters in a string into lower case
 inline std::string &to_lower_case(std::string &str)
 {
     std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::tolower(c); });
+    return str;
+}
+
+/// @brief Turns all characters in a string into upper case
+inline std::string &to_upper_case(std::string &str)
+{
+    std::transform(str.begin(), str.end(), str.begin(), [](unsigned char c){ return std::toupper(c); });
     return str;
 }
 
@@ -86,18 +127,11 @@ inline int findMatch(const std::string &word, const std::vector<std::string> &ve
     return 0;
 }
 
-/// @brief return the extension of @b filename, i.e. "ext" in "path/base.ext"
-inline std::string getFileExt(const std::string &filename)
-{
-    const size_t pos = filename.find_last_of('.');
-    return pos >= filename.length() ? "" : filename.substr(pos + 1);
-}
-
 /// @brief return the 1-based on of array on candidate extensions in @b suffix that matches the extension in @b fileName.
 ///        If ignore_case is true the case of the file extension is ignored.
 inline int findFileExt(const std::string &fileName, const std::vector<std::string> &suffix, bool ignore_case = true)
 {
-    std::string ext = getFileExt(fileName);
+    std::string ext = getExt(fileName);
     if (ignore_case) to_lower_case(ext);
     return findMatch(ext, suffix);
 }
@@ -107,6 +141,13 @@ inline std::string trim(const std::string &s, std::string c = " \n\r\t\f\v")
 {
     const size_t start = s.find_first_not_of(c), end = s.find_last_not_of(c);
     return start == std::string::npos ? "" : s.substr(start, 1 + end - start);
+}
+
+inline std::vector<size_t> find_all(const std::string &str, char name = '%')
+{
+    std::vector<size_t> vec;
+    for (size_t pos = str.find(name); pos != std::string::npos; pos = str.find(name, pos + 1)) vec.push_back(pos);
+    return vec;
 }
 
 /// @brief returns the number of replacements of  % @b name in @b str starting at @b pos
@@ -161,6 +202,7 @@ inline int replace(std::string &str, char name, const std::string &value, size_t
         return m >= n ? str.compare(m - n, n, pattern) == 0 : false;
     }
 
+    inline bool isInt(float x) {return floorf(x) == x;}
 /// @brief Returns true if the string contains an integer, in which case @b i contains the value.
 /// @note Leading and trailing whilespaces in the input string are not allowed
 inline bool is_int(const std::string &s, int &i)
@@ -224,6 +266,18 @@ inline bool str2bool(const std::string &str)
     throw std::invalid_argument("str2bool: invalid bool \"" + str + "\"");
     return "str2bool: internal error"; // should never happen
 }
+
+template <typename T>
+inline T str2(const std::string &str);
+
+template <>
+inline int str2<int>(const std::string &str){return str2int(str);}
+template <>
+inline float str2<float>(const std::string &str){return str2float(str);}
+template <>
+inline double str2<double>(const std::string &str){return str2double(str);}
+template <>
+inline bool str2<bool>(const std::string &str){return str2bool(str);}
 
 /// @brief Returns true if the string contains a float, in which case @b v contains the value.
 /// @note Leading and trailing whilespaces in the input string are not allowed

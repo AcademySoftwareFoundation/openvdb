@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This examples demonstrates how to read a polygon mesh from a ply file,
 # converting it into a narrow-band level set, dilating the level set,

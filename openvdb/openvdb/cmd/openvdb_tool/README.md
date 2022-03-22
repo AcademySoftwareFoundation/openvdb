@@ -1,13 +1,13 @@
 # vdb_tool
 
-This command-line tool, dubbed vdb_tool, that can execute and combine any sequence of the of high-level tools available in openvdb/tools.
+This command-line tool, dubbed vdb_tool, that can execute and combine the of high-level tools available in openvdb/tools.
 For instance, it can convert a sequence of polygon meshes and particles to level sets, and perform a large number of operations on these
-level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk
-or even stream VDBs to STDOUT so other tools can render them (using pipelining). Currently the following list of actions are supported:
+level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk or even stream VDBs to STDOUT so other tools can render them (using pipelining). We denote the operations **actions**, and their arguments **options**. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
 
 | Action | Description |
 |-------|-------|
 | **for/each/end** | Defines the scope of a for-loop or each-loop with loop-variables that can be used for other arguments or file names |
+| **eval** | Evaluate an expression written in our Reverse Polish Notation |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
 | **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
@@ -71,7 +71,9 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 
 Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of the expected option "radius". Also note that this tool maintains two lists of primitives, namely geometry (i.e. points and meshes) and VDB volumes (that may contain voxels or points). They can be referenced with "geo=n" and "vdb=n" where the integer "n" refers to "age" of the primitive. That is, "n=0" means the most recent added primitive and "n=1" means the second primitive added to the internal list. So, "-mesh2ls g=1" means convert the second to last geometry (here a polygon mesh) to a level set. If no other VDB grid exists this level set can be referenced as "vdb=0". Thus, "-gauss v=0" means perform a gaussian filter on the most recent level set. By default the most recent geometry, i.e. "g=0, or most recent level set, i.e. "v=0", is selected for processing.
 
----
+# Stack-based string expressions
+
+This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define operations that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops loops, e.g. "-quiet -for i=1,3,1 -eval {$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below and the unit test named "TEST_F(Test_vdb_tool, Translator)" in src/unittest.cpp for all operations currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
 # Building this tool
 At the moment we only provide a gnu Makefile, but it's simple so it shouldn't be hard to roll your own cmake. The only mandatory dependency of this command-line tool is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic (enable them at the top of the Makefile).
@@ -106,12 +108,17 @@ vdb_tool -read mesh.obj -mesh2ls -write level_set.vdb
 
 * Convert 5 polygon mesh files, "mesh_0{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb":
 ```
-vdb_tool -for f=1,6,1 -read mesh_%2f.obj -mesh2ls -write level_set_%2f.vdb -end
+vdb_tool -for f=1,6,1 -read mesh_'{$f:2:pad0}'.obj -mesh2ls -write level_set_'{$f:2:pad0}'.vdb -end
 ```
  
 * Generate 5 sphere with different voxel sizes and save them all into a single vdb file:
 ```
-vdb_tool -for v=0.01,0.06,0.01 -sphere voxel=%v name=sphere_%v -end -write vdb="*" spheres.vdb
+vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write vdb="*" spheres.vdb
+```
+
+* Generate spheres that are rotating along a parametric circle
+```
+vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center=('{$radian:cos}','{$radian:sin}',0) name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
 ```
 
 * Converts input points in the file points.[vdb/ply/abc/obj/pts] to a level set, perform level set operations, and written to it the file surface.vdb:
@@ -166,7 +173,7 @@ vdb_tool -sphere -dilate -o stdout.vdb | vdb_view
 
 * Process files identified by a regex
 ```
-vdb_tool -each f=`find ~/dev/data -name '*.vdb'` -i %f -render %2J.exr -end
+vdb_tool -each f=`find ~/dev/data -name '*.vdb'` -i '{$f}' -render data/'{$#f}'.exr image=100x100 -end
 ```
 
 * View a sequence of animated level sets
@@ -175,7 +182,29 @@ vdb_tool -sphere d=80 r=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0.05 k=1
 vdb_tool -platonic d=128 f=8 s=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
 ```
 
-Arguably the last example is the only application of pipelining that should be used in practice (since there is no faster alternative).
+# String evaluation:
+
+* Define, modify and access custom variables<br>
+Define the local variable G=0 and increment it inside a for-loop.
+```
+vdb_tool -quiet -eval '{0:@G}' -for i=10,15,1 -eval '{$G:++:@G}G = {$G}' -end
+```
+which prints the output:<br>
+G = 1<br>
+G = 2<br>
+G = 3<br>
+G = 4<br>
+G = 5<br>
+
+* Find real roots of a quadratic polynomial:<br>
+For convenience the computation is split in the following three steps:<br>
+a=1, b=-8, c=5<br>
+c=b^2-4ac, a=-2a<br>
+if (c==0) one solution: b/a, else if (c>0) two solutions: (b+-sqrt(c))/a
+```
+vdb_tool -eval '{1:@a:-8:@b:5:@c}' '{$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a}' '{$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}'
+```
+which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the single real root -2.
 
 ---
 # To Do List:
@@ -260,11 +289,15 @@ Arguably the last example is the only application of pipelining that should be u
 - [x] -read delayed=false file.vdb
 - [x] -clear vdb=1,2,3 geo=*
 - [x] -config update=false execute=true configure.txt
-- [x] -each f= *.vdb
+- [x] -each f=*.vdb
+- [x] -each f=path/base.ext -write $P/$B.vdb -end
+- [x] add stack-based translator and storage
+- [x] -eval '{1:@G}'
+- [x] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
+- [x] add switch-statement: {$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
 - [ ] Combine: -min, -max, -sum
 - [ ] -xform (translate and scale grid transforms)
 - [ ] -merge
 - [ ] -points2mask
 - [ ] -erodeTopology
 - [ ] use cmake
-- [ ] add Geometry::readUSD

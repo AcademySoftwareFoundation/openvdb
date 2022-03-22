@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This examples demonstrates how to read a polygon mesh from a ply file,
 # converting it into a narrow-band level set, smoothing the level set,
@@ -17,8 +17,8 @@ mesh2ls dim=256 width=3
 # number of iterations is 5
 # spatial discretization is 5'th order WENO
 # temporal discretization is 1'th order TVD-RK
-# width of the filter kernel is 1.0 voxels
-gauss iter=5 space=5 time=1 width=1
+# size of the filter kernel is 1.0 voxels
+gauss iter=5 space=5 time=1 size=1
 
 # Level set to polygon mesh conversion
 # Mesh adaptivity is 0.1 %

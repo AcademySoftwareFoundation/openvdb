@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This examples demonstrates how to create a narrow-band
 # level set of a sphere and save it to an OpenVDB file.

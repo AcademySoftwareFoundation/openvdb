@@ -1,4 +1,4 @@
-vdb_tool 9.0.0
+vdb_tool 10.0.0
 
 # This examples demonstrates how points, e.g. from a fluid
 # simulation, can be surfaced and converted into a mesh surface.
@@ -32,8 +32,8 @@ dilate radius=1 space=5 time=1
 # number of iterations is 1
 # spatial discretization is 5'th order WENO
 # temporal discretization is 1'th order TVD-RK
-# width of the filter kernel is 1.0 voxels
-gauss iter=1 space=5 time=1 width=1
+# size of the filter kernel is 1.0 voxels
+gauss iter=1 space=5 time=1 size=1
 
 # Erode level set
 # radius of erosion is 1.0 voxels
