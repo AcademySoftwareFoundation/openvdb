@@ -273,21 +273,26 @@ public:
         mOps["float"]=[&](){this->set(str2float(mStack.top()));};
         mOps["lower"]=[&](){to_lower_case(mStack.top());};
         mOps["upper"]=[&](){to_upper_case(mStack.top());};
-        mOps["dup"]=[&](){mStack.dup();};// x -- x x
-        mOps["nip"]=[&](){mStack.nip();};// y x -- x
-        mOps["drop"]=[&](){mStack.drop();};// y x -- y
-        mOps["swap"]=[&](){mStack.swap();};// y x -- x y
+        mOps["dup"]=[&](){mStack.dup();};// x -- x x (push top onto stack)
+        mOps["nip"]=[&](){mStack.nip();};// y x -- x (remove the entry below the top)
+        mOps["drop"]=[&](){mStack.drop();};// y x -- y (pop the top)
+        mOps["swap"]=[&](){mStack.swap();};// y x -- x y (swap the two top entries)
         mOps["over"]=[&](){mStack.over();};// y x -- y x y (push second entry onto top)
-        mOps["rot"]=[&](){mStack.rot();};// z y x -- y x z (permutation)
-        mOps["tuck"]=[&](){mStack.tuck();};// z y x -- x z y (permutation)
-        mOps["scrape"]=[&](){mStack.scrape();};// ... x -- x (removed all entries below top)
-        mOps["clear"]=[&](){mStack.clear();};// ... --
+        mOps["rot"]=[&](){mStack.rot();};// z y x -- y x z (rotation left)
+        mOps["tuck"]=[&](){mStack.tuck();};// z y x -- x z y (rotation right)
+        mOps["scrape"]=[&](){mStack.scrape();};// ... x -- x (removed everything except for the top)
+        mOps["clear"]=[&](){mStack.clear();};// ... -- (remove everything)
         mOps["squash"]=[&](){// "x" "y" "z" --- "x y z"   combines entire stack into the top
             if (mStack.empty()) return;
             std::stringstream ss;
             mStack.print(ss);
             mStack.scrape();
             mStack.top()=ss.str();
+        };
+        mOps["replace"]=[&](){// e.g. "foo bar" " _" -- "foo_bar" (replace character in string)
+          const std::string old_new = mStack.pop();
+          if (old_new.size()!=2) throw std::invalid_argument("Translator::replace: expected two characters, not \""+old_new+"\"");
+          std::replace(mStack.top().begin(), mStack.top().end(), old_new[0], old_new[1]);
         };
         mOps["exists"]=[&](){this->set(mStorage.isSet(mStack.top()));};
         mOps["size"]=[&](){mStack.push(std::to_string(mStack.size()));};// push size of stack onto the stack

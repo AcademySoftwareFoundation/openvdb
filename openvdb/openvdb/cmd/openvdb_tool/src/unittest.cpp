@@ -734,6 +734,9 @@ TEST_F(Test_vdb_tool, Translator)
 
     // find two real roots of a quadratic polynomial
     EXPECT_EQ(" 0.683375 7.316625", t("{1:@a:-8:@b:5:@c:$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a:$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}"));
+    
+    EXPECT_EQ("foo bar bla", t("{foo_bar_bla:_ :replace}"));
+    EXPECT_EQ("foo_bar_bla", t("{foo bar bla: _:replace}"));
     //});// end EXPECT_NO_THROW
 }// Translator
 
