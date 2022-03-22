@@ -570,7 +570,7 @@ message(STATUS "Configuring for OpenVDB Version ${OpenVDB_VERSION}")
 # Locate openvdb_ax if necessary
 
 if(NOT OPENVDB_BUILD_AX AND
-    OPENVDB_BUILD_AX_UNITTESTS OR
+    (OPENVDB_BUILD_AX_UNITTESTS OR
     USE_AX))
   find_package(OpenVDB REQUIRED COMPONENTS openvdb_ax)
 endif()
