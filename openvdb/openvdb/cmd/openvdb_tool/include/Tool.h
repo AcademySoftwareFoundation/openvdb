@@ -169,6 +169,9 @@ class Tool
     void clear();
     void init();
 
+    inline auto getGrid(size_t age) const;
+    inline auto getGeom(size_t age) const;
+
 public:
 
     /// @brief Constructor from command-line arguments
@@ -213,6 +216,26 @@ Tool::Tool(int argc, char *argv[])
     //mTimer.restart("parse");
     mParser.parse(argc, argv);// extremely fast
     //mTimer.stop();
+}
+
+// ==============================================================================================================
+
+auto Tool::getGrid(size_t age) const
+{
+    if (mGrid.size()<=age) throw std::invalid_argument(mParser.getAction().name+": no VDB with age "+std::to_string(age));
+    auto it = mGrid.crbegin();
+    std::advance(it, age);
+    return it;
+}
+
+// ==============================================================================================================
+
+auto Tool::getGeom(size_t age) const
+{
+    if (mGeom.size()<=age) throw std::invalid_argument(mParser.getAction().name+": no Geometry with age "+std::to_string(age));
+    auto it = mGeom.crbegin();
+    std::advance(it, age);
+    return it;
 }
 
 // ==============================================================================================================
@@ -307,9 +330,10 @@ void Tool::init()
      [](){}, [&](){this->write();}, 0);// anonymous options are appended to "files"
 
   mParser.addAction(
-     "clear", "", "Deletes geometry and VDB grids",
+     "clear", "", "Deletes geometry, VDB grids and local variables",
     {{"geo", "*", "*|0,1,...", "list of geometries to delete (defaults to all)"},
-     {"vdb", "*", "*|0,1,...", "list of VDB grids to delete (defaults to all)"}},
+     {"vdb", "*", "*|0,1,...", "list of VDB grids to delete (defaults to all)"},
+     {"variables", "0", "1|0|true|false", "clear all the local variables (defaults to off)"}},
      [](){}, [&](){this->clear();});
 
   mParser.addAction(
@@ -324,10 +348,11 @@ void Tool::init()
 
   mParser.addAction(
       "mesh2ls", "m2ls", "Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
-    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). In \"voxel\" is defined \"dim\" is ignored"},
+    {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
      {"geo", "0", "0", "age (i.e. stack index) of the geometry to be processed. Defaults to 0, i.e. most recently inserted geometry."},
+     {"vdb", "-1", "0", "age (i.e. stack index) of reference grid used to define the transform. Defaults to -1, i.e. disabled. If specified this option takes precedence over \"dim\" and \"voxel\"!"},
      {"keep", "", "1|0|true|false", "toggle wether the input geometry is preserved or deleted after the conversion"},
      {"name", "", "mesh2ls_input", "specify the name of the resulting vdb (by default it's derived from the input geometry)"}},
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
@@ -360,7 +385,7 @@ void Tool::init()
 
   mParser.addAction(
       "iso2ls", "i2l", "Converts an iso-surface of a scalar field into a level set (i.e. SDF)",
-    {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+    {{"vdb", "0", "0,1", "age (i.e. stack index) of the VDB grid to be processed and an optional reference grid. Defaults to 0, i.e. most recently inserted VDB."},
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -624,6 +649,107 @@ void Tool::init()
       "examples", "", "print examples to the terminal and terminate", {},
       [&](){std::cerr << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
 
+  Computer &comp = mParser.computer;
+
+  // operations related to VDB grids
+  comp.add("voxelSize", "voxel size of specified vdb grid, e.g. {0:voxelSize} -> {0.01}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->voxelSize()[0]);}
+  );
+
+  comp.add("voxelCount", "number of active voxels of specified VDB grid, e.g. {0:voxelCount} -> {3269821}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->activeVoxelCount());}
+  );
+
+  comp.add("gridCount", "push the number of loaded VDB grids onto the stack, e.g. {gridCount} -> {1}",
+      [&](){comp.push(mGrid.size());});
+
+  comp.add("gridName", "name of a specified VDB grid, e.g. {0:gridName} -> {sphere}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->getName());});
+
+  comp.add("isGridEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->empty());});
+
+  comp.add("gridType", "value type of a specified VDB grid, e.g. {0:gridType} -> {float}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->valueType());});
+
+  comp.add("gridClass", "class of a specified VDB grid, e.g. {0:gridClass} -> {ls}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            switch ((*it)->getGridClass()) {
+                case GRID_LEVEL_SET: comp.set("ls"); break;
+                case GRID_FOG_VOLUME: comp.set("fog"); break;
+                default: comp.set("unknown");
+      }});
+
+  comp.add("isLS", "test if a specified VDB grid is a level set or not, e.g. {0:isLS} -> {1}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->getGridClass()==GRID_LEVEL_SET);
+      });
+
+  comp.add("isFOG", "test if a specified VDB grid is a fog volume or not, e.g. {0:isFOG} -> {0}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            comp.set((*it)->getGridClass()==GRID_FOG_VOLUME);
+      });
+
+  comp.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0|gridDim} -> {[255,255,255]}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
+            std::stringstream ss;
+            ss << bbox.dim();
+            comp.set(ss.str());
+      });
+
+  comp.add("gridBBox", "world bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+      [&](){auto it = this->getGrid(str2int(comp.get()));
+            const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
+            const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+            const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
+            std::stringstream ss;
+            ss << bboxWorld;
+            comp.set(ss.str());
+      });
+
+   // operations related to geometry
+  comp.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            comp.set((*it)->vtxCount());});
+
+  comp.add("polyCount", "number of polygons of a specified geometry, e.g. {0:polyCount} -> {23560}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            comp.set((*it)->polyCount());});
+
+  comp.add("geomCount", "push the number of loaded geometries onto the stack, e.g. {geomCount} -> {1}",
+      [&](){comp.push(mGrid.size());});
+
+  comp.add("geomName", "name of a specified geometry, e.g. {0:geomName} -> {bunny}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            comp.set((*it)->getName());});
+
+  comp.add("isGeomEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            comp.set((*it)->isEmpty());});
+
+  comp.add("geomClass", "class of a specified geometry, e.g. {0:geomClass} -> {points}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            if ((*it)->isPoints()) {
+                comp.set("points");
+            } else if ((*it)->isMesh()) {
+                comp.set("mesh");
+            } else {
+                comp.set("unknown");
+      }});
+
+  comp.add("geomBBox", "world bounding box of specifiedgeometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+      [&](){auto it = this->getGeom(str2int(comp.get()));
+            std::stringstream ss;
+            ss << (*it)->bbox();
+            comp.set(ss.str());
+      });
+
 }// Tool::init()
 
 // ==============================================================================================================
@@ -697,9 +823,7 @@ void Tool::clear()
     mGeom.clear();
   } else {
     for (int a : mParser.getVec<int>("geo")) {
-      if (mGeom.size()<=a) throw std::invalid_argument("clear: no geometry with age "+std::to_string(a));
-      auto it = mGeom.crbegin();
-      std::advance(it, a);
+      auto it = this->getGeom(a);
       mGeom.erase(std::next(it).base());
     }
   }
@@ -707,11 +831,12 @@ void Tool::clear()
     mGrid.clear();
   } else {
     for (int a : mParser.getVec<int>("vdb")) {
-      if (mGrid.size()<=a) throw std::invalid_argument("clear: no vdb with age "+std::to_string(a));
-      auto it = mGrid.crbegin();
-      std::advance(it, a);
+      auto it = this->getGrid(a);
       mGrid.erase(std::next(it).base());
     }
+  }
+  if (mParser.get<bool>("variables")) {
+    mParser.computer.memory().clear();
   }
   mFilter.reset();
 }// Tool::clear
@@ -888,9 +1013,7 @@ void Tool::writeVDB(const std::string &fileName) const
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
     } else {
       for (int a : vectorize<int>(age, ",")) {
-        if (mGrid.size()<=a) throw std::invalid_argument("writeVDB: no vdb grid with age "+std::to_string(a));
-        auto it = mGrid.crbegin();
-        std::advance(it, a);
+        auto it = this->getGrid(a);
         grids.push_back(*it);
       }
     }
@@ -998,9 +1121,7 @@ void Tool::writeNVDB(const std::string &fileName) const
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
     } else {
       for (int a : vectorize<int>(age, ",")) {
-        if (mGrid.size()<=a) throw std::invalid_argument("writeNVDB: no vdb grid with age "+std::to_string(a));
-        auto it = mGrid.crbegin();
-        std::advance(it, a);
+        auto it = this->getGrid(a);
         grids.push_back(*it);
       }
     }
@@ -1070,9 +1191,7 @@ void Tool::writeGeo(const std::string &fileName) const
   assert(mParser.getAction().name == "write");
   const int age = mParser.get<int>("geo");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
-  if (mGeom.size()<=age) throw std::invalid_argument("writeGeo: no geometry with age "+std::to_string(age));
-  auto it = mGeom.crbegin();
-  std::advance(it, age);
+  auto it = this->getGeom(age);
   const Geometry &mesh = **it;
   if (mParser.verbose) mTimer.start("Write geometry");
   mesh.write(fileName);
@@ -1106,9 +1225,7 @@ void Tool::vdbToPoints()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (mGrid.size()<=age) throw std::invalid_argument("vdbToPoints: no geometry with age "+std::to_string(age));
-    auto it = mGrid.crbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     auto grid = gridPtrCast<points::PointDataGrid>(*it);
     if (!grid || grid->getGridClass() != GRID_UNKNOWN) throw std::invalid_argument("vdbToPoints: no PointDataGrid with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("VDB to points");
@@ -1153,10 +1270,8 @@ void Tool::pointsToVdb()
     const int bits = mParser.get<int>("bits");
     std::string grid_name = mParser.get<std::string>("name");
     using GridT = points::PointDataGrid;
-    if (mGeom.size()<=age) throw std::invalid_argument("pointsToVdb: no geometry with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("Points to VDB");
-    auto it = mGeom.crbegin();
-    std::advance(it, age);
+    auto it = this->getGeom(age);
     Points points((*it)->vtx());
     const float voxelSize = points::computeVoxelSize(points, pointsPerVoxel);
     auto xform = math::Transform::createLinearTransform(voxelSize);
@@ -1196,9 +1311,7 @@ void Tool::levelSetToFog()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (mGrid.size()<=age) throw std::invalid_argument("levelSetToFog: no VDB with age "+std::to_string(age));
-    auto it = mGrid.crbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     auto sdf = gridPtrCast<FloatGrid>(*it);
     if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToFog: no Level Set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF to FOG");
@@ -1222,20 +1335,24 @@ void Tool::isoToLevelSet()
   assert(name == "iso2ls");
   try {
     mParser.printAction();
-    const int age = mParser.get<int>("vdb");
+    const VecI age = mParser.getVec<int>("vdb");
+    if (age.size()!=1 && age.size()!=2) throw std::invalid_argument(name+": expected one or two vdb grids, not "+std::to_string(age.size()));
     const float isoValue = mParser.get<float>("iso");
     const float voxel = mParser.get<float>("voxel");
     const float width = mParser.get<float>("width");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (mGrid.size()<=age) throw std::invalid_argument(name+": no VDB with age "+std::to_string(age));
-    auto it = mGrid.crbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age[0]);
     auto grid = gridPtrCast<FloatGrid>(*it);
-    if (!grid) throw std::invalid_argument(name+": no FloatGrid with age "+std::to_string(age));
+    if (!grid) throw std::invalid_argument(name+": no FloatGrid with age "+std::to_string(age[0]));
     if (mParser.verbose) mTimer.start("Iso to SDF");
     math::Transform::Ptr xform(nullptr);
-    if (voxel>0.0f) xform = math::Transform::createLinearTransform(voxel);
+    if (age.size()==2) {
+      auto it = this->getGrid(age[1]);
+      xform = (*it)->transform().copy();
+    } else if (voxel>0.0f) {
+      xform = math::Transform::createLinearTransform(voxel);
+    }
     auto sdf = tools::levelSetRebuild(*grid, isoValue, width, xform.get());
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = "iso2ls_"+grid->getName();
@@ -1251,9 +1368,7 @@ void Tool::isoToLevelSet()
 
 float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
 {
-  if (mGeom.size()<=geo_age) throw std::invalid_argument("estimateVoxelSize: no geometry with age "+std::to_string(geo_age));
-  auto it = mGeom.crbegin();
-  std::advance(it, geo_age);
+  auto it = this->getGeom(geo_age);
   const auto bbox = (*it)->bbox();
   if (!bbox) {
     throw std::invalid_argument("estimateVoxelSize: invalid bbox");
@@ -1275,18 +1390,23 @@ void Tool::meshToLevelSet()
     const int dim = mParser.get<int>("dim");
     float voxel = mParser.get<float>("voxel");
     const float width = mParser.get<float>("width");
-    const int age = mParser.get<int>("geo");
+    const int geo_age = mParser.get<int>("geo");
+    const int vdb_age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, age);
 
-    if (mGeom.size()<=age) throw std::invalid_argument("mesh2ls: no geometry with age "+std::to_string(age));
-    auto it = mGeom.crbegin();
-    std::advance(it, age);
+    math::Transform::Ptr xform(nullptr);
+    if (vdb_age>=0) {
+      auto it = this->getGrid(vdb_age);
+      xform = (*it)->transform().copy();
+    } else {
+      if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, geo_age);
+      xform = math::Transform::createLinearTransform(voxel);
+    }
+    auto it = this->getGeom(geo_age);
     const Geometry &mesh = **it;
     if (mesh.isPoints()) this->warning("Warning: -mesh2ls was called on points, not a mesh! Hint: use -points2ls instead!");
     if (mParser.verbose) mTimer.start("Mesh -> SDF");
-    auto xform = math::Transform::createLinearTransform(voxel);
     auto grid  = tools::meshToLevelSet<GridT>(*xform, mesh.vtx(), mesh.tri(), mesh.quad(), width);
     if (grid_name.empty()) grid_name = "mesh2ls_" + mesh.getName();
     grid->setName(grid_name);
@@ -1314,9 +1434,7 @@ void Tool::particlesToLevelSet()
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
     if (voxel == 0.0f) voxel = this->estimateVoxelSize(dim, width, age);
-    if (mGeom.size()<=age) throw std::invalid_argument("p2ls: no geometry with age "+std::to_string(age));
-    auto it = mGeom.crbegin();
-    std::advance(it, age);
+    auto it = this->getGeom(age);
     const Geometry &points = **it;
     if (points.isMesh()) this->warning("Warning: -points2ls was called on a mesh, not points! Hint: use -mesh2ls instead!");
     if (mParser.verbose) mTimer.start("Points->SDF");
@@ -1390,9 +1508,7 @@ void Tool::offsetLevelSet()
     const int age = mParser.get<int>("vdb");
     if (radius<0) throw std::invalid_argument("offsetLevelSet: invalid radius");
     if (radius==0) return;
-    if (mGrid.size()<=age) throw std::invalid_argument("offsetLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("offsetLevelSet: no level set with age "+std::to_string(age));
     this->updateFilter(*grid, space, time);
@@ -1436,9 +1552,7 @@ void Tool::filterLevelSet()
     const int size = mParser.get<int>("size");
     if (size<0) throw std::invalid_argument("filterLevelSet: invalid filter size");
     if (size==0) return;
-    if (mGrid.size()<=age) throw std::invalid_argument("filterLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("filterLevelSet: no level set with age "+std::to_string(age));
     this->updateFilter(*grid, space, time);
@@ -1471,9 +1585,7 @@ void Tool::pruneLevelSet()
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
-    if (mGrid.size()<=age) throw std::invalid_argument("pruneLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("pruneLevelSet: no level set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("Prune   SDF");
@@ -1494,9 +1606,7 @@ void Tool::floodLevelSet()
   try {
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
-    if (mGrid.size()<=age) throw std::invalid_argument("floodLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("Flood   SDF");
@@ -1518,9 +1628,7 @@ void Tool::compute()
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    if (mGrid.size()<=age) throw std::invalid_argument("floodLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     if (name == "cpt") {
       if (mParser.verbose) mTimer.start("CPT of SDF");
       auto sdf = gridPtrCast<FloatGrid>(*it);
@@ -1592,11 +1700,7 @@ void Tool::csg()
     const bool rebuild = mParser.get<bool>("rebuild");
     if (ij.size()!=2) throw std::invalid_argument("csg: expected two vdb ages, but got "+std::to_string(ij.size()));
     if (ij[0] == ij[1]) throw std::invalid_argument("csg: identical inputs: volume1=volume2="+std::to_string(ij[0]));
-    if (mGrid.size()<=ij[0]) throw std::invalid_argument("csg: no Level set at volume1="+std::to_string(ij[0]));
-    if (mGrid.size()<=ij[1]) throw std::invalid_argument("csg: no Level set at volume2="+std::to_string(ij[1]));
-    auto itA = mGrid.rbegin(), itB = mGrid.rbegin();
-    std::advance(itA, ij[0]);
-    std::advance(itB, ij[1]);
+    auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
     GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
     if (!gridA || gridA->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("floodLevelSet: no level set with age "+std::to_string(ij[0]));
     GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
@@ -1671,9 +1775,7 @@ void Tool::levelSetToMesh()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (mGrid.size()<=age) throw std::invalid_argument("levelSetToMesh: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF -> mesh");
@@ -1764,9 +1866,7 @@ void Tool::multires()
     const int levels = mParser.get<int>("levels");
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    if (mGrid.size()<=age) throw std::invalid_argument("multires: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid) throw std::invalid_argument("multires: no FloatGrid with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("MultiResGrid");
@@ -1796,9 +1896,7 @@ void Tool::expandLevelSet()
     const int iter = mParser.get<int>("iter");
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    if (mGrid.size()<=age) throw std::invalid_argument("expandLevelSet: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr sdf = gridPtrCast<GridT>(*it);
     if (!sdf || sdf->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("expandLevelSet: no level set with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("Expand SDF");
@@ -1822,9 +1920,7 @@ void Tool::segment()
     mParser.printAction();
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    if (mGrid.size()<=age) throw std::invalid_argument("segment: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     if (mParser.verbose) mTimer.start("Segmenting VDB");
     std::vector<GridBase::Ptr> grids;
     if (auto grid = gridPtrCast<GridT>(*it)) {
@@ -1862,13 +1958,11 @@ void Tool::resample()
     const bool keep = mParser.get<bool>("keep");
 
     if (age.size()!=1 && age.size()!=2) throw std::invalid_argument("resample: expected one or two arguments to \"vdb\"");
-    if (mGrid.size()<=age[0]) throw std::invalid_argument("resample: no grid with age "+std::to_string(age[0]));
-    FloatGrid::Ptr inGrid, outGrid;
+    auto itIn = this->getGrid(age[0]);
+    FloatGrid::Ptr inGrid = gridPtrCast<FloatGrid>(*itIn), outGrid;
     if (age.size()==2) {
-      if (mGrid.size()<=age[1]) throw std::invalid_argument("resample: no reference grid with age "+std::to_string(age[1]));
-      auto it = mGrid.rbegin();
-      std::advance(it, age[1]);
-      outGrid = gridPtrCast<FloatGrid>(*it);
+      auto itOut = this->getGrid(age[1]);
+      outGrid = gridPtrCast<FloatGrid>(*itOut);
       if (!outGrid) throw std::invalid_argument("resample: no reference grid of type float with age "+std::to_string(age[1]));
     } else {
       if (scale<=0.0f) throw std::invalid_argument("resample: invalid scale: "+std::to_string(scale));
@@ -1877,9 +1971,7 @@ void Tool::resample()
       outGrid = FloatGrid::create();
       outGrid->setTransform(xform);
     }
-    auto it = mGrid.rbegin();
-    std::advance(it, age[0]);
-    inGrid = gridPtrCast<FloatGrid>(*it);
+
     if (!inGrid) throw std::invalid_argument("resample: no grid of type float with age "+std::to_string(age[0]));
 
     if (mParser.verbose) mTimer.start("Resampling VDB");
@@ -1896,7 +1988,7 @@ void Tool::resample()
     default:
       throw std::invalid_argument("resample: invalid interpolation order: "+std::to_string(order));
     }
-    if (!keep) mGrid.erase(std::next(it).base());
+    if (!keep) mGrid.erase(std::next(itIn).base());
     if (age.size()==1) mGrid.push_back(outGrid);
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
@@ -1918,9 +2010,7 @@ void Tool::scatter()
     const int age = mParser.get<int>("vdb");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
-    if (mGrid.size()<=age) throw std::invalid_argument("scatter: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid) throw std::invalid_argument("scatter: no float grid with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF -> mesh");
@@ -1992,9 +2082,7 @@ void Tool::enright()
       }
       Vec3f operator() (const Coord& ijk, float time) const {return (*this)(ijk.asVec3d(), time);}
     } field(xform);
-    if (mGrid.size()<=age) throw std::invalid_argument("enright: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (keep) {
       auto tmp = grid->deepCopy();
@@ -2024,9 +2112,7 @@ GridBase::Ptr Tool::clip(const VecF &v, int age, const GridType &input)
   GridBase::Ptr output;
   switch (v.size()) {
   case 0: {// clip against a mask
-    if (mGrid.size()<=age) throw std::invalid_argument("clip: no mask grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     if (auto mask = gridPtrCast<FloatGrid>(*it)) {
       output = tools::clip(input, *mask);
     } else if (auto mask = gridPtrCast<Vec3fGrid>(*it)) {
@@ -2069,9 +2155,7 @@ void Tool::clip()
     if ((tmp = mParser.get<float>("taper")) > 0.0f) vec.push_back(tmp);
     if ((tmp = mParser.get<float>("depth")) > 0.0f) vec.push_back(tmp);
     const int mask = mParser.get<int>("mask");
-    if (mGrid.size()<=age) throw std::invalid_argument("clip: no grid with age "+std::to_string(age));
-    auto it = mGrid.rbegin();
-    std::advance(it, age);
+    auto it = this->getGrid(age);
     GridBase::Ptr grid;
     if (mParser.verbose) mTimer.start("Clip VDB grid");
     if (auto floatGrid = gridPtrCast<FloatGrid>(*it)) {
@@ -2259,9 +2343,7 @@ void Tool::render()
     throw std::invalid_argument("render: \"light\" option expected 3 or 6 values, got "+std::to_string(light.size()));
   }
   if (image.size()!=2) throw std::invalid_argument("render: expected width and height,  e.g. image=1920x1080");
-  if (mGrid.size()<=age) throw std::invalid_argument("render: no grid with age "+std::to_string(age));
-  auto it = mGrid.rbegin();
-  std::advance(it, age);
+  auto it = this->getGrid(age);
   GridT::Ptr grid = gridPtrCast<GridT>(*it);
   if (!grid) throw std::invalid_argument("render: no float with age "+std::to_string(age));
   if (step.size()!=2) throw std::invalid_argument("render: \"step\" option expected 2 values, but got "+std::to_string(step.size()));
@@ -2277,9 +2359,7 @@ void Tool::render()
   }
   Vec3SGrid::Ptr colorgridPtr;
   if (colorgrid>=0) {
-    if (mGrid.size()<=colorgrid) throw std::invalid_argument("render: no colorgrid with age "+std::to_string(colorgrid));
-    auto it2 = mGrid.rbegin();
-    std::advance(it2, colorgrid);
+    auto it2 = this->getGrid(colorgrid);
     colorgridPtr = gridPtrCast<Vec3SGrid>(*it2);
     if (!colorgridPtr) throw std::invalid_argument("render: no colorgrid of type Vec3f with age "+std::to_string(colorgrid));
   }
@@ -2397,7 +2477,7 @@ void Tool::print(std::ostream& os) const
     mParser.print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
     os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
-    mParser.storage.print(os);
+    mParser.computer.memory().print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
   if (mParser.verbose>0) {

@@ -4,6 +4,7 @@
 #include <stdio.h>// for std::remove
 #include <string>
 #include <fstream>
+#include <set>
 
 #include "Tool.h"
 
@@ -108,44 +109,6 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ(3, openvdb::vdb_tool::findFileExt("path/file_002.EXT", {"e",   "ex",  "ext"}));
       EXPECT_EQ(1, openvdb::vdb_tool::findFileExt("path/file_002.ext", {"ext", "ext", "ab"}));
       EXPECT_EQ(0, openvdb::vdb_tool::findFileExt("path/file_002.ext", {"abc", "efg", "ab"}));
-    }
-    {// replace
-      EXPECT_EQ("base%",  openvdb::vdb_tool::replace("base%", 'i', "1"));
-      EXPECT_EQ("base1234",  openvdb::vdb_tool::replace("base%i", 'i', "1234"));
-      EXPECT_EQ("base%1", openvdb::vdb_tool::replace("base%1", 'i', "1"));
-      EXPECT_EQ("base1",  openvdb::vdb_tool::replace("base%1i", 'i', "1"));
-      EXPECT_EQ("path/base_0003.vdb", openvdb::vdb_tool::replace("path/base_%4i.vdb",  'i', "3"));
-      EXPECT_EQ("path/base_0003_03.vdb", openvdb::vdb_tool::replace("path/base_%4i_%2i.vdb",  'i', "3"));
-      EXPECT_EQ("path/base_0003_%2j.vdb", openvdb::vdb_tool::replace("path/base_%4i_%2j.vdb",  'i', "3"));
-      EXPECT_EQ("path/base_20003_02.vdb", openvdb::vdb_tool::replace(openvdb::vdb_tool::replace("path/base_%j%4i_%2j.vdb",  'i', "3"),'j', "2"));
-      EXPECT_EQ("path/base_1003.vdb", openvdb::vdb_tool::replace("path/base_%4i.vdb",  'i', "1003"));
-      EXPECT_EQ("path/base_3.vdb", openvdb::vdb_tool::replace("path/base_%i.vdb",  'i', "3"));
-      EXPECT_EQ("path/base_%4i.vdb", openvdb::vdb_tool::replace("path/base_%4i.vdb", 'j', "3"));
-      EXPECT_EQ("path/base_0003.vdb", openvdb::vdb_tool::replace("path/base_0003.vdb", 'i', "3"));
-
-      EXPECT_EQ("f=1.2", openvdb::vdb_tool::replace("f=%i", 'i', "1.2"));
-      EXPECT_EQ("f=1.2", openvdb::vdb_tool::replace("f=%3i", 'i', "1.2"));
-      EXPECT_EQ("f=01.2", openvdb::vdb_tool::replace("f=%4i", 'i', "1.2"));
-      EXPECT_EQ("f=%", openvdb::vdb_tool::replace("f=%", 'i', "1.2"));
-      EXPECT_EQ("f=1", openvdb::vdb_tool::replace("f=1", 'i', "1.2"));
-      EXPECT_EQ("1", openvdb::vdb_tool::replace("1", 'i', "1.2"));
-      EXPECT_EQ("%", openvdb::vdb_tool::replace("%", 'i', "1.2"));
-    }
-
-    {// test LoopParam
-      struct LoopParam {
-        char c; double value, end, stride;
-        bool next() { value += stride; return value < end; }
-        std::string str() const {return floor(value) == value ? std::to_string(int(value)) : std::to_string(float(value));}
-      } p{'i', 0.0, 4.0, 2.0};
-
-      EXPECT_EQ("value=0", openvdb::vdb_tool::replace("value=%i", p.c, p.str()));
-      EXPECT_TRUE( p.next() );
-      EXPECT_EQ("value=002", openvdb::vdb_tool::replace("value=%3i", p.c, p.str()));
-      LoopParam q{'v', 0.1, 4.0, 0.5};
-      EXPECT_EQ("value=0.100000", openvdb::vdb_tool::replace("value=%v", q.c, q.str()));
-      EXPECT_TRUE( q.next() );
-      EXPECT_EQ("value=0.600000", openvdb::vdb_tool::replace("value=%v", q.c, q.str()));
     }
 
     {// starts_with
@@ -307,7 +270,16 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ(-6.0, v);
       EXPECT_FALSE(openvdb::vdb_tool::is_number("-7.0f", i, v));
     }
-}
+
+    {// uuid
+      std::set<std::string> tmp;
+      const size_t size = 10000;
+      for (size_t i=0; i<size; ++i) {
+        EXPECT_TRUE(tmp.emplace(openvdb::vdb_tool::uuid()).second);
+      }
+      EXPECT_EQ(size, tmp.size());
+    }
+}// Util
 
 TEST_F(Test_vdb_tool, getArgs)
 {
@@ -416,29 +388,48 @@ TEST_F(Test_vdb_tool, Geometry)
   }
 }// Geometry
 
+TEST_F(Test_vdb_tool, Memory)
+{
+    using namespace openvdb::vdb_tool;
+    Memory mem;
+    EXPECT_EQ(std::to_string(2.718281828459), mem.get("e"));
+    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), mem.get("pi"));
+    EXPECT_EQ(2, mem.size());
+    EXPECT_FALSE(mem.isSet("a"));
+    mem.set("a", 1.4f);
+    EXPECT_TRUE(mem.isSet("a"));
+    EXPECT_EQ(std::to_string(1.4f), mem.get("a"));
+    EXPECT_EQ(3, mem.size());
+    mem.clear();
+    EXPECT_EQ(std::to_string(2.718281828459), mem.get("e"));
+    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), mem.get("pi"));
+    EXPECT_EQ(2, mem.size());
+    EXPECT_FALSE(mem.isSet("a"));
+}
+
 TEST_F(Test_vdb_tool, Stack)
 {
     using namespace openvdb::vdb_tool;
     Stack s;
-    EXPECT_EQ(0, s.size());
+    EXPECT_EQ(0, s.depth());
     EXPECT_TRUE(s.empty());
     s.push("foo");
-    EXPECT_EQ(1, s.size());
+    EXPECT_EQ(1, s.depth());
     EXPECT_FALSE(s.empty());
     EXPECT_EQ("foo", s.pop());
     s.push("foo");
     s.push("bar");
-    EXPECT_EQ(2, s.size());
+    EXPECT_EQ(2, s.depth());
     EXPECT_FALSE(s.empty());
     s.drop();
-    EXPECT_EQ(1, s.size());
+    EXPECT_EQ(1, s.depth());
     EXPECT_EQ("foo", s.top());
     EXPECT_EQ("foo", s.peek());
     s.top() = "bar";
     EXPECT_EQ("bar", s.top());
     EXPECT_EQ("bar", s.peek());
     s.dup();
-    EXPECT_EQ(2, s.size());
+    EXPECT_EQ(2, s.depth());
     EXPECT_EQ(Stack({"bar", "bar"}), s);
     s.top() = "foo";
     EXPECT_EQ(Stack({"bar", "foo"}), s);
@@ -462,283 +453,303 @@ TEST_F(Test_vdb_tool, Stack)
     EXPECT_EQ(Stack({"bla", "bar", "bob", "foo"}), s);
     s.tuck();
     EXPECT_EQ(Stack({"bla", "foo", "bar", "bob"}), s);
-    //s.print();
     std::stringstream ss;
     s.print(ss);
-    EXPECT_EQ(std::string(" bla foo bar bob"), ss.str());
-}
+    EXPECT_EQ(std::string("bla,foo,bar,bob"), ss.str());
+}// Stack
 
-TEST_F(Test_vdb_tool, Translator)
+TEST_F(Test_vdb_tool, Computer)
 {
     using namespace openvdb::vdb_tool;
-    Storage s;
-    Translator t(s);
+    Computer comp;
 
     // test set and get, i.e. @ and $
-    EXPECT_THROW({t("{$file}");}, std::invalid_argument);
-    EXPECT_THROW({t("{dup}");},  std::invalid_argument);
-    EXPECT_THROW({t("{drop}");}, std::invalid_argument);
-    EXPECT_THROW({t("{swap}");}, std::invalid_argument);
+    EXPECT_THROW({comp("{$file}");}, std::invalid_argument);
+    EXPECT_THROW({comp("{dup}");},  std::invalid_argument);
+    EXPECT_THROW({comp("{drop}");}, std::invalid_argument);
+    EXPECT_THROW({comp("{swap}");}, std::invalid_argument);
 
     //EXPECT_NO_THROW({// everything below should pass and not throw!
 
-    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), t("{$pi}"));
-    EXPECT_TRUE(t("{path/base_0123.ext:@file}").empty());
-    EXPECT_EQ("path/base_0123.ext", t("{$file}"));
-    EXPECT_TRUE(t("{1:@G}").empty());
-    EXPECT_EQ("1", t("{$G}"));
-    EXPECT_TRUE(t("{$file:upper:@file2}").empty());
-    EXPECT_EQ("PATH/BASE_0123.EXT", t("{$file2}"));
-    EXPECT_TRUE(t("{$G:1000:+:@F}").empty());
-    EXPECT_EQ("1001", t("{$F}"));
-    EXPECT_TRUE(t("{0.1:@x:0.2:@y}").empty());
-    EXPECT_EQ("0.1", t("{$x}"));
-    EXPECT_EQ("0.2", t("{$y}"));
-    EXPECT_TRUE(t("{1:$G:+:@G}").empty());
-    EXPECT_EQ("2", t("{$G}"));
-    EXPECT_TRUE(t("{$G:++:@G}").empty());
-    EXPECT_EQ("3", t("{$G}"));
-    EXPECT_EQ(7, s.size());
+    EXPECT_EQ(2, comp.memory().size());
+    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{$pi}"));
+    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{pi:get}"));
+    EXPECT_EQ(std::to_string(2.718281828459), comp("{$e}"));
+    EXPECT_TRUE(comp("{path/base_0123.ext:@file}").empty());
+    EXPECT_EQ("path/base_0123.ext", comp("{$file}"));
+    EXPECT_TRUE(comp("{1:@G}").empty());
+    EXPECT_EQ("1", comp("{$G}"));
+    EXPECT_TRUE(comp("{$file:upper:@file2}").empty());
+    EXPECT_EQ("PATH/BASE_0123.EXT", comp("{$file2}"));
+    EXPECT_TRUE(comp("{$G:1000:+:@F}").empty());
+    EXPECT_EQ("1001", comp("{$F}"));
+    EXPECT_TRUE(comp("{0.1:@x:0.2:@y}").empty());
+    EXPECT_EQ("0.1", comp("{$x}"));
+    EXPECT_EQ("0.2", comp("{$y}"));
+    EXPECT_TRUE(comp("{1:$G:+:@G}").empty());
+    EXPECT_EQ("2", comp("{$G}"));
+    EXPECT_TRUE(comp("{$G:++:@G}").empty());
+    EXPECT_EQ("3", comp("{$G}"));
+    EXPECT_EQ(8, comp.memory().size());
 
     // test file-name methods
-    EXPECT_EQ("path", t("{$file:path}"));
-    EXPECT_EQ("base_0123.ext", t("{$file:file}"));
-    EXPECT_EQ("base_0123", t("{$file:name}"));
-    EXPECT_EQ("base_", t("{$file:base}"));
-    EXPECT_EQ("0123", t("{$file:number}"));
-    EXPECT_EQ("ext", t("{$file:ext}"));
+    EXPECT_EQ("path", comp("{$file:path}"));
+    EXPECT_EQ("base_0123.ext", comp("{$file:file}"));
+    EXPECT_EQ("base_0123", comp("{$file:name}"));
+    EXPECT_EQ("base_", comp("{$file:base}"));
+    EXPECT_EQ("0123", comp("{$file:number}"));
+    EXPECT_EQ("ext", comp("{$file:ext}"));
 
-    EXPECT_EQ("6", t("{5:1:+}"));
-    EXPECT_EQ(std::to_string(6.0f), t("{5.0:1:+}"));
-    EXPECT_EQ(std::to_string(6.2f), t("{5.0:1.2:+}"));
+    EXPECT_EQ("6", comp("{5:1:+}"));
+    EXPECT_EQ(std::to_string(6.0f), comp("{5.0:1:+}"));
+    EXPECT_EQ(std::to_string(6.2f), comp("{5.0:1.2:+}"));
 
-    EXPECT_EQ("4", t("{5:1:-}"));
-    EXPECT_EQ(std::to_string(4.0f), t("{5.0:1:-}"));
-    EXPECT_EQ(std::to_string(3.8f), t("{5.0:1.2:-}"));
+    EXPECT_EQ("4", comp("{5:1:-}"));
+    EXPECT_EQ(std::to_string(4.0f), comp("{5.0:1:-}"));
+    EXPECT_EQ(std::to_string(3.8f), comp("{5.0:1.2:-}"));
 
-    EXPECT_EQ("10", t("{5:2:*}"));
-    EXPECT_EQ(std::to_string(10.0f), t("{5.0:2:*}"));
-    EXPECT_EQ(std::to_string(6.0f), t("{5.0:1.2:*}"));
+    EXPECT_EQ("10", comp("{5:2:*}"));
+    EXPECT_EQ(std::to_string(10.0f), comp("{5.0:2:*}"));
+    EXPECT_EQ(std::to_string(6.0f), comp("{5.0:1.2:*}"));
 
-    EXPECT_EQ("5", t("{10:2:/}"));
-    EXPECT_EQ("0", t("{2:10:/}"));
-    EXPECT_EQ(std::to_string(5.0f), t("{10.0:2.0:/}"));
-    EXPECT_EQ(std::to_string(0.2f), t("{2.0:10.0:/}"));
+    EXPECT_EQ("5", comp("{10:2:/}"));
+    EXPECT_EQ("0", comp("{2:10:/}"));
+    EXPECT_EQ(std::to_string(5.0f), comp("{10.0:2.0:/}"));
+    EXPECT_EQ(std::to_string(0.2f), comp("{2.0:10.0:/}"));
 
-    EXPECT_EQ("6", t("{5:++}"));
-    EXPECT_EQ(std::to_string(6.2f), t("{5.2:++}"));
+    EXPECT_EQ("6", comp("{5:++}"));
+    EXPECT_EQ(std::to_string(6.2f), comp("{5.2:++}"));
 
-    EXPECT_EQ("4", t("{5:--}"));
-    EXPECT_EQ(std::to_string(4.2f), t("{5.2:--}"));
+    EXPECT_EQ("4", comp("{5:--}"));
+    EXPECT_EQ(std::to_string(4.2f), comp("{5.2:--}"));
 
-    EXPECT_EQ("0", t("{5:2:==}"));
-    EXPECT_EQ("0", t("{5.0:2.0:==}"));
-    EXPECT_EQ("1", t("{5:5:==}"));
-    EXPECT_EQ("1", t("{5.0:5.0:==}"));
-    EXPECT_EQ("0", t("{foo:bar:==}"));
-    EXPECT_EQ("1", t("{foo:foo:==}"));
+    EXPECT_EQ("0", comp("{5:2:==}"));
+    EXPECT_EQ("0", comp("{5.0:2.0:==}"));
+    EXPECT_EQ("1", comp("{5:5:==}"));
+    EXPECT_EQ("1", comp("{5.0:5.0:==}"));
+    EXPECT_EQ("0", comp("{foo:bar:==}"));
+    EXPECT_EQ("1", comp("{foo:foo:==}"));
 
-    EXPECT_EQ("1", t("{5:2:!=}"));
-    EXPECT_EQ("1", t("{5.0:2.0:!=}"));
-    EXPECT_EQ("0", t("{5:5:!=}"));
-    EXPECT_EQ("0", t("{5.0:5.0:!=}"));
-    EXPECT_EQ("1", t("{foo:bar:!=}"));
-    EXPECT_EQ("0", t("{foo:foo:!=}"));
+    EXPECT_EQ("1", comp("{5:2:!=}"));
+    EXPECT_EQ("1", comp("{5.0:2.0:!=}"));
+    EXPECT_EQ("0", comp("{5:5:!=}"));
+    EXPECT_EQ("0", comp("{5.0:5.0:!=}"));
+    EXPECT_EQ("1", comp("{foo:bar:!=}"));
+    EXPECT_EQ("0", comp("{foo:foo:!=}"));
 
-    EXPECT_EQ("0", t("{5:2:<=}"));
-    EXPECT_EQ("0", t("{5.0:2.0:<=}"));
-    EXPECT_EQ("0", t("{foo:bar:<=}"));
-    EXPECT_EQ("1", t("{2:5:<=}"));
-    EXPECT_EQ("1", t("{2.0:5.0:<=}"));
-    EXPECT_EQ("1", t("{bar:foo:<=}"));
-    EXPECT_EQ("1", t("{5:5:<=}"));
-    EXPECT_EQ("1", t("{5.0:5.0:<=}"));
-    EXPECT_EQ("1", t("{foo:foo:<=}"));
+    EXPECT_EQ("0", comp("{5:2:<=}"));
+    EXPECT_EQ("0", comp("{5.0:2.0:<=}"));
+    EXPECT_EQ("0", comp("{foo:bar:<=}"));
+    EXPECT_EQ("1", comp("{2:5:<=}"));
+    EXPECT_EQ("1", comp("{2.0:5.0:<=}"));
+    EXPECT_EQ("1", comp("{bar:foo:<=}"));
+    EXPECT_EQ("1", comp("{5:5:<=}"));
+    EXPECT_EQ("1", comp("{5.0:5.0:<=}"));
+    EXPECT_EQ("1", comp("{foo:foo:<=}"));
 
-    EXPECT_EQ("1", t("{5:2:>=}"));
-    EXPECT_EQ("1", t("{5.0:2.0:>=}"));
-    EXPECT_EQ("1", t("{foo:bar:>=}"));
-    EXPECT_EQ("0", t("{2:5:>=}"));
-    EXPECT_EQ("0", t("{2.0:5.0:>=}"));
-    EXPECT_EQ("0", t("{bar:foo:>=}"));
-    EXPECT_EQ("1", t("{5:5:>=}"));
-    EXPECT_EQ("1", t("{5.0:5.0:>=}"));
-    EXPECT_EQ("1", t("{foo:foo:>=}"));
+    EXPECT_EQ("1", comp("{5:2:>=}"));
+    EXPECT_EQ("1", comp("{5.0:2.0:>=}"));
+    EXPECT_EQ("1", comp("{foo:bar:>=}"));
+    EXPECT_EQ("0", comp("{2:5:>=}"));
+    EXPECT_EQ("0", comp("{2.0:5.0:>=}"));
+    EXPECT_EQ("0", comp("{bar:foo:>=}"));
+    EXPECT_EQ("1", comp("{5:5:>=}"));
+    EXPECT_EQ("1", comp("{5.0:5.0:>=}"));
+    EXPECT_EQ("1", comp("{foo:foo:>=}"));
 
-    EXPECT_EQ("1", t("{5:2:>}"));
-    EXPECT_EQ("1", t("{5.0:2.0:>}"));
-    EXPECT_EQ("1", t("{foo:bar:>}"));
-    EXPECT_EQ("0", t("{2:5:>}"));
-    EXPECT_EQ("0", t("{2.0:5.0:>}"));
-    EXPECT_EQ("0", t("{bar:foo:>}"));
-    EXPECT_EQ("0", t("{5:5:>}"));
-    EXPECT_EQ("0", t("{5.0:5.0:>}"));
-    EXPECT_EQ("0", t("{foo:foo:>}"));
+    EXPECT_EQ("1", comp("{5:2:>}"));
+    EXPECT_EQ("1", comp("{5.0:2.0:>}"));
+    EXPECT_EQ("1", comp("{foo:bar:>}"));
+    EXPECT_EQ("0", comp("{2:5:>}"));
+    EXPECT_EQ("0", comp("{2.0:5.0:>}"));
+    EXPECT_EQ("0", comp("{bar:foo:>}"));
+    EXPECT_EQ("0", comp("{5:5:>}"));
+    EXPECT_EQ("0", comp("{5.0:5.0:>}"));
+    EXPECT_EQ("0", comp("{foo:foo:>}"));
 
-    EXPECT_EQ("0", t("{5:2:<}"));
-    EXPECT_EQ("0", t("{5.0:2.0:<}"));
-    EXPECT_EQ("0", t("{foo:bar:<}"));
-    EXPECT_EQ("1", t("{2:5:<}"));
-    EXPECT_EQ("1", t("{2.0:5.0:<}"));
-    EXPECT_EQ("1", t("{bar:foo:<}"));
-    EXPECT_EQ("0", t("{5:5:<}"));
-    EXPECT_EQ("0", t("{5.0:5.0:<}"));
-    EXPECT_EQ("0", t("{foo:foo:<}"));
+    EXPECT_EQ("0", comp("{5:2:<}"));
+    EXPECT_EQ("0", comp("{5.0:2.0:<}"));
+    EXPECT_EQ("0", comp("{foo:bar:<}"));
+    EXPECT_EQ("1", comp("{2:5:<}"));
+    EXPECT_EQ("1", comp("{2.0:5.0:<}"));
+    EXPECT_EQ("1", comp("{bar:foo:<}"));
+    EXPECT_EQ("0", comp("{5:5:<}"));
+    EXPECT_EQ("0", comp("{5.0:5.0:<}"));
+    EXPECT_EQ("0", comp("{foo:foo:<}"));
 
-    EXPECT_EQ("1", t("{0:!}"));
-    EXPECT_EQ("0", t("{1:!}"));
-    EXPECT_EQ("1", t("{false:!}"));
-    EXPECT_EQ("0", t("{true:!}"));
+    EXPECT_EQ("1", comp("{0:!}"));
+    EXPECT_EQ("0", comp("{1:!}"));
+    EXPECT_EQ("1", comp("{false:!}"));
+    EXPECT_EQ("0", comp("{true:!}"));
 
-    EXPECT_EQ("1", t("{0:1:|}"));
-    EXPECT_EQ("1", t("{1:0:|}"));
-    EXPECT_EQ("1", t("{1:1:|}"));
-    EXPECT_EQ("0", t("{0:0:|}"));
-    EXPECT_EQ("1", t("{false:true:|}"));
-    EXPECT_EQ("0", t("{false:false:|}"));
+    EXPECT_EQ("1", comp("{0:1:|}"));
+    EXPECT_EQ("1", comp("{1:0:|}"));
+    EXPECT_EQ("1", comp("{1:1:|}"));
+    EXPECT_EQ("0", comp("{0:0:|}"));
+    EXPECT_EQ("1", comp("{false:true:|}"));
+    EXPECT_EQ("0", comp("{false:false:|}"));
 
-    EXPECT_EQ("0", t("{0:1:&}"));
-    EXPECT_EQ("0", t("{1:0:&}"));
-    EXPECT_EQ("1", t("{1:1:&}"));
-    EXPECT_EQ("0", t("{0:0:&}"));
-    EXPECT_EQ("0", t("{false:true:&}"));
-    EXPECT_EQ("0", t("{false:false:&}"));
+    EXPECT_EQ("0", comp("{0:1:&}"));
+    EXPECT_EQ("0", comp("{1:0:&}"));
+    EXPECT_EQ("1", comp("{1:1:&}"));
+    EXPECT_EQ("0", comp("{0:0:&}"));
+    EXPECT_EQ("0", comp("{false:true:&}"));
+    EXPECT_EQ("0", comp("{false:false:&}"));
 
-    EXPECT_EQ("1", t("{1:abs}"));
-    EXPECT_EQ("1", t("{-1:abs}"));
-    EXPECT_EQ(std::to_string(1.2f), t("{1.2:abs}"));
-    EXPECT_EQ(std::to_string(1.2f), t("{-1.2:abs}"));
+    EXPECT_EQ("1", comp("{1:abs}"));
+    EXPECT_EQ("1", comp("{-1:abs}"));
+    EXPECT_EQ(std::to_string(1.2f), comp("{1.2:abs}"));
+    EXPECT_EQ(std::to_string(1.2f), comp("{-1.2:abs}"));
 
-    EXPECT_EQ(std::to_string(1.0f), t("{1:ceil}"));
-    EXPECT_EQ(std::to_string(2.0f), t("{1.2:ceil}"));
-    EXPECT_EQ(std::to_string(-1.0f), t("{-1.2:ceil}"));
+    EXPECT_EQ(std::to_string(1.0f), comp("{1:ceil}"));
+    EXPECT_EQ(std::to_string(2.0f), comp("{1.2:ceil}"));
+    EXPECT_EQ(std::to_string(-1.0f), comp("{-1.2:ceil}"));
 
-    EXPECT_EQ(std::to_string(1.0f), t("{1:floor}"));
-    EXPECT_EQ(std::to_string(1.0f), t("{1.2:floor}"));
-    EXPECT_EQ(std::to_string(-2.0f), t("{-1.2:floor}"));
+    EXPECT_EQ(std::to_string(1.0f), comp("{1:floor}"));
+    EXPECT_EQ(std::to_string(1.0f), comp("{1.2:floor}"));
+    EXPECT_EQ(std::to_string(-2.0f), comp("{-1.2:floor}"));
 
-    EXPECT_EQ("4", t("{2:pow2}"));
-    EXPECT_EQ(std::to_string(4.0f), t("{2.0:pow2}"));
+    EXPECT_EQ("4", comp("{2:pow2}"));
+    EXPECT_EQ(std::to_string(4.0f), comp("{2.0:pow2}"));
 
-    EXPECT_EQ("8", t("{2:pow3}"));
-    EXPECT_EQ(std::to_string(8.0f), t("{2.0:pow3}"));
+    EXPECT_EQ("8", comp("{2:pow3}"));
+    EXPECT_EQ(std::to_string(8.0f), comp("{2.0:pow3}"));
 
-    EXPECT_EQ("9", t("{3:2:pow}"));
-    EXPECT_EQ(std::to_string(9.0f), t("{3.0:2.0:pow}"));
+    EXPECT_EQ("9", comp("{3:2:pow}"));
+    EXPECT_EQ(std::to_string(9.0f), comp("{3.0:2.0:pow}"));
 
-    EXPECT_EQ("2", t("{3:2:min}"));
-    EXPECT_EQ("-2", t("{3:-2:min}"));
-    EXPECT_EQ(std::to_string(2.0f), t("{3.0:2.0:min}"));
-    EXPECT_EQ(std::to_string(-2.0f), t("{3.0:-2.0:min}"));
+    EXPECT_EQ("2", comp("{3:2:min}"));
+    EXPECT_EQ("-2", comp("{3:-2:min}"));
+    EXPECT_EQ(std::to_string(2.0f), comp("{3.0:2.0:min}"));
+    EXPECT_EQ(std::to_string(-2.0f), comp("{3.0:-2.0:min}"));
 
-    EXPECT_EQ("3", t("{3:2:max}"));
-    EXPECT_EQ("3", t("{3:-2:max}"));
-    EXPECT_EQ(std::to_string(3.0f), t("{3.0:2.0:max}"));
-    EXPECT_EQ(std::to_string(2.0f), t("{-3.0:2.0:max}"));
+    EXPECT_EQ("3", comp("{3:2:max}"));
+    EXPECT_EQ("3", comp("{3:-2:max}"));
+    EXPECT_EQ(std::to_string(3.0f), comp("{3.0:2.0:max}"));
+    EXPECT_EQ(std::to_string(2.0f), comp("{-3.0:2.0:max}"));
 
-    EXPECT_EQ("-3", t("{3:neg}"));
-    EXPECT_EQ("3", t("{-3:neg}"));
-    EXPECT_EQ(std::to_string(-3.0f), t("{3.0:neg}"));
-    EXPECT_EQ(std::to_string(3.0f), t("{-3.0:neg}"));
+    EXPECT_EQ("-3", comp("{3:neg}"));
+    EXPECT_EQ("3", comp("{-3:neg}"));
+    EXPECT_EQ(std::to_string(-3.0f), comp("{3.0:neg}"));
+    EXPECT_EQ(std::to_string(3.0f), comp("{-3.0:neg}"));
 
-    EXPECT_EQ(std::to_string(sin(2.0f)), t("{2:sin}"));
-    EXPECT_EQ(std::to_string(sin(2.0f)), t("{2.0:sin}"));
+    EXPECT_EQ(std::to_string(sin(2.0f)), comp("{2:sin}"));
+    EXPECT_EQ(std::to_string(sin(2.0f)), comp("{2.0:sin}"));
 
-    EXPECT_EQ(std::to_string(cos(2.0f)), t("{2:cos}"));
-    EXPECT_EQ(std::to_string(cos(2.0f)), t("{2.0:cos}"));
+    EXPECT_EQ(std::to_string(cos(2.0f)), comp("{2:cos}"));
+    EXPECT_EQ(std::to_string(cos(2.0f)), comp("{2.0:cos}"));
 
-    EXPECT_EQ(std::to_string(tan(2.0f)), t("{2:tan}"));
-    EXPECT_EQ(std::to_string(tan(2.0f)), t("{2.0:tan}"));
+    EXPECT_EQ(std::to_string(tan(2.0f)), comp("{2:tan}"));
+    EXPECT_EQ(std::to_string(tan(2.0f)), comp("{2.0:tan}"));
 
-    EXPECT_EQ(std::to_string(asin(2.0f)), t("{2:asin}"));
-    EXPECT_EQ(std::to_string(asin(2.0f)), t("{2.0:asin}"));
+    EXPECT_EQ(std::to_string(asin(2.0f)), comp("{2:asin}"));
+    EXPECT_EQ(std::to_string(asin(2.0f)), comp("{2.0:asin}"));
 
-    EXPECT_EQ(std::to_string(acos(2.0f)), t("{2:acos}"));
-    EXPECT_EQ(std::to_string(acos(2.0f)), t("{2.0:acos}"));
+    EXPECT_EQ(std::to_string(acos(2.0f)), comp("{2:acos}"));
+    EXPECT_EQ(std::to_string(acos(2.0f)), comp("{2.0:acos}"));
 
-    EXPECT_EQ(std::to_string(atan(2.0f)), t("{2:atan}"));
-    EXPECT_EQ(std::to_string(atan(2.0f)), t("{2.0:atan}"));
+    EXPECT_EQ(std::to_string(atan(2.0f)), comp("{2:atan}"));
+    EXPECT_EQ(std::to_string(atan(2.0f)), comp("{2.0:atan}"));
 
-    EXPECT_NEAR(openvdb::math::pi<float>(), str2float(t("{180.0:d2r}")), 1e-4);
-    EXPECT_NEAR(180.0f, str2float(t("{$pi:r2d}")), 1e-4);
+    EXPECT_NEAR(openvdb::math::pi<float>(), str2float(comp("{180.0:d2r}")), 1e-4);
+    EXPECT_NEAR(180.0f, str2float(comp("{$pi:r2d}")), 1e-4);
 
-    EXPECT_EQ(std::to_string(1.0f/2.0f), t("{2:inv}"));
-    EXPECT_EQ(std::to_string(1.0f), t("{1.0:inv}"));
-    EXPECT_EQ(std::to_string(1.0f/1.2f), t("{1.2:inv}"));
+    EXPECT_EQ(std::to_string(1.0f/2.0f), comp("{2:inv}"));
+    EXPECT_EQ(std::to_string(1.0f), comp("{1.0:inv}"));
+    EXPECT_EQ(std::to_string(1.0f/1.2f), comp("{1.2:inv}"));
 
-    EXPECT_EQ(std::to_string(exp(1.2f)), t("{1.2:exp}"));
-    EXPECT_EQ(std::to_string(log(1.2f)), t("{1.2:ln}"));
-    EXPECT_EQ(std::to_string(log10(1.2f)), t("{1.2:log}"));
-    EXPECT_EQ(std::to_string(sqrt(1.2f)), t("{1.2:sqrt}"));
-    EXPECT_EQ("1", t("{1:int}"));
-    EXPECT_EQ("1", t("{1.2:int}"));
-    EXPECT_EQ(std::to_string(1.0f), t("{1:float}"));
-    EXPECT_EQ(std::to_string(1.2f), t("{1.2:float}"));
+    EXPECT_EQ(std::to_string(exp(1.2f)), comp("{1.2:exp}"));
+    EXPECT_EQ(std::to_string(log(1.2f)), comp("{1.2:ln}"));
+    EXPECT_EQ(std::to_string(log10(1.2f)), comp("{1.2:log}"));
+    EXPECT_EQ(std::to_string(sqrt(1.2f)), comp("{1.2:sqrt}"));
+    EXPECT_EQ("1", comp("{1:to_int}"));
+    EXPECT_EQ("1", comp("{1.2:to_int}"));
+    EXPECT_EQ(std::to_string(1.0f), comp("{1:to_float}"));
+    EXPECT_EQ(std::to_string(1.2f), comp("{1.2:to_float}"));
 
-    EXPECT_EQ("abcde012", t("{AbCdE012:lower}"));
-    EXPECT_EQ("ABCDE012", t("{AbCdE012:upper}"));
+    EXPECT_EQ("abcde012", comp("{AbCdE012:lower}"));
+    EXPECT_EQ("ABCDE012", comp("{AbCdE012:upper}"));
 
-    EXPECT_EQ("1", t("{1:dup:==}"));
-    EXPECT_EQ("2", t("{1:2:nip}"));
-    EXPECT_EQ("1", t("{1:2:drop}"));
-    EXPECT_EQ(std::to_string(0.5f), t("{1.0:2.0:/}"));
-    EXPECT_EQ(std::to_string(2.0f), t("{1.0:2.0:swap:/}"));
-    EXPECT_EQ(std::to_string(2.0f/1.0f+1.0f), t("{1.0:2.0:over:/:+}"));
+    EXPECT_EQ("1", comp("{1:dup:==}"));
+    EXPECT_EQ("2", comp("{1:2:nip}"));
+    EXPECT_EQ("1", comp("{1:2:drop}"));
+    EXPECT_EQ(std::to_string(0.5f), comp("{1.0:2.0:/}"));
+    EXPECT_EQ(std::to_string(2.0f), comp("{1.0:2.0:swap:/}"));
+    EXPECT_EQ(std::to_string(2.0f/1.0f+1.0f), comp("{1.0:2.0:over:/:+}"));
 
-    EXPECT_EQ(std::to_string(2.0f/3.0f+1.0f), t("{1.0:2.0:3.0:/:+}"));
-    EXPECT_EQ(std::to_string(3.0f/1.0f+2.0f), t("{1.0:2.0:3.0:rot:/:+}"));// rot(1 2 3) = 2 3 1
-    EXPECT_EQ(std::to_string(1.0f/2.0f+3.0f), t("{1.0:2.0:3.0:tuck:/:+}"));// tuck(1 2 3) = 3 1 2
+    EXPECT_EQ(std::to_string(2.0f/3.0f+1.0f), comp("{1.0:2.0:3.0:/:+}"));
+    EXPECT_EQ(std::to_string(3.0f/1.0f+2.0f), comp("{1.0:2.0:3.0:rot:/:+}"));// rot(1 2 3) = 2 3 1
+    EXPECT_EQ(std::to_string(1.0f/2.0f+3.0f), comp("{1.0:2.0:3.0:tuck:/:+}"));// tuck(1 2 3) = 3 1 2
 
-    EXPECT_EQ("123", t("{123:0:pad0}"));
-    EXPECT_EQ("123", t("{123:1:pad0}"));
-    EXPECT_EQ("123", t("{123:2:pad0}"));
-    EXPECT_EQ("123", t("{123:3:pad0}"));
-    EXPECT_EQ("0123", t("{123:4:pad0}"));
-    EXPECT_EQ("00123", t("{123:5:pad0}"));
-    EXPECT_EQ("000123", t("{123:6:pad0}"));
+    EXPECT_EQ("123", comp("{123:0:pad0}"));
+    EXPECT_EQ("123", comp("{123:1:pad0}"));
+    EXPECT_EQ("123", comp("{123:2:pad0}"));
+    EXPECT_EQ("123", comp("{123:3:pad0}"));
+    EXPECT_EQ("0123", comp("{123:4:pad0}"));
+    EXPECT_EQ("00123", comp("{123:5:pad0}"));
+    EXPECT_EQ("000123", comp("{123:6:pad0}"));
 
-    EXPECT_EQ("0", t("{size}"));
-    EXPECT_EQ("1", t("{0:size:scrape}"));
-    EXPECT_EQ("2", t("{0:1:size:scrape}"));
-    EXPECT_EQ("3", t("{0:1:2:size:scrape}"));
-    EXPECT_EQ("4", t("{0:1:2:3:size:scrape}"));
-    EXPECT_EQ("4", t("{0:1:2:3:clear:4}"));
-    EXPECT_EQ("4", t("{0:1:2:3:size:@size:clear:$size}"));
+    EXPECT_EQ("0", comp("{depth}"));
+    EXPECT_EQ("1", comp("{0:depth:scrape}"));
+    EXPECT_EQ("2", comp("{0:1:depth:scrape}"));
+    EXPECT_EQ("3", comp("{0:1:2:depth:scrape}"));
+    EXPECT_EQ("4", comp("{0:1:2:3:depth:scrape}"));
+    EXPECT_EQ("4", comp("{0:1:2:3:clear:4}"));
+    EXPECT_EQ("4", comp("{0:1:2:3:depth:@size:clear:$size}"));
 
-    EXPECT_EQ("1", t("{pi:exists}"));
-    EXPECT_EQ("0", t("{foo:exists}"));
-    EXPECT_EQ("1", t("{8:@bar:bar:exists}"));
+    EXPECT_EQ("1", comp("{e:is_set}"));
+    EXPECT_EQ("1", comp("{pi:is_set}"));
+    EXPECT_EQ("0", comp("{foo:is_set}"));
+    EXPECT_EQ("1", comp("{8:@bar:bar:is_set}"));
 
-    EXPECT_EQ(std::to_string(sqrt(0.1f*0.1f + 0.2f*0.2f)), t("{$x:pow2:$y:pow2:+:sqrt}"));
+    EXPECT_EQ(std::to_string(sqrt(0.1f*0.1f + 0.2f*0.2f)), comp("{$x:pow2:$y:pow2:+:sqrt}"));
 
-    EXPECT_EQ("4",t("{1:2:<:if(1:3:+)}"));
-    EXPECT_EQ("",t("{1:2:>:if(1:3:+)}"));
-    EXPECT_EQ("1",t("{5:@a:1:2:<:if(1:@a):$a}"));
-    EXPECT_EQ("5",t("{5:@a:1:2:>:if(1:@a):$a}"));
+    EXPECT_EQ("4",comp("{1:2:<:if(1:3:+)}"));
+    EXPECT_EQ("",comp("{1:2:>:if(1:3:+)}"));
+    EXPECT_EQ("1",comp("{5:@a:1:2:<:if(1:@a):$a}"));
+    EXPECT_EQ("5",comp("{5:@a:1:2:>:if(1:@a):$a}"));
 
-    EXPECT_EQ("4",t("{1:2:<:if(1:3:+?2:2:-)}"));
-    EXPECT_EQ("0",t("{1:2:>:if(1:3:+?2:2:-)}"));
-    EXPECT_EQ("1",t("{1:2:<:if(1:@a?2:@a):$a}"));
-    EXPECT_EQ("2",t("{1:2:>:if(1:@a?2:@a):$a}"));
-    EXPECT_EQ(std::to_string(sqrt(4+16)),t("{$pi:2:>:if(2:pow2:4:pow2:+:sqrt?2:sin)}"));
-    EXPECT_EQ(std::to_string(sin(2)),t("{$pi:2:<:if(2:pow2:4:pow2:+:sqrt?2:sin)}"));
+    EXPECT_EQ("4",comp("{1:2:<:if(1:3:+?2:2:-)}"));
+    EXPECT_EQ("0",comp("{1:2:>:if(1:3:+?2:2:-)}"));
+    EXPECT_EQ("1",comp("{1:2:<:if(1:@a?2:@a):$a}"));
+    EXPECT_EQ("2",comp("{1:2:>:if(1:@a?2:@a):$a}"));
+    EXPECT_EQ(std::to_string(sqrt(4+16)),comp("{$pi:2:>:if(2:pow2:4:pow2:+:sqrt?2:sin)}"));
+    EXPECT_EQ(std::to_string(sin(2)),comp("{$pi:2:<:if(2:pow2:4:pow2:+:sqrt?2:sin)}"));
 
-    EXPECT_EQ("a", t("{1:switch(1:a?2:b?3:c)}"));
-    EXPECT_EQ("b", t("{2:switch(1:a?2:b?3:c)}"));
-    EXPECT_EQ("c", t("{3:switch(1:a?2:b?3:c)}"));
-    //EXPECT_THROW({t("{0:switch(1:a?2:b?3:c)}");}, std::invalid_argument);
-    //EXPECT_THROW({t("{4:switch(1:a?2:b?3:c)}");}, std::invalid_argument);
-    EXPECT_EQ("SUPER", t("{1:switch(1:super:upper?2:1:2:+?3:$pi)}"));
-    EXPECT_EQ("3", t("{2:switch(1:super:upper?2:1:2:+?3:$pi)}"));
-    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), t("{3:switch(1:super:upper?2:1:2:+?3:$pi)}"));
+    EXPECT_EQ("a", comp("{1:switch(1:a?2:b?3:c)}"));
+    EXPECT_EQ("b", comp("{2:switch(1:a?2:b?3:c)}"));
+    EXPECT_EQ("c", comp("{3:switch(1:a?2:b?3:c)}"));
+    //EXPECT_THROW({comp("{0:switch(1:a?2:b?3:c)}");}, std::invalid_argument);
+    //EXPECT_THROW({comp("{4:switch(1:a?2:b?3:c)}");}, std::invalid_argument);
+    EXPECT_EQ("SUPER", comp("{1:switch(1:super:upper?2:1:2:+?3:$pi)}"));
+    EXPECT_EQ("3", comp("{2:switch(1:super:upper?2:1:2:+?3:$pi)}"));
+    EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{3:switch(1:super:upper?2:1:2:+?3:$pi)}"));
+
+    EXPECT_EQ("a", comp("{a:squash}"));
+    EXPECT_EQ("a,b,c,d", comp("{a:b:c:d:squash}"));
+
+    EXPECT_EQ("1", comp("{a:length}"));
+    EXPECT_EQ("3", comp("{foo:length}"));
+    EXPECT_EQ("7", comp("{foo bar:length}"));
+
+    EXPECT_EQ("foobar", comp("{foo:bar:append}"));
+
+    EXPECT_EQ("3", comp("{1,2,3:,:tokenize:depth:scrape}"));
+    EXPECT_EQ("5", comp("{1,2,3:,:tokenize:+:*}"));
 
     // find two real roots of a quadratic polynomial
-    EXPECT_EQ(" 0.683375 7.316625", t("{1:@a:-8:@b:5:@c:$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a:$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}"));
-    
-    EXPECT_EQ("foo bar bla", t("{foo_bar_bla:_ :replace}"));
-    EXPECT_EQ("foo_bar_bla", t("{foo bar bla: _:replace}"));
+    EXPECT_EQ("0.683375,7.316625", comp("{1:@a:-8:@b:5:@c:$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a:$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}"));
+
+    EXPECT_EQ("foo bar bla", comp("{foo_bar_bla:_: :replace}"));
+    EXPECT_EQ("foo_bar_bla", comp("{foo bar bla: :_:replace}"));
+    EXPECT_EQ("a b c d", comp("{a,b,c,d:,: :replace}"));
+    EXPECT_EQ("a b c d", comp("{a:b:c:d:squash:,: :replace}"));
+
+    EXPECT_EQ("_bar", comp("{foo_bar:foo:erase}"));
+    EXPECT_EQ("f_bar", comp("{foo_bar:o:erase}"));
+    EXPECT_EQ("foobar", comp("{foo bar: :erase}"));
     //});// end EXPECT_NO_THROW
-}// Translator
+}// Computer
 
 TEST_F(Test_vdb_tool, ToolParser)
 {
@@ -845,7 +856,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
 
     // test single for-loop
     EXPECT_NO_THROW({
-      auto args = getArgs("vdb_tool -quiet -for i=0,3,1 -sphere r=1.{$i} dim=128 name=sphere_{$i} -ls2mesh -write data/sphere_{$#i:++}.ply -end");
+      auto args = getArgs("vdb_tool -quiet -for i=0,3 -sphere r=1.{$i} dim=128 name=sphere_{$i} -ls2mesh -write data/sphere_{$#i:++}.ply -end");
       Tool vdb_tool(args.size(), args.data());
       vdb_tool.run();
     });

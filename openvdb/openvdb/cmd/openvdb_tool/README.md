@@ -69,11 +69,13 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 
 # Terminology
 
+We introduce three terms: **actions**, **options** and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Operations are low-level functions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3".
+
 Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of the expected option "radius". Also note that this tool maintains two lists of primitives, namely geometry (i.e. points and meshes) and VDB volumes (that may contain voxels or points). They can be referenced with "geo=n" and "vdb=n" where the integer "n" refers to "age" of the primitive. That is, "n=0" means the most recent added primitive and "n=1" means the second primitive added to the internal list. So, "-mesh2ls g=1" means convert the second to last geometry (here a polygon mesh) to a level set. If no other VDB grid exists this level set can be referenced as "vdb=0". Thus, "-gauss v=0" means perform a gaussian filter on the most recent level set. By default the most recent geometry, i.e. "g=0, or most recent level set, i.e. "v=0", is selected for processing.
 
 # Stack-based string expressions
 
-This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define operations that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops loops, e.g. "-quiet -for i=1,3,1 -eval {$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below and the unit test named "TEST_F(Test_vdb_tool, Translator)" in src/unittest.cpp for all operations currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
+This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops, e.g. "-quiet -for i=1,3,1 -eval {$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
 # Building this tool
 At the moment we only provide a gnu Makefile, but it's simple so it shouldn't be hard to roll your own cmake. The only mandatory dependency of this command-line tool is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic (enable them at the top of the Makefile).
@@ -92,6 +94,19 @@ which builds the executable debug/vdb_tool. Other build targets are _archive_ wh
 
 # Examples
 
+* Get help on actions
+```
+vdb_tool -help
+vdb_tool -help read write
+```
+
+* Get help on instructions
+```
+vdb_tool -eval help="*"
+vdb_tool -eval help=if,switch
+```
+
+
 * "Hello-world" example: Create a level set sphere and save it to a file
 ```
 vdb_tool -sphere -write sphere.vdb
@@ -106,9 +121,14 @@ vdb_tool -sphere -write bits=16 sphere.vdb
 vdb_tool -read mesh.obj -mesh2ls -write level_set.vdb
 ```
 
+* Convert a polygon mesh file into a narrow-band level with a transform that matches another vdb:
+```
+vdb_tool -read mesh.obj,reference.vdb -mesh2ls vdb=0 -write level_set.vdb
+```
+
 * Convert 5 polygon mesh files, "mesh_0{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb":
 ```
-vdb_tool -for f=1,6,1 -read mesh_'{$f:2:pad0}'.obj -mesh2ls -write level_set_'{$f:2:pad0}'.vdb -end
+vdb_tool -for f=1,6 -read mesh_'{$f:2:pad0}'.obj -mesh2ls -write level_set_'{$f:2:pad0}'.vdb -end
 ```
  
 * Generate 5 sphere with different voxel sizes and save them all into a single vdb file:
@@ -121,7 +141,7 @@ vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write v
 vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center=('{$radian:cos}','{$radian:sin}',0) name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
 ```
 
-* Converts input points in the file points.[vdb/ply/abc/obj/pts] to a level set, perform level set operations, and written to it the file surface.vdb:
+* Converts input points in the file points.[vdb/ply/abc/obj/pts] to a level set, perform level set actions, and written to it the file surface.vdb:
 ```
 vdb_tool -read points.[obj/ply/abc/vdb/pts] -points2ls -dilate -gauss -erode -write surface.vdb
 ```
@@ -178,8 +198,8 @@ vdb_tool -each f=`find ~/dev/data -name '*.vdb'` -i '{$f}' -render data/'{$#f}'.
 
 * View a sequence of animated level sets
 ```
-vdb_tool -sphere d=80 r=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
-vdb_tool -platonic d=128 f=8 s=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
+vdb_tool -sphere d=80 r=0.15 c=0.35,0.35,0.35 -for i=1,20 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
+vdb_tool -platonic d=128 f=8 s=0.15 c=0.35,0.35,0.35 -for i=1,20 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
 ```
 
 # String evaluation:
@@ -187,7 +207,7 @@ vdb_tool -platonic d=128 f=8 s=0.15 c=0.35,0.35,0.35 -for i=1,20,1 -enright dt=0
 * Define, modify and access custom variables<br>
 Define the local variable G=0 and increment it inside a for-loop.
 ```
-vdb_tool -quiet -eval '{0:@G}' -for i=10,15,1 -eval '{$G:++:@G}G = {$G}' -end
+vdb_tool -quiet -eval '{0:@G}' -for i=10,15 -eval '{$G:++:@G}G = {$G}' -end
 ```
 which prints the output:<br>
 G = 1<br>
@@ -205,6 +225,42 @@ if (c==0) one solution: b/a, else if (c>0) two solutions: (b+-sqrt(c))/a
 vdb_tool -eval '{1:@a:-8:@b:5:@c}' '{$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a}' '{$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}'
 ```
 which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the single real root -2.
+
+* Use scripting to access properties of grids and geometry
+
+Read both a vdb and mesh file and convert the mesh to a vdb with twice the voxel size of the input vdb.
+```
+vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='{0:voxelSize:2:*}' -print
+```
+
+* Loop skipping and expressions
+
+```
+vdb_tool -each i=1 -for j='{$i}',2 -end -end
+```
+
+which prints:<br>
+Processing: i = 1 counter = 0<br>
+Processing: j = 1 counter = 0
+
+```
+vdb_tool -each i=2 -for j='{$i}',2 -end -end
+```
+produces the output to:<br>
+Processing: i = 2 counter = 0
+
+```
+vdb_tool -each i= -for j='{$i}',2 -end -end
+```
+produces no output, since both loops are skipped
+
+* If-statement to level set grids
+
+Read multiple grids, and render all level set grids
+
+```
+vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vdb='{$v}' -end -end
+```
 
 ---
 # To Do List:
@@ -295,6 +351,14 @@ which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the si
 - [x] -eval '{1:@G}'
 - [x] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
 - [x] add switch-statement: {$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
+- [x] Added numerous methods to scripting language
+- [x] -mesh2ls vdb=0  (use another vdb to defined the transform)
+- [x] -iso2ls vdb=0,1 (use another vdb to defined the transform)
+- [x] loops will now skip, instead of throw, if its initial condition is invalid
+- [x] -for i=1,9  (third argument defaults to 1, i.e. i=1,9,1)
+- [x] -if 0|1|false|true  ... -end (if statement)
+- [x] -eval help="*" or -eval help=if,switch
+- [x] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sh:match}
 - [ ] Combine: -min, -max, -sum
 - [ ] -xform (translate and scale grid transforms)
 - [ ] -merge

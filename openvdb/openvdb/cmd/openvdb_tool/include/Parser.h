@@ -7,7 +7,7 @@
 ///
 /// @file Parser.h
 ///
-/// @brief Defines various classes (Translator, Parser, Option, Action, Loop) for processing
+/// @brief Defines various classes (Computer, Parser, Option, Action, Loop) for processing
 ///        command-line arguments.
 ///
 ////////////////////////////////////////////////////////////////////////////////
@@ -19,10 +19,12 @@
 #include <sstream>
 #include <string> // for std::string, std::stof and std::stoi
 #include <algorithm> // std::sort
+#include <random>
 #include <functional>
 #include <vector>
 #include <list>
-//#include <stack>
+#include <set>
+#include <time.h>
 #include <initializer_list>
 #include <unordered_map>
 #include <iterator>// for std::advance
@@ -85,27 +87,31 @@ using VecS = std::vector<std::string>;// vector of strings
 
 // ==============================================================================================================
 
-/// @brief Class that stores variables accessed by the Parser
-class Storage
+/// @brief Class that stores values by name
+class Memory
 {
     std::unordered_map<std::string, std::string> mData;
+    void init() {
+        this->set("pi", math::pi<float>());
+        this->set("e", 2.718281828459);
+    }
 public:
-    Storage() {}
-    std::string get(const std::string &name){
+    Memory() {this->init();}
+    std::string get(const std::string &name) {
         auto it = mData.find(name);
         if (it == mData.end()) throw std::invalid_argument("Storrage::get: undefined variable \""+name+"\"");
         return it->second;
     }
-    void clear() {mData.clear();}
+    void clear() {mData.clear(); this->init();}
     void clear(const std::string &name) {mData.erase(name);}
-    void set(const std::string &name, const std::string &value){mData[name]=value;}
-    void set(const std::string &name, const char *value){mData[name]=value;}
+    void set(const std::string &name, const std::string &value) {mData[name]=value;}
+    void set(const std::string &name, const char *value) {mData[name]=value;}
     template <typename T>
-    void set(const std::string &name, const T &value){mData[name]=std::to_string(value);}
-    void print(std::ostream& os = std::cerr) const {for (auto &d : mData) os << d.first <<"="<<d.second<<std::endl; }
+    void set(const std::string &name, const T &value) {mData[name]=std::to_string(value);}
+    void print(std::ostream& os = std::cerr) const {for (auto &d : mData) os << d.first <<"="<<d.second<<std::endl;}
     size_t size() const {return mData.size();}
     bool isSet(const std::string &name) const {return mData.find(name)!=mData.end();}
-};// Storage
+};// Memory
 
 // ==============================================================================================================
 
@@ -114,7 +120,7 @@ class Stack {
 public:
     Stack(){mData.reserve(10);}
     Stack(std::initializer_list<std::string> d) : mData(d.begin(), d.end()) {}
-    size_t size() const {return mData.size();}
+    size_t depth() const {return mData.size();}
     bool empty() const {return mData.empty();}
     bool operator==(const Stack &other) const {return mData == other.mData;}
     void push(const std::string &s) {mData.push_back(s);}
@@ -170,7 +176,11 @@ public:
         std::swap(mData[n-2], mData[n]);
         std::swap(mData[n-1], mData[n]);
     }
-    void print(std::ostream& os = std::cerr) const {for (auto &s : mData) os << " " << s;}
+    void print(std::ostream& os = std::cerr) const {
+        if (mData.empty()) return;
+        os << mData[0];
+        for (size_t i=1; i<mData.size(); ++i) os << "," << mData[i];
+    }
 };// Stack
 
 // ==============================================================================================================
@@ -178,161 +188,284 @@ public:
 /// @brief   Implements a light-weight stack-oriented programming language (very loosely) inspired by Forth
 /// @details Specifically, it uses Reverse Polish Notation to define operations that are evaluated during
 ///          paring of the command-line arguments (options to be precise).
-class Translator
+class Computer
 {
-    Stack                                        mStack;
-    std::unordered_map<std::string, std::function<void()>> mOps;
-    Storage                                     &mStorage;
-    template <typename T>
-    void set(const T &t) {mStack.top() = std::to_string(t);}
-    void set(bool t) {mStack.top() = t ? "1" : "0";}
+    struct Instruction {std::string doc; std::function<void()> callback;};// documentation and callback for instruction
+    using Instructions = std::unordered_map<std::string, Instruction>;
+
+    Stack        mCallStack;// computer stack for data and instructions
+    Instructions mInstructions;// map of all supported instructions
+    Memory       mMemory;
+
     template <typename OpT>
     void a(OpT op){
         union {std::int32_t i; float x;} A;
-        if (is_int(mStack.top(), A.i)) {
-            mStack.top() = std::to_string(op(A.i));
-        } else if (is_flt(mStack.top(), A.x)) {
-            mStack.top() = std::to_string(op(A.x));
+        if (is_int(mCallStack.top(), A.i)) {
+            mCallStack.top() = std::to_string(op(A.i));
+        } else if (is_flt(mCallStack.top(), A.x)) {
+            mCallStack.top() = std::to_string(op(A.x));
         } else {
-            throw std::invalid_argument("a: invalid argument \"" + mStack.top() + "\"");
+            throw std::invalid_argument("a: invalid argument \"" + mCallStack.top() + "\"");
         }
     }
-    template <typename T>
-    void ab(T op){
+    template <typename OpT>
+    void ab(OpT op){
         union {std::int32_t i; float x;} A, B;
-        const std::string str = mStack.pop();
-        if (is_int(mStack.top(), A.i) && is_int(str, B.i)) {
-            mStack.top() = std::to_string(op(A.i, B.i));
-        } else if (is_flt(mStack.top(), A.x) && is_flt(str, B.x)) {
-            mStack.top() = std::to_string(op(A.x, B.x));
+        const std::string str = mCallStack.pop();
+        if (is_int(mCallStack.top(), A.i) && is_int(str, B.i)) {
+            mCallStack.top() = std::to_string(op(A.i, B.i));
+        } else if (is_flt(mCallStack.top(), A.x) && is_flt(str, B.x)) {
+            mCallStack.top() = std::to_string(op(A.x, B.x));
         } else {
-            throw std::invalid_argument("ab: invalid arguments \"" + mStack.top() + "\" and \"" + str + "\"");
+            throw std::invalid_argument("ab: invalid arguments \"" + mCallStack.top() + "\" and \"" + str + "\"");
         }
     }
     template <typename T>
     void boolian(T test){
         union {std::int32_t i; float x;} A, B;
-        const std::string str = mStack.pop();
-        if (is_int(mStack.top(), A.i) && is_int(str, B.i)) {
-            mStack.top() = test(A.i, B.i) ? "1" : "0";
-        } else if (is_flt(mStack.top(), A.x) && is_flt(str, B.x)) {
-            mStack.top() = test(A.i, B.i) ? "1" : "0";
+        const std::string str = mCallStack.pop();
+        if (is_int(mCallStack.top(), A.i) && is_int(str, B.i)) {
+            mCallStack.top() = test(A.i, B.i) ? "1" : "0";
+        } else if (is_flt(mCallStack.top(), A.x) && is_flt(str, B.x)) {
+            mCallStack.top() = test(A.i, B.i) ? "1" : "0";
         } else {// string
-            mStack.top() = test(mStack.top(), str) ? "1" : "0";
+            mCallStack.top() = test(mCallStack.top(), str) ? "1" : "0";
         }
     }
 
 public:
+    template <typename T>
+    void push(const T &t) {mCallStack.push(std::to_string(t));}
+    void push(const std::string &s) {mCallStack.push(s);}
+    template <typename T>
+    void set(const T &t) {mCallStack.top() = std::to_string(t);}
+    void set(bool t) {mCallStack.top() = t ? "1" : "0";}
+    void set(const std::string &str) {mCallStack.top() = str;}
+    void set(const char *str) {mCallStack.top() = str;}
+    std::string& get() {return mCallStack.top();}
+    const Memory& memory() const {return mMemory;}
+    Memory& memory() {return mMemory;}
+    void add(const std::string &name, std::string &&doc, std::function<void()> &&func) {mInstructions[name]={std::move(doc),std::move(func)};}
+
     /// @brief c-tor
-    Translator(Storage &storage) : mStorage(storage)
+    Computer()
     {
-        mOps["path"]=[&](){mStack.top()=getPath(mStack.top());};// path in path/base0123.ext
-        mOps["file"]=[&](){mStack.top()=getFile(mStack.top());};// base0123.ext in path/base0123.ext
-        mOps["name"]=[&](){mStack.top()=getName(mStack.top());};// base0123 in path/base0123.ext
-        mOps["base"]=[&](){mStack.top()=getBase(mStack.top());};// base in path/base0123.ext
-        mOps["number"]=[&](){mStack.top()=getNumber(mStack.top());};// 0123 in path/base0123.ext
-        mOps["ext"]=[&](){mStack.top()=getExt(mStack.top());};// ext in path/base0123.ext
-        mOps["+"]=[&](){this->ab(std::plus<>());};
-        mOps["-"]=[&](){this->ab(std::minus<>());};
-        mOps["*"]=[&](){this->ab(std::multiplies<>());};
-        mOps["/"]=[&](){this->ab(std::divides<>());};
-        mOps["++"]=[&](){this->a([](auto& x){return ++x;});};
-        mOps["--"]=[&](){this->a([](auto& x){return --x;});};
-        mOps["=="]=[&](){this->boolian(std::equal_to<>());};
-        mOps["!="]=[&](){this->boolian(std::not_equal_to<>());};
-        mOps["<="]=[&](){this->boolian(std::less_equal<>());};
-        mOps[">="]=[&](){this->boolian(std::greater_equal<>());};
-        mOps["<"]=[&](){this->boolian(std::less<>());};
-        mOps[">"]=[&](){this->boolian(std::greater<>());};
-        mOps["!"]=[&](){this->set(!str2bool(mStack.top()));};
-        mOps["|"]=[&](){bool b=str2bool(mStack.pop());this->set(str2bool(mStack.top())||b);};
-        mOps["&"]=[&](){bool b=str2bool(mStack.pop());this->set(str2bool(mStack.top())&&b);};
-        mOps["abs"]=[&](){this->a([](auto& x){return math::Abs(x);});};
-        mOps["ceil"]=[&](){this->a([](auto& x){return std::ceil(x);});};
-        mOps["floor"]=[&](){this->a([](auto& x){return std::floor(x);});};
-        mOps["pow2"]=[&](){this->a([](auto& x){return math::Pow2(x);});};
-        mOps["pow3"]=[&](){this->a([](auto& x){return math::Pow3(x);});};
-        mOps["pow"]=[&](){this->ab([](auto& a, auto& b){return math::Pow(a, b);});};
-        mOps["min"]=[&](){this->ab([](auto& a, auto& b){return std::min(a, b);});};
-        mOps["max"]=[&](){this->ab([](auto& a, auto& b){return std::max(a, b);});};
-        mOps["neg"]=[&](){this->a([](auto& x){return -x;});};
-        mOps["sin"]=[&](){this->set(std::sin(str2float(mStack.top())));};
-        mOps["cos"]=[&](){this->set(std::cos(str2float(mStack.top())));};
-        mOps["tan"]=[&](){this->set(std::tan(str2float(mStack.top())));};
-        mOps["asin"]=[&](){this->set(std::asin(str2float(mStack.top())));};
-        mOps["acos"]=[&](){this->set(std::acos(str2float(mStack.top())));};
-        mOps["atan"]=[&](){this->set(std::atan(str2float(mStack.top())));};
-        mOps["r2d"]=[&](){this->set(180.0f*str2float(mStack.top())/math::pi<float>());};// radian to degree
-        mOps["d2r"]=[&](){this->set(math::pi<float>()*str2float(mStack.top())/180.0f);};// degree to radian
-        mOps["inv"]=[&](){this->set(1.0f/str2float(mStack.top()));};
-        mOps["exp"]=[&](){this->set(std::exp(str2float(mStack.top())));};
-        mOps["ln"]=[&](){this->set(std::log(str2float(mStack.top())));};
-        mOps["log"]=[&](){this->set(std::log10(str2float(mStack.top())));};
-        mOps["sqrt"]=[&](){this->set(std::sqrt(str2float(mStack.top())));};
-        mOps["int"]=[&](){this->set(int(str2float(mStack.top())));};
-        mOps["float"]=[&](){this->set(str2float(mStack.top()));};
-        mOps["lower"]=[&](){to_lower_case(mStack.top());};
-        mOps["upper"]=[&](){to_upper_case(mStack.top());};
-        mOps["dup"]=[&](){mStack.dup();};// x -- x x (push top onto stack)
-        mOps["nip"]=[&](){mStack.nip();};// y x -- x (remove the entry below the top)
-        mOps["drop"]=[&](){mStack.drop();};// y x -- y (pop the top)
-        mOps["swap"]=[&](){mStack.swap();};// y x -- x y (swap the two top entries)
-        mOps["over"]=[&](){mStack.over();};// y x -- y x y (push second entry onto top)
-        mOps["rot"]=[&](){mStack.rot();};// z y x -- y x z (rotation left)
-        mOps["tuck"]=[&](){mStack.tuck();};// z y x -- x z y (rotation right)
-        mOps["scrape"]=[&](){mStack.scrape();};// ... x -- x (removed everything except for the top)
-        mOps["clear"]=[&](){mStack.clear();};// ... -- (remove everything)
-        mOps["squash"]=[&](){// "x" "y" "z" --- "x y z"   combines entire stack into the top
-            if (mStack.empty()) return;
-            std::stringstream ss;
-            mStack.print(ss);
-            mStack.scrape();
-            mStack.top()=ss.str();
-        };
-        mOps["replace"]=[&](){// e.g. "foo bar" " _" -- "foo_bar" (replace character in string)
-          const std::string old_new = mStack.pop();
-          if (old_new.size()!=2) throw std::invalid_argument("Translator::replace: expected two characters, not \""+old_new+"\"");
-          std::replace(mStack.top().begin(), mStack.top().end(), old_new[0], old_new[1]);
-        };
-        mOps["exists"]=[&](){this->set(mStorage.isSet(mStack.top()));};
-        mOps["size"]=[&](){mStack.push(std::to_string(mStack.size()));};// push size of stack onto the stack
-        mOps["pad0"]=[&](){// add zero-padding of a specified with to a string, e.g. {12:4:pad0} -> 0012
-            const int w = str2int(mStack.pop());
-            std::stringstream ss;
-            ss << std::setfill('0') << std::setw(w) << mStack.top();
-            mStack.top() = ss.str();
-        };
-        mStorage.set("pi", math::pi<float>());
+        // file-name operations
+        add("path","extract file path from string, e.g. {path/base0123.ext:path} -> {path}",
+            [&](){mCallStack.top()=getPath(mCallStack.top());});
+        add("file","extract file name from string, e.g. {path/base0123.ext:file} -> {base0123.ext}",
+            [&](){mCallStack.top()=getFile(mCallStack.top());});
+        add("name","extract file name without extension from string, e.g. {path/base0123:name} -> {extbase0123}",
+            [&](){mCallStack.top()=getName(mCallStack.top());});
+        add("base","extract file base name from string, e.g. {path/base0123.ext:base -> {base}",
+            [&](){mCallStack.top()=getBase(mCallStack.top());});
+        add("number","extract file number from string, e.g. {path/base0123.ext:number} -> {0123}",
+            [&](){mCallStack.top()=getNumber(mCallStack.top());});
+        add("ext","extract file extension from string, e.g. {path/base0123.ext:ext} -> {ext}",
+            [&](){mCallStack.top()=getExt(mCallStack.top());});
+
+        // boolean operations
+        add("==","returns true if the two top enteries on the stack compare equal, e.g. {1:2:==} -> {0}",
+            [&](){this->boolian(std::equal_to<>());});
+        add("!=","returns true if the two top enteries on the stack are not equal, e.g. {1:2:!=} -> {1}",
+            [&](){this->boolian(std::not_equal_to<>());});
+        add("<=","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+            [&](){this->boolian(std::less_equal<>());});
+        add(">=","returns true if the two top enteries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
+            [&](){this->boolian(std::greater_equal<>());});
+        add("<","returns true if the two top enteries on the stack are less than, e.g. {1:2:<} -> {1}",
+            [&](){this->boolian(std::less<>());});
+        add(">","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
+            [&](){this->boolian(std::greater<>());});
+        add("!","logical negation, e.g. {1:!} -> {0}",
+            [&](){this->set(!str2bool(mCallStack.top()));});
+        add("|","logical or, e.g. {1:0:|} -> {1}",
+            [&](){bool b=str2bool(mCallStack.pop());this->set(str2bool(mCallStack.top())||b);});
+        add("&","logical and, e.g. {1:0:&} -> {0}",
+            [&](){bool b=str2bool(mCallStack.pop());this->set(str2bool(mCallStack.top())&&b);});
+
+        // math operations
+        add("+","adds two top stack entries, e.g. {1:2:+} -> {3}",
+            [&](){this->ab(std::plus<>());});
+        add("-","subtracts two top stack entries, e.g. {1:2:-} -> {-1}",
+            [&](){this->ab(std::minus<>());});
+        add("*","multiplies two top stack entries, e.g. {1:2:*} -> {2}",
+            [&](){this->ab(std::multiplies<>());});
+        add("/","adds two top stack entries, e.g. {1.0:2.0:/} -> {0.5} and {1:2:/} -> {0}",
+            [&](){this->ab(std::divides<>());});
+        add("++","increment top stack entry, e.g. {1:++} -> {2}",
+            [&](){this->a([](auto& x){return ++x;});});
+        add("--","decrement top stack entry, e.g. {1:--} -> {0}",
+            [&](){this->a([](auto& x){return --x;});});
+        add("abs","absolute value, {-1:abs} -> {1}",
+            [&](){this->a([](auto& x){return math::Abs(x);});});
+        add("ceil","ceiling of floating point value, e.g. {0.5:ceil} -> {0.0}",
+            [&](){this->a([](auto& x){return std::ceil(x);});});
+        add("floor","floor of floating point value, e.g. {0.5:floor} -> {1.0}",
+            [&](){this->a([](auto& x){return std::floor(x);});});
+        add("pow2","square of value, e.g. {2:pow2} -> {4}",
+            [&](){this->a([](auto& x){return math::Pow2(x);});});
+        add("pow3","cube of value, e.g. {2:pow3} -> {8}",
+            [&](){this->a([](auto& x){return math::Pow3(x);});});
+        add("pow","power of vale, e.g. {2:3:pow} -> {8}",
+            [&](){this->ab([](auto& a, auto& b){return math::Pow(a, b);});});
+        add("min","minimum of two values, e.g. {1:2:min} -> {1}",
+            [&](){this->ab([](auto& a, auto& b){return std::min(a, b);});});
+        add("max","minimum of two values, e.g. {1:2:max} -> {2}",
+            [&](){this->ab([](auto& a, auto& b){return std::max(a, b);});});
+        add("neg","negative of value, e.g. {1:neg} -> {-1}",
+            [&](){this->a([](auto& x){return -x;});});
+        add("sign","sign of value, e.g. {-2:neg} -> {-1}",
+            [&](){this->a([](auto& x){return (x > 0) - (x < 0);});});
+        add("sin","sine of value, e.g. {$pi:sin} -> {0.0}",
+            [&](){this->set(std::sin(str2float(mCallStack.top())));});
+        add("cos","cosine of value, e.g. {$pi:cos} -> {-1.0}",
+            [&](){this->set(std::cos(str2float(mCallStack.top())));});
+        add("tan","tangent of value, e.g. {$pi:tan} -> {0.0}",
+            [&](){this->set(std::tan(str2float(mCallStack.top())));});
+        add("asin","inverse sine of value, e.g. {1:asin} -> {1.570796}",
+            [&](){this->set(std::asin(str2float(mCallStack.top())));});
+        add("acos","inverse cosine of value, e.g. {1:acos} -> {0.0}",
+            [&](){this->set(std::acos(str2float(mCallStack.top())));});
+        add("atan","inverse tangent of value, e.g. {1:atan} -> {0.785398}",
+            [&](){this->set(std::atan(str2float(mCallStack.top())));});
+        add("r2d","radian to degrees, e.g. {$pi:r2d} -> {180.0}",
+            [&](){this->set(180.0f*str2float(mCallStack.top())/math::pi<float>());});
+        add("d2r","degrees to radian, e.g. {180:d2r} -> {3.141593}",
+            [&](){this->set(math::pi<float>()*str2float(mCallStack.top())/180.0f);});
+        add("inv","inverse of value, e.g. {5:inv} -> {0.2}",
+            [&](){this->set(1.0f/str2float(mCallStack.top()));});
+        add("exp","exponential of value, e.g. {1:exp} -> {2.718282}",
+            [&](){this->set(std::exp(str2float(mCallStack.top())));});
+        add("ln","natural log of value, e.g. {1:ln} -> {0.0}",
+            [&](){this->set(std::log(str2float(mCallStack.top())));});
+        add("log","10 base log of value, e.g. {1:log} -> {0.0}",
+            [&](){this->set(std::log10(str2float(mCallStack.top())));});
+        add("sqrt","squareroot of value, e.g. {2:sqrt} -> {1.414214}",
+            [&](){this->set(std::sqrt(str2float(mCallStack.top())));});
+        add("to_int","convert value to integer, e.g. {1.2:to_int} -> {1}",
+            [&](){this->set(int(str2float(mCallStack.top())));});
+        add("to_float","convert value to floating point, e.g. {1:to_float} -> {1.0}",
+            [&](){this->set(str2float(mCallStack.top()));});
+
+        // stack operations
+        add("dup","duplicates the top, i.e. pushes the top entry onto the stack, e.g. {x:dup} -> {x:x}",
+            [&](){mCallStack.dup();});
+        add("nip","remove the entry below the top, e.g. {x:y:nip} -> {y}",
+            [&](){mCallStack.nip();});
+        add("drop","remove the top entry, e.g. {x:y:drop} -> {x}",
+            [&](){mCallStack.drop();});
+        add("swap","swap the two top entries, e.g. {x:y:swap} -> {y:x}",
+            [&](){mCallStack.swap();});
+        add("over","push second entry onto the top, e.g. {x:y:over} -> {x:y:x}",
+            [&](){mCallStack.over();});
+        add("rot","rotate three top entries left, e.g. {x:y:z:rot} -> {y:z:x}",
+            [&](){mCallStack.rot();});
+        add("tuck","rotate three top entries right, e.g. {x:y:z:tuck} -> {z:x:y}",
+            [&](){mCallStack.tuck();});
+        add("scrape","removed everything except for the top, e.g. {x:y:z:scrape} -> {z}",
+            [&](){mCallStack.scrape();});
+        add("clear","remove everything on the stack, e.g. {x:y:z:clear} -> {}",
+            [&](){mCallStack.clear();});
+        add("depth","push depth of stack onto the stack, e.g. {x:y:z:depth} -> {3}",
+            [&](){this->push(mCallStack.depth());});
+        add("squash","combines entire stack into the top, e.g. {x:y:z:squash} -> {x,y,z}",
+            [&](){if (mCallStack.empty()) return;
+                  std::stringstream ss;
+                  mCallStack.print(ss);
+                  mCallStack.scrape();
+                  mCallStack.top()=ss.str();
+        });
+
+        // string operations
+        add("lower","convert all characters in a string to lower case, e.g. {HeLlO:lower} -> {hello}",
+            [&](){to_lower_case(mCallStack.top());});
+        add("upper","convert all characters in a string to upper case, e.g. {HeLlO:upper} -> {HELLO}",
+            [&](){to_upper_case(mCallStack.top());});
+        add("length","push the number of characters in a string onto the stack, e.g. {foo bar:length} -> {7}",
+            [&](){this->set(mCallStack.top().length());});
+        add("replace","replace words in string, e.g. {for bar:a:b:replace} -> {foo bbr}",
+            [&](){std::string b = mCallStack.pop(), a = mCallStack.pop(), &t = mCallStack.top();
+                  for (size_t i=a.size(),j=b.size(),p=t.find(a); p!=std::string::npos; p=t.find(a,p+j)) t.replace(p,i,b);
+        });
+        add("erase","remove words in string, e.g. {foo bar:a:erase} -> {foo br}",
+            [&](){std::string a = mCallStack.pop(), &t = mCallStack.top();
+                  for (size_t p=t.find(a), n=a.size(); p!=std::string::npos; p=t.find(a,p)) t.erase(p,n);
+        });
+        add("append","append string to string, e.g. {foo:bar:append} -> {foobar}",
+            [&](){const std::string str = mCallStack.pop();
+                  mCallStack.top() += str;
+        });
+        add("tokenize","split a string according to a specific delimiter and push the tokens onto the stack e.g. foo,bar:,:tokenize -> foo:bar",
+            [&](){const std::string delimiters = mCallStack.pop(), str = mCallStack.pop();
+                  for (auto &s : tokenize(str, delimiters.c_str())) mCallStack.push(s);
+        });
+        add("match","test if a word matches a string, e.g. {sphere_01.vdb:sphere:match} -> {1}",
+            [&](){std::string word = mCallStack.pop();
+                  this->set(mCallStack.top().find(word) != std::string::npos);
+        });
+
+        add("is_set","returns true if a string has an associated value, e.g. {pi:is_set} ->{1}",
+            [&](){this->set(mMemory.isSet(mCallStack.top()));});
+        add("pad0","add zero-padding of a specified with to a string, e.g. {12:4:pad0} -> {0012}",
+            [&](){const int w = str2int(mCallStack.pop());
+                  std::stringstream ss;
+                  ss << std::setfill('0') << std::setw(w) << mCallStack.top();
+                  mCallStack.top() = ss.str();
+        });
+
+        add("get","get the value of a variable from memory, e.g. {pi:get} -> {3.141593",
+            [&](){mCallStack.top() = mMemory.get(mCallStack.top());});
+        add("set","set a variable to a value and save it to memory, e.g. {1:G:set} -> {}",
+            [&](){const std::string str = mCallStack.pop();
+                  mMemory.set(str, mCallStack.pop());
+        });
+        add("date","date, e.g {date} -> {Sun Mar 27 19:31:16 2022} or {date: :_:replace} -> {Sun_Mar_27_19:31:55_2022}",
+            [&](){std::time_t tmp = std::time(nullptr);
+                  std::stringstream ss;
+                  ss << std::asctime(std::localtime(&tmp));
+                  this->push(ss.str());
+        });
+        add("uuid","an approximate uuid v4 random hex string, e.g. {uuid} -> {821105a2-0e60-4a23-970d-0165e0ad4373}",
+            [&](){this->push(uuid());}
+        );
+
+        // dummy entries for documentation
+        add("$","get the value of a variable from memory, e.g. {$pi} -> {3.141593}", [](){});
+        add("@","set a variable to a value and save it to memory, e.g. {1:@G} -> {}", [](){});
+        add("if","if- and optional else-statement, e.g. {1:if(2)} -> {2} and {0:if(2?3)} -> {3}",[](){});
+        add("switch","switch-statement, e.g. {2:switch(1:first?2:second?3:third)} -> {second}",[](){});
+        add("quit","terminate evaluation, e.g. {1:2:+:quit:3:*} -> {3}",[](){});
     }
     /// @brief process the specified string
     void operator()(std::string &str)
     {
         for (size_t pos = str.find_first_of("{}"); pos != std::string::npos; pos = str.find_first_of("{}", pos)) {
-            if (str[pos]=='}') throw std::invalid_argument("Translator(): expected \"{\" before \"}\" in \""+str.substr(pos)+"\"");
+            if (str[pos]=='}') throw std::invalid_argument("Computer(): expected \"{\" before \"}\" in \""+str.substr(pos)+"\"");
             size_t end = str.find_first_of("{}", pos + 1);
-            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Translator(): missing \"}\" in \""+str.substr(pos)+"\"");
+            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Computer(): missing \"}\" in \""+str.substr(pos)+"\"");
             for (size_t p=str.find_first_of(":}",pos+1), q=pos+1; p<=end; q=p+1, p=str.find_first_of(":}",q)) {
                 if (p == q) {// ignores {:} and {::}
                     continue;
                 } else if (str[q]=='$') {// get value
-                    mStack.push(mStorage.get(str.substr(q + 1, p - q - 1)));
+                    mCallStack.push(mMemory.get(str.substr(q + 1, p - q - 1)));
                 } else if (str[q]=='@') {// set value
-                    if (mStack.empty()) throw std::invalid_argument("Translator::(): cannot evaluate \""+str.substr(q,p-q)+"\" when the stack is empty");
-                    mStorage.set(str.substr(q + 1, p - q - 1), mStack.pop());
+                    if (mCallStack.empty()) throw std::invalid_argument("Computer::(): cannot evaluate \""+str.substr(q,p-q)+"\" when the stack is empty");
+                    mMemory.set(str.substr(q + 1, p - q - 1), mCallStack.pop());
                 } else if (str.compare(q,3,"if(")==0) {// if-statement: 0|1:if(a) or 0|1:if(a?b)}
                     const size_t i = str.find_first_of("(){}", q+3);
-                    if (str[i]!=')') throw std::invalid_argument("Translator():: missing \")\" in if-statement \""+str.substr(q)+"\"");
+                    if (str[i]!=')') throw std::invalid_argument("Computer():: missing \")\" in if-statement \""+str.substr(q)+"\"");
                     const auto v = tokenize(str.substr(q+3, i-q-3), "?");
                     if (v.size() == 1) {
-                        if (str2bool(mStack.pop())) {
+                        if (str2bool(mCallStack.pop())) {
                             str.replace(q, i - q + 1, v[0]);
                         } else {
                             str.erase(q - 1, i - q + 2);// also erase the leading ':' character
                         }
                     } else if (v.size() == 2) {
-                        str.replace(q, i - q + 1, v[str2bool(mStack.pop()) ? 0 : 1]);
+                        str.replace(q, i - q + 1, v[str2bool(mCallStack.pop()) ? 0 : 1]);
                     } else {
-                        throw std::invalid_argument("Translator():: invalid if-statement \""+str.substr(q)+"\"");
+                        throw std::invalid_argument("Computer():: invalid if-statement \""+str.substr(q)+"\"");
                     }
                     end = str.find('}', pos + 1);// needs to be recomputed since str was modified
                     p = q - 1;// rewind
@@ -340,68 +473,92 @@ public:
                     break;
                 } else if (str.compare(q,7,"switch(")==0) {//switch-statement: $1:switch(a:case_a?b:case_b?c:case_c)
                     const size_t i = str.find_first_of("(){}", q+7);
-                    if (str[i]!=')') throw std::invalid_argument("Translator():: missing \")\" in switch-statement \""+str.substr(q)+"\"");
+                    if (str[i]!=')') throw std::invalid_argument("Computer():: missing \")\" in switch-statement \""+str.substr(q)+"\"");
                     for (auto s : tokenize(str.substr(q+7, i-q-7), "?")) {
                         const size_t j = s.find(':');
-                        if (j==std::string::npos) throw std::invalid_argument("Translator():: missing \":\" in switch-statement \""+str.substr(q)+"\"");
-                        if (mStack.top() == s.substr(0,j)) {
+                        if (j==std::string::npos) throw std::invalid_argument("Computer():: missing \":\" in switch-statement \""+str.substr(q)+"\"");
+                        if (mCallStack.top() == s.substr(0,j)) {
                             str.replace(q, i - q + 1, s.substr(j + 1));
                             end = str.find('}', pos + 1);// needs to be recomputed since str was modified
                             p = q - 1;// rewind
-                            mStack.drop();
+                            mCallStack.drop();
                             break;
                         }
                     }
-                    if (str.compare(q,7,"switch(")==0) throw std::invalid_argument("Translator():: no match in switch-statement \""+str.substr(q)+"\"");
-                } else {
+                    if (str.compare(q,7,"switch(")==0) throw std::invalid_argument("Computer():: no match in switch-statement \""+str.substr(q)+"\"");
+                } else {// apply callback
                     const std::string s = str.substr(q, p - q);
-                    auto it = mOps.find(s);
-                    if (it != mOps.end()) {
-                        it->second();// callback
+                    auto it = mInstructions.find(s);
+                    if (it != mInstructions.end()) {
+                        it->second.callback();
                     } else {
-                        mStack.push(s);
+                        mCallStack.push(s);
                     }
                 }
-            }
-            if (mStack.empty()) {
+            }// for-loop over ":" in string
+            if (mCallStack.empty()) {
                 str.erase(pos, end-pos+1);
-            } else if (mStack.size()==1) {
-                str.replace(pos, end-pos+1, mStack.pop());
+            } else if (mCallStack.depth()==1) {
+                str.replace(pos, end-pos+1, mCallStack.pop());
             } else {
                 std::stringstream ss;
-                mStack.print(ss);
-                throw std::invalid_argument("Translator::(): compute stack contains more than one entry: " + ss.str());
+                mCallStack.print(ss);
+                throw std::invalid_argument("Computer::(): compute stack contains more than one entry: " + ss.str());
+            }
+        }// for-loop over "{}" in string
+    }
+    std::string operator()(const std::string &str)
+    {
+        std::string tmp = str;// copy
+        (*this)(tmp);
+        return tmp;
+    }
+    void help(std::ostream& os = std::cerr) const
+    {
+        std::set<std::string> vec;// print help in lexicographic order
+        for (auto it=mInstructions.begin(); it!=mInstructions.end(); ++it) vec.insert(it->first);
+        this->help(vec, os);
+    }
+    template <typename VecT>
+    void help(const VecT &vec, std::ostream& os = std::cerr) const
+    {
+        size_t w = 0;
+        for (auto &s : vec) w = std::max(w, s.size());
+        w += 2;
+        for (auto &s : vec) {
+            auto it = mInstructions.find(s);
+            if (it != mInstructions.end()) {
+                os << std::left << std::setw(w) << it->first << it->second.doc << "\n\n";
+            } else {
+                throw std::invalid_argument("Computer::help:: unknown operation \"" + s + "\"");
             }
         }
     }
-    std::string operator()(const std::string &_str)
-    {
-        std::string str = _str;// copy
-        (*this)(str);
-        return str;
-    }
-};// Translator
+};// Computer
 
 // ==============================================================================================================
 
 /// @brief Abstract base class
 struct BaseLoop
 {
-    Storage&    storage;
+    Memory&     memory;
     ActIterT    begin;// marks the start of the for loop
     std::string name;
-    size_t      pos;// index of the string value in vec
-    BaseLoop(Storage &s, ActIterT i, const std::string &n) : storage(s), begin(i), name(n), pos(0) {}
-    virtual ~BaseLoop() {storage.clear(name); storage.clear("#"+name);}
+    size_t      pos;// loop counter starting at zero
+    BaseLoop(Memory &s, ActIterT i, const std::string &n) : memory(s), begin(i), name(n), pos(0) {}
+    virtual ~BaseLoop() {memory.clear(name); memory.clear("#"+name);}
+    virtual bool valid() = 0;
     virtual bool next() = 0;
     template <typename T>
-    T get() const { return str2<T>(storage.get(name)); }
+    T get() const { return str2<T>(memory.get(name)); }
     template <typename T>
     void set(T v){
-        storage.set(name, v);
-        storage.set("#"+name, pos);
+        memory.set(name, v);
+        memory.set("#"+name, pos);
     }
-    void print(std::ostream& os = std::cerr) const { os << "Processing: " << name << " = " << storage.get(name) << " counter=" << pos;}
+    void print(std::ostream& os = std::cerr) const {
+        os << "Processing: " << name << " = " << memory.get(name) << " counter = " << pos <<std::endl;
+    }
 };
 
 // ==============================================================================================================
@@ -412,14 +569,16 @@ struct ForLoop : public BaseLoop
     using BaseLoop::pos;
     math::Vec3<T> vec;
 public:
-    ForLoop(Storage &s, ActIterT i, const std::string &n, const math::Vec3<T> &v) : BaseLoop(s, i, n), vec(v) {
-        if (vec[0]>=vec[1]) throw std::invalid_argument("ForLoop: expected 3 arguments a,b,c where a<b, e.g. i=0,1,1 or f=1.1,2.3,0.1");
-        this->set(vec[0]);
+    ForLoop(Memory &s, ActIterT i, const std::string &n, const std::vector<T> &v) : BaseLoop(s, i, n), vec(1) {
+        if (v.size()!=2 && v.size()!=3)  throw std::invalid_argument("ForLoop: expected two or three arguments, i=1,9 or i=1,9,2");
+        for (size_t i=0; i<v.size(); ++i) vec[i] = v[i];
+        if (this->valid()) this->set(vec[0]);
     }
     virtual ~ForLoop() {}
+    bool valid() override {return vec[0] < vec[1];}
     bool next() override {
         ++pos;
-        vec[0] = this->template get<T>() + vec[2];// read from storage
+        vec[0] = this->template get<T>() + vec[2];// read from memory
         if (vec[0] < vec[1]) this->set(vec[0]);
         return vec[0] < vec[1];
     }
@@ -432,11 +591,11 @@ class EachLoop : public BaseLoop
     using BaseLoop::pos;
     const VecS vec;// list of all string values
 public:
-    EachLoop(Storage &s, ActIterT i, const std::string &n, const VecS &v) : BaseLoop(s,i,n), vec(v.begin(), v.end()){
-        if (vec.empty()) throw std::invalid_argument("EachLoop: -each does not accept an empty list");
-        this->set(vec[0]);
+    EachLoop(Memory &s, ActIterT i, const std::string &n, const VecS &v) : BaseLoop(s,i,n), vec(v.begin(), v.end()){
+        if (this->valid()) this->set(vec[0]);
     }
     virtual ~EachLoop() {}
+    bool valid() override {return pos < vec.size();}
     bool next() override {
         if (++pos < vec.size()) this->set(vec[pos]);
         return pos < vec.size();
@@ -445,16 +604,26 @@ public:
 
 // ==============================================================================================================
 
+class IfLoop : public BaseLoop
+{
+public:
+    IfLoop(Memory &s, ActIterT i) : BaseLoop(s,i,"") {}
+    virtual ~IfLoop() {}
+    bool valid() override {return true;}
+    bool next() override {return false;}
+};// IfLoop
+
+// ==============================================================================================================
+
 struct Parser {
     ActListT            available, actions;
-    ActIterT            action_iter;
+    ActIterT            iter;// iterator pointing to the current actions being processed
     std::unordered_map<std::string, ActIterT> hashMap;
     std::list<std::shared_ptr<BaseLoop>> loops;
     std::vector<Option> defaults;
     int                 verbose;
-    mutable size_t      counter;// loop counter
-    mutable Storage     storage;
-    mutable Translator  translator;
+    mutable size_t      counter;// loop counter used to validate matching "-for/each" and "-end" actions
+    mutable Computer    computer;// responsible for storing local variables and executing string expressions
 
     Parser(std::vector<Option> &&def);
     void parse(int argc, char *argv[]);
@@ -473,7 +642,7 @@ struct Parser {
     inline std::vector<T> getVec(const std::string &name, const char* delimiters = "(),") const;
 
     void usage(const VecS &actions, bool brief) const;
-    void usage(bool brief) const {for (auto i = std::next(action_iter);i!=actions.end(); ++i) std::cerr << this->usage(*i, brief);}
+    void usage(bool brief) const {for (auto i = std::next(iter);i!=actions.end(); ++i) std::cerr << this->usage(*i, brief);}
     void usage_all(bool brief) const {for (const auto &a : available) std::cerr << this->usage(a, brief);}
     std::string usage(const Action &action, bool brief) const;
     void addAction(std::string &&name, // primary name of the action
@@ -487,22 +656,22 @@ struct Parser {
       available.emplace_back(std::move(name),    std::move(alias), std::move(doc),
                              std::move(options), std::move(parse), std::move(run), anonymous);
     }
-    Action& getAction() {return *action_iter;}
-    const Action& getAction() const {return *action_iter;}
-    void printAction() const {if (verbose>1) action_iter->print();}
+    Action& getAction() {return *iter;}
+    const Action& getAction() const {return *iter;}
+    void printAction() const {if (verbose>1) iter->print();}
 };// Parser struct
 
 // ==============================================================================================================
 
 std::string Parser::getStr(const std::string &name) const
 {
-  for (auto &opt : action_iter->options) {
+  for (auto &opt : iter->options) {
       if (opt.name != name) continue;// linear search
       std::string str = opt.value;// deep copy since it might get modified by map
-      translator(str);
+      computer(str);
       return str;
   }
-  throw std::invalid_argument(action_iter->name+": Parser::getStr: no option named \""+name+"\"");
+  throw std::invalid_argument(iter->name+": Parser::getStr: no option named \""+name+"\"");
 }
 
 // ==============================================================================================================
@@ -527,6 +696,16 @@ std::vector<T> Parser::getVec(const std::string &name, const char* delimiters) c
     std::vector<T> vec(v.size());
     for (int i=0; i<v.size(); ++i) vec[i] = str2<T>(v[i]);
     return vec;
+}
+
+// ==============================================================================================================
+
+template <typename T>
+math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) const
+{
+    VecS v = this->getVec<std::string>(name, delimiters);
+    if (v.size()!=3) throw std::invalid_argument(iter->name+": Parser::getVec3: not a valid input "+name);
+    return math::Vec3<T>(str2<T>(v[0]), str2<T>(v[1]), str2<T>(v[2]));
 }
 
 // ==============================================================================================================
@@ -569,22 +748,31 @@ void Action::print(std::ostream& os) const
 Parser::Parser(std::vector<Option> &&def)
   : available()// vector of all available actions
   , actions()//   vector of all selected actions
-  , action_iter()// iterator the the current actions being processed
+  , iter()// iterator pointing to the current actions being processed
   , hashMap()
   , loops()// list of all for- and each-loops
   , verbose(1)// verbose level is set to 1 my default
   , defaults(def)// by default keep is set to false
   , counter(1)// 1-based global loop counter associated with 'G'
-  , translator(storage)
 {
     this->addAction(
         "eval", "", "evaluate string expression",
-        {{"str", "", "{1:@G}", "one or more strings to be processed by the stack-oriented programming language. Non-empty string outputs are printed to the terminal"}},
-        [](){},[&](){
-            assert(action_iter->name == "eval");
-            std::string str =action_iter->options[0].value;
-            translator(str);
-            for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;
+        {{"str", "", "{1:2:+}", "one or more strings to be processed by the stack-oriented programming language. Non-empty string outputs are printed to the terminal"},
+         {"help", "", "*|+,-,...", "print a list of all or specified list operations each with brief documentation"}},
+        [](){},
+        [&](){
+            assert(iter->name == "eval");
+            const std::string &help =iter->options[1].value;
+            if (!help.empty()) {
+                if (help[0]=='*' && help.size()==1) {
+                    computer.help();
+                } else {
+                    computer.help(tokenize(help, ","));
+                }
+            }
+            std::string str = iter->options[0].value;// copy
+            computer(str);// <- evaluate string
+            for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;// split and print
         }, 0
     );
 
@@ -609,41 +797,76 @@ Parser::Parser(std::vector<Option> &&def)
         [&](){this->updateDefaults();}, [](){}
     );
 
+    auto skip2end = [&](){
+        for (int i=1; i>0; i+=iter->name == "end" ? -1 :
+                              iter->name == "for" ||
+                              iter->name == "each" ||
+                              iter->name == "if" ? 1 : 0) ++iter;
+    };
+
     this->addAction(
-        "for", "", "beginning of for-loop over a user-defined loop variable and range.",
-        {{"", "", "i=0,10,1", "define name of loop variable and its range."}},
-        [&](){++counter;}, [&](){
-            assert(action_iter->name == "for");
-            const std::string &name = action_iter->options[0].name;
+        "for", "", "start of for-loop over a user-defined loop variable and range.",
+        {{"", "", "i=0,9|i=0,9,2", "define name of loop variable and its range."}},
+        [&](){++counter;},
+        [&](){
+            assert(iter->name == "for");
+            const std::string &name = iter->options[0].name;
+            std::shared_ptr<BaseLoop> loop;
             try {
-                loops.push_back(std::make_shared<ForLoop<int>>(storage, action_iter, name, this->getVec3<int>(name,",")));
+                loop=std::make_shared<ForLoop<int>>(computer.memory(), iter, name, this->getVec<int>(name,","));
             } catch (const std::invalid_argument &){
-                loops.push_back(std::make_shared<ForLoop<float>>(storage, action_iter, name, this->getVec3<float>(name,",")));
+                loop=std::make_shared<ForLoop<float>>(computer.memory(), iter, name, this->getVec<float>(name,","));
             }
-            if (verbose) loops.back()->print();
+            if (loop->valid()) {
+                loops.push_back(loop);
+                if (verbose) loop->print();
+            } else {
+                skip2end();
+            }
         }
     );
 
     this->addAction(
-        "each", "", "beginning of each-loop over a user-defined loop variable and list of values.",
-      {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
-        [&](){++counter;}, [&](){
-            assert(action_iter->name == "each");
-            const std::string &name = action_iter->options[0].name;
-            loops.push_back(std::make_shared<EachLoop>(storage, action_iter, name, this->getVec<std::string>(name,",")));
-            if (verbose) loops.back()->print();
+        "each", "", "start of each-loop over a user-defined loop variable and list of values.",
+        {{"", "", "s=sphere,bunny,...", "defined name of loop variable and list of its values."}},
+        [&](){++counter;},
+        [&](){
+            assert(iter->name == "each");
+            const std::string &name = iter->options[0].name;
+            auto loop = std::make_shared<EachLoop>(computer.memory(), iter, name, this->getVec<std::string>(name,","));
+            if (loop->valid()) {
+                loops.push_back(loop);
+                if (verbose) loop->print();
+            } else {
+                skip2end();
+            }
+        }, 0
+    );
+
+    this->addAction(
+        "if", "", "start of if-scope. If the value of its option, named test, evaluates to false the entire scope is skipped",
+        {{"test", "", "0|1|false|true", "boolean value used to test if-statement"}},
+        [&](){++counter;},
+        [&](){
+            assert(iter->name == "if");
+            if (this->get<bool>("test")) {
+                loops.push_back(std::make_shared<IfLoop>(computer.memory(), iter));
+            } else {
+                skip2end();
+            }
         }, 0
     );
 
     this->addAction(
         "end", "", "marks the end scope of a for- or each-loop", {},
-        [&](){if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for or -each");
+        [&](){
+            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for or -each");
             --counter;},
         [&](){
-            assert(action_iter->name == "end");
+            assert(iter->name == "end");
             auto loop = loops.back();// current loop
             if (loop->next()) {// rewind loop
-                action_iter = loop->begin;
+                iter = loop->begin;
                 if (verbose) loop->print();
             } else {// exit loop
                 loops.pop_back();
@@ -655,10 +878,7 @@ Parser::Parser(std::vector<Option> &&def)
 
 void Parser::run()
 {
-    counter=1;// reset for the global counter "%G"
-    for (action_iter=actions.begin(); action_iter!=actions.end(); ++action_iter) {
-      action_iter->run();
-    }
+    for (iter=actions.begin();iter!=actions.end();++iter) iter->run();
 }
 
 // ==============================================================================================================
@@ -690,9 +910,9 @@ void Parser::parse(int argc, char *argv[])
         auto search = hashMap.find(str.substr(pos));//first remove all leading "-"
         if (search != hashMap.end()) {
             actions.push_back(*search->second);// copy construction of Action
-            action_iter = std::prev(actions.end());// important
-            while(i+1<argc && argv[i+1][0] != '-') action_iter->setOption(argv[++i]);
-            action_iter->init();// optional callback function unique to action
+            iter = std::prev(actions.end());// important
+            while(i+1<argc && argv[i+1][0] != '-') iter->setOption(argv[++i]);
+            iter->init();// optional callback function unique to action
         } else {
             throw std::invalid_argument("Parser: unsupported action \""+str+"\"\n");
         }
@@ -702,21 +922,11 @@ void Parser::parse(int argc, char *argv[])
 
 // ==============================================================================================================
 
-template <typename T>
-math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) const
-{
-    VecS v = this->getVec<std::string>(name, delimiters);
-    if (v.size()!=3) throw std::invalid_argument(action_iter->name+": Parser::getVec3: not a valid input "+name);
-    return math::Vec3<T>(str2<T>(v[0]), str2<T>(v[1]), str2<T>(v[2]));
-}
-
-// ==============================================================================================================
-
 void Parser::usage(const VecS &actions, bool brief) const
 {
     for (const std::string &str : actions) {
         auto search = hashMap.find(str);
-        if (search == hashMap.end()) throw std::invalid_argument(action_iter->name+": Parser:::usage: unsupported action \""+str+"\"\n");
+        if (search == hashMap.end()) throw std::invalid_argument(iter->name+": Parser:::usage: unsupported action \""+str+"\"\n");
         std::cerr << this->usage(*search->second, brief);
     }
 }
@@ -777,8 +987,8 @@ std::string Parser::usage(const Action &action, bool brief) const
 
 void Parser::updateDefaults()
 {
-    assert(action_iter->name == "default");
-    const std::vector<Option> &other = action_iter->options;
+    assert(iter->name == "default");
+    const std::vector<Option> &other = iter->options;
     assert(defaults.size() == other.size());
     for (int i=0; i<defaults.size(); ++i) {
         if (!other[i].value.empty()) defaults[i].value = other[i].value;
@@ -789,7 +999,7 @@ void Parser::updateDefaults()
 
 void Parser::setDefaults()
 {
-    for (auto &dst : action_iter->options) {
+    for (auto &dst : iter->options) {
         if (dst.value.empty()) {
             for (auto &src : defaults) {
                 if (dst.name == src.name) {

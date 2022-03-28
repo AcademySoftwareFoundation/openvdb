@@ -107,6 +107,7 @@ public:
     size_t vtxCount() const { return mVtx.size(); }
     size_t triCount() const { return mTri.size(); }
     size_t quadCount() const { return mQuad.size(); }
+    size_t polyCount() const { return mTri.size() + mQuad.size(); }
 
     bool isEmpty() const { return mVtx.empty() && mTri.empty() && mQuad.empty(); }
     bool isPoints() const { return !mVtx.empty() && mTri.empty() && mQuad.empty(); }
