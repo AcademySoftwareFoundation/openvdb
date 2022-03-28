@@ -1,4 +1,0 @@
-Build:
-    - Improved locating NumPy in CMake when multiple python versions are installed.
-    - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.
-    [Reported by Sam James]
