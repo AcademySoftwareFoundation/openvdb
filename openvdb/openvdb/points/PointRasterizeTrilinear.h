@@ -49,22 +49,29 @@ struct TrilinearTraits<ValueT, false>
     using TreeT = typename PointDataTreeT::template ValueConverter<ResultT>::Type;
 };
 
-/// @brief Threaded method to perform a weighted rasterization of all points within a voxel
-/// @details Accumulates values and weights according to a simple 0-1-0 weighted hat function.
-///          This algorithm is an exact inverse of a trilinear interpolation and thus a key method
-///          used in PIC/FLIP style simulations. Returns a grid of the same precision as the input
-///          source attribute.
-///
-/// @tparam Staggered whether to perform a staggered rasterization
-/// @param points     the PointDataGrid used to hold the point set to be rasterized
-/// @param attribute  the name of the source attribute to rasterize
-/// @param exclude    the group of names to exclude
+/// @brief Perform weighted trilinear rasterization of all points within a
+///   voxel. This method takes and returns a tree i.e. ignores grid
+///   transformations.
+/// @details Accumulates values and weights according to a simple 0-1-0 weighted
+///   hat function. This algorithm is an exact inverse of a trilinear
+///   interpolation and thus a key method used in PIC/FLIP style simulations.
+///   Returns a tree of the same precision as the input source attribute, but
+///   may be of a different math type depending on the value of the Staggered
+///   template attribute. If Staggered is true, this method produces values at
+///   each voxels negative faces, causing scalar attributes to produce
+///   math::Vec3<ValueT> tree types. The result Tree type is equal to:
+///     TrilinearTraits<ValueT, Staggered>::template TreeT<PointDataTreeT>
+/// @tparam Staggered whether to perform a staggered or collocated rasterization
+/// @tparam ValueT    the value type of the point attribute to rasterize
+/// @param points     the point tree to be rasterized
+/// @param attribute  the name of the attribute to rasterize. Must be a scalar
+///   or Vec3 attribute.
+/// @param filter     an optional point filter to use
 template <bool Staggered,
     typename ValueT,
     typename FilterT = NullFilter,
     typename PointDataTreeT = PointDataTree>
-inline typename TrilinearTraits<ValueT, Staggered>::template
-    TreeT<PointDataTreeT>::Ptr
+inline auto
 rasterizeTrilinear(const PointDataTreeT& points,
            const std::string& attribute,
            const FilterT& filter = NullFilter());
@@ -326,14 +333,22 @@ struct CellCenteredTransfer :
     }
 };
 
+// @note  If building with MSVC we have to use auto to deduce the return type
+//   due to a compiler bug. We can also use that for the public API - but
+//   we explicitly define it in non-msvc builds to ensure the API remains
+//   consistent
 template <bool Staggered,
     typename ValueT,
     typename CodecT,
     typename PositionCodecT,
     typename FilterT,
     typename PointDataTreeT>
-inline typename TrilinearTraits<ValueT, Staggered>::template
-    TreeT<PointDataTreeT>::Ptr
+inline
+#ifndef _MSC_VER
+typename TrilinearTraits<ValueT, Staggered>::template TreeT<PointDataTreeT>::Ptr
+#else
+auto
+#endif
 rasterizeTrilinear(const PointDataTreeT& points,
            const size_t pidx,
            const size_t sidx,
@@ -372,8 +387,7 @@ template <bool Staggered,
     typename ValueT,
     typename FilterT,
     typename PointDataTreeT>
-inline typename TrilinearTraits<ValueT, Staggered>::template
-    TreeT<PointDataTreeT>::Ptr
+inline auto
 rasterizeTrilinear(const PointDataTreeT& points,
            const std::string& attribute,
            const FilterT& filter)
