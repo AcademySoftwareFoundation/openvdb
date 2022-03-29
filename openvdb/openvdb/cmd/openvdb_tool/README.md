@@ -94,7 +94,7 @@ which builds the executable debug/vdb_tool. Other build targets are _archive_ wh
 
 # Examples
 
-* Get help on actions
+* Get help on actions and their options
 ```
 vdb_tool -help
 vdb_tool -help read write

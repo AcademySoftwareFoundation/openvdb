@@ -246,6 +246,7 @@ void Geometry::writePLY(std::ostream &os) const
     if (mTri.size()>0) {
         const size_t size = sizeof(char) + 3*sizeof(uint32_t);
         char *buffer = static_cast<char*>(std::malloc(mTri.size()*size)), *p = buffer;// uninitialized
+        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
         static_assert(sizeof(Vec3I) == 3 * sizeof(uint32_t), "Unexpected sizeof(Vec3I)");
         for (const Vec3I *t = mTri.data(), *e = t + mTri.size(); t!=e; ++t) {
             *p = 3;
@@ -258,6 +259,7 @@ void Geometry::writePLY(std::ostream &os) const
     if (mQuad.size()>0) {
         const size_t size = sizeof(char) + 4*sizeof(uint32_t);
         char *buffer = static_cast<char*>(std::malloc(mQuad.size()*size)), *p = buffer;// uninitialized
+        if (buffer==nullptr) throw std::invalid_argument("Geometry::writePLY: failed to allocate buffer");
         static_assert(sizeof(Vec4I) == 4 * sizeof(uint32_t), "Unexpected sizeof(Vec4I)");
         for (const Vec4I *q = mQuad.data(), *e = q + mQuad.size(); q!=e; ++q) {
             *p = 4;
@@ -568,12 +570,13 @@ void Geometry::readPLY(std::istream &is)
         } else {
             const size_t bSize = vtx_skip[0].bytes + 3*sizeof(float) + vtx_skip[1].bytes;
             char *buffer = static_cast<char*>(std::malloc(vtxCount*bSize));// uninitialized
+            if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
             is.read(buffer, vtxCount*bSize);
             for (size_t i=0; i<vtxCount; ++i) {
                 const float *p = reinterpret_cast<const float*>(buffer + i*bSize + vtx_skip[0].bytes);
                 mVtx[i] = Vec3f(p);
             }
-            std:free(buffer);
+            std::free(buffer);
         }
         if (reverseBytes) {
             auto flipBytes = [](float v)->float{
@@ -619,9 +622,10 @@ void Geometry::readPLY(std::istream &is)
                 vtx[i] = tmp;
             }
         };// flipBytes in uint32_t
-        char buffer[ply_skip[0].bytes + 1];// small stack allocated buffer
+        char *buffer = static_cast<char*>(std::malloc(ply_skip[0].bytes + 1));// uninitialized
+        if (buffer==nullptr) throw std::invalid_argument("Geometry::readPLY: failed to allocate buffer");
         for (size_t i=0; i<polyCount; ++i) {
-            is.read((char *)buffer, ply_skip[0].bytes + 1);
+            is.read(buffer, ply_skip[0].bytes + 1);
             const unsigned int n = (unsigned int)buffer[ply_skip[0].bytes];
             switch (n) {
             case 3:
@@ -640,6 +644,7 @@ void Geometry::readPLY(std::istream &is)
             }
             is.ignore(ply_skip[1].bytes);
         }// loop over polygons
+        std::free(buffer);
     } else {// ascii format
         for (size_t i=0; i<polyCount; ++i) {
             tokens = tokenize_line();
@@ -750,7 +755,7 @@ void Geometry::readSTL(const std::string &fileName)
     std::ifstream infile(fileName, std::ios::in | std::ios::binary);
     if (!infile.is_open()) throw std::runtime_error("Geometry::readSTL: Error opening STL file \""+fileName+"\"");
     PosT xyz;
-    char buffer[80] = "";// small stack allocated buffer
+    char buffer[80] = "";// small fixed stack allocated buffer
     if (!infile.read(buffer, 5)) throw std::invalid_argument("Geometry::readSTL: Failed to head header");
     if (strcmp(buffer, "solid") == 0) {//ASCII file
         std::string line;
