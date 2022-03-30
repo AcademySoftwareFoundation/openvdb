@@ -135,8 +135,8 @@ Disable CMakes default system search paths when locating dependencies. When enab
 its default system search routine if it cannot find a dependency with the provided settings. When disabled, only
 paths provided through the Xxx_ROOT, supported XXX_INCLUDEDIR/XXX_LIBRARYDIR variables or the SYSTEM_LIBRARY_PATHS
 list will be searched.]=] OFF)
-option(OPENVDB_USE_DEPRECATED_ABI_6 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_USE_DEPRECATED_ABI_7 "Bypass minimum ABI requirement checks" OFF)
+option(OPENVDB_USE_DEPRECATED_ABI_8 "Bypass minimum ABI requirement checks" OFF)
 option(OPENVDB_USE_FUTURE_ABI_10 "Bypass future ABI check" OFF)
 option(OPENVDB_FUTURE_DEPRECATION "Generate messages for upcoming deprecation" ON)
 option(OPENVDB_ENABLE_UNINSTALL "Adds a CMake uninstall target." ON)
@@ -209,8 +209,28 @@ if(USE_AX)
   endif()
 endif()
 
+if(OPENVDB_BUILD_HOUDINI_PLUGIN OR OPENVDB_BUILD_HOUDINI_ABITESTS)
+  set(USE_HOUDINI ON)
+endif()
+
+if(OPENVDB_BUILD_MAYA_PLUGIN)
+  set(USE_MAYA ON)
+endif()
+
+if(USE_MAYA AND USE_HOUDINI)
+  # @todo technically this is possible so long as library versions match
+  # exactly but it's difficult to validate and dangerous
+  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
+    "the same core dependencies. Plugins must be compiled separately to "
+    "ensure the required DCC dependencies are met.")
+endif()
+
 ###### Deprecated options
 
+if(OPENVDB_CODE_COVERAGE)
+  message(FATAL_ERROR "The OPENVDB_CODE_COVERAGE option  has been removed. Choose instead the unique"
+      "build type -DCMAKE_BUILD_TYPE=coverage")
+endif()
 if(OPENVDB_BUILD_HOUDINI_SOPS)
   message(FATAL_ERROR "The OPENVDB_BUILD_HOUDINI_SOPS option has been removed. Use OPENVDB_BUILD_HOUDINI_PLUGIN.")
 endif()
@@ -221,142 +241,33 @@ endif()
 # Various root level CMake options which are marked as advanced
 
 mark_as_advanced(
+  CONCURRENT_MALLOC
+  DISABLE_CMAKE_SEARCH_PATHS
+  DISABLE_DEPENDENCY_VERSION_CHECKS
+  OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
-  USE_HOUDINI
-  USE_MAYA
-  USE_LOG4CPLUS
-  USE_IMATH_HALF
-  USE_CCACHE
-  OPENVDB_BUILD_HOUDINI_ABITESTS
-  DISABLE_DEPENDENCY_VERSION_CHECKS
-  DISABLE_CMAKE_SEARCH_PATHS
-  OPENVDB_USE_DEPRECATED_ABI_6
-  OPENVDB_USE_DEPRECATED_ABI_7
-  OPENVDB_USE_FUTURE_ABI_10
   OPENVDB_FUTURE_DEPRECATION
-  CONCURRENT_MALLOC
-  USE_COLORED_OUTPUT
-  SYSTEM_LIBRARY_PATHS
   OPENVDB_SIMD
+  OPENVDB_USE_DEPRECATED_ABI_7
+  OPENVDB_USE_DEPRECATED_ABI_8
+  OPENVDB_USE_FUTURE_ABI_10
+  SYSTEM_LIBRARY_PATHS
+  USE_CCACHE
+  USE_COLORED_OUTPUT
+  USE_HOUDINI
+  USE_IMATH_HALF
+  USE_LOG4CPLUS
+  USE_MAYA
 )
-
-# Configure minimum version requirements - some are treated specially and fall
-# outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
-set(MINIMUM_CXX_STANDARD 14)
-
-# @note  ABI always enforced so the correct deprecation messages are available.
-# OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
-set(MINIMUM_OPENVDB_ABI_VERSION 6)
-set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 8)
-set(FUTURE_OPENVDB_ABI_VERSION 10)
-
-if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
-  # @note  Currently tracking CY2020 of the VFX platform where available
-  set(MINIMUM_GCC_VERSION 6.3.1)
-  set(MINIMUM_CLANG_VERSION 3.8)
-  set(MINIMUM_ICC_VERSION 17)
-  set(MINIMUM_MSVC_VERSION 19.10)
-
-  set(MINIMUM_BOOST_VERSION 1.70)
-  set(MINIMUM_ILMBASE_VERSION 2.4)
-  set(MINIMUM_OPENEXR_VERSION 2.4)
-  set(MINIMUM_ZLIB_VERSION 1.2.7)
-  set(MINIMUM_TBB_VERSION 2019.0)
-  set(MINIMUM_LLVM_VERSION 7.0.0)
-  set(MINIMUM_BLOSC_VERSION 1.5.0)
-
-  set(MINIMUM_PYTHON_VERSION 2.7) # @warning should be 3.7.x, but H18.5+ can still be used with 2.7.x
-  set(MINIMUM_NUMPY_VERSION 1.14.0)
-
-  set(MINIMUM_GOOGLETEST_VERSION 1.10)
-  set(MINIMUM_GLFW_VERSION 3.1)
-  set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
-  set(MINIMUM_HOUDINI_VERSION 18.5)
-
-  # These always promote warnings rather than errors
-  set(MINIMUM_MAYA_VERSION 2017)
-  set(MINIMUM_DOXYGEN_VERSION 1.8.8)
-endif()
-
-# VFX 21 deprecations to transition to MINIMUM_* variables in OpenVDB 10.0.0
-
-# No compiler upgrades planned
-set(FUTURE_MINIMUM_GCC_VERSION 9.3.1)
-set(FUTURE_MINIMUM_ICC_VERSION 19)
-# set(FUTURE_MINIMUM_MSVC_VERSION 19.10)
-
-# set(FUTURE_MINIMUM_CMAKE_VERSION 3.18)
-# set(FUTURE_MINIMUM_ILMBASE_VERSION 2.4)
-# set(FUTURE_MINIMUM_OPENEXR_VERSION 2.4)
-set(FUTURE_MINIMUM_BOOST_VERSION 1.73)
-set(FUTURE_MINIMUM_BLOSC_VERSION 1.17.0)
-set(FUTURE_MINIMUM_TBB_VERSION 2020.2)
-set(FUTURE_MINIMUM_PYTHON_VERSION 3.7)
-set(FUTURE_MINIMUM_NUMPY_VERSION 1.17.0)
-# set(FUTURE_MINIMUM_HOUDINI_VERSION 18.5)
-set(FUTURE_MINIMUM_LLVM_VERSION 10.0.0)
 
 #########################################################################
 
-# General CMake and CXX settings
+# Configure MINIMUM and FUTURE_MINIMUM version variables
 
-if(FUTURE_MINIMUM_CMAKE_VERSION)
-  if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
-    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
-      "is deprecated and will be removed.")
-  endif()
-endif()
+include(cmake/config/OpenVDBVersions.cmake)
 
-if(NOT CMAKE_CXX_STANDARD)
-  set(CMAKE_CXX_STANDARD ${MINIMUM_CXX_STANDARD} CACHE STRING
-    "The C++ standard whose features are requested to build OpenVDB components." FORCE)
-elseif(CMAKE_CXX_STANDARD LESS ${MINIMUM_CXX_STANDARD})
-  message(FATAL_ERROR "Provided C++ Standard is less than the supported minimum."
-    "Required is at least \"${MINIMUM_CXX_STANDARD}\" (found ${CMAKE_CXX_STANDARD})")
-endif()
-
-# Configure MS Runtime
-
-if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
-  message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
-
-  # Configure Boost library varient on Windows
-  if(NOT Boost_USE_STATIC_RUNTIME)
-    set(Boost_USE_STATIC_RUNTIME OFF)
-    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
-       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
-      set(Boost_USE_STATIC_RUNTIME ON)
-    endif()
-  endif()
-  if(NOT Boost_USE_DEBUG_RUNTIME)
-    set(Boost_USE_DEBUG_RUNTIME OFF)
-    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL OR
-       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
-      set(Boost_USE_DEBUG_RUNTIME ON)
-    endif()
-  endif()
-endif()
-
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
-set(CMAKE_CXX_EXTENSIONS OFF)
-
-set(CMAKE_DISABLE_SOURCE_CHANGES ON)
-set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
-
-if(OPENVDB_ENABLE_RPATH)
-  # Configure rpath for installation base on the following:
-  # https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/RPATH-handling
-  set(CMAKE_SKIP_BUILD_RPATH FALSE)
-  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
-  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
-  # @todo make relocatable?
-  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
-endif()
-
-# For CMake's find Threads module which brings in pthread - This flag
-# forces the compiler -pthread flag vs -lpthread
-set(THREADS_PREFER_PTHREAD_FLAG TRUE)
+#########################################################################
 
 enable_testing()
 
@@ -382,26 +293,6 @@ if(OPENVDB_INSTALL_CMAKE_MODULES)
     cmake/OpenVDBUtils.cmake
   )
   install(FILES ${OPENVDB_CMAKE_MODULES} DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/OpenVDB)
-endif()
-
-# Configure DCC installation if necessary
-
-if(OPENVDB_BUILD_HOUDINI_PLUGIN OR
-   OPENVDB_BUILD_HOUDINI_ABITESTS)
-  set(USE_HOUDINI ON)
-endif()
-
-if(OPENVDB_BUILD_MAYA_PLUGIN)
-  set(USE_MAYA ON)
-endif()
-
-if(USE_MAYA AND USE_HOUDINI)
-  # @todo technically this is possible so long as library versions match
-  # exactly but it's difficult to validate and dangerous
-  message(FATAL_ERROR "Cannot build both Houdini and Maya plugins against "
-    "the same core dependencies. Plugins must be compiled separately to "
-    "ensure the required DCC dependencies are met."
-  )
 endif()
 
 # Configure component dependencies by loading the Houdini/Maya setup
@@ -457,31 +348,11 @@ if(USE_CCACHE)
   endif()
 endif()
 
-# Build type configuration
+#########################################################################
 
-if(OPENVDB_CODE_COVERAGE)
-  message(DEPRECATION "The OPENVDB_CODE_COVERAGE option is deprecated. Choose instead the unique"
-    "build type -DCMAKE_BUILD_TYPE=coverage")
-  set(CMAKE_BUILD_TYPE coverage)
-endif()
-if(NOT CMAKE_BUILD_TYPE)
-  set(CMAKE_BUILD_TYPE Release)
-endif()
+# Configure general CMake and CXX settings
 
-include(cmake/config/OpenVDBBuildTypes.cmake)
-
-if(CMAKE_BUILD_TYPE EQUAL coverage)
-  # use .gcno extension instead of .cc.gcno
-  # @note This is an undocumented internal cmake var and does not work
-  # with multi config generators
-  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
-endif()
-
-# CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
-get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
-if(NOT _isMultiConfig)
-  message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
-endif()
+include(cmake/config/OpenVDBCXX.cmake)
 
 #########################################################################
 

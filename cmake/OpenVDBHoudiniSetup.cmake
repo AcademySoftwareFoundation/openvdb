@@ -333,9 +333,7 @@ endif()
 # Explicitly configure the OpenVDB ABI version depending on the Houdini
 # version.
 
-if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.0)
-  set(OPENVDB_HOUDINI_ABI 6)
-elseif(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
+if(Houdini_VERSION_MAJOR_MINOR VERSION_EQUAL 18.5)
   set(OPENVDB_HOUDINI_ABI 7)
 else()
   find_file(_houdini_openvdb_version_file "openvdb/version.h"

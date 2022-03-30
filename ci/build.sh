@@ -155,8 +155,8 @@ set -x
 # Note:
 # - all sub binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_8=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DOPENVDB_BUILD_VDB_RENDER=ON \
