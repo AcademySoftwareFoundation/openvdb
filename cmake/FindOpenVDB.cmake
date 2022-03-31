@@ -570,6 +570,10 @@ if(WIN32)
   list(APPEND OpenVDB_DEFINITIONS NOMINMAX)
 endif()
 
+if(MINGW)
+  list(APPEND OpenVDB_DEFINITIONS _USE_MATH_DEFINES)
+endif()
+
 if(OpenVDB_ABI)
   # Newer version of OpenVDB defines this in version.h, but it is are also
   # provided here to maintain backwards compatibility with header include

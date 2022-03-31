@@ -613,6 +613,10 @@ endif()
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
+if(MINGW)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
+endif()
+
 if(WIN32)
   if(USE_IMATH_HALF)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
