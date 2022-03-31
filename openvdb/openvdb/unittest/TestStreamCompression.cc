@@ -23,7 +23,7 @@
 #include <boost/uuid/uuid_io.hpp>
 #include <boost/version.hpp> // for BOOST_VERSION
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
 // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
 // Ensure that both namespaces exist.
@@ -70,7 +70,7 @@ private:
         {
             mLastWriteTime = 0;
             const char* regionFilename = mMap.get_name();
-#ifdef _MSC_VER
+#ifdef _WIN32
             using namespace boost::interprocess::detail;
             using namespace boost::interprocess::ipcdetail;
             using openvdb::Index64;
@@ -454,7 +454,7 @@ TestStreamCompression::testPagedStreams()
 
     std::string tempDir;
     if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
+#ifdef _WIN32
     if (tempDir.empty()) {
         char tempDirBuffer[MAX_PATH+1];
         int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);
