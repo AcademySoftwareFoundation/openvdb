@@ -111,6 +111,13 @@ inline std::string getFile(const std::string &str)
         return to_lower_case(tmp);
     }
 
+    /// @brief Turns all characters in a string into upper case
+    inline std::string to_upper_case(const std::string &str)
+    {
+        std::string tmp = str;
+        return to_upper_case(tmp);
+    }
+
     /// @brief return the 1-based index of the first matching word in a string-vector with comma-seperated words.
     /// @details findMatch("ba", {"abc,a", "aab,c,ba"}) returns 2 since "ba" is a word in the second entry of vec
     inline int findMatch(const std::string &word, const std::vector<std::string> &vec)

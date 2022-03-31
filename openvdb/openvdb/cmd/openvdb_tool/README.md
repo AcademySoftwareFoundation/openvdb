@@ -1,13 +1,13 @@
 # vdb_tool
 
-This command-line tool, dubbed vdb_tool, that can execute and combine the of high-level tools available in openvdb/tools.
-For instance, it can convert a sequence of polygon meshes and particles to level sets, and perform a large number of operations on these
-level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk or even stream VDBs to STDOUT so other tools can render them (using pipelining). We denote the operations **actions**, and their arguments **options**. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
+This command-line tool, dubbed vdb_tool, can combine any number of the of high-level tools available in openvdb/tools. For instance, it can convert a sequence of polygon meshes and particles to level sets, and perform a large number of operations on these level set surfaces. It can also generate adaptive polygon meshes from level sets, ray-trace images and export particles, meshes or VDBs to disk or even stream VDBs to STDOUT so other tools can render them (using pipelining). We denote the operations **actions**, and their arguments **options**. This command-line tool also supports a string-evaluation language that can be used to define procedural expressions for options of the actions. Currently the following list of actions are supported:
 
 | Action | Description |
 |-------|-------|
-| **for/each/end** | Defines the scope of a for-loop or each-loop with loop-variables that can be used for other arguments or file names |
-| **eval** | Evaluate an expression written in our Reverse Polish Notation |
+| **for/end** | Defines the scope of a for-loop with a range for a loop-variable |
+| **each/end** | Defines the scope of an each-loop with a list for a loop-variable |
+| **if/end** | If-statement used to enable/disable actions |
+| **eval** | Evaluate an expression written in our Reverse Polish Notation (see below) |
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
 | **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
@@ -43,6 +43,7 @@ level set surfaces. It can also generate adaptive polygon meshes from level sets
 | **enright** | Advects a level set in a periodic and divergence-free velocity field. Primarily intended for benchmarks |
 | **expand** | Expand the narrow band of a level set |
 | **resample** | Re-sample a scalar VDB grid |
+| **transform** | Apply affine transformations to VDB grids |
 | **ls2mesh** | Convert a level set surface into an adaptive polygon mesh surface |
 | **clip** | Clips one VDB grid with another VDB grid or a bbox or frustum |
 | **render**| Render and save an image of a level set or fog VDB |
@@ -75,7 +76,7 @@ Note that **actions** always start with one or more "-" and (except for file nam
 
 # Stack-based string expressions
 
-This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops, e.g. "-quiet -for i=1,3,1 -eval {$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
+This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
 # Building this tool
 At the moment we only provide a gnu Makefile, but it's simple so it shouldn't be hard to roll your own cmake. The only mandatory dependency of this command-line tool is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic (enable them at the top of the Makefile).
@@ -346,11 +347,10 @@ vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vd
 - [x] -clear vdb=1,2,3 geo=*
 - [x] -config update=false execute=true configure.txt
 - [x] -each f=*.vdb
-- [x] -each f=path/base.ext -write $P/$B.vdb -end
 - [x] add stack-based translator and storage
 - [x] -eval '{1:@G}'
-- [x] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
-- [x] add switch-statement: {$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
+- [x] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {\$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
+- [x] add switch-statement: {\$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
 - [x] Added numerous methods to scripting language
 - [x] -mesh2ls vdb=0  (use another vdb to defined the transform)
 - [x] -iso2ls vdb=0,1 (use another vdb to defined the transform)
@@ -358,9 +358,9 @@ vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vd
 - [x] -for i=1,9  (third argument defaults to 1, i.e. i=1,9,1)
 - [x] -if 0|1|false|true  ... -end (if statement)
 - [x] -eval help="*" or -eval help=if,switch
-- [x] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sh:match}
+- [x] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
 - [ ] Combine: -min, -max, -sum
-- [ ] -xform (translate and scale grid transforms)
+- [x] -transform vdb=0,3 geo=5 (scale -> rotate -> translate of VDB grids and geometry)
 - [ ] -merge
 - [ ] -points2mask
 - [ ] -erodeTopology

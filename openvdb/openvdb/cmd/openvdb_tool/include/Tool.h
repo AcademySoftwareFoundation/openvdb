@@ -95,8 +95,6 @@ class Tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
 
-    void config();
-
     void read();
     void readGeo( const std::string &fileName);
     void readVDB( const std::string &fileName);
@@ -107,49 +105,53 @@ class Tool
     void writeNVDB(const std::string &fileName) const;
     void writeConf(const std::string &fileName) const;
 
-    void meshToLevelSet();
+    void compute();
 
-    void vdbToPoints();
+    void config();
 
-    void pointsToVdb();
+    void csg();
 
-    void levelSetToFog();
+    void enright();
+
+    void expandLevelSet();
+
+    void filterLevelSet();
+
+    void floodLevelSet();
 
     void isoToLevelSet();
 
-    void particlesToLevelSet();
+    void levelSetToMesh();
 
     void levelSetSphere();
 
     void levelSetPlatonic();
 
-    void offsetLevelSet();
+    void levelSetToFog();
 
-    void expandLevelSet();
-
-    void segment();
-
-    void resample();
-
-    void filterLevelSet();
-
-    void compute();
-
-    void csg();
-
-    void scatter();
+    void meshToLevelSet();
 
     void multires();
 
+    void offsetLevelSet();
+
+    void particlesToLevelSet();
+
+    void pointsToVdb();
+
     void pruneLevelSet();
 
-    void floodLevelSet();
-
-    void enright();
-
-    void levelSetToMesh();
-
     void render();
+
+    void resample();
+
+    void segment();
+
+    void scatter();
+
+    void vdbToPoints();
+
+    void transform();
 
     template <typename GridType>
     GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
@@ -607,6 +609,16 @@ void Tool::init()
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"}},
      [&](){mParser.setDefaults();}, [&](){this->segment();});
+
+  mParser.addAction(
+      "transform", "", "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grid",
+    {{"rotate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "rotation in radians around x,y,z axis"},
+     {"translate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "translation in world units along x,y,z axis"},
+     {"scale", "1.0", "1.0", "uniform scaling in world units"},
+     {"vdb", "", "0,2,..", "age (i.e. stack index) of the VDB grid to be processed. Defaults to empty."},
+     {"geo", "", "0,2,..", "age (i.e. stack index) of the Geometry to be processed. Defaults to empty."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or overwritten"}},
+     [&](){mParser.setDefaults();}, [&](){this->transform();});
 
   mParser.addAction(
       "render", "", "ray-tracing of level set surfaces and volume rendering of fog volumes",
@@ -1299,6 +1311,65 @@ void Tool::pointsToVdb()
     throw std::invalid_argument(name+": "+e.what());
   }
 }// Tool::pointsToVdb
+
+// ==============================================================================================================
+
+void Tool::transform()
+{
+  const std::string &name = mParser.getAction().name;
+  assert(name == "transform");
+  try {
+    mParser.printAction();
+    const auto vdb_age = mParser.getVec<int>("vdb");
+    const auto geo_age = mParser.getVec<int>("geo");
+    const bool keep = mParser.get<bool>("keep");
+    const Vec3d trans = mParser.getVec3<double>("translate");
+    const Vec3d rot = mParser.getVec3<double>("rotate");
+    const double scale = mParser.get<double>("scale");
+    if (scale<=0.0) throw std::invalid_argument(name+": invalid scale: "+std::to_string(scale));
+
+    for (int age : vdb_age) {
+      auto it = this->getGrid(age);
+      GridBase::Ptr grid(nullptr);
+      if (keep) {
+        grid = (*it)->copyGrid();// transform and tree are shared
+        if (!grid->getName().empty()) grid->setName("xform_"+grid->getName());
+        grid->setTransform((*it)->transform().copy());// new transform
+        mGrid.push_back(grid);
+      } else {
+        grid = *it;
+      }
+      // Order of translations: scale -> rotate -> translate
+      if (scale!=1.0)  grid->transform().postScale(scale);
+      if (rot[0]!=0.0) grid->transform().postRotate(rot[0], math::X_AXIS);
+      if (rot[1]!=0.0) grid->transform().postRotate(rot[1], math::Y_AXIS);
+      if (rot[2]!=0.0) grid->transform().postRotate(rot[2], math::Z_AXIS);
+      if (trans.length()>0.0) grid->transform().postTranslate(trans);
+    }
+    if (geo_age.empty()) return;
+
+    // Order of translations: scale -> rotate -> translate
+    math::Transform::Ptr xform = math::Transform::createLinearTransform(scale);
+    if (rot[0]!=0.0) xform->postRotate(rot[0], math::X_AXIS);
+    if (rot[1]!=0.0) xform->postRotate(rot[1], math::Y_AXIS);
+    if (rot[2]!=0.0) xform->postRotate(rot[2], math::Z_AXIS);
+    if (trans.length()>0.0) xform->postTranslate(trans);
+    for (int age : geo_age) {
+      auto it = this->getGeom(age);
+      Geometry::Ptr geom(nullptr);
+      if (keep) {
+        geom = (*it)->copyGeom();
+        if (!geom->getName().empty()) geom->setName("xform_"+geom->getName());
+        mGeom.push_back(geom);
+      } else {
+        geom = *it;
+      }
+      geom->transform(*xform);
+    }
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(name+": "+e.what());
+  }
+}// Tool::transform
 
 // ==============================================================================================================
 

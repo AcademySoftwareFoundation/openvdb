@@ -629,7 +629,6 @@ struct Parser {
     void parse(int argc, char *argv[]);
     inline void finalize();
     inline void run();
-    inline void updateDefaults();
     inline void setDefaults();
     void print(std::ostream& os = std::cerr) const {for (auto &a : actions) a.print(os);}
 
@@ -762,12 +761,11 @@ Parser::Parser(std::vector<Option> &&def)
         [](){},
         [&](){
             assert(iter->name == "eval");
-            const std::string &help =iter->options[1].value;
-            if (!help.empty()) {
-                if (help[0]=='*' && help.size()==1) {
+            if (!iter->options[1].value.empty()) {
+                if (iter->options[1].value=="*") {
                     computer.help();
                 } else {
-                    computer.help(tokenize(help, ","));
+                    computer.help(tokenize(iter->options[1].value, ","));
                 }
             }
             std::string str = iter->options[0].value;// copy
@@ -794,7 +792,11 @@ Parser::Parser(std::vector<Option> &&def)
     this->addAction(
         "default", "", "define default values to be used by subsequent actions",
         std::move(std::vector<Option>(defaults)),// move a deep copy
-        [&](){this->updateDefaults();}, [](){}
+        [&](){assert(iter->name == "default");
+              std::vector<Option> &src = iter->options, &dst = defaults;
+              assert(src.size() == dst.size());
+              for (int i=0; i<src.size(); ++i) if (!src[i].value.empty()) dst[i].value = src[i].value;},
+        [](){}
     );
 
     auto skip2end = [&](){
@@ -985,26 +987,14 @@ std::string Parser::usage(const Action &action, bool brief) const
 
 // ==============================================================================================================
 
-void Parser::updateDefaults()
-{
-    assert(iter->name == "default");
-    const std::vector<Option> &other = iter->options;
-    assert(defaults.size() == other.size());
-    for (int i=0; i<defaults.size(); ++i) {
-        if (!other[i].value.empty()) defaults[i].value = other[i].value;
-    }
-}
-
-// ==============================================================================================================
-
 void Parser::setDefaults()
 {
     for (auto &dst : iter->options) {
-        if (dst.value.empty()) {
+        if (dst.value.empty()) {// is the existing value un-defined?
             for (auto &src : defaults) {
                 if (dst.name == src.name) {
                     dst.value = src.value;
-                    break;
+                    break;//only bread the inner loop
                 }
             }
         }

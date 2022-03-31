@@ -23,6 +23,7 @@
 #include <vector>
 #include <cstdlib> // for std::malloc and std::free
 
+#include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <tbb/blocked_range.h>
 
@@ -64,11 +65,15 @@ public:
     using Ptr = std::shared_ptr<Geometry>;
     struct Header;
 
-    Geometry() : mVtx(), mTri(), mQuad(), mBBox(), mName() {}
+    Geometry() = default;
+    ~Geometry() = default;
+
     Geometry(const Geometry&) = delete;// disallow copy construction
     Geometry(Geometry&&) = delete;// disallow move construction
     Geometry& operator=(const Geometry&) = delete;// disallow assignment
     Geometry& operator=(Geometry&&) = delete;// disallow move assignment
+
+    inline Ptr copyGeom() const;
 
     const std::vector<Vec3s>& vtx() const  { return mVtx; }
     const std::vector<Vec3I>& tri() const  { return mTri; }
@@ -108,6 +113,8 @@ public:
     size_t triCount() const { return mTri.size(); }
     size_t quadCount() const { return mQuad.size(); }
     size_t polyCount() const { return mTri.size() + mQuad.size(); }
+
+    inline void transform(const math::Transform &xform);
 
     bool isEmpty() const { return mVtx.empty() && mTri.empty() && mQuad.empty(); }
     bool isPoints() const { return !mVtx.empty() && mTri.empty() && mQuad.empty(); }
@@ -167,7 +174,7 @@ size_t Geometry::read(std::istream &is)
 void Geometry::clear()
 {
     mName.clear();
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
     mVtx.clear();
     mTri.clear();
     mQuad.clear();
@@ -385,7 +392,7 @@ void Geometry::readOBJ(const std::string &fileName)
         if (!infile.is_open()) throw std::invalid_argument("Error opening Geometry file \""+fileName+"\"");
         this->readOBJ(infile);
     }
-}
+}// Geometry::readOBJ
 
 void Geometry::readOBJ(std::istream &is)
 {
@@ -416,7 +423,7 @@ void Geometry::readOBJ(std::istream &is)
             }
         }
     }
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 }// Geometry::readOBJ
 
 void Geometry::readPLY(const std::string &fileName)
@@ -429,7 +436,7 @@ void Geometry::readPLY(const std::string &fileName)
         if (!infile.is_open()) throw std::invalid_argument("Error opening ply file \""+fileName+"\"");
         this->readPLY(infile);
     }
-}
+}// Geometry::readPLY
 
 void Geometry::readPLY(std::istream &is)
 {
@@ -471,7 +478,7 @@ void Geometry::readPLY(std::istream &is)
     } else {
         error("vdb_tool::readPLY: invalid format");
     }
-    const bool reverseBytes = format && format != (isLittleEndian ? 1 : 2);
+    const bool reverseBytes = format && format != (isLittleEndian() ? 1 : 2);
     // header: https://www.mathworks.com/help/vision/ug/the-ply-format.html
     size_t vtxCount = 0, polyCount = 0;
     struct Skip {int count, bytes;} vtx_skip[2]={{0,0},{0,0}}, ply_skip[2]={{0,0},{0,0}};
@@ -662,7 +669,7 @@ void Geometry::readPLY(std::istream &is)
             }
         }// loop over polygons
     }
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 }// Geometry::readPLY
 
 void Geometry::readGEO(const std::string &fileName)
@@ -675,7 +682,7 @@ void Geometry::readGEO(const std::string &fileName)
         if (!infile.is_open()) throw std::invalid_argument("Error opening geo file \""+fileName+"\"");
         this->read(infile);
     }
-}
+}//  Geometry::readGEO
 
 // Read vertices from all PointDataGrids in the specified file
 void Geometry::readVDB(const std::string &fileName)
@@ -705,7 +712,7 @@ void Geometry::readVDB(const std::string &fileName)
             }// loop over leaf nodes
         }// is a PointDataGrid
     }// loop over gids in file
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 }// Geometry::readVDB
 
 /*
@@ -746,7 +753,7 @@ void Geometry::readPTS(const std::string &fileName)
             }
         }// loop over points
     }// loop over scans
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 }// readPTS
 
 // Reading ASCII or binary STL file
@@ -816,7 +823,7 @@ void Geometry::readSTL(const std::string &fileName)
             vtxBegin += 3;
         }
     }// end binary
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 }// Geometry::readSTL
 
 void Geometry::readNVDB(const std::string &fileName)
@@ -832,11 +839,11 @@ void Geometry::readNVDB(const std::string &fileName)
     size_t n = mVtx.size();
     mVtx.resize(n + count);
     for (size_t i=n; i<mVtx.size(); ++i) mVtx[i] = *p++;// loop over points
-    mBBox = BBoxT();//invalid BBOX
+    mBBox = BBoxT();//invalidate BBox
 #else
     throw std::runtime_error("NanoVDB support was disabled during compilation!");
 #endif
-}// readNVDB
+}// Geometry::readNVDB
 
 void Geometry::print(size_t n, std::ostream& os) const
 {
@@ -859,7 +866,7 @@ void Geometry::print(size_t n, std::ostream& os) const
             os << "Quad[" << i << "] = " << mQuad[i] << std::endl;
         }
     }
-}
+}// Geometry::print
 
 #ifdef VDB_TOOL_USE_ABC
 
@@ -1021,7 +1028,7 @@ void Geometry::readABC(const std::string &fileName)
 
         AlembicReader tmp(meshVisitor);
         tmp.visit(fileName);
-        mBBox = BBoxT();//invalid BBOX
+        mBBox = BBoxT();//invalidate BBox
 }// Geometry::readABC
 #else
 void Geometry::readABC(const std::string &fileName)
@@ -1029,6 +1036,29 @@ void Geometry::readABC(const std::string &fileName)
     throw std::runtime_error("Alembic support was disabled during compilation!");
 }
 #endif
+
+Geometry::Ptr Geometry::copyGeom() const
+{
+    Ptr other = std::make_shared<Geometry>();
+    other->mVtx = mVtx;
+    other->mTri = mTri;
+    other->mQuad = mQuad;
+    other->mBBox = mBBox;
+    other->mName = mName;
+    return other;
+}
+
+void Geometry::transform(const math::Transform &xform)
+{
+    using RangeT = tbb::blocked_range<size_t>;
+    tbb::parallel_for(RangeT(0, mVtx.size()), [&](RangeT r){
+        for (int i=r.begin(); i<r.end(); ++i){
+            Vec3d xyz(mVtx[i]);
+            mVtx[i] = xform.baseMap()->applyMap(xyz);
+        }
+    });
+    mBBox = BBoxT();//invalidate BBox
+}// Geometry::transform
 
 } // namespace vdb_tool
 } // namespace OPENVDB_VERSION_NAME

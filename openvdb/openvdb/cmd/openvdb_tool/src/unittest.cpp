@@ -72,6 +72,9 @@ TEST_F(Test_vdb_tool, Util)
     {// to_lower_case
       EXPECT_EQ(" abc=", openvdb::vdb_tool::to_lower_case(" AbC="));
     }
+    {// to_upper_case
+      EXPECT_EQ(" ABC=", openvdb::vdb_tool::to_upper_case(" AbC="));
+    }
     {// contains
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", "base"));
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", "base", 5));
