@@ -1773,7 +1773,7 @@ __hostdev__ static inline uint32_t FindHighestOn(uint64_t v)
 NANOVDB_HOSTDEV_DISABLE_WARNING
 __hostdev__ inline uint32_t CountOn(uint64_t v)
 {
-#if defined(_MSC_VER) && defined(_M_X64)
+#if defined(_MSC_VER) && defined(_M_X64) && defined(NANOVDB_USE_INTRINSICS)
     v = __popcnt64(v);
 #elif (defined(__GNUC__) || defined(__clang__))
     v = __builtin_popcountll(v);
