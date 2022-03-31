@@ -130,7 +130,7 @@ public:
 
     /// A const iterator that iterates over all names in the file. This is only
     /// valid once the file has been opened.
-    class NameIterator
+    class OPENVDB_API NameIterator
     {
     public:
         NameIterator(const NameMapCIter& iter): mIter(iter) {}
