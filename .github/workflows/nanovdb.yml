@@ -90,6 +90,7 @@ jobs:
     runs-on: windows-2019
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      VCPKG_BINARY_SOURCES: 'clear;nuget,GitHub,readwrite'
       visual_studio: "Visual Studio 16 2019"
       cuda: "11.0.3"
     strategy:
@@ -113,6 +114,13 @@ jobs:
     - name: install_cuda
       shell: powershell
       run: .\ci\install_windows_cuda.ps1
+    - name: Setup NuGet Credentials
+      run: |
+        & $(vcpkg fetch nuget | select -last 1) sources add `
+        -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+        -name "GitHub" `
+        -username ${{ github.repository_owner }} `
+        -password "${{ secrets.GITHUB_TOKEN }}"
     - name: install_deps
       shell: bash
       run: |

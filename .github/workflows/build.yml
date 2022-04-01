@@ -117,6 +117,7 @@ jobs:
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      VCPKG_BINARY_SOURCES: 'clear;nuget,GitHub,readwrite'
     strategy:
       matrix:
         config:
@@ -138,6 +139,13 @@ jobs:
         # note: system path must be modified in a previous step to it's use
         echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
         echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - name: Setup NuGet Credentials
+      run: |
+        & $(vcpkg fetch nuget | select -last 1) sources add `
+        -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+        -name "GitHub" `
+        -username ${{ github.repository_owner }} `
+        -password "${{ secrets.GITHUB_TOKEN }}"
     - name: install
       shell: bash
       run: ./ci/install_windows.sh

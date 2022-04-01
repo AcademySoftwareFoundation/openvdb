@@ -421,6 +421,7 @@ jobs:
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      VCPKG_BINARY_SOURCES: 'clear;nuget,GitHub,readwrite'
     strategy:
       matrix:
         config:
@@ -441,6 +442,13 @@ jobs:
       shell: bash
       # If building debug, build llvm with MTd
       run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm_crt }}
+    - name: Setup NuGet Credentials
+      run: |
+        & $(vcpkg fetch nuget | select -last 1) sources add `
+        -source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" `
+        -name "GitHub" `
+        -username ${{ github.repository_owner }} `
+        -password "${{ secrets.GITHUB_TOKEN }}"
     - name: install
       shell: bash
       run: |
