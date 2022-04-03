@@ -132,6 +132,7 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   ast/PrintTree.cc
   ast/Scanners.cc
   ax.cc
+  codegen/Codecs.cc
   codegen/ComputeGenerator.cc
   codegen/FunctionRegistry.cc
   codegen/FunctionTypes.cc
@@ -169,6 +170,7 @@ set(OPENVDB_AX_AST_INCLUDE_FILES
 )
 
 set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
+  codegen/Codecs.h
   codegen/ComputeGenerator.h
   codegen/ConstantFolding.h
   codegen/FunctionRegistry.h

@@ -13,9 +13,8 @@
 #define OPENVDB_AX_CODEGEN_FUNCTION_REGISTRY_HAS_BEEN_INCLUDED
 
 #include "FunctionTypes.h"
-#include "Types.h"
 
-#include "../compiler/CompilerOptions.h"
+#include "openvdb_ax/compiler/CompilerOptions.h"
 
 #include <openvdb/version.h>
 
