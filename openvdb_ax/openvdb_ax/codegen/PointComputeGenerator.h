@@ -32,25 +32,6 @@ namespace codegen {
 ///////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////
 
-inline const std::map<const char*, uint64_t>& EncoderFlags()
-{
-    static const std::map<const char*, uint64_t> flags {
-        { "uniform", uint64_t(1<<0) },
-        { points::NullCodec::name(), uint64_t(1<<1) },
-        { points::TruncateCodec::name(), uint64_t(1<<2) },
-        { points::FixedPointCodec<false, points::UnitRange>::name(), uint64_t(1<<3) },
-        { points::FixedPointCodec<true, points::UnitRange>::name(), uint64_t(1<<4) },
-        { points::FixedPointCodec<false, points::PositionRange>::name(), uint64_t(1<<5) },
-        { points::FixedPointCodec<true, points::PositionRange>::name(), uint64_t(1<<6) }
-        //{ UnitVecCodec::name(), uint64_t(1<<7) }
-    };
-
-    return flags;
-}
-
-///////////////////////////////////////////////////////////////////////////////
-///////////////////////////////////////////////////////////////////////////////
-
 struct PointKernelValue
 {
     // The signature of the generated function
@@ -76,24 +57,6 @@ struct PointKernelValue
 
 struct PointKernelAttributeArray
 {
-    enum ArgKey {
-        kCustomData = 0,
-        kOrigin,
-        kValueBuffer,
-        kActive,
-        kPointIndex,
-        kTransforms,
-        kAttributeBuffers,
-        kAttributeFlags,
-        kAttributeSet,
-        kGroupHandles,
-        kLeafData
-    };
-
-    static inline llvm::Value* getArg(llvm::Function* F, const ArgKey key) {
-        return llvm::cast<llvm::Argument>(F->arg_begin() + static_cast<int>(key));
-    }
-
     // The signature of the generated function
     using Signature =
         void(const void* const,
