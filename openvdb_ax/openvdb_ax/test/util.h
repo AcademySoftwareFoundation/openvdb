@@ -11,6 +11,7 @@
 #define OPENVDB_AX_UNITTEST_UTIL_HAS_BEEN_INCLUDED
 
 #include <openvdb_ax/ast/AST.h>
+#include <openvdb_ax/ast/PrintTree.h>
 #include <openvdb_ax/ast/Parse.h>
 #include <openvdb_ax/ast/Tokens.h>
 #include <openvdb_ax/compiler/Logger.h>
@@ -34,7 +35,7 @@
         const std::string& code = test.first; \
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
         std::stringstream str; \
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unexpected parsing error(s)\n", str.str()), tree); \
+        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Unexpected parsing error(s)\n", str.str()), tree && !logger.hasError()); \
     } \
 } \
 
@@ -45,7 +46,7 @@
         logger.clear();\
         const std::string& code = test.first; \
         openvdb::ax::ast::Tree::ConstPtr tree = openvdb::ax::ast::parse(code.c_str(), logger);\
-        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected parsing error", code), logger.hasError()); \
+        CPPUNIT_ASSERT_MESSAGE(ERROR_MSG("Expected parsing error", code), !tree && logger.hasError()); \
     } \
 } \
 

@@ -768,7 +768,7 @@ TestVolumeExecutable::testCompilerCases()
         // with string only
         CPPUNIT_ASSERT(static_cast<bool>(compiler->compile<openvdb::ax::VolumeExecutable>("int i;")));
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i;"), openvdb::AXCompilerError);
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i"), openvdb::AXCompilerError);
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i"), openvdb::AXSyntaxError);
         // with AST only
         auto ast = openvdb::ax::ast::parse("i;");
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>(*ast), openvdb::AXCompilerError);

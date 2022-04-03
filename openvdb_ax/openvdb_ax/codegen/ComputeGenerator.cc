@@ -138,9 +138,8 @@ bool ComputeGenerator::generate(const ast::Tree& tree)
 
     // if traverse is false, log should have error, but can error
     // without stopping traversal, so check both
-
-    const bool result = this->traverse(&tree) && !mLog.hasError();
-    if (!result) return false;
+    const size_t err = mLog.errors();
+    if (!this->traverse(&tree) || (mLog.errors() > err)) return false;
 
     // free strings at terminating blocks
 
