@@ -31,7 +31,7 @@
 
 #include <atomic>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <boost/interprocess/detail/os_file_functions.hpp> // open_existing_file(), close_file()
 extern "C" __declspec(dllimport) bool __stdcall GetFileTime(
     void* fh, void* ctime, void* atime, void* mtime);
@@ -459,7 +459,7 @@ public:
         mLastWriteTime = this->getLastWriteTime();
 
         if (mAutoDelete) {
-#ifndef _MSC_VER
+#ifndef _WIN32
             // On Unix systems, unlink the file so that it gets deleted once it is closed.
             ::unlink(mMap.get_name());
 #endif
@@ -489,7 +489,7 @@ public:
         Index64 result = 0;
         const char* filename = mMap.get_name();
 
-#ifdef _MSC_VER
+#ifdef _WIN32
         // boost::interprocess::detail was renamed to boost::interprocess::ipcdetail in Boost 1.48.
         using namespace boost::interprocess::detail;
         using namespace boost::interprocess::ipcdetail;

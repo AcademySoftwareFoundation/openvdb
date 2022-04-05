@@ -767,7 +767,7 @@ public:
     /// @endcode
     template<typename CombineOp>
     void combine(Tree& other, CombineOp& op, bool prune = false);
-#ifndef _MSC_VER
+#ifndef _WIN32
     template<typename CombineOp>
     void combine(Tree& other, const CombineOp& op, bool prune = false);
 #endif
@@ -812,7 +812,7 @@ public:
     /// @endcode
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, ExtendedCombineOp& op, bool prune = false);
-#ifndef _MSC_VER
+#ifndef _WIN32
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, const ExtendedCombineOp& op, bool prune = false);
 #endif
@@ -847,7 +847,7 @@ public:
     /// @endcode
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, CombineOp& op, bool prune = false);
-#ifndef _MSC_VER
+#ifndef _WIN32
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, const CombineOp& op, bool prune = false);
 #endif
@@ -928,7 +928,7 @@ public:
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, ExtendedCombineOp& op,
         bool prune = false);
-#ifndef _MSC_VER
+#ifndef _WIN32
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, const ExtendedCombineOp&,
         bool prune = false);
@@ -1760,7 +1760,7 @@ Tree<RootNodeType>::combine(Tree& other, CombineOp& op, bool prune)
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combine(bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp>
 inline void
@@ -1784,7 +1784,7 @@ Tree<RootNodeType>::combineExtended(Tree& other, ExtendedCombineOp& op, bool pru
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combineExtended(bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp>
 inline void
@@ -1808,7 +1808,7 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, CombineOp& o
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>tree.combine2(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp, typename OtherTreeType>
 inline void
@@ -1834,7 +1834,7 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like the following, where the functor argument is a temporary:
 /// <tt>tree.combine2Extended(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp, typename OtherTreeType>
 inline void

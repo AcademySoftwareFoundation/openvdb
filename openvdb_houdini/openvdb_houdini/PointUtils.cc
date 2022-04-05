@@ -1817,7 +1817,7 @@ sopBuildVDBPointsGroupMenu(void* data, PRM_Name* menuEntries, int /*themenusize*
 } // unnamed namespace
 
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 
 OPENVDB_HOUDINI_API const PRM_ChoiceList
 VDBPointsGroupMenuInput1(PRM_CHOICELIST_TOGGLE, sopBuildVDBPointsGroupMenu);
