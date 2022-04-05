@@ -502,7 +502,7 @@ find_package(Boost REQUIRED COMPONENTS iostreams)
 # @todo track for numpy
 
 if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
-  find_package(PythonLibs REQUIRED)
+  find_package(Python REQUIRED)
 
   # Boost python handling - try and find both python and pythonXx (version suffixed).
   # Prioritize the version suffixed library, failing if neither exist.
