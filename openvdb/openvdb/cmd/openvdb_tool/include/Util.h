@@ -16,13 +16,14 @@
 
 #include <openvdb/openvdb.h>
 
+#include <algorithm>// for std::transform
+#include <cctype> // for std::tolower
+#include <cstring>// for std::strtok
+#include <iomanip> // for std::setfill
 #include <iostream>
 #include <sstream>
 #include <string>
-#include <iomanip> // for std::setfill
-#include <cstring>// for std::strtok
 #include <vector>
-#include <algorithm>// for std::transform
 #include <sys/stat.h>
 
 namespace openvdb {
@@ -48,6 +49,7 @@ inline bool file_exists(const std::string &fileOrPath)
     struct stat buffer;
     return stat(fileOrPath.c_str(), &buffer) == 0;
 }
+
 /// @return the filename, i.e. "base0123.ext" if input is "path/base0123.ext"
 inline std::string getFile(const std::string &str)
 {

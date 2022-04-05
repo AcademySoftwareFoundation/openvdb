@@ -1,10 +1,20 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#define _USE_MATH_DEFINES
+
 #include <stdio.h>// for std::remove
 #include <string>
 #include <fstream>
 #include <set>
+
+#if defined(_WIN32)
+#include <direct.h>// for mkdir
+int mkdir_wrapper(const char *dirname) { return _mkdir(dirname); }
+#else
+#include <sys/stat.h>// for mkdir
+int mkdir_wrapper(const char *dirname) { return mkdir(dirname, 0777); }
+#endif
 
 #include "Tool.h"
 
@@ -23,6 +33,13 @@ protected:
 
     void SetUp() override
     {
+        if (!openvdb::vdb_tool::file_exists("data")) {
+            if (mkdir_wrapper("data") == -1) {
+                std::cerr << "Test_vdb_tool::SetUp: Failed to create \"data\" directory :  " << strerror(errno) << std::endl;
+            } else {
+                std::cerr << "Successfully created \"data\" directory\n";
+            }
+        }
         // Code here will be called immediately after the constructor (right
         // before each test).
     }

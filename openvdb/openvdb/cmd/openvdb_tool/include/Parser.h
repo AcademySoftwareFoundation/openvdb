@@ -29,7 +29,6 @@
 #include <unordered_map>
 #include <iterator>// for std::advance
 #include <sys/stat.h>
-#include <unistd.h>
 #include <stdio.h>
 
 #include <openvdb/openvdb.h>
@@ -496,11 +495,11 @@ public:
                     }
                 }
             }// for-loop over ":" in string
-            if (mCallStack.empty()) {
+            if (mCallStack.empty()) {// if call stack is empty clear inout string
                 str.erase(pos, end-pos+1);
-            } else if (mCallStack.depth()==1) {
+            } else if (mCallStack.depth()==1) {// if call stack has one entry replace it with the input string
                 str.replace(pos, end-pos+1, mCallStack.pop());
-            } else {
+            } else {// more than one entry in the call stack is considered an error
                 std::stringstream ss;
                 mCallStack.print(ss);
                 throw std::invalid_argument("Computer::(): compute stack contains more than one entry: " + ss.str());
@@ -546,7 +545,10 @@ struct BaseLoop
     std::string name;
     size_t      pos;// loop counter starting at zero
     BaseLoop(Memory &s, ActIterT i, const std::string &n) : memory(s), begin(i), name(n), pos(0) {}
-    virtual ~BaseLoop() {memory.clear(name); memory.clear("#"+name);}
+    virtual ~BaseLoop() {
+        memory.clear(name);
+        memory.clear("#"+name);
+    }
     virtual bool valid() = 0;
     virtual bool next() = 0;
     template <typename T>
@@ -799,11 +801,20 @@ Parser::Parser(std::vector<Option> &&def)
         [](){}
     );
 
-    auto skip2end = [&](){
-        for (int i=1; i>0; i+=iter->name == "end" ? -1 :
-                              iter->name == "for" ||
-                              iter->name == "each" ||
-                              iter->name == "if" ? 1 : 0) ++iter;
+    // Lambda function used to skip loops by forwarding iterator to matching -end.
+    // Note, this function assumes that -for,-each,-if all have a matching -end, which
+    // was enforced during parsing by increasing and decreasing "counter" and checking
+    // that it never becomes negative and ends up being zero.
+    auto skip2end = [](auto &it){
+        for (int i = 1; i > 0;) {
+            const std::string &name = (++it)->name;
+            if (name == "end") {
+                i -= 1;
+            } else if (name == "for" || name == "each" || name == "if") {
+                i += 1;
+            }
+        }
+        assert(it->name == "end");
     };
 
     this->addAction(
@@ -823,7 +834,7 @@ Parser::Parser(std::vector<Option> &&def)
                 loops.push_back(loop);
                 if (verbose) loop->print();
             } else {
-                skip2end();
+                skip2end(iter);// skip to matching -end
             }
         }
     );
@@ -840,7 +851,7 @@ Parser::Parser(std::vector<Option> &&def)
                 loops.push_back(loop);
                 if (verbose) loop->print();
             } else {
-                skip2end();
+                skip2end(iter);// skip to matching -end
             }
         }, 0
     );
@@ -854,7 +865,7 @@ Parser::Parser(std::vector<Option> &&def)
             if (this->get<bool>("test")) {
                 loops.push_back(std::make_shared<IfLoop>(computer.memory(), iter));
             } else {
-                skip2end();
+                skip2end(iter);// skip to matching -end
             }
         }, 0
     );

@@ -43,6 +43,12 @@
 #include <Alembic/Util/All.h>
 #endif
 
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 #include "Util.h"
 
 namespace openvdb {
@@ -182,7 +188,7 @@ void Geometry::clear()
 
 const math::BBox<Vec3s>& Geometry::bbox() const
 {
-    if (mBBox) mBBox;// early termination if it was already computed
+    if (mBBox) return mBBox;// early termination if it was already computed
 #if 0
     for (auto &p : mVtx) mBBox.expand(p);
 #else

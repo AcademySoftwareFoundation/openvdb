@@ -22,6 +22,7 @@
 #include <openvdb/io/Stream.h>
 #include <openvdb/util/CpuTimer.h>
 #include <openvdb/util/Formats.h>
+#include <openvdb/tools/Composite.h>
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/LevelSetAdvect.h>
 #include <openvdb/tools/LevelSetSphere.h>
@@ -72,6 +73,12 @@
 #include "Parser.h"
 #include "Geometry.h"
 
+#if defined(_WIN32)
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
+
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
@@ -81,7 +88,7 @@ class Tool
 {
     static const int sMajor =10;// incremented for incompatible changes options or file.
     static const int sMinor = 0;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
+    static const int sPatch = 2;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = tools::LevelSetFilter<GridT>;
@@ -95,80 +102,115 @@ class Tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
 
+    /// @brief Deletes geometry, VDB grids and local variables
+    void clear();
+
+    /// @brief Clip a VDB grid against another grid, a bbox or frustum
+    template <typename GridType>
+    GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
+    void clip();
+
+    /// @brief composit two grids, e.g. min, max, sum
+    void composite();
+
+    /// @brief generate a grid of selected properties from another grid
+    void compute();
+
+    /// @brief Import and process one or more configuration files
+    void config();
+
+    /// @brief "perform CSG operations between of two level sets surfaces
+    void csg();
+
+    /// @brief Performs Enright advection benchmark test on a level set
+    void enright();
+
+    /// @brief expand narrow band of level set
+    void expandLevelSet();
+
+    /// @brief perform filtering (convolution) of a level set surface
+    void filterLevelSet();
+
+    /// @brief signed-flood filling of a level set VDB
+    void floodLevelSet();
+
+    /// @brief Print documentation for one, multiple or all available actions
+    void help();
+
+    /// @brief Converts an iso-surface of a scalar field into a level set (i.e. SDF)
+    void isoToLevelSet();
+
+    /// @brief Convert a level set to an adaptive polygen mesh
+    void levelSetToMesh();
+
+    /// @brief Create a level set sphere, i.e. a narrow-band signed distance to a sphere
+    void levelSetSphere();
+
+    /// @brief Create a level set shape with the specified number of polygon faces
+    void levelSetPlatonic();
+
+    /// @brief Converts a level set VDB into a VDB with a fog volume, i.e. normalized density
+    void levelSetToFog();
+
+    /// @brief Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh
+    void meshToLevelSet();
+
+    /// @brief construct a LoD sequences of VDB trees with powers of two refinements
+    void multires();
+
+    /// @brief perform morphology operations on a level set surface
+    void offsetLevelSet();
+
+    /// @brief Converts geometry points into a narrow-band level set
+    void particlesToLevelSet();
+
+    /// @brief Encode geometry points into a VDB grid
+    void pointsToVdb();
+
+    /// @brief prune away inactive values in a VDB grid
+    void pruneLevelSet();
+
+    /// @brief Read one or more geometry or VDB files from disk or STDIN
     void read();
     void readGeo( const std::string &fileName);
     void readVDB( const std::string &fileName);
 
+    /// @brief ray-tracing of level set surfaces and volume rendering of fog volumes
+    void render();
+
+    /// @brief resample one VDB grid into another VDB grid or a transformation of the input grid
+    void resample();
+
+    /// @brief "segment an input VDB into a list if topologically disconnected VDB grids
+    void segment();
+
+    /// @brief Scatters point into the active values of an input VDB grid
+    void scatter();
+
+    /// @brief apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry
+    void transform();
+
+    /// @brief Extracts points encoded in a VDB to points in a geometry format
+    void vdbToPoints();
+
+    /// @brief Write list of geometry, VDB or config files to disk or STDOUT
     void write() const;
     void writeGeo( const std::string &fileName) const;
     void writeVDB( const std::string &fileName) const;
     void writeNVDB(const std::string &fileName) const;
     void writeConf(const std::string &fileName) const;
 
-    void compute();
-
-    void config();
-
-    void csg();
-
-    void enright();
-
-    void expandLevelSet();
-
-    void filterLevelSet();
-
-    void floodLevelSet();
-
-    void isoToLevelSet();
-
-    void levelSetToMesh();
-
-    void levelSetSphere();
-
-    void levelSetPlatonic();
-
-    void levelSetToFog();
-
-    void meshToLevelSet();
-
-    void multires();
-
-    void offsetLevelSet();
-
-    void particlesToLevelSet();
-
-    void pointsToVdb();
-
-    void pruneLevelSet();
-
-    void render();
-
-    void resample();
-
-    void segment();
-
-    void scatter();
-
-    void vdbToPoints();
-
-    void transform();
-
-    template <typename GridType>
-    GridBase::Ptr clip(const VecF &v, int age, const GridType &input);
-    void clip();
-
-    void help();
-
     /// @brief return the voxel-size of  a LS estimated from a desired grid dimension of a specific geometry
     float estimateVoxelSize(int maxDimension,  float halfWidth, int geo_age);
 
     void updateFilter(GridT &grid,  int space, int time);
 
+    /// @brief print examples to the terminal and terminate
     std::string examples() const;
 
     void warning(const std::string &msg, std::ostream& os = std::cerr) const;
 
-    void clear();
+    /// @brief Initialize this parser, i.e. register available actions
     void init();
 
     inline auto getGrid(size_t age) const;
@@ -187,6 +229,7 @@ public:
     /// @brief Executes all the actions defined during construction
     void run();
 
+    /// @brief prints information to the terminal about the current stack of VDB grids and Geometry
     void print(std::ostream& os = std::cerr) const;
     void print_args(std::ostream& os = std::cerr) const;
 
@@ -211,20 +254,16 @@ Tool::Tool(int argc, char *argv[])
                {"keep", "false", "1|0|true|false", "by default delete the input"}})
 {
     openvdb::initialize();
-    //mTimer.start("init");
     this->init();// fast: less than 1 ms
-    //mTimer.restart("finalize");
     mParser.finalize();
-    //mTimer.restart("parse");
     mParser.parse(argc, argv);// extremely fast
-    //mTimer.stop();
 }
 
 // ==============================================================================================================
 
 auto Tool::getGrid(size_t age) const
 {
-    if (mGrid.size()<=age) throw std::invalid_argument(mParser.getAction().name+": no VDB with age "+std::to_string(age));
+    if (age>=mGrid.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGrid("+std::to_string(age)+"), but grid count = "+std::to_string(mGrid.size()));
     auto it = mGrid.crbegin();
     std::advance(it, age);
     return it;
@@ -234,7 +273,7 @@ auto Tool::getGrid(size_t age) const
 
 auto Tool::getGeom(size_t age) const
 {
-    if (mGeom.size()<=age) throw std::invalid_argument(mParser.getAction().name+": no Geometry with age "+std::to_string(age));
+    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGrid.size()));
     auto it = mGeom.crbegin();
     std::advance(it, age);
     return it;
@@ -245,7 +284,12 @@ auto Tool::getGeom(size_t age) const
 void Tool::run()
 {
     if (mParser.verbose>1) this->print_args();
-    mParser.run();
+    try {
+        mParser.run();
+    } catch (const std::exception& e) {
+        std::cerr << "Fatal error in Tool::run: " << e.what() << std::endl;
+        std::exit(EXIT_FAILURE);
+    }
     if (mParser.verbose>1) this->print();
 }
 
@@ -299,20 +343,20 @@ void Tool::init()
   mParser.addAction(
       "config", "c", "Import and process one or more configuration files",
     {{"files", "",  "config1.txt,config2.txt...", "list of configuration files to load and execute"},
-     {"execute", "true", "1|0|true|false", "toggle wether to load and execute the actions in the config file"},
+     {"execute", "true", "1|0|true|false", "toggle wether to execute the actions in the config file"},
      {"update", "false", "1|0|true|false", "toggle wether to update the version number of the config file"}},
      [&](){this->config();}, [](){}, 0); // anonymous options are appended to "files"
 
   mParser.addAction(
       "help", "h", "Print documentation for one, multiple or all available actions",
-    {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed documentation is printed for those actions only"},
+    {{"actions", "", "read,write,...", "list of actions to document. If the list is empty documentation is printed for all available actions and if other actions proceed this action, documentation is printed for those actions only"},
      {"exit", "true", "1|0|true|false", "toggle wether to terminate after this action or not"},
      {"brief", "false", "1|0|true|false", "toggle brief or detailed documentation"}},
      [](){}, [&](){this->help();}, 0); // anonymous options are appended to "actions"
 
   mParser.addAction(
       "read", "i", "Read one or more geometry or VDB files from disk or STDIN.",
-    {{"files", "", "{file|stdin}.{obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
+    {{"files", "", "{file|stdin}.{abc|obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
      [](){}, [&](){this->read();}, 0);// anonymous options are appended to "files"
@@ -349,7 +393,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetSphere();});
 
   mParser.addAction(
-      "mesh2ls", "m2ls", "Converts a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
+      "mesh2ls", "m2ls", "Convert a polygon mesh into a narrow-band level set, i.e. a narrow-band signed distance to a polygon mesh",
     {{"dim", "", "256", "largest dimension in voxel units of the mesh bbox (defaults to 256). If \"vdb\" or \"voxel\" is defined then \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -368,14 +412,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
 
   mParser.addAction(
-      "ls2fog", "l2f", "Converts a level set VDB into a VDB with a fog volume, i.e. normalized density.",
+      "ls2fog", "l2f", "Convert a level set VDB into a VDB with a fog volume, i.e. normalized density.",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2fog_input", "specify the name of the resulting VDB (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToFog();});
 
   mParser.addAction(
-      "points2ls", "p2l", "Converts geometry points into a narrow-band level set",
+      "points2ls", "p2l", "Convert geometry points into a narrow-band level set",
     {{"dim", "", "256", "largest dimension in voxel units of the bbox of all the points (defaults to 256). In \"voxel\" is defined \"dim\" is ignored"},
      {"voxel", "", "0.01", "voxel size in world units (by defaults \"dim\" is used to derive \"voxel\"). If specified this option takes precedence over \"dim\""},
      {"width", "", "3.0", "half-width in voxel units of the output narrow-band level set (defaults to 3 units on either side of the zero-crossing)"},
@@ -386,7 +430,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->particlesToLevelSet();});
 
   mParser.addAction(
-      "iso2ls", "i2l", "Converts an iso-surface of a scalar field into a level set (i.e. SDF)",
+      "iso2ls", "i2l", "Convert an iso-surface of a scalar field into a level set (i.e. SDF)",
     {{"vdb", "0", "0,1", "age (i.e. stack index) of the VDB grid to be processed and an optional reference grid. Defaults to 0, i.e. most recently inserted VDB."},
      {"iso", "0.0", "0.0", "value of the iso-surface from which to compute the level set"},
      {"voxel", "", "0.0", "voxel size in world units (defaults to zero, i.e the transform out the output matches the input)"},
@@ -405,14 +449,14 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->pointsToVdb();});
 
   mParser.addAction(
-      "vdb2points", "v2p", "Extracts points encoded in a VDB to points in a geometry format",
+      "vdb2points", "v2p", "Extract points encoded in a VDB to points in a geometry format",
     {{"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "vdb2points_input", "specify the name of the resulting points (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->vdbToPoints();});
 
   mParser.addAction(
-      "scatter", "", "Scatters point into the active values of an input VDB grid",
+      "scatter", "", "Scatter point into the active values of an input VDB grid",
     {{"count", "0", "0", "fixed number of points to randomly scatter (disabled by default)"},
      {"density", "0.0", "0.0", "uniform density of points per active voxel (disabled by default)"},
      {"ppv", "8", "8", "number of points per active voxel (defaults to 8)"},
@@ -561,6 +605,24 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->csg();});
 
   mParser.addAction(
+      "min", "", "Given grids A and B, compute min(a, b) per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
+      "max", "", "Given grids A and B, compute max(a, b) per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
+      "sum", "", "Given grids A and B, compute sum(a, b) per voxel",
+    {{"vdb", "0,1", "0,1", "ages (i.e. stack indices) of the two VDB grids to composit. Defaults to 0,1, i.e. two most recently inserted VDBs."},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDBs is preserved or deleted after the processing"}},
+     [&](){mParser.setDefaults();}, [&](){this->composite();});
+
+  mParser.addAction(
       "multires", "", "construct a LoD sequences of VDB trees with powers of two refinements",
     {{"levels", "2", "2", "number of multi-resolution grids in the output LoD sequence"},
      {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -611,7 +673,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->segment();});
 
   mParser.addAction(
-      "transform", "", "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grid",
+      "transform", "", "apply affine transformations (uniform scale -> rotation -> translation) to a VDB grids and geometry",
     {{"rotate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "rotation in radians around x,y,z axis"},
      {"translate", "(0.0,0.0,0.0)", "(0.0,0.0,0.0)", "translation in world units along x,y,z axis"},
      {"scale", "1.0", "1.0", "uniform scaling in world units"},
@@ -973,7 +1035,7 @@ void Tool::config()
             if (mParser.verbose) mTimer.stop();
         }
     }
-}
+}// Tool::config
 
 // ==============================================================================================================
 
@@ -1756,6 +1818,51 @@ void Tool::compute()
     throw std::invalid_argument(name+": "+e.what());
   }
 }// Tool::compute
+
+// ==============================================================================================================
+
+void Tool::composite()
+{
+  const std::string &name = mParser.getAction().name;
+  assert(findMatch(name, {"min","max","sum"}));
+  try {
+    mParser.printAction();
+    const VecI ij = mParser.getVec<int>("vdb");
+    const bool keep = mParser.get<bool>("keep");
+    if (ij.size()!=2) throw std::invalid_argument(name+": expected two vdb ages, but got "+std::to_string(ij.size()));
+    if (ij[0] == ij[1]) throw std::invalid_argument(name+": identical inputs: volume1=volume2="+std::to_string(ij[0]));
+    auto itA = this->getGrid(ij[0]), itB = this->getGrid(ij[1]);
+    GridT::Ptr gridA = gridPtrCast<GridT>(*itA);
+    if (!gridA) throw std::invalid_argument(name+": no float grid with age "+std::to_string(ij[0]));
+    GridT::Ptr gridB = gridPtrCast<GridT>(*itB);
+    if (!gridB) throw std::invalid_argument(name+": no float grid with age "+std::to_string(ij[1]));
+    if (gridA->transform() != gridB->transform()) this->warning(name+": grids have different transforms");
+    GridT::Ptr tmpA, tmpB;
+    if (keep) {
+      tmpA = gridA->deepCopy();
+      tmpB = gridB->deepCopy();
+      mGrid.push_back(tmpA);
+    } else {
+      tmpA = gridA;
+      tmpB = gridB;
+      mGrid.erase(std::next(itB).base());// remove B from mGrids since it will be destroyed
+    }
+    tmpA->setName(name+"_"+tmpA->getName());
+    if (mParser.verbose) mTimer.start(name);
+    if (name == "min") {
+      tools::compMin(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+    } else if (name == "max") {
+      tools::compMax(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+    } else if (name == "sum") {
+      tools::compSum(*tmpA, *tmpB);// Store the result in the A grid and leave the B grid empty.
+    } else {
+      throw std::invalid_argument(name+": invalid operation");
+    }
+    if (mParser.verbose) mTimer.stop();
+  } catch (const std::exception& e) {
+    throw std::invalid_argument(name+": "+e.what());
+  }
+}// Tool::composite
 
 // ==============================================================================================================
 

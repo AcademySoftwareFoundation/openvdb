@@ -39,6 +39,9 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **div** | Compute the divergence of a vector VDB |
 | **curvature** | Mean curvature of a scalar VDB |
 | **length** | Compute the magnitude of a vector VDB |
+| **min** | Composite two grid by means of min |
+| **max** | Composite two grid by means of max |
+| **sum** | Composite two grid by means of sum |
 | **multires** | Compute multi-resolution grids |
 | **enright** | Advects a level set in a periodic and divergence-free velocity field. Primarily intended for benchmarks |
 | **expand** | Expand the narrow band of a level set |
@@ -79,19 +82,72 @@ Note that **actions** always start with one or more "-" and (except for file nam
 This tool supports its own light-weight stack-oriented programming language that is (very loosely) inspired by Forth. Specifically, it uses Reverse Polish Notation (RPN) to define instructions that are evaluated during paring of the command-line arguments (options to be precise). All such expressions start with the character "{", ends with "}", and arguments are separated by ":". Variables starting with "\$" are substituted by its (previously) defined values, and variables starting with "@" are stored in memory. So, "{1:2:+:@x}" is conceptually equivalent to "x = 1 + 2". Conversely, "{\$x:++}" is conceptually equivalent "2 + 1 = 3" since "x=2" was already saved to memory. This is especially useful in combination loops, e.g. "-quiet -for i=1,3,1 -eval {\$i:+} -end" will print 2 and 3 to the terminal. Branching is also supported, "{$x:1:>:if(0.5:sin?0.3:cos)}" is conceptually equal to "if (x>1) sin(0.5) else cos(0.3)". See the root-searching example below or run vdb_tool -eval help="*" to see a list of all instructions currently supported by this scripting language. Note that since this language uses characters that are interpreted by most shells it is necessary to use single quotes around strings! This is of course not the case when using config files.
 
 # Building this tool
-At the moment we only provide a gnu Makefile, but it's simple so it shouldn't be hard to roll your own cmake. The only mandatory dependency of this command-line tool is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic (enable them at the top of the Makefile).
 
-To build this command-line tool first edit the included Makefile and make sure the variables "INCLUDES" and "LIBRARY" are updated to point to your local installation of OpenVDB. Then simply type:
-```
-make
-```
-which builds the executable release/vdb_tool or
-```
-make debug
-```
-which builds the executable debug/vdb_tool. Other build targets are _archive_ which generates a tar-ball of this repository and _clean_ which deletes all the object, executable, volume, mesh and image files.
+This tool is using CMake for build on Linux and Windows.
+The only mandatory dependency of is [OpenVDB](http://www.openvdb.org). Optional dependencies include NanoVDB, libpng, libjpeg, OpenEXR, and Alembic. To enable them use the `-DUSE_<name>=ON` flags. See the CMakeLists.txt for details.
 
----
+The included unit test are using Gtest. Add `-DBUILD_TEST=ON` to the cmake command line to build it.
+
+## Building OpenVDB
+
+Follow the instructions at OpenVDB`s [github page](https://github.com/AcademySoftwareFoundation/openvdb#developer-quick-start)
+
+Make sure to build with NanoVDB support, if you intend to use vdb_tool's NanoVDB features.
+
+## Building vdb_tool on Linux
+
+To generate the makefile, navigate to the cloned directory of vdb_tool, then follow these steps:
+```bash
+mkdir build
+cd build
+cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DBUILD_TEST=ON ..
+```
+Update the OpenVDB cmake path above as needed.
+
+To build in debug mode, add `-DCMAKE_BUILD_TYPE=Debug` to the cmake command above.
+
+To build use
+```bash
+cmake --build . --parallel 2
+```
+or
+```bash
+make -j 2
+```
+
+## Building on Windows
+
+### Install CMake
+
+Install from cmake.org or with Chocolatey:
+```bash
+choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+```
+
+### Install optional dependencies
+
+Gtest for the unit tests
+```bash
+vcpkg install gtest:x64-windows
+```
+
+Other optional dependencies
+```bash
+vcpkg install libpng:x64-windows
+vcpkg install libjpeg-turbo:x64-windows
+vcpkg install openexr:x64-windows
+vcpkg install alembic:x64-windows
+```
+
+### Building
+
+```bash
+mkdir build
+cd build
+cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg root>\scripts\buildsystems\vcpkg.cmake -A x64 -DOPENVDB_CMAKE_PATH=<OpenVDB install path>\lib\cmake\OpenVDB ..
+cmake --build . --config Release --parallel 2
+```
+
 
 # Examples
 
@@ -139,7 +195,7 @@ vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write v
 
 * Generate spheres that are rotating along a parametric circle
 ```
-vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center=('{$radian:cos}','{$radian:sin}',0) name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
+vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center='({$radian:cos},{$radian:sin},0)' name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
 ```
 
 * Converts input points in the file points.[vdb/ply/abc/obj/pts] to a level set, perform level set actions, and written to it the file surface.vdb:
@@ -190,11 +246,6 @@ vdb_tool -sphere -dilate -o stdout.vdb > sphere.vdb
 * Pipelining vdb_tool with vdb_view for interactive viewing
 ```
 vdb_tool -sphere -dilate -o stdout.vdb | vdb_view
-```
-
-* Process files identified by a regex
-```
-vdb_tool -each f=`find ~/dev/data -name '*.vdb'` -i '{$f}' -render data/'{$#f}'.exr image=100x100 -end
 ```
 
 * View a sequence of animated level sets
@@ -262,6 +313,12 @@ Read multiple grids, and render all level set grids
 ```
 vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vdb='{$v}' -end -end
 ```
+
+* Find and render thumbnails of all level sets in an entire directory structure
+```
+vdb_tool -each file=`find ~/dev/data -name '*.vdb'` -read '{$file}' -for grid=0,'{gridCount}' -if '{$grid:isLS}' -render vdb='{$grid}' thumbnail_'{$grid:gridName}'.ppm image=256x256 keep=1 -end -end -clear -end
+```
+Most of the arguments should be self-explanatory, but at least two deserve an explanation: -render has the option keep=1 because otherwise rendered grids are removed from the stack which invalidates {gridCount}, and -clear is added to avoid accumulating all grids as multiple files are loaded.
 
 ---
 # To Do List:
@@ -359,9 +416,9 @@ vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vd
 - [x] -if 0|1|false|true  ... -end (if statement)
 - [x] -eval help="*" or -eval help=if,switch
 - [x] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
-- [ ] Combine: -min, -max, -sum
+- [x] composite: -min, -max, -sum
 - [x] -transform vdb=0,3 geo=5 (scale -> rotate -> translate of VDB grids and geometry)
 - [ ] -merge
 - [ ] -points2mask
 - [ ] -erodeTopology
-- [ ] use cmake
+- [x] use cmake (thanks to Greg Klar!)
