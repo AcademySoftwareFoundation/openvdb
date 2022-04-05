@@ -1,2 +1,0 @@
-Bug Fixes:
-    - Fix unit tests failures with Blosc versions >= 1.19.0.
