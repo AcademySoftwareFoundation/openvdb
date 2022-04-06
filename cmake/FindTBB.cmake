@@ -163,7 +163,7 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
 )
 
 # Look for a standard tbb header file.
-find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
+find_path(Tbb_INCLUDE_DIR NAMES tbb/version.h tbb/tbb_stddef.h
   ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
