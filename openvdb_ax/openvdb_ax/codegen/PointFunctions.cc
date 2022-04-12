@@ -18,9 +18,9 @@
 #include "Utils.h"
 #include "PointLeafLocalData.h"
 
-#include "../ast/Tokens.h"
-#include "../compiler/CompilerOptions.h"
-#include "../Exceptions.h"
+#include "openvdb_ax/ast/Tokens.h"
+#include "openvdb_ax/compiler/CompilerOptions.h"
+#include "openvdb_ax/Exceptions.h"
 
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
@@ -65,6 +65,9 @@ groupHandle(const std::string& name, void** groupHandles, const void* const data
 }
 
 }
+
+///////////////////////////////////////////////////////////////////////////////
+///////////////////////////////////////////////////////////////////////////////
 
 inline FunctionGroup::UniquePtr ax_ingroup(const FunctionOptions& op)
 {

@@ -24,14 +24,14 @@
 using namespace openvdb;
 using namespace openvdb::points;
 
-class TestPointRasterize: public ::testing::Test
+class TestPointRasterizeFrustum: public ::testing::Test
 {
 public:
     void SetUp() override { openvdb::initialize(); }
     void TearDown() override { openvdb::uninitialize(); }
-}; // class TestPointRasterize
+}; // class TestPointRasterizeFrustum
 
-TEST_F(TestPointRasterize, testScaleByVoxelVolume)
+TEST_F(TestPointRasterizeFrustum, testScaleByVoxelVolume)
 {
     const double tolerance = 1.0e-6;
 
@@ -310,7 +310,7 @@ TEST_F(TestPointRasterize, testScaleByVoxelVolume)
 }
 
 
-TEST_F(TestPointRasterize, testPointRasterization)
+TEST_F(TestPointRasterizeFrustum, testPointRasterization)
 {
     const double tolerance = 1.0e-5;
 
@@ -782,7 +782,7 @@ TEST_F(TestPointRasterize, testPointRasterization)
     }
 }
 
-TEST_F(TestPointRasterize, testSphereRasterization)
+TEST_F(TestPointRasterizeFrustum, testSphereRasterization)
 {
     using Rasterizer = VolumeRasterizer<PointDataGrid>;
     using Settings = VolumeRasterizerSettings;
@@ -1043,7 +1043,7 @@ TEST_F(TestPointRasterize, testSphereRasterization)
     }
 }
 
-TEST_F(TestPointRasterize, testVelocityMotionBlur)
+TEST_F(TestPointRasterizeFrustum, testVelocityMotionBlur)
 {
     // particle 0 and particle 2 rasterize into two of the same voxels
 
@@ -1240,7 +1240,7 @@ TEST_F(TestPointRasterize, testVelocityMotionBlur)
     }
 }
 
-TEST_F(TestPointRasterize, testCameraMotionBlur)
+TEST_F(TestPointRasterizeFrustum, testCameraMotionBlur)
 {
     using Rasterizer = VolumeRasterizer<PointDataGrid>;
     using Settings = VolumeRasterizerSettings;
@@ -1522,7 +1522,7 @@ TEST_F(TestPointRasterize, testCameraMotionBlur)
 }
 
 #ifndef ONLY_RASTER_FLOAT
-TEST_F(TestPointRasterize, testBool)
+TEST_F(TestPointRasterizeFrustum, testBool)
 {
     std::vector<Vec3s> positions =  {
                                         {0.0f, 1.2f, 0.0f},
@@ -1619,7 +1619,7 @@ TEST_F(TestPointRasterize, testBool)
     }
 }
 
-TEST_F(TestPointRasterize, testInt)
+TEST_F(TestPointRasterizeFrustum, testInt)
 {
     std::vector<Vec3s> positions =  {
                                         {0.0f, 1.2f, 0.0f},
@@ -1701,7 +1701,7 @@ TEST_F(TestPointRasterize, testInt)
 }
 #endif
 
-TEST_F(TestPointRasterize, testInputs)
+TEST_F(TestPointRasterizeFrustum, testInputs)
 {
     using Rasterizer = VolumeRasterizer<PointDataGrid>;
     using Settings = VolumeRasterizerSettings;
@@ -1804,7 +1804,7 @@ struct HaltOnSecondInterrupt
 } // namespace
 
 
-TEST_F(TestPointRasterize, testInterrupter)
+TEST_F(TestPointRasterizeFrustum, testInterrupter)
 {
     using Rasterizer = VolumeRasterizer<PointDataGrid>;
     using Settings = VolumeRasterizerSettings;
@@ -1928,7 +1928,7 @@ TEST_F(TestPointRasterize, testInterrupter)
     }
 }
 
-TEST_F(TestPointRasterize, testClipping)
+TEST_F(TestPointRasterizeFrustum, testClipping)
 {
     std::vector<Vec3s> positions =  {
                                         {0, 0, 0},
@@ -2082,7 +2082,7 @@ TEST_F(TestPointRasterize, testClipping)
     }
 }
 
-TEST_F(TestPointRasterize, testStreaming)
+TEST_F(TestPointRasterizeFrustum, testStreaming)
 {
     Name filename("rasterpoints.vdb");
 
@@ -2460,7 +2460,7 @@ TEST_F(TestPointRasterize, testStreaming)
     remove(filename.c_str());
 }
 
-TEST_F(TestPointRasterize, testProfile)
+TEST_F(TestPointRasterizeFrustum, testProfile)
 {
     using Rasterizer = VolumeRasterizer<PointDataGrid>;
     using Settings = VolumeRasterizerSettings;

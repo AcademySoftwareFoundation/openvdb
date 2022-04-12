@@ -3,12 +3,12 @@
 
 /// @author Dan Bailey, Rick Hankins
 ///
-/// @file PointRasterize.h
+/// @file PointRasterizeFrustum.h
 ///
 /// @brief Volume rasterization of VDB Points using velocity and camera motion-blur
 
-#ifndef OPENVDB_POINTS_POINT_RASTERIZE_HAS_BEEN_INCLUDED
-#define OPENVDB_POINTS_POINT_RASTERIZE_HAS_BEEN_INCLUDED
+#ifndef OPENVDB_POINTS_POINT_RASTERIZE_FRUSTUM_HAS_BEEN_INCLUDED
+#define OPENVDB_POINTS_POINT_RASTERIZE_FRUSTUM_HAS_BEEN_INCLUDED
 
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
@@ -1782,4 +1782,4 @@ VolumeRasterizer<PointDataGridT, InterruptT>::performRasterization(
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#endif // OPENVDB_POINTS_POINT_RASTERIZE_HAS_BEEN_INCLUDED
+#endif // OPENVDB_POINTS_POINT_RASTERIZE_FRUSTUM_HAS_BEEN_INCLUDED

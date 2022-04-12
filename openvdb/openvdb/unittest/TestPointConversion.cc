@@ -138,7 +138,7 @@ genPoints(const int numPoints, const double scale, const bool stride,
     AttributeWrapper<float>::Handle uniformHandle(uniform);
     AttributeWrapper<openvdb::Name>::Handle stringHandle(string);
 
-    int i = 0;
+    size_t i = 0;
 
     // loop over a [0 to n) x [0 to n) grid.
     for (int a = 0; a < n; ++a) {
@@ -164,14 +164,14 @@ genPoints(const int numPoints, const double scale, const bool stride,
 
             if (stride)
             {
-                xyzHandle.set(i, 0, i);
-                xyzHandle.set(i, 1, i*i);
-                xyzHandle.set(i, 2, i*i*i);
+                xyzHandle.set(i, 0, static_cast<int>(i));
+                xyzHandle.set(i, 1, static_cast<int>(i*i));
+                xyzHandle.set(i, 2, static_cast<int>(i*i*i));
             }
 
             // add points with even id to the group
             if ((i % 2) == 0) {
-                group.setOffsetOn(i);
+                group.setOffsetOn(static_cast<int>(i));
                 stringHandle.set(i, /*stride*/0, "testA");
             }
             else {

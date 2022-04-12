@@ -446,6 +446,8 @@ private:
 /// LeafNode::getValue() return a reference to a value.  Since it's not possible
 /// to return a reference to a bit in a node mask, we return a reference to one
 /// of the following static values instead.
+///
+/// @todo  Make these static inline with C++17
 template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOn = true;
 template<Index Log2Dim> const bool LeafBuffer<bool, Log2Dim>::sOff = false;
 

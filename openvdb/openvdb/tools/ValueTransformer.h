@@ -139,7 +139,7 @@ inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     const XformOp& op, bool threaded = true, bool shareOp = true,
@@ -602,7 +602,7 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
     }
 }
 
-#ifndef _MSC_VER
+#ifndef _WIN32
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void
 transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,

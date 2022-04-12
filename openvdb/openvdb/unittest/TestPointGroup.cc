@@ -13,7 +13,7 @@
 #include <string>
 #include <vector>
 
-#ifdef _MSC_VER
+#ifdef _WIN32
 #include <windows.h>
 #endif
 
@@ -482,7 +482,7 @@ TEST_F(TestPointGroup, testSet)
 
         std::string tempDir;
         if (const char* dir = std::getenv("TMPDIR")) tempDir = dir;
-#ifdef _MSC_VER
+#ifdef _WIN32
         if (tempDir.empty()) {
             char tempDirBuffer[MAX_PATH+1];
             int tempDirLen = GetTempPath(MAX_PATH+1, tempDirBuffer);

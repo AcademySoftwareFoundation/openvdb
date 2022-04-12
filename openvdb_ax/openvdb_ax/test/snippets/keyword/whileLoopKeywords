@@ -15,7 +15,7 @@
 {
     vec3f v = 0.0f;
     int i = 0;
-    while(i < 3) {
+    while(i < 2) {
         i++;
         if (i == 1) continue;
         v[i] = i;

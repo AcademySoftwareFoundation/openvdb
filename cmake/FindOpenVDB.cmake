@@ -357,7 +357,7 @@ list(REMOVE_DUPLICATES OPENVDB_PYTHON_PATH_SUFFIXES)
 list(REMOVE_DUPLICATES OPENVDB_LIB_PATH_SUFFIXES)
 
 # Static library setup
-if(WIN32)
+if(MSVC)
   if(OPENVDB_USE_STATIC_LIBS)
     set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
   endif()
@@ -502,7 +502,7 @@ find_package(Boost REQUIRED COMPONENTS iostreams)
 # @todo track for numpy
 
 if(pyopenvdb IN_LIST OpenVDB_FIND_COMPONENTS)
-  find_package(PythonLibs REQUIRED)
+  find_package(Python REQUIRED)
 
   # Boost python handling - try and find both python and pythonXx (version suffixed).
   # Prioritize the version suffixed library, failing if neither exist.
@@ -568,6 +568,10 @@ if(WIN32)
   # others
   list(APPEND OpenVDB_DEFINITIONS _WIN32)
   list(APPEND OpenVDB_DEFINITIONS NOMINMAX)
+endif()
+
+if(MINGW)
+  list(APPEND OpenVDB_DEFINITIONS _USE_MATH_DEFINES)
 endif()
 
 if(OpenVDB_ABI)
@@ -655,8 +659,8 @@ if(OpenVDB_USES_IMATH_HALF)
   if(WIN32)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
     if(OPENEXR_USE_STATIC_LIBS OR
-        (${ILMBASE_LIB_TYPE} STREQUAL STATIC_LIBRARY) OR
-        (${IMATH_LIB_TYPE} STREQUAL STATIC_LIBRARY))
+        ("${ILMBASE_LIB_TYPE}" STREQUAL "STATIC_LIBRARY") OR
+        ("${IMATH_LIB_TYPE}" STREQUAL "STATIC_LIBRARY"))
       list(APPEND OpenVDB_DEFINITIONS OPENVDB_OPENEXR_STATICLIB)
     endif()
   endif()
