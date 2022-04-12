@@ -112,36 +112,85 @@ struct TSHasTypeImpl<TypeList<T, Ts...>, T, Idx>
 };
 
 
-/// @brief    Remove any duplicate types from a @c TypeList.
-/// @details  This implementation effectively rebuilds a @c TypeList by starting
-///           with an empty @c TypeList and recursively defining an expanded
-///           @c TypeList for every type (first to last), only if the type does
-///           not already exist in the new @c TypeList. This has the effect of
-///           dropping all but the first of duplicate types.
-/// @note     Each type must define a new instantiation of this object.
-/// @tparam ListT The starting @c TypeList, usually (but not limited to) an
-///               empty @c TypeList
-/// @tparam Ts    The list of types to make unique
-template <typename ListT, typename... Ts>
-struct TSMakeUniqueImpl {
-    using type = ListT;
+/// @brief  Similar to TsAppendImpl but only appends types to a list if the
+///   type does not alreay exist in the list.
+/// @details Defines a new @c TypeList with non-unique types appended
+/// @tparam U      Type to append
+/// @tparam ListT  The @c TypeList to append to
+template <typename U, typename ListT,
+  bool ListContainsType = TSHasTypeImpl<ListT, U>::Value>
+struct TSAppendUniqueImpl;
+
+/// @brief  Partial specialization where the currently evaluating type @c U in
+///   a @c TypeList already exists in the list. Returns the unmodified list.
+/// @tparam U  Type to append
+/// @tparam Ts Other types within the @c TypeList
+template <typename U, typename... Ts>
+struct TSAppendUniqueImpl<U, TypeList<Ts...>, true> {
+private:
+    using RemovedU = typename TypeList<Ts...>::template Remove<U>;
+public:
+    /// @note  It's simpler to remove the current type U and append the rest by
+    ///   just having "using type = TypeList<Ts...>". However this ends up with
+    ///   with keeping the last seen type rather than the first which this
+    ///   method historically did. e.g:
+    ///      TypeList<float, int, float>::Unique<> can become:
+    ///        a)  TypeList<float, int>  currently
+    ///        b)  TypeList<int, float>  if we used the afformentioned technique
+    ///  Might be useful to have both? Complexity in (a) is currently linear so
+    ///  this shouldn't be a problem, but be careful this doesn't change.
+    //using type = TypeList<Ts...>;
+    using type = typename TypeList<U>::template Append<RemovedU>;
 };
 
-/// @brief  Partial specialization for type packs, where by the next type @c U
-///         is checked in the existing type set @c Ts for duplication. If the
-///         type does not exist, it is added to the new @c TypeList definition,
-///         otherwise it is dropped. In either case, this class is recursively
-///         defined with the remaining types @c Us.
-/// @tparam Ts  Current types in the @c TypeList
-/// @tparam U   Type to check for duplication in @c Ts
-/// @tparam Us  Remaining types
-template <typename... Ts, typename U, typename... Us>
-struct TSMakeUniqueImpl<TypeList<Ts...>, U, Us...>
+/// @brief  Partial specialization where the currently evaluating type @c U in
+///   a @c TypeList does not exists in the list. Returns the appended list.
+/// @tparam U  Type to append
+/// @tparam Ts Other types within the @c TypeList
+template <typename U, typename... Ts>
+struct TSAppendUniqueImpl<U, TypeList<Ts...>, false> {
+    using type = TypeList<U, Ts...>;
+};
+
+/// @brief    Reconstruct a @c TypeList containing only unique types.
+/// @details  This implementation effectively rebuilds a @c TypeList by
+///   starting with an empty @c TypeList and recursively defining an expanded
+///   @c TypeList for every type (first to last), only if the type does not
+///   already exist in the new @c TypeList. This has the effect of dropping all
+///   but the first of duplicate types.
+/// @warning  This implementation previously used an embdedded std::conditional
+///   which resulted in drastically slow compilation times. If you're changing
+///   this implementation make sure to profile compile times with larger lists.
+/// @tparam Ts Types within the @c TypeList
+template <typename... Ts>
+struct TSRecurseAppendUniqueImpl;
+
+/// @brief  Terminate type recursion when the end of a @c TypeList is reached.
+template <>
+struct TSRecurseAppendUniqueImpl<> {
+    using type = TypeList<>;
+};
+
+/// @brief  Merge and unpack an initial @c TypeList from the first argument if
+///   such a @c TypeList has been provided.
+/// @tparam Ts      Types within the first @c TypeList
+/// @tparam OtherTs Other types
+template <typename... Ts, typename... OtherTs>
+struct TSRecurseAppendUniqueImpl<TypeList<Ts...>, OtherTs...> {
+    using type = typename TSRecurseAppendUniqueImpl<OtherTs..., Ts...>::type;
+};
+
+/// @brief  Recursively call TSRecurseAppendUniqueImpl with each type in the
+///   provided @c TypeLists, rebuilding a new list with only the unique set
+///   of types.
+/// @tparam U  Next type to check for uniqueness and append
+/// @tparam Ts Remaining types within the @c TypeList
+template <typename U, typename... Ts>
+struct TSRecurseAppendUniqueImpl<U, Ts...>
 {
-    using type = typename std::conditional<
-        TSHasTypeImpl<TypeList<Ts...>, U>::Value,
-        typename TSMakeUniqueImpl<TypeList<Ts...>, Us...>::type,
-        typename TSMakeUniqueImpl<TypeList<Ts..., U>, Us...>::type  >::type;
+    using type = typename TSAppendUniqueImpl<U,
+            typename TSRecurseAppendUniqueImpl<Ts...>::type
+        >::type;
 };
 
 
@@ -425,7 +474,7 @@ struct TypeList
     /// }
     /// @endcode
     template<typename ListT = TypeList<>>
-    using Unique = typename typelist_internal::TSMakeUniqueImpl<ListT, Ts...>::type;
+    using Unique = typename typelist_internal::TSRecurseAppendUniqueImpl<ListT, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
     /// @details Example:
