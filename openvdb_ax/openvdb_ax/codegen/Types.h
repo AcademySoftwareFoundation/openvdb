@@ -80,6 +80,7 @@ struct LLVMType
         }
         else if (std::is_floating_point<T>::value) {
             switch (bits) {
+                case 16: return llvm::Type::getHalfTy(C);
                 case 32: return llvm::Type::getFloatTy(C);
                 case 64: return llvm::Type::getDoubleTy(C);
             }
@@ -199,6 +200,25 @@ struct LLVMType<void>
 
 /// @note void* implemented as signed int_t* to match clang IR generation
 template <> struct LLVMType<void*> : public LLVMType<int_t<sizeof(void*)>::type*> {};
+template <> struct LLVMType<openvdb::math::half>
+{
+    // @note LLVM has a special representation of half types. Don't alias to
+    //   uint16_t as we want type->isFloatingPointTy() to still return true.
+
+    static inline llvm::Type* get(llvm::LLVMContext& C) { return llvm::Type::getHalfTy(C); }
+    static inline llvm::Constant* get(llvm::LLVMContext& C, const openvdb::math::half V)
+    {
+        llvm::Type* type = LLVMType<openvdb::math::half>::get(C);
+        assert(llvm::ConstantFP::isValueValidForType(type, llvm::APFloat(V)));
+        llvm::Constant* constant = llvm::ConstantFP::get(type, static_cast<double>(V));
+        assert(constant);
+        return constant;
+    }
+    static inline llvm::Constant* get(llvm::LLVMContext& C, const openvdb::math::half* const V)
+    {
+        return LLVMType<uintptr_t>::get(C, reinterpret_cast<uintptr_t>(V));
+    }
+};
 
 template <typename T> struct LLVMType<const T> : public LLVMType<T> {};
 template <typename T> struct LLVMType<const T*> : public LLVMType<T*> {};

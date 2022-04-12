@@ -321,7 +321,7 @@ TEST_F(TestIndexIterator, testProfile)
 
     { // for loop
         ProfileTimer timer("ForLoop: sum");
-        volatile int sum = 0;
+        volatile uint64_t sum = 0;
         for (int i = 0; i < elements; i++) {
             sum += i;
         }
@@ -330,7 +330,7 @@ TEST_F(TestIndexIterator, testProfile)
 
     { // index iterator
         ProfileTimer timer("IndexIter: sum");
-        volatile int sum = 0;
+        volatile uint64_t sum = 0;
         ValueVoxelCIter iter(0, elements);
         for (; iter; ++iter) {
             sum += *iter;
@@ -350,7 +350,7 @@ TEST_F(TestIndexIterator, testProfile)
 
     { // manual value iteration
         ProfileTimer timer("ValueIteratorManual: sum");
-        volatile int sum = 0;
+        volatile uint64_t sum = 0;
         auto indexIter(leafNode.cbeginValueOn());
         int offset = 0;
         for (; indexIter; ++indexIter) {
@@ -366,7 +366,7 @@ TEST_F(TestIndexIterator, testProfile)
 
     { // value on iterator (all on)
         ProfileTimer timer("ValueIndexIter: sum");
-        volatile int sum = 0;
+        volatile uint64_t sum = 0;
         auto indexIter(leafNode.cbeginValueAll());
         IndexIter<LeafNode::ValueAllCIter, NullFilter>::ValueIndexIter iter(indexIter);
         for (; iter; ++iter) {

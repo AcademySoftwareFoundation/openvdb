@@ -872,7 +872,7 @@ template<typename Type>
 inline Type
 Truncate(Type x, unsigned int digits)
 {
-    Type tenth = Pow(10,digits);
+    Type tenth = static_cast<Type>(Pow(size_t(10), digits));
     return RoundDown(x*tenth+0.5)/tenth;
 }
 

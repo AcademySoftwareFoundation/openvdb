@@ -187,7 +187,7 @@ endif()
 if(USE_BLOSC OR USE_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
+    if(MSVC)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
     else()
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -449,9 +449,12 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeSDF.h
+  points/PointRasterizeTrilinear.h
   points/PointSample.h
   points/PointScatter.h
   points/PointStatistics.h
+  points/PointTransfer.h
   points/StreamCompression.h
 )
 
@@ -612,6 +615,10 @@ endif()
 
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
+
+if(MINGW)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
+endif()
 
 if(WIN32)
   if(USE_IMATH_HALF)

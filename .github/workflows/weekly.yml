@@ -155,8 +155,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { build: 'asan',  cmake: '-DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { build: 'ubsan', cmake: '' } # Currently doesn't error, just reports all issues
+          - { build: 'asan',  components: 'core,test,nano,nanotest,axcore,axtest', cmake: '-DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { build: 'ubsan', components: 'core,test,axcore,axtest', cmake: '' } # Doesn't currently test NanoVDB
           #- { build: 'lsan', cmake: '' } # asan encompasses and includes lsan
           #- { build: 'tsan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
           #- { build: 'msan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
@@ -168,7 +168,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components="core,test,nano,nanotest,axcore,axtest"
+        --components="${{ matrix.config.components }}"
         --cargs=\"
         -DOPENVDB_CORE_STATIC=OFF
         -DOPENVDB_AX_STATIC=OFF

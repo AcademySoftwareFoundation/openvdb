@@ -1,3 +1,0 @@
-Houdini:
-    - Fix race condition in OpenVDB Merge SOP that could cause crashes
-      or merged VDBs to not be deleted.
