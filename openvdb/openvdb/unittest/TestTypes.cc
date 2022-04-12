@@ -486,6 +486,7 @@ TEST_F(TestTypes, testTypeList)
 
     // Unique
     STATIC_ASSERT((std::is_same<IntTypes::Unique<>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Unique<IntTypes>, IntTypes>::value));
     STATIC_ASSERT((std::is_same<EmptyList::Unique<>, EmptyList>::value));
 
     // Front/Back
@@ -526,11 +527,14 @@ TEST_F(TestTypes, testTypeList)
     // Test some methods on lists with duplicate types
     using DuplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
     using DuplicateRealTypes = TypeList<float, float, float, float>;
+
     STATIC_ASSERT((DuplicateIntTypes::Size == 4));
     STATIC_ASSERT((DuplicateRealTypes::Size == 4));
     STATIC_ASSERT((DuplicateIntTypes::Index<Int16> == 1));
     STATIC_ASSERT((std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value));
     STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value));
+    STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<DuplicateIntTypes>,
+        TypeList<float, Int32, Int16, Int64>>::value));
 
     //
 
@@ -772,4 +776,60 @@ TEST_F(TestTypes, testPromoteType)
 
     CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat3)
     CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat4)
+}
+
+template <typename T> struct IsRegistered { inline void operator()() { EXPECT_TRUE(T::isRegistered()); } };
+template <typename T> struct IsRegisteredType { inline void operator()() { EXPECT_TRUE(T::isRegisteredType()); } };
+template <typename GridT> struct GridListContains { inline void operator()() { STATIC_ASSERT((GridTypes::Contains<GridT>)); } };
+template <typename GridT> struct AttrListContains { inline void operator()() { STATIC_ASSERT((AttributeTypes::Contains<GridT>)); } };
+
+
+TEST_F(TestTypes, testOpenVDBTypeLists)
+{
+    openvdb::initialize();
+
+#define CHECK_TYPE_LIST_IS_VALID(LIST_T) \
+    STATIC_ASSERT((LIST_T::Size > 0));   \
+    STATIC_ASSERT((std::is_same<LIST_T::Unique<>, LIST_T>::value));
+
+    CHECK_TYPE_LIST_IS_VALID(GridTypes)
+    CHECK_TYPE_LIST_IS_VALID(FloatGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(ScalarGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3GridTypes)
+
+    GridTypes::foreach<IsRegistered>();
+
+    FloatGridTypes::foreach<GridListContains>();
+    IntegerGridTypes::foreach<GridListContains>();
+    ScalarGridTypes::foreach<GridListContains>();
+    Vec3GridTypes::foreach<GridListContains>();
+
+    CHECK_TYPE_LIST_IS_VALID(AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerAttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(ScalarAttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Mat3AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Mat4AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(QuatAttributeTypes)
+
+    AttributeTypes::foreach<IsRegistered>();
+
+    FloatAttributeTypes::foreach<AttrListContains>();
+    IntegerAttributeTypes::foreach<AttrListContains>();
+    ScalarAttributeTypes::foreach<AttrListContains>();
+    Vec3AttributeTypes::foreach<AttrListContains>();
+    Mat3AttributeTypes::foreach<AttrListContains>();
+    Mat4AttributeTypes::foreach<AttrListContains>();
+    QuatAttributeTypes::foreach<AttrListContains>();
+
+    CHECK_TYPE_LIST_IS_VALID(MapTypes)
+
+    MapTypes::foreach<IsRegistered>();
+
+    CHECK_TYPE_LIST_IS_VALID(MetaTypes)
+
+    MetaTypes::foreach<IsRegisteredType>();
+
+    openvdb::uninitialize();
 }
