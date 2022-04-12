@@ -68,15 +68,15 @@ initialize()
 
     // Register metadata.
     Metadata::clearRegistry();
-    NativeMetaTypes::foreach<RegisterMeta>();
+    MetaTypes::foreach<RegisterMeta>();
 
     // Register maps
     math::MapRegistry::clear();
-    NativeMapTypes::foreach<RegisterMap>();
+    MapTypes::foreach<RegisterMap>();
 
     // Register common grid types.
     GridBase::clearRegistry();
-    NativeGridTypes::foreach<RegisterGrid>();
+    GridTypes::foreach<RegisterGrid>();
 
     // @note String grids types are deprecated but we still register them
     //   as supported serializable types for backward compatibility. This

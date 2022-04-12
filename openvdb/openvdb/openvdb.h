@@ -88,20 +88,20 @@ using VectorGrid   = Vec3fGrid;
 /// @name Lists of native Grid Types
 /// @{
 /// The floating point Grid types which OpenVDB will register by default.
-using NativeFloatGridTypes   = TypeList<FloatGrid, DoubleGrid>;
+using FloatGridTypes   = TypeList<FloatGrid, DoubleGrid>;
 /// The integer Grid types which OpenVDB will register by default.
-using NativeIntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
+using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
 /// combination of native floating point and integer grid types. Note that
 /// this list does not include Bool or Mask Grids.
-using NativeScalarGridTypes  = NativeFloatGridTypes::Append<NativeIntegerGridTypes>;
+using ScalarGridTypes  = FloatGridTypes::Append<IntegerGridTypes>;
 /// The Vec3 Grid types which OpenVDB will register by default.
-using NativeVec3GridTypes    = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
+using Vec3GridTypes    = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
 /// The Grid types which OpenVDB will register by default.
-using NativeGridTypes =
-    NativeScalarGridTypes::
-        Append<NativeVec3GridTypes>::
+using GridTypes =
+    ScalarGridTypes::
+        Append<Vec3GridTypes>::
         Append<tools::PointIndexGrid>::
     // #define unfortunately required for one of the tests that removes this alias
 #ifndef OPENVDB_DISABLE_POINT_DATA_TREE_ALIAS
@@ -114,7 +114,7 @@ using NativeGridTypes =
 /// @name Lists of native TypedAttributeArray Types (for PointDataGrids)
 /// @{
 /// The floating point attribute array types which OpenVDB will register by default.
-using NativeFloatAttributeTypes = TypeList<
+using FloatAttributeTypes = TypeList<
     points::TypedAttributeArray<float>,
     points::TypedAttributeArray<double>,
     points::TypedAttributeArray<float, points::TruncateCodec>,
@@ -122,7 +122,7 @@ using NativeFloatAttributeTypes = TypeList<
     points::TypedAttributeArray<float, points::FixedPointCodec<false, points::UnitRange>>
     >;
 /// The integer attribute array types which OpenVDB will register by default.
-using NativeIntegerAttributeTypes = TypeList<
+using IntegerAttributeTypes = TypeList<
     points::TypedAttributeArray<int8_t>,
     points::TypedAttributeArray<int16_t>,
     points::TypedAttributeArray<int32_t>,
@@ -131,10 +131,10 @@ using NativeIntegerAttributeTypes = TypeList<
 /// The scalar attribute array types which OpenVDB will register by default.
 /// This is a combination of native floating point and integer array types.
 /// Note that this list does not include bool arrays.
-using NativeScalarAttributeTypes =
-    NativeFloatAttributeTypes::Append<NativeIntegerAttributeTypes>;
+using ScalarAttributeTypes =
+    FloatAttributeTypes::Append<IntegerAttributeTypes>;
 /// The Vec3 attribute array types which OpenVDB will register by default.
-using NativeVec3AttributeTypes = TypeList<
+using Vec3AttributeTypes = TypeList<
     points::TypedAttributeArray<math::Vec3<int32_t>>,
     points::TypedAttributeArray<math::Vec3<float>>,
     points::TypedAttributeArray<math::Vec3<double>>,
@@ -146,28 +146,28 @@ using NativeVec3AttributeTypes = TypeList<
     points::TypedAttributeArray<math::Vec3<float>, points::UnitVecCodec>
     >;
 /// The Mat3 attribute array types which OpenVDB will register by default.
-using NativeMat3AttributeTypes = TypeList<
+using Mat3AttributeTypes = TypeList<
     points::TypedAttributeArray<math::Mat3<float>>,
     points::TypedAttributeArray<math::Mat3<double>>
     >;
 /// The Mat4 attribute array types which OpenVDB will register by default.
-using NativeMat4AttributeTypes = TypeList<
+using Mat4AttributeTypes = TypeList<
     points::TypedAttributeArray<math::Mat4<float>>,
     points::TypedAttributeArray<math::Mat4<double>>
     >;
 /// The Quat attribute array types which OpenVDB will register by default.
-using NativeQuatAttributeTypes = TypeList<
+using QuatAttributeTypes = TypeList<
     points::TypedAttributeArray<math::Quat<float>>,
     points::TypedAttributeArray<math::Quat<double>>
     >;
 
 /// The attribute array types which OpenVDB will register by default.
-using NativeAttributeTypes =
-    NativeScalarAttributeTypes::
-    Append<NativeVec3AttributeTypes>::
-    Append<NativeMat3AttributeTypes>::
-    Append<NativeMat4AttributeTypes>::
-    Append<NativeQuatAttributeTypes>::
+using AttributeTypes =
+    ScalarAttributeTypes::
+    Append<Vec3AttributeTypes>::
+    Append<Mat3AttributeTypes>::
+    Append<Mat4AttributeTypes>::
+    Append<QuatAttributeTypes>::
     Append<points::GroupAttributeArray>::
     Append<points::StringAttributeArray>::
     Append<points::TypedAttributeArray<bool>>;
@@ -175,7 +175,7 @@ using NativeAttributeTypes =
 
 
 /// The Map types which OpenVDB will register by default.
-using NativeMapTypes = TypeList<
+using MapTypes = TypeList<
     math::AffineMap,
     math::UnitaryMap,
     math::ScaleMap,
@@ -187,7 +187,7 @@ using NativeMapTypes = TypeList<
 
 
 /// The Metadata types which OpenVDB will register by default.
-using NativeMetaTypes = TypeList<
+using MetaTypes = TypeList<
     BoolMetadata,
     DoubleMetadata,
     FloatMetadata,

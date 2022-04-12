@@ -16,7 +16,7 @@ template <typename ArrayT> struct RegisterArray { inline void operator()() { Arr
 void
 internal::initialize()
 {
-    NativeAttributeTypes::foreach<RegisterArray>();
+    AttributeTypes::foreach<RegisterArray>();
 
     // Register types associated with point data grids.
     Metadata::registerType(typeNameAsString<PointDataIndex32>(), Int32Metadata::createMetadata);
