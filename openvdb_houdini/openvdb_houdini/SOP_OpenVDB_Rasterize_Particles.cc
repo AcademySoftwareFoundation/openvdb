@@ -14,7 +14,7 @@
 #include <openvdb_houdini/Utils.h>
 
 #include <openvdb/tools/Mask.h>
-#include <openvdb/points/PointRasterize.h>
+#include <openvdb/points/PointRasterizeFrustum.h>
 
 #include <GU/GU_Detail.h>
 #include <OP/OP_Operator.h>
@@ -1048,7 +1048,7 @@ SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
             const std::string velocityAttribute = evalStdString("velocityattribute", time);
             const std::string radiusAttribute = evalStdString("radiusattribute", time);
 
-            openvdb::points::VolumeRasterizerSettings settings(*xform);
+            openvdb::points::FrustumRasterizerSettings settings(*xform);
             // settings.threaded = false;
             settings.threshold = static_cast<float>(evalFloat("contributionthreshold", 0, time));
             settings.useRadius = 0 != evalInt("enableradius", 0, time);
@@ -1062,7 +1062,7 @@ SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
             settings.framesPerSecond = static_cast<float>(evalFloat("framespersecond", 0, time));
             settings.motionSamples = std::max(2, static_cast<int>(evalInt("motionsamples", 0, time)));
 
-            openvdb::points::VolumeRasterizerMask mask(*xform,
+            openvdb::points::FrustumRasterizerMask mask(*xform,
                 maskGrid ? maskGrid.get() : nullptr,
                 maskBBox ? *maskBBox : openvdb::BBoxd(), clipToFrustum, invertMask);
 
@@ -1240,7 +1240,7 @@ SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
                 const float densityScale = static_cast<float>(evalFloat("densityscale", 0, time));
                 const float scale = 1.0f;
 
-                openvdb::points::VolumeRasterizer<
+                openvdb::points::FrustumRasterizer<
                     openvdb::points::PointDataGrid, hvdb::Interrupter> rasterizer(settings, mask, &boss);
 
                 size_t iterations = pointGrids.size();

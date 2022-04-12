@@ -7,7 +7,7 @@
 #include <openvdb/tools/Mask.h>
 #include <openvdb/points/PointScatter.h>
 #include <openvdb/points/PointConversion.h>
-#include <openvdb/points/PointRasterize.h>
+#include <openvdb/points/PointRasterizeFrustum.h>
 
 // enable this flag to reduce compilation time by only unit testing float rasterization
 // #define ONLY_RASTER_FLOAT
@@ -62,9 +62,9 @@ TEST_F(TestPointRasterizeFrustum, testScaleByVoxelVolume)
         createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     auto& tree = points->tree();
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
-    using Mask = VolumeRasterizerMask;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
+    using Mask = FrustumRasterizerMask;
 
     Settings settings(*transform);
     settings.velocityAttribute = "velocityAttr";
@@ -339,9 +339,9 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
         createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     auto& tree = points->tree();
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
-    using Mask = VolumeRasterizerMask;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
+    using Mask = FrustumRasterizerMask;
 
     Settings settings(*transform);
     settings.velocityAttribute = "velocityAttr";
@@ -784,8 +784,8 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
 
 TEST_F(TestPointRasterizeFrustum, testSphereRasterization)
 {
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     { // single point that lives at (0,0.2,0)
 
@@ -1095,8 +1095,8 @@ TEST_F(TestPointRasterizeFrustum, testVelocityMotionBlur)
     // per-voxel contribution 1: 1.0
     // per-voxel contribution 2: 0.2
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
     Settings settings(*transform);
     settings.velocityMotionBlur = true;
     settings.threaded = false;
@@ -1242,8 +1242,8 @@ TEST_F(TestPointRasterizeFrustum, testVelocityMotionBlur)
 
 TEST_F(TestPointRasterizeFrustum, testCameraMotionBlur)
 {
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     { // test RasterCamera API
         math::Transform::Ptr transform1a(
@@ -1545,8 +1545,8 @@ TEST_F(TestPointRasterizeFrustum, testBool)
         createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     auto& pointsTree = points->tree();
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     {
         Settings settings(*transform);
@@ -1662,8 +1662,8 @@ TEST_F(TestPointRasterizeFrustum, testInt)
     PointAttributeVector<Vec3s> velocityWrapper(velocities);
     populateAttribute(pointsTree, pointIndexGrid->tree(), "v", velocityWrapper);
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     {
         Settings settings(*transform);
@@ -1703,8 +1703,8 @@ TEST_F(TestPointRasterizeFrustum, testInt)
 
 TEST_F(TestPointRasterizeFrustum, testInputs)
 {
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     auto empty = PointDataGrid::create();
 
@@ -1806,10 +1806,10 @@ struct HaltOnSecondInterrupt
 
 TEST_F(TestPointRasterizeFrustum, testInterrupter)
 {
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
-    using Mask = VolumeRasterizerMask;
-    using InterruptRasterizer = VolumeRasterizer<PointDataGrid, HaltOnSecondInterrupt>;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
+    using Mask = FrustumRasterizerMask;
+    using InterruptRasterizer = FrustumRasterizer<PointDataGrid, HaltOnSecondInterrupt>;
 
     // manually build frustum transform using camera API
 
@@ -1953,9 +1953,9 @@ TEST_F(TestPointRasterizeFrustum, testClipping)
         createPointDataGrid<NullCodec, PointDataGrid>(*pointIndexGrid, pointList, *transform);
     auto& tree = points->tree();
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
-    using Mask = VolumeRasterizerMask;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
+    using Mask = FrustumRasterizerMask;
 
     { // default settings (except no motion-blur), no clip bbox or clip mask
         Settings settings(*outputTransform);
@@ -2155,9 +2155,9 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
     EXPECT_TRUE(leaf);
     EXPECT_TRUE(leaf->buffer().isOutOfCore());
 
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
-    using Mask = VolumeRasterizerMask;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
+    using Mask = FrustumRasterizerMask;
 
     Settings settings(*frustum);
     settings.velocityMotionBlur = true;
@@ -2462,8 +2462,8 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
 
 TEST_F(TestPointRasterizeFrustum, testProfile)
 {
-    using Rasterizer = VolumeRasterizer<PointDataGrid>;
-    using Settings = VolumeRasterizerSettings;
+    using Rasterizer = FrustumRasterizer<PointDataGrid>;
+    using Settings = FrustumRasterizerSettings;
 
     // fill a sphere with points to use for rasterization
 

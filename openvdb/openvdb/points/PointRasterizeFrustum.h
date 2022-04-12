@@ -82,11 +82,11 @@ private:
 /// @param framesPerSecond      the global value for frames / second for computing motion blur
 /// @param threaded             if enabled, use threading to accelerate rasterization
 /// @note rasterization can clip can using any combination of bounding box, mask and frustum
-struct VolumeRasterizerSettings
+struct FrustumRasterizerSettings
 {
-    VolumeRasterizerSettings() = delete;
+    FrustumRasterizerSettings() = delete;
 
-    explicit VolumeRasterizerSettings(const math::Transform& _transform)
+    explicit FrustumRasterizerSettings(const math::Transform& _transform)
         : transform(_transform)
         , camera(_transform) { }
 
@@ -104,16 +104,16 @@ struct VolumeRasterizerSettings
     float framesPerSecond = 24.0f;
     int motionSamples = 2;
     bool threaded = true;
-}; // struct VolumeRasterizerSettings
+}; // struct FrustumRasterizerSettings
 
 
-struct VolumeRasterizerMask
+struct FrustumRasterizerMask
 {
     using AccessorT = const tree::ValueAccessor<const MaskTree>;
 
-    VolumeRasterizerMask() = default;
+    FrustumRasterizerMask() = default;
 
-    explicit VolumeRasterizerMask(
+    explicit FrustumRasterizerMask(
         const math::Transform& transform,
         const MaskGrid* mask = nullptr,
         const BBoxd& bbox = BBoxd(),
@@ -132,7 +132,7 @@ private:
     MaskGrid::Ptr mMask;
     CoordBBox mClipBBox;
     bool mInvert = false;
-}; // struct VolumeRasterizerMask
+}; // struct FrustumRasterizerMask
 
 
 namespace point_rasterize_internal {
@@ -160,7 +160,7 @@ class GridToRasterize;
 /// size.
 template<typename PointDataGridT,
          typename InterruptT = util::NullInterrupter>
-class VolumeRasterizer
+class FrustumRasterizer
 {
 public:
     using GridPtr = typename PointDataGridT::Ptr;
@@ -170,9 +170,9 @@ public:
     /// @brief main constructor
     /// @param settings             the shared settings for rasterizing, see class for more details
     /// @param interrupt            a pointer adhering to the util::NullInterrupter interface
-    explicit VolumeRasterizer(
-        const VolumeRasterizerSettings& settings,
-        const VolumeRasterizerMask& mask = VolumeRasterizerMask(),
+    explicit FrustumRasterizer(
+        const FrustumRasterizerSettings& settings,
+        const FrustumRasterizerMask& mask = FrustumRasterizerMask(),
         InterruptT* interrupt = nullptr);
 
     /// @brief Append a PointDataGrid to the rasterizer (but don't rasterize yet).
@@ -226,12 +226,12 @@ private:
         bool reduceMemory, float scale, const FilterT& filter);
 
 private:
-    VolumeRasterizerSettings mSettings;
-    VolumeRasterizerMask mMask;
+    FrustumRasterizerSettings mSettings;
+    FrustumRasterizerMask mMask;
 
     InterruptT* mInterrupter;
     std::vector<GridToRasterize> mPointGrids;
-}; // class VolumeRasterizer
+}; // class FrustumRasterizer
 
 
 /// @brief A struct that stores all include/exclude attribute names as strings
@@ -377,8 +377,8 @@ struct RasterizeOp
                 const bool computeMax,
                 const bool alignedTransform,
                 const bool staticCamera,
-                const VolumeRasterizerSettings& settings,
-                const VolumeRasterizerMask& mask,
+                const FrustumRasterizerSettings& settings,
+                const FrustumRasterizerMask& mask,
                 InterrupterT* interrupt)
         : mGrid(grid)
         , mOffsets(offsets)
@@ -996,8 +996,8 @@ private:
     const bool mComputeMax;
     const bool mAlignedTransform;
     const bool mStaticCamera;
-    const VolumeRasterizerSettings& mSettings;
-    const VolumeRasterizerMask& mMask;
+    const FrustumRasterizerSettings& mSettings;
+    const FrustumRasterizerMask& mMask;
     InterrupterT* mInterrupter;
 }; // struct RasterizeOp
 
@@ -1067,15 +1067,15 @@ public:
     using PointDataLeafT = typename PointDataTreeT::LeafNodeType;
 
     GridToRasterize(GridPtr& grid, bool stream,
-         const VolumeRasterizerSettings& settings,
-         const VolumeRasterizerMask& mask)
+         const FrustumRasterizerSettings& settings,
+         const FrustumRasterizerMask& mask)
         : mGrid(grid)
         , mStream(stream)
         , mSettings(settings)
         , mMask(mask) { }
 
-    GridToRasterize(GridConstPtr& grid, const VolumeRasterizerSettings& settings,
-         const VolumeRasterizerMask& mask)
+    GridToRasterize(GridConstPtr& grid, const FrustumRasterizerSettings& settings,
+         const FrustumRasterizerMask& mask)
         : mGrid(ConstPtrCast<PointDataGridT>(grid))
         , mStream(false)
         , mSettings(settings)
@@ -1218,8 +1218,8 @@ public:
 private:
     GridPtr mGrid;
     const bool mStream;
-    const VolumeRasterizerSettings& mSettings;
-    const VolumeRasterizerMask& mMask;
+    const FrustumRasterizerSettings& mSettings;
+    const FrustumRasterizerMask& mMask;
     int mLeafPercentage = -1;
     std::vector<Index64> mLeafOffsets;
 }; // class GridToRasterize
@@ -1382,7 +1382,7 @@ float RasterCamera::shutterEnd() const
 ////////////////////////////////////////////////////////////////////////////
 
 
-VolumeRasterizerMask::VolumeRasterizerMask( const math::Transform& transform,
+FrustumRasterizerMask::FrustumRasterizerMask( const math::Transform& transform,
                                             const MaskGrid* mask,
                                             const BBoxd& bbox,
                                             const bool clipToFrustum,
@@ -1438,25 +1438,25 @@ VolumeRasterizerMask::VolumeRasterizerMask( const math::Transform& transform,
     }
 }
 
-VolumeRasterizerMask::operator bool() const
+FrustumRasterizerMask::operator bool() const
 {
     return mMask || !mClipBBox.empty();
 }
 
 MaskTree::ConstPtr
-VolumeRasterizerMask::getTreePtr() const
+FrustumRasterizerMask::getTreePtr() const
 {
     return mMask ? mMask->treePtr() : MaskTree::ConstPtr();
 }
 
 const CoordBBox&
-VolumeRasterizerMask::clipBBox() const
+FrustumRasterizerMask::clipBBox() const
 {
     return mClipBBox;
 }
 
 bool
-VolumeRasterizerMask::valid(const Coord& ijk, const tree::ValueAccessor<const MaskTree>* acc) const
+FrustumRasterizerMask::valid(const Coord& ijk, const tree::ValueAccessor<const MaskTree>* acc) const
 {
     const bool maskValue = acc ? acc->isValueOn(ijk) : true;
     const bool insideMask = mInvert ? !maskValue : maskValue;
@@ -1469,8 +1469,8 @@ VolumeRasterizerMask::valid(const Coord& ijk, const tree::ValueAccessor<const Ma
 
 
 template <typename PointDataGridT, typename InterruptT>
-VolumeRasterizer<PointDataGridT, InterruptT>::VolumeRasterizer( const VolumeRasterizerSettings& settings,
-                                                                const VolumeRasterizerMask& mask,
+FrustumRasterizer<PointDataGridT, InterruptT>::FrustumRasterizer( const FrustumRasterizerSettings& settings,
+                                                                const FrustumRasterizerMask& mask,
                                                                 InterruptT* interrupt)
     : mSettings(settings)
     , mMask(mask)
@@ -1484,7 +1484,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::VolumeRasterizer( const VolumeRast
 
 template <typename PointDataGridT, typename InterruptT>
 void
-VolumeRasterizer<PointDataGridT, InterruptT>::addPoints(GridConstPtr& grid)
+FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridConstPtr& grid)
 {
     // skip any empty grids
     if (!grid || grid->tree().empty())     return;
@@ -1495,7 +1495,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::addPoints(GridConstPtr& grid)
 
 template <typename PointDataGridT, typename InterruptT>
 void
-VolumeRasterizer<PointDataGridT, InterruptT>::addPoints(GridPtr& grid, bool stream)
+FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridPtr& grid, bool stream)
 {
     // skip any empty grids
     if (!grid || grid->tree().empty())     return;
@@ -1505,21 +1505,21 @@ VolumeRasterizer<PointDataGridT, InterruptT>::addPoints(GridPtr& grid, bool stre
 
 template <typename PointDataGridT, typename InterruptT>
 void
-VolumeRasterizer<PointDataGridT, InterruptT>::clear()
+FrustumRasterizer<PointDataGridT, InterruptT>::clear()
 {
     mPointGrids.clear();
 }
 
 template <typename PointDataGridT, typename InterruptT>
 size_t
-VolumeRasterizer<PointDataGridT, InterruptT>::size() const
+FrustumRasterizer<PointDataGridT, InterruptT>::size() const
 {
     return mPointGrids.size();
 }
 
 template <typename PointDataGridT, typename InterruptT>
 size_t
-VolumeRasterizer<PointDataGridT, InterruptT>::memUsage() const
+FrustumRasterizer<PointDataGridT, InterruptT>::memUsage() const
 {
     size_t mem = sizeof(*this) + sizeof(mPointGrids);
     for (const auto& grid : mPointGrids) {
@@ -1531,7 +1531,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::memUsage() const
 template <typename PointDataGridT, typename InterruptT>
 template <typename FilterT>
 FloatGrid::Ptr
-VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeUniformDensity(
+FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeUniformDensity(
     RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     // no attribute to rasterize, so just provide an empty string and default to float type
@@ -1544,7 +1544,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeUniformDensity(
 template <typename PointDataGridT, typename InterruptT>
 template <typename FilterT>
 FloatGrid::Ptr
-VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeDensity(
+FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeDensity(
     const openvdb::Name& attribute, RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     auto density = rasterizeAttribute<FloatGrid, float>(attribute, mode, reduceMemory, scale, filter);
@@ -1556,7 +1556,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeDensity(
 template <typename PointDataGridT, typename InterruptT>
 template <typename FilterT>
 GridBase::Ptr
-VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(
+FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(
     const Name& attribute, RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     // retrieve the source type of the attribute
@@ -1623,7 +1623,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(
 template <typename PointDataGridT, typename InterruptT>
 template <typename GridT, typename AttributeT, typename FilterT>
 typename GridT::Ptr
-VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(const Name& attribute, RasterMode mode,
+FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(const Name& attribute, RasterMode mode,
     bool reduceMemory, float scale, const FilterT& filter)
 {
     if (attribute == "P") {
@@ -1642,7 +1642,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(const Name& att
 template <typename PointDataGridT, typename InterruptT>
 template <typename GridT, typename FilterT>
 typename GridT::Ptr
-VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeMask(bool reduceMemory, const FilterT& filter)
+FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeMask(bool reduceMemory, const FilterT& filter)
 {
     using ValueT = typename GridT::ValueType;
 
@@ -1658,7 +1658,7 @@ VolumeRasterizer<PointDataGridT, InterruptT>::rasterizeMask(bool reduceMemory, c
 template <typename PointDataGridT, typename InterruptT>
 template <typename AttributeT, typename GridT, typename FilterT>
 void
-VolumeRasterizer<PointDataGridT, InterruptT>::performRasterization(
+FrustumRasterizer<PointDataGridT, InterruptT>::performRasterization(
     GridT& grid, RasterMode mode, const openvdb::Name& attribute, bool reduceMemory,
     float scale, const FilterT& filter)
 {
