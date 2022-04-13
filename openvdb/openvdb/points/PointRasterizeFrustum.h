@@ -362,7 +362,7 @@ struct MultiplyOp<bool>
     template <typename AttributeT>
     static bool mul(const bool& a, const AttributeT& b)
     {
-        return a && b;
+        return a && (b != zeroVal<AttributeT>());
     }
 };
 
