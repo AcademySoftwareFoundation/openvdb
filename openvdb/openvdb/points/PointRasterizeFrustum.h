@@ -347,6 +347,26 @@ getAttributeScale(HandleT& handlePtr, StridedHandleT& stridedHandlePtr, Index in
 }
 
 
+template <typename ValueT>
+struct MultiplyOp
+{
+    template <typename AttributeT>
+    static ValueT mul(const ValueT& a, const AttributeT& b)
+    {
+        return a * b;
+    }
+};
+
+template <>
+struct MultiplyOp<bool>
+{
+    template <typename AttributeT>
+    static bool mul(const bool& a, const AttributeT& b)
+    {
+        return a && b;
+    }
+};
+
 template <typename PointDataGridT, typename AttributeT, typename GridT,
     typename FilterT, typename InterrupterT>
 struct RasterizeOp
@@ -629,7 +649,7 @@ struct RasterizeOp
                 }
             } else {
                 ValueT weightValue = castValue<ValueT>(scale);
-                ValueT newValue = weightValue * attributeScale;
+                ValueT newValue = MultiplyOp<ValueT>::mul(weightValue, attributeScale);
                 if (scaleByVoxelVolume) {
                     newValue /= static_cast<ValueT>(mSettings.transform.voxelSize(ijk.asVec3d()).product());
                 }
