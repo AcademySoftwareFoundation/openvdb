@@ -158,8 +158,7 @@ class GridToRasterize;
 /// example use case where a point is moving away from a camera that is used to
 /// generate a frustum volume being rasterized into, each successive voxel is larger in
 /// size.
-template<typename PointDataGridT,
-         typename InterruptT = util::NullInterrupter>
+template<typename PointDataGridT>
 class FrustumRasterizer
 {
 public:
@@ -173,7 +172,7 @@ public:
     explicit FrustumRasterizer(
         const FrustumRasterizerSettings& settings,
         const FrustumRasterizerMask& mask = FrustumRasterizerMask(),
-        InterruptT* interrupt = nullptr);
+        util::NullInterrupter* interrupt = nullptr);
 
     /// @brief Append a PointDataGrid to the rasterizer (but don't rasterize yet).
     /// @param points   the PointDataGrid
@@ -229,7 +228,7 @@ private:
     FrustumRasterizerSettings mSettings;
     FrustumRasterizerMask mMask;
 
-    InterruptT* mInterrupter;
+    util::NullInterrupter* mInterrupter;
     std::vector<GridToRasterize> mPointGrids;
 }; // class FrustumRasterizer
 
@@ -284,12 +283,12 @@ struct TrueOp {
     bool mOn;
     explicit TrueOp(double scale) : mOn(scale > 0.0) { }
     template<typename ValueType>
-    inline void operator()(ValueType& v) const { v = static_cast<ValueType>(mOn); }
+    void operator()(ValueType& v) const { v = static_cast<ValueType>(mOn); }
 };
 
 
 template <typename ValueT>
-inline typename std::enable_if<std::is_integral<typename ValueTraits<ValueT>::ElementType>::value, ValueT>::type
+typename std::enable_if<std::is_integral<typename ValueTraits<ValueT>::ElementType>::value, ValueT>::type
 castValue(const double value)
 {
     return ValueT(math::Ceil(value));
@@ -297,7 +296,7 @@ castValue(const double value)
 
 
 template <typename ValueT>
-inline typename std::enable_if<!std::is_integral<typename ValueTraits<ValueT>::ElementType>::value, ValueT>::type
+typename std::enable_if<!std::is_integral<typename ValueTraits<ValueT>::ElementType>::value, ValueT>::type
 castValue(const double value)
 {
     return static_cast<ValueT>(value);
@@ -305,7 +304,7 @@ castValue(const double value)
 
 
 template <typename ValueT>
-inline typename std::enable_if<!ValueTraits<ValueT>::IsVec, bool>::type
+typename std::enable_if<!ValueTraits<ValueT>::IsVec, bool>::type
 greaterThan(const ValueT& value, const float threshold)
 {
     return value >= static_cast<ValueT>(threshold);
@@ -313,7 +312,7 @@ greaterThan(const ValueT& value, const float threshold)
 
 
 template <typename ValueT>
-inline typename std::enable_if<ValueTraits<ValueT>::IsVec, bool>::type
+typename std::enable_if<ValueTraits<ValueT>::IsVec, bool>::type
 greaterThan(const ValueT& value, const float threshold)
 {
     return static_cast<double>(value.lengthSqr()) >= threshold*threshold;
@@ -321,7 +320,7 @@ greaterThan(const ValueT& value, const float threshold)
 
 
 template <typename AttributeT, typename HandleT, typename StridedHandleT>
-inline typename std::enable_if<!ValueTraits<AttributeT>::IsVec, AttributeT>::type
+typename std::enable_if<!ValueTraits<AttributeT>::IsVec, AttributeT>::type
 getAttributeScale(HandleT& handlePtr, StridedHandleT&, Index index)
 {
     if (handlePtr) {
@@ -332,7 +331,7 @@ getAttributeScale(HandleT& handlePtr, StridedHandleT&, Index index)
 
 
 template <typename AttributeT, typename HandleT, typename StridedHandleT>
-inline typename std::enable_if<ValueTraits<AttributeT>::IsVec, AttributeT>::type
+typename std::enable_if<ValueTraits<AttributeT>::IsVec, AttributeT>::type
 getAttributeScale(HandleT& handlePtr, StridedHandleT& stridedHandlePtr, Index index)
 {
     if (handlePtr) {
@@ -368,7 +367,7 @@ struct MultiplyOp<bool>
 };
 
 template <typename PointDataGridT, typename AttributeT, typename GridT,
-    typename FilterT, typename InterrupterT>
+    typename FilterT>
 struct RasterizeOp
 {
     using TreeT = typename GridT::TreeType;
@@ -399,7 +398,7 @@ struct RasterizeOp
                 const bool staticCamera,
                 const FrustumRasterizerSettings& settings,
                 const FrustumRasterizerMask& mask,
-                InterrupterT* interrupt)
+                util::NullInterrupter* interrupt)
         : mGrid(grid)
         , mOffsets(offsets)
         , mAttributeIndex(attributeIndex)
@@ -434,7 +433,7 @@ struct RasterizeOp
 
     template <typename SphereOpT>
     static void rasterVoxelSphere(const Vec3d& position, const double scale,
-        const AttributeT& attributeScale, const float radius, InterrupterT* interrupter, SphereOpT& op)
+        const AttributeT& attributeScale, const float radius, util::NullInterrupter* interrupter, SphereOpT& op)
     {
         assert(radius > 0.0f);
         Coord ijk = Coord::round(position);
@@ -463,7 +462,7 @@ struct RasterizeOp
     static void rasterApproximateFrustumSphere(const Vec3d& position, const double scale,
         const AttributeT& attributeScale, const float radiusWS,
         const math::Transform& frustum, const CoordBBox* clipBBox,
-        InterrupterT* interrupter, SphereOpT& op)
+        util::NullInterrupter* interrupter, SphereOpT& op)
     {
         Vec3d voxelSize = frustum.voxelSize(position);
         Vec3d radius = Vec3d(radiusWS)/voxelSize;
@@ -508,7 +507,7 @@ struct RasterizeOp
     static void rasterFrustumSphere(const Vec3d& position, const double scale,
         const AttributeT& attributeScale, const float radiusWS,
         const math::Transform& frustum, const CoordBBox* clipBBox,
-        InterrupterT* interrupter, SphereOpT& op)
+        util::NullInterrupter* interrupter, SphereOpT& op)
     {
         const Vec3d positionWS = frustum.indexToWorld(position);
 
@@ -1018,7 +1017,7 @@ private:
     const bool mStaticCamera;
     const FrustumRasterizerSettings& mSettings;
     const FrustumRasterizerMask& mMask;
-    InterrupterT* mInterrupter;
+    util::NullInterrupter* mInterrupter;
 }; // struct RasterizeOp
 
 
@@ -1121,10 +1120,11 @@ public:
         return mGrid->memUsage() + mLeafOffsets.capacity();
     }
 
-    template <typename AttributeT, typename GridT, typename FilterT, typename InterruptT>
+    template <typename AttributeT, typename GridT, typename FilterT>
     void rasterize(const Name& attribute,
         typename CombinableTraits<GridT>::T& combiner, typename CombinableTraits<GridT>::T* weightCombiner,
-        const float scale, const FilterT& groupFilter, const bool computeMax, const bool reduceMemory, InterruptT* interrupter)
+        const float scale, const FilterT& groupFilter, const bool computeMax, const bool reduceMemory,
+        util::NullInterrupter* interrupter)
     {
         using point_rasterize_internal::RasterizeOp;
 
@@ -1221,7 +1221,7 @@ public:
 
         const bool alignedTransform = mSettings.transform == mGrid->constTransform();
 
-        RasterizeOp<PointDataGridT, AttributeT, GridT, ResolvedFilterT, InterruptT> rasterizeOp(
+        RasterizeOp<PointDataGridT, AttributeT, GridT, ResolvedFilterT> rasterizeOp(
             *mGrid, mLeafOffsets, attributeIndex, velocityAttribute, radiusAttribute, combiner, weightCombiner,
             dropBuffers, scale, resolvedFilter, computeMax, alignedTransform, mSettings.camera.isStatic(),
             mSettings, mMask, interrupter);
@@ -1246,7 +1246,7 @@ private:
 
 
 template <typename ValueT>
-inline typename std::enable_if<!ValueTraits<ValueT>::IsVec, ValueT>::type
+typename std::enable_if<!ValueTraits<ValueT>::IsVec, ValueT>::type
 computeWeightedValue(const ValueT& value, const ValueT& weight)
 {
     constexpr bool isSignedInt = std::is_integral<ValueT>() && std::is_signed<ValueT>();
@@ -1261,7 +1261,7 @@ computeWeightedValue(const ValueT& value, const ValueT& weight)
 
 
 template <typename ValueT>
-inline typename std::enable_if<ValueTraits<ValueT>::IsVec, ValueT>::type
+typename std::enable_if<ValueTraits<ValueT>::IsVec, ValueT>::type
 computeWeightedValue(const ValueT& value, const ValueT& weight)
 {
     using ElementT = typename ValueTraits<ValueT>::ElementType;
@@ -1488,10 +1488,10 @@ FrustumRasterizerMask::valid(const Coord& ijk, const tree::ValueAccessor<const M
 ////////////////////////////////////////////////////////////////////////////
 
 
-template <typename PointDataGridT, typename InterruptT>
-FrustumRasterizer<PointDataGridT, InterruptT>::FrustumRasterizer( const FrustumRasterizerSettings& settings,
-                                                                const FrustumRasterizerMask& mask,
-                                                                InterruptT* interrupt)
+template <typename PointDataGridT>
+FrustumRasterizer<PointDataGridT>::FrustumRasterizer(const FrustumRasterizerSettings& settings,
+                                                     const FrustumRasterizerMask& mask,
+                                                     util::NullInterrupter* interrupt)
     : mSettings(settings)
     , mMask(mask)
     , mInterrupter(interrupt)
@@ -1502,9 +1502,9 @@ FrustumRasterizer<PointDataGridT, InterruptT>::FrustumRasterizer( const FrustumR
     }
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 void
-FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridConstPtr& grid)
+FrustumRasterizer<PointDataGridT>::addPoints(GridConstPtr& grid)
 {
     // skip any empty grids
     if (!grid || grid->tree().empty())     return;
@@ -1513,9 +1513,9 @@ FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridConstPtr& grid)
     mPointGrids.emplace_back(grid, mSettings, mMask);
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 void
-FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridPtr& grid, bool stream)
+FrustumRasterizer<PointDataGridT>::addPoints(GridPtr& grid, bool stream)
 {
     // skip any empty grids
     if (!grid || grid->tree().empty())     return;
@@ -1523,23 +1523,23 @@ FrustumRasterizer<PointDataGridT, InterruptT>::addPoints(GridPtr& grid, bool str
     mPointGrids.emplace_back(grid, stream, mSettings, mMask);
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 void
-FrustumRasterizer<PointDataGridT, InterruptT>::clear()
+FrustumRasterizer<PointDataGridT>::clear()
 {
     mPointGrids.clear();
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 size_t
-FrustumRasterizer<PointDataGridT, InterruptT>::size() const
+FrustumRasterizer<PointDataGridT>::size() const
 {
     return mPointGrids.size();
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 size_t
-FrustumRasterizer<PointDataGridT, InterruptT>::memUsage() const
+FrustumRasterizer<PointDataGridT>::memUsage() const
 {
     size_t mem = sizeof(*this) + sizeof(mPointGrids);
     for (const auto& grid : mPointGrids) {
@@ -1548,10 +1548,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::memUsage() const
     return mem;
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename FilterT>
 FloatGrid::Ptr
-FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeUniformDensity(
+FrustumRasterizer<PointDataGridT>::rasterizeUniformDensity(
     RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     // no attribute to rasterize, so just provide an empty string and default to float type
@@ -1561,10 +1561,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeUniformDensity(
     return density;
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename FilterT>
 FloatGrid::Ptr
-FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeDensity(
+FrustumRasterizer<PointDataGridT>::rasterizeDensity(
     const openvdb::Name& attribute, RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     auto density = rasterizeAttribute<FloatGrid, float>(attribute, mode, reduceMemory, scale, filter);
@@ -1573,10 +1573,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeDensity(
     return density;
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename FilterT>
 GridBase::Ptr
-FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(
+FrustumRasterizer<PointDataGridT>::rasterizeAttribute(
     const Name& attribute, RasterMode mode, bool reduceMemory, float scale, const FilterT& filter)
 {
     // retrieve the source type of the attribute
@@ -1640,10 +1640,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(
     }
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename GridT, typename AttributeT, typename FilterT>
 typename GridT::Ptr
-FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(const Name& attribute, RasterMode mode,
+FrustumRasterizer<PointDataGridT>::rasterizeAttribute(const Name& attribute, RasterMode mode,
     bool reduceMemory, float scale, const FilterT& filter)
 {
     if (attribute == "P") {
@@ -1659,10 +1659,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeAttribute(const Name& at
     return grid;
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename GridT, typename FilterT>
 typename GridT::Ptr
-FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeMask(bool reduceMemory, const FilterT& filter)
+FrustumRasterizer<PointDataGridT>::rasterizeMask(bool reduceMemory, const FilterT& filter)
 {
     using ValueT = typename GridT::ValueType;
 
@@ -1675,10 +1675,10 @@ FrustumRasterizer<PointDataGridT, InterruptT>::rasterizeMask(bool reduceMemory, 
     return grid;
 }
 
-template <typename PointDataGridT, typename InterruptT>
+template <typename PointDataGridT>
 template <typename AttributeT, typename GridT, typename FilterT>
 void
-FrustumRasterizer<PointDataGridT, InterruptT>::performRasterization(
+FrustumRasterizer<PointDataGridT>::performRasterization(
     GridT& grid, RasterMode mode, const openvdb::Name& attribute, bool reduceMemory,
     float scale, const FilterT& filter)
 {

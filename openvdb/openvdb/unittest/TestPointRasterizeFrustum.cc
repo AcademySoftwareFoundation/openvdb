@@ -1784,14 +1784,14 @@ namespace
 {
 
 // Test thread-safe Interrupter that halts on the second interrupt check
-struct HaltOnSecondInterrupt
+struct HaltOnSecondInterrupt : public util::NullInterrupter
 {
     /// Default constructor
     HaltOnSecondInterrupt() = default;
-    void start(const char* name = NULL) { (void)name; }
-    void end() {}
+    void start(const char* name = NULL) override { (void)name; }
+    void end() override {}
     /// Check if an interruptible operation should be aborted.
-    inline bool wasInterrupted(int percent = -1)
+    inline bool wasInterrupted(int percent = -1) override
     {
         (void)percent;
         if (mInterrupt)     return true;
@@ -1809,7 +1809,7 @@ TEST_F(TestPointRasterizeFrustum, testInterrupter)
     using Rasterizer = FrustumRasterizer<PointDataGrid>;
     using Settings = FrustumRasterizerSettings;
     using Mask = FrustumRasterizerMask;
-    using InterruptRasterizer = FrustumRasterizer<PointDataGrid, HaltOnSecondInterrupt>;
+    using InterruptRasterizer = FrustumRasterizer<PointDataGrid>;
 
     // manually build frustum transform using camera API
 

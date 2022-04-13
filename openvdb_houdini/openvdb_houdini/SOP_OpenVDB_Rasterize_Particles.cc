@@ -1017,7 +1017,7 @@ SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
 
         if (createDensity || createMask || !scalarAttribNames.empty() || !vectorAttribNames.empty())
         {
-            hvdb::Interrupter boss("Rasterizing points");
+            hvdb::HoudiniInterrupter boss("Rasterizing points");
 
             // Set rasterization settings
 
@@ -1241,7 +1241,7 @@ SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
                 const float scale = 1.0f;
 
                 openvdb::points::FrustumRasterizer<
-                    openvdb::points::PointDataGrid, hvdb::Interrupter> rasterizer(settings, mask, &boss);
+                    openvdb::points::PointDataGrid> rasterizer(settings, mask, &boss);
 
                 size_t iterations = pointGrids.size();
 
