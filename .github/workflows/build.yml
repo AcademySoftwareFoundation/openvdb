@@ -92,7 +92,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}\"
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
@@ -146,7 +146,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,bin,test\"
+        --components=\"core,bin,view,render,test\"
         --cargs=\'${{ matrix.config.cmake }} -DUSE_EXR=ON -DUSE_PNG=ON -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
     - name: test
       shell: bash
@@ -182,7 +182,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
