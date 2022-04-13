@@ -239,7 +239,7 @@ TEST_F(TestPointRasterizeFrustum, testScaleByVoxelVolume)
 
     Mask mask(*frustum, nullptr, BBoxd(), false);
 
-    settings.transform = *frustum;
+    settings.transform = frustum->copy();
 
     Rasterizer frustumRasterizer(settings, mask);
     frustumRasterizer.addPoints(points, /*stream=*/false);
@@ -716,7 +716,7 @@ TEST_F(TestPointRasterizeFrustum, testPointRasterization)
 
     Mask mask(*frustum, nullptr, BBoxd(), false);
 
-    settings.transform = *frustum;
+    settings.transform = frustum->copy();
 
     Rasterizer frustumRasterizer(settings, mask);
     frustumRasterizer.addPoints(points, /*stream=*/false);
@@ -1215,7 +1215,7 @@ TEST_F(TestPointRasterizeFrustum, testVelocityMotionBlur)
 
     // scale contribution by voxel volume
 
-    settings.transform = *transform;
+    settings.transform = transform->copy();
     settings.scaleByVoxelVolume = true;
     Rasterizer scaleRasterizer(settings);
 

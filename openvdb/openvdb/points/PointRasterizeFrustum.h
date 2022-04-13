@@ -87,10 +87,10 @@ struct FrustumRasterizerSettings
     FrustumRasterizerSettings() = delete;
 
     explicit FrustumRasterizerSettings(const math::Transform& _transform)
-        : transform(_transform)
+        : transform(new math::Transform(_transform))
         , camera(_transform) { }
 
-    math::Transform transform;
+    math::Transform::Ptr transform;
     RasterCamera camera;
     float threshold = 1e-6f;
     bool scaleByVoxelVolume = false;
@@ -579,7 +579,7 @@ struct RasterizeOp
         using MaskAccessorT = tree::ValueAccessor<const MaskTree>;
 
         const bool isBool = BoolTraits<ValueT>::IsBool;
-        const bool isFrustum = !mSettings.transform.isLinear();
+        const bool isFrustum = !mSettings.transform->isLinear();
 
         const bool useRaytrace = mSettings.velocityMotionBlur || !mStaticCamera;
         const bool useRadius = mSettings.useRadius;
@@ -598,13 +598,13 @@ struct RasterizeOp
 
         const auto& pointsTransform = mGrid.constTransform();
 
-        const float voxelSize = static_cast<float>(mSettings.transform.voxelSize()[0]);
+        const float voxelSize = static_cast<float>(mSettings.transform->voxelSize()[0]);
 
         auto& grid = mCombinable.local();
         auto& tree = grid.tree();
-        const auto& transform = mSettings.transform;
+        const auto& transform = *(mSettings.transform);
 
-        grid.setTransform(transform.copy());
+        grid.setTransform(mSettings.transform->copy());
 
         AccessorT valueAccessor(tree);
 
@@ -650,7 +650,7 @@ struct RasterizeOp
                 ValueT weightValue = castValue<ValueT>(scale);
                 ValueT newValue = MultiplyOp<ValueT>::mul(weightValue, attributeScale);
                 if (scaleByVoxelVolume) {
-                    newValue /= static_cast<ValueT>(mSettings.transform.voxelSize(ijk.asVec3d()).product());
+                    newValue /= static_cast<ValueT>(transform.voxelSize(ijk.asVec3d()).product());
                 }
                 if (point_rasterize_internal::greaterThan(newValue, threshold)) {
                     if (isTemp) {
@@ -967,7 +967,7 @@ struct RasterizeOp
 
             } else {
                 if (!mAlignedTransform) {
-                    position = mSettings.transform.worldToIndex(
+                    position = transform.worldToIndex(
                         pointsTransform.indexToWorld(position));
                 }
 
@@ -1219,7 +1219,7 @@ public:
             }
         }
 
-        const bool alignedTransform = mSettings.transform == mGrid->constTransform();
+        const bool alignedTransform = *(mSettings.transform) == mGrid->constTransform();
 
         RasterizeOp<PointDataGridT, AttributeT, GridT, ResolvedFilterT> rasterizeOp(
             *mGrid, mLeafOffsets, attributeIndex, velocityAttribute, radiusAttribute, combiner, weightCombiner,
@@ -1652,7 +1652,7 @@ FrustumRasterizer<PointDataGridT>::rasterizeAttribute(const Name& attribute, Ras
 
     auto grid = GridT::create();
     grid->setName(attribute);
-    grid->setTransform(mSettings.transform.copy());
+    grid->setTransform(mSettings.transform->copy());
 
     this->performRasterization<AttributeT>(*grid, mode, attribute, reduceMemory, scale, filter);
 
@@ -1698,7 +1698,7 @@ FrustumRasterizer<PointDataGridT>::performRasterization(
         if (!mSettings.camera.isStatic() || mSettings.velocityMotionBlur) {
             ss << "with Motion Blur ";
         }
-        if (mSettings.transform.isLinear()) {
+        if (mSettings.transform->isLinear()) {
             ss << "to Linear Volume";
         } else {
             ss << "to Frustum Volume";
