@@ -88,19 +88,19 @@ using VectorGrid   = Vec3fGrid;
 /// @name Lists of native Grid Types
 /// @{
 /// The floating point Grid types which OpenVDB will register by default.
-using FloatGridTypes   = TypeList<FloatGrid, DoubleGrid>;
+using RealGridTypes   = TypeList<FloatGrid, DoubleGrid>;
 /// The integer Grid types which OpenVDB will register by default.
 using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// The scalar Grid types which OpenVDB will register by default. This is a
 /// combination of native floating point and integer grid types. Note that
 /// this list does not include Bool or Mask Grids.
-using ScalarGridTypes  = FloatGridTypes::Append<IntegerGridTypes>;
+using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>;
 /// The Vec3 Grid types which OpenVDB will register by default.
 using Vec3GridTypes    = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
 /// The Grid types which OpenVDB will register by default.
 using GridTypes =
-    ScalarGridTypes::
+    NumericGridTypes::
         Append<Vec3GridTypes>::
         Append<tools::PointIndexGrid>::
     // #define unfortunately required for one of the tests that removes this alias
@@ -114,7 +114,7 @@ using GridTypes =
 /// @name Lists of native TypedAttributeArray Types (for PointDataGrids)
 /// @{
 /// The floating point attribute array types which OpenVDB will register by default.
-using FloatAttributeTypes = TypeList<
+using RealAttributeTypes = TypeList<
     points::TypedAttributeArray<float>,
     points::TypedAttributeArray<double>,
     points::TypedAttributeArray<float, points::TruncateCodec>,
@@ -131,8 +131,8 @@ using IntegerAttributeTypes = TypeList<
 /// The scalar attribute array types which OpenVDB will register by default.
 /// This is a combination of native floating point and integer array types.
 /// Note that this list does not include bool arrays.
-using ScalarAttributeTypes =
-    FloatAttributeTypes::Append<IntegerAttributeTypes>;
+using NumericAttributeTypes =
+    RealAttributeTypes::Append<IntegerAttributeTypes>;
 /// The Vec3 attribute array types which OpenVDB will register by default.
 using Vec3AttributeTypes = TypeList<
     points::TypedAttributeArray<math::Vec3<int32_t>>,
@@ -163,7 +163,7 @@ using QuatAttributeTypes = TypeList<
 
 /// The attribute array types which OpenVDB will register by default.
 using AttributeTypes =
-    ScalarAttributeTypes::
+    NumericAttributeTypes::
     Append<Vec3AttributeTypes>::
     Append<Mat3AttributeTypes>::
     Append<Mat4AttributeTypes>::

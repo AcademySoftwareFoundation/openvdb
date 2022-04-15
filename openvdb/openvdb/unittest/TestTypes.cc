@@ -793,21 +793,21 @@ TEST_F(TestTypes, testOpenVDBTypeLists)
     STATIC_ASSERT((std::is_same<LIST_T::Unique<>, LIST_T>::value));
 
     CHECK_TYPE_LIST_IS_VALID(GridTypes)
-    CHECK_TYPE_LIST_IS_VALID(FloatGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(RealGridTypes)
     CHECK_TYPE_LIST_IS_VALID(IntegerGridTypes)
-    CHECK_TYPE_LIST_IS_VALID(ScalarGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericGridTypes)
     CHECK_TYPE_LIST_IS_VALID(Vec3GridTypes)
 
     GridTypes::foreach<IsRegistered>();
 
-    FloatGridTypes::foreach<GridListContains>();
+    RealGridTypes::foreach<GridListContains>();
     IntegerGridTypes::foreach<GridListContains>();
-    ScalarGridTypes::foreach<GridListContains>();
+    NumericGridTypes::foreach<GridListContains>();
     Vec3GridTypes::foreach<GridListContains>();
 
     CHECK_TYPE_LIST_IS_VALID(AttributeTypes)
     CHECK_TYPE_LIST_IS_VALID(IntegerAttributeTypes)
-    CHECK_TYPE_LIST_IS_VALID(ScalarAttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericAttributeTypes)
     CHECK_TYPE_LIST_IS_VALID(Vec3AttributeTypes)
     CHECK_TYPE_LIST_IS_VALID(Mat3AttributeTypes)
     CHECK_TYPE_LIST_IS_VALID(Mat4AttributeTypes)
@@ -815,9 +815,9 @@ TEST_F(TestTypes, testOpenVDBTypeLists)
 
     AttributeTypes::foreach<IsRegistered>();
 
-    FloatAttributeTypes::foreach<AttrListContains>();
+    RealAttributeTypes::foreach<AttrListContains>();
     IntegerAttributeTypes::foreach<AttrListContains>();
-    ScalarAttributeTypes::foreach<AttrListContains>();
+    NumericAttributeTypes::foreach<AttrListContains>();
     Vec3AttributeTypes::foreach<AttrListContains>();
     Mat3AttributeTypes::foreach<AttrListContains>();
     Mat4AttributeTypes::foreach<AttrListContains>();
