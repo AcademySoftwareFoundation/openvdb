@@ -1,0 +1,4 @@
+Build:
+    - Changed the way boost_python and boost_numpy are located. Both
+    components must match the major/minor version of python in use. This
+    can be circumvented with DISABLE_DEPENDENCY_VERSION_CHECKS.
