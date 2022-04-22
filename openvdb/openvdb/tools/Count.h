@@ -60,8 +60,20 @@ Index64 countActiveTiles(const TreeT& tree, bool threaded = true);
 
 
 /// @brief Return the total amount of memory in bytes occupied by this tree.
+/// @details  This method returns the total in-core memory usage which can be
+///   different to the maximum possible memory usage for trees which have not
+///   been fully deserialized (via delay-loading). Thus, this is the current
+///   true memory consumption.
 template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded = true);
+
+
+/// @brief Return the deserialized memory usage of this tree. This is not
+///   necessarily equal to the current memory usage (returned by tools::memUsage)
+///   if delay-loading is enabled. See File::open.
+template <typename TreeT>
+Index64 memUsageIfLoaded(const TreeT& tree, bool threaded = true);
+
 
 /// @brief Return the minimum and maximum active values in this tree.
 /// @note  Returns zeroVal<ValueType> for empty trees.
@@ -287,13 +299,14 @@ struct MemUsageOp
     using RootT = typename TreeType::RootNodeType;
     using LeafT = typename TreeType::LeafNodeType;
 
-    MemUsageOp() = default;
-    MemUsageOp(const MemUsageOp&, tbb::split) { }
+    MemUsageOp(const bool inCoreOnly) : mInCoreOnly(inCoreOnly) {}
+    MemUsageOp(const MemUsageOp& other) : mCount(0), mInCoreOnly(other.mInCoreOnly) {}
+    MemUsageOp(const MemUsageOp& other, tbb::split) : MemUsageOp(other) {}
 
     // accumulate size of the root node in bytes
     bool operator()(const RootT& root, size_t)
     {
-        count += sizeof(root);
+        mCount += sizeof(root);
         return true;
     }
 
@@ -301,7 +314,7 @@ struct MemUsageOp
     template<typename NodeT>
     bool operator()(const NodeT& node, size_t)
     {
-        count += NodeT::NUM_VALUES * sizeof(typename NodeT::UnionType) +
+        mCount += NodeT::NUM_VALUES * sizeof(typename NodeT::UnionType) +
             node.getChildMask().memUsage() + node.getValueMask().memUsage() +
             sizeof(Coord);
         return true;
@@ -310,16 +323,18 @@ struct MemUsageOp
     // accumulate size of leaf node in bytes
     bool operator()(const LeafT& leaf, size_t)
     {
-        count += leaf.memUsage();
+        if (mInCoreOnly) mCount += leaf.memUsage();
+        else             mCount += leaf.memUsageIfLoaded();
         return false;
     }
 
     void join(const MemUsageOp& other)
     {
-        count += other.count;
+        mCount += other.mCount;
     }
 
-    openvdb::Index64 count{0};
+    openvdb::Index64 mCount{0};
+    const bool mInCoreOnly;
 }; // struct MemUsageOp
 
 /// @brief A DynamicNodeManager operator to find the minimum and maximum active values in this tree.
@@ -477,10 +492,24 @@ Index64 countActiveTiles(const TreeT& tree, bool threaded)
 template <typename TreeT>
 Index64 memUsage(const TreeT& tree, bool threaded)
 {
-    count_internal::MemUsageOp<TreeT> op;
+    count_internal::MemUsageOp<TreeT> op(true);
     tree::DynamicNodeManager<const TreeT> nodeManager(tree);
     nodeManager.reduceTopDown(op, threaded);
-    return op.count + sizeof(tree);
+    return op.mCount + sizeof(tree);
+}
+
+template <typename TreeT>
+Index64 memUsageIfLoaded(const TreeT& tree, bool threaded)
+{
+    /// @note  For numeric (non-point) grids this really doesn't need to
+    ///   traverse the tree and could instead be computed from the node counts.
+    ///   We do so anyway as it ties this method into the tree data structure
+    ///   which makes sure that changes to the tree/nodes are reflected/kept in
+    ///   sync here.
+    count_internal::MemUsageOp<TreeT> op(false);
+    tree::DynamicNodeManager<const TreeT> nodeManager(tree);
+    nodeManager.reduceTopDown(op, threaded);
+    return op.mCount + sizeof(tree);
 }
 
 template <typename TreeT>

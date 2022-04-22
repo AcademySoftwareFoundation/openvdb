@@ -1,0 +1,5 @@
+New Features:
+    - Added tools::memUsageIfLoaded() which returns the memory consumption of a deserialized VDB tree, useful if delay-loading is enabled.
+
+Improvements:
+    - vdb_print now prints both the in-core memory and total memory usage for VDB grids.

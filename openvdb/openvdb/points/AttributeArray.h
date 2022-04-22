@@ -194,6 +194,14 @@ public:
     /// Return the number of bytes of memory used by this attribute.
     virtual size_t memUsage() const = 0;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the number of bytes of memory used by this attribute array once it
+    /// has been deserialized (this may be different to memUsage() if delay-loading
+    /// is in use). Note that this method does NOT consider the fact that a
+    /// uniform attribute could be expanded and only deals with delay-loading.
+    virtual size_t memUsageIfLoaded() const = 0;
+#endif
+
     /// Create a new attribute array of the given (registered) type, length and stride.
     /// @details If @a lock is non-null, the AttributeArray registry mutex
     /// has already been locked
@@ -644,6 +652,14 @@ public:
 
     /// Return the number of bytes of memory used by this attribute.
     size_t memUsage() const override;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the number of bytes of memory used by this attribute array once it
+    /// has been deserialized (this may be different to memUsage() if delay-loading
+    /// is in use). Note that this method does NOT consider the fact that a
+    /// uniform attribute could be expanded and only deals with delay-loading.
+    size_t memUsageIfLoaded() const override;
+#endif
 
     /// Return the value at index @a n (assumes in-core)
     ValueType getUnsafe(Index n) const;
@@ -1374,6 +1390,15 @@ TypedAttributeArray<ValueType_, Codec_>::memUsage() const
 {
     return sizeof(*this) + (bool(mData) ? this->arrayMemUsage() : 0);
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename ValueType_, typename Codec_>
+size_t
+TypedAttributeArray<ValueType_, Codec_>::memUsageIfLoaded() const
+{
+    return sizeof(*this) + (mIsUniform ? 1 : this->dataSize()) * sizeof(StorageType);
+}
+#endif
 
 
 template<typename ValueType_, typename Codec_>

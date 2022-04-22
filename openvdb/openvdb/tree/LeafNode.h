@@ -155,6 +155,7 @@ public:
 
     /// Return the memory in bytes occupied by this node.
     Index64 memUsage() const;
+    Index64 memUsageIfLoaded() const;
 
     /// Expand the given bounding box so that it includes this leaf node's active voxels.
     /// If visitVoxels is false this LeafNode will be approximated as dense, i.e. with all
@@ -1466,6 +1467,16 @@ LeafNode<T, Log2Dim>::memUsage() const
     // Use sizeof(*this) to capture alignment-related padding
     // (but note that sizeof(*this) includes sizeof(mBuffer)).
     return sizeof(*this) + mBuffer.memUsage() - sizeof(mBuffer);
+}
+
+
+template<typename T, Index Log2Dim>
+inline Index64
+LeafNode<T, Log2Dim>::memUsageIfLoaded() const
+{
+    // Use sizeof(*this) to capture alignment-related padding
+    // (but note that sizeof(*this) includes sizeof(mBuffer)).
+    return sizeof(*this) + mBuffer.memUsageIfLoaded() - sizeof(mBuffer);
 }
 
 
