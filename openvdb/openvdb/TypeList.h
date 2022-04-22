@@ -395,6 +395,38 @@ public:
     using type = typename ThisList::template Append<NextList>;
 };
 
+/// @brief  Transform a @c TypeList, converting each type into a new type based
+///         on a transformation struct @c OpT.
+/// @details This implementation iterates through each type in a @c TypeList
+///          and builds a new @c TypeList where each element is resolved through
+///          a user provided converter which provides a @c Type definition.
+/// @tparam  OpT  User struct to convert each type
+/// @tparam Ts  Remaining types in the @c TypeList
+template<template <typename> class OpT, typename... Ts> struct TSTranformImpl;
+
+/// @brief  Partial specialization for an empty @c TypeList
+/// @tparam  OpT  User struct to convert each type
+template<template <typename> class OpT>
+struct TSTranformImpl<OpT> {
+    using type = TypeList<>;
+};
+
+/// @brief  Implementation of TSTranformImpl. See fwd declaration for details.
+/// @tparam OpT  User struct to convert each type
+/// @tparam Ts   Remaining types in the @c TypeList
+/// @tparam T    Current type being converted
+template<template <typename> class OpT, typename T, typename... Ts>
+struct TSTranformImpl<OpT, T, Ts...> {
+private:
+    using NextList = typename TSTranformImpl<OpT, Ts...>::type;
+public:
+    // Invoke Append for each type to match the behaviour should OpT<T> be a
+    // TypeList<>
+    using type = typename TSTranformImpl<OpT>::type::template
+        Append<OpT<T>>::template
+        Append<NextList>;
+};
+
 
 template<typename OpT> inline void TSForEachImpl(OpT) {}
 template<typename OpT, typename T, typename... Ts>
@@ -403,6 +435,39 @@ inline void TSForEachImpl(OpT op) { op(T()); TSForEachImpl<OpT, Ts...>(op); }
 template<template <typename> class OpT> inline void TSForEachImpl() {}
 template<template <typename> class OpT, typename T, typename... Ts>
 inline void TSForEachImpl() { OpT<T>()(); TSForEachImpl<OpT, Ts...>(); }
+
+
+/// @brief  Partial apply specialization for an empty @c TypeList
+/// @tparam  OpT    User functor to apply to the first valid type
+/// @tparam  BaseT  Type of the provided obj
+/// @tparam  T      Current type
+/// @tparam  Ts     Remaining types
+template<typename OpT, typename BaseT, typename T, typename ...Ts>
+struct TSApplyImpl { static bool apply(BaseT&, OpT&) { return false; } };
+
+/// @brief  Apply a unary functor to a provided object only if the object
+///   satisfies the cast requirement of isType<T> for a type in a TypeList.
+/// @note  Iteration terminates immediately on the first valid type and true
+///    is returned.
+/// @tparam  OpT    User functor to apply to the first valid type
+/// @tparam  BaseT  Type of the provided obj
+/// @tparam  T      Current type
+/// @tparam  Ts     Remaining types
+template<typename OpT, typename BaseT, typename T, typename ...Ts>
+struct TSApplyImpl<OpT, BaseT, TypeList<T, Ts...>>
+{
+    using CastT =
+        typename std::conditional<std::is_const<BaseT>::value, const T, T>::type;
+
+    static bool apply(BaseT& obj, OpT& op)
+    {
+        if (obj.template isType<T>()) {
+            op(static_cast<CastT&>(obj));
+            return true;
+        }
+        return TSApplyImpl<OpT, BaseT, TypeList<Ts...>>::apply(obj, op);
+    }
+};
 
 } // namespace internal
 
@@ -477,6 +542,8 @@ struct TypeList
     using Unique = typename typelist_internal::TSRecurseAppendUniqueImpl<ListT, Ts...>::type;
 
     /// @brief Append types, or the members of another TypeList, to this list.
+    /// @warning Appending nested TypeList<> objects causes them to expand to
+    ///          their contained list of types.
     /// @details Example:
     /// @code
     /// {
@@ -552,8 +619,29 @@ struct TypeList
     template <size_t First, size_t Last>
     using RemoveByIndex = typename typelist_internal::TSRemoveIndicesImpl<Self, First, Last>::type;
 
+    /// @brief Transform each type of this TypeList, rebuiling a new list of
+    ///        converted types. This method instantiates a user provided Opt<T> to
+    ///        replace each type in the current list.
+    /// @warning Transforming types to new TypeList<> objects causes them to expand to
+    ///          their contained list of types.
+    /// @details Example:
+    /// @code
+    /// {
+    ///     // Templated type decl, where the type T will be subsituted for each type
+    ///     // in the TypeList being transformed.
+    ///     template <typename T>
+    ///     using ConvertedType = typename openvdb::PromoteType<T>::Next;
+    ///
+    ///     // Results in: openvdb::TypeList<Int64, double>;
+    ///     using PromotedType = openvdb::TypeList<Int32, float>::Transform<ConvertedType>;
+    /// }
+    /// @endcode
+    template<template <typename> class OpT>
+    using Transform = typename typelist_internal::TSTranformImpl<OpT, Ts...>::type;
+
     /// @brief Invoke a templated class operator on each type in this list. Use
     ///   this method if you only need access to the type for static methods.
+    /// @details Example:
     /// @code
     /// #include <typeinfo>
     ///
@@ -593,6 +681,46 @@ struct TypeList
     /// to use the same object for each type.
     template<typename OpT>
     static void foreach(OpT op) { typelist_internal::TSForEachImpl<OpT, Ts...>(op); }
+
+    /// @brief Invoke a templated, unary functor on a provide @c obj of type
+    ///        @c BaseT only if said object is an applicable (derived) type
+    ///        also contained in the current @c TypeList.
+    /// @details  This method loops over every type in the type list and calls
+    ///   an interface method on @c obj to check to see if the @c obj is
+    ///   interpretable as the given type. If it is, the method static casts
+    ///   @c obj to the type, invokes the provided functor with the casted type
+    ///   and returns, stopping further list iteration. @c obj is expected to
+    ///   supply an interface to validate the type which satisfies the
+    ///   prototype:
+    /// @code
+    ///   template <typename T> bool isType()
+    /// @endcode
+    ///
+    ///   A full example (using dynamic_cast - see Grid/Tree implementations
+    ///   for string based comparisons:
+    /// @code
+    ///   struct Base {
+    ///       virtual ~Base() = default;
+    ///       template<typename T> bool isType() { return dynamic_cast<const T*>(this); }
+    ///   };
+    ///   struct MyType1 : public Base { void print() { std::cerr << "MyType1" << std::endl; } };
+    ///   struct MyType2 : public Base { void print() { std::cerr << "MyType2" << std::endl; } };
+    ///
+    ///   using MyTypeList = TypeList<MyType1, MyType2>;
+    ///   Base* getObj() { return new MyType2(); }
+    ///
+    ///   std::unique_ptr<Base> obj = getObj();
+    ///   // Returns 'true', prints 'MyType2'
+    ///   const bool success =
+    ///       MyTypeList::apply([](const auto& type) { type.print(); }, *obj);
+    /// @endcode
+    ///
+    /// @note The functor object is passed by value.  Wrap it with @c std::ref
+    ///   pass by reference.
+    template<typename OpT, typename BaseT>
+    static bool apply(OpT op, BaseT& obj) {
+        return typelist_internal::TSApplyImpl<OpT, BaseT, Self>::apply(obj, op);
+    }
 };
 
 

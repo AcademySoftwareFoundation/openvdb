@@ -1783,60 +1783,35 @@ createLevelSet(Real voxelSize, Real halfWidth)
 
 ////////////////////////////////////////
 
-/// @cond OPENVDB_DOCS_INTERNAL
-
-namespace internal {
-
-/// @private
-template<typename OpT, typename GridBaseT, typename T, typename ...Ts>
-struct GridApplyImpl { static bool apply(GridBaseT&, OpT&) { return false; } };
-
-// Partial specialization for (nonempty) TypeLists
-/// @private
-template<typename OpT, typename GridBaseT, typename GridT, typename ...GridTs>
-struct GridApplyImpl<OpT, GridBaseT, TypeList<GridT, GridTs...>>
-{
-    static bool apply(GridBaseT& grid, OpT& op)
-    {
-        if (grid.template isType<GridT>()) {
-            op(static_cast<typename CopyConstness<GridBaseT, GridT>::Type&>(grid));
-            return true;
-        }
-        return GridApplyImpl<OpT, GridBaseT, TypeList<GridTs...>>::apply(grid, op);
-    }
-};
-
-} // namespace internal
-
-/// @endcond
 
 template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(OpT& op) const
 {
-    return internal::GridApplyImpl<OpT, const GridBase, GridTypeListT>::apply(*this, op);
+    return GridTypeListT::template apply<OpT&, const GridBase>(std::ref(op), *this);
 }
 
 template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(OpT& op)
 {
-    return internal::GridApplyImpl<OpT, GridBase, GridTypeListT>::apply(*this, op);
+    return GridTypeListT::template apply<OpT&, GridBase>(std::ref(op), *this);
 }
 
 template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(const OpT& op) const
 {
-    return internal::GridApplyImpl<const OpT, const GridBase, GridTypeListT>::apply(*this, op);
+    return GridTypeListT::template apply<const OpT&, const GridBase>(std::ref(op), *this);
 }
 
 template<typename GridTypeListT, typename OpT>
 inline bool
 GridBase::apply(const OpT& op)
 {
-    return internal::GridApplyImpl<const OpT, GridBase, GridTypeListT>::apply(*this, op);
+    return GridTypeListT::template apply<const OpT&, GridBase>(std::ref(op), *this);
 }
+
 
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
