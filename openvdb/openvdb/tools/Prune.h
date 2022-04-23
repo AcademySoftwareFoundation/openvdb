@@ -10,10 +10,10 @@
 #ifndef OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_PRUNE_HAS_BEEN_INCLUDED
 
-#include <openvdb/math/Math.h> // for isNegative and negative
-#include <openvdb/Types.h>
-#include <openvdb/tree/NodeManager.h>
-#include <openvdb/openvdb.h>
+#include "math/Math.h" // for isNegative and negative
+#include "Types.h"
+#include "tree/NodeManager.h"
+#include "openvdb.h"
 #include <algorithm> // for std::nth_element()
 #include <type_traits>
 

@@ -4,7 +4,7 @@
 #ifndef OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT3_H_HAS_BEEN_INCLUDED
 
-#include <openvdb/Exceptions.h>
+#include "Exceptions.h"
 #include "Vec3.h"
 #include "Mat.h"
 #include <algorithm> // for std::copy()

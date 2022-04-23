@@ -4,7 +4,7 @@
 #ifndef OPENVDB_UTIL_NAME_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_NAME_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h>
+#include "Platform.h"
 #include <openvdb/version.h>
 #include <string>
 #include <iostream>

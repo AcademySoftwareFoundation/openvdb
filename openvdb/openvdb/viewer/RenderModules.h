@@ -4,12 +4,12 @@
 #ifndef OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 #define OPENVDB_VIEWER_RENDERMODULES_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/VolumeToMesh.h>
-#include <openvdb/tools/MeshToVolume.h>
-#include <openvdb/tools/PointScatter.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/math/Operators.h>
+#include "openvdb.h"
+#include "tools/VolumeToMesh.h"
+#include "tools/MeshToVolume.h"
+#include "tools/PointScatter.h"
+#include "tree/LeafManager.h"
+#include "math/Operators.h"
 #include <string>
 #include <vector>
 

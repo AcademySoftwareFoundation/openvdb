@@ -1,19 +1,19 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/Types.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin(), et al.
-#include <openvdb/tree/LeafNode.h>
-#include <openvdb/io/Compression.h> // for io::RealToHalf
-#include <openvdb/math/Math.h> // for Abs()
-#include <openvdb/openvdb.h>
-#include <openvdb/util/CpuTimer.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/Prune.h>
-#include <openvdb/tools/ChangeBackground.h>
-#include <openvdb/tools/SignedFloodFill.h>
+#include "Exceptions.h"
+#include "Types.h"
+#include "math/Transform.h"
+#include "tools/ValueTransformer.h" // for tools::setValueOnMin(), et al.
+#include "tree/LeafNode.h"
+#include "io/Compression.h" // for io::RealToHalf
+#include "math/Math.h" // for Abs()
+#include "openvdb.h"
+#include "util/CpuTimer.h"
+#include "tools/LevelSetSphere.h"
+#include "tools/Prune.h"
+#include "tools/ChangeBackground.h"
+#include "tools/SignedFloodFill.h"
 #include "util.h" // for unittest_util::makeSphere()
 
 #include <gtest/gtest.h>

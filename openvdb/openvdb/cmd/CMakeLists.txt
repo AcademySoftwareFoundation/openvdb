@@ -59,6 +59,7 @@ endif()
 if(OPENVDB_BUILD_VDB_PRINT)
   set(VDB_PRINT_SOURCE_FILES openvdb_print.cc)
   add_executable(vdb_print ${VDB_PRINT_SOURCE_FILES})
+  target_include_directories(vdb_print PRIVATE ../.)
   target_link_libraries(vdb_print ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
   install(TARGETS vdb_print RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -71,6 +72,7 @@ endif()
 if(OPENVDB_BUILD_VDB_LOD)
   set(VDB_LOD_SOURCE_FILES  openvdb_lod.cc)
   add_executable(vdb_lod ${VDB_LOD_SOURCE_FILES})
+  target_include_directories(vdb_lod PRIVATE ../.)
   target_link_libraries(vdb_lod ${OPENVDB_BINARIES_DEPENDENT_LIBS})
 
   install(TARGETS vdb_lod RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR})
@@ -107,6 +109,7 @@ if(OPENVDB_BUILD_VDB_RENDER)
 
   set(VDB_RENDER_SOURCE_FILES openvdb_render.cc)
   add_executable(vdb_render ${VDB_RENDER_SOURCE_FILES})
+  target_include_directories(vdb_render PRIVATE ../.)
 
   if(USE_EXR)
     target_compile_definitions(vdb_render PRIVATE -DOPENVDB_USE_EXR)
@@ -174,6 +177,7 @@ if(OPENVDB_BUILD_VDB_VIEW)
   )
 
   add_executable(vdb_view ${VDB_VIEW_SOURCE_FILES})
+  target_include_directories(vdb_view PRIVATE ../.)
 
   target_link_libraries(vdb_view
     ${OPENVDB_BINARIES_DEPENDENT_LIBS}

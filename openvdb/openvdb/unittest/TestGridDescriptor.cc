@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/io/GridDescriptor.h>
-#include <openvdb/openvdb.h>
+#include "Exceptions.h"
+#include "io/GridDescriptor.h"
+#include "openvdb.h"
 
 #include <gtest/gtest.h>
 

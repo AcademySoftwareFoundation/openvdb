@@ -3,8 +3,8 @@
 //
 /// @file TestQuadraticInterp.cc
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Interpolation.h>
+#include "openvdb.h"
+#include "tools/Interpolation.h"
 
 #include <gtest/gtest.h>
 

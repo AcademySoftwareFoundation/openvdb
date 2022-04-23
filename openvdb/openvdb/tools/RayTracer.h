@@ -18,13 +18,13 @@
 #ifndef OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_RAYTRACER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include <openvdb/math/BBox.h>
-#include <openvdb/math/Ray.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/tools/RayIntersector.h>
-#include <openvdb/tools/Interpolation.h>
-#include <openvdb/openvdb.h>
+#include "Types.h"
+#include "math/BBox.h"
+#include "math/Ray.h"
+#include "math/Math.h"
+#include "tools/RayIntersector.h"
+#include "tools/Interpolation.h"
+#include "openvdb.h"
 #include <deque>
 #include <iostream>
 #include <fstream>

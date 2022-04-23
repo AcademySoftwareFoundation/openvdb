@@ -13,10 +13,10 @@
 #define OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/Grid.h>
-#include <openvdb/tree/Tree.h>
-#include <openvdb/tree/LeafNode.h>
-#include <openvdb/tools/PointIndexGrid.h>
+#include "Grid.h"
+#include "tree/Tree.h"
+#include "tree/LeafNode.h"
+#include "tools/PointIndexGrid.h"
 #include "AttributeArray.h"
 #include "AttributeArrayString.h"
 #include "AttributeGroup.h"

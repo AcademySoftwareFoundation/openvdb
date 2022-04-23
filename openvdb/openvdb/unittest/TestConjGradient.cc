@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 #include <openvdb/version.h>
-#include <openvdb/math/ConjGradient.h>
+#include "math/ConjGradient.h"
 
 #include <gtest/gtest.h>
 

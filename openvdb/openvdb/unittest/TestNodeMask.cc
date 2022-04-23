@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/NodeMasks.h>
-#include <openvdb/io/Compression.h>
+#include "Exceptions.h>"
+#include "util/NodeMasks.h"
+#include "io/Compression.h"
 
 #include <gtest/gtest.h>
 

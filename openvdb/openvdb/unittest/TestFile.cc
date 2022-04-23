@@ -1,18 +1,18 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/io/File.h>
-#include <openvdb/io/io.h>
-#include <openvdb/io/Queue.h>
-#include <openvdb/io/Stream.h>
-#include <openvdb/Metadata.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tools/Count.h>
-#include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
-#include <openvdb/util/logging.h>
+#include "Exceptions.h"
+#include "io/File.h"
+#include "io/io.h"
+#include "io/Queue.h"
+#include "io/Stream.h"
+#include "Metadata.h"
+#include "math/Transform.h"
+#include "tools/Count.h"
+#include "tools/LevelSetUtil.h" // for tools::sdfToFogVolume()
+#include "util/logging.h"
 #include <openvdb/version.h>
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 #include "util.h" // for unittest_util::makeSphere()
 
 #include <gtest/gtest.h>

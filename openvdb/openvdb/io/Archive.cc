@@ -7,11 +7,11 @@
 #include "DelayedLoadMetadata.h"
 #include "io.h"
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/Metadata.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/util/logging.h>
-#include <openvdb/openvdb.h>
+#include "Exceptions.h"
+#include "Metadata.h"
+#include "tree/LeafManager.h"
+#include "util/logging.h"
+#include "openvdb.h"
 
 // Boost.Interprocess uses a header-only portion of Boost.DateTime
 #ifdef __clang__

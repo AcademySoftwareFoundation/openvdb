@@ -6,8 +6,8 @@
 #include "File.h"
 
 #include "TempFile.h"
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/logging.h>
+#include "Exceptions.h"
+#include "util/logging.h"
 #include <cstdint>
 #include <boost/iostreams/copy.hpp>
 #ifndef _WIN32

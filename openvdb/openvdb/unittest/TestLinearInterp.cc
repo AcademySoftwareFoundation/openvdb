@@ -2,10 +2,10 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "gtest/gtest.h"
-#include <openvdb/Exceptions.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Interpolation.h>
-#include <openvdb/math/Stencils.h>
+#include "Exceptions.h"
+#include "openvdb.h"
+#include "tools/Interpolation.h"
+#include "math/Stencils.h"
 
 namespace {
 // Absolute tolerance for floating-point equality comparisons

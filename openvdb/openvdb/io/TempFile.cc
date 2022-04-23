@@ -5,7 +5,7 @@
 
 #include "TempFile.h"
 
-#include <openvdb/Exceptions.h>
+#include "Exceptions.h"
 #ifndef _WIN32
 #include <boost/iostreams/stream.hpp>
 #include <boost/iostreams/device/file_descriptor.hpp>

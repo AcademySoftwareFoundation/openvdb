@@ -4,7 +4,7 @@
 #ifndef OPENVDB_VIEWER_VIEWER_HAS_BEEN_INCLUDED
 #define OPENVDB_VIEWER_VIEWER_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 #include <string>
 
 

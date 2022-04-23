@@ -16,7 +16,7 @@
 #define OPENVDB_TOOLS_NODE_VISITOR_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/Types.h>
+#include "Types.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

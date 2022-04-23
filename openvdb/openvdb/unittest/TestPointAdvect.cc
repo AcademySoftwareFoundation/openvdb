@@ -1,16 +1,16 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/points/PointAttribute.h>
-#include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointConversion.h>
-#include <openvdb/points/PointScatter.h>
-#include <openvdb/points/PointAdvect.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/Composite.h> // csgDifference
-#include <openvdb/tools/MeshToVolume.h> // createLevelSetBox
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
+#include "points/PointAttribute.h"
+#include "points/PointDataGrid.h"
+#include "points/PointConversion.h"
+#include "points/PointScatter.h"
+#include "points/PointAdvect.h"
+#include "tools/LevelSetSphere.h"
+#include "tools/Composite.h" // csgDifference
+#include "tools/MeshToVolume.h" // createLevelSetBox
+#include "openvdb.h"
+#include "Types.h"
 
 #include <gtest/gtest.h>
 #include "util.h"

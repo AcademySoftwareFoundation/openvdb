@@ -10,7 +10,7 @@
 #ifndef OPENVDB_TOOLS_POTENTIAL_FLOW_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POTENTIAL_FLOW_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 
 #include "GridOperators.h"
 #include "GridTransformer.h"

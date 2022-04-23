@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "gtest/gtest.h"
-#include <openvdb/Exceptions.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/Types.h>
+#include "Exceptions.h"
+#include "math/Math.h"
+#include "Types.h"
 #include <type_traits>
 #include <vector>
 

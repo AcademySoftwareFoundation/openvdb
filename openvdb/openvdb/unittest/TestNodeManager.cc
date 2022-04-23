@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/Types.h>
-#include <openvdb/tree/NodeManager.h>
-#include <openvdb/tree/LeafManager.h>
+#include "Exceptions.h"
+#include "Types.h"
+#include "tree/NodeManager.h"
+#include "tree/LeafManager.h"
 #include "util.h" // for unittest_util::makeSphere()
 #include <gtest/gtest.h>
 

@@ -11,13 +11,13 @@
 #ifndef OPENVEB_POINTS_RASTERIZE_TRILINEAR_HAS_BEEN_INCLUDED
 #define OPENVEB_POINTS_RASTERIZE_TRILINEAR_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
-#include <openvdb/Grid.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tools/Morphology.h>
-#include <openvdb/tree/ValueAccessor.h>
+#include "openvdb.h"
+#include "Types.h"
+#include "Grid.h"
+#include "math/Math.h"
+#include "math/Transform.h"
+#include "tools/Morphology.h"
+#include "tree/ValueAccessor.h"
 
 #include "PointDataGrid.h"
 #include "PointMask.h"

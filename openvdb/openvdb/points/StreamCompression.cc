@@ -4,7 +4,7 @@
 /// @file points/StreamCompression.cc
 
 #include "StreamCompression.h"
-#include <openvdb/util/logging.h>
+#include "util/logging.h"
 #include <map>
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>

@@ -3,7 +3,7 @@
 
 #include "Font.h"
 
-#include <openvdb/Types.h> // for OPENVDB_START_THREADSAFE_STATIC_WRITE
+#include "Types.h" // for OPENVDB_START_THREADSAFE_STATIC_WRITE
 
 
 namespace openvdb_viewer {

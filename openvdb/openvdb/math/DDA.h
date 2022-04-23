@@ -13,7 +13,7 @@
 #include "Coord.h"
 #include "Math.h"
 #include "Vec3.h"
-#include <openvdb/Types.h>
+#include "Types.h"
 #include <iostream> // for std::ostream
 #include <limits> // for std::numeric_limits<Type>::max()
 

@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/math/QuantizedUnitVec.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/Vec3.h>
+#include "Exceptions.h"
+#include "math/QuantizedUnitVec.h"
+#include "math/Math.h"
+#include "math/Vec3.h"
 
 #include <gtest/gtest.h>
 

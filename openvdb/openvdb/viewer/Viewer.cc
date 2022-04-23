@@ -7,10 +7,10 @@
 #include "ClipBox.h"
 #include "Font.h"
 #include "RenderModules.h"
-#include <openvdb/util/Formats.h> // for formattedInt()
-#include <openvdb/util/logging.h>
-#include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointCount.h>
+#include "util/Formats.h" // for formattedInt()
+#include "util/logging.h"
+#include "points/PointDataGrid.h"
+#include "points/PointCount.h"
 #include <openvdb/version.h> // for OPENVDB_LIBRARY_MAJOR_VERSION, etc.
 #include <atomic>
 #include <cmath> // for fabs()

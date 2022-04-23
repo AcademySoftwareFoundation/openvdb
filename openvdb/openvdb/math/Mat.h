@@ -8,7 +8,7 @@
 #define OPENVDB_MATH_MAT_HAS_BEEN_INCLUDED
 
 #include "Math.h"
-#include <openvdb/Exceptions.h>
+#include "Exceptions.h"
 #include <algorithm> // for std::max()
 #include <cmath>
 #include <iostream>

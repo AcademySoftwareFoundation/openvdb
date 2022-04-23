@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Exceptions.h>
-#include <openvdb/Types.h>
-#include <openvdb/tree/LeafNode.h>
-#include <openvdb/tools/LevelSetUtil.h> // for sdfInteriorMask()
-#include <openvdb/tools/ParticlesToLevelSet.h>
+#include "openvdb.h"
+#include "Exceptions.h"
+#include "Types.h"
+#include "tree/LeafNode.h"
+#include "tools/LevelSetUtil.h" // for sdfInteriorMask()
+#include "tools/ParticlesToLevelSet.h"
 
 #include <gtest/gtest.h>
 

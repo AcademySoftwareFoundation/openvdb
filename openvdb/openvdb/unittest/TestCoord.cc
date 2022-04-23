@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Types.h>
-#include <openvdb/math/Coord.h>
+#include "Types.h"
+#include "math/Coord.h"
 
 #include <gtest/gtest.h>
 

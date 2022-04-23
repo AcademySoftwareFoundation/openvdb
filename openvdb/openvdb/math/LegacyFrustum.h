@@ -7,7 +7,7 @@
 #define OPENVDB_MATH_LEGACYFRUSTUM_HAS_BEEN_INCLUDED
 
 #include <iostream>
-#include <openvdb/Types.h> // for Real typedef
+#include "Types.h" // for Real typedef
 #include "Coord.h"
 #include "Mat4.h"
 #include "Vec3.h"

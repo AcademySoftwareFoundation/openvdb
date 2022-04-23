@@ -8,8 +8,8 @@
 #ifndef OPENVDB_TOOLS_MASK_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MASK_HAS_BEEN_INCLUDED
 
-#include <openvdb/Grid.h>
-#include <openvdb/openvdb.h>
+#include "Grid.h"
+#include "openvdb.h"
 #include "LevelSetUtil.h" // for tools::sdfInteriorMask()
 #include <type_traits> // for std::enable_if, std::is_floating_point
 

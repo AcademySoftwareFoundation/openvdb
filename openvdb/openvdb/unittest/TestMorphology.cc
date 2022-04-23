@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Types.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Morphology.h>
-#include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/util/Util.h>
+#include "Types.h"
+#include "openvdb.h"
+#include "tools/Morphology.h"
+#include "tools/LevelSetUtil.h"
+#include "tools/LevelSetSphere.h"
+#include "util/Util.h"
 
 #include <gtest/gtest.h>
 

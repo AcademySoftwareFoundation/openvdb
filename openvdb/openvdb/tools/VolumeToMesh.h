@@ -10,11 +10,11 @@
 #ifndef OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_MESH_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h>
-#include <openvdb/math/Operators.h> // for ISGradient
-#include <openvdb/tree/ValueAccessor.h>
-#include <openvdb/util/Util.h> // for INVALID_IDX
-#include <openvdb/openvdb.h>
+#include "Platform.h"
+#include "math/Operators.h" // for ISGradient
+#include "tree/ValueAccessor.h"
+#include "util/Util.h" // for INVALID_IDX
+#include "openvdb.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>

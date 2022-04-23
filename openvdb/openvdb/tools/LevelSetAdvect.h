@@ -12,7 +12,7 @@
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-#include <openvdb/Platform.h>
+#include "Platform.h"
 #include "LevelSetTracker.h"
 #include "VelocityFields.h" // for EnrightField
 #include <openvdb/math/FiniteDifference.h>

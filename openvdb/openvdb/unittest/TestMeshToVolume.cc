@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Exceptions.h>
-#include <openvdb/tools/MeshToVolume.h>
-#include <openvdb/util/Util.h>
+#include "openvdb.h"
+#include "Exceptions.h"
+#include "tools/MeshToVolume.h"
+#include "util/Util.h"
 
 #include <gtest/gtest.h>
 #include <vector>

@@ -8,12 +8,12 @@
 #ifndef OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_INTERNALNODE_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h>
-#include <openvdb/util/NodeMasks.h>
-#include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc.
-#include <openvdb/math/Math.h> // for math::isExactlyEqual(), etc.
+#include "Platform.h"
+#include "util/NodeMasks.h"
+#include "io/Compression.h" // for io::readCompressedValues(), etc.
+#include "math/Math.h" // for math::isExactlyEqual(), etc.
 #include <openvdb/version.h>
-#include <openvdb/Types.h>
+#include "Types.h"
 #include "Iterator.h"
 #include "NodeUnion.h"
 #include <tbb/parallel_for.h>

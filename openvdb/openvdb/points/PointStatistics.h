@@ -16,10 +16,10 @@
 
 #include "PointDataGrid.h"
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/tree/LeafManager.h>
+#include "openvdb.h"
+#include "Types.h"
+#include "math/Math.h"
+#include "tree/LeafManager.h"
 
 #include <tbb/parallel_reduce.h>
 #include <tbb/parallel_for.h>

@@ -32,10 +32,10 @@
 #ifndef OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_MOVE_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 
-#include <openvdb/points/PointDataGrid.h>
-#include <openvdb/points/PointMask.h>
+#include "PointDataGrid.h"
+#include "PointMask.h"
 
 #include <tbb/concurrent_vector.h>
 

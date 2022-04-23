@@ -3,8 +3,8 @@
 
 #include <gtest/gtest.h>
 
-#include <openvdb/openvdb.h>
-#include <openvdb/points/PointStatistics.h>
+#include "openvdb.h"
+#include "points/PointStatistics.h"
 #include "PointBuilder.h"
 
 using namespace openvdb;

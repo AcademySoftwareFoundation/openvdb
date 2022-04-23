@@ -7,7 +7,7 @@
 #ifndef OPENVDB_VIEWER_CAMERA_HAS_BEEN_INCLUDED
 #define OPENVDB_VIEWER_CAMERA_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
+#include "Types.h"
 
 struct GLFWwindow; // forward declaration
 

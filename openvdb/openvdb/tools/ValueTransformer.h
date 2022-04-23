@@ -32,9 +32,9 @@
 #include <algorithm> // for std::min(), std::max()
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
-#include <openvdb/Types.h>
-#include <openvdb/Grid.h>
-#include <openvdb/openvdb.h>
+#include "Types.h"
+#include "Grid.h"
+#include "openvdb.h"
 
 
 namespace openvdb {

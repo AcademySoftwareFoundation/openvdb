@@ -38,10 +38,10 @@
 #define OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/Types.h>
+#include "Types.h"
 
-#include <openvdb/math/Transform.h>
-#include <openvdb/tools/Interpolation.h>
+#include "math/Transform.h"
+#include "tools/Interpolation.h"
 
 #include "IndexIterator.h"
 #include "AttributeArray.h"

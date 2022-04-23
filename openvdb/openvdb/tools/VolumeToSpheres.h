@@ -8,14 +8,14 @@
 #ifndef OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VOLUME_TO_SPHERES_HAS_BEEN_INCLUDED
 
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/math/Math.h>
+#include "tree/LeafManager.h"
+#include "math/Math.h"
 #include "Morphology.h" // for erodeActiveValues()
 #include "PointScatter.h"
 #include "LevelSetRebuild.h"
 #include "LevelSetUtil.h"
 #include "VolumeToMesh.h"
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>

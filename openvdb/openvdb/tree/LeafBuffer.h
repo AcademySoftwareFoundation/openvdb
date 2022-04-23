@@ -4,9 +4,9 @@
 #ifndef OPENVDB_TREE_LEAFBUFFER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAFBUFFER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include <openvdb/io/Compression.h> // for io::readCompressedValues(), etc
-#include <openvdb/util/NodeMasks.h>
+#include "Types.h"
+#include "io/Compression.h" // for io::readCompressedValues(), etc
+#include "util/NodeMasks.h"
 #include <tbb/spin_mutex.h>
 #include <algorithm> // for std::swap
 #include <atomic>

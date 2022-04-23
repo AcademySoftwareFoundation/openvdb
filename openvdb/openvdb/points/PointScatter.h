@@ -19,11 +19,11 @@
 #include <thread>
 #include <random>
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/tools/Prune.h>
-#include <openvdb/util/NullInterrupter.h>
+#include "openvdb.h"
+#include "Types.h"
+#include "tree/LeafManager.h"
+#include "tools/Prune.h"
+#include "util/NullInterrupter.h"
 
 #include "AttributeArray.h"
 #include "PointCount.h"

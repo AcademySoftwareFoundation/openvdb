@@ -18,7 +18,7 @@
 #include "openvdb/math/Operators.h"
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/thread/Threading.h"
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_reduce.h>

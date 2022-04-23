@@ -9,7 +9,7 @@
 #include <array> // for std::array
 #include <iostream>
 #include <limits>
-#include <openvdb/Platform.h>
+#include "Platform.h"
 #include "Math.h"
 #include "Vec3.h"
 

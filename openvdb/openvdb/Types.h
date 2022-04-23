@@ -30,15 +30,15 @@ using half = internal::half;
 }}}
 #endif
 
-#include <openvdb/math/Math.h>
-#include <openvdb/math/BBox.h>
-#include <openvdb/math/Quat.h>
-#include <openvdb/math/Vec2.h>
-#include <openvdb/math/Vec3.h>
-#include <openvdb/math/Vec4.h>
-#include <openvdb/math/Mat3.h>
-#include <openvdb/math/Mat4.h>
-#include <openvdb/math/Coord.h>
+#include "math/Math.h"
+#include "math/BBox.h"
+#include "math/Quat.h"
+#include "math/Vec2.h"
+#include "math/Vec3.h"
+#include "math/Vec4.h"
+#include "math/Mat3.h"
+#include "math/Mat4.h"
+#include "math/Coord.h"
 #include <cstdint>
 #include <memory>
 #include <type_traits>

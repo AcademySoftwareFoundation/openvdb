@@ -4,10 +4,10 @@
 #ifndef OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAF_NODE_BOOL_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include <openvdb/io/Compression.h> // for io::readData(), etc.
-#include <openvdb/math/Math.h> // for math::isZero()
-#include <openvdb/util/NodeMasks.h>
+#include "Types.h"
+#include "io/Compression.h" // for io::readData(), etc.
+#include "math/Math.h" // for math::isZero()
+#include "util/NodeMasks.h"
 #include "LeafNode.h"
 #include "Iterator.h"
 #include <iostream>

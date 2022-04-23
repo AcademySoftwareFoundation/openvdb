@@ -4,8 +4,8 @@
 #ifndef OPENVDB_IO_IO_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_IO_HAS_BEEN_INCLUDED
 
-#include <openvdb/Platform.h>
-#include <openvdb/Types.h> // for SharedPtr
+#include "Platform.h"
+#include "Types.h" // for SharedPtr
 #include <openvdb/version.h>
 #include <boost/any.hpp>
 #include <functional>

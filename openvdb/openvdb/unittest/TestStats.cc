@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/math/Operators.h> // for ISGradient
-#include <openvdb/math/Stats.h>
-#include <openvdb/tools/Statistics.h>
+#include "openvdb.h"
+#include "math/Operators.h" // for ISGradient
+#include "math/Stats.h"
+#include "tools/Statistics.h"
 #include <gtest/gtest.h>
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \

@@ -12,7 +12,7 @@
 #define OPENVDB_TREE_NODEUNION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/Types.h>
+#include "Types.h"
 #include <cstring> // for std::memcpy()
 #include <type_traits>
 

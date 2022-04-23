@@ -10,7 +10,7 @@
 #ifndef OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_ATTRIBUTE_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 
 #include "AttributeArrayString.h"
 #include "AttributeSet.h"

@@ -15,7 +15,7 @@
 #include <sstream>
 #include <string>
 #include <openvdb/version.h>
-#include <openvdb/Platform.h>
+#include "Platform.h"
 
 
 namespace openvdb {

@@ -4,12 +4,12 @@
 /// @file unittest/TestVolumeRayIntersector.cc
 /// @author Ken Museth
 
-#include <openvdb/openvdb.h>
-#include <openvdb/math/Ray.h>
-#include <openvdb/Types.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/RayIntersector.h>
+#include "openvdb.h"
+#include "math/Ray.h"
+#include "Types.h"
+#include "math/Transform.h"
+#include "tools/LevelSetSphere.h"
+#include "tools/RayIntersector.h"
 
 #include "gtest/gtest.h"
 

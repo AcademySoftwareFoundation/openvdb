@@ -6,7 +6,7 @@
 #include "File.h" ///< @todo refactor
 #include "GridDescriptor.h"
 #include "TempFile.h"
-#include <openvdb/Exceptions.h>
+#include "Exceptions.h"
 #include <cstdint>
 #include <boost/iostreams/copy.hpp>
 #include <cstdio> // for remove()

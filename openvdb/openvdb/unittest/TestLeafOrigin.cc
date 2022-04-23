@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/tree/Tree.h>
-#include <openvdb/tree/LeafNode.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
+#include "Exceptions.h"
+#include "tree/Tree.h"
+#include "tree/LeafNode.h"
+#include "math/Transform.h"
+#include "openvdb.h"
+#include "Types.h"
 
 #include <gtest/gtest.h>
 

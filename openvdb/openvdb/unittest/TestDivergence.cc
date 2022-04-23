@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "gtest/gtest.h"
-#include <openvdb/Types.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/GridOperators.h>
+#include "Types.h"
+#include "openvdb.h"
+#include "tools/GridOperators.h"
 
 #define ASSERT_DOUBLES_EXACTLY_EQUAL(expected, actual) \
     EXPECT_NEAR((expected), (actual), /*tolerance=*/0.0);

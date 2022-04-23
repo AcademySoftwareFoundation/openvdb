@@ -6,10 +6,10 @@
 #ifndef OPENVDB_TOOLS_VECTORTRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_VECTORTRANSFORMER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include <openvdb/math/Mat4.h>
-#include <openvdb/math/Vec3.h>
-#include <openvdb/openvdb.h>
+#include "Types.h"
+#include "math/Mat4.h"
+#include "math/Vec3.h"
+#include "openvdb.h"
 #include "ValueTransformer.h" // for tools::foreach()
 #include <type_traits>
 

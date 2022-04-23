@@ -3,7 +3,7 @@
 
 #include "DelayedLoadMetadata.h"
 
-#include <openvdb/points/StreamCompression.h>
+#include "points/StreamCompression.h"
 
 #ifdef OPENVDB_USE_BLOSC
 #include <blosc.h>

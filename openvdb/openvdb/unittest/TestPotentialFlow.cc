@@ -3,9 +3,9 @@
 
 /// @file unittest/TestPotentialFlow.cc
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/LevelSetSphere.h>
-#include <openvdb/tools/PotentialFlow.h>
+#include "openvdb.h"
+#include "tools/LevelSetSphere.h"
+#include "tools/PotentialFlow.h"
 
 #include <gtest/gtest.h>
 

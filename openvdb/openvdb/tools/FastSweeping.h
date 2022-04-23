@@ -29,10 +29,10 @@
 
 //#define BENCHMARK_FAST_SWEEPING
 
-#include <openvdb/Platform.h>
-#include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
-#include <openvdb/math/Stencils.h> // for GradStencil
-#include <openvdb/tree/LeafManager.h>
+#include "Platform.h"
+#include "math/Math.h" // for Abs() and isExactlyEqual()
+#include "math/Stencils.h" // for GradStencil
+#include "tree/LeafManager.h"
 #include "LevelSetUtil.h"
 #include "Morphology.h"
 #include <openvdb/openvdb.h>

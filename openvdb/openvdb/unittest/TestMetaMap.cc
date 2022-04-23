@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/logging.h>
-#include <openvdb/Metadata.h>
-#include <openvdb/MetaMap.h>
+#include "Exceptions.h"
+#include "util/logging.h"
+#include "Metadata.h"
+#include "MetaMap.h"
 
 #include <gtest/gtest.h>
 

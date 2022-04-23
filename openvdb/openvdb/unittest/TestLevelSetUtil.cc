@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Exceptions.h>
-#include <openvdb/tools/LevelSetUtil.h>
-#include <openvdb/tools/MeshToVolume.h>     // for createLevelSetBox()
-#include <openvdb/tools/Composite.h>        // for csgDifference()
+#include "openvdb.h"
+#include "Exceptions.h"
+#include "tools/LevelSetUtil.h"
+#include "tools/MeshToVolume.h"     // for createLevelSetBox()
+#include "tools/Composite.h"        // for csgDifference()
 
 #include <gtest/gtest.h>
 

@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/tools/ParticleAtlas.h>
-#include <openvdb/math/Math.h>
+#include "tools/ParticleAtlas.h"
+#include "math/Math.h"
 
 #include <gtest/gtest.h>
 

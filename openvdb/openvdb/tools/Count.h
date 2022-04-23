@@ -12,9 +12,9 @@
 #define OPENVDB_TOOLS_COUNT_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include <openvdb/math/Stats.h>
-#include <openvdb/tree/LeafManager.h>
-#include <openvdb/tree/NodeManager.h>
+#include "math/Stats.h"
+#include "tree/LeafManager.h"
+#include "tree/NodeManager.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

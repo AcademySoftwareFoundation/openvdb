@@ -7,8 +7,8 @@
 #include "Queue.h"
 #include "File.h"
 #include "Stream.h"
-#include "openvdb/Exceptions.h"
-#include "openvdb/util/logging.h"
+#include "Exceptions.h"
+#include "util/logging.h"
 
 #include <tbb/concurrent_hash_map.h>
 #include <tbb/task_arena.h>

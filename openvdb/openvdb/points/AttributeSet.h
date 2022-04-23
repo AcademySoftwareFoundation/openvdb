@@ -12,7 +12,7 @@
 
 #include "AttributeArray.h"
 #include <openvdb/version.h>
-#include <openvdb/MetaMap.h>
+#include "MetaMap.h"
 
 #include <limits>
 #include <memory>

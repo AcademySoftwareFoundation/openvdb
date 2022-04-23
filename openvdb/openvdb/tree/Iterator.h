@@ -10,8 +10,8 @@
 
 #include <sstream>
 #include <type_traits>
-#include <openvdb/util/NodeMasks.h>
-#include <openvdb/Exceptions.h>
+#include "util/NodeMasks.h"
+#include "Exceptions.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

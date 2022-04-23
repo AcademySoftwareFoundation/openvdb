@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Prune.h>
+#include "openvdb.h"
+#include "tools/Prune.h"
 
 #include <gtest/gtest.h>
 #include <tbb/task_group.h>

@@ -6,14 +6,14 @@
 #ifndef OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_TREE_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
-#include <openvdb/Metadata.h>
-#include <openvdb/math/Math.h>
-#include <openvdb/math/BBox.h>
-#include <openvdb/tools/Count.h> // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
-#include <openvdb/util/Formats.h>
-#include <openvdb/util/logging.h>
-#include <openvdb/Platform.h>
+#include "Types.h"
+#include "Metadata.h"
+#include "math/Math.h"
+#include "math/BBox.h"
+#include "tools/Count.h" // tools::countActiveVoxels(), tools::memUsage(), tools::minMax()
+#include "util/Formats.h"
+#include "util/logging.h"
+#include "Platform.h"
 #include "RootNode.h"
 #include "InternalNode.h"
 #include "LeafNode.h"

@@ -1,13 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/io/Stream.h>
-#include <openvdb/Metadata.h>
-#include <openvdb/math/Maps.h>
-#include <openvdb/math/Transform.h>
+#include "Exceptions.h"
+#include "io/Stream.h"
+#include "Metadata.h"
+#include "math/Maps.h"
+#include "math/Transform.h"
 #include <openvdb/version.h>
-#include <openvdb/openvdb.h>
+#include "openvdb.h"
 #include "gtest/gtest.h"
 #include <cstdio> // for remove()
 #include <fstream>

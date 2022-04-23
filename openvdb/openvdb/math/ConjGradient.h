@@ -9,10 +9,10 @@
 #ifndef OPENVDB_MATH_CONJGRADIENT_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_CONJGRADIENT_HAS_BEEN_INCLUDED
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/Types.h>
-#include <openvdb/util/logging.h>
-#include <openvdb/util/NullInterrupter.h>
+#include "Exceptions.h"
+#include "Types.h"
+#include "util/logging.h"
+#include "util/NullInterrupter.h"
 #include "Math.h" // for Abs(), isZero(), Max(), Sqrt()
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>

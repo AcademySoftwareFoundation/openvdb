@@ -24,9 +24,9 @@
 
 #include <vector>
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
-#include <openvdb/Types.h>
-#include <openvdb/tree/ValueAccessor.h>
-#include <openvdb/openvdb.h>
+#include "Types.h"
+#include "tree/ValueAccessor.h"
+#include "openvdb.h"
 
 #include "Count.h" // tools::countActiveVoxels()
 

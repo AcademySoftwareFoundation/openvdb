@@ -14,10 +14,10 @@
 #include "MeshToVolume.h" // for traceExteriorBoundaries
 #include "SignedFloodFill.h" // for signedFloodFillWithValues
 
-#include <openvdb/Types.h>
-#include <openvdb/Grid.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/points/PointDataGrid.h>
+#include "Types.h"
+#include "Grid.h"
+#include "openvdb.h"
+#include "points/PointDataGrid.h"
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>

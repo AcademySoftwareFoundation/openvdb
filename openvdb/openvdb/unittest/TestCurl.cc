@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/Types.h>
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/GridOperators.h>
+#include "Types.h"
+#include "openvdb.h"
+#include "tools/GridOperators.h"
 
 #include <gtest/gtest.h>
 

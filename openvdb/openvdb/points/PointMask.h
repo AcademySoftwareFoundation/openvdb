@@ -10,8 +10,8 @@
 #ifndef OPENVDB_POINTS_POINT_MASK_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_MASK_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/ValueTransformer.h> // valxform::SumOp
+#include "openvdb.h"
+#include "tools/ValueTransformer.h" // valxform::SumOp
 
 #include "PointDataGrid.h"
 #include "IndexFilter.h"

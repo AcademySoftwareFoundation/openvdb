@@ -13,7 +13,7 @@
 #ifndef OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_NODEMANAGER_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
+#include "Types.h"
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
 #include <deque>

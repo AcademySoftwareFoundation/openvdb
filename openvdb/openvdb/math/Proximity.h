@@ -4,7 +4,7 @@
 #ifndef OPENVDB_MATH_PROXIMITY_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_PROXIMITY_HAS_BEEN_INCLUDED
 
-#include <openvdb/Types.h>
+#include "Types.h"
 
 
 namespace openvdb {

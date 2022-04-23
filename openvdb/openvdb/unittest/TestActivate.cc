@@ -1,8 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include <openvdb/openvdb.h>
-#include <openvdb/tools/Activate.h>
+#include "openvdb.h"
+#include "tools/Activate.h"
 
 #include <gtest/gtest.h>
 

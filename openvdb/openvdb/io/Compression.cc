@@ -3,8 +3,8 @@
 
 #include "Compression.h"
 
-#include <openvdb/Exceptions.h>
-#include <openvdb/util/logging.h>
+#include "Exceptions.h"
+#include "util/logging.h"
 #include <boost/algorithm/string/join.hpp>
 #ifdef OPENVDB_USE_ZLIB
 #include <zlib.h>

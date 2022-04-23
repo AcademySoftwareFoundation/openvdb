@@ -5,8 +5,8 @@
 
 #include "AttributeArrayString.h"
 
-#include <openvdb/Metadata.h>
-#include <openvdb/MetaMap.h>
+#include "Metadata.h"
+#include "MetaMap.h"
 
 #include <tbb/parallel_sort.h>
 

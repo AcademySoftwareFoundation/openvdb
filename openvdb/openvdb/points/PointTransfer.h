@@ -20,12 +20,12 @@
 #ifndef OPENVEB_POINTS_TRANSFER_HAS_BEEN_INCLUDED
 #define OPENVEB_POINTS_TRANSFER_HAS_BEEN_INCLUDED
 
-#include <openvdb/openvdb.h>
-#include <openvdb/Types.h>
-#include <openvdb/Grid.h>
-#include <openvdb/math/Transform.h>
-#include <openvdb/util/NullInterrupter.h>
-#include <openvdb/thread/Threading.h>
+#include "openvdb.h"
+#include "Types.h"
+#include "Grid.h"
+#include "math/Transform.h"
+#include "util/NullInterrupter.h"
+#include "thread/Threading.h"
 
 #include <type_traits>
 #include <tuple>
