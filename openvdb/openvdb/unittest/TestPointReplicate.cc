@@ -316,7 +316,7 @@ TEST_F(TestPointReplicate, testReplicateZero)
 {
     // Test box points, arbitrary attributes
     {
-        const std::vector<float> scales = {0.4,0.4};
+        const std::vector<float> scales = {0.4f,0.4f};
         const std::vector<openvdb::Vec3f> positions = {
             openvdb::Vec3f(0.0f, 0.0f, 0.0f),
             openvdb::Vec3f(0.0f, 0.0f, 0.0f)

@@ -37,7 +37,7 @@ namespace points {
 template <typename PointDataGridT>
 inline typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
-          const size_t multiplier,
+          const Index multiplier,
           const std::vector<std::string>& attributes,
           const std::string& scaleAttribute = "",
           const std::string& replicationIndex = "");
@@ -58,7 +58,7 @@ replicate(const PointDataGridT& source,
 template <typename PointDataGridT>
 inline typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
-          const size_t multiplier,
+          const Index multiplier,
           const std::string& scaleAttribute = "",
           const std::string& replicationIndex = "");
 
@@ -69,7 +69,7 @@ replicate(const PointDataGridT& source,
 template <typename PointDataGridT>
 inline typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
-          const size_t multiplier,
+          const Index multiplier,
           const std::vector<std::string>& attributes,
           const std::string& scaleAttribute,
           const std::string& replicationIndex)
@@ -78,7 +78,15 @@ replicate(const PointDataGridT& source,
     // to the target (replicated grid).
     struct CopyIter
     {
+#ifdef __clang__
+        // Silence incorrect clang warning
+        _Pragma("clang diagnostic push")
+        _Pragma("clang diagnostic ignored \"-Wunused-local-typedef\"")
         using GetIncrementCB = std::function<Index(const Index)>;
+        _Pragma("clang diagnostic pop")
+#else
+        using GetIncrementCB = std::function<Index(const Index)>;
+#endif
 
         CopyIter(const Index end, const GetIncrementCB& cb)
             : mIt(0), mEnd(0), mSource(0), mSourceEnd(end), mCallback(cb) {
@@ -174,8 +182,12 @@ replicate(const PointDataGridT& source,
         using ValueType = PointDataTree::ValueType;
 
         const auto& sourceLeaf = sourceManager.leaf(pos);
-        const openvdb::Index64 sourceCount = sourceLeaf.pointCount();
-        size_t uniformMultiplier = multiplier;
+        // @note  This really shoudn't return uint64_t as AttributeArray's size is
+        //  limited to the max of a uint32_t...
+        assert(sourceLeaf.pointCount() < Index64(std::numeric_limits<Index>::max()));
+        const Index sourceCount = static_cast<Index>(sourceLeaf.pointCount());
+
+        Index uniformMultiplier = multiplier;
         AttributeHandle<float>::UniquePtr scaleHandle(nullptr);
         bool useScale = scaleIdx != AttributeSet::INVALID_POS;
         if (useScale) {
@@ -185,9 +197,9 @@ replicate(const PointDataGridT& source,
         // small lambda that returns the amount of points to generate
         // based on a scale. Should only be called if useScale is true,
         // otherwise the scaleHandle will be reset or null
-        auto getPointsToGenerate = [&](const size_t index) -> size_t {
+        auto getPointsToGenerate = [&](const Index index) -> Index {
             const float scale = std::max(0.0f, scaleHandle->get(index));
-            return static_cast<size_t>
+            return static_cast<Index>
                 (math::Round(static_cast<float>(multiplier) * scale));
         };
 
@@ -203,7 +215,7 @@ replicate(const PointDataGridT& source,
         // don't have to cache the offset vector. Note that the leaf offsets become
         // invalid until leaf.replaceAttributeSet is called and should not be used
 
-        openvdb::Index64 total = 0;
+        Index total = 0;
 
         if (useScale) {
             for (auto iter = sourceLeaf.cbeginValueAll(); iter; ++iter) {
@@ -268,17 +280,17 @@ replicate(const PointDataGridT& source,
             assert(idxHandle.size() == total);
 
             if (useScale) {
-                size_t offset = 0;
-                for (size_t i = 0; i < sourceCount; ++i) {
-                    const size_t pointRepCount = getPointsToGenerate(i);
-                    for (size_t j = 0; j < pointRepCount; ++j, ++offset) {
+                Index offset = 0;
+                for (Index i = 0; i < sourceCount; ++i) {
+                    const Index pointRepCount = getPointsToGenerate(i);
+                    for (Index j = 0; j < pointRepCount; ++j, ++offset) {
                         idxHandle.set(offset, j);
                     }
                 }
             }
             else {
-                for (size_t i = 0; i < total;) {
-                    for (size_t j = 0; j < uniformMultiplier; ++j, ++i) {
+                for (Index i = 0; i < total;) {
+                    for (Index j = 0; j < uniformMultiplier; ++j, ++i) {
                         idxHandle.set(i, j);
                     }
                 }
@@ -298,7 +310,7 @@ replicate(const PointDataGridT& source,
 template <typename PointDataGridT>
 inline typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
-          const size_t multiplier,
+          const Index multiplier,
           const std::string& scaleAttribute,
           const std::string& replicationIndex)
 {
