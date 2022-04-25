@@ -1,0 +1,8 @@
+New Features:
+    - Exposed TypeList declarations in openvdb.h which denote the default set of types supported by OpenVDB.
+
+Improvements:
+    - Added a new foreach method to TypeList for iterating over types without constructing them.
+
+Bug Fixes:
+    - Fixed an issue which could result in significant compilation times when instantiating TypeList<>::Unique<>
