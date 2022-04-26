@@ -4,7 +4,7 @@
 #ifndef OPENVDB_TREE_LEAF_NODE_MASK_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAF_NODE_MASK_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h"
 #include "openvdb/io/Compression.h" // for io::readData(), etc.
 #include "openvdb/math/Math.h" // for math::isZero()

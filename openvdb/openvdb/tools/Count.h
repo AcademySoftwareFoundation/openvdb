@@ -11,7 +11,7 @@
 #ifndef OPENVDB_TOOLS_COUNT_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_COUNT_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/math/Stats.h"
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/tree/NodeManager.h"

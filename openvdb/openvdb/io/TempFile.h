@@ -6,7 +6,7 @@
 #ifndef OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_TEMPFILE_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include <memory>
 #include <ostream>
 

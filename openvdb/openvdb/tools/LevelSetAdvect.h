@@ -15,7 +15,7 @@
 #include "openvdb/Platform.h"
 #include "LevelSetTracker.h"
 #include "VelocityFields.h" // for EnrightField
-#include <openvdb/math/FiniteDifference.h>
+#include "openvdb/math/FiniteDifference.h"
 //#include <openvdb/util/CpuTimer.h>
 #include <functional>
 

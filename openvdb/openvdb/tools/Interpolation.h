@@ -40,7 +40,7 @@
 #ifndef OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h> // for OPENVDB_VERSION_NAME
+#include "openvdb/version.h" // for OPENVDB_VERSION_NAME
 #include "openvdb/Platform.h" // for round()
 #include "openvdb/math/Math.h"// for SmoothUnitStep
 #include "openvdb/math/Transform.h" // for Transform

@@ -3,7 +3,7 @@
 
 #include "GridDescriptor.h"
 
-#include "Exceptions.h"
+#include "openvdb/Exceptions.h"
 #include <boost/algorithm/string/predicate.hpp> // for boost::ends_with()
 #include <boost/algorithm/string/erase.hpp> // for boost::erase_last()
 #include <sstream>

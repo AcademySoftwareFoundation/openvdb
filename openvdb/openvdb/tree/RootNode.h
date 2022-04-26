@@ -14,7 +14,7 @@
 #include "openvdb/math/Math.h"      // for isZero(), isExactlyEqual(), etc.
 #include "openvdb/math/BBox.h"
 #include "openvdb/util/NodeMasks.h" // for backward compatibility only (see readTopology())
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include <tbb/parallel_for.h>
 #include <map>
 #include <set>

@@ -14,8 +14,8 @@
 #include <iosfwd>
 #include <sstream>
 #include <string>
-#include <openvdb/version.h>
-#include "Platform.h"
+#include "openvdb/version.h"
+#include "openvdb/Platform.h"
 
 
 namespace openvdb {

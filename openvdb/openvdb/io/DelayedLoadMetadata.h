@@ -4,7 +4,7 @@
 #ifndef OPENVDB_DELAYED_LOAD_METADATA_HAS_BEEN_INCLUDED
 #define OPENVDB_DELAYED_LOAD_METADATA_HAS_BEEN_INCLUDED
 
-#include "Metadata.h"
+#include "openvdb/Metadata.h"
 #include <cstdint>
 #include <iostream>
 #include <string>

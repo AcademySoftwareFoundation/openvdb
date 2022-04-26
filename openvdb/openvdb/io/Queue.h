@@ -7,8 +7,8 @@
 #ifndef OPENVDB_IO_QUEUE_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_QUEUE_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
 #include <algorithm> // for std::copy
 #include <functional>
 #include <iterator> // for std::back_inserter

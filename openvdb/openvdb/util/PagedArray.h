@@ -15,8 +15,8 @@
 #ifndef OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_PAGED_ARRAY_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
-#include "Types.h"// SharedPtr
+#include "openvdb/version.h"
+#include "openvdb/Types.h"// SharedPtr
 #include <deque>
 #include <cassert>
 #include <iostream>

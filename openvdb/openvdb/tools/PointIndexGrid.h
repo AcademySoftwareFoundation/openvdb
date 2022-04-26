@@ -19,7 +19,7 @@
 #include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Exceptions.h"
 #include "openvdb/Grid.h"
 #include "openvdb/Types.h"

@@ -11,7 +11,7 @@
 #ifndef OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h" // for Index typedef
 #include "openvdb/math/Math.h" // for math::negative
 #include "openvdb/tree/NodeManager.h"

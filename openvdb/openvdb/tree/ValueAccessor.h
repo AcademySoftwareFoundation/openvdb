@@ -33,7 +33,7 @@
 
 #include <tbb/null_mutex.h>
 #include <tbb/spin_mutex.h>
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h"
 #include <cassert>
 #include <limits>

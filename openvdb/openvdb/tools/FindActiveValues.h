@@ -23,7 +23,7 @@
 #define OPENVDB_TOOLS_FINDACTIVEVALUES_HAS_BEEN_INCLUDED
 
 #include <vector>
-#include <openvdb/version.h> // for OPENVDB_VERSION_NAME
+#include "openvdb/version.h" // for OPENVDB_VERSION_NAME
 #include "openvdb/Types.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/openvdb.h"

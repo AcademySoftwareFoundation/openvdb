@@ -8,7 +8,7 @@
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "Types.h"
 #include <algorithm>
 #include <sstream>

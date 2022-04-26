@@ -29,7 +29,7 @@
 #include "openvdb/Platform.h"
 #include "openvdb/openvdb.h"
 #include "Interpolation.h" // for Sampler, etc.
-#include <openvdb/math/FiniteDifference.h>
+#include "openvdb/math/FiniteDifference.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

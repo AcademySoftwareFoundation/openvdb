@@ -16,7 +16,7 @@
 #include "openvdb/tree/LeafManager.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "ValueTransformer.h" // for tools::foreach()
-#include "openvdb.h"
+#include "openvdb/openvdb.h"
 
 #include <tbb/parallel_for.h>
 

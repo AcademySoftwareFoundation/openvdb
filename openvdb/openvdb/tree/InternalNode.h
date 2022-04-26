@@ -12,7 +12,7 @@
 #include "openvdb/util/NodeMasks.h"
 #include "openvdb/io/Compression.h" // for io::readCompressedValues(), etc.
 #include "openvdb/math/Math.h" // for math::isExactlyEqual(), etc.
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h"
 #include "Iterator.h"
 #include "NodeUnion.h"

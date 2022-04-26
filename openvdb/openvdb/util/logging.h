@@ -4,7 +4,7 @@
 #ifndef OPENVDB_UTIL_LOGGING_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_LOGGING_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 
 #ifdef OPENVDB_USE_LOG4CPLUS
 

@@ -11,7 +11,7 @@
 #include <openvdb/util/logging.h>
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/points/PointCount.h>
-#include <openvdb/version.h> // for OPENVDB_LIBRARY_MAJOR_VERSION, etc.
+#include "openvdb/version.h" // for OPENVDB_LIBRARY_MAJOR_VERSION, etc.
 #include <atomic>
 #include <cmath> // for fabs()
 #include <iomanip> // for std::setprecision()

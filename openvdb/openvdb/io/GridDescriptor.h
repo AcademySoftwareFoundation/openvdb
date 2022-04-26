@@ -4,7 +4,7 @@
 #ifndef OPENVDB_IO_GRIDDESCRIPTOR_HAS_BEEN_INCLUDED
 #define OPENVDB_IO_GRIDDESCRIPTOR_HAS_BEEN_INCLUDED
 
-#include "Grid.h"
+#include "openvdb/Grid.h"
 #include <iostream>
 #include <string>
 

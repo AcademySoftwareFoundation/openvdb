@@ -4,7 +4,7 @@
 #ifndef OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_CPUTIMER_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include <string>
 #include <chrono>
 #include <iostream>// for std::cerr

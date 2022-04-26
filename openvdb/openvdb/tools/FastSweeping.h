@@ -35,7 +35,7 @@
 #include "openvdb/tree/LeafManager.h"
 #include "LevelSetUtil.h"
 #include "Morphology.h"
-#include <openvdb/openvdb.h>
+#include "openvdb/openvdb.h"
 
 #include "Statistics.h"
 #ifdef BENCHMARK_FAST_SWEEPING

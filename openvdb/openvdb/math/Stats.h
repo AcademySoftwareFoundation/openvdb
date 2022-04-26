@@ -11,7 +11,7 @@
 #define OPENVDB_MATH_STATS_HAS_BEEN_INCLUDED
 
 #include <iosfwd> // for ostringstream
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Exceptions.h"
 #include <iostream>
 #include <iomanip>

@@ -15,7 +15,7 @@
 #ifndef OPENVDB_TOOLS_NODE_VISITOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_NODE_VISITOR_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h"
 
 namespace openvdb {

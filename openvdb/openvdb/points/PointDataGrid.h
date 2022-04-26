@@ -12,7 +12,7 @@
 #ifndef OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_DATA_GRID_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Grid.h"
 #include "openvdb/tree/Tree.h"
 #include "openvdb/tree/LeafNode.h"

@@ -11,7 +11,7 @@
 #define OPENVDB_POINTS_ATTRIBUTE_SET_HAS_BEEN_INCLUDED
 
 #include "AttributeArray.h"
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/MetaMap.h"
 
 #include <limits>

@@ -5,7 +5,7 @@
 #define OPENVDB_MATH_QUANTIZED_UNIT_VEC_HAS_BEEN_INCLUDED
 
 #include "openvdb/Platform.h"
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "Vec3.h"
 
 namespace openvdb {

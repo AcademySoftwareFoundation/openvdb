@@ -6,7 +6,7 @@
 #ifndef OPENVDB_UTIL_NULL_INTERRUPTER_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_NULL_INTERRUPTER_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

@@ -37,7 +37,7 @@
 #ifndef OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_INDEX_FILTER_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include "openvdb/Types.h"
 
 #include "openvdb/math/Transform.h"

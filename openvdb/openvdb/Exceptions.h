@@ -4,7 +4,7 @@
 #ifndef OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 #define OPENVDB_EXCEPTIONS_HAS_BEEN_INCLUDED
 
-#include <openvdb/version.h>
+#include "openvdb/version.h"
 #include <exception>
 #include <sstream>
 #include <string>
