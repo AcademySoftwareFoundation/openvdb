@@ -479,7 +479,7 @@ jobs:
     name: linux-blosc:${{ matrix.blosc }}
     strategy:
       matrix:
-        blosc: ['1.17.0','1.18.0'] # Need to fix unit tests for '1.19.0','1.20.0','1.21.0'
+        blosc: ['1.17.0','1.18.0','1.19.0','1.20.0','1.21.0']
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
