@@ -157,11 +157,10 @@ endif()
 # Newer boost versions now seems to say that the suffixing is only required if
 # you have multiple boost installations, however the CMake implementation still
 # requires it. Boost specifically reads from Boost_PYTHON_VERSION and
-# Boost_PYTHON_VERSION_MAJOR variables. If the user has set these or
-# DISABLE_DEPENDENCY_VERSION_CHECKS is defined, we just search for the non
-# suffixed versions. Note that users can also provide Boost_NO_BOOST_CMAKE to
-# skip the CMake implementation of FindBoost, though this will impact other
-# boost components.
+# Boost_PYTHON_VERSION_MAJOR variables. If the user has set these we just
+# search for the non suffixed versions. Note that users can also provide
+# Boost_NO_BOOST_CMAKE to skip the CMake implementation of FindBoost, though
+# this will impact other boost components.
 #
 # @todo just get rid of boost python and migrate to pybind asap.
 
@@ -170,9 +169,8 @@ if(USE_NUMPY)
   list(APPEND _REQUIRED_BOOST_COMPONENTS numpy)
 endif()
 
-if(DISABLE_DEPENDENCY_VERSION_CHECKS OR
-  Boost_PYTHON_VERSION OR
-  Boost_PYTHON_VERSION_MAJOR)
+if(Boost_PYTHON_VERSION OR
+   Boost_PYTHON_VERSION_MAJOR)
   # Search for non-suffixed boost libraries
   find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS ${_REQUIRED_BOOST_COMPONENTS} REQUIRED)
 else()
@@ -220,12 +218,16 @@ if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
   list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
 elseif(TARGET Boost::python)
   list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
+  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
 endif()
 
 if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
   list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
 elseif(TARGET Boost::numpy)
   list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
+  message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
 endif()
 
 ##########################################################################
