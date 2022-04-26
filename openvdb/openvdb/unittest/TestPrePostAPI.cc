@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Exceptions.h"
-#include "math/Mat4.h"
-#include "math/Maps.h"
-#include "math/Transform.h"
-#include "util/MapsUtil.h"
+#include <openvdb/Exceptions.h>
+#include <openvdb/math/Mat4.h>
+#include <openvdb/math/Maps.h>
+#include <openvdb/math/Transform.h>
+#include <openvdb/util/MapsUtil.h>
 
 #include <gtest/gtest.h>
 

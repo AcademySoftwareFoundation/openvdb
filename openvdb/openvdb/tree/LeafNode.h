@@ -4,9 +4,9 @@
 #ifndef OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAFNODE_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "util/NodeMasks.h"
-#include "io/Compression.h" // for io::readData(), etc.
+#include "openvdb/Types.h"
+#include "openvdb/util/NodeMasks.h"
+#include "openvdb/io/Compression.h" // for io::readData(), etc.
 #include "Iterator.h"
 #include "LeafBuffer.h"
 #include <algorithm> // for std::nth_element()

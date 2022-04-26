@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "tree/Tree.h"
+#include <openvdb/tree/Tree.h>
 
 #include <gtest/gtest.h>
 

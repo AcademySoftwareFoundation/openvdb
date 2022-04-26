@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include "gtest/gtest.h"
-#include "points/PointGroup.h"
-#include "points/PointCount.h"
-#include "points/PointConversion.h"
+#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointConversion.h>
 
 #include <cstdio> // for std::remove()
 #include <cstdlib> // for std::getenv()

@@ -9,11 +9,11 @@
 #ifndef OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_DENSE_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "Grid.h"
-#include "tree/ValueAccessor.h"
-#include "Exceptions.h"
-#include "util/Formats.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/tree/ValueAccessor.h"
+#include "openvdb/Exceptions.h"
+#include "openvdb/util/Formats.h"
 #include "Prune.h"
 #include <tbb/parallel_for.h>
 #include <iostream>

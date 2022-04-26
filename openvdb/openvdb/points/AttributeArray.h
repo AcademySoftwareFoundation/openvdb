@@ -10,12 +10,12 @@
 #ifndef OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_ATTRIBUTE_ARRAY_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "math/QuantizedUnitVec.h"
-#include "util/Name.h"
-#include "util/logging.h"
-#include "io/io.h" // MappedFile
-#include "io/Compression.h" // COMPRESS_BLOSC
+#include "openvdb/Types.h"
+#include "openvdb/math/QuantizedUnitVec.h"
+#include "openvdb/util/Name.h"
+#include "openvdb/util/logging.h"
+#include "openvdb/io/io.h" // MappedFile
+#include "openvdb/io/Compression.h" // COMPRESS_BLOSC
 
 #include "IndexIterator.h"
 #include "StreamCompression.h"

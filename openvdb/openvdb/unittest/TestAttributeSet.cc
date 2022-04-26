@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "points/AttributeGroup.h"
-#include "points/AttributeSet.h"
-#include "openvdb.h"
-#include "Types.h"
-#include "Metadata.h"
+#include <openvdb/points/AttributeGroup.h>
+#include <openvdb/points/AttributeSet.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
+#include <openvdb/Metadata.h>
 
 #include <gtest/gtest.h>
 

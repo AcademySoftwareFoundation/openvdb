@@ -4,7 +4,7 @@
 #ifndef OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_VEC3_HAS_BEEN_INCLUDED
 
-#include "Exceptions.h"
+#include "openvdb/Exceptions.h"
 #include "Math.h"
 #include "Tuple.h"
 #include <algorithm>

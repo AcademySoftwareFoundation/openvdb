@@ -23,7 +23,7 @@
 #include "openvdb/util/NullInterrupter.h"
 #include "openvdb/util/Util.h"
 #include "openvdb/thread/Threading.h"
-#include <openvdb/openvdb.h>
+#include "openvdb//openvdb.h"
 
 #include "ChangeBackground.h"
 #include "Prune.h" // for pruneInactive and pruneLevelSet

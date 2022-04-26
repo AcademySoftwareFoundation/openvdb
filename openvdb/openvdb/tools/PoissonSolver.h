@@ -61,13 +61,13 @@
 #ifndef OPENVDB_TOOLS_POISSONSOLVER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POISSONSOLVER_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "math/ConjGradient.h"
-#include "tree/LeafManager.h"
-#include "tree/Tree.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/ConjGradient.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/tree/Tree.h"
+#include "openvdb/util/NullInterrupter.h"
 #include "Morphology.h" // for erodeActiveValues
-#include <openvdb/openvdb.h>
+#include "openvdb/openvdb.h"
 
 
 namespace openvdb {

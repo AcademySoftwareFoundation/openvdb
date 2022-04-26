@@ -16,12 +16,12 @@
 #include "Morphology.h" // for erodeActiveValues and dilateActiveValues
 #include "SignedFloodFill.h"
 
-#include "Grid.h"
-#include "Types.h"
-#include "math/FiniteDifference.h" // for math::BiasedGradientScheme
-#include "util/NullInterrupter.h"
-#include "openvdb.h"
-#include "points/PointDataGrid.h"
+#include "openvdb/Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/FiniteDifference.h" // for math::BiasedGradientScheme
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/openvdb.h"
+#include "openvdb/points/PointDataGrid.h"
 #include <tbb/task_group.h>
 #include <algorithm> // for std::min(), std::max()
 #include <vector>

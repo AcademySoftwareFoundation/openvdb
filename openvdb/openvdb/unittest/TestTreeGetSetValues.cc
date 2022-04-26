@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Exceptions.h"
-#include "Types.h"
-#include "tree/Tree.h"
-#include "tools/ValueTransformer.h" // for tools::setValueOnMin() et al.
-#include "tools/Prune.h"
+#include <openvdb/Exceptions.h>
+#include <openvdb/Types.h>
+#include <openvdb/tree/Tree.h>
+#include <openvdb/tools/ValueTransformer.h> // for tools::setValueOnMin() et al.
+#include <openvdb/tools/Prune.h>
 
 #include <gtest/gtest.h>
 

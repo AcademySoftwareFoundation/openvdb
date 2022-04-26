@@ -11,12 +11,12 @@
 #ifndef OPENVDB_TOOLS_ACTIVATE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_ACTIVATE_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "Grid.h"
-#include "math/Math.h" // for isApproxEqual()
-#include "tree/NodeManager.h"
-#include "openvdb.h"
-#include "points/PointDataGrid.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h" // for isApproxEqual()
+#include "openvdb/tree/NodeManager.h"
+#include "openvdb/openvdb.h"
+#include "openvdb/points/PointDataGrid.h"
 
 
 namespace openvdb {

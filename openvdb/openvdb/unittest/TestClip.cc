@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "math/Maps.h" // for math::NonlinearFrustumMap
-#include "tools/Clip.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/math/Maps.h> // for math::NonlinearFrustumMap
+#include <openvdb/tools/Clip.h>
 
 #include <gtest/gtest.h>
 

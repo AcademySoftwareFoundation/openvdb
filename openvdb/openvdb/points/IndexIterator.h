@@ -11,7 +11,7 @@
 #define OPENVDB_POINTS_INDEX_ITERATOR_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include "Types.h"
+#include "openvdb/Types.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

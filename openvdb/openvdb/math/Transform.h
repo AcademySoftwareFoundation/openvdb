@@ -5,7 +5,7 @@
 #define OPENVDB_MATH_TRANSFORM_HAS_BEEN_INCLUDED
 
 #include "Maps.h"
-#include "Types.h"
+#include "openvdb/Types.h"
 #include <iosfwd>
 
 namespace openvdb {

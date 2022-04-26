@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include"openvdb.h"
-#include"points/PointScatter.h"
-#include"points/PointCount.h"
-#include"points/PointDataGrid.h"
-#include"math/Math.h"
-#include"math/Coord.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointScatter.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/math/Coord.h>
 
 #include <gtest/gtest.h>
 

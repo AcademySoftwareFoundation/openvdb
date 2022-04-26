@@ -8,7 +8,7 @@
 #include "Mat3.h"
 #include "Math.h"
 #include "Vec3.h"
-#include "Exceptions.h"
+#include "openvdb/Exceptions.h"
 #include <cmath>
 #include <iostream>
 #include <sstream>

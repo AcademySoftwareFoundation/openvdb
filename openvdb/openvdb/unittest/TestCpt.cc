@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Types.h"
-#include "openvdb.h"
-#include "tools/GridOperators.h"
-#include "math/Stencils.h" // for old GradientStencil
+#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/GridOperators.h>
+#include <openvdb/math/Stencils.h> // for old GradientStencil
 
 #include <gtest/gtest.h>
 

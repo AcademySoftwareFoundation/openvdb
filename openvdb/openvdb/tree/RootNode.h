@@ -8,12 +8,12 @@
 #ifndef OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_ROOTNODE_HAS_BEEN_INCLUDED
 
-#include "Exceptions.h"
-#include "Types.h"
-#include "io/Compression.h" // for truncateRealToHalf()
-#include "math/Math.h"      // for isZero(), isExactlyEqual(), etc.
-#include "math/BBox.h"
-#include "util/NodeMasks.h" // for backward compatibility only (see readTopology())
+#include "openvdb/Exceptions.h"
+#include "openvdb/Types.h"
+#include "openvdb/io/Compression.h" // for truncateRealToHalf()
+#include "openvdb/math/Math.h"      // for isZero(), isExactlyEqual(), etc.
+#include "openvdb/math/BBox.h"
+#include "openvdb/util/NodeMasks.h" // for backward compatibility only (see readTopology())
 #include <openvdb/version.h>
 #include <tbb/parallel_for.h>
 #include <map>

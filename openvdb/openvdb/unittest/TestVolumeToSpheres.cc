@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "tools/LevelSetSphere.h" // for createLevelSetSphere
-#include "tools/LevelSetUtil.h" // for sdfToFogVolume
-#include "tools/VolumeToSpheres.h" // for fillWithSpheres
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/LevelSetSphere.h> // for createLevelSetSphere
+#include <openvdb/tools/LevelSetUtil.h> // for sdfToFogVolume
+#include <openvdb/tools/VolumeToSpheres.h> // for fillWithSpheres
 
 #include <gtest/gtest.h>
 

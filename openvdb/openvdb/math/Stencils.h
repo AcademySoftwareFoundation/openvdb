@@ -20,7 +20,7 @@
 #include "openvdb/Types.h"                 // for Real
 #include "Coord.h"                         // for Coord
 #include "FiniteDifference.h"              // for WENO5 and GodunovsNormSqrd
-#include "tree/ValueAccessor.h"
+#include "openvdb/tree/ValueAccessor.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

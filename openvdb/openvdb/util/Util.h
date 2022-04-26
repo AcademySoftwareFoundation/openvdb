@@ -4,10 +4,10 @@
 #ifndef OPENVDB_UTIL_UTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_UTIL_UTIL_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "tree/Tree.h"
-#include "tools/ValueTransformer.h"
-#include "tools/Prune.h" // for tree::pruneInactive
+#include "openvdb/Types.h"
+#include "openvdb/tree/Tree.h"
+#include "openvdb/tools/ValueTransformer.h"
+#include "openvdb/tools/Prune.h" // for tree::pruneInactive
 
 
 namespace openvdb {

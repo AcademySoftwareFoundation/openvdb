@@ -44,12 +44,12 @@
 #include "PointTransfer.h"
 #include "PointStatistics.h"
 
-#include "openvdb.h"
-#include "Types.h"
-#include "tools/Prune.h"
-#include "tools/ValueTransformer.h"
-#include "thread/Threading.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/openvdb.h"
+#include "openvdb/Types.h"
+#include "openvdb/tools/Prune.h"
+#include "openvdb/tools/ValueTransformer.h"
+#include "openvdb/thread/Threading.h"
+#include "openvdb/util/NullInterrupter.h"
 
 #include <unordered_map>
 

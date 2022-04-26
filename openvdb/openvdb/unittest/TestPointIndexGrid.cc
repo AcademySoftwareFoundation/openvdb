@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "tools/PointIndexGrid.h"
+#include <openvdb/tools/PointIndexGrid.h>
 
 #include <gtest/gtest.h>
 

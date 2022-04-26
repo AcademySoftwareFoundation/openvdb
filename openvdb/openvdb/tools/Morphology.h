@@ -23,8 +23,8 @@
 #include "openvdb/Grid.h"
 #include "openvdb/tree/ValueAccessor.h"
 #include "openvdb/tree/LeafManager.h"
-#include "openvdb.h"
-#include "points/PointDataGrid.h"
+#include "openvdb/openvdb.h"
+#include "openvdb/points/PointDataGrid.h"
 
 #include <tbb/task_arena.h>
 #include <tbb/enumerable_thread_specific.h>

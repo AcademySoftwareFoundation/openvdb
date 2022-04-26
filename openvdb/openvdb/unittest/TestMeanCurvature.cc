@@ -1,13 +1,13 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Types.h"
-#include "openvdb.h"
-#include "math/Stencils.h"
-#include "math/Operators.h"
-#include "tools/GridOperators.h"
+#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/math/Stencils.h>
+#include <openvdb/math/Operators.h>
+#include <openvdb/tools/GridOperators.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "tools/LevelSetSphere.h"
+#include <openvdb/tools/LevelSetSphere.h>
 
 #include <gtest/gtest.h>
 

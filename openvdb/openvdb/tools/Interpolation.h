@@ -41,11 +41,11 @@
 #define OPENVDB_TOOLS_INTERPOLATION_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h> // for OPENVDB_VERSION_NAME
-#include "Platform.h" // for round()
-#include "math/Math.h"// for SmoothUnitStep
-#include "math/Transform.h" // for Transform
-#include "Grid.h"
-#include "tree/ValueAccessor.h"
+#include "openvdb/Platform.h" // for round()
+#include "openvdb/math/Math.h"// for SmoothUnitStep
+#include "openvdb/math/Transform.h" // for Transform
+#include "openvdb/Grid.h"
+#include "openvdb/tree/ValueAccessor.h"
 #include <cmath>
 #include <type_traits>
 

@@ -10,11 +10,11 @@
 #ifndef OPENVDB_POINTS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_CONVERSION_HAS_BEEN_INCLUDED
 
-#include "math/Transform.h"
+#include "openvdb/math/Transform.h"
 
-#include "tools/PointIndexGrid.h"
-#include "tools/PointsToMask.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/tools/PointIndexGrid.h"
+#include "openvdb/tools/PointsToMask.h"
+#include "openvdb/util/NullInterrupter.h"
 
 #include "AttributeArrayString.h"
 #include "AttributeSet.h"

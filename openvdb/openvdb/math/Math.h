@@ -8,7 +8,7 @@
 #ifndef OPENVDB_MATH_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_HAS_BEEN_INCLUDED
 
-#include "Platform.h"
+#include "openvdb/Platform.h"
 #include <openvdb/version.h>
 #include <boost/numeric/conversion/conversion_traits.hpp>
 #include <algorithm> // for std::max()

@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "math/Math.h" // for math::Random01
-#include "tools/PointsToMask.h"
-#include "util/CpuTimer.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/math/Math.h> // for math::Random01
+#include <openvdb/tools/PointsToMask.h>
+#include <openvdb/util/CpuTimer.h>
 #include "gtest/gtest.h"
 #include <vector>
 #include <algorithm>

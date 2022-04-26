@@ -12,12 +12,12 @@
 #ifndef OPENVDB_TOOLS_LEVELSETSPHERE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETSPHERE_HAS_BEEN_INCLUDED
 
-#include "Grid.h"
-#include "Types.h"
-#include "math/Math.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/util/NullInterrupter.h"
 #include "SignedFloodFill.h"
-#include "openvdb.h"
+#include "openvdb/openvdb.h"
 #include <type_traits>
 
 #include <tbb/enumerable_thread_specific.h>

@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "math/BBox.h"
-#include "math/Math.h"
-#include "tree/Tree.h"
-#include "tools/GridTransformer.h"
-#include "tools/Prune.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/math/BBox.h>
+#include <openvdb/math/Math.h>
+#include <openvdb/tree/Tree.h>
+#include <openvdb/tools/GridTransformer.h>
+#include <openvdb/tools/Prune.h>
 
 #include <gtest/gtest.h>
 

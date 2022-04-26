@@ -15,7 +15,7 @@
 #ifndef OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_LEAFMANAGER_HAS_BEEN_INCLUDED
 
-#include "Types.h"
+#include "openvdb/Types.h"
 #include "RootNode.h" // for NodeChain
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>

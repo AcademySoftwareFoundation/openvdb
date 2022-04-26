@@ -18,8 +18,8 @@
 #ifndef OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_PARTITIONER_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "math/Transform.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/Transform.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>

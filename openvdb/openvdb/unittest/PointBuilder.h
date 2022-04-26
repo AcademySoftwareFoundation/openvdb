@@ -4,10 +4,10 @@
 #ifndef OPENVDB_UNITTEST_POINT_BUILDER_HAS_BEEN_INCLUDED
 #define OPENVDB_UNITTEST_POINT_BUILDER_HAS_BEEN_INCLUDED
 
-#include "openvdb.h"
-#include "tools/PointIndexGrid.h"
-#include "points/PointAttribute.h"
-#include "points/PointConversion.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/PointIndexGrid.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
 
 /// @brief  Get 8 corner points from a cube with a given scale, ordered such
 ///   that if used for conversion to OpenVDB Points, that the default

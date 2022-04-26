@@ -10,9 +10,9 @@
 #ifndef OPENVDB_POINTS_POINT_ADVECT_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_ADVECT_HAS_BEEN_INCLUDED
 
-#include "openvdb.h"
-#include "tools/Prune.h"
-#include "tools/VelocityFields.h"
+#include "openvdb/openvdb.h"
+#include "openvdb/tools/Prune.h"
+#include "openvdb/tools/VelocityFields.h"
 
 #include "AttributeGroup.h"
 #include "PointDataGrid.h"

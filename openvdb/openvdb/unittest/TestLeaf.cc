@@ -1,9 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Exceptions.h"
-#include "tree/LeafNode.h"
-#include "math/Math.h"// for math::Random01(), math::Pow3()
+#include <openvdb/Exceptions.h>
+#include <openvdb/tree/LeafNode.h>
+#include <openvdb/math/Math.h>// for math::Random01(), math::Pow3()
 #include <gtest/gtest.h>
 
 class TestLeaf: public ::testing::Test

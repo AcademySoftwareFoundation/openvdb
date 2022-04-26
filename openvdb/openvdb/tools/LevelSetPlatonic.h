@@ -14,13 +14,13 @@
 #ifndef OPENVDB_TOOLS_LEVELSETPLATONIC_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETPLATONIC_HAS_BEEN_INCLUDED
 
-#include "Grid.h"
-#include "Types.h"
-#include "math/Math.h"
-#include "math/Transform.h"
+#include "openvdb/Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/math/Transform.h"
 #include "MeshToVolume.h"
-#include "util/NullInterrupter.h"
-#include "openvdb.h"
+#include "openvdb/util/NullInterrupter.h"
+#include "openvdb/openvdb.h"
 #include <type_traits>
 #include <vector>
 

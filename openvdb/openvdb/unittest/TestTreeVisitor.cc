@@ -5,8 +5,8 @@
 ///
 /// @author Peter Cucka
 
-#include "openvdb.h"
-#include "tree/Tree.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tree/Tree.h>
 
 #include <gtest/gtest.h>
 

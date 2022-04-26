@@ -1,30 +1,30 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Types.h"
-#include "openvdb.h"
-#include "tools/ChangeBackground.h"
-#include "tools/Composite.h"        // for csunion()
-#include "tools/Diagnostics.h"
-#include "tools/GridOperators.h"
-#include "tools/LevelSetUtil.h"
-#include "tools/LevelSetSphere.h"
-#include "tools/LevelSetAdvect.h"
-#include "tools/LevelSetMeasure.h"
-#include "tools/LevelSetMorph.h"
-#include "tools/LevelSetRebuild.h"
-#include "tools/LevelSetPlatonic.h"
-#include "tools/Mask.h"
-#include "tools/Morphology.h"
-#include "tools/PointAdvect.h"
-#include "tools/PointScatter.h"
-#include "tools/Prune.h"
-#include "tools/ValueTransformer.h"
-#include "tools/VectorTransformer.h"
-#include "tools/VolumeAdvect.h"
-#include "util/Util.h"
-#include "util/CpuTimer.h"
-#include "math/Stats.h"
+#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Composite.h>        // for csunion()
+#include <openvdb/tools/Diagnostics.h>
+#include <openvdb/tools/GridOperators.h>
+#include <openvdb/tools/LevelSetUtil.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/LevelSetAdvect.h>
+#include <openvdb/tools/LevelSetMeasure.h>
+#include <openvdb/tools/LevelSetMorph.h>
+#include <openvdb/tools/LevelSetRebuild.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/Mask.h>
+#include <openvdb/tools/Morphology.h>
+#include <openvdb/tools/PointAdvect.h>
+#include <openvdb/tools/PointScatter.h>
+#include <openvdb/tools/Prune.h>
+#include <openvdb/tools/ValueTransformer.h>
+#include <openvdb/tools/VectorTransformer.h>
+#include <openvdb/tools/VolumeAdvect.h>
+#include <openvdb/util/Util.h>
+#include <openvdb/util/CpuTimer.h>
+#include <openvdb/math/Stats.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include <gtest/gtest.h>
 #include <algorithm> // for std::sort

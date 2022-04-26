@@ -6,7 +6,7 @@
 #ifndef OPENVDB_MATH_FINITEDIFFERENCE_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_FINITEDIFFERENCE_HAS_BEEN_INCLUDED
 
-#include "Types.h"
+#include "openvdb/Types.h"
 #include "Math.h"
 #include "Coord.h"
 #include "Vec3.h"

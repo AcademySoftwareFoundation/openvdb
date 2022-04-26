@@ -12,10 +12,10 @@
 #define OPENVDB_TOOLS_SIGNEDFLOODFILL_HAS_BEEN_INCLUDED
 
 #include <openvdb/version.h>
-#include "Types.h" // for Index typedef
-#include "math/Math.h" // for math::negative
-#include "tree/NodeManager.h"
-#include "openvdb.h"
+#include "openvdb/Types.h" // for Index typedef
+#include "openvdb/math/Math.h" // for math::negative
+#include "openvdb/tree/NodeManager.h"
+#include "openvdb/openvdb.h"
 #include <map>
 #include <type_traits>
 

@@ -4,8 +4,8 @@
 #ifndef OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_MAT4_H_HAS_BEEN_INCLUDED
 
-#include"Exceptions.h"
-#include"Platform.h"
+#include "openvdb/Exceptions.h"
+#include "openvdb/Platform.h"
 #include "Math.h"
 #include "Mat3.h"
 #include "Vec3.h"

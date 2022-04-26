@@ -8,9 +8,9 @@
 /// @note This is intended mainly as an example of how to ray-trace
 /// OpenVDB volumes.  It is not a production-quality renderer.
 
-#include "openvdb.h"
-#include "tools/RayIntersector.h"
-#include "tools/RayTracer.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/RayIntersector.h>
+#include <openvdb/tools/RayTracer.h>
 
 #include <boost/algorithm/string/predicate.hpp>
 #include <boost/algorithm/string/split.hpp>

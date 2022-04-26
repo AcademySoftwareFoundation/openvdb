@@ -20,13 +20,13 @@
 #include "PointPartitioner.h"
 
 #include <openvdb/version.h>
-#include "Exceptions.h"
-#include "Grid.h"
-#include "Types.h"
-#include "math/Transform.h"
-#include "tree/LeafManager.h"
-#include "tree/LeafNode.h"
-#include "tree/Tree.h"
+#include "openvdb/Exceptions.h"
+#include "openvdb/Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/Transform.h"
+#include "openvdb/tree/LeafManager.h"
+#include "openvdb/tree/LeafNode.h"
+#include "openvdb/tree/Tree.h"
 
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>

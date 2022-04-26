@@ -8,16 +8,16 @@
 //#define BENCHMARK_FAST_SWEEPING
 //#define TIMING_FAST_SWEEPING
 
-#include "Types.h"
-#include "openvdb.h"
-#include "tools/ChangeBackground.h"
-#include "tools/Diagnostics.h"
-#include "tools/FastSweeping.h"
-#include "tools/LevelSetSphere.h"
-#include "tools/LevelSetTracker.h"
-#include "tools/LevelSetRebuild.h"
-#include "tools/LevelSetPlatonic.h"
-#include "tools/LevelSetUtil.h"
+#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Diagnostics.h>
+#include <openvdb/tools/FastSweeping.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/LevelSetTracker.h>
+#include <openvdb/tools/LevelSetRebuild.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/LevelSetUtil.h>
 #ifdef TIMING_FAST_SWEEPING
 #include <openvdb/util/CpuTimer.h>
 #endif

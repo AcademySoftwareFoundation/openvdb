@@ -12,7 +12,7 @@
 
 #include <iosfwd> // for ostringstream
 #include <openvdb/version.h>
-#include "Exceptions.h"
+#include "openvdb/Exceptions.h"
 #include <iostream>
 #include <iomanip>
 #include <sstream>

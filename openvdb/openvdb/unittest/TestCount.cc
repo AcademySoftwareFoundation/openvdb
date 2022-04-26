@@ -3,11 +3,11 @@
 
 #include "gtest/gtest.h"
 
-#include "openvdb.h"
-#include "tools/Count.h"
-#include "tools/LevelSetSphere.h" // tools::createLevelSetSphere
-#include "tools/LevelSetUtil.h"   // tools::sdfToFogVolume
-#include "tree/ValueAccessor.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Count.h>
+#include <openvdb/tools/LevelSetSphere.h> // tools::createLevelSetSphere
+#include <openvdb/tools/LevelSetUtil.h> // tools::sdfToFogVolume
+#include <openvdb/tree/ValueAccessor.h>
 
 
 class TestCount: public ::testing::Test

@@ -10,7 +10,7 @@
 #ifndef OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_GROUP_HAS_BEEN_INCLUDED
 
-#include "openvdb.h"
+#include "openvdb/openvdb.h"
 
 #include "IndexIterator.h" // FilterTraits
 #include "IndexFilter.h" // FilterTraits

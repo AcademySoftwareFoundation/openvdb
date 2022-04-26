@@ -9,9 +9,9 @@
 #ifndef OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_STATISTICS_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "Exceptions.h"
-#include "math/Stats.h"
+#include "openvdb/Types.h"
+#include "openvdb/Exceptions.h"
+#include "openvdb/math/Stats.h"
 #include "ValueTransformer.h"
 
 

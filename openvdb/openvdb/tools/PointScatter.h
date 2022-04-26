@@ -22,10 +22,10 @@
 #ifndef OPENVDB_TOOLS_POINT_SCATTER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_SCATTER_HAS_BEEN_INCLUDED
 
-#include "Types.h"
-#include "Grid.h"
-#include "math/Math.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Math.h"
+#include "openvdb/util/NullInterrupter.h"
 #include <tbb/parallel_sort.h>
 #include <tbb/parallel_for.h>
 #include <iostream>

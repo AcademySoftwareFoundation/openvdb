@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Types.h"
-#include "openvdb.h"
-#include "tools/Filter.h"
-#include "tools/ValueTransformer.h"
+#include <openvdb/Types.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/Filter.h>
+#include <openvdb/tools/ValueTransformer.h>
 #include "util.h" // for unittest_util::makeSphere()
 #include "gtest/gtest.h"
 

@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "tools/MultiResGrid.h"
-#include "util/CpuTimer.h"
-#include "util/logging.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/MultiResGrid.h>
+#include <openvdb/util/CpuTimer.h>
+#include <openvdb/util/logging.h>
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/split.hpp>
 #include <cstdlib> // for std::atof()

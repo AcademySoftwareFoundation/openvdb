@@ -1,12 +1,12 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "points/IndexIterator.h"
-#include "points/IndexFilter.h"
-#include "points/PointAttribute.h"
-#include "points/PointConversion.h"
-#include "points/PointGroup.h"
-#include "points/PointCount.h"
+#include <openvdb/points/IndexIterator.h>
+#include <openvdb/points/IndexFilter.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointCount.h>
 
 #include <gtest/gtest.h>
 

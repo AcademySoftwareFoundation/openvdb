@@ -4,14 +4,14 @@
 /// @file unittest/TestPoissonSolver.cc
 /// @authors D.J. Hill, Peter Cucka
 
-#include "openvdb.h"
-#include "Types.h"
-#include "math/ConjGradient.h" // for JacobiPreconditioner
-#include "tools/Composite.h" // for csgDifference/Union/Intersection
-#include "tools/LevelSetSphere.h" // for tools::createLevelSetSphere()
-#include "tools/LevelSetUtil.h" // for tools::sdfToFogVolume()
-#include "tools/MeshToVolume.h" // for createLevelSetBox()
-#include "tools/PoissonSolver.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/Types.h>
+#include <openvdb/math/ConjGradient.h> // for JacobiPreconditioner
+#include <openvdb/tools/Composite.h> // for csgDifference/Union/Intersection
+#include <openvdb/tools/LevelSetSphere.h> // for tools::createLevelSetSphere()
+#include <openvdb/tools/LevelSetUtil.h> // for tools::sdfToFogVolume()
+#include <openvdb/tools/MeshToVolume.h> // for createLevelSetBox()
+#include <openvdb/tools/PoissonSolver.h>
 
 #include <gtest/gtest.h>
 

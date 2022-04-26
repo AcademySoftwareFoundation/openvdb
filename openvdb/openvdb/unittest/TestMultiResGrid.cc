@@ -1,11 +1,11 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Exceptions.h"
-#include "openvdb.h"
-#include "tools/MultiResGrid.h"
-#include "tools/LevelSetSphere.h"
-#include "tools/Diagnostics.h"
+#include <openvdb/Exceptions.h>
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/MultiResGrid.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/Diagnostics.h>
 
 #include <gtest/gtest.h>
 

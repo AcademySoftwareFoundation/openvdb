@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "openvdb.h"
-#include "tools/LevelSetPlatonic.h"
-#include "tools/NodeVisitor.h"
-#include "tools/Prune.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/tools/LevelSetPlatonic.h>
+#include <openvdb/tools/NodeVisitor.h>
+#include <openvdb/tools/Prune.h>
 #include "gtest/gtest.h"
 
 class TestNodeVisitor: public ::testing::Test

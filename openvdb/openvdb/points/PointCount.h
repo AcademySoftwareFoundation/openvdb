@@ -10,7 +10,7 @@
 #ifndef OPENVDB_POINTS_POINT_COUNT_HAS_BEEN_INCLUDED
 #define OPENVDB_POINTS_POINT_COUNT_HAS_BEEN_INCLUDED
 
-#include "openvdb.h"
+#include "openvdb/openvdb.h"
 
 #include "PointDataGrid.h"
 #include "PointMask.h"

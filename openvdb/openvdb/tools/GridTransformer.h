@@ -7,10 +7,10 @@
 #ifndef OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_GRIDTRANSFORMER_HAS_BEEN_INCLUDED
 
-#include "Grid.h"
-#include "Types.h"
-#include "math/Math.h" // for isApproxEqual()
-#include "util/NullInterrupter.h"
+#include "openvdb/Grid.h"
+#include "openvdb/Types.h"
+#include "openvdb/math/Math.h" // for isApproxEqual()
+#include "openvdb/util/NullInterrupter.h"
 #include "ChangeBackground.h"
 #include "Interpolation.h"
 #include "LevelSetRebuild.h" // for doLevelSetRebuild()

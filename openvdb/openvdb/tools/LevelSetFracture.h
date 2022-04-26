@@ -10,9 +10,9 @@
 #ifndef OPENVDB_TOOLS_LEVELSETFRACTURE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_LEVELSETFRACTURE_HAS_BEEN_INCLUDED
 
-#include "Grid.h"
-#include "math/Quat.h"
-#include "util/NullInterrupter.h"
+#include "openvdb/Grid.h"
+#include "openvdb/math/Quat.h"
+#include "openvdb/util/NullInterrupter.h"
 
 #include "Composite.h" // for csgIntersectionCopy() and csgDifferenceCopy()
 #include "GridTransformer.h" // for resampleToMatch()

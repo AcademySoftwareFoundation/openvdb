@@ -85,7 +85,7 @@
 #ifndef OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED
 #define OPENVDB_MATH_HALF_HAS_BEEN_INCLUDED
 
-#include "Platform.h"
+#include "openvdb/Platform.h"
 #include <openvdb/version.h>
 #include <iostream>
 

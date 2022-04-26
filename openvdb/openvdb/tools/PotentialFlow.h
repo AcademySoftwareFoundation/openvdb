@@ -10,14 +10,13 @@
 #ifndef OPENVDB_TOOLS_POTENTIAL_FLOW_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POTENTIAL_FLOW_HAS_BEEN_INCLUDED
 
-#include "openvdb.h"
+#include "openvdb/openvdb.h"
 
 #include "GridOperators.h"
 #include "GridTransformer.h"
 #include "Mask.h" // interiorMask
 #include "Morphology.h" // erodeActiveValues
 #include "PoissonSolver.h"
-#include <openvdb/openvdb.h>
 
 
 namespace openvdb {

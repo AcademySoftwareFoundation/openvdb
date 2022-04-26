@@ -183,7 +183,6 @@ else()
 endif()
 
 add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
-target_include_directories(vdb_test PRIVATE ../.)
 
 # Blosc and ZLib are hidden dependencies for the core library
 # (not exposed in headers), so we need to manually link them in

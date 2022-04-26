@@ -1,10 +1,10 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-#include "Exceptions.h"
-#include "util/CpuTimer.h"
-#include "util/PagedArray.h"
-#include "util/Formats.h"
+#include <openvdb/Exceptions.h>
+#include <openvdb/util/CpuTimer.h>
+#include <openvdb/util/PagedArray.h>
+#include <openvdb/util/Formats.h>
 
 #include <gtest/gtest.h>
 

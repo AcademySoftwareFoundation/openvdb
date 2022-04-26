@@ -13,7 +13,7 @@
 
 #include "LevelSetTracker.h"
 #include "Interpolation.h" // for BoxSampler, etc.
-#include "math/FiniteDifference.h"
+#include "openvdb/math/FiniteDifference.h"
 #include <functional>
 #include <limits>
 

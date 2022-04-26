@@ -7,17 +7,17 @@
 // include all of the point headers and confirm that none are referring directly
 // to the removed aliases
 
-#include "points/PointAdvect.h"
-#include "points/PointAttribute.h"
-#include "points/PointConversion.h"
-#include "points/PointCount.h"
-#include "points/PointDataGrid.h"
-#include "points/PointDelete.h"
-#include "points/PointGroup.h"
-#include "points/PointMask.h"
-#include "points/PointMove.h"
-#include "points/PointSample.h"
-#include "points/PointScatter.h"
+#include <openvdb/points/PointAdvect.h>
+#include <openvdb/points/PointAttribute.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointDelete.h>
+#include <openvdb/points/PointGroup.h>
+#include <openvdb/points/PointMask.h>
+#include <openvdb/points/PointMove.h>
+#include <openvdb/points/PointSample.h>
+#include <openvdb/points/PointScatter.h>
 
 #include <gtest/gtest.h>
 

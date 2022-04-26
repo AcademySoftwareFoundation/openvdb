@@ -8,8 +8,8 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#include "openvdb.h"
-#include "util/logging.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/util/logging.h>
 
 
 namespace {

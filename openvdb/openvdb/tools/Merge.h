@@ -10,13 +10,13 @@
 #ifndef OPENVDB_TOOLS_MERGE_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MERGE_HAS_BEEN_INCLUDED
 
-#include "Platform.h"
-#include "Exceptions.h"
-#include "Types.h"
-#include "Grid.h"
-#include "tree/NodeManager.h"
-#include "tools/NodeVisitor.h"
-#include "openvdb.h"
+#include "openvdb/Platform.h"
+#include "openvdb/Exceptions.h"
+#include "openvdb/Types.h"
+#include "openvdb/Grid.h"
+#include "openvdb/tree/NodeManager.h"
+#include "openvdb/tools/NodeVisitor.h"
+#include "openvdb/openvdb.h"
 
 #include <memory>
 #include <unordered_map>

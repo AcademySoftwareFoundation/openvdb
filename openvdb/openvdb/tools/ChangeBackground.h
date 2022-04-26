@@ -11,10 +11,10 @@
 #ifndef OPENVDB_TOOLS_ChangeBACKGROUND_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_ChangeBACKGROUND_HAS_BEEN_INCLUDED
 
-#include "math/Math.h" // for isNegative and negative
-#include "Types.h" // for Index typedef
-#include "tree/NodeManager.h"
-#include "openvdb.h"
+#include "openvdb/math/Math.h" // for isNegative and negative
+#include "openvdb/Types.h" // for Index typedef
+#include "openvdb/tree/NodeManager.h"
+#include "openvdb/openvdb.h"
 
 
 namespace openvdb {

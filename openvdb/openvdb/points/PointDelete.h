@@ -15,8 +15,8 @@
 #include "IndexIterator.h"
 #include "IndexFilter.h"
 
-#include "tools/Prune.h"
-#include "tree/LeafManager.h"
+#include "openvdb/tools/Prune.h"
+#include "openvdb/tree/LeafManager.h"
 
 #include <memory>
 #include <string>

@@ -3,14 +3,14 @@
 
 #include "RenderModules.h"
 
-#include "points/PointDataGrid.h"
-#include "points/PointCount.h"
-#include "points/PointConversion.h"
-#include "tools/Count.h"
-#include "tools/Morphology.h"
-#include "tools/Prune.h"
-#include "tree/LeafManager.h"
-#include "util/logging.h"
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/points/PointCount.h>
+#include <openvdb/points/PointConversion.h>
+#include <openvdb/tools/Count.h>
+#include <openvdb/tools/Morphology.h>
+#include <openvdb/tools/Prune.h>
+#include <openvdb/tree/LeafManager.h>
+#include <openvdb/util/logging.h>
 #include <algorithm> // for std::min()
 #include <cmath> // for std::abs(), std::fabs(), std::floor()
 #include <limits>
