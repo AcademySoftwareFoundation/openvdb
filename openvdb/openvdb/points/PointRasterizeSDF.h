@@ -358,6 +358,6 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#include "impl/PointRasterizeSDF.h"
+#include "impl/PointRasterizeSDFImpl.h"
 
 #endif //OPENVDB_POINTS_RASTERIZE_SDF_HAS_BEEN_INCLUDED

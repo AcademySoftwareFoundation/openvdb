@@ -80,6 +80,6 @@ rasterizeTrilinear(const PointDataTreeT& points,
 } // namespace OPENVDB_VERSION_NAME
 } // namespace openvdb
 
-#include "impl/PointRasterizeTrilinear.h"
+#include "impl/PointRasterizeTrilinearImpl.h"
 
 #endif //OPENVDB_POINTS_RASTERIZE_TRILINEAR_HAS_BEEN_INCLUDED
