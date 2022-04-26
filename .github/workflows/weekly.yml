@@ -75,7 +75,7 @@ jobs:
         cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
-        --components="core,hou,bin,python,test,axcore,axbin,axtest"
+        --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest"
         --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
@@ -122,7 +122,7 @@ jobs:
         cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
         --build-type=Release
-        --components="core,hou,bin,python,test,axcore,axbin,axtest"
+        --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest"
         --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
@@ -210,7 +210,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=9 ${{ matrix.config.cmake }}\"
     - name: test
       run: cd build && ctest -V
@@ -245,7 +245,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         -j ${{ matrix.config.j }}
-        --components=\"core,python,test,bin,axcore,axbin,axtest\"
+        --components=\"core,python,test,bin,view,render,axcore,axbin,axtest\"
         --cargs=\"
         -DUSE_BLOSC=OFF
         -DCMAKE_CXX_STANDARD=17
@@ -277,7 +277,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,bin,test\"
+        --components=\"core,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DUSE_BLOSC=OFF -DUSE_ZLIB=OFF\"
     - name: test
       shell: bash
@@ -310,7 +310,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
@@ -336,8 +336,8 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2020-clang7',  cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2020-clang7',  cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
+          - { image: '2020-clang7',  cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2020-clang7',  cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
           # Standalone
           - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core' }
@@ -366,7 +366,7 @@ jobs:
           ./ci/build.sh -v
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components="axcore,axbin,axtest"
+          --components="bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -401,7 +401,7 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,axcore,axbin,axtest"
+          --components="core,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -452,7 +452,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,axcore,axbin,axtest\"
+        --components=\"core,bin,axcore,axbin,axtest\"
         --cargs=\'
         -A x64 -G \"Visual Studio 16 2019\"
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
