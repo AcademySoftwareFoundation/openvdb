@@ -142,69 +142,92 @@ if(TARGET openvdb_shared AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-# Boost python handling. Try to find the following named boost python libraries:
-# - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-# - boost_python{Python_VERSION_MAJOR}
-# - boost_python
-# Prioritize the version suffixed library, failing if none exist.
+# Boost python cmake is a mess. Implementations provided by boost's config
+# cmake and kitware's module differ significantly and different cmake versions
+# also do slightly different things regarding the major/minor suffixing. We
+# previously attempted to handle all these cases by searching for boost_python
+# three times, prioritize the version suffixed library and falling back such:
+#   - boost_python{Python_VERSION_MAJOR}${Python_VERSION_MINOR}
+#   - boost_python{Python_VERSION_MAJOR}
+#   - boost_python
+# This unfortunately fails as CMake sometimes creates an empty Boost::python
+# target on failed searches which stops subsequent searches. CMake also
+# sometimes just fails to find the suffixed versions regardless.
+#
+# Newer boost versions now seems to say that the suffixing is only required if
+# you have multiple boost installations, however the CMake implementation still
+# requires it. Boost specifically reads from Boost_PYTHON_VERSION and
+# Boost_PYTHON_VERSION_MAJOR variables. If the user has set these we just
+# search for the non suffixed versions. Note that users can also provide
+# Boost_NO_BOOST_CMAKE to skip the CMake implementation of FindBoost, though
+# this will impact other boost components.
+#
+# @todo just get rid of boost python and migrate to pybind asap.
 
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-)
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python${Python_VERSION_MAJOR}
-)
-find_package(Boost ${MINIMUM_BOOST_VERSION}
-  QUIET COMPONENTS python
-)
-
-if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  message(STATUS "Found boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-elseif(TARGET Boost::python${Python_VERSION_MAJOR})
-  message(STATUS "Found boost_python${Python_VERSION_MAJOR}")
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR})
-elseif(TARGET Boost::python)
-  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
-    "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-  )
-  list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
-else()
-  message(FATAL_ERROR "Unable to find boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
-    "boost_python${Python_VERSION_MAJOR} or boost_python."
-  )
+set(_REQUIRED_BOOST_COMPONENTS python)
+if(USE_NUMPY)
+  list(APPEND _REQUIRED_BOOST_COMPONENTS numpy)
 endif()
 
-# If boost >= 1.65, find the required numpy boost component and link that in.
-# Use the same system as above, first trying without the suffix, then with.
+if(Boost_PYTHON_VERSION OR
+   Boost_PYTHON_VERSION_MAJOR)
+  # Search for non-suffixed boost libraries
+  find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS ${_REQUIRED_BOOST_COMPONENTS} REQUIRED)
+else()
+  # Try to find matching boost components to the version of python detected
+  list(TRANSFORM _REQUIRED_BOOST_COMPONENTS APPEND ${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
 
-if(USE_NUMPY)
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}
-  )
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy${Python_VERSION_MAJOR}
-  )
-  find_package(Boost ${MINIMUM_BOOST_VERSION}
-    QUIET COMPONENTS numpy
-  )
+  # Explicitly don't pass REQUIRED so we can provide the user a message with
+  # instructions to circumvent the major/minor requirement.
+  find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS ${_REQUIRED_BOOST_COMPONENTS})
 
-  if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
-  elseif(TARGET Boost::numpy${Python_VERSION_MAJOR})
-    message(STATUS "Found boost_numpy${Python_VERSION_MAJOR}")
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR})
-  elseif(TARGET Boost::numpy)
-    message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
-      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible"
-    )
-    list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
-  else()
-    message(FATAL_ERROR "Unable to find boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}, "
-      "boost_numpy${Python_VERSION_MAJOR} or boost_numpy."
-    )
+  # See if we found the target. If we didn't and CMake/Boost created a broken
+  # aliased target, we can't try another search. Build an error message and stop.
+  set(_BOOST_ERROR "")
+  if(NOT TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND TARGET Boost::python)
+    list(APPEND _BOOST_ERROR "boost_python${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
   endif()
+  if(USE_NUMPY AND NOT TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND TARGET Boost::numpy)
+    list(APPEND _BOOST_ERROR "boost_numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR}")
+  endif()
+
+  if(_BOOST_ERROR)
+    message(FATAL_ERROR "Unable to find versioned boost python libraries (${_BOOST_ERROR}). It's "
+      "recommended that your installation of boost_python/boost_numpy match your python version "
+      "exactly.\n"
+      "Alternatively, you can try to search for boost python versions explicitly with either:\n"
+      "  'Boost_PYTHON_VERSION=XY'\n"
+      "  'Boost_PYTHON_VERSION_MAJOR=X'")
+  endif()
+
+  # If we didn't create the target but CMake didn't create a broken alias, try another search
+  if(NOT TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND NOT TARGET Boost::python)
+    find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS python REQUIRED)
+    message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+  endif()
+  if(USE_NUMPY AND
+     NOT TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR} AND NOT TARGET Boost::numpy)
+    find_package(Boost ${MINIMUM_BOOST_VERSION} COMPONENTS numpy REQUIRED)
+    message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+        "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+  endif()
+endif()
+
+if(TARGET Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+elseif(TARGET Boost::python)
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::python)
+  message(STATUS "Found non-suffixed boost_python, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
+endif()
+
+if(TARGET Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy${Python_VERSION_MAJOR}${Python_VERSION_MINOR})
+elseif(TARGET Boost::numpy)
+  list(APPEND OPENVDB_PYTHON_DEPS Boost::numpy)
+  message(STATUS "Found non-suffixed boost_numpy, assuming to be python version "
+      "\"${Python_VERSION_MAJOR}.${Python_VERSION_MINOR}\" compatible")
 endif()
 
 ##########################################################################

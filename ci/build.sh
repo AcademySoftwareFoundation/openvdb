@@ -161,8 +161,8 @@ set -x
 # Note:
 # - print and lod binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_8=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
