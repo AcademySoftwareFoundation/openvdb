@@ -12,7 +12,7 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: 'The type of CI to run (all, houdini, sanitize, mac, extra, ax, blosc)'
+        description: 'The type of CI to run (all, houdini, sanitize, mac, extra, ax, blosc, abi)'
         required: true
         default: 'all'
 
@@ -484,7 +484,7 @@ jobs:
     steps:
     - uses: actions/checkout@v2
     - name: install_boost
-      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev libboost-python-dev
+      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev
     - name: install_tbb
       run: sudo apt-get -q install -y libtbb-dev
     - name: install_gtest
@@ -499,4 +499,60 @@ jobs:
         --components=\"core,test\"
     - name: test
       run: cd build && sudo ctest -V
+
+  #############################################################################
+  ################################## ABI ######################################
+  #############################################################################
+
+  linux-abi-checker:
+    if: |
+      github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'abi'
+    # abi-dumper version verified to work with 20.04/GCC9
+    runs-on: ubuntu-20.04
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: install_deps
+      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
+    # abi-compliance-checker and abi-dumper
+    #
+    # @note that abi-dumper is available through apt but at the time of writing this
+    # the version there (1.1) doesn't work correctly and maniftest by creating an
+    # invalid ABI report with missing headers. This then always reports 100% success
+    # rate when used with abi-compliance-checker.
+    # To fix, install both from source and checkout specific commits for both
+    # which have been verified to work on ubuntu 20.04.
+    #
+    # @warning  If you update these, test that they fail when expected!
+    #
+    # Also note that these are far superior to abigail/abidiff tools from redhat
+    - name: install_abi_checker
+      run: |
+        git clone https://github.com/lvc/abi-dumper.git abi-dumper
+        cd abi-dumper && git checkout 16bb467cd7d343dd3a16782b151b56cf15509594 && cd -
+        git clone https://github.com/lvc/abi-compliance-checker abi-compliance-checker
+        cd abi-compliance-checker && git checkout 7c175c45a8ba9ac41b8e47d8ebbab557b623b18e && cd -
+    - name: build_latest
+      run: |
+        CXXFLAGS=-Og ./ci/build.sh --build-dir=build_latest -v --build-type=Debug --target=openvdb_shared --components=\"core\" --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+    - name: build_9
+      run: |
+        git checkout v9.0.0
+        CXXFLAGS=-Og ./ci/build.sh -v --build-type=Debug --target=openvdb_shared --components=\"core\" --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+    - name: abi_check
+      # -strict treats warnings as errors
+      run: |
+        abi-dumper/abi-dumper.pl build_latest/openvdb/openvdb/libopenvdb.so -o ABI-1.dump -lver 1
+        abi-dumper/abi-dumper.pl        build/openvdb/openvdb/libopenvdb.so -o ABI-2.dump -lver 2
+        abi-compliance-checker/abi-compliance-checker.pl -l OPENVDB -old ABI-2.dump -new ABI-1.dump -strict
+    - name: upload_report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: abi_report
+        path: ./compat_reports/OPENVDB/2_to_1/compat_report.html
+        retention-days: 5
 

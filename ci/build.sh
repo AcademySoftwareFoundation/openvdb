@@ -17,6 +17,7 @@ OPTS_ARGS+=("v")   ## See --verbose
 OPTL_ARGS+=("components:")  ## Specify cmake component(s) to enable
 OPTL_ARGS+=("config:")      ## Specify cmake configuration during the build step
 OPTL_ARGS+=("target:")      ## Specify target(s) to build
+OPTL_ARGS+=("build-dir:")    ## Build directory
 OPTL_ARGS+=("cargs:")       ## args to pass directly to cmake generation step
 OPTL_ARGS+=("build-type:")  ## Release, Debug, etc.
 OPTL_ARGS+=("verbose")      ## Verbose build output
@@ -25,6 +26,7 @@ OPTL_ARGS+=("verbose")      ## Verbose build output
 declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
+PARMS[--build-dir]=build
 # github actions runners have 2 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 PARMS[-j]=2
@@ -96,6 +98,8 @@ if HAS_PARM --cargs; then
     if [ -z $CMAKE_EXTRA ]; then CMAKE_EXTRA=${PARMS[--cargs]}
     else CMAKE_EXTRA+=" "${PARMS[--cargs]}; fi
 fi
+BUILD_DIR=${PARMS[--build-dir]}
+
 # handle whitespace
 eval "CMAKE_EXTRA=($CMAKE_EXTRA)"
 
@@ -148,8 +152,8 @@ fi
 
 ################################################
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR}
+cd ${BUILD_DIR}
 
 # Report the cmake commands
 set -x
