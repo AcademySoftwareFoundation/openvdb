@@ -2763,7 +2763,6 @@ TEST_F(TestTree, testStealNode)
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
 TEST_F(TestTree, testNodeCount)
 {
     //openvdb::util::CpuTimer timer;// use for benchmark test
@@ -2791,7 +2790,6 @@ TEST_F(TestTree, testNodeCount)
     EXPECT_EQ(tree.leafCount(), nodeCount2.front());// leaf nodes
     for (size_t i=0; i<nodeCount2.size(); ++i) EXPECT_EQ( nodeCount1[i], nodeCount2[i]);
 }
-#endif
 
 TEST_F(TestTree, testRootNode)
 {
