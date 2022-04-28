@@ -1,0 +1,100 @@
+name: Build and Release Python Bindings to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        type: string
+        default: ''
+        required: false
+        description: Ref to build
+      test_pypi:
+        type: boolean
+        description: 'Test release: publish on test.pypi.org'
+        default: false
+
+jobs:
+  build-sdist:
+    name: Build sdist
+    runs-on: ubuntu-latest
+    steps:
+      - name:   Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+      - name: 🐍 Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name:   Install build dependencies
+        run: |
+          python -m pip install build
+
+      - name: 📦 Build the sdist
+        working-directory: ./openvdb/openvdb/python
+        run: |
+          python -m build --sdist
+
+      - name:   Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./openvdb/openvdb/python/dist/
+
+  build-wheels:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name:   Checkout the repo
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ github.event.inputs.tag }}
+
+
+      - name: Build wheels
+        uses: pypa/cibuildwheel@v2.12.1
+        with:
+          package-dir: ./openvdb/openvdb/python
+          config-file: ./openvdb/openvdb/python/pyproject.toml
+        env:
+          CIBW_ARCHS_MACOS: auto universal2
+
+      - name:   Upload artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: dist
+          path: ./openvdb/openvdb/python/dist/
+
+  publish:
+    name: Publish Python packages on PyPI
+    needs: [build-sdist, build-wheels]
+    runs-on: ubuntu-latest
+    steps:
+      - name:   Download artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: dist
+          path: dist
+
+      - name: 🧪 Publish to PyPI Testing
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ inputs.test_pypi }}
+        with:
+          user: __token__
+          password: ${{ secrets.TEST_PYPI_API_TOKEN }}
+          repository_url: https://test.pypi.org/legacy/
+          packages_dir: dist
+
+      - name: 🎉 Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        if: ${{ !inputs.test_pypi }}
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: dist

@@ -1,0 +1,9 @@
+CMakeCache.txt
+CMakeFiles/
+Makefile
+cmake_install.cmake
+*.egg-info/
+*.so
+_skbuild/
+MANIFEST.in
+dist/
