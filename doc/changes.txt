@@ -56,7 +56,7 @@ preserve ABI compatibility it might be necessary to define the macro
 <BLOCKQUOTE>
 Official release of NanoVDB, which for the first time offers GPU support for
 static sparse volumes in OpenVDB. See the
-<A HREF="https://academysoftwarefoundation.github.io/openvdb/NanoVDB_MainPage.html">documentation</A>
+<A HREF="https://www.openvdb.org/documentation/doxygen/NanoVDB_MainPage.html">documentation</A>
 for details.
 </BLOCKQUOTE>
 
@@ -488,7 +488,7 @@ a domain specific JIT (just-in-time) compiled expression language,
 providing users with a new way of interacting with OpenVDB data. AX is
 tailored towards writing highly parallelizable and customizable OpenVDB
 volume and point kernel operations. See the
-<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
+<A HREF="https://www.openvdb.org/documentation/openvdbax.html">documentation</A>
 for more.
 </BLOCKQUOTE>
 

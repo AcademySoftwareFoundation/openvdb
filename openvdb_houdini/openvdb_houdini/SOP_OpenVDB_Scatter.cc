@@ -237,7 +237,7 @@ with the same transform and topology as the source.\n\
 For signed distance field or fog volume VDBs, points can be scattered\n\
 either throughout the interior of the volume or only on an isosurface.\n\
 For level sets, an additional option is to scatter points only in the\n\
-[narrow band|https://academysoftwarefoundation.github.io/openvdb/overview.html#secGrid]\n\
+[narrow band|https://www.openvdb.org/documentation/doxygen/overview.html#secGrid]\n\
 surrounding the zero crossing.\n\
 For all other volumes, points are scattered in active voxels.\n\
 \n\

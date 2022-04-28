@@ -18,12 +18,12 @@
   and required dependencies are expected. See the dependency documentation
   for more information:
 
-    https://academysoftwarefoundation.github.io/openvdb/dependencies.html
+    https://www.openvdb.org/documentation/doxygen/dependencies.html
 
   And the documentation on building OpenVDB for more in depth installation
   instructions:
 
-    https://academysoftwarefoundation.github.io/openvdb/build.html
+    https://www.openvdb.org/documentation/doxygen/build.html
 
   This CMakeLists file provides most available options for configuring the
   build and installation of all OpenVDB components. By default the core

@@ -422,7 +422,7 @@ Version 8.0.0 - December 23, 2020
       providing users with a new way of interacting with OpenVDB data. AX is
       tailored towards writing highly parallelizable and customizable OpenVDB
       volume and point kernel operations. See the documentation for more:
-      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html
+      https://www.openvdb.org/documentation/openvdbax.html
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check
