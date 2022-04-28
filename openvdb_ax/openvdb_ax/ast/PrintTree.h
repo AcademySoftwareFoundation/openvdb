@@ -31,7 +31,7 @@ struct Node;
 /// @param numberStatements  Whether to number the line statements
 /// @param os  Stream to write into
 /// @param indent  The indent to print on each child traversal
-void print(const ast::Node& node,
+OPENVDB_AX_API void print(const ast::Node& node,
     const bool numberStatements = true,
     std::ostream& os = std::cout,
     const char* indent = "    ");
@@ -45,7 +45,7 @@ void print(const ast::Node& node,
 /// @param node  Node to print
 /// @param os    Stream to write into
 /// @param indent  The indent to print on each child traversal
-void reprint(const ast::Node& node,
+OPENVDB_AX_API void reprint(const ast::Node& node,
     std::ostream& os = std::cout,
     const char* indent = "    ");
 

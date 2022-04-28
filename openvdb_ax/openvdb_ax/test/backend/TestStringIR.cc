@@ -10,6 +10,8 @@
 
 #include <cppunit/extensions/HelperMacros.h>
 
+#include <numeric> // iota
+
 using String = openvdb::ax::codegen::String;
 
 class TestStringIR : public CppUnit::TestCase
@@ -32,6 +34,24 @@ public:
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestStringIR);
+
+template <size_t N>
+inline std::array<char, N+1> fillCharArray(char c)
+{
+    std::array<char, N+1> arr;
+    std::fill(std::begin(arr),std::end(arr),c);
+    arr[N] = '\0';
+    return arr;
+}
+
+template <size_t N>
+inline std::array<char, N+1> fillCharArrayIota(char c = char(1))
+{
+    std::array<char, N+1> arr;
+    std::iota(std::begin(arr), std::end(arr), c); // start the fill at char(1) as char(0) == '\0'
+    arr[N] = '\0';
+    return arr;
+}
 
 void
 TestStringIR::testStringImpl()
@@ -63,29 +83,27 @@ TestStringIR::testStringImpl()
     }
 
     {
-        char arr[String::SSO_LENGTH-1];
-        std::fill(std::begin(arr),std::end(arr),'0');
-        String a(arr);
+        auto arr = fillCharArray<String::SSO_LENGTH-1>('0');
+        String a(arr.data());
         const char* c(a);
         CPPUNIT_ASSERT(a.isLocal());
         CPPUNIT_ASSERT(c);
         CPPUNIT_ASSERT_EQUAL(int64_t(String::SSO_LENGTH-1), a.size());
         CPPUNIT_ASSERT_EQUAL(c, a.c_str());
-        CPPUNIT_ASSERT(a.c_str() != arr);
-        CPPUNIT_ASSERT_EQUAL(std::string(arr, String::SSO_LENGTH-1), a.str());
+        CPPUNIT_ASSERT(a.c_str() != arr.data());
+        CPPUNIT_ASSERT_EQUAL(std::string(arr.data(), String::SSO_LENGTH-1), a.str());
     }
 
     {
-        char arr[String::SSO_LENGTH];
-        std::fill(std::begin(arr),std::end(arr),'0');
-        String a(arr);
+        auto arr = fillCharArray<String::SSO_LENGTH>('0');
+        String a(arr.data());
         const char* c(a);
         CPPUNIT_ASSERT(!a.isLocal());
         CPPUNIT_ASSERT(c);
         CPPUNIT_ASSERT_EQUAL(int64_t(String::SSO_LENGTH), a.size());
         CPPUNIT_ASSERT_EQUAL(c, a.c_str());
-        CPPUNIT_ASSERT(a.c_str() != arr);
-        CPPUNIT_ASSERT_EQUAL(std::string(arr, String::SSO_LENGTH), a.str());
+        CPPUNIT_ASSERT(a.c_str() != arr.data());
+        CPPUNIT_ASSERT_EQUAL(std::string(arr.data(), String::SSO_LENGTH), a.str());
     }
 
     {
@@ -143,9 +161,8 @@ TestStringIR::testStringImpl()
     }
 
     {
-        char arr[String::SSO_LENGTH];
-        std::fill(std::begin(arr),std::end(arr),'a');
-        String a(arr);
+        auto arr = fillCharArray<String::SSO_LENGTH>('a');
+        String a(arr.data());
         String b(a);
         const char* c(b);
         CPPUNIT_ASSERT(!b.isLocal());
@@ -157,13 +174,12 @@ TestStringIR::testStringImpl()
             CPPUNIT_ASSERT_EQUAL('a', b.c_str()[i]);
         }
         CPPUNIT_ASSERT_EQUAL('\0', b.c_str()[int64_t(String::SSO_LENGTH)]);
-        CPPUNIT_ASSERT_EQUAL(std::string(arr, String::SSO_LENGTH), b.str());
+        CPPUNIT_ASSERT_EQUAL(std::string(arr.data(), String::SSO_LENGTH), b.str());
     }
 
     {
-        char arr[String::SSO_LENGTH];
-        std::fill(std::begin(arr),std::end(arr),'a');
-        String a(arr);
+        auto arr = fillCharArray<String::SSO_LENGTH>('a');
+        String a(arr.data());
         String b("");
         CPPUNIT_ASSERT(b.isLocal());
         CPPUNIT_ASSERT_EQUAL(int64_t(0), b.size());
@@ -178,7 +194,7 @@ TestStringIR::testStringImpl()
             CPPUNIT_ASSERT_EQUAL('a', b.c_str()[i]);
         }
         CPPUNIT_ASSERT_EQUAL('\0', b.c_str()[int64_t(String::SSO_LENGTH)]);
-        CPPUNIT_ASSERT_EQUAL(std::string(arr, String::SSO_LENGTH), b.str());
+        CPPUNIT_ASSERT_EQUAL(std::string(arr.data(), String::SSO_LENGTH), b.str());
     }
 
     // From std::string
@@ -229,9 +245,8 @@ TestStringIR::testStringImpl()
 
     {
         CPPUNIT_ASSERT(String::SSO_LENGTH >= 2);
-        char arr[String::SSO_LENGTH-2];
-        std::fill(std::begin(arr),std::end(arr),'a');
-        String a(""), b1(arr), b2("b");
+        auto arr = fillCharArray<String::SSO_LENGTH-2>('a');
+        String a(""), b1(arr.data()), b2("b");
         a = b1 + b2;
         CPPUNIT_ASSERT(a.isLocal());
         const char* c(a);
@@ -249,9 +264,8 @@ TestStringIR::testStringImpl()
 
     {
         CPPUNIT_ASSERT(String::SSO_LENGTH >= 2);
-        char arr[String::SSO_LENGTH-1];
-        std::fill(std::begin(arr),std::end(arr),'a');
-        String a(""), b1(arr), b2("b");
+        auto arr = fillCharArray<String::SSO_LENGTH-1>('a');
+        String a(""), b1(arr.data()), b2("b");
         a = b1 + b2;
         CPPUNIT_ASSERT(!a.isLocal());
         const char* c(a);
@@ -295,6 +309,11 @@ TestStringIR::testStringStringIR()
     unittest_util::LLVMState state;
     llvm::Module& M = state.module();
     openvdb::ax::FunctionOptions opts;
+    // This test does not test the C bindings and will fail if they are being
+    // used as the function addressed wont be linked into the EE.
+    // @todo  Expose the global function address binding in Compiler.cc (without
+    //   exposing LLVM headers)
+    CPPUNIT_ASSERT(opts.mPrioritiseIR);
     openvdb::ax::codegen::FunctionRegistry::UniquePtr reg =
         openvdb::ax::codegen::createDefaultRegistry(&opts);
 
@@ -307,9 +326,27 @@ TestStringIR::testStringStringIR()
         CPPUNIT_ASSERT(LF);
     }
 
+    // also insert string::clear for the malloc tests
+    const openvdb::ax::codegen::FunctionGroup* SC =
+        reg->getOrInsert("string::clear", opts, true);
+    CPPUNIT_ASSERT(SC);
+    for (auto& F : SC->list()) {
+        llvm::Function* LF = F->create(M);
+        CPPUNIT_ASSERT(LF);
+    }
+
     // JIT gen the functions
     auto EE = state.EE();
     CPPUNIT_ASSERT(EE);
+
+    // get the string::clear function for later
+    CPPUNIT_ASSERT(!SC->list().empty());
+    const int64_t addressOfClear =
+        EE->getFunctionAddress(SC->list()[0]->symbol());
+    CPPUNIT_ASSERT(addressOfClear);
+    auto freeString =
+        reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
+
 
     // Test the IR for each string function. These match the signatures
     // defined in StringFunctions.cc
@@ -352,10 +389,8 @@ TestStringIR::testStringStringIR()
             ///   the string memory is completely uninitialized
             String input;
             setInvalidString(input); // uninit string, invalid class memory
-            char arr[String::SSO_LENGTH];
-            std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-            arr[String::SSO_LENGTH-1] = '\0'; // terminator
-            const char* data = arr;
+            auto arr = fillCharArrayIota<String::SSO_LENGTH-1>();
+            const char* data = arr.data();
             CPPUNIT_ASSERT_EQUAL(std::size_t(String::SSO_LENGTH-1), std::strlen(data));
 
             F(&input, data); // run function
@@ -373,16 +408,18 @@ TestStringIR::testStringStringIR()
         }
 
         // test malloc
+        // @warning  If using the IR functions this will return memory allocated by LLVM.
+        //   If we've statically linked malloc (i.e. /MT or /MTd on Windows) then
+        //   we can't free this ourselves and need to make sure we call string::clear to
+        //   free the malloced char array
         {
             /// @note the IR version of string::string should handle the case where
             ///   the string memory is completely uninitialized
             String input;
             // Also test that string::string mallocs when size >= String::SSO_LENGTH
             setInvalidString(input); // uninit string, invalid class memory
-            char arr[String::SSO_LENGTH+1];
-            std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-            arr[String::SSO_LENGTH] = '\0'; // terminator
-            const char* data = arr;
+            auto arr = fillCharArrayIota<String::SSO_LENGTH>();
+            const char* data = arr.data();
             CPPUNIT_ASSERT_EQUAL(std::size_t(String::SSO_LENGTH), std::strlen(data));
 
             F(&input, data); // run function
@@ -397,6 +434,9 @@ TestStringIR::testStringStringIR()
                 CPPUNIT_ASSERT_EQUAL(char(i+1), input.c_str()[i]);
             }
             CPPUNIT_ASSERT_EQUAL('\0', input.c_str()[String::SSO_LENGTH]);
+
+            // free through string::clear
+            freeString(&input);
         }
     }
 }
@@ -410,6 +450,11 @@ TestStringIR::testStringAssignIR()
     unittest_util::LLVMState state;
     llvm::Module& M = state.module();
     openvdb::ax::FunctionOptions opts;
+    // This test does not test the C bindings and will fail if they are being
+    // used as the function addressed wont be linked into the EE.
+    // @todo  Expose the global function address binding in Compiler.cc (without
+    //   exposing LLVM headers)
+    CPPUNIT_ASSERT(opts.mPrioritiseIR);
     openvdb::ax::codegen::FunctionRegistry::UniquePtr reg =
         openvdb::ax::codegen::createDefaultRegistry(&opts);
 
@@ -422,9 +467,26 @@ TestStringIR::testStringAssignIR()
         CPPUNIT_ASSERT(LF);
     }
 
+    // also insert string::clear for the malloc tests
+    const openvdb::ax::codegen::FunctionGroup* SC =
+        reg->getOrInsert("string::clear", opts, true);
+    CPPUNIT_ASSERT(SC);
+    for (auto& F : SC->list()) {
+        llvm::Function* LF = F->create(M);
+        CPPUNIT_ASSERT(LF);
+    }
+
     // JIT gen the functions
     auto EE = state.EE();
     CPPUNIT_ASSERT(EE);
+
+    // get the string::clear function for later
+    CPPUNIT_ASSERT(!SC->list().empty());
+    const int64_t addressOfClear =
+        EE->getFunctionAddress(SC->list()[0]->symbol());
+    CPPUNIT_ASSERT(addressOfClear);
+    auto freeString =
+        reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
 
     // Test the IR for each string function. These match the signatures
     // defined in StringFunctions.cc
@@ -476,10 +538,14 @@ TestStringIR::testStringAssignIR()
     }
 
     // copy to malloced
+    // @warning  We can't run this test if we've statically linked the allocaor
+    //   as we're passing memory allocated here to llvm which will free it
+    //   during the assignment
+    // @todo enable if we detect we're using a dynamic malloc
+    /*
     {
-        char arr[String::SSO_LENGTH];
-        std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-        String dest(arr), src("foo");
+        auto arr = fillCharArrayIota<String::SSO_LENGTH>();
+        String dest(arr.data()), src("foo");
         CPPUNIT_ASSERT(!dest.isLocal());
         CPPUNIT_ASSERT(src.isLocal());
 
@@ -492,13 +558,17 @@ TestStringIR::testStringAssignIR()
         CPPUNIT_ASSERT_EQUAL('o', dest.c_str()[2]);
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[3]);
     }
+    */
 
 
     // copy from malloced
+    // @warning  If using the IR functions this will return memory allocated by LLVM.
+    //   If we've statically linked malloc (i.e. /MT or /MTd on Windows) then
+    //   we can't free this ourselves and need to make sure we call string::clear to
+    //   free the malloced char array
     {
-        char arr[String::SSO_LENGTH];
-        std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-        String dest("foo"), src(arr);
+        auto arr = fillCharArrayIota<String::SSO_LENGTH>();
+        String dest("foo"), src(arr.data());
         CPPUNIT_ASSERT(dest.isLocal());
         CPPUNIT_ASSERT(!src.isLocal());
 
@@ -510,6 +580,9 @@ TestStringIR::testStringAssignIR()
             CPPUNIT_ASSERT_EQUAL(char(i+1), dest.c_str()[i]);
         }
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[int64_t(String::SSO_LENGTH)]);
+
+        // free through string::clear
+        freeString(&dest);
     }
 }
 
@@ -533,9 +606,26 @@ void TestStringIR::testStringAddIR()
         CPPUNIT_ASSERT(LF);
     }
 
+    // also insert string::clear for the malloc tests
+    const openvdb::ax::codegen::FunctionGroup* SC =
+        reg->getOrInsert("string::clear", opts, true);
+    CPPUNIT_ASSERT(SC);
+    for (auto& F : SC->list()) {
+        llvm::Function* LF = F->create(M);
+        CPPUNIT_ASSERT(LF);
+    }
+
     // JIT gen the functions
     auto EE = state.EE();
     CPPUNIT_ASSERT(EE);
+
+    // get the string::clear function for later
+    CPPUNIT_ASSERT(!SC->list().empty());
+    const int64_t addressOfClear =
+        EE->getFunctionAddress(SC->list()[0]->symbol());
+    CPPUNIT_ASSERT(addressOfClear);
+    auto freeString =
+        reinterpret_cast<std::add_pointer<void(String*)>::type>(addressOfClear);
 
     // Test the IR for each string function. These match the signatures
     // defined in StringFunctions.cc
@@ -593,6 +683,8 @@ void TestStringIR::testStringAddIR()
     // add from both local strings
     {
         String dest(""), lhs("foo"), rhs(" bar");
+        CPPUNIT_ASSERT(lhs.isLocal());
+        CPPUNIT_ASSERT(rhs.isLocal());
         F(&dest, &lhs, &rhs); // run function
         CPPUNIT_ASSERT(dest.isLocal());
         CPPUNIT_ASSERT(dest.c_str() != rhs.c_str());
@@ -608,11 +700,16 @@ void TestStringIR::testStringAddIR()
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[7]);
     }
 
-    // add from local lhs, malloced rhs
+    // add from local rhs, malloced lhs
+    // @warning  If using the IR functions this will return memory allocated by LLVM.
+    //   If we've statically linked malloc (i.e. /MT or /MTd on Windows) then
+    //   we can't free this ourselves and need to make sure we call string::clear to
+    //   free the malloced char array
     {
-        char arr[String::SSO_LENGTH];
-        std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-        String dest(""), lhs(arr), rhs(" bar");
+        auto arr = fillCharArrayIota<String::SSO_LENGTH>();
+        String dest(""), lhs(arr.data()), rhs(" bar");
+        CPPUNIT_ASSERT(!lhs.isLocal());
+        CPPUNIT_ASSERT(rhs.isLocal());
         F(&dest, &lhs, &rhs); // run function
         CPPUNIT_ASSERT(!dest.isLocal());
         CPPUNIT_ASSERT(dest.c_str() != rhs.c_str());
@@ -627,13 +724,20 @@ void TestStringIR::testStringAddIR()
         CPPUNIT_ASSERT_EQUAL('a', dest.c_str()[int64_t(String::SSO_LENGTH+2)]);
         CPPUNIT_ASSERT_EQUAL('r', dest.c_str()[int64_t(String::SSO_LENGTH+3)]);
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[int64_t(String::SSO_LENGTH+4)]);
+        // free through string::clear
+        freeString(&dest);
     }
 
-    // add from local rhs, malloced lhs
+    // add from local lhs, malloced rhs
+    // @warning  If using the IR functions this will return memory allocated by LLVM.
+    //   If we've statically linked malloc (i.e. /MT or /MTd on Windows) then
+    //   we can't free this ourselves and need to make sure we call string::clear to
+    //   free the malloced char array
     {
-        char arr[String::SSO_LENGTH];
-        std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-        String dest(""), lhs(" bar"), rhs(arr);
+        auto arr = fillCharArrayIota<String::SSO_LENGTH>();
+        String dest(""), lhs(" bar"), rhs(arr.data());
+        CPPUNIT_ASSERT(lhs.isLocal());
+        CPPUNIT_ASSERT(!rhs.isLocal());
         F(&dest, &lhs, &rhs); // run function
         CPPUNIT_ASSERT(!dest.isLocal());
         CPPUNIT_ASSERT(dest.c_str() != rhs.c_str());
@@ -649,15 +753,24 @@ void TestStringIR::testStringAddIR()
         }
 
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[int64_t(String::SSO_LENGTH+4)]);
+        // free through string::clear
+        freeString(&dest);
     }
 
     // add from malloced rhs, malloced lhs
+    // @warning  If using the IR functions this will return memory allocated by LLVM.
+    //   If we've statically linked malloc (i.e. /MT or /MTd on Windows) then
+    //   we can't free this ourselves and need to make sure we call string::clear to
+    //   free the malloced char array
     {
-        char arr[String::SSO_LENGTH];
-        std::iota(std::begin(arr), std::end(arr), char(1)); // start the fill at char(1) as char(0) == '\0'
-        String lhs(arr);
-        std::iota(std::begin(arr), std::end(arr), char(1+String::SSO_LENGTH));
-        String rhs(arr);
+        auto arr1 = fillCharArrayIota<String::SSO_LENGTH>();
+        auto arr2 = fillCharArrayIota<String::SSO_LENGTH>(char(1+String::SSO_LENGTH));
+        String lhs(arr1.data());
+        String rhs(arr2.data());
+        CPPUNIT_ASSERT(!lhs.isLocal());
+        CPPUNIT_ASSERT(!rhs.isLocal());
+        arr1.fill('0');
+        arr2.fill('0');
         String dest("");
         F(&dest, &lhs, &rhs); // run function
         CPPUNIT_ASSERT(!dest.isLocal());
@@ -670,6 +783,8 @@ void TestStringIR::testStringAddIR()
         }
 
         CPPUNIT_ASSERT_EQUAL('\0', dest.c_str()[int64_t(String::SSO_LENGTH*2)]);
+        // free through string::clear
+        freeString(&dest);
     }
 }
 
@@ -689,6 +804,16 @@ void TestStringIR::testStringClearIR()
         reg->getOrInsert("string::clear", opts, true);
     CPPUNIT_ASSERT(FG);
     for (auto& F : FG->list()) {
+        llvm::Function* LF = F->create(M);
+        CPPUNIT_ASSERT(LF);
+    }
+
+    // insert all the string::string functions into a module
+    // for the malloc clear tests
+    const openvdb::ax::codegen::FunctionGroup* MFG =
+        reg->getOrInsert("string::string", opts, true);
+    CPPUNIT_ASSERT(MFG);
+    for (auto& F : MFG->list()) {
         llvm::Function* LF = F->create(M);
         CPPUNIT_ASSERT(LF);
     }
@@ -729,9 +854,39 @@ void TestStringIR::testStringClearIR()
     }
 
     // clear malloced
+    // @warning  We can't run this test if we've statically linked the allocaor
+    //   as we're passing memory allocated here to llvm which will free it
+    //   during clear
+    // @todo enable if we detect we're using a dynamic malloc
+    /*
     {
-        char arr[String::SSO_LENGTH];
-        String a(arr);
+        auto arr = fillCharArray<String::SSO_LENGTH>('0');
+        String a(arr.data());
+        CPPUNIT_ASSERT(!a.isLocal());
+        F(&a); // run function
+        CPPUNIT_ASSERT(a.isLocal());
+        CPPUNIT_ASSERT_EQUAL(int64_t(0), a.size());
+        CPPUNIT_ASSERT_EQUAL('\0', a.c_str()[0]);
+    }
+    */
+
+    // malloc then clear
+    // @warning  If using the IR functions this will attempt to free memory that
+    //  we've allocated. To test clear we need to create the string through the
+    //  LLVM binding then free.
+    {
+        // get the string::clear function which takes a char* initializer
+        CPPUNIT_ASSERT(!MFG->list().empty());
+        const int64_t addressOfStringCtr =
+            EE->getFunctionAddress(MFG->list()[1]->symbol());
+        CPPUNIT_ASSERT(addressOfStringCtr);
+        auto createString =
+            reinterpret_cast<std::add_pointer<void(String*, const char*)>::type>(addressOfStringCtr);
+
+        auto arr = fillCharArray<String::SSO_LENGTH>('0');
+
+        String a;
+        createString(&a, arr.data());
         CPPUNIT_ASSERT(!a.isLocal());
         F(&a); // run function
         CPPUNIT_ASSERT(a.isLocal());

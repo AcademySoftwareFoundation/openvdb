@@ -15,38 +15,36 @@ using namespace openvdb::points;
 
 // Configuration values for assignment code
 
-using ConfigMap = std::unordered_map<std::string, std::unordered_map<std::string, std::string>>;
-
-static const ConfigMap integral = {
+static const unittest_util::ConfigMap integral = {
     { "bool",   { { "_l1_", "true" }, { "_l2_", "false" } }  },
     { "int32",  { { "_l1_", "2" },    { "_l2_", "3" } }      },
     { "int64",  { { "_l1_", "2l" },   { "_l2_", "3l" } }     }
 };
 
-static const ConfigMap floating = {
+static const unittest_util::ConfigMap floating = {
     { "float",  { { "_l1_", "1.1f" }, { "_l2_", "2.3f" } }   },
     { "double", { { "_l1_", "1.1" },  { "_l2_", "2.3" } }    }
 };
 
-static const ConfigMap vec2 = {
+static const unittest_util::ConfigMap vec2 = {
     { "vec2i",  { { "_l1_",  "{1, 2}" },                    { "_l2_", "{3, 4}" } } },
     { "vec2f",  { { "_l1_",  "{1.1f, 2.3f}" },              { "_l2_", "{4.1f, 5.3f}" } } },
     { "vec2d",  { { "_l1_",  "{1.1, 2.3}" },                { "_l2_", "{4.1, 5.3}" } } }
 };
 
-static const ConfigMap vec3 = {
+static const unittest_util::ConfigMap vec3 = {
     { "vec3i",  { { "_l1_",  "{1, 2, 3}" },                 { "_l2_", "{4, 5, 6}" } } },
     { "vec3f",  { { "_l1_",  "{1.1f, 2.3f, 4.3f}" },        { "_l2_", "{4.1f, 5.3f, 6.3f}" } } },
     { "vec3d",  { { "_l1_",  "{1.1,  2.3 , 4.3}" },         { "_l2_", "{4.1,  5.3, 6.3}" } } }
 };
 
-static const ConfigMap vec4 = {
+static const unittest_util::ConfigMap vec4 = {
     { "vec4i",  { { "_l1_",  "{1, 2, 3, 4}" },              { "_l2_", "{5, 6, 7, 8}" } } },
     { "vec4f",  { { "_l1_",  "{1.1f, 2.3f, 4.3f, 5.4f}" },  { "_l2_", "{5.1f, 6.3f, 7.3f, 8.4f}" } } },
     { "vec4d",  { { "_l1_",  "{1.1,  2.3, 4.3, 5.4}" },     { "_l2_", "{5.1, 6.3, 7.3, 8.4}" } } }
 };
 
-static const ConfigMap mat3 = {
+static const unittest_util::ConfigMap mat3 = {
     { "mat3f",  { { "_l1_",  "{1.1f, 2.3f, 4.3f,   5.4f, 6.7f, 7.8f,   9.1f, 4.5f, 8.2f }" },
                   { "_l2_",  "{9.1f, 7.3f, -1.3f,  4.4f, -6.7f, 0.8f,  9.1f,-0.5f, 8.2f }" } }
     },
@@ -55,7 +53,7 @@ static const ConfigMap mat3 = {
     }
 };
 
-static const ConfigMap mat4 = {
+static const unittest_util::ConfigMap mat4 = {
     { "mat4f",  { { "_l1_",  "{1.1f, 2.3f, 4.3f, 5.4f,   6.7f, 7.8f, 9.1f, 4.5f,  8.2f, 3.3f, 2.9f, 5.9f,  0.1f, 0.3f, 5.1f, 1.9f}" },
                   { "_l2_",  "{0.1f, 2.3f,-9.3f, 4.5f,  -1.7f, 7.8f, 2.1f, 3.3f,  3.3f,-3.3f,-0.3f, 2.5f,  5.1f, 0.5f, 8.1f,-1.7f}" } }
     },
@@ -64,7 +62,7 @@ static const ConfigMap mat4 = {
     }
 };
 
-static const ConfigMap string = {
+static const unittest_util::ConfigMap string = {
     { "string",  { { "_l1_", "\"foo\"" }, { "_l2_", "\"bar\"" } }   }
 };
 

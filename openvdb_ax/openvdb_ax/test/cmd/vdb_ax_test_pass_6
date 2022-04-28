@@ -1,0 +1,383 @@
+scoped block: 10 statement(s)
+    [0]     scoped block: 3 statement(s)
+        [1] declaration: vec3f
+            local v
+            init:
+                float (32bit) literal: 0
+
+        [2] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 0
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 3
+            iterator:
+                crement: pre-increment
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [3] assignment expression: =
+                    array unpack
+                        expression: local v
+                        component(s) : local i
+                    binary: +
+                        local i
+                        int32 literal: 1
+
+
+        [4] assignment expression: =
+            attribute: @(vec3f) loop_test1
+            local v
+
+
+    [5]     scoped block: 4 statement(s)
+        [6] declaration: vec3f
+            local v
+            init:
+                float (32bit) literal: 0
+
+        [7] declaration: int32
+            local i
+            init:
+                int32 literal: 0
+
+        [8] for loop:
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 3
+            iterator:
+                crement: pre-increment
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [9] assignment expression: =
+                    array unpack
+                        expression: local v
+                        component(s) : local i
+                    binary: +
+                        local i
+                        int32 literal: 1
+
+
+        [10] assignment expression: =
+            attribute: @(vec3f) loop_test2
+            local v
+
+
+    [11]     scoped block: 4 statement(s)
+        [12] declaration: vec3f
+            local v
+            init:
+                float (32bit) literal: 0
+
+        [13] declaration: int32
+            local i
+            init:
+                int32 literal: 1
+
+        [14] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 0
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 3
+            body:
+            scoped block: 2 statement(s)
+                [15] assignment expression: =
+                    array unpack
+                        expression: local v
+                        component(s) : local i
+                    binary: +
+                        local i
+                        int32 literal: 1
+
+                [16] crement: post-increment
+                    local i
+
+
+        [17] assignment expression: =
+            attribute: @(vec3f) loop_test3
+            local v
+
+
+    [18]     scoped block: 3 statement(s)
+        [19] declaration: vec3f
+            local v
+            init:
+                float (32bit) literal: 0
+
+        [20] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 0
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 0
+            iterator:
+                crement: pre-increment
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [21] assignment expression: =
+                    array unpack
+                        expression: local v
+                        component(s) : local i
+                    binary: +
+                        local i
+                        int32 literal: 1
+
+
+        [22] assignment expression: =
+            attribute: @(vec3f) loop_test15
+            local v
+
+
+    [23]     scoped block: 3 statement(s)
+        [24] declaration: mat3f
+            local mat
+            init:
+                float (32bit) literal: 0
+
+        [25] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 0
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 3
+            iterator:
+                crement: pre-increment
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [26] for loop:
+                    init:
+                        declaration: int32
+                            local j
+                            init:
+                                int32 literal: 0
+                    conditional:
+                        binary: <
+                            local j
+                            int32 literal: 3
+                    iterator:
+                        crement: pre-increment
+                            local j
+                    body:
+                    scoped block: 1 statement(s)
+                        [27] assignment expression: =
+                            array unpack
+                                expression: local mat
+                                component(s) : local i
+local j
+                            binary: +
+                                binary: +
+                                    binary: *
+                                        local i
+                                        int32 literal: 3
+                                    local j
+                                int32 literal: 1
+
+
+
+        [28] assignment expression: =
+            attribute: @(mat3f) loop_test18
+            local mat
+
+
+    [29]     scoped block: 3 statement(s)
+        [30] declaration: int32
+            local j
+            init:
+                int32 literal: 0
+
+        [31] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 0
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 3
+            iterator:
+                comma: 2 element(s)
+                    crement: pre-increment
+                        local i
+                    crement: pre-increment
+                        local j
+            body:
+            scoped block: 0 statement(s)
+                <empty>
+
+        [32] assignment expression: =
+            attribute: @(int32) loop_test22
+            local j
+
+
+    [33]     scoped block: 3 statement(s)
+        [34] declaration: int32
+            local j
+            init:
+                int32 literal: 0
+
+        [35] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 5
+            conditional:
+                declaration: int32
+                    local k
+                    init:
+                        function call: floor
+                            binary: -
+                                local i
+                                int32 literal: 1
+            iterator:
+                crement: pre-decrement
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [36] crement: post-increment
+                    local j
+
+
+        [37] assignment expression: =
+            attribute: @(int32) loop_test23
+            local j
+
+
+    [38]     scoped block: 5 statement(s)
+        [39] declaration: int32
+            local j
+            init:
+                int32 literal: 0
+
+        [40] declaration: int32
+            local k
+            init:
+                int32 literal: 0
+
+        [41] declaration: int32
+            local l
+            init:
+                int32 literal: 1
+
+        [42] for loop:
+            init:
+                declaration: int32
+                    local i
+                    init:
+                        int32 literal: 5
+            conditional:
+                comma: 2 element(s)
+                    binary: !=
+                        local k
+                        int32 literal: 0
+                    crement: post-decrement
+                        local l
+            iterator:
+                crement: pre-decrement
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [43] crement: post-increment
+                    local j
+
+
+        [44] assignment expression: =
+            attribute: @(int32) loop_test25
+            local j
+
+
+    [45]     scoped block: 3 statement(s)
+        [46] declaration: int32
+            local i
+            init:
+                int32 literal: 0
+
+        [47] declaration: int32
+            local j
+            init:
+                int32 literal: 0
+
+        [48] for loop:
+            init:
+                comma: 2 element(s)
+                    assignment expression: -=
+                        local i
+                        int32 literal: 10
+                    assignment expression: +=
+                        local j
+                        int32 literal: 4
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 10
+            iterator:
+                assignment expression: +=
+                    local i
+                    local j
+            body:
+            scoped block: 2 statement(s)
+                [49] assignment expression: *=
+                    local j
+                    int32 literal: 2
+
+                [50] assignment expression: =
+                    attribute: @(int32) loop_test27
+                    binary: +
+                        local i
+                        local j
+
+
+
+    [51]     scoped block: 1 statement(s)
+        [52] for loop:
+            init:
+                statement list: 2 statement(s)
+                    [53] declaration: int32
+                        local i
+                        init:
+                            int32 literal: 0
+
+                    [54] declaration: int32
+                        local j
+                        init:
+                            int32 literal: 10
+
+            conditional:
+                binary: <
+                    local i
+                    int32 literal: 10
+            iterator:
+                crement: pre-increment
+                    local i
+            body:
+            scoped block: 1 statement(s)
+                [55] assignment expression: =
+                    attribute: @(int32) loop_test30
+                    binary: +
+                        local i
+                        local j
+
+
+

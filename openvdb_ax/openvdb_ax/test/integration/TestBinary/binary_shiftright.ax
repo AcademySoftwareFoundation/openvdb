@@ -1,9 +1,9 @@
 
-int64@testint641 = 2l >> 3l;
-int64@testint642 = 3l >> 2l;
-int32@testint321 = 2 >> 3;
-int32@testint322 = 3 >> 2;
-int16@testint161 = 2 >> 3;
-int16@testint162 = 3 >> 2;
 bool@testbool1 = true >> false;
 bool@testbool2 = false >> true;
+int16@testint161 = 2 >> 3;
+int16@testint162 = 3 >> 2;
+int32@testint321 = 2 >> 3;
+int32@testint322 = 3 >> 2;
+int64@testint641 = 2l >> 3l;
+int64@testint642 = 3l >> 2l;

@@ -46,10 +46,19 @@ set(OPENVDB_AX_GRAMMAR_DIR ${CMAKE_CURRENT_BINARY_DIR}/openvdb_ax/grammar)
 file(MAKE_DIRECTORY ${OPENVDB_AX_GRAMMAR_DIR})
 
 if(OPENVDB_BUILD_AX_GRAMMAR)
-  find_package(FLEX REQUIRED)
+  # Flex 2.6 and later needed to avoid register warnings under C++17
+  find_package(FLEX 2.6 REQUIRED)
   find_package(BISON 3.0 REQUIRED)
 
-  set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Werror")
+  # @todo fix precedence (as of writing they are innocuous)
+  set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} -Wall -Wno-precedence -Werror")
+
+  # Supported from Bison 3.7 - change #define/#line directives by removing
+  # the full path prefix (this produces reproducible files)
+  if(BISON_VERSION VERSION_GREATER_EQUAL 3.7)
+    set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} --file-prefix-map ${OPENVDB_AX_GRAMMAR_DIR}=.")
+    set(BISON_COMPILE_FLAGS "${BISON_COMPILE_FLAGS} --file-prefix-map ${CMAKE_SOURCE_DIR}=.")
+  endif()
 
   if(OPENVDB_AX_GRAMMAR_NO_LINES)
     # Suppress #line directives
@@ -123,6 +132,7 @@ set(OPENVDB_AX_LIBRARY_SOURCE_FILES
   ast/PrintTree.cc
   ast/Scanners.cc
   ax.cc
+  codegen/Codecs.cc
   codegen/ComputeGenerator.cc
   codegen/FunctionRegistry.cc
   codegen/FunctionTypes.cc
@@ -160,6 +170,7 @@ set(OPENVDB_AX_AST_INCLUDE_FILES
 )
 
 set(OPENVDB_AX_CODEGEN_INCLUDE_FILES
+  codegen/Codecs.h
   codegen/ComputeGenerator.h
   codegen/ConstantFolding.h
   codegen/FunctionRegistry.h
@@ -185,6 +196,12 @@ set(OPENVDB_AX_COMPILER_INCLUDE_FILES
   compiler/PointExecutable.h
   compiler/VolumeExecutable.h
 )
+
+# Suppress some noising warnings from LLVM
+# @todo  Treat LLVM headers as "system" headers on windows to avoid all warnings
+#   as this obviously disables them in OpenVDB too
+add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4624>")
+add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4180>")
 
 # @todo CMake >= 3.12, use an object library to consolidate shared/static
 # builds. There are limitations with earlier versions of CMake when used with
@@ -249,6 +266,8 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
     -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
 endif()
+
+list(APPEND OPENVDB_AX_PRIVATE_DEFINES "-DOPENVDB_AX_PRIVATE")
 
 if(USE_NEW_PASS_MANAGER)
   list(APPEND OPENVDB_AX_PRIVATE_DEFINES -DUSE_NEW_PASS_MANAGER)

@@ -9,6 +9,12 @@ SPDX-License-Identifier: MPL-2.0
 @brief  OpenVDB AX Lexer
 */
 
+%top{
+    // Manually include MIN/MAX macro definitions - fixes warnings on
+    // Windows with older version of flex
+    #include <stdint.h>
+}
+
 %{
     #include "openvdb_ax/ast/Parse.h"
     #include "openvdb_ax/compiler/Logger.h"
@@ -42,6 +48,20 @@ SPDX-License-Identifier: MPL-2.0
             } \
         }
 %}
+
+/* Option 'nounistd' suppresses the inclusion of the non-ANSI header
+ * file unistd.h. This is necessary on Windows (perhaps we should be
+ * doing this in a platform depedant way?). This also requires us to
+ * completely disable parsing interactivity (which for now if fine
+ * as we currently don't support that).
+ */
+%option nounistd
+
+/* Option 'never-interactive' instructs flex to generate a scanner which
+ * never considers its input interactive. Essentially disabled EOF calls
+ * to isatty().
+ */
+%option never-interactive
 
 /* Option 'noyywrap' indicates that when EOF is hit, yyin does not
  * automatically reset to another file.
@@ -230,7 +250,11 @@ COMMENT     "//".*
 {NEWLINE}                   { } /* ignore newlines */
 
 \"(\\.|[^\\"\n])*\"         {
-                                axlval.string = strndup(axtext+1, axleng-2);
+                                // minus quotes, plus null terminator
+                                char* dst = (char*)malloc(sizeof(char) * ((axleng-2) + 1));
+                                memcpy(dst, axtext+1, axleng-2);
+                                dst[axleng-2] = '\0';
+                                axlval.string = dst;
                                 return L_STRING;
                             }
 

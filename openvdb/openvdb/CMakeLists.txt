@@ -117,7 +117,7 @@ if(OPENVDB_CORE_SHARED AND NOT Boost_USE_STATIC_LIBS)
   set(Boost_USE_STATIC_LIBS OFF)
 endif()
 
-find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams system)
+find_package(Boost ${MINIMUM_BOOST_VERSION} REQUIRED COMPONENTS iostreams)
 if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_BOOST_VERSION)
   # The X.Y.Z boost version value isn't available until CMake 3.14
   set(FULL_BOOST_VERSION "${Boost_MAJOR_VERSION}.${Boost_MINOR_VERSION}.${Boost_SUBMINOR_VERSION}")
@@ -187,7 +187,7 @@ endif()
 if(USE_BLOSC OR USE_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
+    if(MSVC)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
     else()
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -250,9 +250,7 @@ endif()
 # if it's in a shared place (like /usr/local) it doesn't accidently pull in
 # other headers.
 
-list(APPEND OPENVDB_CORE_DEPENDENT_LIBS
-  Boost::iostreams
-  Boost::system)
+list(APPEND OPENVDB_CORE_DEPENDENT_LIBS Boost::iostreams)
 
 if(WIN32)
   # Boost headers contain #pragma commands on Windows which causes Boost
@@ -451,10 +449,18 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeSDF.h
+  points/PointRasterizeTrilinear.h
   points/PointSample.h
   points/PointScatter.h
   points/PointStatistics.h
+  points/PointTransfer.h
   points/StreamCompression.h
+)
+
+set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointRasterizeSDFImpl.h
+  points/impl/PointRasterizeTrilinearImpl.h
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
@@ -615,6 +621,10 @@ endif()
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
+if(MINGW)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
+endif()
+
 if(WIN32)
   if(USE_IMATH_HALF)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
@@ -723,6 +733,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${CMAKE_
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points)
+install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points/impl)
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tools)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)

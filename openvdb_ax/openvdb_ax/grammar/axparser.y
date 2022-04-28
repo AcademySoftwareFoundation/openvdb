@@ -13,11 +13,7 @@
     #include "openvdb_ax/ast/Parse.h"
     #include "openvdb_ax/ast/Tokens.h"
     #include "openvdb_ax/compiler/Logger.h"
-    #include <openvdb/Platform.h> // for OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
     #include <vector>
-
-    /// @note  Bypasses bison conversion warnings in yyparse
-    OPENVDB_NO_TYPE_CONVERSION_WARNING_BEGIN
 
     extern int axlex();
     extern openvdb::ax::Logger* axlog;
@@ -208,7 +204,7 @@
 %%
 
 tree:
-    /*empty*/    {  *tree = newNode<Tree>(&@$);
+    /*empty*/     %empty {  *tree = newNode<Tree>(&@$);
                     $$ = *tree;
                  }
     | body       {  *tree = newNode<Tree>(&@1, $1);
@@ -335,20 +331,20 @@ loop_condition:
 
 loop_condition_optional:
       loop_condition  { $$ = $1; }
-    | /*empty*/       { $$ = nullptr; }
+    | /*empty*/        %empty { $$ = nullptr; }
 ;
 
 /// @brief A for loop initial statement, an optional list of declarations/list of expressions
 loop_init:
       expressions   { $$ = $1; }
     | declarations  { $$ = $1; }
-    | /*empty*/     { $$ = nullptr; }
+    | /*empty*/      %empty { $$ = nullptr; }
 ;
 
 /// @brief A for loop iteration statement, an optional list of expressions
 loop_iter:
       expressions  { $$ = $1; }
-    | /* empty */  { $$ = nullptr; }
+    | /* empty */   %empty { $$ = nullptr; }
 ;
 
 /// @brief  For loops, while loops and do-while loops.
@@ -546,6 +542,3 @@ vector_type:
 ;
 
 %%
-
-OPENVDB_NO_TYPE_CONVERSION_WARNING_END
-

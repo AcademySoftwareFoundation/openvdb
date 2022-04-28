@@ -1,2 +1,0 @@
-Build:
-    - Improved locating NumPy in CMake when multiple python versions are installed.

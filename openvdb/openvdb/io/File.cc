@@ -10,7 +10,7 @@
 #include <openvdb/util/logging.h>
 #include <cstdint>
 #include <boost/iostreams/copy.hpp>
-#ifndef _MSC_VER
+#ifndef _WIN32
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
@@ -213,7 +213,7 @@ File::getSize() const
 
     std::string mesg = "could not get size of file " + filename();
 
-#ifdef _MSC_VER
+#ifdef _WIN32
     // Get the file size by seeking to the end of the file.
     std::ifstream fstrm(filename());
     if (fstrm) {

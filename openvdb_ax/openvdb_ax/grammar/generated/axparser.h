@@ -1,8 +1,9 @@
-/* A Bison parser, made by GNU Bison 3.0.5.  */
+/* A Bison parser, made by GNU Bison 3.8.2.  */
 
 /* Bison interface for Yacc-like parsers in C
 
-   Copyright (C) 1984, 1989-1990, 2000-2015, 2018 Free Software Foundation, Inc.
+   Copyright (C) 1984, 1989-1990, 2000-2015, 2018-2021 Free Software Foundation,
+   Inc.
 
    This program is free software: you can redistribute it and/or modify
    it under the terms of the GNU General Public License as published by
@@ -15,7 +16,7 @@
    GNU General Public License for more details.
 
    You should have received a copy of the GNU General Public License
-   along with this program.  If not, see <http://www.gnu.org/licenses/>.  */
+   along with this program.  If not, see <https://www.gnu.org/licenses/>.  */
 
 /* As a special exception, you may create a larger work that contains
    part or all of the Bison parser skeleton and distribute that work
@@ -30,8 +31,12 @@
    This special exception was added by the Free Software Foundation in
    version 2.2 of Bison.  */
 
-#ifndef YY_AX_OPENVDB_AX_GRAMMAR_AXPARSER_H_INCLUDED
-# define YY_AX_OPENVDB_AX_GRAMMAR_AXPARSER_H_INCLUDED
+/* DO NOT RELY ON FEATURES THAT ARE NOT DOCUMENTED in the manual,
+   especially those whose name start with YY_ or yy_.  They are
+   private implementation details that can be changed or removed.  */
+
+#ifndef YY_AX_AXPARSER_H_INCLUDED
+# define YY_AX_AXPARSER_H_INCLUDED
 /* Debug traces.  */
 #ifndef AXDEBUG
 # if defined YYDEBUG
@@ -48,116 +53,119 @@
 extern int axdebug;
 #endif
 
-/* Token type.  */
+/* Token kinds.  */
 #ifndef AXTOKENTYPE
 # define AXTOKENTYPE
   enum axtokentype
   {
-    TRUE = 258,
-    FALSE = 259,
-    SEMICOLON = 260,
-    AT = 261,
-    DOLLAR = 262,
-    IF = 263,
-    ELSE = 264,
-    FOR = 265,
-    DO = 266,
-    WHILE = 267,
-    RETURN = 268,
-    BREAK = 269,
-    CONTINUE = 270,
-    LCURLY = 271,
-    RCURLY = 272,
-    LSQUARE = 273,
-    RSQUARE = 274,
-    STRING = 275,
-    DOUBLE = 276,
-    FLOAT = 277,
-    INT32 = 278,
-    INT64 = 279,
-    BOOL = 280,
-    VEC2I = 281,
-    VEC2F = 282,
-    VEC2D = 283,
-    VEC3I = 284,
-    VEC3F = 285,
-    VEC3D = 286,
-    VEC4I = 287,
-    VEC4F = 288,
-    VEC4D = 289,
-    F_AT = 290,
-    I_AT = 291,
-    V_AT = 292,
-    S_AT = 293,
-    I16_AT = 294,
-    MAT3F = 295,
-    MAT3D = 296,
-    MAT4F = 297,
-    MAT4D = 298,
-    M3F_AT = 299,
-    M4F_AT = 300,
-    F_DOLLAR = 301,
-    I_DOLLAR = 302,
-    V_DOLLAR = 303,
-    S_DOLLAR = 304,
-    DOT_X = 305,
-    DOT_Y = 306,
-    DOT_Z = 307,
-    L_INT32 = 308,
-    L_INT64 = 309,
-    L_FLOAT = 310,
-    L_DOUBLE = 311,
-    L_STRING = 312,
-    IDENTIFIER = 313,
-    COMMA = 314,
-    QUESTION = 315,
-    COLON = 316,
-    EQUALS = 317,
-    PLUSEQUALS = 318,
-    MINUSEQUALS = 319,
-    MULTIPLYEQUALS = 320,
-    DIVIDEEQUALS = 321,
-    MODULOEQUALS = 322,
-    BITANDEQUALS = 323,
-    BITXOREQUALS = 324,
-    BITOREQUALS = 325,
-    SHIFTLEFTEQUALS = 326,
-    SHIFTRIGHTEQUALS = 327,
-    OR = 328,
-    AND = 329,
-    BITOR = 330,
-    BITXOR = 331,
-    BITAND = 332,
-    EQUALSEQUALS = 333,
-    NOTEQUALS = 334,
-    MORETHAN = 335,
-    LESSTHAN = 336,
-    MORETHANOREQUAL = 337,
-    LESSTHANOREQUAL = 338,
-    SHIFTLEFT = 339,
-    SHIFTRIGHT = 340,
-    PLUS = 341,
-    MINUS = 342,
-    MULTIPLY = 343,
-    DIVIDE = 344,
-    MODULO = 345,
-    UMINUS = 346,
-    NOT = 347,
-    BITNOT = 348,
-    PLUSPLUS = 349,
-    MINUSMINUS = 350,
-    LPARENS = 351,
-    RPARENS = 352,
-    LOWER_THAN_ELSE = 353
+    AXEMPTY = -2,
+    AXEOF = 0,                     /* "end of file"  */
+    AXerror = 256,                 /* error  */
+    AXUNDEF = 257,                 /* "invalid token"  */
+    TRUE = 258,                    /* TRUE  */
+    FALSE = 259,                   /* FALSE  */
+    SEMICOLON = 260,               /* SEMICOLON  */
+    AT = 261,                      /* AT  */
+    DOLLAR = 262,                  /* DOLLAR  */
+    IF = 263,                      /* IF  */
+    ELSE = 264,                    /* ELSE  */
+    FOR = 265,                     /* FOR  */
+    DO = 266,                      /* DO  */
+    WHILE = 267,                   /* WHILE  */
+    RETURN = 268,                  /* RETURN  */
+    BREAK = 269,                   /* BREAK  */
+    CONTINUE = 270,                /* CONTINUE  */
+    LCURLY = 271,                  /* LCURLY  */
+    RCURLY = 272,                  /* RCURLY  */
+    LSQUARE = 273,                 /* LSQUARE  */
+    RSQUARE = 274,                 /* RSQUARE  */
+    STRING = 275,                  /* STRING  */
+    DOUBLE = 276,                  /* DOUBLE  */
+    FLOAT = 277,                   /* FLOAT  */
+    INT32 = 278,                   /* INT32  */
+    INT64 = 279,                   /* INT64  */
+    BOOL = 280,                    /* BOOL  */
+    VEC2I = 281,                   /* VEC2I  */
+    VEC2F = 282,                   /* VEC2F  */
+    VEC2D = 283,                   /* VEC2D  */
+    VEC3I = 284,                   /* VEC3I  */
+    VEC3F = 285,                   /* VEC3F  */
+    VEC3D = 286,                   /* VEC3D  */
+    VEC4I = 287,                   /* VEC4I  */
+    VEC4F = 288,                   /* VEC4F  */
+    VEC4D = 289,                   /* VEC4D  */
+    F_AT = 290,                    /* F_AT  */
+    I_AT = 291,                    /* I_AT  */
+    V_AT = 292,                    /* V_AT  */
+    S_AT = 293,                    /* S_AT  */
+    I16_AT = 294,                  /* I16_AT  */
+    MAT3F = 295,                   /* MAT3F  */
+    MAT3D = 296,                   /* MAT3D  */
+    MAT4F = 297,                   /* MAT4F  */
+    MAT4D = 298,                   /* MAT4D  */
+    M3F_AT = 299,                  /* M3F_AT  */
+    M4F_AT = 300,                  /* M4F_AT  */
+    F_DOLLAR = 301,                /* F_DOLLAR  */
+    I_DOLLAR = 302,                /* I_DOLLAR  */
+    V_DOLLAR = 303,                /* V_DOLLAR  */
+    S_DOLLAR = 304,                /* S_DOLLAR  */
+    DOT_X = 305,                   /* DOT_X  */
+    DOT_Y = 306,                   /* DOT_Y  */
+    DOT_Z = 307,                   /* DOT_Z  */
+    L_INT32 = 308,                 /* L_INT32  */
+    L_INT64 = 309,                 /* L_INT64  */
+    L_FLOAT = 310,                 /* L_FLOAT  */
+    L_DOUBLE = 311,                /* L_DOUBLE  */
+    L_STRING = 312,                /* L_STRING  */
+    IDENTIFIER = 313,              /* IDENTIFIER  */
+    COMMA = 314,                   /* COMMA  */
+    QUESTION = 315,                /* QUESTION  */
+    COLON = 316,                   /* COLON  */
+    EQUALS = 317,                  /* EQUALS  */
+    PLUSEQUALS = 318,              /* PLUSEQUALS  */
+    MINUSEQUALS = 319,             /* MINUSEQUALS  */
+    MULTIPLYEQUALS = 320,          /* MULTIPLYEQUALS  */
+    DIVIDEEQUALS = 321,            /* DIVIDEEQUALS  */
+    MODULOEQUALS = 322,            /* MODULOEQUALS  */
+    BITANDEQUALS = 323,            /* BITANDEQUALS  */
+    BITXOREQUALS = 324,            /* BITXOREQUALS  */
+    BITOREQUALS = 325,             /* BITOREQUALS  */
+    SHIFTLEFTEQUALS = 326,         /* SHIFTLEFTEQUALS  */
+    SHIFTRIGHTEQUALS = 327,        /* SHIFTRIGHTEQUALS  */
+    OR = 328,                      /* OR  */
+    AND = 329,                     /* AND  */
+    BITOR = 330,                   /* BITOR  */
+    BITXOR = 331,                  /* BITXOR  */
+    BITAND = 332,                  /* BITAND  */
+    EQUALSEQUALS = 333,            /* EQUALSEQUALS  */
+    NOTEQUALS = 334,               /* NOTEQUALS  */
+    MORETHAN = 335,                /* MORETHAN  */
+    LESSTHAN = 336,                /* LESSTHAN  */
+    MORETHANOREQUAL = 337,         /* MORETHANOREQUAL  */
+    LESSTHANOREQUAL = 338,         /* LESSTHANOREQUAL  */
+    SHIFTLEFT = 339,               /* SHIFTLEFT  */
+    SHIFTRIGHT = 340,              /* SHIFTRIGHT  */
+    PLUS = 341,                    /* PLUS  */
+    MINUS = 342,                   /* MINUS  */
+    MULTIPLY = 343,                /* MULTIPLY  */
+    DIVIDE = 344,                  /* DIVIDE  */
+    MODULO = 345,                  /* MODULO  */
+    UMINUS = 346,                  /* UMINUS  */
+    NOT = 347,                     /* NOT  */
+    BITNOT = 348,                  /* BITNOT  */
+    PLUSPLUS = 349,                /* PLUSPLUS  */
+    MINUSMINUS = 350,              /* MINUSMINUS  */
+    LPARENS = 351,                 /* LPARENS  */
+    RPARENS = 352,                 /* RPARENS  */
+    LOWER_THAN_ELSE = 353          /* LOWER_THAN_ELSE  */
   };
+  typedef enum axtokentype axtoken_kind_t;
 #endif
 
 /* Value type.  */
 #if ! defined AXSTYPE && ! defined AXSTYPE_IS_DECLARED
-
 union AXSTYPE
 {
-
 
     /// @brief Temporary storage for comma separated expressions
     using ExpList = std::vector<openvdb::ax::ast::Expression*>;
@@ -184,7 +192,6 @@ union AXSTYPE
 
 
 };
-
 typedef union AXSTYPE AXSTYPE;
 # define AXSTYPE_IS_TRIVIAL 1
 # define AXSTYPE_IS_DECLARED 1
@@ -207,6 +214,8 @@ struct AXLTYPE
 
 extern AXSTYPE axlval;
 extern AXLTYPE axlloc;
+
 int axparse (openvdb::ax::ast::Tree** tree);
 
-#endif /* !YY_AX_OPENVDB_AX_GRAMMAR_AXPARSER_H_INCLUDED  */
+
+#endif /* !YY_AX_AXPARSER_H_INCLUDED  */

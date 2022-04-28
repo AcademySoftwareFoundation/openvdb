@@ -11,6 +11,8 @@ cmake_minimum_required(VERSION 3.15)
 project(OpenVDBAXUnitTests LANGUAGES CXX)
 
 option(OPENVDB_AX_TEST_PROFILE "Switch on profiling for some of the unit tests." OFF)
+option(OPENVDB_AX_TEST_CMD "Enable/disable tests for the vdb_ax binary." ON)
+option(OPENVDB_AX_TEST_CMD_DOWNLOADS "Enable/disable tests for the vdb_ax binary which require downloads." OFF)
 
 ##########################################################################
 
@@ -19,6 +21,15 @@ message(STATUS "---------- Configuring OpenVDBAXUnitTests ----------")
 message(STATUS "----------------------------------------------------")
 
 ##########################################################################
+
+if(TARGET vdb_ax AND OPENVDB_AX_TEST_CMD)
+  add_test(NAME vdb_ax_cmd_test
+    COMMAND ${CMAKE_COMMAND}
+      -DVDB_AX_BINARY_PATH=$<TARGET_FILE:vdb_ax>
+      -DDOWNLOAD_VDBS=${OPENVDB_AX_TEST_CMD_DOWNLOADS}
+      -DCMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
+      -P ${CMAKE_CURRENT_LIST_DIR}/TestAXCmd.cmake)
+endif()
 
 if(NOT OPENVDB_BUILD_AX)
   set(OPENVDBAX_LIB OpenVDB::openvdb_ax)
@@ -32,6 +43,7 @@ set(TEST_SOURCE_FILES
   ast/TestScanners.cc
   ast/TestPrinters.cc
   backend/TestAttributeBindings.cc
+  backend/TestCodecs.cc
   backend/TestComputeGeneratorFailures.cc
   backend/TestFunctionGroup.cc
   backend/TestFunctionRegistry.cc
@@ -102,3 +114,15 @@ if(OPENVDB_AX_TEST_PROFILE)
 endif()
 
 add_test(NAME vdb_ax_unit_test COMMAND vdb_ax_test -v WORKING_DIRECTORY ${CMAKE_CURRENT_LIST_DIR}/../)
+
+# For the undefined behaviour sanitizer, add the suppression file and
+# additional options
+
+get_filename_component(PATH_TO_PROJECT_ROOT ${CMAKE_CURRENT_LIST_DIR} DIRECTORY)
+get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
+get_filename_component(PATH_TO_PROJECT_ROOT ${PATH_TO_PROJECT_ROOT} DIRECTORY)
+set(UBSAN_SUPRESSION_FILE ${PATH_TO_PROJECT_ROOT}/cmake/scripts/ubsan.supp)
+
+set_tests_properties(vdb_ax_unit_test PROPERTIES
+    ENVIRONMENT
+      "$<$<CONFIG:UBSAN>:UBSAN_OPTIONS=halt_on_error=1 report_error_type=1 suppressions=${UBSAN_SUPRESSION_FILE}>")

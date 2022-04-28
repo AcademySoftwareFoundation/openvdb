@@ -67,7 +67,7 @@ class Compiler;
 ///       @sa setGrainSize
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
-class PointExecutable
+class OPENVDB_AX_API PointExecutable
 {
 public:
     using Ptr = std::shared_ptr<PointExecutable>;
@@ -145,6 +145,9 @@ public:
 private:
     friend class Compiler;
     friend class ::TestPointExecutable;
+
+    /// @brief  Private method used in the unit tests
+    bool usesAcceleratedKernel(const points::PointDataTree& tree) const;
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not
     ///   be invoked directly.

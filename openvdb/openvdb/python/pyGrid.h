@@ -23,6 +23,7 @@
 #include "openvdb/math/Math.h" // for math::isExactlyEqual()
 #include "openvdb/points/PointDataGrid.h"
 #include "openvdb/tools/LevelSetSphere.h"
+#include "openvdb/tools/Count.h"
 #include "openvdb/tools/Dense.h"
 #include "openvdb/tools/ChangeBackground.h"
 #include "openvdb/tools/Prune.h"
@@ -504,9 +505,8 @@ template<typename GridType>
 inline py::tuple
 evalMinMax(const GridType& grid)
 {
-    typename GridType::ValueType vmin, vmax;
-    grid.tree().evalMinMax(vmin, vmax);
-    return py::make_tuple(vmin, vmax);
+    const math::MinMax<typename GridType::ValueType> extrema = tools::minMax(grid.tree());
+    return py::make_tuple(extrema.min(), extrema.max());
 }
 
 

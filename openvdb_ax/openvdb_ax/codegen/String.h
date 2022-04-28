@@ -36,16 +36,18 @@ struct String
     static_assert(SSO_LENGTH >= 2, "SSO should be greater than or equal to 2");
 
     String() : String("", 0) {}
+    /// Construct from null terminated character string
     String(const char* str) : String(str, std::strlen(str)) {}
-    // initialize from a fixed size char array
-    // @note the last element in the array is NOT the null terminator.
-    //   this is automatically added. i.e. char data[3] = {'f','o','o'}
-    //   is valid.
-    template<std::size_t S>
-    String(char (&str)[S]) : String(str, S) {}
     String(const std::string& str) : String(str.c_str(), str.size()) {}
-    String(const String& other) : String(other.ptr, other.len) {}
+    String(const char* str, const int64_t size)
+    {
+        assert(str != nullptr);
+        this->ptr = this->SSO; // for the isLocal check in alloc
+        this->reset(str, size);
+    }
     ~String() { if (!this->isLocal()) std::free(ptr); }
+
+    String(const String& other) : String(other.ptr, other.len) {}
 
     ///////////////////////////////////////////////////////////////////////////
 
@@ -96,13 +98,6 @@ struct String
     // Internal methods and members. These should never be used directly, but
     // remain public for C bindings in StringFunction (allowing for behaviour
     // coupling with the IR implementations).
-
-    String(const char* str, const int64_t size)
-    {
-        assert(str != nullptr);
-        this->ptr = this->SSO; // for the isLocal check in alloc
-        this->reset(str, size);
-    }
 
     inline void reset(const char* str, const int64_t size)
     {

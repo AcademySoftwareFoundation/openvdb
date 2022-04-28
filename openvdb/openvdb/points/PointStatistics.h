@@ -571,7 +571,7 @@ bool evalAverage(const PointDataTreeT& points,
         });
 
     auto iter = values.cbegin();
-    while (!(*iter) && iter != values.cend()) ++iter;
+    while (iter != values.cend() && !(*iter)) ++iter;
     if (iter == values.cend()) return false;
     assert(*iter);
 
@@ -652,7 +652,7 @@ bool accumulate(const PointDataTreeT& points,
         });
 
     auto iter = values.cbegin();
-    while (!(*iter) && iter != values.cend()) ++iter;
+    while (iter != values.cend() && !(*iter)) ++iter;
     if (iter == values.cend()) return false;
     assert(*iter);
     total = **iter; ++iter;

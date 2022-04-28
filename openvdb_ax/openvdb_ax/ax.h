@@ -32,18 +32,18 @@ namespace ax {
 /// @details  Must be called before any AX compilation or execution is performed.
 ///           Can be safely called from multiple threads. Cannot be called after
 ///           uninitialize has been called.
-void initialize();
+OPENVDB_AX_API void initialize();
 
 /// @brief  Check to see if OpenVDB AX components have been initialized.
 /// @note  Can be safely called from multiple threads.
-bool isInitialized();
+OPENVDB_AX_API bool isInitialized();
 
 /// @brief  Uninitialize and deregister OpenVDB AX.
 /// @details  This has the important function of shutting down LLVM and
 ///           correctly freeing statically allocated LLVM types. Should be
 ///           called on application termination. Can be safely called from
 ///           multiple threads.
-void uninitialize();
+OPENVDB_AX_API void uninitialize();
 
 ////////////////////////////////////////
 ////////////////////////////////////////
@@ -70,6 +70,7 @@ void uninitialize();
 ///                  This can be initialized as a vector of pairs of strings e.g.
 ///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
 ///                  AttributeBindings.h for details.
+OPENVDB_AX_API
 void run(const char* ax, openvdb::GridBase& grid,
          const AttributeBindings& bindings = {});
 
@@ -98,6 +99,7 @@ void run(const char* ax, openvdb::GridBase& grid,
 ///                  This can be initialized as a vector of pairs of strings e.g.
 ///                  {{"axname0","dataname0"}, {"axname1","dataname1"}} see
 ///                  AttributeBindings.h for details.
+OPENVDB_AX_API
 void run(const char* ax, openvdb::GridPtrVec& grids,
          const AttributeBindings& bindings = {});
 

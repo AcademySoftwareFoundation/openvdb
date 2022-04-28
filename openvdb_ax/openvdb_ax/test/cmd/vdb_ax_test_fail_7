@@ -1,0 +1,3 @@
+[1] error: implicit conversion in assignment (possible truncation) [warning-as-error] 1:1
+int a = 1.0; int a = 1.0;
+^

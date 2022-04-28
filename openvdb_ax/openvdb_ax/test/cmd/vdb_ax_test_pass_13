@@ -1,0 +1,21 @@
+log
+|
+| - Computes the natural (base e) logarithm of arg.
+|
+|  - double(double n)
+|  - float(float n)
+
+log10
+|
+| - Computes the common (base-10) logarithm of arg.
+|
+|  - double(double n)
+|  - float(float n)
+
+log2
+|
+| - Computes the binary (base-2) logarithm of arg.
+|
+|  - double(double n)
+|  - float(float n)
+

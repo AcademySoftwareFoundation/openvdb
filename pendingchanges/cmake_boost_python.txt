@@ -1,0 +1,4 @@
+Build:
+    - Changed the way boost_python and boost_numpy are located. Both
+    components must match the major/minor version of python in use. This
+    can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.

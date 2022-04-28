@@ -1,0 +1,3 @@
+Improvements:
+    - Significant performance improvements to AX point kernels, primarily due to
+    providing AX access to attribute buffers for superior code generation.

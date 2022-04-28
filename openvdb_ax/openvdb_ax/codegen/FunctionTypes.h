@@ -132,6 +132,11 @@ using M4F = ArgType<float, 16>;
 template <typename T> struct TypeToSymbol { static inline std::string s() { return "?"; } };
 template <> struct TypeToSymbol<void> { static inline std::string s() { return "v"; } };
 template <> struct TypeToSymbol<char> { static inline std::string s() { return "c"; } };
+template <> struct TypeToSymbol<uint8_t>  { static inline std::string s() { return "u8"; } };
+template <> struct TypeToSymbol<uint16_t> { static inline std::string s() { return "us"; } };
+template <> struct TypeToSymbol<uint32_t> { static inline std::string s() { return "ui"; } };
+template <> struct TypeToSymbol<uint64_t> { static inline std::string s() { return "ul"; } };
+template <> struct TypeToSymbol<int8_t>  { static inline std::string s() { return "8"; } };
 template <> struct TypeToSymbol<int16_t> { static inline std::string s() { return "s"; } };
 template <> struct TypeToSymbol<int32_t> { static inline std::string s() { return "i"; } };
 template <> struct TypeToSymbol<int64_t> { static inline std::string s() { return "l"; } };
@@ -245,7 +250,7 @@ llvmFunctionTypeFromSignature(llvm::LLVMContext& C)
 ///               skipped
 /// @param  axTypes Whether to try and convert the llvm::Types provided to
 ///                 AX types. If false, the llvm types are used.
-void
+OPENVDB_AX_API void
 printSignature(std::ostream& os,
                const std::vector<llvm::Type*>& types,
                const llvm::Type* returnType,
@@ -258,7 +263,7 @@ printSignature(std::ostream& os,
 
 /// @brief  The base/abstract representation of an AX function. Derived classes
 ///         must implement the Function::types call to describe their signature.
-struct Function
+struct OPENVDB_AX_API Function
 {
     using Ptr = std::shared_ptr<Function>;
 
@@ -618,7 +623,7 @@ struct CFunction : public CFunctionBase
         "CFunction object has been setup with a pointer return argument. C bindings "
         "cannot return memory locations to LLVM - Consider using a CFunctionSRet.");
 
-    CFunction(const std::string& symbol, const SignatureT function)
+    CFunction(const std::string& symbol, SignatureT* function)
         : CFunctionBase(Traits::N_ARGS, symbol)
         , mFunction(function) {}
 
@@ -666,11 +671,11 @@ struct CFunction : public CFunctionBase
     }
 
 private:
-    const SignatureT* mFunction;
+    SignatureT* mFunction;
 };
 
 /// @brief  The base/abstract definition for an IR function.
-struct IRFunctionBase : public Function
+struct OPENVDB_AX_API IRFunctionBase : public Function
 {
     using Ptr = std::shared_ptr<IRFunctionBase>;
 
@@ -685,9 +690,6 @@ struct IRFunctionBase : public Function
     ///           a ret void, a ret void instruction, or an actual value
     using GeneratorCb = std::function<llvm::Value*
         (const std::vector<llvm::Value*>&, llvm::IRBuilder<>&)>;
-
-    llvm::Type* types(std::vector<llvm::Type*>& types,
-            llvm::LLVMContext& C) const override = 0;
 
     /// @brief  Enable or disable the embedding of IR. Embedded IR is currently
     ///         required for function which use parent function parameters.
@@ -787,7 +789,7 @@ struct IRFunctionSRet : public SRetFunction<SignatureT, IRFunction<SignatureT>>
 };
 
 /// @brief  todo
-struct FunctionGroup
+struct OPENVDB_AX_API FunctionGroup
 {
     using Ptr = std::shared_ptr<FunctionGroup>;
     using UniquePtr = std::unique_ptr<FunctionGroup>;

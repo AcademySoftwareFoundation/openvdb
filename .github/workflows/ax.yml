@@ -56,11 +56,11 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -83,7 +83,11 @@ jobs:
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
           --components=${{ matrix.config.components }}
-          --cargs=\"-DOPENVDB_CXX_STRICT=ON -DUSE_EXPLICIT_INSTANTIATION=OFF\"
+          --cargs=\"
+          -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+          -DUSE_EXPLICIT_INSTANTIATION=OFF
+          -DOPENVDB_CXX_STRICT=ON
+          \"
       - name: clean
         if: matrix.config.components == 'core'
         run: rm -rf build
@@ -93,8 +97,12 @@ jobs:
           ./ci/build.sh -v
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components="axcore,axbin,axtest"
-          --cargs=\"-DOPENVDB_CXX_STRICT=ON -DUSE_EXPLICIT_INSTANTIATION=OFF\"
+          --components="bin,axcore,axbin,axtest"
+          --cargs=\"
+          -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+          -DUSE_EXPLICIT_INSTANTIATION=OFF
+          -DOPENVDB_CXX_STRICT=ON
+          \"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples
@@ -119,10 +127,10 @@ jobs:
         config:
           #@note llvm10 never got its own brew formula...
           - { runner: 'macos-10.15',  cxx: 'clang++', build: 'Release', llvm: '7'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '8'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '9'  }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '11' }
-          - { runner: 'macos-latest', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '8'  }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '9'  }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '11' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '12' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -132,8 +140,12 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,axcore,axbin,axtest"
-          --cargs=\"-DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm -DUSE_EXPLICIT_INSTANTIATION=OFF\"
+          --components="core,bin,axcore,axbin,axtest"
+          --cargs=\"
+          -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
+          -DUSE_EXPLICIT_INSTANTIATION=OFF
+          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          \"
       - name: test
         run: cd build && ctest -V
       - name: test_doxygen_examples

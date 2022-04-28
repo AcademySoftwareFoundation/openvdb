@@ -5,7 +5,6 @@
 #include <openvdb/tools/Prune.h>
 
 #include <gtest/gtest.h>
-#include <tbb/task.h>
 #include <tbb/task_group.h>
 
 #include <type_traits>

@@ -211,38 +211,45 @@ void LLVMoptimise(llvm::Module& module,
     passes.run(module);
 }
 
+// OptimizationLevel moved from llvm 13
+#if LLVM_VERSION_MAJOR <= 13
+using LLVM_OPTIMIZATION_LEVEL = llvm::PassBuilder::OptimizationLevel;
+#else
+using LLVM_OPTIMIZATION_LEVEL = llvm::OptimizationLevel;
+#endif
+
 void LLVMoptimise(llvm::Module& module,
-                  const llvm::PassBuilder::OptimizationLevel opt,
+                  const LLVM_OPTIMIZATION_LEVEL opt,
                   llvm::TargetMachine* TM)
 {
     unsigned optLevel = 0, sizeLevel = 0;
 
-    // llvm::PassBuilder::OptimizationLevel is an enum in llvm 10
+    // LLVM_OPTIMIZATION_LEVEL is an enum in llvm 10
     // and earlier, a class in llvm 11 and later (which holds
     // various member data about the optimization level)
 #if LLVM_VERSION_MAJOR < 11
     switch (opt) {
-        case llvm::PassBuilder::OptimizationLevel::O0 : {
+        case LLVM_OPTIMIZATION_LEVEL::O0 : {
             optLevel = 0; sizeLevel = 0;
             break;
         }
-        case llvm::PassBuilder::OptimizationLevel::O1 : {
+        case LLVM_OPTIMIZATION_LEVEL::O1 : {
             optLevel = 1; sizeLevel = 0;
             break;
         }
-        case llvm::PassBuilder::OptimizationLevel::O2 : {
+        case LLVM_OPTIMIZATION_LEVEL::O2 : {
             optLevel = 2; sizeLevel = 0;
             break;
         }
-        case llvm::PassBuilder::OptimizationLevel::Os : {
+        case LLVM_OPTIMIZATION_LEVEL::Os : {
             optLevel = 2; sizeLevel = 1;
             break;
         }
-        case llvm::PassBuilder::OptimizationLevel::Oz : {
+        case LLVM_OPTIMIZATION_LEVEL::Oz : {
             optLevel = 2; sizeLevel = 2;
             break;
         }
-        case llvm::PassBuilder::OptimizationLevel::O3 : {
+        case LLVM_OPTIMIZATION_LEVEL::O3 : {
             optLevel = 3; sizeLevel = 0;
             break;
         }
@@ -259,7 +266,7 @@ void LLVMoptimise(llvm::Module& module,
 #else
 
 void LLVMoptimise(llvm::Module& module,
-                  const llvm::PassBuilder::OptimizationLevel optLevel,
+                  const LLVM_OPTIMIZATION_LEVEL optLevel,
                   llvm::TargetMachine* TM)
 {
     // use the PassBuilder for optimisation pass management
@@ -283,7 +290,7 @@ void LLVMoptimise(llvm::Module& module,
     PB.crossRegisterProxies(LAM, FAM, cGSCCAM, MAM);
 
     // the PassBuilder does not produce -O0 pipelines, so do that ourselves
-    if (optLevel == llvm::PassBuilder::OptimizationLevel::O0) {
+    if (optLevel == LLVM_OPTIMIZATION_LEVEL::O0) {
         // matching clang -O0, only add inliner pass
         // ref: clang CodeGen/BackEndUtil.cpp EmitAssemblyWithNewPassManager
         llvm::ModulePassManager MPM;
@@ -317,27 +324,27 @@ void optimise(llvm::Module& module,
 {
     switch (optLevel) {
         case CompilerOptions::OptLevel::O0 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O0, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::O0, TM);
             break;
         }
         case CompilerOptions::OptLevel::O1 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O1, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::O1, TM);
             break;
         }
         case CompilerOptions::OptLevel::O2 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O2, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::O2, TM);
             break;
         }
         case CompilerOptions::OptLevel::Os : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Os, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::Os, TM);
             break;
         }
         case CompilerOptions::OptLevel::Oz : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::Oz, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::Oz, TM);
             break;
         }
         case CompilerOptions::OptLevel::O3 : {
-            LLVMoptimise(module, llvm::PassBuilder::OptimizationLevel::O3, TM);
+            LLVMoptimise(module, LLVM_OPTIMIZATION_LEVEL::O3, TM);
             break;
         }
         case CompilerOptions::OptLevel::NONE :
@@ -750,7 +757,7 @@ Compiler::compile(const ast::Tree& tree,
 }
 
 template<>
-PointExecutable::Ptr
+OPENVDB_AX_API PointExecutable::Ptr
 Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
                                    Logger& logger,
                                    const CustomData::Ptr customData)
@@ -764,8 +771,8 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     verifyTypedAccesses(*tree, logger);
 
     const std::vector<std::string> functionNames {
-        codegen::PointKernel::getDefaultName(),
-        codegen::PointRangeKernel::getDefaultName()
+        codegen::PointKernelBufferRange::getDefaultName(),
+        codegen::PointKernelAttributeArray::getDefaultName()
     };
 
     return this->compile<PointExecutable, GenT>(*tree, "ax.point.module",
@@ -773,7 +780,7 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
 }
 
 template<>
-VolumeExecutable::Ptr
+OPENVDB_AX_API VolumeExecutable::Ptr
 Compiler::compile<VolumeExecutable>(const ast::Tree& syntaxTree,
                                     Logger& logger,
                                     const CustomData::Ptr customData)

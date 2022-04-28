@@ -214,10 +214,6 @@
 #ifdef OPENVDB_IMPORT
 #undef OPENVDB_IMPORT
 #endif
-#ifdef __GNUC__
-    #define OPENVDB_EXPORT __attribute__((visibility("default")))
-    #define OPENVDB_IMPORT __attribute__((visibility("default")))
-#endif
 #ifdef _WIN32
     #ifdef OPENVDB_DLL
         #define OPENVDB_EXPORT __declspec(dllexport)
@@ -226,6 +222,9 @@
         #define OPENVDB_EXPORT
         #define OPENVDB_IMPORT
     #endif
+#elif defined(__GNUC__)
+    #define OPENVDB_EXPORT __attribute__((visibility("default")))
+    #define OPENVDB_IMPORT __attribute__((visibility("default")))
 #endif
 
 /// Helper macros for explicit template instantiation
@@ -261,6 +260,19 @@
 #else
     #define OPENVDB_HOUDINI_API OPENVDB_IMPORT
 #endif
+
+#ifdef OPENVDB_AX_DLL
+#ifdef OPENVDB_AX_API
+#undef OPENVDB_AX_API
+#endif
+#ifdef OPENVDB_AX_PRIVATE
+    #define OPENVDB_AX_API OPENVDB_EXPORT
+#else
+    #define OPENVDB_AX_API OPENVDB_IMPORT
+#endif
+#else
+#define OPENVDB_AX_API
+#endif // OPENVDB_AX_DLL
 
 #if defined(__ICC)
 

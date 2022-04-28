@@ -1,0 +1,30 @@
+#################################################################################
+## This file is loaded by the Undefined Behaviour Sanitizer build for the unit ##
+## tests. It can be used to ignore various errors reported by the sanitizer.   ##
+## This is especially useful with upstream issues (e.g. boost/tbb). For help   ##
+## defining suppression rules, see:                                            ##
+##   https://clang.llvm.org/docs/UndefinedBehaviorSanitizer.html               ##
+## The build is configured with CMAKE_BUILD_TYPE=ubsan.                        ##
+#################################################################################
+
+##### Upstream #####
+
+# Lots of warnings from TBB, ignore them
+alignment:tbb/concurrent_hash_map.h
+vptr:tbb/parallel_reduce.h
+vptr:tbb/task.h
+
+##### OpenVDB #####
+
+# The sOn/sOff static bool data held on the LeaffBuff<bool> objects can be
+# initialised to arbitrary true/false values. See the note in LeafBuffer.h
+enum:openvdb/tools/Activate.h
+# Some 2s complement tests, ignore the negative shifts
+# @todo Should address these
+shift-base:TestMultiResGrid.cc
+shift-base:openvdb/math/Coord.h
+
+##### OpenVDB AX #####
+
+# Ignore overflows reported from old OpenSimplexNoise
+signed-integer-overflow:openvdb_ax/math/OpenSimplexNoise.cc

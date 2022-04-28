@@ -704,12 +704,12 @@ T OSNoise::eval(const T x, const T y, const T z) const
   return (value * NORM_CONSTANT);
 }
 
-template double OSNoise::extrapolate(const OSNoise::inttype xsb, const OSNoise::inttype ysb, const OSNoise::inttype zsb,
+template OPENVDB_AX_API double OSNoise::extrapolate(const OSNoise::inttype xsb, const OSNoise::inttype ysb, const OSNoise::inttype zsb,
                                      const double dx, const double dy, const double dz) const;
-template double OSNoise::extrapolate(const OSNoise::inttype xsb, const OSNoise::inttype ysb, const OSNoise::inttype zsb,
+template OPENVDB_AX_API double OSNoise::extrapolate(const OSNoise::inttype xsb, const OSNoise::inttype ysb, const OSNoise::inttype zsb,
                                      const double dx, const double dy, const double dz,
                                      double (&de) [3]) const;
 
-template double OSNoise::eval(const double x, const double y, const double z) const;
+template OPENVDB_AX_API double OSNoise::eval(const double x, const double y, const double z) const;
 
 } // namespace OSN

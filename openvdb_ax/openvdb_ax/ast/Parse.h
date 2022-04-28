@@ -35,7 +35,8 @@ namespace ast {
 /// @param code    The code to parse
 /// @param logger  The logger to collect syntax errors
 ///
-openvdb::ax::ast::Tree::ConstPtr parse(const char* code, ax::Logger& logger);
+OPENVDB_AX_API openvdb::ax::ast::Tree::ConstPtr
+parse(const char* code, ax::Logger& logger);
 
 /// @brief  Construct an abstract syntax tree from a code snippet.
 ///         A runtime exception will be thrown with the first syntax error.
@@ -44,7 +45,7 @@ openvdb::ax::ast::Tree::ConstPtr parse(const char* code, ax::Logger& logger);
 ///
 /// @param code The code to parse
 ///
-openvdb::ax::ast::Tree::Ptr parse(const char* code);
+OPENVDB_AX_API openvdb::ax::ast::Tree::Ptr parse(const char* code);
 
 } // namespace ast
 } // namespace ax

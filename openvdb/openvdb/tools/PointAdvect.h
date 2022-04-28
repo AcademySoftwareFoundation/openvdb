@@ -21,7 +21,6 @@
 
 #include <tbb/blocked_range.h>             // threading
 #include <tbb/parallel_for.h>              // threading
-#include <tbb/task.h>                      // for cancel
 
 #include <vector>
 

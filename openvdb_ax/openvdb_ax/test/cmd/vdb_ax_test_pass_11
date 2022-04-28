@@ -1,0 +1,9 @@
+[1] warning: declaration of variable "i" shadows a previous declaration 24:9
+    for(int32 i = 0; i < 3;) {
+--------^
+[2] warning: implicit conversion in function call 61:33
+    for (int32 i = 5; int32 k = floor(i - 1); --i) j++;
+--------------------------------^
+[3] warning: implicit conversion in assignment (possible truncation) 61:23
+    for (int32 i = 5; int32 k = floor(i - 1); --i) j++;
+----------------------^

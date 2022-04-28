@@ -88,13 +88,11 @@ jobs:
         path: /tmp/ccache
         key: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-${{ steps.timestamp.outputs.timestamp }}
         restore-keys: linux-vfx${{ matrix.config.image }}-abi${{ matrix.config.abi }}-${{ matrix.config.cxx }}-
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}\"
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
@@ -148,21 +146,21 @@ jobs:
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,bin,test\"
+        --components=\"core,bin,view,render,test\"
         --cargs=\'${{ matrix.config.cmake }} -DUSE_EXR=ON -DUSE_PNG=ON -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
     - name: test
       shell: bash
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
       # https://github.community/t/distinct-job-for-each-schedule/17811/2
       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
-      run: cd build && ctest -V
+      run: cd build && ctest -V -C ${{ matrix.config.build }}
 
-  testmacos1015:
+  testmacos11:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-10.15
+    runs-on: macos-11
     env:
       CXX: clang++
     steps:
@@ -184,7 +182,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash

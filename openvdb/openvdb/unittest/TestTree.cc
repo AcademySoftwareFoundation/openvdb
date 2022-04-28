@@ -293,10 +293,9 @@ TEST_F(TestTree, testSetValue)
     ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, tree.getValue(c1));
     EXPECT_EQ(2, int(tree.activeVoxelCount()));
 
-    float minVal = -999.0, maxVal = -999.0;
-    tree.evalMinMax(minVal, maxVal);
-    ASSERT_DOUBLES_EXACTLY_EQUAL(12.0, minVal);
-    ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, maxVal);
+    const openvdb::math::MinMax<float> extrema = openvdb::tools::minMax(tree);
+    ASSERT_DOUBLES_EXACTLY_EQUAL(12.0, extrema.min());
+    ASSERT_DOUBLES_EXACTLY_EQUAL(15.0, extrema.max());
 
     tree.setValueOff(c0, background);
 
@@ -462,139 +461,6 @@ TEST_F(TestTree, testSetValueInPlace)
     // use slower de-allocation to ensure that no value copying occurs
 
     tree.root().clear();
-}
-
-namespace {
-
-/// Helper function to test openvdb::tree::Tree::evalMinMax() for various tree types
-template<typename TreeT>
-void
-evalMinMaxTest()
-{
-    using ValueT = typename TreeT::ValueType;
-
-    struct Local {
-        static bool isEqual(const ValueT& a, const ValueT& b) {
-            using namespace openvdb; // for operator>()
-            return !(math::Abs(a - b) > zeroVal<ValueT>());
-        }
-    };
-
-    const ValueT
-        zero = openvdb::zeroVal<ValueT>(),
-        minusTwo = zero + (-2),
-        plusTwo = zero + 2,
-        five = zero + 5;
-
-    TreeT tree(/*background=*/five);
-
-    // No set voxels (defaults to min = max = zero)
-    ValueT minVal = five, maxVal = five;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_TRUE(Local::isEqual(minVal, zero));
-    EXPECT_TRUE(Local::isEqual(maxVal, zero));
-
-    // Only one set voxel
-    tree.setValue(openvdb::Coord(0, 0, 0), minusTwo);
-    minVal = maxVal = five;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_TRUE(Local::isEqual(minVal, minusTwo));
-    EXPECT_TRUE(Local::isEqual(maxVal, minusTwo));
-
-    // Multiple set voxels, single value
-    tree.setValue(openvdb::Coord(10, 10, 10), minusTwo);
-    minVal = maxVal = five;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_TRUE(Local::isEqual(minVal, minusTwo));
-    EXPECT_TRUE(Local::isEqual(maxVal, minusTwo));
-
-    // Multiple set voxels, multiple values
-    tree.setValue(openvdb::Coord(10, 10, 10), plusTwo);
-    tree.setValue(openvdb::Coord(-10, -10, -10), zero);
-    minVal = maxVal = five;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_TRUE(Local::isEqual(minVal, minusTwo));
-    EXPECT_TRUE(Local::isEqual(maxVal, plusTwo));
-}
-
-/// Specialization for boolean trees
-template<>
-void
-evalMinMaxTest<openvdb::BoolTree>()
-{
-    openvdb::BoolTree tree(/*background=*/false);
-
-    // No set voxels (defaults to min = max = zero)
-    bool minVal = true, maxVal = false;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(false, minVal);
-    EXPECT_EQ(false, maxVal);
-
-    // Only one set voxel
-    tree.setValue(openvdb::Coord(0, 0, 0), true);
-    minVal = maxVal = false;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(true, minVal);
-    EXPECT_EQ(true, maxVal);
-
-    // Multiple set voxels, single value
-    tree.setValue(openvdb::Coord(-10, -10, -10), true);
-    minVal = maxVal = false;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(true, minVal);
-    EXPECT_EQ(true, maxVal);
-
-    // Multiple set voxels, multiple values
-    tree.setValue(openvdb::Coord(10, 10, 10), false);
-    minVal = true; maxVal = false;
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(false, minVal);
-    EXPECT_EQ(true, maxVal);
-}
-
-/// Specialization for Coord trees
-template<>
-void
-evalMinMaxTest<openvdb::Coord>()
-{
-    using CoordTree = openvdb::tree::Tree4<openvdb::Coord,5,4,3>::Type;
-    const openvdb::Coord backg(5,4,-6), a(5,4,-7), b(5,5,-6);
-
-    CoordTree tree(backg);
-
-    // No set voxels (defaults to min = max = zero)
-    openvdb::Coord minVal=openvdb::Coord::max(), maxVal=openvdb::Coord::min();
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(openvdb::Coord(0), minVal);
-    EXPECT_EQ(openvdb::Coord(0), maxVal);
-
-    // Only one set voxel
-    tree.setValue(openvdb::Coord(0, 0, 0), a);
-    minVal=openvdb::Coord::max();
-    maxVal=openvdb::Coord::min();
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(a, minVal);
-    EXPECT_EQ(a, maxVal);
-
-    // Multiple set voxels
-    tree.setValue(openvdb::Coord(-10, -10, -10), b);
-    minVal=openvdb::Coord::max();
-    maxVal=openvdb::Coord::min();
-    tree.evalMinMax(minVal, maxVal);
-    EXPECT_EQ(a, minVal);
-    EXPECT_EQ(b, maxVal);
-}
-
-} // unnamed namespace
-
-TEST_F(TestTree, testEvalMinMax)
-{
-    evalMinMaxTest<openvdb::BoolTree>();
-    evalMinMaxTest<openvdb::FloatTree>();
-    evalMinMaxTest<openvdb::Int32Tree>();
-    evalMinMaxTest<openvdb::Vec3STree>();
-    evalMinMaxTest<openvdb::Vec2ITree>();
-    evalMinMaxTest<openvdb::Coord>();
 }
 
 
@@ -2897,7 +2763,6 @@ TEST_F(TestTree, testStealNode)
     }
 }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
 TEST_F(TestTree, testNodeCount)
 {
     //openvdb::util::CpuTimer timer;// use for benchmark test
@@ -2925,7 +2790,6 @@ TEST_F(TestTree, testNodeCount)
     EXPECT_EQ(tree.leafCount(), nodeCount2.front());// leaf nodes
     for (size_t i=0; i<nodeCount2.size(); ++i) EXPECT_EQ( nodeCount1[i], nodeCount2[i]);
 }
-#endif
 
 TEST_F(TestTree, testRootNode)
 {
@@ -3131,7 +2995,3 @@ TEST_F(TestTree, testInternalNode)
     }
 #endif
 }
-
-// Copyright (c) DreamWorks Animation LLC
-// All rights reserved. This software is distributed under the
-// Mozilla Public License 2.0 ( http://www.mozilla.org/MPL/2.0/ )

@@ -83,7 +83,7 @@ namespace codegen_internal {
 ///   independent Statements to not halt traversal for future Statements and so
 ///   allow capturing of multiple errors in an ast::Tree in a single call to
 ///   ComputeGenerator::generate().
-struct ComputeGenerator : public ast::Visitor<ComputeGenerator>
+struct OPENVDB_AX_API ComputeGenerator : public ast::Visitor<ComputeGenerator>
 {
     ComputeGenerator(llvm::Module& module,
                      const FunctionOptions& options,

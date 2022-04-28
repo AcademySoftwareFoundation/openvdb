@@ -21,7 +21,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 
 /// @brief Options that control how functions behave
-struct FunctionOptions
+struct OPENVDB_AX_API FunctionOptions
 {
     /// @brief  Enable the constant folding of C bindings. Functions may use this setting
     ///         to determine whether they are allowed to be called during code generation
@@ -44,7 +44,7 @@ struct FunctionOptions
 };
 
 /// @brief Settings which control how a Compiler class object behaves
-struct CompilerOptions
+struct OPENVDB_AX_API CompilerOptions
 {
     /// @brief Controls the llvm compiler optimization level
     enum class OptLevel

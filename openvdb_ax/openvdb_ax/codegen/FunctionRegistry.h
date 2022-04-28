@@ -13,9 +13,8 @@
 #define OPENVDB_AX_CODEGEN_FUNCTION_REGISTRY_HAS_BEEN_INCLUDED
 
 #include "FunctionTypes.h"
-#include "Types.h"
 
-#include "../compiler/CompilerOptions.h"
+#include "openvdb_ax/compiler/CompilerOptions.h"
 
 #include <openvdb/version.h>
 
@@ -33,7 +32,7 @@ namespace codegen {
 ///   a key into this registry for the corresponding function retrieval and
 ///   execution. Functions can be inserted into the registry using insert() with
 ///   a given identifier and pointer.
-class FunctionRegistry
+class OPENVDB_AX_API FunctionRegistry
 {
 public:
     using ConstructorT = FunctionGroup::UniquePtr(*)(const FunctionOptions&);
@@ -63,9 +62,9 @@ public:
         inline bool isInternal() const { return mInternal; }
 
     private:
-        const ConstructorT mConstructor;
+        ConstructorT mConstructor;
         FunctionGroup::Ptr mFunction;
-        const bool mInternal;
+        bool mInternal;
     };
 
     using RegistryMap = std::unordered_map<std::string, RegisteredFunction>;

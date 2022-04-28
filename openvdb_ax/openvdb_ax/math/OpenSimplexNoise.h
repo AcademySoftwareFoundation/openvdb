@@ -101,7 +101,7 @@ namespace OSN
  */
 
 // 3D Implementation of the OpenSimplexNoise generator.
-class OSNoise
+class OPENVDB_AX_API OSNoise
 {
 public:
     using inttype = int64_t;

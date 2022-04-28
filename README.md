@@ -40,7 +40,6 @@ The following provides basic installation examples for the core OpenVDB library.
 
 ```bash
 apt-get install -y libboost-iostreams-dev
-apt-get install -y libboost-system-dev
 apt-get install -y libtbb-dev
 apt-get install -y libblosc-dev
 ```
@@ -84,7 +83,6 @@ vcpkg install zlib:x64-windows
 vcpkg install blosc:x64-windows
 vcpkg install tbb:x64-windows
 vcpkg install boost-iostreams:x64-windows
-vcpkg install boost-system:x64-windows
 vcpkg install boost-any:x64-windows
 vcpkg install boost-algorithm:x64-windows
 vcpkg install boost-uuid:x64-windows

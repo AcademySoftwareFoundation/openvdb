@@ -1,0 +1,12 @@
+[1] error: implicit conversion in assignment (possible truncation) [warning-as-error] 1:1
+int a = 1.0; int a = 1.0;
+^
+[2] error: local variable "a" has already been declared 1:14
+int a = 1.0; int a = 1.0;
+-------------^
+[3] error: implicit conversion in assignment (possible truncation) [warning-as-error] 1:1
+int a = 1.0; int a = 1.0;
+^
+[4] error: local variable "a" has already been declared 1:14
+int a = 1.0; int a = 1.0;
+-------------^

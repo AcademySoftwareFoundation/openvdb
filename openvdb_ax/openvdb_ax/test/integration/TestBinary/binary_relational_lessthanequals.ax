@@ -1,16 +1,16 @@
 
-bool@test1 = 2l <= 3l;
-bool@test2 = 3l <= 2l;
-bool@test3 = 3l <= 3l;
+bool@test1 = true <= false;
+bool@test2 = false <= true;
+bool@test3 = false <= false;
 bool@test4 = 2 <= 3;
 bool@test5 = 3 <= 2;
 bool@test6 = 3 <= 3;
 bool@test7 = 2 <= 3;
 bool@test8 = 3 <= 2;
 bool@test9 = 3 <= 3;
-bool@test10 = true <= false;
-bool@test11 = false <= true;
-bool@test12 = false <= false;
+bool@test10 = 2l <= 3l;
+bool@test11 = 3l <= 2l;
+bool@test12 = 3l <= 3l;
 bool@test13 = 1.1 <= 2.3;
 bool@test14 = 2.3 <= 1.1;
 bool@test15 = 2.3 <= 2.3;

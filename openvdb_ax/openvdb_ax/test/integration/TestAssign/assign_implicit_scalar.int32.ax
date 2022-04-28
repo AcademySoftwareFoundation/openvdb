@@ -1,6 +1,6 @@
 int32 local = 2;
-int64@testint64 = local;
 bool@testbool = local;
+int64@testint64 = local;
 double@testdouble = local;
 float@testfloat = local;
 

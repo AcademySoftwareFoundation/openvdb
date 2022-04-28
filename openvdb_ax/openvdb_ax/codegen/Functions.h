@@ -38,21 +38,21 @@ inline FunctionRegistry::UniquePtr createDefaultRegistry(const FunctionOptions* 
 /// @param reg The function registry to populate
 /// @param options The current function options
 ///
-void insertStandardFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
+OPENVDB_AX_API void insertStandardFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
 
 /// @brief Populates a function registry with all available OpenVDB Point AX
 ///        library function
 /// @param reg The function registry to populate
 /// @param options The current function options
 ///
-void insertVDBPointFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
+OPENVDB_AX_API void insertVDBPointFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
 
 /// @brief Populates a function registry with all available OpenVDB Volume AX
 ///        library function
 /// @param reg The function registry to populate
 /// @param options The current function options
 ///
-void insertVDBVolumeFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
+OPENVDB_AX_API void insertVDBVolumeFunctions(FunctionRegistry& reg, const FunctionOptions* options = nullptr);
 
 
 ///////////////////////////////////////////////////////////////////////////

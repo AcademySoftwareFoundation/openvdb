@@ -64,8 +64,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
           - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Debug', components: 'core,hou', disable_checks: 'OFF' }
           - { cxx: g++,     image: '2020', hou: '19_0', j: '1', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
       fail-fast: false
@@ -88,8 +88,8 @@ jobs:
       uses: actions/cache@v2
       with:
         path: hou
-        key: vdb-v4-houdini${{ matrix.config.hou }}-${{ hashFiles('hou/hou.tar.gz') }}
-        restore-keys: vdb-v4-houdini${{ matrix.config.hou }}-
+        key: dummy-houdini${{ matrix.config.hou }}-${{ steps.timestamp.outputs.timestamp }}
+        restore-keys: vdb-v5-houdini${{ matrix.config.hou }}-
     - name: validate_houdini
       run: test -f "hou/hou.tar.gz"
       # Make sure the cache is copied, not moved, as the cache action always posts the cache.
@@ -102,8 +102,6 @@ jobs:
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: install_cmake
       run: ./ci/install_cmake.sh 3.15.0
-    - name: install_gtest
-      run: ./ci/install_gtest.sh 1.10.0
     - name: build
       shell: bash
       run: >
@@ -120,6 +118,6 @@ jobs:
       if: matrix.config.build == 'Release'
       shell: bash
       run: ccache --evict-older-than 1d
-      # Final check to make sure the cache still exists
-    - name: validate_houdini
-      run: test -f "hou/hou.tar.gz"
+      # Delete the houdini tarball so that this dummy cache occupies no space
+    - name: delete_hou
+      run: rm -f hou/hou.tar.gz

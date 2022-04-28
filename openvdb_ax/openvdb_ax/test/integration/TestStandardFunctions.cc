@@ -275,7 +275,7 @@ TestStandardFunctions::abs()
     mHarness.addAttributes<int32_t>(unittest_util::nameSequence("test", 3), {
         std::abs(-3), std::abs(3), std::abs(0)
     });
-    mHarness.addAttribute<int64_t>("test4", std::abs(-2147483649l));
+    mHarness.addAttribute<int64_t>("test4", std::llabs(-2147483649LL));
     mHarness.addAttribute<float>("test5", std::abs(0.3f));
     mHarness.addAttribute<float>("test6", std::abs(-0.3f));
     mHarness.addAttribute<double>("test7", std::abs(1.79769e+308));

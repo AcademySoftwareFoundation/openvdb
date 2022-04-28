@@ -113,6 +113,13 @@ public:
     /// Return the number of bytes of memory used by this attribute set.
     size_t memUsage() const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the number of bytes of memory used by this attribute set once it
+    /// has been deserialized (this may be different to memUsage() if delay-loading
+    /// is in use).
+    size_t memUsageIfLoaded() const;
+#endif
+
     /// @brief  Return the position of the attribute array whose name is @a name,
     ///         or @c INVALID_POS if no match is found.
     size_t find(const std::string& name) const;
