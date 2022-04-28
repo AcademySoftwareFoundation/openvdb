@@ -41,9 +41,12 @@ jobs:
         mkdir -p /usr/local/share/doc/OpenVDB/html
         touch /usr/local/share/doc/OpenVDB/html/test
     - name: pre_deploy
-      run: |
-        mkdir -p ~/.ssh
-        ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
+      # Overwrite global SSH configuration
+      run: >
+        echo "Host *
+          StrictHostKeyChecking no
+          UserKnownHostsFile=/dev/null
+        " > /etc/ssh/ssh_config
     - name: deploy
       # only deploy documentation to gh-pages on a manual workflow dispatch
       if: |
