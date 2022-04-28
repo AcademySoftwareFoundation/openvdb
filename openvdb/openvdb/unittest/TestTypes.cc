@@ -396,6 +396,17 @@ struct TypeCodeOp
     template<typename T> void operator()(const T&) { codes.push_back(typeCode<T>()); }
 };
 
+struct ListModifier
+{
+    template <typename T>
+    using Promote = typename PromoteType<T>::Next;
+
+    template <typename T>
+    using RemoveInt32 = typename std::conditional<std::is_same<int32_t, T>::value, TypeList<>, T>::type;
+
+    template <typename T>
+    using Duplicate = TypeList<T, T>;
+};
 
 template<typename TSet>
 inline std::string
@@ -406,6 +417,19 @@ typeSetAsString()
     return op.codes;
 }
 
+template <typename T1, typename T2>
+using ConvertIntegrals = typename std::conditional<std::is_integral<T1>::value, T2, T1>::type;
+
+template <typename T1>
+using ConvertIntegralsToFloats = ConvertIntegrals<T1, float>;
+
+template <typename T>
+struct Tester
+{
+    template <typename T1>
+    using ConvertIntegralsToFloats = ConvertIntegrals<T1, T>;
+};
+
 } // anonymous namespace
 
 /// @note  static_assert with no message requires C++17
@@ -413,49 +437,6 @@ typeSetAsString()
 
 TEST_F(TestTypes, testTypeList)
 {
-    using T0 = TypeList<>;
-    EXPECT_EQ(std::string(), typeSetAsString<T0>());
-
-    using T1 = TypeList<int>;
-    EXPECT_EQ(std::string("i"), typeSetAsString<T1>());
-
-    using T2 = TypeList<float>;
-    EXPECT_EQ(std::string("f"), typeSetAsString<T2>());
-
-    using T3 = TypeList<bool, double>;
-    EXPECT_EQ(std::string("bd"), typeSetAsString<T3>());
-
-    using T4 = T1::Append<T2>;
-    EXPECT_EQ(std::string("if"), typeSetAsString<T4>());
-    EXPECT_EQ(std::string("fi"), typeSetAsString<T2::Append<T1>>());
-
-    using T5 = T3::Append<T4>;
-    EXPECT_EQ(std::string("bdif"), typeSetAsString<T5>());
-
-    using T6 = T5::Append<T5>;
-    EXPECT_EQ(std::string("bdifbdif"), typeSetAsString<T6>());
-
-    using T7 = T5::Append<char, long>;
-    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T7>());
-
-    using T8 = T5::Append<char>::Append<long>;
-    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T8>());
-
-    using T9 = T8::Remove<TypeList<>>;
-    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T9>());
-
-    using T10 = T8::Remove<std::string>;
-    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T10>());
-
-    using T11 = T8::Remove<char>::Remove<int>;
-    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T11>());
-
-    using T12 = T8::Remove<char, int>;
-    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T12>());
-
-    using T13 = T8::Remove<TypeList<char, int>>;
-    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T13>());
-
     /// Compile time tests of TypeList
 
     using IntTypes = TypeList<Int16, Int32, Int64>;
@@ -488,6 +469,9 @@ TEST_F(TestTypes, testTypeList)
     STATIC_ASSERT((std::is_same<IntTypes::Unique<>, IntTypes>::value));
     STATIC_ASSERT((std::is_same<IntTypes::Unique<IntTypes>, IntTypes>::value));
     STATIC_ASSERT((std::is_same<EmptyList::Unique<>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int, int, int>::Unique<>, TypeList<int>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float, int, float>::Unique<>, TypeList<float, int>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<bool, int, float, int, float>::Unique<>, TypeList<bool, int, float>>::value));
 
     // Front/Back
     STATIC_ASSERT((std::is_same<IntTypes::Front, Int16>::value));
@@ -553,6 +537,118 @@ TEST_F(TestTypes, testTypeList)
     STATIC_ASSERT((std::is_same<NodeChainT::Get<2>, IternalT2>::value));
     STATIC_ASSERT((std::is_same<NodeChainT::Get<3>, RootT>::value));
     STATIC_ASSERT((std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value));
+
+    // Transform
+    STATIC_ASSERT((std::is_same<EmptyList::Transform<ListModifier::Promote>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int32_t>::Transform<ListModifier::Promote>, TypeList<int64_t>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float>::Transform<ListModifier::Promote>, TypeList<double>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<bool, uint32_t>::Transform<ListModifier::Promote>, TypeList<uint16_t, uint64_t>>::value));
+
+    STATIC_ASSERT((std::is_same<TypeList<float, uint32_t>::Transform<ConvertIntegralsToFloats>,
+        TypeList<float, float>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float, uint32_t>::Transform<Tester<float>::ConvertIntegralsToFloats>,
+        TypeList<float, float>>::value));
+
+    // @note  Transforming types to TypeList<>s causes the target type to expand.
+    //   This has some weird effects like being able to remove/extend types with
+    //   TypeList::Transform.
+    STATIC_ASSERT((std::is_same<TypeList<int32_t, int32_t>::Transform<ListModifier::RemoveInt32>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int32_t, float>::Transform<ListModifier::Duplicate>,
+        TypeList<int32_t, int32_t, float, float>>::value));
+
+    // Foreach
+    using T0 = TypeList<>;
+    EXPECT_EQ(std::string(), typeSetAsString<T0>());
+
+    using T1 = TypeList<int>;
+    EXPECT_EQ(std::string("i"), typeSetAsString<T1>());
+
+    using T2 = TypeList<float>;
+    EXPECT_EQ(std::string("f"), typeSetAsString<T2>());
+
+    using T3 = TypeList<bool, double>;
+    EXPECT_EQ(std::string("bd"), typeSetAsString<T3>());
+
+    using T4 = T1::Append<T2>;
+    EXPECT_EQ(std::string("if"), typeSetAsString<T4>());
+    EXPECT_EQ(std::string("fi"), typeSetAsString<T2::Append<T1>>());
+
+    using T5 = T3::Append<T4>;
+    EXPECT_EQ(std::string("bdif"), typeSetAsString<T5>());
+
+    using T6 = T5::Append<T5>;
+    EXPECT_EQ(std::string("bdifbdif"), typeSetAsString<T6>());
+
+    using T7 = T5::Append<char, long>;
+    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T7>());
+
+    using T8 = T5::Append<char>::Append<long>;
+    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T8>());
+
+    using T9 = T8::Remove<TypeList<>>;
+    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T9>());
+
+    using T10 = T8::Remove<std::string>;
+    EXPECT_EQ(std::string("bdifcl"), typeSetAsString<T10>());
+
+    using T11 = T8::Remove<char>::Remove<int>;
+    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T11>());
+
+    using T12 = T8::Remove<char, int>;
+    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T12>());
+
+    using T13 = T8::Remove<TypeList<char, int>>;
+    EXPECT_EQ(std::string("bdfl"), typeSetAsString<T13>());
+
+    // Apply
+    FloatGrid g1;
+    GridBase& base = g1;
+    bool applied = false;
+    EXPECT_TRUE((!TypeList<>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<Int32Grid>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<DoubleGrid>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<DoubleGrid>::apply([&](auto&) {}, base)));
+    EXPECT_TRUE((TypeList<FloatGrid>::apply([&](const auto& typed) {
+        EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+        applied = true; }, base)));
+    EXPECT_TRUE((applied));
+
+    // check arg is passed non-const
+    applied = false;
+    EXPECT_TRUE((TypeList<FloatGrid>::apply([&](auto& typed) {
+        EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+        applied = true; }, base)));
+    EXPECT_TRUE(applied);
+
+    applied = false;
+    EXPECT_TRUE((TypeList<Int32Grid, FloatGrid, DoubleGrid>::apply([&](const auto& typed) {
+            EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+            applied = true;
+        }, base)));
+    EXPECT_TRUE(applied);
+
+    // check const args
+    applied = false;
+    const GridBase& cbase = base;
+    EXPECT_TRUE((TypeList<Int32Grid, FloatGrid, DoubleGrid>::apply([&](const auto& typed) {
+            EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+            applied = true;
+        }, cbase)));
+    EXPECT_TRUE(applied);
+
+    // check same functor is used and how many types are processed
+    struct Counter {
+        Counter() = default;
+        // delete copy constructor to check functor isn't being copied
+        Counter(const Counter&) = delete;
+        inline void operator()(const FloatGrid&) { ++mCounter; }
+        int32_t mCounter = 0;
+    } count;
+
+    EXPECT_TRUE((TypeList<FloatGrid>::apply(std::ref(count), cbase)));
+    EXPECT_EQ(count.mCounter, 1);
+    EXPECT_TRUE((TypeList<FloatGrid, FloatGrid>::apply(std::ref(count), cbase)));
+    EXPECT_EQ(count.mCounter, 2);
 }
 
 TEST_F(TestTypes, testConvertElementType)
@@ -783,7 +879,6 @@ template <typename T> struct IsRegisteredType { inline void operator()() { EXPEC
 template <typename GridT> struct GridListContains { inline void operator()() { STATIC_ASSERT((GridTypes::Contains<GridT>)); } };
 template <typename GridT> struct AttrListContains { inline void operator()() { STATIC_ASSERT((AttributeTypes::Contains<GridT>)); } };
 
-
 TEST_F(TestTypes, testOpenVDBTypeLists)
 {
     openvdb::initialize();
@@ -797,6 +892,18 @@ TEST_F(TestTypes, testOpenVDBTypeLists)
     CHECK_TYPE_LIST_IS_VALID(IntegerGridTypes)
     CHECK_TYPE_LIST_IS_VALID(NumericGridTypes)
     CHECK_TYPE_LIST_IS_VALID(Vec3GridTypes)
+
+    CHECK_TYPE_LIST_IS_VALID(TreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(RealTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3TreeTypes)
+
+    STATIC_ASSERT((GridTypes::Size == TreeTypes::Size));
+    STATIC_ASSERT((RealGridTypes::Size == RealTreeTypes::Size));
+    STATIC_ASSERT((IntegerGridTypes::Size == IntegerTreeTypes::Size));
+    STATIC_ASSERT((NumericGridTypes::Size == NumericTreeTypes::Size));
+    STATIC_ASSERT((Vec3GridTypes::Size == Vec3TreeTypes::Size));
 
     GridTypes::foreach<IsRegistered>();
 
@@ -830,6 +937,15 @@ TEST_F(TestTypes, testOpenVDBTypeLists)
     CHECK_TYPE_LIST_IS_VALID(MetaTypes)
 
     MetaTypes::foreach<IsRegisteredType>();
+
+    // Test apply methods
+    const FloatGrid grid;
+    const GridBase& gridBase = grid;
+    EXPECT_TRUE(GridTypes::apply([](const auto&) {}, gridBase));
+
+    const FloatTree tree;
+    const TreeBase& treeBase = tree;
+    EXPECT_TRUE(TreeTypes::apply([](const auto&) {}, treeBase));
 
     openvdb::uninitialize();
 }

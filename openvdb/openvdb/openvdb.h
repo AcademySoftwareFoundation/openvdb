@@ -96,7 +96,7 @@ using IntegerGridTypes = TypeList<Int32Grid, Int64Grid>;
 /// this list does not include Bool or Mask Grids.
 using NumericGridTypes  = RealGridTypes::Append<IntegerGridTypes>;
 /// The Vec3 Grid types which OpenVDB will register by default.
-using Vec3GridTypes    = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
+using Vec3GridTypes     = TypeList<Vec3IGrid, Vec3SGrid, Vec3DGrid>;
 
 /// The Grid types which OpenVDB will register by default.
 using GridTypes =
@@ -108,6 +108,19 @@ using GridTypes =
         Append<points::PointDataGrid>::
 #endif
         Append<BoolGrid, MaskGrid>;
+/// @}
+
+
+namespace internal {
+template <typename T> using ToTreeType = typename T::TreeType;
+}
+/// @name Lists of native Tree Types
+/// @{
+using RealTreeTypes    = RealGridTypes::Transform<internal::ToTreeType>;
+using IntegerTreeTypes = IntegerGridTypes::Transform<internal::ToTreeType>;
+using NumericTreeTypes = NumericGridTypes::Transform<internal::ToTreeType>;
+using Vec3TreeTypes    = Vec3GridTypes::Transform<internal::ToTreeType>;
+using TreeTypes        = GridTypes::Transform<internal::ToTreeType>;
 /// @}
 
 

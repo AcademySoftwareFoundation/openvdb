@@ -50,6 +50,10 @@ public:
     /// Return the name of the type of a voxel's value (e.g., "float" or "vec3d").
     virtual Name valueType() const = 0;
 
+    /// Return @c true if this tree is of the same type as the template parameter.
+    template<typename TreeType>
+    bool isType() const { return (this->type() == TreeType::treeType()); }
+
     /// Return a pointer to a deep copy of this tree
     virtual TreeBase::Ptr copy() const = 0;
 

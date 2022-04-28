@@ -3,6 +3,8 @@ New Features:
 
 Improvements:
     - Added a new foreach method to TypeList for iterating over types without constructing them.
+    - Added TypeList::Transform declaration for transforming TypeLists into new types.
+    - Moved Grid::apply implementation to TypeList::apply to allow for other polymorphic types to invoke it.
 
 Bug Fixes:
     - Fixed an issue which could result in significant compilation times when instantiating TypeList<>::Unique<>
