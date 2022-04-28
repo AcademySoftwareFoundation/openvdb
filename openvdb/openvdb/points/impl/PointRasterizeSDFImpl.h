@@ -3,7 +3,7 @@
 //
 /// @author Nick Avramoussis
 ///
-/// @file PointRasterizeSDF.h
+/// @file PointRasterizeSDFImpl.h
 ///
 
 #ifndef OPENVDB_POINTS_RASTERIZE_SDF_IMPL_HAS_BEEN_INCLUDED
@@ -13,6 +13,8 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
+
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace rasterize_sdf_internal
 {
@@ -1045,6 +1047,7 @@ rasterizeSurface(const PointDataGridT& points,
 
 } // namespace rasterize_sdf_internal
 
+/// @endcond
 
 ///////////////////////////////////////////////////
 ///////////////////////////////////////////////////

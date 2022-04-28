@@ -3,7 +3,7 @@
 //
 /// @author Nick Avramoussis
 ///
-/// @file PointTransferSchemes.h
+/// @file PointRasterizeTrilinear.h
 ///
 /// @brief Transfer schemes for rasterizing point data
 ///

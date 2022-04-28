@@ -28,7 +28,7 @@ namespace OPENVDB_VERSION_NAME {
 namespace points {
 
 /// @brief Extract a Mask Tree from a Point Data Tree
-/// @param grid         the PointDataGrid to extract the mask from.
+/// @param tree         the PointDataTree to extract the mask from.
 /// @param filter       an optional index filter
 /// @param threaded     enable or disable threading  (threading is enabled by default)
 template <typename PointDataTreeT,

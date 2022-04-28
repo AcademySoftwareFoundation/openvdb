@@ -3,7 +3,7 @@
 //
 /// @author Nick Avramoussis
 ///
-/// @file PointTransferSchemes.h
+/// @file PointRasterizeTrilinearImpl.h
 ///
 
 #ifndef OPENVDB_POINTS_RASTERIZE_TRILINEAR_IMPL_HAS_BEEN_INCLUDED
@@ -13,6 +13,8 @@ namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace points {
+
+/// @cond OPENVDB_DOCS_INTERNAL
 
 namespace rasterize_trilinear_internal {
 
@@ -315,6 +317,8 @@ rasterizeTrilinear(const PointDataTreeT& points,
 }
 
 } // namespace rasterize_trilinear_internal
+
+/// @endcond
 
 ///////////////////////////////////////////////////
 

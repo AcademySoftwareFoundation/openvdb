@@ -12,7 +12,7 @@ Bug Fixes:
   This could potentially be a problem on Windows debug builds (unconfirmed).
 - Minor fix to range in openvdb/tools/LevelSetSphere.h. This could result
   in data races for multi-threaded execution (unconfirmed) [Reported by Tommy Hinks]
-- Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by @frapit]
+- Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by \@frapit]
 - Fix unit tests failures with Blosc versions >= 1.19.0.
 
 @par
@@ -768,7 +768,7 @@ Improvements:
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
 - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
   the latter in favour of new openvdb math constants for pi
-- Removed usage of boost/mpl/*.hpp methods in favour of new template
+- Removed usage of boost/mpl/\*.hpp methods in favour of new template
   meta-programming methods on the @vdblink::TypeList TypeList@endlink struct.
   This now supports get, front, back, contains, index, unique, popback, popfront
   and range removal of types.
@@ -1234,7 +1234,7 @@ Bug fixes:
 @par
 API changes:
 - Moved the @vdblink::CopyConstness CopyConstness@endlink metafunction from
-  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h@endlink.
+  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h Types.h@endlink.
 
 @par
 Houdini:
@@ -2199,8 +2199,8 @@ Bug fixes:
 - Fixed memory leak in a @vdblink::tools::meshToVolume tools::meshToVolume@endlink
   sub-tool (expandNarrowband).
   <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
-- Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
-  @link tools/RayIntersector.h@endlink.
+- Fixed parameter type inconsistencies in @link math/Stencils.h math/Stencils.h@endlink
+  and @link tools/RayIntersector.h tools/RayIntersector.h@endlink.
   <I>[Contributed by K&eacute;vin&nbsp;Dietrich and Nick&nbsp;Avramoussis]</I>
 - Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool that
   produced artifacts for adaptive surface extraction on clipped level sets.
@@ -2514,7 +2514,7 @@ Houdini:
   for material color lookups.
 - Added @vdblink::getLibraryVersionString()
   getLibraryVersionString@endlink and
-  @link OPENVDB_LIBRARY_VERSION_STRING@endlink.
+  @link OPENVDB_LIBRARY_VERSION_STRING OPENVDB_LIBRARY_VERSION_STRING@endlink.
 - Modified the mesh to volume converter to always set the grid background
   value to the exterior narrow-band width, and added finite value checks
   to narrow band parameters.
