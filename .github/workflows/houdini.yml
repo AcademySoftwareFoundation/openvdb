@@ -64,8 +64,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
-          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Release', components: 'core,hou,bin,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2020', hou: '18_5', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
           - { cxx: clang++, image: '2020', hou: '19_0', j: '2', build: 'Debug', components: 'core,hou', disable_checks: 'OFF' }
           - { cxx: g++,     image: '2020', hou: '19_0', j: '1', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
       fail-fast: false

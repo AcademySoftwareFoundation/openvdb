@@ -132,14 +132,7 @@ NanoToOpenVDB<T>::operator()(const NanoGrid<T>& grid, int /*verbose*/)
     for (uint32_t i=0; i<data->mTableSize; ++i) {
         auto *tile = data->tile(i);
         if (tile->isChild()) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
             root.addChild( this->process( data->getChild(tile)) );
-#else// hack since RootNode::addChild is not available in older versions
-            root.addTile(tile->origin(), root.background(), false);//dummy tile
-            auto it = root.beginChildAll();
-            while(it.getCoord() != tile->origin()) ++it;// find tile
-            it.setChild(this->process( data->getChild(tile)) );//replace tile with child
-#endif
         } else {
             root.addTile(tile->origin(), tile->value, tile->state);
         }

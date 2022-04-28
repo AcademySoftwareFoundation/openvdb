@@ -17,6 +17,7 @@ OPTS_ARGS+=("v")   ## See --verbose
 OPTL_ARGS+=("components:")  ## Specify cmake component(s) to enable
 OPTL_ARGS+=("config:")      ## Specify cmake configuration during the build step
 OPTL_ARGS+=("target:")      ## Specify target(s) to build
+OPTL_ARGS+=("build-dir:")    ## Build directory
 OPTL_ARGS+=("cargs:")       ## args to pass directly to cmake generation step
 OPTL_ARGS+=("build-type:")  ## Release, Debug, etc.
 OPTL_ARGS+=("verbose")      ## Verbose build output
@@ -25,6 +26,7 @@ OPTL_ARGS+=("verbose")      ## Verbose build output
 declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
+PARMS[--build-dir]=build
 # github actions runners have 2 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 PARMS[-j]=2
@@ -35,6 +37,8 @@ COMPONENTS['core']='OPENVDB_BUILD_CORE'
 COMPONENTS['python']='OPENVDB_BUILD_PYTHON_MODULE'
 COMPONENTS['test']='OPENVDB_BUILD_UNITTESTS'
 COMPONENTS['bin']='OPENVDB_BUILD_BINARIES'
+COMPONENTS['view']='OPENVDB_BUILD_VDB_VIEW'
+COMPONENTS['render']='OPENVDB_BUILD_VDB_RENDER'
 COMPONENTS['hou']='OPENVDB_BUILD_HOUDINI_PLUGIN'
 COMPONENTS['doc']='OPENVDB_BUILD_DOCS'
 
@@ -94,6 +98,8 @@ if HAS_PARM --cargs; then
     if [ -z $CMAKE_EXTRA ]; then CMAKE_EXTRA=${PARMS[--cargs]}
     else CMAKE_EXTRA+=" "${PARMS[--cargs]}; fi
 fi
+BUILD_DIR=${PARMS[--build-dir]}
+
 # handle whitespace
 eval "CMAKE_EXTRA=($CMAKE_EXTRA)"
 
@@ -146,21 +152,19 @@ fi
 
 ################################################
 
-mkdir -p build
-cd build
+mkdir -p ${BUILD_DIR}
+cd ${BUILD_DIR}
 
 # Report the cmake commands
 set -x
 
 # Note:
-# - all sub binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
+# - print and lod binary options are always on and can be toggles with: OPENVDB_BUILD_BINARIES=ON/OFF
 cmake \
-    -DOPENVDB_USE_DEPRECATED_ABI_6=ON \
     -DOPENVDB_USE_DEPRECATED_ABI_7=ON \
+    -DOPENVDB_USE_DEPRECATED_ABI_8=ON \
     -DOPENVDB_BUILD_VDB_PRINT=ON \
     -DOPENVDB_BUILD_VDB_LOD=ON \
-    -DOPENVDB_BUILD_VDB_RENDER=ON \
-    -DOPENVDB_BUILD_VDB_VIEW=ON \
     -DMSVC_MP_THREAD_COUNT=${PARMS[-j]} \
     "${CMAKE_EXTRA[@]}" \
     ..

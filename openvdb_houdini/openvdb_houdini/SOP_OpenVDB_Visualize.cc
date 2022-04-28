@@ -1844,15 +1844,7 @@ TreeVisualizer::allocateOffsetArrays(const GridType& grid)
 {
     // allocate offsets per node arrays - no zero value initialization
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     const auto nodeCounts = grid.tree().nodeCount();
-#else
-    // Tree::nodeCount() was only added in ABI=7, so use a NodeIterator with an earlier ABI
-    std::vector<openvdb::Index32> nodeCounts(grid.tree().treeDepth());
-    for (auto it = grid.tree().cbeginNode(); it; ++it) {
-        ++(nodeCounts[it.getLevel()]);
-    }
-#endif
 
     for (const auto& count : nodeCounts) {
         mPointOffsets.emplace_back(new size_t[count]);

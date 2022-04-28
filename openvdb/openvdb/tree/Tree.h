@@ -109,12 +109,10 @@ public:
     virtual Index treeDepth() const = 0;
     /// Return the number of leaf nodes.
     virtual Index32 leafCount() const = 0;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
     virtual std::vector<Index32> nodeCount() const = 0;
-#endif
     /// Return the number of non-leaf nodes.
     virtual Index32 nonLeafCount() const = 0;
     /// Return the number of active voxels stored in leaf nodes.
@@ -336,7 +334,6 @@ public:
     Index treeDepth() const override { return DEPTH; }
     /// Return the number of leaf nodes.
     Index32 leafCount() const override { return mRoot.leafCount(); }
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     /// Return a vector with node counts. The number of nodes of type NodeType
     /// is given as element NodeType::LEVEL in the return vector. Thus, the size
     /// of this vector corresponds to the height (or depth) of this tree.
@@ -346,7 +343,6 @@ public:
         mRoot.nodeCount( vec );
         return vec;// Named Return Value Optimization
     }
-#endif
     /// Return the number of non-leaf nodes.
     Index32 nonLeafCount() const override { return mRoot.nonLeafCount(); }
     /// Return the number of active voxels stored in leaf nodes.
@@ -2093,14 +2089,8 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
         maxVal = extrema.max();
     }
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     const auto nodeCount = this->nodeCount();//fast
     const Index32 leafCount = nodeCount.front();// leaf is the first element
-#else
-    std::vector<Index64> nodeCount(dims.size());
-    for (NodeCIter it = cbeginNode(); it; ++it) ++(nodeCount[it.getDepth()]);//slow
-    const Index64 leafCount = *nodeCount.rbegin();// leaf is the last element
-#endif
     assert(dims.size() == nodeCount.size());
 
     Index64 totalNodeCount = 0;
@@ -2110,11 +2100,7 @@ Tree<RootNodeType>::print(std::ostream& os, int verboseLevel) const
     os << "    Root(1 x " << mRoot.getTableSize() << ")";
     if (dims.size() >= 2) {
         for (size_t i = 1, N = dims.size() - 1; i < N; ++i) {
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
             os << ", Internal(" << util::formattedInt(nodeCount[N - i]);
-#else
-            os << ", Internal(" << util::formattedInt(nodeCount[i]);
-#endif
             os << " x " << (1 << dims[i]) << "^3)";
         }
         os << ", Leaf(" << util::formattedInt(leafCount);
