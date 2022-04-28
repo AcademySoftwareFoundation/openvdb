@@ -25,7 +25,7 @@ on:
       deploy:
         description: 'Deploy docs?'
         required: true
-        default: 'false'
+        default: 'true'
 
 jobs:
   doxygen:
@@ -36,31 +36,13 @@ jobs:
       image: aswf/ci-openvdb:2019
     steps:
     - uses: actions/checkout@v2
-    - name: install_doxygen
-      run: ./ci/install_doxygen.sh 1_8_11
-    - name: install_epydoc
-      run: pip install epydoc
-    - name: install_latex
-      run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
-    - name: install_cmake
-      run: ./ci/install_cmake.sh 3.15.0
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components="core,python,doc"
-        --cargs=\"
-        -DUSE_BLOSC=OFF
-        -DOPENVDB_CORE_STATIC=OFF
-        -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON
-        -DUSE_EXPLICIT_INSTANTIATION=OFF
-        -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
-        \"
-    - name: epydoc
+    - name: make_data
       run: |
-        epydoc --html -o /usr/local/share/doc/OpenVDB/html/python pyopenvdb
+        mkdir -p /usr/local/share/doc/OpenVDB/html
+        touch /usr/local/share/doc/OpenVDB/html/test
     - name: pre_deploy
       run: |
+        mkdir -p ~/.ssh
         ssh-keyscan -t rsa github.com >> ~/.ssh/known_hosts
     - name: deploy
       # only deploy documentation to gh-pages on a manual workflow dispatch
