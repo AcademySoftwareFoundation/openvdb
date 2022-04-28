@@ -12,10 +12,7 @@ C++-to-Python bindings, not the OpenVDB library itself.
 import os, os.path
 import sys
 import unittest
-try:
-    from studio import openvdb
-except ImportError:
-    import pyopenvdb as openvdb
+import pyopenvdb as openvdb
 
 
 def valueFactory(zeroValue, elemValue):

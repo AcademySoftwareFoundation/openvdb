@@ -366,9 +366,7 @@ private:
         bool rangeChecking = true);
 
 protected:
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     AttributeArray(const AttributeArray& rhs, const tbb::spin_mutex::scoped_lock&);
-#endif
 
     /// @brief Specify whether this attribute has a constant stride or not.
     void setConstantStride(bool state);
@@ -544,7 +542,7 @@ public:
     /// Default constructor, always constructs a uniform attribute.
     explicit TypedAttributeArray(Index n = 1, Index strideOrTotalSize = 1, bool constantStride = true,
         const ValueType& uniformValue = zeroVal<ValueType>());
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
+
     /// Deep copy constructor.
     /// @note This method is thread-safe (as of ABI=7) for concurrently reading from the
     /// source attribute array while being deep-copied. Specifically, this means that the
@@ -555,12 +553,7 @@ public:
     /// Deep copy constructor.
     OPENVDB_DEPRECATED_MESSAGE("Use copy-constructor without unused bool parameter")
     TypedAttributeArray(const TypedAttributeArray&, bool /*unused*/);
-#else
-    /// Deep copy constructor.
-    /// @note This method is not thread-safe for reading or writing, use
-    /// TypedAttributeArray::copy() to ensure thread-safety when reading concurrently.
-    TypedAttributeArray(const TypedAttributeArray&, bool uncompress = false);
-#endif
+
     /// Deep copy assignment operator.
     /// @note this operator is thread-safe.
     TypedAttributeArray& operator=(const TypedAttributeArray&);
@@ -762,9 +755,7 @@ protected:
 private:
     friend class ::TestAttributeArray;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     TypedAttributeArray(const TypedAttributeArray&, const tbb::spin_mutex::scoped_lock&);
-#endif
 
     /// Load data from memory-mapped file.
     inline void doLoad() const;
@@ -1132,7 +1123,6 @@ TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
 template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs)
     : TypedAttributeArray(rhs, tbb::spin_mutex::scoped_lock(rhs.mMutex))
@@ -1144,11 +1134,6 @@ template<typename ValueType_, typename Codec_>
 TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs,
     const tbb::spin_mutex::scoped_lock& lock)
     : AttributeArray(rhs, lock)
-#else
-template<typename ValueType_, typename Codec_>
-TypedAttributeArray<ValueType_, Codec_>::TypedAttributeArray(const TypedAttributeArray& rhs, bool)
-    : AttributeArray(rhs)
-#endif
     , mSize(rhs.mSize)
     , mStrideOrTotalSize(rhs.mStrideOrTotalSize)
 {
@@ -1259,9 +1244,6 @@ template<typename ValueType_, typename Codec_>
 AttributeArray::Ptr
 TypedAttributeArray<ValueType_, Codec_>::copy() const
 {
-#if OPENVDB_ABI_VERSION_NUMBER < 7
-    tbb::spin_mutex::scoped_lock lock(mMutex);
-#endif
     return AttributeArray::Ptr(new TypedAttributeArray<ValueType, Codec>(*this));
 }
 

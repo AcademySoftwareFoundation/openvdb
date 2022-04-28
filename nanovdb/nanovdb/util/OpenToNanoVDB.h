@@ -513,14 +513,7 @@ GridHandle<BufferT> OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
     mArray0.clear();
     mArray1.clear();
     mArray2.clear();
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     std::vector<uint32_t> nodeCount = openTree.nodeCount();
-#else
-    std::vector<uint32_t> nodeCount(openTree.treeDepth());
-    for (auto it = openTree.cbeginNode(); it; ++it) {
-        ++(nodeCount[it.getDepth()]);
-    }
-#endif
     mArray0.reserve(nodeCount[0]);
     mArray1.reserve(nodeCount[1]);
     mArray2.reserve(nodeCount[2]);
