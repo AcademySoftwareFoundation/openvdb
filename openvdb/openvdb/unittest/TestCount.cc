@@ -8,6 +8,7 @@
 #include <openvdb/tools/LevelSetSphere.h> // tools::createLevelSetSphere
 #include <openvdb/tools/LevelSetUtil.h> // tools::sdfToFogVolume
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/io/TempFile.h>
 
 
 class TestCount: public ::testing::Test
@@ -206,29 +207,78 @@ TEST_F(TestCount, testMemUsage)
 
     const auto& root = tree.root();
 
-    Index64 memUsage1(sizeof(tree) + sizeof(root));
+    Index64 internalNodeMemUsage(0);
+    Index64 expectedMaxMem(sizeof(tree) + sizeof(root));
+    Index64 leafCount(0);
 
     for (auto internal1Iter = root.cbeginChildOn(); internal1Iter; ++internal1Iter) {
-        memUsage1 += Internal1NodeT::NUM_VALUES * sizeof(Internal1NodeT::UnionType);
-        memUsage1 += internal1Iter->getChildMask().memUsage();
-        memUsage1 += internal1Iter->getValueMask().memUsage();
-        memUsage1 += sizeof(Coord);
+        internalNodeMemUsage += Internal1NodeT::NUM_VALUES * sizeof(Internal1NodeT::UnionType);
+        internalNodeMemUsage += internal1Iter->getChildMask().memUsage();
+        internalNodeMemUsage += internal1Iter->getValueMask().memUsage();
+        internalNodeMemUsage += sizeof(Coord);
 
         for (auto internal2Iter = internal1Iter->cbeginChildOn(); internal2Iter; ++internal2Iter) {
-            memUsage1 += Internal2NodeT::NUM_VALUES * sizeof(Internal2NodeT::UnionType);
-            memUsage1 += internal2Iter->getChildMask().memUsage();
-            memUsage1 += internal2Iter->getValueMask().memUsage();
-            memUsage1 += sizeof(Coord);
+            internalNodeMemUsage += Internal2NodeT::NUM_VALUES * sizeof(Internal2NodeT::UnionType);
+            internalNodeMemUsage += internal2Iter->getChildMask().memUsage();
+            internalNodeMemUsage += internal2Iter->getValueMask().memUsage();
+            internalNodeMemUsage += sizeof(Coord);
 
             for (auto leafIter = internal2Iter->cbeginChildOn(); leafIter; ++leafIter) {
-                memUsage1 += leafIter->memUsage();
+                EXPECT_EQ(leafIter->memUsage(), leafIter->memUsageIfLoaded());
+                expectedMaxMem += leafIter->memUsageIfLoaded();
+                ++leafCount;
             }
         }
     }
 
-    Index64 memUsage2 = tools::memUsage(grid->tree());
+    expectedMaxMem += internalNodeMemUsage;
 
-    EXPECT_EQ(memUsage1, memUsage2);
+    Index64 inCoreMemUsage = tools::memUsage(grid->tree());
+    Index64 memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
+
+    EXPECT_EQ(expectedMaxMem, inCoreMemUsage);
+    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
+
+    // Write out the grid and read it in with delay-loading. Check the
+    // expected memory usage values.]
+
+    openvdb::initialize();
+
+    std::string filename;
+
+    // write out grid to a temp file
+    {
+        io::TempFile file;
+        filename = file.filename();
+        io::File fileOut(filename);
+        fileOut.write({grid});
+    }
+
+    io::File fileIn(filename);
+    fileIn.open(true); // delay-load
+    auto grids = fileIn.getGrids();
+    fileIn.close();
+
+    grid = GridBase::grid<FloatGrid>((*grids)[0]);
+    EXPECT_TRUE(grid);
+
+    inCoreMemUsage = tools::memUsage(grid->tree());
+    memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
+
+    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
+    EXPECT_TRUE(inCoreMemUsage < expectedMaxMem);
+
+    // in core memory should be the max memory without the leaf buffers but
+    // with the FileInfo
+
+    const Index64 leafBuffers = sizeof(FloatGrid::ValueType) * FloatTree::LeafNodeType::SIZE;
+    const Index64 fileInfo = sizeof(FloatTree::LeafNodeType::Buffer::FileInfo);
+    const Index64 expectedInCoreMemUsage = expectedMaxMem + (leafCount * (-leafBuffers + fileInfo));
+    EXPECT_EQ(expectedInCoreMemUsage, inCoreMemUsage);
+
+    std::remove(filename.c_str());
+
+    openvdb::uninitialize();
 }
 
 
