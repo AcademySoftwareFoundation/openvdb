@@ -840,7 +840,8 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
     // full code generation
     // errors can stop traversal, but dont always, so check the log
 
-    if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
+    const size_t err = mLog.errors();
+    if (!this->traverse(&tree) || (mLog.errors() > err)) return nullptr;
 
     // insert free calls for any strings
 

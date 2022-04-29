@@ -51,6 +51,9 @@ namespace ax {
 ///   parsing, to allow resolution of code locations when they are not
 ///   explicitly available. The Logger also stores a pointer to the AST Tree
 ///   that these nodes belong to and the code used to create it.
+///
+/// @warning  The logger is not thread safe. A unique instance of the Logger
+///   should be used for unique invocations of ax pipelines.
 class OPENVDB_AX_API Logger
 {
 public:
@@ -75,14 +78,14 @@ public:
     ///   associated code location.
     /// @param message The error message
     /// @param lineCol The line/column number of the offending code
-    /// @return true if non-fatal and can continue to capture future messages.
+    /// @return true if can continue to capture future messages.
     bool error(const std::string& message, const CodeLocation& lineCol = CodeLocation(0,0));
 
     /// @brief Log a compiler error using the offending AST node. Used in AST
     ///   traversal.
     /// @param message The error message
     /// @param node The offending AST node causing the error
-    /// @return true if non-fatal and can continue to capture future messages.
+    /// @return true if can continue to capture future messages.
     bool error(const std::string& message, const ax::ast::Node* node);
 
     /// @brief Log a compiler warning and its offending code location. If the
@@ -90,14 +93,14 @@ public:
     ///   associated code location.
     /// @param message The warning message
     /// @param lineCol The line/column number of the offending code
-    /// @return true if non-fatal and can continue to capture future messages.
+    /// @return true if can continue to capture future messages.
     bool warning(const std::string& message, const CodeLocation& lineCol = CodeLocation(0,0));
 
     /// @brief Log a compiler warning using the offending AST node. Used in AST
     ///   traversal.
     /// @param message The warning message
     /// @param node The offending AST node causing the warning
-    /// @return true if non-fatal and can continue to capture future messages.
+    /// @return true if can continue to capture future messages.
     bool warning(const std::string& message, const ax::ast::Node* node);
 
     ///
@@ -130,7 +133,9 @@ public:
     bool getWarningsAsErrors() const;
 
     /// @brief Sets the maximum number of errors that are allowed before
-    ///   compilation should exit
+    ///   compilation should exit.
+    /// @note The logger will continue to increment the error counter beyond
+    ///   this value but, once reached, it will not invoke the error callback.
     /// @param maxErrors The number of allowed errors
     void setMaxErrors(const size_t maxErrors = 0);
     /// @brief Returns the number of allowed errors
@@ -194,8 +199,8 @@ private:
 
     friend class ::TestLogger;
 
-    std::function<void(const std::string&)> mErrorOutput;
-    std::function<void(const std::string&)> mWarningOutput;
+    OutputFunction mErrorOutput;
+    OutputFunction mWarningOutput;
 
     size_t mNumErrors;
     size_t mNumWarnings;

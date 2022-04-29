@@ -36,11 +36,14 @@ extern void axerror (openvdb::ax::ast::Tree**, char const *s) {
 }
 
 openvdb::ax::ast::Tree::ConstPtr
-openvdb::ax::ast::parse(const char* code, openvdb::ax::Logger& logger)
+openvdb::ax::ast::parse(const char* code,
+    openvdb::ax::Logger& logger)
 {
     std::lock_guard<std::mutex> lock(sInitMutex);
     axlog = &logger; // for lexer errs
     logger.setSourceCode(code);
+
+    const size_t err = logger.errors();
 
     // reset all locations
     axlloc.first_line = axlloc.last_line = 1;
@@ -55,6 +58,8 @@ openvdb::ax::ast::parse(const char* code, openvdb::ax::Logger& logger)
     openvdb::ax::ast::Tree::ConstPtr ptr(const_cast<const openvdb::ax::ast::Tree*>(tree));
 
     ax_delete_buffer(buffer);
+
+    if (logger.errors() > err) ptr.reset();
 
     logger.setSourceTree(ptr);
     return ptr;
