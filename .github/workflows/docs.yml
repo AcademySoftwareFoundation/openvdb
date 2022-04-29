@@ -67,7 +67,7 @@ jobs:
           UserKnownHostsFile=/dev/null
         " > /etc/ssh/ssh_config
     - name: deploy
-      # only deploy documentation to gh-pages on a manual workflow dispatch
+      # only deploy documentation on a manual workflow dispatch
       if: |
         github.repository_owner == 'AcademySoftwareFoundation' &&
         github.event_name == 'workflow_dispatch' &&
@@ -79,4 +79,7 @@ jobs:
         destination_dir: documentation/doxygen
         external_repository: AcademySoftwareFoundation/openvdb-website
         publish_branch: doxygen
-        commit_message: "doxygen documentation update"
+        full_commit_message: "Automatic doxygen documentation update
+          - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
+
+          Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
