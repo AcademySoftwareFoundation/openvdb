@@ -208,7 +208,7 @@ Using Voxel Scale Only:\n\
         .setTooltip(
             "Apply the resampling transform to the voxel values of vector-valued VDBs,"
             " in accordance with those VDBs'"
-            " [Vector Type|https://academysoftwarefoundation.github.io/openvdb/overview.html#secGrid]"
+            " [Vector Type|https://www.openvdb.org/documentation/doxygen/overview.html#secGrid]"
             " attributes."));
 
     // Level set rebuild toggle

@@ -2,7 +2,7 @@
 
 Welcome to the NanoVDB documentation page.
 
-* @ref NanoVDB_HowToBuild
-* @ref NanoVDB_FAQ
-* @ref NanoVDB_SourceTree
-* @ref NanoVDB_HelloWorld
+* @subpage NanoVDB_HowToBuild
+* @subpage NanoVDB_FAQ
+* @subpage NanoVDB_SourceTree
+* @subpage NanoVDB_HelloWorld

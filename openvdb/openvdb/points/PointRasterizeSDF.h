@@ -280,6 +280,7 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
 /// @param points       the point data grid to rasterize
 /// @param radius       the world space radius of every point
 /// @param searchRadius the maximum search distance of every point
+/// @param attributes   list of attributes to transfer
 /// @param halfband     the half band width
 /// @param transform    the target transform for the surface
 /// @param filter       a filter to apply to points
@@ -329,6 +330,7 @@ rasterizeSmoothSpheres(const PointDataGridT& points,
 /// @param radius       the attribute containing the world space radius
 /// @param radiusScale  the scale applied to every world space radius value
 /// @param searchRadius the maximum search distance of every point
+/// @param attributes   list of attributes to transfer
 /// @param halfband     the half band width
 /// @param transform    the target transform for the surface
 /// @param filter       a filter to apply to points

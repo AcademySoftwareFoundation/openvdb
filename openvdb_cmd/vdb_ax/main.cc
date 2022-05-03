@@ -151,7 +151,7 @@ auto usage_execute(const bool verbose)
             "         " << gProgName << " points.vdb -s \"@P += v@v * 2;\" -o out.vdb        // move points based on a vector attribute\n" <<
             "\n" <<
             "    For more examples and help with syntax, see the AX documentation:\n" <<
-            "      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html\n" <<
+            "      https://www.openvdb.org/documentation/openvdbax.html\n" <<
             "\n";
         }
         os <<
