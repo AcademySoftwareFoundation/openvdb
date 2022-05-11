@@ -9,6 +9,7 @@
 #include <string>
 #include <vector>
 #include <openvdb/openvdb.h>
+#include <openvdb/tools/Count.h>
 #include <openvdb/util/logging.h>
 
 
@@ -206,8 +207,33 @@ printShortListing(const StringVec& filenames, bool metadata)
             std::cout << "  " << std::right << std::setw(8)
                 << sizeAsString(grid->activeVoxelCount(), "Vox");
 
-            // Print the grid's in-core size, in bytes.
-            std::cout << " " << std::right << std::setw(6) << bytesAsString(grid->memUsage());
+            // Print the grid's size, in bytes
+
+            // no support for memUsageIfLoaded until ABI >= 10 for points::PointDataGrid types
+#if OPENVDB_ABI_VERSION_NUMBER < 10
+            using ListT = openvdb::GridTypes::Remove<openvdb::points::PointDataGrid>;
+#else
+            using ListT = openvdb::GridTypes;
+#endif
+            bool success =
+                grid->apply<ListT>([&](const auto& typed){
+                    // @todo combine these methods to avoid iterating across the tree twice
+                    const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
+                    const openvdb::Index64 total = openvdb::tools::memUsageIfLoaded(typed.tree());
+
+                    std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
+                    std::cout << " " << std::right << std::setw(6) << bytesAsString(total) << " (Total)";
+                });
+
+#if OPENVDB_ABI_VERSION_NUMBER < 10
+            if (!success) {
+                // could be a points grid, print in-core memory only
+                grid->apply<openvdb::GridTypes>([&](const auto& typed){
+                    const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
+                    std::cout << " " << std::right << std::setw(6) << bytesAsString(incore) << " (In Core)";
+                });
+            }
+#endif
 
             std::cout << std::endl;
 

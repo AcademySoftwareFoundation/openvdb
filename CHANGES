@@ -8,9 +8,30 @@ Version 9.0.1 - In development
       This could potentially be a problem on Windows debug builds (unconfirmed).
     - Minor fix to range in openvdb/tools/LevelSetSphere.h. This could result
       in data races for multi-threaded execution (unconfirmed) [Reported by Tommy Hinks]
+    - Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by @frapit]
+    - Fix unit tests failures with Blosc versions >= 1.19.0.
 
     New features:
     - Added support for AMD's HIP API in NanoVDB [Contributed by Blender Foundation]
+    - Added bindings mechanism to AX to allow differing data and AX attribute names (@) in Point and Volume executables.
+    - Added support for OpenVDB AX on Windows.
+
+    Improvements:
+    - Added a --thread [n] argument to the vdb_ax binary.
+    - Added a --copy-file-metadata option to vdb_ax. This behaviour is now off by default.
+    - Added support for multiple input files with the vdb_ax binary using -i. Positional arguments as input files are deprecated.
+    - Added tools::minMax() which supports multithreaded evaluation of active minimum and maximum values. Grid::evalMinMax() has been deprecated.  [Contributed by Greg Hurst]
+
+    Build:
+    - Regenerated AX grammar with Flex 2.6.4 and Bison 3.8.2.
+    - Improved locating NumPy in CMake when multiple python versions are installed.
+    - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.  [Reported by Sam James]
+
+    Houdini:
+    - Added Attribute Bindings to AX SOP to allow differently named AX attributes (@) and target point attributes/volumes.
+    - Fix race condition in OpenVDB Merge SOP that could cause crashes
+      or merged VDBs to not be deleted.
+
 
 Version 9.0.0 - October 29, 2021
 
@@ -401,7 +422,7 @@ Version 8.0.0 - December 23, 2020
       providing users with a new way of interacting with OpenVDB data. AX is
       tailored towards writing highly parallelizable and customizable OpenVDB
       volume and point kernel operations. See the documentation for more:
-      https://academysoftwarefoundation.github.io/openvdb/openvdbax.html
+      https://www.openvdb.org/documentation/openvdbax.html
 
     New features:
     - Added tools::anyActiveVoxels and tools::anyActiveTiles that check

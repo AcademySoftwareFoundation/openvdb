@@ -404,11 +404,7 @@ public:
         ParmList& parms, OP_OperatorTable& table, OpFlavor flavor = SOP);
 
     /// Register the operator.
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     virtual ~OpFactory();
-#else
-    ~OpFactory();
-#endif
 
     OpFactory(const OpFactory&) = delete;
     OpFactory& operator=(const OpFactory&) = delete;

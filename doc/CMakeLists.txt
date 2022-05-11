@@ -41,6 +41,7 @@ set(DOXY_FILES
   openvdb/openvdb/io
   openvdb/openvdb/math
   openvdb/openvdb/points
+  openvdb/openvdb/points/impl
   openvdb/openvdb/python/pyopenvdb.h
   openvdb/openvdb/tools
   openvdb/openvdb/tree
@@ -215,7 +216,6 @@ if(OPENVDB_DOXYGEN_AX)
     doc/ax/doc.txt
     openvdb_ax/openvdb_ax
     openvdb_ax/openvdb_ax/ast
-    openvdb_ax/openvdb_ax/cmd
     openvdb_ax/openvdb_ax/codegen
     openvdb_ax/openvdb_ax/compiler
     openvdb_ax/openvdb_ax/grammar
@@ -235,9 +235,6 @@ if(OPENVDB_DOXYGEN_NANOVDB)
     doc/nanovdb/HelloWorld.md
     nanovdb/nanovdb
     nanovdb/nanovdb/util
-    nanovdb/nanovdb/cmd/convert
-    nanovdb/nanovdb/cmd/print
-    nanovdb/nanovdb/cmd/validate
     nanovdb/nanovdb/examples/benchmark
     nanovdb/nanovdb/examples/ex_bump_pool_buffer
     nanovdb/nanovdb/examples/ex_collide_level_set

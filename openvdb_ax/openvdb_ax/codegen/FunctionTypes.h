@@ -132,6 +132,11 @@ using M4F = ArgType<float, 16>;
 template <typename T> struct TypeToSymbol { static inline std::string s() { return "?"; } };
 template <> struct TypeToSymbol<void> { static inline std::string s() { return "v"; } };
 template <> struct TypeToSymbol<char> { static inline std::string s() { return "c"; } };
+template <> struct TypeToSymbol<uint8_t>  { static inline std::string s() { return "u8"; } };
+template <> struct TypeToSymbol<uint16_t> { static inline std::string s() { return "us"; } };
+template <> struct TypeToSymbol<uint32_t> { static inline std::string s() { return "ui"; } };
+template <> struct TypeToSymbol<uint64_t> { static inline std::string s() { return "ul"; } };
+template <> struct TypeToSymbol<int8_t>  { static inline std::string s() { return "8"; } };
 template <> struct TypeToSymbol<int16_t> { static inline std::string s() { return "s"; } };
 template <> struct TypeToSymbol<int32_t> { static inline std::string s() { return "i"; } };
 template <> struct TypeToSymbol<int64_t> { static inline std::string s() { return "l"; } };
@@ -685,9 +690,6 @@ struct OPENVDB_AX_API IRFunctionBase : public Function
     ///           a ret void, a ret void instruction, or an actual value
     using GeneratorCb = std::function<llvm::Value*
         (const std::vector<llvm::Value*>&, llvm::IRBuilder<>&)>;
-
-    llvm::Type* types(std::vector<llvm::Type*>& types,
-            llvm::LLVMContext& C) const override = 0;
 
     /// @brief  Enable or disable the embedding of IR. Embedded IR is currently
     ///         required for function which use parent function parameters.

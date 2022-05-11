@@ -1490,6 +1490,7 @@ public:
 
 
     Index64 memUsage() const;
+    Index64 memUsageIfLoaded() const;
 
 
     ////////////////////////////////////////
@@ -1785,6 +1786,13 @@ inline Index64
 PointIndexLeafNode<T, Log2Dim>::memUsage() const
 {
     return BaseLeaf::memUsage() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
+}
+
+template<typename T, Index Log2Dim>
+inline Index64
+PointIndexLeafNode<T, Log2Dim>::memUsageIfLoaded() const
+{
+    return BaseLeaf::memUsageIfLoaded() + Index64((sizeof(T)*mIndices.capacity()) + sizeof(mIndices));
 }
 
 } // namespace tools

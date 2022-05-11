@@ -29,14 +29,14 @@ struct NullInterrupter
     virtual ~NullInterrupter() = default;
     /// Signal the start of an interruptible operation.
     /// @param name  an optional descriptive name for the operation
-    virtual void start(const char* /*name*/ = nullptr) { }
+    virtual void start(const char* name = nullptr) { (void)name; }
     /// Signal the end of an interruptible operation.
     virtual void end() { }
     /// Check if an interruptible operation should be aborted.
     /// @param percent  an optional (when >= 0) percentage indicating
     ///     the fraction of the operation that has been completed
     /// @note this method is assumed to be thread-safe.
-    virtual bool wasInterrupted(int /*percent*/ = -1) { return false; }
+    virtual bool wasInterrupted(int percent = -1) { (void)percent; return false; }
     /// Convenience method to return a reference to the base class from a derived class.
     virtual NullInterrupter& interrupter() final {
         return static_cast<NullInterrupter&>(*this);

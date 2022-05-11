@@ -123,7 +123,7 @@ public:
     size_t getGrainSize() const;
 
     /// @brief  Set attribute bindings.
-    /// @param attributeBindings A map of attribute bindings to expected names on
+    /// @param bindings A map of attribute bindings to expected names on
     ///   the geometry to be executed over. By default the AX attributes will be
     ///   bound to point attributes of the same name. Supplying bindings
     ///   for a subset of the attributes will leave the others unchanged.
@@ -145,6 +145,9 @@ public:
 private:
     friend class Compiler;
     friend class ::TestPointExecutable;
+
+    /// @brief  Private method used in the unit tests
+    bool usesAcceleratedKernel(const points::PointDataTree& tree) const;
 
     /// @brief Constructor, expected to be invoked by the compiler. Should not
     ///   be invoked directly.

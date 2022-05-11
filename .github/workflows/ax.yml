@@ -56,11 +56,11 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -97,7 +97,7 @@ jobs:
           ./ci/build.sh -v
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components="axcore,axbin,axtest"
+          --components="bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -140,7 +140,7 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,axcore,axbin,axtest"
+          --components="core,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF

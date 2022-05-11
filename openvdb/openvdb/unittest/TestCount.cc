@@ -8,6 +8,7 @@
 #include <openvdb/tools/LevelSetSphere.h> // tools::createLevelSetSphere
 #include <openvdb/tools/LevelSetUtil.h> // tools::sdfToFogVolume
 #include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/io/TempFile.h>
 
 
 class TestCount: public ::testing::Test
@@ -206,29 +207,78 @@ TEST_F(TestCount, testMemUsage)
 
     const auto& root = tree.root();
 
-    Index64 memUsage1(sizeof(tree) + sizeof(root));
+    Index64 internalNodeMemUsage(0);
+    Index64 expectedMaxMem(sizeof(tree) + sizeof(root));
+    Index64 leafCount(0);
 
     for (auto internal1Iter = root.cbeginChildOn(); internal1Iter; ++internal1Iter) {
-        memUsage1 += Internal1NodeT::NUM_VALUES * sizeof(Internal1NodeT::UnionType);
-        memUsage1 += internal1Iter->getChildMask().memUsage();
-        memUsage1 += internal1Iter->getValueMask().memUsage();
-        memUsage1 += sizeof(Coord);
+        internalNodeMemUsage += Internal1NodeT::NUM_VALUES * sizeof(Internal1NodeT::UnionType);
+        internalNodeMemUsage += internal1Iter->getChildMask().memUsage();
+        internalNodeMemUsage += internal1Iter->getValueMask().memUsage();
+        internalNodeMemUsage += sizeof(Coord);
 
         for (auto internal2Iter = internal1Iter->cbeginChildOn(); internal2Iter; ++internal2Iter) {
-            memUsage1 += Internal2NodeT::NUM_VALUES * sizeof(Internal2NodeT::UnionType);
-            memUsage1 += internal2Iter->getChildMask().memUsage();
-            memUsage1 += internal2Iter->getValueMask().memUsage();
-            memUsage1 += sizeof(Coord);
+            internalNodeMemUsage += Internal2NodeT::NUM_VALUES * sizeof(Internal2NodeT::UnionType);
+            internalNodeMemUsage += internal2Iter->getChildMask().memUsage();
+            internalNodeMemUsage += internal2Iter->getValueMask().memUsage();
+            internalNodeMemUsage += sizeof(Coord);
 
             for (auto leafIter = internal2Iter->cbeginChildOn(); leafIter; ++leafIter) {
-                memUsage1 += leafIter->memUsage();
+                EXPECT_EQ(leafIter->memUsage(), leafIter->memUsageIfLoaded());
+                expectedMaxMem += leafIter->memUsageIfLoaded();
+                ++leafCount;
             }
         }
     }
 
-    Index64 memUsage2 = tools::memUsage(grid->tree());
+    expectedMaxMem += internalNodeMemUsage;
 
-    EXPECT_EQ(memUsage1, memUsage2);
+    Index64 inCoreMemUsage = tools::memUsage(grid->tree());
+    Index64 memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
+
+    EXPECT_EQ(expectedMaxMem, inCoreMemUsage);
+    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
+
+    // Write out the grid and read it in with delay-loading. Check the
+    // expected memory usage values.]
+
+    openvdb::initialize();
+
+    std::string filename;
+
+    // write out grid to a temp file
+    {
+        io::TempFile file;
+        filename = file.filename();
+        io::File fileOut(filename);
+        fileOut.write({grid});
+    }
+
+    io::File fileIn(filename);
+    fileIn.open(true); // delay-load
+    auto grids = fileIn.getGrids();
+    fileIn.close();
+
+    grid = GridBase::grid<FloatGrid>((*grids)[0]);
+    EXPECT_TRUE(grid);
+
+    inCoreMemUsage = tools::memUsage(grid->tree());
+    memUsageIfLoaded = tools::memUsageIfLoaded(grid->tree());
+
+    EXPECT_EQ(expectedMaxMem, memUsageIfLoaded);
+    EXPECT_TRUE(inCoreMemUsage < expectedMaxMem);
+
+    // in core memory should be the max memory without the leaf buffers but
+    // with the FileInfo
+
+    const Index64 leafBuffers = sizeof(FloatGrid::ValueType) * FloatTree::LeafNodeType::SIZE;
+    const Index64 fileInfo = sizeof(FloatTree::LeafNodeType::Buffer::FileInfo);
+    const Index64 expectedInCoreMemUsage = expectedMaxMem + (leafCount * (-leafBuffers + fileInfo));
+    EXPECT_EQ(expectedInCoreMemUsage, inCoreMemUsage);
+
+    std::remove(filename.c_str());
+
+    openvdb::uninitialize();
 }
 
 
@@ -241,44 +291,64 @@ minMaxTest()
 {
     using ValueT = typename TreeT::ValueType;
 
-    struct Local {
-        static bool isEqual(const ValueT& a, const ValueT& b) {
-            using namespace openvdb; // for operator>()
-            return !(math::Abs(a - b) > zeroVal<ValueT>());
-        }
-    };
-
     const ValueT
         zero = openvdb::zeroVal<ValueT>(),
         minusTwo = zero + (-2),
         plusTwo = zero + 2,
-        five = zero + 5;
+        five = zero + 5,
+        ten = zero + 10,
+        twenty = zero + 20;
+
+    static constexpr int64_t DIM = TreeT::LeafNodeType::DIM;
 
     TreeT tree(/*background=*/five);
 
     // No set voxels (defaults to min = max = zero)
     openvdb::math::MinMax<ValueT> extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), zero));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), zero));
+    EXPECT_EQ(zero, extrema.min());
+    EXPECT_EQ(zero, extrema.max());
 
     // Only one set voxel
-    tree.setValue(openvdb::Coord(0, 0, 0), minusTwo);
+    tree.setValue(openvdb::Coord(0), minusTwo);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), minusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(minusTwo, extrema.max());
 
     // Multiple set voxels, single value
-    tree.setValue(openvdb::Coord(10, 10, 10), minusTwo);
+    tree.setValue(openvdb::Coord(DIM), minusTwo);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), minusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(minusTwo, extrema.max());
 
     // Multiple set voxels, multiple values
-    tree.setValue(openvdb::Coord(10, 10, 10), plusTwo);
-    tree.setValue(openvdb::Coord(-10, -10, -10), zero);
+    tree.setValue(openvdb::Coord(DIM), plusTwo);
+    tree.setValue(openvdb::Coord(DIM*2), zero);
     extrema = openvdb::tools::minMax(tree);
-    EXPECT_TRUE(Local::isEqual(extrema.min(), minusTwo));
-    EXPECT_TRUE(Local::isEqual(extrema.max(), plusTwo));
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(plusTwo, extrema.max());
+
+    // add some empty leaf nodes to test the join op
+    tree.setValueOnly(openvdb::Coord(DIM*3), ten);
+    tree.setValueOnly(openvdb::Coord(DIM*4),-ten);
+    extrema = openvdb::tools::minMax(tree);
+    EXPECT_EQ(minusTwo, extrema.min());
+    EXPECT_EQ(plusTwo, extrema.max());
+
+    tree.clear();
+
+    // test tiles
+    using NodeChainT = typename TreeT::RootNodeType::NodeChainType;
+    using ChildT1 = typename NodeChainT::template Get<1>; // Leaf parent
+    using ChildT2 = typename NodeChainT::template Get<2>; // ChildT1 parent
+    tree.addTile(ChildT2::LEVEL, openvdb::Coord(0), -ten, true);
+    tree.addTile(ChildT2::LEVEL, openvdb::Coord(ChildT2::DIM), ten, true);
+    tree.addTile(ChildT1::LEVEL, openvdb::Coord(ChildT2::DIM + ChildT2::DIM), -twenty, false);
+    tree.setValueOnly(openvdb::Coord(-1), twenty);
+    tree.setValue(openvdb::Coord(-2), five);
+
+    extrema = openvdb::tools::minMax(tree);
+    EXPECT_EQ(-ten, extrema.min());
+    EXPECT_EQ( ten, extrema.max());
 }
 
 /// Specialization for boolean trees

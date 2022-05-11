@@ -315,8 +315,8 @@ TEST_F(TestCoord, testCoordBBox)
         EXPECT_EQ(count, n);
     }
 
-    {// bit-wise operations
-        const openvdb::Coord min(-1,-2,3), max(2,3,5);
+    {// bit-wise operations (note that the API doesn't define behaviour for shifting neg coords)
+        const openvdb::Coord min(1,2,3), max(2,3,5);
         const openvdb::CoordBBox b(min, max);
         EXPECT_EQ(openvdb::CoordBBox(min>>1,max>>1), b>>size_t(1));
         EXPECT_EQ(openvdb::CoordBBox(min>>3,max>>3), b>>size_t(3));

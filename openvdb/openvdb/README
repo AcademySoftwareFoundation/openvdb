@@ -9,7 +9,7 @@ volumetric data discretized on a three-dimensional grid.
 For instructions on library installation and dependencies see INSTALL
 
 For documentation of the library and code examples see:
-https://academysoftwarefoundation.github.io/openvdb
+https://www.openvdb.org/documentation/doxygen
 
 For more details visit the project's home page:
 www.openvdb.org

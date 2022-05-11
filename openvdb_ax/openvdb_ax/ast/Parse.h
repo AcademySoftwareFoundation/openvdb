@@ -23,14 +23,19 @@ namespace OPENVDB_VERSION_NAME {
 namespace ax {
 namespace ast {
 
-/// @brief  Construct an abstract syntax tree from a code snippet. If the code is
-///         not well formed, as defined by the AX grammar, this will simply return
-///         nullptr, with the logger collecting the errors.
+/// @brief   Construct an abstract syntax tree from a code snippet.
+/// @details This method parses the provided null terminated code snippet and
+///   attempts to construct a complete abstract syntax tree (AST) which can be
+///   passed to the AX Compiler. If the code is not well formed (as defined by
+///   the AX grammar) a nullptr is returned and instances of any errors
+///   encoutered are stored to the provided logger.
 /// @note   The returned AST is const as the logger uses this to determine line
-///         and column numbers of errors/warnings in later stages. If you need to
-///         modify the tree, take a copy.
+///   and column numbers of errors/warnings in later stages. If you need to
+///   modify the tree, take a copy.
 ///
-/// @return A shared pointer to a valid const AST, or nullptr if errored.
+/// @return A shared pointer to a valid const AST. Can be a nullptr on error.
+/// @todo  In the future it may be useful for ::parse to return as much of
+///   the valid AST that exists.
 ///
 /// @param code    The code to parse
 /// @param logger  The logger to collect syntax errors
@@ -38,14 +43,15 @@ namespace ast {
 OPENVDB_AX_API openvdb::ax::ast::Tree::ConstPtr
 parse(const char* code, ax::Logger& logger);
 
-/// @brief  Construct an abstract syntax tree from a code snippet.
-///         A runtime exception will be thrown with the first syntax error.
+/// @brief   Construct an abstract syntax tree from a code snippet.
+/// @details A runtime exception will be thrown with the first syntax error.
 ///
 /// @return A shared pointer to a valid AST.
 ///
 /// @param code The code to parse
 ///
-OPENVDB_AX_API openvdb::ax::ast::Tree::Ptr parse(const char* code);
+OPENVDB_AX_API openvdb::ax::ast::Tree::Ptr
+parse(const char* code);
 
 } // namespace ast
 } // namespace ax
