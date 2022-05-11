@@ -52,6 +52,7 @@
 #include <nanovdb/NanoVDB.h>
 #include <nanovdb/util/IO.h>
 #include <nanovdb/util/OpenToNanoVDB.h>
+#include <nanovdb/util/NanoToOpenVDB.h>
 #endif
 
 #ifdef VDB_TOOL_USE_EXR
@@ -174,6 +175,7 @@ class Tool
     void read();
     void readGeo( const std::string &fileName);
     void readVDB( const std::string &fileName);
+    void readNVDB( const std::string &fileName);
 
     /// @brief ray-tracing of level set surfaces and volume rendering of fog volumes
     void render();
@@ -712,7 +714,10 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->render();}, 0);
 
   mParser.addAction(
-      "print", "p", "prints information to the terminal about the current stack of VDB grids and Geometry", {},
+      "print", "p", "prints information to the terminal about the current stack of VDB grids and Geometry",
+      {{"vdb", "*", "*", "print information about VDB grids"},
+       {"geo", "*", "*", "print information about geometries"},
+       {"mem", "0", "0|1|false|true", "print a list of all stored variables"}},
       [](){}, [&](){this->print();});
 
   mParser.addAction(
@@ -921,12 +926,15 @@ void Tool::read()
 {
   assert(mParser.getAction().name == "read");
   for (auto &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,abc,pts,stl", "vdb", "nvdb"})) {
     case 1:
       this->readGeo(fileName);
       break;
     case 2:
       this->readVDB(fileName);
+      break;
+    case 3:
+      this->readNVDB(fileName);
       break;
     default:
       throw std::invalid_argument("File \""+fileName+"\" has an invalid extension");
@@ -987,6 +995,42 @@ void Tool::readVDB(const std::string &fileName)
     if (mParser.verbose>1) for (GridBase::Ptr grid : *grids) grid->print();
   }
 }// Tool::readVDB
+
+// ==============================================================================================================
+
+void Tool::readNVDB(const std::string &fileName)
+{
+#ifdef VDB_TOOL_USE_NANO
+  assert(mParser.getAction().name == "read");
+  const VecS gridNames = mParser.getVec<std::string>("grids");
+  if (gridNames.empty()) throw std::invalid_argument("readNVDB: no grids names specified");
+  std::vector<nanovdb::GridHandle<>> grids;
+  if (fileName=="stdin.nvdb") {
+    if (isatty(fileno(stdin))) throw std::invalid_argument("readNVDB: stdin is not connected to the terminal!");
+    if (mParser.verbose) mTimer.start("Reading NanoVDB grid(s) from input stream");
+    grids = nanovdb::io::readGrids(std::cin);
+    throw std::runtime_error("Not implemented");
+  } else {
+    if (mParser.verbose) mTimer.start("Reading NanoVDB grid(s) from file named \""+fileName+"\"");
+    grids = nanovdb::io::readGrids(fileName);
+  }
+  const size_t count = mGrid.size();
+  if (grids.size()) {
+    for (const auto& gridHandle : grids) {
+      if (gridNames[0]=="*" || findMatch(gridHandle.gridMetaData()->shortGridName(), gridNames)) mGrid.push_back(nanovdb::nanoToOpenVDB(gridHandle));
+    }
+  } else if (mParser.verbose>0) {
+    std::cerr << "readVDB: no vdb grids in \"" << fileName << "\"";
+  }
+  if (mParser.verbose) {
+    mTimer.stop();
+    if (mGrid.size() == count) std::cerr << "readNVDB: no NanoVDB grids were loaded\n";
+    if (mParser.verbose>1) for (auto it = std::next(mGrid.cbegin(), count); it != mGrid.cend(); ++it) (*it)->print();
+  }
+#else
+    throw std::runtime_error("NanoVDB support was disabled during compilation!");
+#endif
+}// Tool::readNVDB
 
 // ==============================================================================================================
 
@@ -2650,6 +2694,8 @@ void Tool::print_args(std::ostream& os) const
 
 void Tool::print(std::ostream& os) const
 {
+  assert(mParser.getAction().name == "print");
+
   if (mParser.verbose>1) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Actions <" << std::setw(40) << "\n";
     mParser.print(os);
@@ -2658,27 +2704,57 @@ void Tool::print(std::ostream& os) const
     mParser.computer.memory().print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
+
   if (mParser.verbose>0) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
-    int n = 0;
-    for (auto it = mGeom.crbegin(); it != mGeom.crend(); ++it, ++n) {
-      const Geometry &geom = **it;
-      os << "Geometry: age = " << n << ", name = \"" << geom.getName() << "\", ";
-      geom.print(0, os);
-      os << "\n";
+    
+    if (mParser.getStr("geo")=="*") {
+      for (auto begin = mGeom.crbegin(), it = begin, end = mGeom.crend(); it != end; ++it) {
+        const Geometry &geom = **it;
+        os << "Geometry: age = " << std::distance(begin,it) << ", name = \"" << geom.getName() << "\", ";
+        geom.print(0, os);
+        os << "\n";
+      }
+      if (mGeom.empty()) os << "Geometry: none\n";
+    } else {
+      for (int age : mParser.getVec<int>("geo")) {
+        auto it = this->getGeom(age);
+        const Geometry &geom = **it;
+        os << "Geometry: age = " << age << ", name = \"" << geom.getName() << "\", ";
+        geom.print(0, os);
+        os << "\n";
+      }
     }
-    if (n==0) os << "Geometry: none\n";
-    n = 0;
-    for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it, ++n) {
-      auto grid = *it;
-      const auto bbox = grid->evalActiveVoxelBoundingBox();
-      os << "VDB grid: age = " << n << ", name = \"" << grid->getName() << "\", type = \"";
-      os << grid->valueType() << "\", bbox = " << bbox << ", dim = " << bbox.dim();
-      os << ", voxels = " << grid->activeVoxelCount() << ", dx = " << grid->voxelSize()[0];
-      os << ", size = ";
-      util::printBytes(os, grid->memUsage());
+    
+    if (mParser.getStr("vdb")=="*") {
+      for (auto begin = mGrid.crbegin(), it = begin, end = mGrid.crend(); it != end; ++it) {
+        const auto &grid = **it;
+        const auto bbox = grid.evalActiveVoxelBoundingBox();
+        os << "VDB grid: age = " << std::distance(begin,it) << ", name = \"" << grid.getName() << "\", type = \"";
+        os << grid.valueType() << "\", bbox = " << bbox << ", dim = " << bbox.dim();
+        os << ", voxels = " << grid.activeVoxelCount() << ", dx = " << grid.voxelSize()[0];
+        os << ", size = ";
+        util::printBytes(os, grid.memUsage());
+      }
+      if (mGrid.empty()) os << "VDB grid: none\n";
+    } else {
+      for (int age : mParser.getVec<int>("vdb")) {
+        auto it = this->getGrid(age);
+        const auto &grid = **it;
+        const auto bbox = grid.evalActiveVoxelBoundingBox();
+        os << "VDB grid: age = " << age << ", name = \"" << grid.getName() << "\", type = \"";
+        os << grid.valueType() << "\", bbox = " << bbox << ", dim = " << bbox.dim();
+        os << ", voxels = " << grid.activeVoxelCount() << ", dx = " << grid.voxelSize()[0];
+        os << ", size = ";
+        util::printBytes(os, grid.memUsage());
+      }
     }
-    if (n==0) os << "VDB grid: none\n";
+
+    if (mParser.get<bool>("mem")) {
+      os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
+      mParser.computer.memory().print(os);
+    }
+
     os << std::setw(80) << std::setfill('=') << "\n\n" << std::endl;
 
   }

@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/openvdb.h>
+#include <openvdb/io/Stream.h>
 #include "Viewer.h"
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
@@ -153,7 +154,6 @@ main(int argc, char *argv[])
         }
 
         // Load VDB grid from files.
-
         for (size_t n = 0; n < numFiles; ++n) {
             openvdb::io::File file(filenames[n]);
             file.open();

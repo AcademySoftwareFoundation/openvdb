@@ -20,6 +20,8 @@ if(NOT CMAKE_BUILD_TYPE)
       FORCE)
 endif()
 
+list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
+
 # Pseudo library to manage dependencies
 add_library(vdb_tool_common INTERFACE)
 
@@ -27,6 +29,8 @@ add_library(vdb_tool_common INTERFACE)
 option(BUILD_TEST "Build unit tests" OFF)
 
 option(USE_NANO "Compile with NanoVDB support" ON)
+option(NANO_USE_ZIP "Compile NanoVDB with zip compression support. Requires USE_NANO=ON to have effect" ON)
+option(NANO_USE_BLOSC "Compile NanoVDB with Blosc compression support. Requires USE_NANO=ON to have effect" ON)
 option(USE_PNG "Compile with PNG support" OFF)
 option(USE_EXR "Compile with EXR support" OFF)
 option(USE_JPG "Compile with JPG support" OFF)
@@ -42,6 +46,16 @@ endif()
 
 if(USE_NANO)
   add_compile_definitions("VDB_TOOL_USE_NANO")
+  if(NANO_USE_ZIP)
+    add_compile_definitions("NANOVDB_USE_ZIP")
+    find_package(ZLIB REQUIRED)
+    target_link_libraries(vdb_tool_common INTERFACE ZLIB::ZLIB)
+  endif()
+  if(NANO_USE_BLOSC)
+    add_compile_definitions("NANOVDB_USE_BLOSC")
+    find_package(Blosc REQUIRED)
+    target_link_libraries(vdb_tool_common INTERFACE blosc)
+  endif()
 endif()
 
 if(USE_PNG)
@@ -63,7 +77,7 @@ endif()
 
 if(USE_EXR)
   add_compile_definitions("VDB_TOOL_USE_EXR")
-  find_package(OpenEXR CONFIG REQUIRED)
+  find_package(OpenEXR REQUIRED)
   target_link_libraries(vdb_tool_common INTERFACE OpenEXR::IlmImf)
 endif()
 
@@ -118,8 +132,6 @@ add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4267>")
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4275>")
 # Truncation from 'int' to 'bool'
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4305>")
-
-list(APPEND CMAKE_MODULE_PATH ${OPENVDB_CMAKE_PATH})
 
 find_package(OpenVDB)
 if(NOT OpenVDB_FOUND)

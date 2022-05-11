@@ -414,16 +414,16 @@ TEST_F(Test_vdb_tool, Memory)
     Memory mem;
     EXPECT_EQ(std::to_string(2.718281828459), mem.get("e"));
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), mem.get("pi"));
-    EXPECT_EQ(2, mem.size());
+    EXPECT_EQ(0, mem.size());
     EXPECT_FALSE(mem.isSet("a"));
     mem.set("a", 1.4f);
     EXPECT_TRUE(mem.isSet("a"));
     EXPECT_EQ(std::to_string(1.4f), mem.get("a"));
-    EXPECT_EQ(3, mem.size());
+    EXPECT_EQ(1, mem.size());
     mem.clear();
     EXPECT_EQ(std::to_string(2.718281828459), mem.get("e"));
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), mem.get("pi"));
-    EXPECT_EQ(2, mem.size());
+    EXPECT_EQ(0, mem.size());
     EXPECT_FALSE(mem.isSet("a"));
 }
 
@@ -485,13 +485,13 @@ TEST_F(Test_vdb_tool, Computer)
 
     // test set and get, i.e. @ and $
     EXPECT_THROW({comp("{$file}");}, std::invalid_argument);
-    EXPECT_THROW({comp("{dup}");},  std::invalid_argument);
-    EXPECT_THROW({comp("{drop}");}, std::invalid_argument);
-    EXPECT_THROW({comp("{swap}");}, std::invalid_argument);
+    EXPECT_THROW({comp("{dup}");},   std::invalid_argument);
+    EXPECT_THROW({comp("{drop}");},  std::invalid_argument);
+    EXPECT_THROW({comp("{swap}");},  std::invalid_argument);
 
-    //EXPECT_NO_THROW({// everything below should pass and not throw!
+    EXPECT_NO_THROW({// everything below should pass and not throw!
 
-    EXPECT_EQ(2, comp.memory().size());
+    EXPECT_EQ(0, comp.memory().size());
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{$pi}"));
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{pi:get}"));
     EXPECT_EQ(std::to_string(2.718281828459), comp("{$e}"));
@@ -510,7 +510,7 @@ TEST_F(Test_vdb_tool, Computer)
     EXPECT_EQ("2", comp("{$G}"));
     EXPECT_TRUE(comp("{$G:++:@G}").empty());
     EXPECT_EQ("3", comp("{$G}"));
-    EXPECT_EQ(8, comp.memory().size());
+    EXPECT_EQ(6, comp.memory().size());
 
     // test file-name methods
     EXPECT_EQ("path", comp("{$file:path}"));
@@ -717,8 +717,8 @@ TEST_F(Test_vdb_tool, Computer)
     EXPECT_EQ("4", comp("{0:1:2:3:clear:4}"));
     EXPECT_EQ("4", comp("{0:1:2:3:depth:@size:clear:$size}"));
 
-    EXPECT_EQ("1", comp("{e:is_set}"));
-    EXPECT_EQ("1", comp("{pi:is_set}"));
+    EXPECT_EQ("0", comp("{e:is_set}"));
+    EXPECT_EQ("0", comp("{pi:is_set}"));
     EXPECT_EQ("0", comp("{foo:is_set}"));
     EXPECT_EQ("1", comp("{8:@bar:bar:is_set}"));
 
@@ -768,7 +768,7 @@ TEST_F(Test_vdb_tool, Computer)
     EXPECT_EQ("_bar", comp("{foo_bar:foo:erase}"));
     EXPECT_EQ("f_bar", comp("{foo_bar:o:erase}"));
     EXPECT_EQ("foobar", comp("{foo bar: :erase}"));
-    //});// end EXPECT_NO_THROW
+    });// end EXPECT_NO_THROW
 }// Computer
 
 TEST_F(Test_vdb_tool, ToolParser)

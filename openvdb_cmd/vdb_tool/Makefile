@@ -4,7 +4,7 @@ USE_EXR  := no
 USE_JPG  := no
 USE_ABC  := no
 # use this with enable all of the above
-USE_ALL  := yes
+USE_ALL  := no
 
 CC = g++
 ABI_FLAG =# -DOPENVDB_ABI_VERSION_NUMBER=9
@@ -89,7 +89,7 @@ test: debug/unittest.o
 #########
 
 archive:
-	@tar -C .. -czf vdb_tool.tgz vdb_tool/Makefile vdb_tool/src vdb_tool/include vdb_tool/examples vdb_tool/README.md
+	@tar -C .. -czf vdb_tool.tgz vdb_tool/CMakeLists.txt vdb_tool/Makefile vdb_tool/src vdb_tool/include vdb_tool/examples vdb_tool/README.md vdb_tool/CHANGES.md
 
 #########
 

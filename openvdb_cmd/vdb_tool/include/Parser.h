@@ -57,6 +57,7 @@ struct Action {
     std::vector<Option>    options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
     std::function<void()>  init, run;// callback functions
 
+    /// @brief c-tor
     Action(std::string _name,
            std::string _alias,
            std::string _doc,
@@ -71,7 +72,9 @@ struct Action {
       , options(std::move(_options))
       , init(std::move(_init))
       , run(std::move(_run)) {}
+    /// @brief default copy constructor
     Action(const Action&) = default;
+    /// @brief Sets the options of this actions
     void setOption(const std::string &str);
     void print(std::ostream& os = std::cerr) const;
 };// Action struct
@@ -90,18 +93,22 @@ using VecS = std::vector<std::string>;// vector of strings
 class Memory
 {
     std::unordered_map<std::string, std::string> mData;
-    void init() {
-        this->set("pi", math::pi<float>());
-        this->set("e", 2.718281828459);
-    }
 public:
-    Memory() {this->init();}
+    Memory() = default;
     std::string get(const std::string &name) {
         auto it = mData.find(name);
-        if (it == mData.end()) throw std::invalid_argument("Storrage::get: undefined variable \""+name+"\"");
+        if (it == mData.end()) {
+            if (name=="pi") {
+                return std::to_string(std::atan(1)*4);
+            } else if (name=="e") {
+                return std::to_string(2.718281828459);
+            } else {
+                throw std::invalid_argument("Storrage::get: undefined variable \""+name+"\"");
+            }
+        }
         return it->second;
     }
-    void clear() {mData.clear(); this->init();}
+    void clear() {mData.clear();}
     void clear(const std::string &name) {mData.erase(name);}
     void set(const std::string &name, const std::string &value) {mData[name]=value;}
     void set(const std::string &name, const char *value) {mData[name]=value;}
@@ -196,6 +203,7 @@ class Computer
     Instructions mInstructions;// map of all supported instructions
     Memory       mMemory;
 
+    /// @brief apply functor to the top element, assuming it's either a float or integer
     template <typename OpT>
     void a(OpT op){
         union {std::int32_t i; float x;} A;
@@ -207,6 +215,8 @@ class Computer
             throw std::invalid_argument("a: invalid argument \"" + mCallStack.top() + "\"");
         }
     }
+
+    /// @brief apply functor to the two top element, assuming they are both floats or integers
     template <typename OpT>
     void ab(OpT op){
         union {std::int32_t i; float x;} A, B;
@@ -219,6 +229,8 @@ class Computer
             throw std::invalid_argument("ab: invalid arguments \"" + mCallStack.top() + "\" and \"" + str + "\"");
         }
     }
+
+    /// @brief apply a boolean test, e.g. a == b, to the two top elements, assuming they are floats, integers or strings
     template <typename T>
     void boolian(T test){
         union {std::int32_t i; float x;} A, B;
@@ -226,7 +238,7 @@ class Computer
         if (is_int(mCallStack.top(), A.i) && is_int(str, B.i)) {
             mCallStack.top() = test(A.i, B.i) ? "1" : "0";
         } else if (is_flt(mCallStack.top(), A.x) && is_flt(str, B.x)) {
-            mCallStack.top() = test(A.i, B.i) ? "1" : "0";
+            mCallStack.top() = test(A.x, B.x) ? "1" : "0";
         } else {// string
             mCallStack.top() = test(mCallStack.top(), str) ? "1" : "0";
         }
@@ -434,15 +446,16 @@ public:
         add("@","set a variable to a value and save it to memory, e.g. {1:@G} -> {}", [](){});
         add("if","if- and optional else-statement, e.g. {1:if(2)} -> {2} and {0:if(2?3)} -> {3}",[](){});
         add("switch","switch-statement, e.g. {2:switch(1:first?2:second?3:third)} -> {second}",[](){});
-        add("quit","terminate evaluation, e.g. {1:2:+:quit:3:*} -> {3}",[](){});
+        add("quit","terminate evaluation, e.g. {1:2:+:quit:4:*} -> {3}",[](){});
     }
-    /// @brief process the specified string
+    /// @brief performs syntax analysis on the specified str
     void operator()(std::string &str)
     {
+        try {
         for (size_t pos = str.find_first_of("{}"); pos != std::string::npos; pos = str.find_first_of("{}", pos)) {
             if (str[pos]=='}') throw std::invalid_argument("Computer(): expected \"{\" before \"}\" in \""+str.substr(pos)+"\"");
             size_t end = str.find_first_of("{}", pos + 1);
-            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Computer(): missing \"}\" in \""+str.substr(pos)+"\"");
+            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Computer(): nested \"{}\" is not allowed in \""+str.substr(pos)+"\"");
             for (size_t p=str.find_first_of(":}",pos+1), q=pos+1; p<=end; q=p+1, p=str.find_first_of(":}",q)) {
                 if (p == q) {// ignores {:} and {::}
                     continue;
@@ -485,7 +498,7 @@ public:
                         }
                     }
                     if (str.compare(q,7,"switch(")==0) throw std::invalid_argument("Computer():: no match in switch-statement \""+str.substr(q)+"\"");
-                } else {// apply callback
+                } else {// apply callback or push
                     const std::string s = str.substr(q, p - q);
                     auto it = mInstructions.find(s);
                     if (it != mInstructions.end()) {
@@ -505,6 +518,9 @@ public:
                 throw std::invalid_argument("Computer::(): compute stack contains more than one entry: " + ss.str());
             }
         }// for-loop over "{}" in string
+        } catch (const std::exception& e) {
+            throw std::invalid_argument("Error evaluating \""+str+"\": "+e.what());
+        }
     }
     std::string operator()(const std::string &str)
     {
