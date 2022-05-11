@@ -2707,7 +2707,7 @@ void Tool::print(std::ostream& os) const
 
   if (mParser.verbose>0) {
     os << "\n" << std::setw(40) << std::setfill('=') << "> Primitives <" << std::setw(39) << "\n";
-    
+
     if (mParser.getStr("geo")=="*") {
       for (auto begin = mGeom.crbegin(), it = begin, end = mGeom.crend(); it != end; ++it) {
         const Geometry &geom = **it;
@@ -2725,7 +2725,7 @@ void Tool::print(std::ostream& os) const
         os << "\n";
       }
     }
-    
+
     if (mParser.getStr("vdb")=="*") {
       for (auto begin = mGrid.crbegin(), it = begin, end = mGrid.crend(); it != end; ++it) {
         const auto &grid = **it;
