@@ -275,6 +275,7 @@ c=b^2-4ac, a=-2a<br>
 if (c==0) one solution: b/a, else if (c>0) two solutions: (b+-sqrt(c))/a
 ```
 vdb_tool -eval '{1:@a:-8:@b:5:@c}' '{$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a}' '{$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}'
+//vdb_tool -eval '(a=1;b=-8;c=5;c=b^2-4*a*c;a=-2*a;if(c==0){s1=b/a;}if(c>0){s1=(b+sqrt(c))/a;s2=b-sqrt(c))/a;}'
 ```
 which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the single real root -2.
 
@@ -283,6 +284,7 @@ which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the si
 Read both a vdb and mesh file and convert the mesh to a vdb with twice the voxel size of the input vdb.
 ```
 vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='{0:voxelSize:2:*}' -print
+//vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='(2*voxelSize(0);)' -print
 ```
 
 * Loop skipping and expressions
@@ -321,104 +323,3 @@ vdb_tool -each file=`find ~/dev/data -name '*.vdb'` -read '{$file}' -for grid=0,
 Most of the arguments should be self-explanatory, but at least two deserve an explanation: -render has the option keep=1 because otherwise rendered grids are removed from the stack which invalidates {gridCount}, and -clear is added to avoid accumulating all grids as multiple files are loaded.
 
 ---
-# To Do List:
-
-- [x] vdb_tool::readGeo
-- [x] vdb_tool::readVDB
-- [x] vdb_tool::particlesToLevelSet
-- [x] vdb_tool::processLevelSet
-- [x] vdb_tool::offsetLevelSet
-- [x] vdb_tool::filterLevelSet
-- [x] vdb_tool::levelSetToMesh
-- [x] vdb_tool::writeGeo
-- [x] vdb_tool::writeVDB
-- [x] read ASCI obj particle files
-- [x] read ASCI ply particle files
-- [x] read binary ply particle files
-- [x] write binary ply mesh files
-- [x] write ascii obj mesh files
-- [x] Geometry::readVdb
-- [x] Geometry::readPts
-- [x] define time and space order
-- [x] Mesh::readPly
-- [x] vdb_tool::readMesh
-- [x] vdb_tool::meshToLevelSet
-- [x] Geometry::readObj
-- [x] Geometry::readPly
-- [x] Geometry::readNvdb
-- [x] vdb_tool::writeVDB
-- [x] allow actions to have multiple "-"
-- [x] add "-sphere"
-- [x] add volume/geometry ages to all actions
-- [x] add CSG operations
-- [x] "-read" supports multiple files
-- [x] "-write" supports multiple files
-- [x] added "-print"
-- [x] works with tcsh, sh, ksh, and zsh shells
-- [x] added "-default"
-- [x] cache a list of base grids instead of FloatGrids
-- [x] -points2vdb : points -> PointDataGrid
-- [x] -vdb2points : PointDataGrid -> points
-- [x] -write geo=1 vdb=1,3 file.ply file.vdb
-- [x] -iso2ls, convert scalar field to level set
-- [x] -ls2fog, convert level set to fog volume
-- [x] -scatter, scatter points
-- [x] -prune, prune level set
-- [x] -flood, signed flood fill of level set
-- [x] -multires, generate multi-resolution grids
-- [x] -expand, expand narrow band of level set
-- [x] -cpt, generate closest-point transfer
-- [x] -grad, generate gradient field
-- [x] -div, generate divergence from vector field
-- [x] -curl, generate curl from vector field
-- [x] -curvature, generate mean curvature from scalar field
-- [x] -length, generate length of vector field
-- [x] -render, render level set and fog volumes
-- [x] -enright, performs advection test on level set
-- [x] -for i=0,10,1 -end
-- [x] -each s=str1,str2 -end
-- [x] -read grids=sphere file_%4i.vdb
-- [x] Geometry::readSTL
-- [x] Geometry::writeSTL
-- [x] -clip against either a mask grid, bbox or frustum
-- [x] Added local counter "%I" to for-loops
-- [x] Added global counter "%G"
-- [x] add Tool::savePNG
-- [x] add Tool::saveEXR
-- [x] -platonic faces=4
-- [x] -segment vdb=0 keep=0
-- [x] -resample vdb=0[,1] scale=0 translate=0,0,0 order=1[0|2] keep=0
-- [x] add Geometry::readABC
-- [x] add support for unix pipelining
-- [x] add Tool::saveJPG
-- [x] add Geometry::read/write to support streaming
-- [x] -read stdin.[ply,obj,stl,geo,vdb]
-- [x] -write stdout.[ply,obj,stl,geo,vdb]
-- [x] actions can now have an optional alias, e.g. -read, -i
-- [x] -write file.nvdb stdout.nvdb
-- [x] -write bits=32|16|8|N codec=blosc|zip|active
-- [x] -help read,write,ls2mesh brief=true
-- [x] use openvdb namespace
-- [x] Major revision with Parser.h
-- [x] -read delayed=false file.vdb
-- [x] -clear vdb=1,2,3 geo=*
-- [x] -config update=false execute=true configure.txt
-- [x] -each f=*.vdb
-- [x] add stack-based translator and storage
-- [x] -eval '{1:@G}'
-- [x] add if-statement: {$x:0:==:if(0.5)} equals if (x==0) 0.5 and {\$x:1:>:if(0.5:sin?0.3:cos)} equals if (x>1) sin(0.5) else cos(0.3)
-- [x] add switch-statement: {\$i:switch(1:A?2:B?3:C)} equals switch(x) case 1: A; break; case 2: B; break; case 3: C
-- [x] Added numerous methods to scripting language
-- [x] -mesh2ls vdb=0  (use another vdb to defined the transform)
-- [x] -iso2ls vdb=0,1 (use another vdb to defined the transform)
-- [x] loops will now skip, instead of throw, if its initial condition is invalid
-- [x] -for i=1,9  (third argument defaults to 1, i.e. i=1,9,1)
-- [x] -if 0|1|false|true  ... -end (if statement)
-- [x] -eval help="*" or -eval help=if,switch
-- [x] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
-- [x] composite: -min, -max, -sum
-- [x] -transform vdb=0,3 geo=5 (scale -> rotate -> translate of VDB grids and geometry)
-- [ ] -merge
-- [ ] -points2mask
-- [ ] -erodeTopology
-- [x] use cmake (thanks to Greg Klar!)
