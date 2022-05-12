@@ -1,2 +1,0 @@
-Improvements:
-    - Improved build support for MinGW [Contributed by Mehdi Chinoune]

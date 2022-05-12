@@ -10,22 +10,43 @@ Version 9.0.1 - In development
       in data races for multi-threaded execution (unconfirmed) [Reported by Tommy Hinks]
     - Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by @frapit]
     - Fix unit tests failures with Blosc versions >= 1.19.0.
+    - Fixed a regression in ax::run which wouldn't propagate exceptions
+    - Fixed a bug where ax::ast::parse could return a partially constructed but invalid AST on failure
+    - Fixed AX logger exit handling in ax::Compiler::compile and ax::ast::parse
+    - Fixed an issue which could result in significant compilation times when instantiating TypeList<>::Unique<>
 
     New features:
     - Added support for AMD's HIP API in NanoVDB [Contributed by Blender Foundation]
     - Added bindings mechanism to AX to allow differing data and AX attribute names (@) in Point and Volume executables.
     - Added support for OpenVDB AX on Windows.
+    - Added tools::memUsageIfLoaded() which returns the memory consumption of a deserialized VDB tree, useful if delay-loading is enabled.
+    - Added points::rasterizeSpheres() and points::rasterizeSmoothSpheres()
+      variants, new kernels and improved performance for OpenVDB points to
+      surface rasterization.
+    - Added points::rasterizeTrilinear() for OpenVDB points, fast staggered
+      or colocated trilinear rasterization for scalar and vector attributes.
+    - Exposed TypeList declarations in openvdb.h which denote the default set of types supported by OpenVDB.
+
 
     Improvements:
     - Added a --thread [n] argument to the vdb_ax binary.
     - Added a --copy-file-metadata option to vdb_ax. This behaviour is now off by default.
     - Added support for multiple input files with the vdb_ax binary using -i. Positional arguments as input files are deprecated.
     - Added tools::minMax() which supports multithreaded evaluation of active minimum and maximum values. Grid::evalMinMax() has been deprecated.  [Contributed by Greg Hurst]
+    - Significant performance improvements to AX point kernels, primarily due to
+      providing AX access to attribute buffers for superior code generation.
+    - vdb_print now prints both the in-core memory and total memory usage for VDB grids.
+    - Improved build support for MinGW [Contributed by Mehdi Chinoune]
+    - Added a new foreach method to TypeList for iterating over types without constructing them.
+    - Added TypeList::Transform declaration for transforming TypeLists into new types.
+    - Moved Grid::apply implementation to TypeList::apply to allow for other polymorphic types to invoke it.
 
     Build:
     - Regenerated AX grammar with Flex 2.6.4 and Bison 3.8.2.
     - Improved locating NumPy in CMake when multiple python versions are installed.
     - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.  [Reported by Sam James]
+    - Changed the way boost_python and boost_numpy are located. Both components must match the major/minor version of python in use. This can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.
+    - Relocated OpenVDB binaries to a new openvdb_cmd root directory.
 
     Houdini:
     - Added Attribute Bindings to AX SOP to allow differently named AX attributes (@) and target point attributes/volumes.

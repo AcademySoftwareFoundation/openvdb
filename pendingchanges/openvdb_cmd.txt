@@ -1,2 +1,0 @@
-Build:
-    - Relocated OpenVDB binaries to a new openvdb_cmd root directory.

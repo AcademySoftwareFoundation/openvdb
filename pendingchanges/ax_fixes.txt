@@ -1,4 +1,0 @@
-Bug Fixes:
-    - Fixed a regression in ax::run which wouldn't propagate exceptions
-    - Fixed a bug where ax::ast::parse could return a partially constructed but invalid AST on failure
-    - Fixed AX logger exit handling in ax::Compiler::compile and ax::ast::parse
