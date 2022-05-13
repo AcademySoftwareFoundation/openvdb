@@ -162,26 +162,44 @@ list(APPEND _TBB_INCLUDE_SEARCH_DIRS
   ${SYSTEM_LIBRARY_PATHS}
 )
 
-# Look for a standard tbb header file.
-find_path(Tbb_INCLUDE_DIR tbb/tbb_stddef.h
+if(NOT Tbb_INCLUDE_DIR)
+  # Look for a legacy tbb header file.
+  find_path(Tbb_LEGACY_INCLUDE_DIR tbb/tbb_stddef.h
+    ${_FIND_TBB_ADDITIONAL_OPTIONS}
+    PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
+    PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
+  )
+endif()
+
+# Look for a new tbb header installation
+# From TBB 2021, tbb_stddef is removed and the directory include/tbb is
+# simply an alias for include/oneapi/tbb. Try and find the version header
+# in oneapi/tbb
+find_path(Tbb_INCLUDE_DIR oneapi/tbb/version.h
   ${_FIND_TBB_ADDITIONAL_OPTIONS}
   PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
   PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
 )
 
-set(_tbb_version_file "${Tbb_INCLUDE_DIR}/tbb/tbb_stddef.h")
+set(_tbb_legacy_version_file "${Tbb_LEGACY_INCLUDE_DIR}/tbb/tbb_stddef.h")
+set(_tbb_version_file "${Tbb_INCLUDE_DIR}/oneapi/tbb/version.h")
 
-if(NOT EXISTS ${_tbb_version_file})
-  # From TBB 2021, tbb_stddef is removed and the directory include/tbb is
-  # simply an alias for include/oneapi/tbb. Try and find the version header
-  # in oneapi/tbb
-  find_path(Tbb_INCLUDE_DIR oneapi/tbb/version.h
-    ${_FIND_TBB_ADDITIONAL_OPTIONS}
-    PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
-    PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
-  )
-  set(_tbb_version_file "${Tbb_INCLUDE_DIR}/oneapi/tbb/version.h")
+if(EXISTS ${_tbb_legacy_version_file})
+  if(EXISTS ${_tbb_version_file})
+    message(WARNING "
+      FindTBB located both an old and new tbb installation.
+          old: ${_tbb_legacy_version_file}
+          new: ${_tbb_version_file}
+      The NEWER versioned installation will be used. You can set TBB_INCLUDEDIR
+      to control FindTBB.cmake search, or explicitly set Tbb_INCLUDE_DIR to the
+      desired location.
+      ")
+  else()
+    set(_tbb_version_file "${_tbb_legacy_version_file}")
+    set(Tbb_INCLUDE_DIR ${Tbb_LEGACY_INCLUDE_DIR} CACHE STRING "" FORCE)
+  endif()
 endif()
+
 
 if(EXISTS ${_tbb_version_file})
   file(STRINGS ${_tbb_version_file}
@@ -207,6 +225,8 @@ if(EXISTS ${_tbb_version_file})
 endif()
 
 unset(_tbb_version_file)
+unset(_tbb_legacy_version_file)
+unset(Tbb_LEGACY_INCLUDE_DIR)
 
 # ------------------------------------------------------------------------
 #  Search for TBB lib DIR
