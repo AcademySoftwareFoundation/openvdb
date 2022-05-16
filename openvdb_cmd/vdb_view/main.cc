@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/openvdb.h>
-#include <openvdb/io/Stream.h>
 #include "Viewer.h"
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
