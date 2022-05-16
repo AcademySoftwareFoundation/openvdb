@@ -214,7 +214,7 @@ Clear[gridType];
 KeyValueMap[Function[{k, v}, gridType[v["ClassName"]] = k], Join @@ Values[$GridClassData]];
 
 
-(* ::Subsection:: *)
+(* ::Subsection::Closed:: *)
 (*$OpenVDBTemplate*)
 
 
@@ -347,7 +347,7 @@ matrixOutput[type_, rank_] := {type, rank+2}
 cubeOutput[type_, rank_]   := {type, rank+3}
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*ScalarGrid template*)
 
 
@@ -660,7 +660,177 @@ sameExpression[expr1_, expr2_] :=
 SyntaxInformation[OpenVDBLink`Developer`TestOpenVDBLink] = {"ArgumentsPattern" -> {_.}};
 
 
-addCodeCompletion[OpenVDBLink`Developer`TestOpenVDBLink][iGridAreas[All]];
+addCodeCompletion["OpenVDBLink`Developer`TestOpenVDBLink"][iGridAreas[All]];
+
+
+(* ::Subsection::Closed:: *)
+(*WLTToNotebook*)
+
+
+(* ::Text:: *)
+(*Specialized version of https://resources.wolframcloud.com/FunctionRepository/resources/WLTToNotebook/*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+OpenVDBLink`Developer`WLTToNotebook[unitTestName_] := Enclose @ Module[{
+	file,
+	heldContents,
+	cellids,
+	cells
+},
+	file = FileNameJoin[{
+		$OpenVDBInstallationDirectory, 
+		"UnitTests", "wlt", 
+		FileBaseName[unitTestName] <> ".wlt"
+	}];
+	ConfirmBy[file, FileExistsQ, "File does not exist"];
+	ConfirmBy[ToLowerCase @ FileExtension[file], MatchQ["wlt" | "mt"], "File extension is not .wlt or .mt"];
+	
+	Block[{$Context, $ContextPath, noTitleYetQ = True},
+		Needs["MUnit`"];
+		heldContents = Confirm[Import[file, {"WL", "HeldExpressions"}], "Import error"];
+		cellids = CreateDataStructure["HashSet"];
+		heldContents = testToCellGroup[#, cellids]& /@ heldContents;
+	];
+		
+	cells = Cases[Flatten @ heldContents, _Cell];
+	
+	cells = createCellGroup[cells, "Section"];
+	cells = Replace[cells, CellGroupData[l:{_[_, "Section"], __}, c___] :> CellGroupData[createCellGroup[l, "Subsection"], c], {1}];
+		
+	NotebookPut @ Notebook[
+		cells,
+		ShowGroupOpener -> True,
+		TaggingRules -> Association["$testsRun" -> False],
+		StyleDefinitions -> FrontEnd`FileName[
+			{"MUnit"}, "MUnit.nb",
+			CharacterEncoding -> "UTF-8"
+		]
+	]
+];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Utilities*)
+
+
+generateUniqueID[max_, hashTable_] := Module[{i = 0},
+	TimeConstrained[
+		While[True,
+			i = RandomInteger[max];
+			If[ TrueQ @ hashTable["Insert", i],
+				Break[]
+			]
+		],
+		2
+	];
+	i
+];
+
+
+SetAttributes[testToCellGroup, HoldAllComplete];
+
+
+(* Handle verification tests terminated by a ; *)
+testToCellGroup[
+	HoldComplete[CompoundExpression[expressions__]],
+	rest___
+] := Map[
+	testToCellGroup[#, rest]&,
+	Thread @ HoldComplete[{expressions}]
+];
+
+(* Handle 1-arg tests *)
+testToCellGroup[
+	HoldComplete[test : VerificationTest[fst_, args___]],
+	cellids_
+] /; Quiet @ CheckArguments[test, 1] := testToCellGroup[VerificationTest[fst, True, {}, args], cellids];
+
+(* Handle 2-arg tests *)
+testToCellGroup[
+	HoldComplete[test : VerificationTest[fst_, snd_, args___]],
+	cellids_
+] /; Quiet @ CheckArguments[test, 2] := testToCellGroup[VerificationTest[fst, snd, {}, args], cellids];
+
+(* Handle 3-arg tests *)
+testToCellGroup[
+	HoldComplete[test_VerificationTest],
+	cellids_
+] /; Quiet @ CheckArguments[test, 3] := testToCellGroup[test, cellids]
+
+(* Convert test to Cells *)
+testToCellGroup[
+	test : VerificationTest[in_, out_, msgs_, opts___],
+	cellids_
+] := With[{
+	imax = 10^9
+},
+	Cell @ CellGroupData[
+		{
+			Cell[
+				BoxData @ MakeBoxes[in, StandardForm],
+				"VerificationTest",
+				CellID -> generateUniqueID[imax, cellids]
+			],
+			Cell[
+				BoxData @ MakeBoxes[out, StandardForm],
+				"ExpectedOutput",
+				CellID -> generateUniqueID[imax, cellids]
+			],
+			Cell[
+				BoxData @ MakeBoxes[msgs, StandardForm],
+				"ExpectedMessage",
+				CellID -> generateUniqueID[imax, cellids]
+			],
+			Cell[
+				BoxData @ MakeBoxes[{opts}, StandardForm],
+				"TestOptions",
+				CellID -> generateUniqueID[imax, cellids]
+			],
+			Cell[
+				BoxData @ ToBoxes @ MUnit`bottomCell[],
+				"BottomCell",
+				CellID -> generateUniqueID[imax, cellids]
+			]
+		},
+		Open
+	]
+];
+
+testToCellGroup[HoldComplete[MUnit`BeginTestSection[section_String]], _] := Cell[section, sectionType[section]];
+
+testToCellGroup[other_, _] := Nothing;
+
+
+sectionType[title_] /; noTitleYetQ := (noTitleYetQ = False; "Title");
+sectionType[symbol_String] /; StringStartsQ[symbol, "Initialization" | (("$"...) ~~ "OpenVDB")] = "Subsection";
+sectionType[_] = "Section";
+
+
+createCellGroup[cells_, section_] :=
+	Block[{splitcells},
+		splitcells = SplitBy[cells, #[[-1]] === section&];
+		(
+			Prepend[
+				CellGroupData[Join[##], Closed]& @@@ Partition[Rest[splitcells], 2], 
+				splitcells[[1, 1]]
+			]
+		
+		) /; OddQ[Length[splitcells]] && MatchQ[splitcells, {{_}, _, _, __}]
+	];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+SyntaxInformation[OpenVDBLink`Developer`WLTToNotebook] = {"ArgumentsPattern" -> {_}};
+
+
+addCodeCompletion["OpenVDBLink`Developer`WLTToNotebook"][iGridAreas[All]];
 
 
 (* ::Section:: *)
