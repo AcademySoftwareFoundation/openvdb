@@ -1,8 +1,0 @@
-New features:
-    - Added points::rasterizeSpheres() and points::rasterizeSmoothSpheres()
-    variants, new kernels and improved performance for OpenVDB points to
-    surface rasterization.
-    - Added points::rasterizeTrilinear() for OpenVDB points, fast staggered
-    or colocated trilinear rasterization for scalar and vector attributes.
-
-
