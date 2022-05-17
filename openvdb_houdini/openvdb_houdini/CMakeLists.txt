@@ -259,7 +259,7 @@ if(NOT OPENVDB_DSO_NAMES)
     SOP_OpenVDB_Points_Group
     SOP_OpenVDB_Potential_Flow
     SOP_OpenVDB_Prune
-    SOP_OpenVDB_Rasterize_Particles
+    SOP_OpenVDB_Rasterize_Frustum
     SOP_OpenVDB_Rasterize_Points
     SOP_OpenVDB_Ray
     SOP_OpenVDB_Read

@@ -1,7 +1,7 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
-/// @file SOP_OpenVDB_Rasterize_Particles.cc
+/// @file SOP_OpenVDB_Rasterize_Frustum.cc
 ///
 /// @author Dan Bailey
 ///
@@ -596,9 +596,9 @@ private:
 
 // SOP Implementation
 
-struct SOP_OpenVDB_Rasterize_Particles: public hvdb::SOP_NodeVDB
+struct SOP_OpenVDB_Rasterize_Frustum: public hvdb::SOP_NodeVDB
 {
-    SOP_OpenVDB_Rasterize_Particles(OP_Network*, const char* name, OP_Operator*);
+    SOP_OpenVDB_Rasterize_Frustum(OP_Network*, const char* name, OP_Operator*);
     static OP_Node* factory(OP_Network*, const char* name, OP_Operator*);
 
     int isRefInput(unsigned i) const override { return i > 0; }
@@ -606,7 +606,7 @@ struct SOP_OpenVDB_Rasterize_Particles: public hvdb::SOP_NodeVDB
 protected:
     OP_ERROR cookVDBSop(OP_Context&) override;
     bool updateParmsFlags() override;
-}; // struct SOP_OpenVDB_Rasterize_Particles
+}; // struct SOP_OpenVDB_Rasterize_Frustum
 
 
 ////////////////////////////////////////
@@ -846,9 +846,12 @@ newSopOperator(OP_OperatorTable* table)
 
     /////
 
-    hvdb::OpenVDBOpFactory("VDB Rasterize Particles",
-        SOP_OpenVDB_Rasterize_Particles::factory, parms, *table)
+    hvdb::OpenVDBOpFactory("VDB Rasterize Frustum",
+        SOP_OpenVDB_Rasterize_Frustum::factory, parms, *table)
         .addInput("Particles to rasterize")
+#ifndef SESI_OPENVDB
+        .setInternalName("DW_OpenVDBRasterizeParticles")
+#endif
         .addOptionalInput("Optional VDB grid that defines the output transform.")
         .addOptionalInput("Optional VDB or bounding box mask.")
         .setDocumentation("\
@@ -888,7 +891,7 @@ provided as an input.\n\
 }
 
 bool
-SOP_OpenVDB_Rasterize_Particles::updateParmsFlags()
+SOP_OpenVDB_Rasterize_Frustum::updateParmsFlags()
 {
     bool changed = false;
 
@@ -938,13 +941,13 @@ SOP_OpenVDB_Rasterize_Particles::updateParmsFlags()
 }
 
 OP_Node*
-SOP_OpenVDB_Rasterize_Particles::factory(OP_Network* net, const char* name, OP_Operator* op)
+SOP_OpenVDB_Rasterize_Frustum::factory(OP_Network* net, const char* name, OP_Operator* op)
 {
-    return new SOP_OpenVDB_Rasterize_Particles(net, name, op);
+    return new SOP_OpenVDB_Rasterize_Frustum(net, name, op);
 }
 
 
-SOP_OpenVDB_Rasterize_Particles::SOP_OpenVDB_Rasterize_Particles(OP_Network* net,
+SOP_OpenVDB_Rasterize_Frustum::SOP_OpenVDB_Rasterize_Frustum(OP_Network* net,
     const char* name, OP_Operator* op)
     : hvdb::SOP_NodeVDB(net, name, op)
 {
@@ -952,7 +955,7 @@ SOP_OpenVDB_Rasterize_Particles::SOP_OpenVDB_Rasterize_Particles(OP_Network* net
 
 
 OP_ERROR
-SOP_OpenVDB_Rasterize_Particles::cookVDBSop(OP_Context& context)
+SOP_OpenVDB_Rasterize_Frustum::cookVDBSop(OP_Context& context)
 {
     try {
         OP_AutoLockInputs inputs(this);
