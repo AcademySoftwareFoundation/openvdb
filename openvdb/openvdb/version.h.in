@@ -261,6 +261,8 @@ inline constexpr const char* getLibraryVersionString() { return OPENVDB_LIBRARY_
 inline constexpr const char* getLibraryAbiVersionString() {
     return OPENVDB_LIBRARY_ABI_VERSION_STRING;
 }
+inline constexpr const char* getPackageUrl() { return OPENVDB_PACKAGE_URL; }
+inline constexpr const char* getPackageRevision() { return OPENVDB_PACKAGE_REVISION; }
 
 
 struct VersionId {
