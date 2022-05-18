@@ -228,6 +228,9 @@ struct CsgUnionOrIntersectionOp
     /// @brief Return the number of trees being merged
     size_t size() const { return mTreesToMerge.size(); }
 
+    /// Enables immediate pruning of tiles that cancel each other out.
+    void setPruneCancelledTiles(bool doprune) { mPruneCancelledTiles = doprune; }
+
     // Processes the root node. Required by the NodeManager
     bool operator()(RootT& root, size_t idx) const;
 
@@ -245,6 +248,7 @@ private:
 
     mutable std::vector<TreeToMerge<TreeT>> mTreesToMerge;
     mutable const ValueT* mBackground = nullptr;
+    bool mPruneCancelledTiles = false;
 }; // struct CsgUnionOrIntersectionOp
 
 
@@ -261,7 +265,7 @@ using CsgIntersectionOp = CsgUnionOrIntersectionOp<TreeT, /*Union=*/false>;
 /// PruneCancelledTiles will set to background any leaf tile that matches
 /// in the two trees, thus minimizing ghost banding when common borders
 /// are differenced.
-template<typename TreeT, bool PruneCancelledTiles = false>
+template<typename TreeT>
 struct CsgDifferenceOp
 {
     using ValueT = typename TreeT::ValueType;
@@ -281,6 +285,9 @@ struct CsgDifferenceOp
     /// @brief Constructor to CSG difference the tree in a TreeToMerge object
     /// from another.
     explicit CsgDifferenceOp(TreeToMerge<TreeT>& tree) : mTree(tree) { }
+
+    /// Enables immediate pruning of tiles that cancel each other out.
+    void setPruneCancelledTiles(bool doprune) { mPruneCancelledTiles = doprune; }
 
     /// @brief Return the number of trees being merged (only ever 1)
     size_t size() const { return 1; }
@@ -306,6 +313,7 @@ private:
     mutable TreeToMerge<TreeT> mTree;
     mutable const ValueT* mBackground = nullptr;
     mutable const ValueT* mOtherBackground = nullptr;
+    bool mPruneCancelledTiles = false;
 }; // struct CsgDifferenceOp
 
 
@@ -969,12 +977,35 @@ bool CsgUnionOrIntersectionOp<TreeT, Union>::operator()(LeafT& leaf, size_t) con
             continue;
         }
 
-        for (Index i = 0 ; i < LeafT::SIZE; i++) {
-            const ValueT& newValue = mergeLeaf->getValue(i);
-            const bool doMerge = Union ? newValue < leaf.getValue(i) : newValue > leaf.getValue(i);
-            if (doMerge) {
-                leaf.setValueOnly(i, newValue);
-                leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+        if (mPruneCancelledTiles) {
+            bool allnegequal = true;
+            for (Index i = 0 ; i < LeafT::SIZE; i++) {
+                const ValueT& newValue = mergeLeaf->getValue(i);
+                const ValueT& oldValue = leaf.getValue(i);
+                allnegequal &= oldValue == math::negative(newValue);
+                const bool doMerge = Union ? newValue < oldValue : newValue > oldValue;
+                if (doMerge) {
+                    leaf.setValueOnly(i, newValue);
+                    leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+                }
+            }
+            if (allnegequal) {
+                // If two diffed tiles have the same values of opposite signs,
+                // we know they have both the same distances and gradients.
+                // Thus they will cancel out.
+                if (Union) { leaf.fill(math::negative(this->background()), false); }
+                else { leaf.fill(this->background(), false); }
+            }
+
+        } else {
+            for (Index i = 0 ; i < LeafT::SIZE; i++) {
+                const ValueT& newValue = mergeLeaf->getValue(i);
+                const ValueT& oldValue = leaf.getValue(i);
+                const bool doMerge = Union ? newValue < oldValue : newValue > oldValue;
+                if (doMerge) {
+                    leaf.setValueOnly(i, newValue);
+                    leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+                }
             }
         }
     }
@@ -995,8 +1026,8 @@ CsgUnionOrIntersectionOp<TreeT, Union>::background() const
 ////////////////////////////////////////
 
 
-template <typename TreeT, bool PruneCancelledTiles>
-bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(RootT& root, size_t) const
+template <typename TreeT>
+bool CsgDifferenceOp<TreeT>::operator()(RootT& root, size_t) const
 {
     // store the background values
     if (!mBackground)       mBackground = &root.background();
@@ -1081,9 +1112,9 @@ bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(RootT& root, size_t
     return continueRecurse;
 }
 
-template<typename TreeT, bool PruneCancelledTiles>
+template<typename TreeT>
 template<typename NodeT>
-bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(NodeT& node, size_t) const
+bool CsgDifferenceOp<TreeT>::operator()(NodeT& node, size_t) const
 {
     using NonConstNodeT = typename std::remove_const<NodeT>::type;
 
@@ -1137,8 +1168,8 @@ bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(NodeT& node, size_t
     return continueRecurse;
 }
 
-template <typename TreeT, bool PruneCancelledTiles>
-bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(LeafT& leaf, size_t) const
+template <typename TreeT>
+bool CsgDifferenceOp<TreeT>::operator()(LeafT& leaf, size_t) const
 {
     using LeafT = typename TreeT::LeafNodeType;
     using ValueT = typename LeafT::ValueType;
@@ -1161,40 +1192,51 @@ bool CsgDifferenceOp<TreeT, PruneCancelledTiles>::operator()(LeafT& leaf, size_t
         return false;
     }
 
-    bool allequal = true;
-    for (Index i = 0 ; i < LeafT::SIZE; i++) {
-        const ValueT& aValue = leaf.getValue(i);
-        ValueT bValue = mergeLeaf->getValue(i);
-        if (PruneCancelledTiles)
+    if (mPruneCancelledTiles) {
+        bool allequal = true;
+        for (Index i = 0 ; i < LeafT::SIZE; i++) {
+            const ValueT& aValue = leaf.getValue(i);
+            ValueT bValue = mergeLeaf->getValue(i);
             allequal &= aValue == bValue;
-        bValue = math::negative(bValue);
-        if (aValue < bValue) { // a = max(a, -b)
-            leaf.setValueOnly(i, bValue);
-            leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+            bValue = math::negative(bValue);
+            if (aValue < bValue) { // a = max(a, -b)
+                leaf.setValueOnly(i, bValue);
+                leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+            }
         }
-    }
-    if (PruneCancelledTiles && allequal) {
-        // If two diffed tiles have the same values, we know they
-        // have both the same distances and gradients.  Thus they will
-        // cancel out.
-        leaf.fill(background(), false);
+        if (allequal) {
+            // If two diffed tiles have the same values, we know they
+            // have both the same distances and gradients.  Thus they will
+            // cancel out.
+            leaf.fill(background(), false);
+        }
+    } else {
+        for (Index i = 0 ; i < LeafT::SIZE; i++) {
+            const ValueT& aValue = leaf.getValue(i);
+            ValueT bValue = mergeLeaf->getValue(i);
+            bValue = math::negative(bValue);
+            if (aValue < bValue) { // a = max(a, -b)
+                leaf.setValueOnly(i, bValue);
+                leaf.setActiveState(i, mergeLeaf->isValueOn(i));
+            }
+        }
     }
 
     return false;
 }
 
-template <typename TreeT, bool PruneCancelledTiles>
-const typename CsgDifferenceOp<TreeT, PruneCancelledTiles>::ValueT&
-CsgDifferenceOp<TreeT, PruneCancelledTiles>::background() const
+template <typename TreeT>
+const typename CsgDifferenceOp<TreeT>::ValueT&
+CsgDifferenceOp<TreeT>::background() const
 {
     // this operator is only intended to be used with foreachTopDown()
     assert(mBackground);
     return *mBackground;
 }
 
-template <typename TreeT, bool PruneCancelledTiles>
-const typename CsgDifferenceOp<TreeT, PruneCancelledTiles>::ValueT&
-CsgDifferenceOp<TreeT, PruneCancelledTiles>::otherBackground() const
+template <typename TreeT>
+const typename CsgDifferenceOp<TreeT>::ValueT&
+CsgDifferenceOp<TreeT>::otherBackground() const
 {
     // this operator is only intended to be used with foreachTopDown()
     assert(mOtherBackground);
