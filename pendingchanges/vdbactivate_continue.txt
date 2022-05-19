@@ -1,0 +1,3 @@
+Houdini:
+    - VDB Activate SOP no longer stops at the first non-VDB primitive,
+      but instead just skips such primitives.

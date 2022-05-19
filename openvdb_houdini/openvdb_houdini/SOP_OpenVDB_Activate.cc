@@ -604,7 +604,7 @@ SOP_VDBActivate::Cache::cookVDBSop(OP_Context &context)
         GA_FOR_ALL_GROUP_PRIMITIVES(gdp, group, prim)
         {
             if (!(prim->getPrimitiveId() & GEO_PrimTypeCompat::GEOPRIMVDB))
-                break;
+                continue;
 
             GEO_PrimVDB *vdb = UTverify_cast<GEO_PrimVDB *>(prim);
             vdb->makeGridUnique();
