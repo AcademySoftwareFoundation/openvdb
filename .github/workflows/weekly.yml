@@ -457,6 +457,7 @@ jobs:
         -A x64 -G \"Visual Studio 16 2019\"
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        -DMSVC_COMPRESS_PDB=ON
         -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DLLVM_DIR=${HOME}\llvm_install\lib\cmake\llvm

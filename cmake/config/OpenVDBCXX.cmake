@@ -139,9 +139,32 @@ add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
 # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
 #     compiler-warning-level-3-c4996?view=vs-2019#posix-function-names
 add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_NONSTDC_NO_WARNINGS>")
-# If a user has explicitly requested a parallel build, configure this during CMake
+
 if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+  # If a user has explicitly requested a parallel build, configure this during CMake
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MP${MSVC_MP_THREAD_COUNT}>")
+
+  # If building with multiple threads with MSVC, delay generation of PDB files
+  # until the end of compilation to speed up their generation (invoke mspdbsrv once).
+  # This assumes /Zi is being used to generate PDBs (CMakes default)
+  add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Zf>")
+endif()
+
+if(MSVC_COMPRESS_PDB)
+  # /Zi enables PDBs - CMake seems to default to creating PDBs as the defacto way
+  # of handling debug symbols. As these PDBs can be very large, we attempt to compress
+  # them here with various settings. This disable incremental linking and can make
+  # stack traces more confusing.
+  # https://devblogs.microsoft.com/cppblog/shrink-my-program-database-pdb-file/
+
+  # First, generate comdats to allow the linker to remove unused data
+  add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Gy>")
+  # Remove unreferenced packaged functions and data from comdats
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/OPT:REF>")
+  # Fold duplicate comdat data (1 iteration)
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/OPT:ICF>")
+  # Generally compress the generated pdbs as they are being created
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/PDBCOMPRESS>")
 endif()
 
 if(OPENVDB_CXX_STRICT)
