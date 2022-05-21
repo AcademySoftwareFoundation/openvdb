@@ -60,12 +60,12 @@ usage: vdb_ax [execute] [<args>]
                               attribute bindings for volumes. The argument accepts a quoted string
                               list of AX (source code) name to data (vdb attribute) name pairs
                               joined by colons and seperated by commas. For example:
-                              	--bindings "velocity:v,density:s"
+                                --bindings "velocity:v,density:s"
                               binds velocity AX accesses to a 'v' attribute and density AX accesses
                               to a 's' attribute. The following snippet would then alias these
                               attributes:
-                              	v@velocity *= 5;   // actually accesses 'v' volume
-                              	 @density += 1.0f; // actually accesses 's' volume
+                                v@velocity *= 5;   // actually accesses 'v' volume
+                                 @density += 1.0f; // actually accesses 's' volume
   Points:
     --create-missing [ON|OFF]
                               whether to implicitly point attributes (Default: ON). Attributes are
@@ -73,7 +73,7 @@ usage: vdb_ax [execute] [<args>]
                               the input geometry.
     --group [name]            a point group to process. Only points that belong to this group are
                               processed by the AX program. Note that this is equivalent to using:
-                              	if (!ingroup("name")) return;
+                                 if (!ingroup("name")) return;
                               at the start of the AX program.
     --points-grain [n]        the threading grain size for processing nodes (Default: 1). A value of
                               0 disables threading.
@@ -81,10 +81,10 @@ usage: vdb_ax [execute] [<args>]
                               attribute bindings for points. The argument accepts a quoted string
                               list of AX (source code) name to data (vdb attribute) name pairs
                               joined by colons and seperated by commas. For example:
-                              	--bindings "velocity:v,density:s"
+                                --bindings "velocity:v,density:s"
                               binds velocity AX accesses to a 'v' attribute and density AX accesses
                               to a 's' attribute. The following snippet would then alias these
                               attributes:
-                              	v@velocity *= 5;   // actually accesses 'v' points
-                              	 @density += 1.0f; // actually accesses 's' points
+                                v@velocity *= 5;   // actually accesses 'v' points
+                                 @density += 1.0f; // actually accesses 's' points
 

@@ -32,12 +32,14 @@ template <typename T> struct BasicParamBuilder;
 /// @param maxWidth  column number of max output
 /// @param indent    function that returns an indent for each line
 /// @param ignoreNewLines  whether to ignore new lines in str
+/// @param trimWhitespace  whether to ignore whitespce at the start of lines
 inline void oswrap(std::ostream& os,
     const char* str,
     const size_t nchars,
     const size_t maxWidth,
     const std::function<std::string(int)> indent = nullptr,
-    const bool ignoreNewLines = false)
+    const bool ignoreNewLines = false,
+    const bool trimWhitespace = false)
 {
     size_t pos = 0;
     size_t line = 0;
@@ -54,7 +56,9 @@ inline void oswrap(std::ostream& os,
         }
 
         const char* start = str + pos; // move to new start
-        while (pos < nchars && *start == ' ') { ++start; ++pos; } // skip spaces
+        if (trimWhitespace) {
+            while (pos < nchars && *start == ' ') { ++start; ++pos; } // skip spaces
+        }
         if (pos >= nchars) break;
         const size_t endpos = pos + lineMaxWidth; // set new end
 
@@ -80,6 +84,7 @@ inline void oswrap(std::ostream& os,
         while (end > start && *end != ' ') --end; // back scan to next space
         if (end == start) end = str + endpos; // no spaces found, reset end
         while (start != end) { os << *start; ++start; ++pos; } // output range
+        if (*start == ' ') { ++start; ++pos; } // always skip the space break (replaced with \n)
         os << '\n';
     }
 }
@@ -133,19 +138,26 @@ inline void usage(std::ostream& os,
         if (stop) doclen = stop - doc;
     }
 
-    // output docs. If docs start on the same line (current != 0)
-    // then add whitespace, output the first line, wrap the rest
+    // output docs. If docs start on a new line (current == 0) then just forward
+    // to oswrap - otherwise, if the start on the same line then add whitespace,
+    // output the first line, wrap the rest
     const std::string indent(docBegin, ' ');
     if (current == 0) {
         oswrap(os, doc, doclen, maxWidth, [&](int) { return indent; });
     }
     else {
+        // space between name and docs
         for (int32_t i = 0; i < whitespace; ++i) os << ' ';
 
+        // if the docs don't it on one line, output to the remaining max width
+        // and forward the rest to oswrap
         int32_t remain = maxWidth-(current+whitespace);
         if (doclen > remain) {
+            // calculate how much goes onto the rest of this line
             while (remain > 0 && doc[remain] != ' ') --remain;
             for (int32_t i = 0; i < remain; ++i, ++doc) os << *doc;
+            // skip space break (if found)
+            if (*doc == ' ') { ++doc; --doclen; }
             os << '\n';
             doclen -= remain;
             oswrap(os, doc, doclen, maxWidth, [&](int) { return indent; });

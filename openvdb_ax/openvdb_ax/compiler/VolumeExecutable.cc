@@ -178,11 +178,11 @@ struct VolumeExecutable::Settings
             .setDoc("attribute bindings for volumes. The argument accepts a quoted string list of "
                     "AX (source code) name to data (vdb attribute) name pairs joined by colons and "
                     "seperated by commas. For example:\n"
-                    "\t--bindings \"velocity:v,density:s\"\n"
+                    "  --bindings \"velocity:v,density:s\"\n"
                     "binds velocity AX accesses to a 'v' attribute and density AX accesses to a 's' "
                     "attribute. The following snippet would then alias these attributes:\n"
-                    "\tv@velocity *= 5;   // actually accesses 'v' volume\n"
-                    "\t @density += 1.0f; // actually accesses 's' volume")
+                    "  v@velocity *= 5;   // actually accesses 'v' volume\n"
+                    "   @density += 1.0f; // actually accesses 's' volume")
             .setDefault(AttributeBindings{})
             .setCB([](AttributeBindings& bindings, const char* c) {
                 std::string source, target;

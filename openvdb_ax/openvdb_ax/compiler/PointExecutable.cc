@@ -94,7 +94,7 @@ struct PointExecutable::Settings
             .addOpt("--group [name]")
             .setDoc("a point group to process. Only points that belong to this group are "
                     "processed by the AX program. Note that this is equivalent to using:\n "
-                    "\tif (!ingroup(\"name\")) return;\n"
+                    "  if (!ingroup(\"name\")) return;\n"
                     "at the start of the AX program.")
             .setDefault("")
             .get();
@@ -113,11 +113,11 @@ struct PointExecutable::Settings
             .setDoc("attribute bindings for points. The argument accepts a quoted string list of "
                     "AX (source code) name to data (vdb attribute) name pairs joined by colons and "
                     "seperated by commas. For example:\n"
-                    "\t--bindings \"velocity:v,density:s\"\n"
+                    "  --bindings \"velocity:v,density:s\"\n"
                     "binds velocity AX accesses to a 'v' attribute and density AX accesses to a 's' "
                     "attribute. The following snippet would then alias these attributes:\n"
-                    "\tv@velocity *= 5;   // actually accesses 'v' points\n"
-                    "\t @density += 1.0f; // actually accesses 's' points")
+                    "  v@velocity *= 5;   // actually accesses 'v' points\n"
+                    "   @density += 1.0f; // actually accesses 's' points")
             .setDefault(AttributeBindings{})
             .setCB([](AttributeBindings& bindings, const char* c) {
                 std::string source, target;
