@@ -487,7 +487,7 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             llvm::Value* flag = B.CreateLoad(B.CreateGEP(flags, index));
 
             // @todo  write handles shouldn't need to do this check
-            llvm::Value* isuniform = B.CreateAnd(flag, LLVMType<uint64_t>::get(C, uint64_t(1UL << 63)));
+            llvm::Value* isuniform = B.CreateAnd(flag, LLVMType<uint64_t>::get(C, (uint64_t(1) << 63)));
             isuniform = boolComparison(isuniform, B);
 
             // If the value type has supported codecs we have to allocate the

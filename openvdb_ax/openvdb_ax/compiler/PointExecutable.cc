@@ -246,7 +246,7 @@ struct PointFunctionArguments
     {
         uint64_t flag = 0;
         const points::AttributeArray& array = leaf.constAttributeArray(pos);
-        if (array.isUniform()) flag |= 1UL << 63;
+        if (array.isUniform()) flag |= uint64_t(1) << 63;
 
         // @todo  if the array is shared we should probably make it unique?
 

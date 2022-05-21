@@ -527,10 +527,6 @@ if(OPENVDB_BUILD_AX)
   add_subdirectory(openvdb_ax/openvdb_ax)
 endif()
 
-if(OPENVDB_BUILD_AX_UNITTESTS)
-  add_subdirectory(openvdb_ax/openvdb_ax/test)
-endif()
-
 if(OPENVDB_BUILD_PYTHON_MODULE)
   add_subdirectory(openvdb/openvdb/python)
 endif()
@@ -541,6 +537,10 @@ endif()
 
 if(OPENVDB_BUILD_UNITTESTS)
   add_subdirectory(openvdb/openvdb/unittest)
+endif()
+
+if(OPENVDB_BUILD_AX_UNITTESTS)
+  add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()
 
 if(OPENVDB_BUILD_HOUDINI_PLUGIN)
