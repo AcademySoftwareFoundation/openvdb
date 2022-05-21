@@ -242,7 +242,7 @@ Function::cast(std::vector<llvm::Value*>& args,
                 llvm::Type* strType = LLVMType<codegen::String>::get(C);
                 if (type->getContainedType(0) == strType) {
                     value = B.CreateStructGEP(strType, value, 0); // char**
-                    value = B.CreateLoad(value); // char*
+                    value = ir_load(B, value); // char*
                 }
             }
         }

@@ -1153,7 +1153,7 @@ TestFunctionTypes::testFunctionCall()
     VERIFY_FUNCTION_IR(function);
 
     llvm::Value* vptrptr = B.CreateAlloca(LLVMType<void*>::get(C));
-    llvm::Value* vptr = B.CreateLoad(vptrptr);
+    llvm::Value* vptr = openvdb::ax::codegen::ir_load(B, vptrptr);
 
     result = test->call({vptr}, B, /*cast*/false);
     CPPUNIT_ASSERT(result);
@@ -1941,7 +1941,7 @@ TestFunctionTypes::testIRFunctions()
         // alloc
         llvm::Value* alloc = _B.CreateAlloca(args[0]->getType());
         _B.CreateStore(args[0], alloc);
-        return _B.CreateLoad(alloc);
+        return openvdb::ax::codegen::ir_load(_B, alloc);
     };
 
     test.reset(new TestIRFunction({
@@ -2146,7 +2146,7 @@ TestFunctionTypes::testSRETFunctions()
         CPPUNIT_ASSERT(args[0]->getType() ==
             llvm::ArrayType::get(llvm::Type::getFloatTy(_B.getContext()), 3)->getPointerTo());
 
-        llvm::Value* e0 = _B.CreateConstGEP2_64(args[0], 0, 0);
+        llvm::Value* e0 = openvdb::ax::codegen::ir_constgep2_64(_B, args[0], 0, 0);
         _B.CreateStore(LLVMType<float>::get(_B.getContext(), 1.0f), e0);
         return nullptr;
     };

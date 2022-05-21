@@ -46,6 +46,53 @@ using CastFunction = std::function<llvm::Value*
 using BinaryFunction = std::function<llvm::Value*
     (llvm::IRBuilder<>&, llvm::Value*, llvm::Value*)>;
 
+
+/// @todo   Should really provide a standard interface for all these and avoid
+///   using the IR builder directly.
+
+/// @brief  Alias around IR load inst.
+inline auto ir_load(llvm::IRBuilder<>& B, llvm::Value* ptr, const char* Name = "")
+{
+    assert(ptr);
+    assert(ptr->getType()->isPointerTy());
+    return B.CreateLoad(ptr->getType()->getPointerElementType(), ptr, Name);
+}
+
+/// @brief  Alias around IR gep inst.
+inline auto ir_gep(llvm::IRBuilder<>& B,
+    llvm::Value* ptr, llvm::ArrayRef<llvm::Value*> IdxList, const char* Name = "")
+{
+    assert(ptr);
+    assert(ptr->getType()->getScalarType());
+    assert(ptr->getType()->getScalarType()->isPointerTy());
+    return B.CreateGEP(ptr->getType()->getScalarType()->getPointerElementType(),
+                 ptr, IdxList, Name);
+}
+
+/// @brief  Alias around IR gep2_64 inst.
+inline auto ir_constgep2_64(llvm::IRBuilder<>& B,
+    llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
+{
+    assert(ptr);
+    assert(ptr->getType()->getScalarType());
+    assert(ptr->getType()->getScalarType()->isPointerTy());
+    return B.CreateConstGEP2_64(
+        ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
+        Idx1, Name);
+}
+
+/// @brief  Alias around IR in bounds gep2_64 inst.
+inline auto ir_constinboundsgep2_64(llvm::IRBuilder<>& B,
+    llvm::Value* ptr, uint64_t Idx0, uint64_t Idx1, const char* Name = "")
+{
+    assert(ptr);
+    assert(ptr->getType()->getScalarType());
+    assert(ptr->getType()->getScalarType()->isPointerTy());
+    return B.CreateConstInBoundsGEP2_64(
+        ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
+        Idx1, Name);
+}
+
 /// @brief  Populate a vector of llvm Types from a vector of llvm values
 ///
 /// @param  values  A vector of llvm values to retrieve types from
@@ -142,7 +189,7 @@ insertStaticAlloca(llvm::IRBuilder<>& B,
     if (type == strtype) {
         llvm::Value* cptr = B.CreateStructGEP(strtype, result, 0); // char**
         llvm::Value* sso = B.CreateStructGEP(strtype, result, 1); // char[]*
-        llvm::Value* sso_load = B.CreateConstGEP2_64(sso, 0 ,0); // char*
+        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
         llvm::Value* len = B.CreateStructGEP(strtype, result, 2);
         B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
         B.CreateStore(B.getInt64(0), len);
@@ -469,9 +516,9 @@ arrayCast(llvm::Value* ptrToArray,
             llvm::ArrayType::get(targetElementType, elementSize));
 
     for (size_t i = 0; i < elementSize; ++i) {
-        llvm::Value* target = builder.CreateConstGEP2_64(targetArray, 0, i);
-        llvm::Value* source = builder.CreateConstGEP2_64(ptrToArray, 0, i);
-        source = builder.CreateLoad(source);
+        llvm::Value* target = ir_constgep2_64(builder, targetArray, 0, i);
+        llvm::Value* source = ir_constgep2_64(builder, ptrToArray, 0, i);
+        source = ir_load(builder, source);
         source = llvmCastFunction(builder, source, targetElementType);
         builder.CreateStore(source, target);
     }
@@ -608,7 +655,7 @@ arrayIndexUnpack(llvm::Value* ptrToArray,
                  const int16_t index,
                  llvm::IRBuilder<>& builder)
 {
-    return builder.CreateConstGEP2_64(ptrToArray, 0, index);
+    return ir_constgep2_64(builder, ptrToArray, 0, index);
 }
 
 /// @brief  Unpack an array type into llvm Values which represent all its elements
@@ -632,8 +679,8 @@ arrayUnpack(llvm::Value* ptrToArray,
 
     values.reserve(elements);
     for (size_t i = 0; i < elements; ++i) {
-        llvm::Value* value = builder.CreateConstGEP2_64(ptrToArray, 0, i);
-        if (loadElements) value = builder.CreateLoad(value);
+        llvm::Value* value = ir_constgep2_64(builder, ptrToArray, 0, i);
+        if (loadElements) value = ir_load(builder, value);
         values.push_back(value);
     }
 }
@@ -658,9 +705,9 @@ array3Unpack(llvm::Value* ptrToArray,
     assert(ptrToArray && ptrToArray->getType()->isPointerTy() &&
         "Input to array3Unpack is not a pointer type.");
 
-    value1 = builder.CreateConstGEP2_64(ptrToArray, 0, 0);
-    value2 = builder.CreateConstGEP2_64(ptrToArray, 0, 1);
-    value3 = builder.CreateConstGEP2_64(ptrToArray, 0, 2);
+    value1 = ir_constgep2_64(builder, ptrToArray, 0, 0);
+    value2 = ir_constgep2_64(builder, ptrToArray, 0, 1);
+    value3 = ir_constgep2_64(builder, ptrToArray, 0, 2);
 }
 
 /// @brief  Pack three values into a new array and return a pointer to the
@@ -689,9 +736,9 @@ array3Pack(llvm::Value* value1,
     llvm::Type* vectorType = llvm::ArrayType::get(type, 3);
     llvm::Value* vector = insertStaticAlloca(builder, vectorType);
 
-    llvm::Value* e1 = builder.CreateConstGEP2_64(vector, 0, 0);
-    llvm::Value* e2 = builder.CreateConstGEP2_64(vector, 0, 1);
-    llvm::Value* e3 = builder.CreateConstGEP2_64(vector, 0, 2);
+    llvm::Value* e1 = ir_constgep2_64(builder, vector, 0, 0);
+    llvm::Value* e2 = ir_constgep2_64(builder, vector, 0, 1);
+    llvm::Value* e3 = ir_constgep2_64(builder, vector, 0, 2);
 
     builder.CreateStore(value1, e1);
     builder.CreateStore(value2, e2);
@@ -723,7 +770,7 @@ arrayPack(llvm::Value* value,
             llvm::ArrayType::get(type, size));
 
     for (size_t i = 0; i < size; ++i) {
-        llvm::Value* element = builder.CreateConstGEP2_64(array, 0, i);
+        llvm::Value* element = ir_constgep2_64(builder, array, 0, i);
         builder.CreateStore(value, element);
     }
 
@@ -746,7 +793,7 @@ arrayPack(const std::vector<llvm::Value*>& values,
 
     size_t idx = 0;
     for (llvm::Value* const& value : values) {
-        llvm::Value* element = builder.CreateConstGEP2_64(array, 0, idx++);
+        llvm::Value* element = ir_constgep2_64(builder, array, 0, idx++);
         builder.CreateStore(value, element);
     }
 
@@ -799,7 +846,7 @@ scalarToMatrix(llvm::Value* scalar,
     llvm::Value* zero = llvmConstant(0, type);
     for (size_t i = 0; i < dim*dim; ++i) {
         llvm::Value* m = ((i % (dim+1) == 0) ? scalar : zero);
-        llvm::Value* element = builder.CreateConstGEP2_64(array, 0, i);
+        llvm::Value* element = ir_constgep2_64(builder, array, 0, i);
         builder.CreateStore(m, element);
     }
 

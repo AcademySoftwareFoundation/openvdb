@@ -57,9 +57,9 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
         llvm::Value* size = args[1];
         llvm::Value* cptr = B.CreateStructGEP(strType, str, 0); // char**
         llvm::Value* sso = B.CreateStructGEP(strType, str, 1); // char[]*
-        llvm::Value* sso_load = B.CreateConstGEP2_64(sso, 0 ,0); // char*
+        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
 
-        llvm::Value* cptr_load = B.CreateLoad(cptr); // char*
+        llvm::Value* cptr_load = ir_load(B, cptr); // char*
         llvm::Value* neq = B.CreateICmpNE(cptr_load, sso_load);
 
         llvm::BasicBlock* then = llvm::BasicBlock::Create(C, "then", base);
@@ -106,8 +106,8 @@ inline FunctionGroup::UniquePtr axstringalloc(const FunctionOptions& op)
 
         B.SetInsertPoint(post);
         // re-load cptr
-        cptr_load = B.CreateLoad(cptr); // char*
-        llvm::Value* clast = B.CreateGEP(cptr_load, size);
+        cptr_load = ir_load(B, cptr); // char*
+        llvm::Value* clast = ir_gep(B, cptr_load, size);
         B.CreateStore(B.getInt8(int8_t('\0')), clast); // this->ptr[size] = '\0';
         llvm::Value* len = B.CreateStructGEP(strType, str, 2);
         B.CreateStore(size, len);
@@ -146,14 +146,14 @@ inline FunctionGroup::UniquePtr axstring(const FunctionOptions& op)
 
         llvm::Value* cptr = B.CreateStructGEP(strType, str, 0); // char**
         llvm::Value* sso = B.CreateStructGEP(strType, str, 1); // char[]*
-        llvm::Value* sso_load = B.CreateConstGEP2_64(sso, 0 ,0); // char*
+        llvm::Value* sso_load = ir_constgep2_64(B, sso, 0 ,0); // char*
         llvm::Value* len = B.CreateStructGEP(strType, str, 2);
         B.CreateStore(sso_load, cptr); // this->ptr = this->SSO;
         B.CreateStore(B.getInt64(0), len); // this->len = 0;
 
         axstringalloc(op)->execute({str, slen}, B);
 
-        llvm::Value* cptr_load = B.CreateLoad(cptr);
+        llvm::Value* cptr_load = ir_load(B, cptr);
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr_load, /*dest-align*/llvm::MaybeAlign(0),
             carr, /*src-align*/llvm::MaybeAlign(0), slen);
@@ -203,12 +203,12 @@ inline FunctionGroup::UniquePtr axstringassign(const FunctionOptions& op)
 
         llvm::Value* cptr0 = B.CreateStructGEP(strType, str0, 0);
         llvm::Value* cptr1 = B.CreateStructGEP(strType, str1, 0);
-        llvm::Value* len = B.CreateLoad(B.CreateStructGEP(strType, str1, 2));
+        llvm::Value* len = ir_load(B, B.CreateStructGEP(strType, str1, 2));
 
         axstringalloc(op)->execute({str0, len}, B);
 
-        llvm::Value* cptr0_load = B.CreateLoad(cptr0);
-        llvm::Value* cptr1_load = B.CreateLoad(cptr1);
+        llvm::Value* cptr0_load = ir_load(B, cptr0);
+        llvm::Value* cptr1_load = ir_load(B, cptr1);
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(cptr0_load, /*dest-align*/llvm::MaybeAlign(0),
             cptr1_load, /*src-align*/llvm::MaybeAlign(0), len);
@@ -247,15 +247,15 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 
         llvm::Value* str0 = args[1];
         llvm::Value* str1 = args[2];
-        llvm::Value* len0 = B.CreateLoad(B.CreateStructGEP(strType, str0, 2));
-        llvm::Value* len1 = B.CreateLoad(B.CreateStructGEP(strType, str1, 2));
+        llvm::Value* len0 = ir_load(B, B.CreateStructGEP(strType, str0, 2));
+        llvm::Value* len1 = ir_load(B, B.CreateStructGEP(strType, str1, 2));
 
         llvm::Value* total = B.CreateAdd(len0, len1);
         axstringalloc(op)->execute({result, total}, B);
 
-        llvm::Value* dst = B.CreateLoad(B.CreateStructGEP(strType, result, 0)); //char*
-        llvm::Value* src0 = B.CreateLoad(B.CreateStructGEP(strType, str0, 0)); //char*
-        llvm::Value* src1 = B.CreateLoad(B.CreateStructGEP(strType, str1, 0)); //char*
+        llvm::Value* dst = ir_load(B, B.CreateStructGEP(strType, result, 0)); //char*
+        llvm::Value* src0 = ir_load(B, B.CreateStructGEP(strType, str0, 0)); //char*
+        llvm::Value* src1 = ir_load(B, B.CreateStructGEP(strType, str1, 0)); //char*
 
         // cpy first
 #if LLVM_VERSION_MAJOR >= 10
@@ -268,7 +268,7 @@ inline FunctionGroup::UniquePtr axstringadd(const FunctionOptions& op)
 #endif
 
         // cpy second
-        dst = B.CreateGEP(dst, len0);
+        dst = ir_gep(B, dst, len0);
 #if LLVM_VERSION_MAJOR >= 10
         B.CreateMemCpy(dst, /*dest-align*/llvm::MaybeAlign(0),
             src1, /*src-align*/llvm::MaybeAlign(0), len1);
