@@ -282,6 +282,7 @@ if(OPENVDB_AX_STATIC)
   target_compile_definitions(openvdb_ax_static PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_static PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_static PUBLIC ../)
+  target_include_directories(openvdb_ax_static PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_static
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )
@@ -309,6 +310,7 @@ if(OPENVDB_AX_SHARED)
   target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_shared PUBLIC ../)
+  target_include_directories(openvdb_ax_shared PRIVATE  ../../openvdb_cmd/vdb_ax)
   target_include_directories(openvdb_ax_shared
     SYSTEM PUBLIC ${LLVM_INCLUDE_DIRS}
   )

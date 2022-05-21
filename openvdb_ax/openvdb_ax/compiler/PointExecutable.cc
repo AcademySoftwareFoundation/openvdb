@@ -3,11 +3,13 @@
 
 /// @file compiler/PointExecutable.cc
 
+#include "cli.h" // from vdb_ax command line tool
+
 #include "PointExecutable.h"
 #include "Logger.h"
 
-#include "openvdb_ax/ast/Scanners.h"
 #include "openvdb_ax/Exceptions.h"
+#include "openvdb_ax/ast/Scanners.h"
 // @TODO refactor so we don't have to include PointComputeGenerator.h,
 // but still have the functions defined in one place
 #include "openvdb_ax/codegen/PointComputeGenerator.h"
@@ -31,14 +33,120 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 
+/// @brief Settings which are stored on the point executer
+///   and are configurable by the user.
+template <bool IsCLI>
 struct PointExecutable::Settings
 {
-    bool mCreateMissing = true;
-    size_t mGrainSize = 1;
-    std::string mGroup = "";
     //IterType mValueIterator = IterType::ON;
-    bool mPostDelete = false;
-    AttributeBindings mBindings;
+
+    template <typename T>
+    using ParamT = typename std::conditional<IsCLI,
+        cli::Param<T>,
+        cli::BasicParam<T>>::type;
+
+    template <typename T>
+    using ParamBuilderT = typename std::conditional<IsCLI,
+        cli::ParamBuilder<T>,
+        cli::BasicParamBuilder<T>>::type;
+
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    inline std::vector<cli::ParamBase*> optional()
+    {
+        assert(IsCLI);
+        std::vector<cli::ParamBase*> params {
+            &this->mCreateMissing,
+            &this->mGroup,
+            &this->mGrainSize,
+            &this->mBindings
+        };
+        return params;
+    }
+
+    inline void init(const PointExecutable::Settings<true>& S)
+    {
+        if (S.mCreateMissing.isInit())  mCreateMissing = S.mCreateMissing.get();
+        if (S.mGroup.isInit())          mGroup = S.mGroup.get();
+        if (S.mGrainSize.isInit())      mGrainSize = S.mGrainSize.get();
+        if (S.mBindings.isInit())       mBindings = S.mBindings.get();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    ParamT<bool> mCreateMissing =
+        ParamBuilderT<bool>()
+            .addOpt("--create-missing [ON|OFF]")
+            .setDoc("whether to implicitly point attributes (Default: ON). Attributes are "
+                    "created if they are referenced in the AX program but do not exist on the "
+                    "input geometry.")
+            .setDefault(true)
+            .setCB([](bool& v, const char* arg) {
+                if (std::strcmp(arg, "ON") == 0)       v = true;
+                else if (std::strcmp(arg, "OFF") == 0) v = false;
+                else OPENVDB_THROW(CLIError, "Invalid option passed to --create-missing: '" << arg << "'");
+            })
+            .get();
+
+    ParamT<std::string> mGroup =
+        ParamBuilderT<std::string>()
+            .addOpt("--group [name]")
+            .setDoc("a point group to process. Only points that belong to this group are "
+                    "processed by the AX program. Note that this is equivalent to using:\n "
+                    "\tif (!ingroup(\"name\")) return;\n"
+                    "at the start of the AX program.")
+            .setDefault("")
+            .get();
+
+    ParamT<size_t> mGrainSize =
+        ParamBuilderT<size_t>()
+            .addOpt("--points-grain [n]")
+            .setDoc("the threading grain size for processing nodes (Default: 1). A value of 0 "
+                    "disables threading.")
+            .setDefault(1)
+            .get();
+
+    ParamT<AttributeBindings> mBindings =
+        ParamBuilderT<AttributeBindings>()
+            .addOpt("--bindings [\"ax_name:point_attr_name,...\"]")
+            .setDoc("attribute bindings for points. The argument accepts a quoted string list of "
+                    "AX (source code) name to data (vdb attribute) name pairs joined by colons and "
+                    "seperated by commas. For example:\n"
+                    "\t--bindings \"velocity:v,density:s\"\n"
+                    "binds velocity AX accesses to a 'v' attribute and density AX accesses to a 's' "
+                    "attribute. The following snippet would then alias these attributes:\n"
+                    "\tv@velocity *= 5;   // actually accesses 'v' points\n"
+                    "\t @density += 1.0f; // actually accesses 's' points")
+            .setDefault(AttributeBindings{})
+            .setCB([](AttributeBindings& bindings, const char* c) {
+                std::string source, target;
+                std::string* active = &source, *other = &target;
+                while (*c != '\0') {
+                    if (*c == ':') std::swap(active, other);
+                    else if (*c == ',') {
+                        std::swap(active, other);
+                        if (source.empty() || target.empty()) {
+                            OPENVDB_THROW(CLIError, "invalid string passed to --bindings. '" << c << "'");
+                        }
+                        bindings.set(source, target);
+                        source.clear();
+                        target.clear();
+                    }
+                    else {
+                        active->push_back(*c);
+                    }
+                    ++c;
+                }
+
+                if (source.empty() || target.empty()) {
+                    OPENVDB_THROW(CLIError, "invalid string passed to --bindings: '" << c << "'");
+                }
+                bindings.set(source, target);
+            })
+            .get();
+
+    cli::BasicParam<bool> mPostDelete = false;
 };
 
 namespace {
@@ -659,7 +767,7 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
     , mAttributeRegistry(attributeRegistry)
     , mCustomData(customData)
     , mFunctionAddresses(functions)
-    , mSettings(new Settings)
+    , mSettings(new Settings<false>)
 {
     assert(mContext);
     assert(mExecutionEngine);
@@ -670,7 +778,7 @@ PointExecutable::PointExecutable(const std::shared_ptr<const llvm::LLVMContext>&
 
     // Set up the default attribute bindings
     for (const auto& iter : mAttributeRegistry->data()) {
-        mSettings->mBindings.set(iter.name(), iter.name());
+        mSettings->mBindings.get().set(iter.name(), iter.name());
     }
 }
 
@@ -680,8 +788,7 @@ PointExecutable::PointExecutable(const PointExecutable& other)
     , mAttributeRegistry(other.mAttributeRegistry)
     , mCustomData(other.mCustomData)
     , mFunctionAddresses(other.mFunctionAddresses)
-    , mSettings(new Settings(*other.mSettings)) {
-}
+    , mSettings(new Settings<false>(*other.mSettings)) {}
 
 PointExecutable::~PointExecutable() {}
 
@@ -712,7 +819,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     // create any missing attributes and handle temp ws position storage
     data.mPositionAccess = {false, false};
     processAttributes(grid, data.mAttributeInfo, data.mPositionAccess, data.mPositionAttribute,
-                      *mAttributeRegistry, mSettings->mBindings,
+                      *mAttributeRegistry, mSettings->mBindings.get(),
                       mSettings->mCreateMissing, *logger);
 
     data.mKernelAttributeArray =
@@ -729,7 +836,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
 
     // init the internal dead group if necessary
 
-    if (mSettings->mPostDelete) {
+    if (mSettings->mPostDelete.get()) {
         // @todo  This group is hard coded in the deletepoint function call - we
         //  should perhaps instead pass in a unique group string to the point kernel
         if (leafIter->attributeSet().descriptor().hasGroup("__ax_dead")) {
@@ -742,15 +849,15 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         }
     }
 
-    const bool usingGroup = !mSettings->mGroup.empty();
+    const bool usingGroup = !mSettings->mGroup.get().empty();
     if (usingGroup) {
-        if (!leafIter->attributeSet().descriptor().hasGroup(mSettings->mGroup)) {
-            logger->error("Requested point group \"" + mSettings->mGroup +
+        if (!leafIter->attributeSet().descriptor().hasGroup(mSettings->mGroup.get())) {
+            logger->error("Requested point group \"" + mSettings->mGroup.get() +
                 "\" on grid \"" + grid.getName() + "\" does not exist.");
         }
         else {
             data.mGroupIndex =
-                leafIter->attributeSet().groupIndex(mSettings->mGroup);
+                leafIter->attributeSet().groupIndex(mSettings->mGroup.get());
         }
     }
 
@@ -763,7 +870,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
     if (!usingGroup) {
         const auto& desc = leafIter->attributeSet().descriptor();
         data.mUseBufferKernel = checkCodecs(desc, *mAttributeRegistry,
-            mSettings->mBindings,
+            mSettings->mBindings.get(),
             data.mPositionAttribute);
     }
     else {
@@ -779,10 +886,10 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
 
     LeafManagerT leafManager(grid.tree());
     std::vector<PointLeafLocalData::UniquePtr> leafLocalData(leafManager.leafCount());
-    const bool threaded = mSettings->mGrainSize > 0;
+    const bool threaded = mSettings->mGrainSize.get() > 0;
 
     PointExecuterOp executerOp(data, leafLocalData);
-    leafManager.foreach(executerOp, threaded, mSettings->mGrainSize);
+    leafManager.foreach(executerOp, threaded, mSettings->mGrainSize.get());
 
     // Check to see if any new data has been added and apply it accordingly
 
@@ -868,7 +975,7 @@ void PointExecutable::execute(openvdb::points::PointDataGrid& grid) const
         points::dropAttribute(grid.tree(), data.mPositionAttribute);
     }
 
-    if (mSettings->mPostDelete) {
+    if (mSettings->mPostDelete.get()) {
         points::deleteFromGroup(grid.tree(), "__ax_dead", false, /*drop=*/true);
     }
 }
@@ -922,12 +1029,12 @@ void PointExecutable::setAttributeBindings(const AttributeBindings& bindings)
 {
     //@todo: warn when inferred P, Cd, N etc are bound they default to vec3f
     for (const auto& binding : bindings.axToDataMap()) {
-        mSettings->mBindings.set(binding.first, binding.second);
+        mSettings->mBindings.get().set(binding.first, binding.second);
     }
 
     // check the registry to make sure everything is bound
     for (const auto& access : mAttributeRegistry->data()) {
-        if (!mSettings->mBindings.isBoundAXName(access.name())) {
+        if (!mSettings->mBindings.get().isBoundAXName(access.name())) {
             if (bindings.isBoundDataName(access.name())) {
                 OPENVDB_THROW(AXExecutionError, "AX attribute \"@"
                     + access.name() + "\" not bound to any point attribute."
@@ -937,7 +1044,7 @@ void PointExecutable::setAttributeBindings(const AttributeBindings& bindings)
             else {
                 // rebind to itself as it may have been unbound
                 // by a previous set call
-                mSettings->mBindings.set(access.name(), access.name());
+                mSettings->mBindings.get().set(access.name(), access.name());
             }
         }
     }
@@ -945,7 +1052,7 @@ void PointExecutable::setAttributeBindings(const AttributeBindings& bindings)
 
 const AttributeBindings& PointExecutable::getAttributeBindings() const
 {
-    return mSettings->mBindings;
+    return mSettings->mBindings.get();
 }
 
 //
@@ -964,7 +1071,7 @@ bool PointExecutable::usesAcceleratedKernel(const points::PointDataTree& tree) c
 
     for (const auto& iter : mAttributeRegistry->data()) {
         // get the corresponding point attributes
-        const std::string* nameptr = mSettings->mBindings.dataNameBoundTo(iter.name());
+        const std::string* nameptr = mSettings->mBindings.get().dataNameBoundTo(iter.name());
         if (!nameptr) continue;
         const std::string& name = *nameptr;
         if (points::AttributeSet::INVALID_POS == desc->find(name)) {
@@ -980,7 +1087,44 @@ bool PointExecutable::usesAcceleratedKernel(const points::PointDataTree& tree) c
     desc = desc->duplicateAppend("P", typePairFromToken(ast::tokens::CoreType::VEC3F));
 
     return checkCodecs(*desc, *mAttributeRegistry,
-        mSettings->mBindings, "P");
+        mSettings->mBindings.get(), "P");
+}
+
+
+////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+
+
+PointExecutable::CLI::CLI()
+    : mSettings(new PointExecutable::Settings<true>) {}
+PointExecutable::CLI::~CLI() {}
+PointExecutable::CLI::CLI(CLI&& other) {
+    mSettings = std::move(other.mSettings);
+}
+PointExecutable::CLI& PointExecutable::CLI::operator=(CLI&& other) {
+    mSettings = std::move(other.mSettings);
+    return *this;
+}
+
+PointExecutable::CLI
+PointExecutable::CLI::create(int argc, const char* argv[], bool* flags)
+{
+    CLI cli;
+    openvdb::ax::cli::init(argc, argv, {}, cli.mSettings->optional(), flags);
+    return cli;
+}
+
+void PointExecutable::CLI::usage(std::ostream& os, const bool verbose)
+{
+    PointExecutable::Settings<true> S;
+    for (const auto& P : S.optional()) {
+        ax::cli::usage(os, P->opts(), P->doc(), verbose);
+    }
+}
+
+void PointExecutable::setSettingsFromCLI(const PointExecutable::CLI& cli)
+{
+    mSettings->init(*cli.mSettings);
 }
 
 

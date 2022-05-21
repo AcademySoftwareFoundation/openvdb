@@ -1,20 +1,90 @@
-WARNING: position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o
-WARNING: no output VDB File specified - nothing will be written to disk
-0.0508118
-0.10083
-0.050415
-0.0508118
-0.100403
-0.10083
-0.050415
-0.100403
-0.0508118
-0.10083
-0.0499878
-0.050415
-0.0999756
-0.100403
-0.050415
-0.0508118
-0.100403
-0.10083
+usage: vdb_ax [execute] [<args>]
+[execute] read/process/write VDB file/streams (default command):
+
+    This command takes a list of positional arguments which represent VDB files
+    and runs AX code across their voxel or point values. Unique kernels are built
+    and run separately for volumes and point grids. All grids are written to the
+    same output file:
+
+         vdb_ax -i density.vdb -s "@density += 1;" -o out.vdb       // increment values by 1
+         vdb_ax -i a.vdb -i b.vdb -i c.vdb -s "@c = @a + @b;" -o out.vdb  // combine a,b into c
+         vdb_ax -i points.vdb -s "@P += v@v * 2;" -o out.vdb        // move points based on a vector attribute
+
+    For more examples and help with syntax, see the AX documentation:
+      https://www.openvdb.org/documentation/doxygen/openvdbax.html
+
+    -i [file.vdb]             append an input vdb file to be read.
+    -s [code], -f [file]      input code to execute as a string or from a file. Only the last file
+                              is used
+    -o [file.vdb]             write the result to a given vdb file. Note that providing the same
+                              file-path to both in/out arguments will overwrite the file. If no
+                              output is provided, the input will be processed but nothing will be
+                              written to disk (this is useful for testing the success status of
+                              code).
+    --opt [NONE|O0|O1|O2|Os|Oz|O3]
+                              compilation optimization level (Default: 03). [03] ensures the most
+                              vigorus optimization passes are enabled. This should very rarely be
+                              changed but is useful for identifying issues with particular
+                              optimization passes.
+    --threads [n]             number of threads to use, 0 uses all available (Default: 0).
+    --werror                  warnings as errors.
+    --max-errors [n]          maximum error messages, 0 allows all error messages (Default: 0).
+    --copy-file-metadata      copy the file level metadata of the first input to the output.
+  Volumes:
+    --create-missing [ON|OFF]
+                              whether to implicitly create volumes (Default: ON). Volumes are
+                              created if they are referenced in the AX program but do not exist on
+                              the input geometry.
+    --tree-level [l1|l1:l2]   a node level or node range to process (Default: 0:4). If [l2] is not
+                              provided only a single level [l1] is processed. By default AX
+                              processes the entire VDB tree.
+    --node-iter [ON|OFF|ALL]  the active state type of nodes to process (Default: ON). [ON]
+                              processes active values, [OFF] processes inactive values, ALL
+                              processes both. The default is [ALL].
+    --tile-stream [ON|OFF|AUTO]
+                              set the active tile streaming behaviour (Default: AUTO). Active tiles
+                              are constant tree nodes that can potentially span a large area of the
+                              volume. By default AX will 'stream' these tiles only when it detects
+                              that a given program may produce non-constant values. This involves
+                              densifying tiles into potentially finer child topology. You can
+                              explicitly set this behaviour to always be [ON], or disable it with
+                              [OFF]. The latter ensures that each active tiles single value is only
+                              processed once.
+    --volume-grain [g1|g1:g2]
+                              threading grain size for processing nodes (Default: 1:32). [g1]
+                              controls the outer layer's grain size. The outer layer visits each
+                              individual node in a VDB. [g2] controls the inner layer's grain size.
+                              This is used for Volumes during task splitting of active tile
+                              streaming. A value of 0 disables threading for the respective layer.
+    --bindings ["ax_name:volume_name,..."]
+                              attribute bindings for volumes. The argument accepts a quoted string
+                              list of AX (source code) name to data (vdb attribute) name pairs
+                              joined by colons and seperated by commas. For example:
+                              	--bindings "velocity:v,density:s"
+                              binds velocity AX accesses to a 'v' attribute and density AX accesses
+                              to a 's' attribute. The following snippet would then alias these
+                              attributes:
+                              	v@velocity *= 5;   // actually accesses 'v' volume
+                              	 @density += 1.0f; // actually accesses 's' volume
+  Points:
+    --create-missing [ON|OFF]
+                              whether to implicitly point attributes (Default: ON). Attributes are
+                              created if they are referenced in the AX program but do not exist on
+                              the input geometry.
+    --group [name]            a point group to process. Only points that belong to this group are
+                              processed by the AX program. Note that this is equivalent to using:
+                              	if (!ingroup("name")) return;
+                              at the start of the AX program.
+    --points-grain [n]        the threading grain size for processing nodes (Default: 1). A value of
+                              0 disables threading.
+    --bindings ["ax_name:point_attr_name,..."]
+                              attribute bindings for points. The argument accepts a quoted string
+                              list of AX (source code) name to data (vdb attribute) name pairs
+                              joined by colons and seperated by commas. For example:
+                              	--bindings "velocity:v,density:s"
+                              binds velocity AX accesses to a 'v' attribute and density AX accesses
+                              to a 's' attribute. The following snippet would then alias these
+                              attributes:
+                              	v@velocity *= 5;   // actually accesses 'v' points
+                              	 @density += 1.0f; // actually accesses 's' points
+

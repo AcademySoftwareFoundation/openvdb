@@ -1,3 +1,4 @@
+FATAL: "--create-attributes" is not a valid option
 usage: vdb_ax [command] [--help|-h] [-v] [<args>]
 
 CLI utility for processing OpenVDB data using AX.
