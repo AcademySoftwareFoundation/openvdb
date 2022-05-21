@@ -9,6 +9,7 @@
 #include <openvdb/version.h>
 #include <openvdb_ax/Exceptions.h>
 
+#include <cassert>
 #include <cstring>
 #include <functional>
 #include <limits>
@@ -37,7 +38,7 @@ inline void oswrap(std::ostream& os,
     const char* str,
     const size_t nchars,
     const size_t maxWidth,
-    const std::function<std::string(int)> indent = nullptr,
+    const std::function<std::string(size_t)> indent = nullptr,
     const bool ignoreNewLines = false,
     const bool trimWhitespace = false)
 {
@@ -143,24 +144,26 @@ inline void usage(std::ostream& os,
     // output the first line, wrap the rest
     const std::string indent(docBegin, ' ');
     if (current == 0) {
-        oswrap(os, doc, doclen, maxWidth, [&](int) { return indent; });
+        oswrap(os, doc, doclen, maxWidth, [&](size_t) { return indent; });
     }
     else {
+        assert(whitespace >= argGap);
         // space between name and docs
         for (int32_t i = 0; i < whitespace; ++i) os << ' ';
 
         // if the docs don't it on one line, output to the remaining max width
         // and forward the rest to oswrap
-        int32_t remain = maxWidth-(current+whitespace);
+        size_t remain = static_cast<size_t>(std::max(0, maxWidth-(current+whitespace)));
         if (doclen > remain) {
             // calculate how much goes onto the rest of this line
             while (remain > 0 && doc[remain] != ' ') --remain;
-            for (int32_t i = 0; i < remain; ++i, ++doc) os << *doc;
+            for (size_t i = 0; i < remain; ++i, ++doc) os << *doc;
             // skip space break (if found)
             if (*doc == ' ') { ++doc; --doclen; }
             os << '\n';
+            assert(doclen >= remain);
             doclen -= remain;
-            oswrap(os, doc, doclen, maxWidth, [&](int) { return indent; });
+            oswrap(os, doc, doclen, maxWidth, [&](size_t) { return indent; });
         }
         else {
             for (size_t i = 0; i < doclen; ++i, ++doc) os << *doc;
@@ -217,7 +220,7 @@ struct Param : public BasicParam<T>, ParamBase
     inline bool isInit() const override { return mInit; }
     inline void init(const char* arg, const uint32_t idx = 0) override
     {
-        assert(!arg && mCb1 || arg && mCb2 || arg && mCb3);
+        assert((!arg && mCb1) || (arg && mCb2) || (arg && mCb3));
         if (!arg) mCb1(BasicParam<T>::mValue);
         else if (mCb3 && this->acceptsIndex()) {
             mCb3(BasicParam<T>::mValue, arg, idx);

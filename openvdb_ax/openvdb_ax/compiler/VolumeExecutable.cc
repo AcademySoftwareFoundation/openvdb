@@ -156,18 +156,18 @@ struct VolumeExecutable::Settings
             })
             .get();
 
-   ParamT<std::pair<Index,Index>> mGrainSizes =
-        ParamBuilderT<std::pair<Index,Index>>()
+   ParamT<std::pair<size_t,size_t>> mGrainSizes =
+        ParamBuilderT<std::pair<size_t,size_t>>()
             .addOpt("--volume-grain [g1|g1:g2]")
             .setDoc("threading grain size for processing nodes (Default: 1:32). [g1] controls the outer layer's "
                     "grain size. The outer layer visits each individual node in a VDB. [g2] controls the inner "
                     "layer's grain size. This is used for Volumes during task splitting of active tile streaming. "
                     "A value of 0 disables threading for the respective layer.")
             .setDefault({ 1, 32 })
-            .setCB([](std::pair<Index,Index>& v, const char* arg) {
-                cli::DefaultCallback<Index>::get()(v.first, arg);
+            .setCB([](std::pair<size_t,size_t>& v, const char* arg) {
+                cli::DefaultCallback<size_t>::get()(v.first, arg);
                 if (const char* sep = std::strchr(arg, ':')) {
-                    cli::DefaultCallback<Index>::get()(v.second, sep+1);
+                    cli::DefaultCallback<size_t>::get()(v.second, sep+1);
                 }
             })
             .get();
