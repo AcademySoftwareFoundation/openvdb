@@ -510,7 +510,7 @@ initSphere(ValueT              radius, // radius of sphere in world units
     auto acc = builder->getAccessor();
 
     // Define radius of sphere with narrow-band in voxel units
-    const ValueT r0 = radius / voxelSize, rmax = r0 + halfWidth;
+    const ValueT r0 = radius / ValueT(voxelSize), rmax = r0 + ValueT(halfWidth);
 
     // Radius below the Nyquist frequency
     if (r0 < ValueT(1.5f)) {
@@ -518,9 +518,9 @@ initSphere(ValueT              radius, // radius of sphere in world units
     }
 
     // Define center of sphere in voxel units
-    const Vec3<ValueT> c(ValueT(center[0] - origin[0]) / voxelSize,
-                         ValueT(center[1] - origin[1]) / voxelSize,
-                         ValueT(center[2] - origin[2]) / voxelSize);
+    const Vec3<ValueT> c(ValueT(center[0] - origin[0]) / ValueT(voxelSize),
+                         ValueT(center[1] - origin[1]) / ValueT(voxelSize),
+                         ValueT(center[2] - origin[2]) / ValueT(voxelSize));
 
     // Define bounds of the voxel coordinates
     const int imin = Floor(c[0] - rmax), imax = Ceil(c[0] + rmax);
@@ -539,7 +539,7 @@ initSphere(ValueT              radius, // radius of sphere in world units
                 const auto v = Sqrt(x2y2 + Pow2(ValueT(k) - c[2])) - r0; // Distance in voxel units
                 const auto d = v < 0 ? -v : v;
                 if (d < halfWidth) { // inside narrow band
-                    acc.setValue(ijk, voxelSize * v); // distance in world units
+                    acc.setValue(ijk, ValueT(voxelSize) * v); // distance in world units
                 } else { // outside narrow band
                     m += Floor(d - halfWidth); // leapfrog
                 }
@@ -574,16 +574,16 @@ initTorus(ValueT              radius1, // major radius of torus in world units
     auto acc = builder->getAccessor();
 
     // Define size of torus with narrow-band in voxel units
-    const ValueT r1 = radius1 / voxelSize, r2 = radius2 / voxelSize, rmax1 = r1 + r2 + halfWidth, rmax2 = r2 + halfWidth;
+    const ValueT r1 = radius1 / ValueT(voxelSize), r2 = radius2 / ValueT(voxelSize), rmax1 = r1 + r2 + ValueT(halfWidth), rmax2 = r2 + ValueT(halfWidth);
 
     // Radius below the Nyquist frequency
     if (r2 < ValueT(1.5))
         return builder;
 
     // Define center of torus in voxel units
-    const Vec3<ValueT> c(ValueT(center[0] - origin[0]) / voxelSize,
-                         ValueT(center[1] - origin[1]) / voxelSize,
-                         ValueT(center[2] - origin[2]) / voxelSize);
+    const Vec3<ValueT> c(ValueT(center[0] - origin[0]) / ValueT(voxelSize),
+                         ValueT(center[1] - origin[1]) / ValueT(voxelSize),
+                         ValueT(center[2] - origin[2]) / ValueT(voxelSize));
 
     // Define bounds of the voxel coordinates
     const int imin = Floor(c[0] - rmax1), imax = Ceil(c[0] + rmax1);
@@ -602,7 +602,7 @@ initTorus(ValueT              radius1, // major radius of torus in world units
                 const auto v = Sqrt(x2z2 + Pow2(ValueT(j) - c[1])) - r2; // Distance in voxel units
                 const auto d = v < 0 ? -v : v;
                 if (d < halfWidth) { // inside narrow band
-                    acc.setValue(ijk, voxelSize * v); // distance in world units
+                    acc.setValue(ijk, ValueT(voxelSize) * v); // distance in world units
                 } else { // outside narrow band
                     m += Floor(d - halfWidth); // leapfrog
                 }
@@ -642,23 +642,23 @@ initBox(ValueT              width, // major radius of torus in world units
     auto acc = builder->getAccessor();
 
     // Define size of box with narrow-band in voxel units
-    const Vec3T r(width / (2 * voxelSize), height / (2 * voxelSize), depth / (2 * voxelSize));
+    const Vec3T r(width / (2 * ValueT(voxelSize)), height / (2 * ValueT(voxelSize)), depth / (2 * ValueT(voxelSize)));
 
     // Below the Nyquist frequency
     if (r.min() < ValueT(1.5))
         return builder;
 
     // Define center of box in voxel units
-    const Vec3T c(ValueT(center[0] - origin[0]) / voxelSize,
-                  ValueT(center[1] - origin[1]) / voxelSize,
-                  ValueT(center[2] - origin[2]) / voxelSize);
+    const Vec3T c(ValueT(center[0] - origin[0]) / ValueT(voxelSize),
+                  ValueT(center[1] - origin[1]) / ValueT(voxelSize),
+                  ValueT(center[2] - origin[2]) / ValueT(voxelSize));
 
     // Define utility functions
     auto Pos = [](ValueT x) { return x > 0 ? x : 0; };
     auto Neg = [](ValueT x) { return x < 0 ? x : 0; };
 
     // Define bounds of the voxel coordinates
-    const BBox<Vec3T> b(c - r - Vec3T(halfWidth), c + r + Vec3T(halfWidth));
+    const BBox<Vec3T> b(c - r - Vec3T(ValueT(halfWidth)), c + r + Vec3T(ValueT(halfWidth)));
     const CoordBBox   bbox(Coord(Floor(b[0][0]), Floor(b[0][1]), Floor(b[0][2])),
                            Coord(Ceil(b[1][0]),  Ceil(b[1][1]),  Ceil(b[1][2])));
 
@@ -677,7 +677,7 @@ initBox(ValueT              width, // major radius of torus in world units
                 const auto v = Sqrt(x2y2 + Pow2(Pos(q3))) + Neg(Max(q0, q3)); // Distance in voxel units
                 const auto d = Abs(v);
                 if (d < halfWidth) { // inside narrow band
-                    acc.setValue(p, voxelSize * v); // distance in world units
+                    acc.setValue(p, ValueT(voxelSize) * v); // distance in world units
                 } else { // outside narrow band
                     m += Floor(d - halfWidth); // leapfrog
                 }
@@ -717,24 +717,24 @@ initBBox(ValueT              width, // width of the bbox in world units
     auto acc = builder->getAccessor();
 
     // Define size of bbox with narrow-band in voxel units
-    const Vec3T  r(width / (2 * voxelSize), height / (2 * voxelSize), depth / (2 * voxelSize));
-    const ValueT e = thickness / voxelSize;
+    const Vec3T  r(width / (2 * ValueT(voxelSize)), height / (2 * ValueT(voxelSize)), depth / (2 * ValueT(voxelSize)));
+    const ValueT e = thickness / ValueT(voxelSize);
 
     // Below the Nyquist frequency
     if (r.min() < ValueT(1.5) || e < ValueT(1.5))
         return builder;
 
     // Define center of bbox in voxel units
-    const Vec3T c(ValueT(center[0] - origin[0]) / voxelSize,
-                  ValueT(center[1] - origin[1]) / voxelSize,
-                  ValueT(center[2] - origin[2]) / voxelSize);
+    const Vec3T c(ValueT(center[0] - origin[0]) / ValueT(voxelSize),
+                  ValueT(center[1] - origin[1]) / ValueT(voxelSize),
+                  ValueT(center[2] - origin[2]) / ValueT(voxelSize));
 
     // Define utility functions
     auto Pos = [](ValueT x) { return x > 0 ? x : 0; };
     auto Neg = [](ValueT x) { return x < 0 ? x : 0; };
 
     // Define bounds of the voxel coordinates
-    const BBox<Vec3T> b(c - r - Vec3T(e + halfWidth), c + r + Vec3T(e + halfWidth));
+    const BBox<Vec3T> b(c - r - Vec3T(e + ValueT(halfWidth)), c + r + Vec3T(e + ValueT(halfWidth)));
     const CoordBBox   bbox(Coord(Floor(b[0][0]), Floor(b[0][1]), Floor(b[0][2])),
                          Coord(Ceil(b[1][0]), Ceil(b[1][1]), Ceil(b[1][2])));
 
@@ -765,7 +765,7 @@ initBBox(ValueT              width, // width of the bbox in world units
                 const ValueT v = Min(s1, Min(s2, s3)); // Distance in voxel units
                 const ValueT d = Abs(v);
                 if (d < halfWidth) { // inside narrow band
-                    acc.setValue(p, voxelSize * v); // distance in world units
+                    acc.setValue(p, ValueT(voxelSize) * v); // distance in world units
                 } else { // outside narrow band
                     m += Floor(d - halfWidth); // leapfrog
                 }
@@ -796,16 +796,16 @@ initOctahedron(ValueT              scale, // scale of the octahedron in world un
     auto acc = builder->getAccessor();
 
     // Define size of octahedron with narrow-band in voxel units
-    const ValueT s = scale / (2 * voxelSize);
+    const ValueT s = scale / (2 * ValueT(voxelSize));
 
     // Below the Nyquist frequency
     if ( s < ValueT(1.5) )
         return builder;
 
     // Define center of octahedron in voxel units
-    const Vec3T c(ValueT(center[0] - origin[0]) / voxelSize,
-                  ValueT(center[1] - origin[1]) / voxelSize,
-                  ValueT(center[2] - origin[2]) / voxelSize);
+    const Vec3T c(ValueT(center[0] - origin[0]) / ValueT(voxelSize),
+                  ValueT(center[1] - origin[1]) / ValueT(voxelSize),
+                  ValueT(center[2] - origin[2]) / ValueT(voxelSize));
 
     // Define utility functions
     auto sdf = [&s](ValueT x, ValueT y, ValueT z) {
@@ -819,7 +819,7 @@ initOctahedron(ValueT              scale, // scale of the octahedron in world un
     };
 
     // Define bounds of the voxel coordinates
-    const BBox<Vec3T> b(c - Vec3T(s + halfWidth), c + Vec3T(s + halfWidth));
+    const BBox<Vec3T> b(c - Vec3T(s + ValueT(halfWidth)), c + Vec3T(s + ValueT(halfWidth)));
     const CoordBBox   bbox(Coord(Floor(b[0][0]), Floor(b[0][1]), Floor(b[0][2])),
                            Coord(Ceil(b[1][0]),  Ceil(b[1][1]),  Ceil(b[1][2])));
 
@@ -846,7 +846,7 @@ initOctahedron(ValueT              scale, // scale of the octahedron in world un
                 }
                 d = Abs(v);
                 if (d < halfWidth) { // inside narrow band
-                    acc.setValue(p, voxelSize * v); // distance in world units
+                    acc.setValue(p, ValueT(voxelSize) * v); // distance in world units
                 } else { // outside narrow band
                     m += Floor(d - halfWidth); // leapfrog
                 }

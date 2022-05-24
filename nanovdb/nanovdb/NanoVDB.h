@@ -1773,7 +1773,8 @@ __hostdev__ static inline uint32_t FindHighestOn(uint64_t v)
 NANOVDB_HOSTDEV_DISABLE_WARNING
 __hostdev__ inline uint32_t CountOn(uint64_t v)
 {
-#if defined(_MSC_VER) && defined(_M_X64)
+// __popcnt* intrinsic support was added in VS 2019 16.8
+#if defined(_MSC_VER) && defined(_M_X64) && (_MSC_VER >= 1928)
     v = __popcnt64(v);
 #elif (defined(__GNUC__) || defined(__clang__))
     v = __builtin_popcountll(v);

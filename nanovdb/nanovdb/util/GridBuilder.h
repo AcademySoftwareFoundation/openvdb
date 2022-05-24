@@ -384,7 +384,7 @@ initHandle(const OracleT &oracle, const BufferT& buffer)
     mBufferOffsets[0] = 0;// grid is always stored at the start of the buffer!
     mBufferOffsets[1] = DstGridT::memUsage(); // tree
     mBufferOffsets[2] = DstTreeT::memUsage(); // root
-    mBufferOffsets[3] = DstRootT::memUsage(mRoot.mTable.size()); // upper internal nodes
+    mBufferOffsets[3] = DstRootT::memUsage(static_cast<uint32_t>(mRoot.mTable.size())); // upper internal nodes
     mBufferOffsets[4] = offset[2]; // lower internal nodes
     mBufferOffsets[5] = offset[1]; // leaf nodes
     mBufferOffsets[6] = offset[0]; // blind meta data
@@ -946,9 +946,9 @@ NanoTree<BuildT>* GridBuilder<ValueT, BuildT, StatsT>::processTree()
     DstNode0 *node0 = mArray0.empty() ? nullptr : reinterpret_cast<DstNode0*>(mBufferPtr + mBufferOffsets[5]);
     data->setFirstNode(node0);
 
-    data->mNodeCount[0] = mArray0.size();
-    data->mNodeCount[1] = mArray1.size();
-    data->mNodeCount[2] = mArray2.size();
+    data->mNodeCount[0] = static_cast<uint32_t>(mArray0.size());
+    data->mNodeCount[1] = static_cast<uint32_t>(mArray1.size());
+    data->mNodeCount[2] = static_cast<uint32_t>(mArray2.size());
 
     // Count number of active leaf level tiles
     data->mTileCount[0] = reduce(mArray1, uint32_t(0), [&](Range1D &r, uint32_t sum){
