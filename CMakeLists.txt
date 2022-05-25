@@ -152,6 +152,7 @@ set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[
 The number of threads to use when invoking MSVC builds with cmake --build. CMake defaults to 1. Note that
 cmake --parallel and CMAKE_BUILD_PARALLEL_LEVEL only change the number of PROJECTS that are built in parallel,
 NOT the number of TU's ]=])
+option(MSVC_COMPRESS_PDB "Whether to attempt to compress PDB symbol data in MSVC debug builds." OFF)
 
 set(_CONCURRENT_MALLOC_OPTIONS None Auto Jemalloc Tbbmalloc)
 if(NOT CONCURRENT_MALLOC)
@@ -258,6 +259,7 @@ mark_as_advanced(
   USE_IMATH_HALF
   USE_LOG4CPLUS
   USE_MAYA
+  MSVC_COMPRESS_PDB
 )
 
 #########################################################################

@@ -124,12 +124,15 @@ jobs:
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
         --components=core,nano,nanotest,nanoexam,nanobench,nanotool
-        --cargs=\'${{ matrix.config.cmake }}
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
         -DNANOVDB_USE_CUDA=ON
         -DNANOVDB_USE_OPENVDB=ON
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
-        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
     - name: test
       shell: bash
       run: cd build && ctest -V

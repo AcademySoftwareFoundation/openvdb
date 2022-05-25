@@ -147,7 +147,18 @@ jobs:
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
         --components=\"core,bin,view,render,test\"
-        --cargs=\'${{ matrix.config.cmake }} -DUSE_EXR=ON -DUSE_PNG=ON -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXR=ON
+        -DUSE_PNG=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: size
+      shell: bash
+      # Print the build directy size (monitor if we're hitting runner limits)
+      run: du -h build
     - name: test
       shell: bash
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
