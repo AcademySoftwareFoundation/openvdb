@@ -484,7 +484,7 @@ mOpenVDBFillWithBalls[vdb_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 
 	)
 
 
-mOpenVDBFillWithBalls[vdb_, n_, rspec_List -> regime_, args___] := invalidRegimeSpecQ[regime, OpenVDBFillWithBalls] || mOpenVDBFillWithBalls[vdb, n, rspec, args]
+mOpenVDBFillWithBalls[vdb_, n_, rspec_List -> regime_, args___] := messageRegimeSpecQ[regime, OpenVDBFillWithBalls] || mOpenVDBFillWithBalls[vdb, n, rspec, args]
 
 
 mOpenVDBFillWithBalls[vdb_, n_, rspec_, rest___] /; !MatchQ[rspec, {a_, b_} /; 0 <= a <= b] := 
