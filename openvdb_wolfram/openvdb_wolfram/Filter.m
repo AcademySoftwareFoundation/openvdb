@@ -33,7 +33,23 @@ OpenVDBFilter::usage = "OpenVDBFilter[expr, f] applies a filter on level set Ope
 (*Main*)
 
 
-OpenVDBFilter[vdb_?OpenVDBScalarGridQ, filter_, iter_:1] /; levelSetQ[vdb] && IntegerQ[iter] && iter > 0 :=
+OpenVDBFilter[args___] /; !CheckArguments[OpenVDBFilter[args], {2, 3}] = $Failed;
+
+
+OpenVDBFilter[args___] :=
+	With[{res = iOpenVDBFilter[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBFilter[args___] := mOpenVDBFilter[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBFilter*)
+
+
+iOpenVDBFilter[vdb_?OpenVDBScalarGridQ, filter_, iter_:1] /; levelSetQ[vdb] && IntegerQ[iter] && iter > 0 :=
 	Block[{fdata, method, width},
 		fdata = filteringMethod[filter];
 		(
@@ -47,14 +63,14 @@ OpenVDBFilter[vdb_?OpenVDBScalarGridQ, filter_, iter_:1] /; levelSetQ[vdb] && In
 	]
 
 
-OpenVDBFilter[___] = $Failed;
+iOpenVDBFilter[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBFilter, 1];
+registerForLevelSet[iOpenVDBFilter, 1];
 
 
 SyntaxInformation[OpenVDBFilter] = {"ArgumentsPattern" -> {_, _, _.}};
@@ -76,3 +92,33 @@ filteringMethod["Gaussian"] := {2, 1}
 filteringMethod["Laplacian"] := {3, 1}
 filteringMethod["MeanCurvature"] := {4, 1}
 filteringMethod[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBFilter[expr_, ___] /; messageScalarGridQ[expr, OpenVDBFilter] = $Failed;
+
+
+mOpenVDBFilter[expr_, ___] /; messageLevelSetGridQ[expr, OpenVDBFilter] = $Failed;
+
+
+mOpenVDBFilter[_, filter_, ___] /; filteringMethod[filter] === $Failed := 
+	(
+		Message[OpenVDBFilter::filter, filter];
+		$Failed
+	)
+
+
+mOpenVDBFilter[vdb_, filter_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] := 
+	(
+		Message[OpenVDBFilter::intpm, HoldForm[OpenVDBFillWithBalls[vdb, filter, expr, rest]], 3];
+		$Failed
+	)
+
+
+mOpenVDBFilter[___] = $Failed;
+
+
+OpenVDBFilter::filter = "`1` is not a valid filter.";

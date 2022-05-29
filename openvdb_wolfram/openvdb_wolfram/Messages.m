@@ -17,6 +17,7 @@ Package["OpenVDBLink`"]
 
 PackageScope["messageGridQ"]
 PackageScope["messageScalarGridQ"]
+PackageScope["messageLevelSetGridQ"]
 PackageScope["messageNonMaskGridQ"]
 
 
@@ -105,6 +106,41 @@ messageScalarGridQ[expr_, head_] :=
 
 General::scalargrid = "`1` is not a scalar grid.";
 General::scalargrid2 = "`1` is not a scalar grid or constant 3D region.";
+
+
+(* ::Subsection::Closed:: *)
+(*messageLevelSetGridQ*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+messageLevelSetGridQ[vdb_?OpenVDBScalarGridQ, _] /; levelSetQ[vdb] = False;
+
+
+messageLevelSetGridQ[expr_, head_] :=
+	Block[{regionQ},
+		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+		Which[
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
+			!TrueQ[$OpenVDBSpacing > 0],
+				Message[head::lvlsetgrid, expr];
+				True, 
+			True,
+				Message[head::lvlsetgrid2, expr];
+				True
+		]
+	]
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+General::lvlsetgrid = "`1` is not a level set grid.";
+General::lvlsetgrid2 = "`1` is not a level set grid or constant 3D region.";
 
 
 (* ::Subsection::Closed:: *)
