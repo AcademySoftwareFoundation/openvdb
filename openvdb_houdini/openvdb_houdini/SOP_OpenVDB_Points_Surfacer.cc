@@ -423,8 +423,8 @@ SOP_VDBPointsSurfacer::cookVDBSop(OP_Context& context)
                 else {
                     scale = influenceScale * radiusScale;
                     if (hasPscale) {
-                        float avg;
-                        if (openvdb::points::evalAverage<float>(points->tree(), radiusAttributeName, avg)) scale *= Real(avg);
+                        double avg;
+                        if (openvdb::points::evalAverage<float>(points->tree(), radiusAttributeName, avg)) scale *= avg;
                     }
                 }
 
