@@ -503,6 +503,9 @@ public:
 
 
     Index64 memUsage() const;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    Index64 memUsageIfLoaded() const;
+#endif
 
     void evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels = true) const;
 
@@ -1519,6 +1522,15 @@ PointDataLeafNode<T, Log2Dim>::memUsage() const
 {
     return BaseLeaf::memUsage() + mAttributeSet->memUsage();
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename T, Index Log2Dim>
+inline Index64
+PointDataLeafNode<T, Log2Dim>::memUsageIfLoaded() const
+{
+    return BaseLeaf::memUsageIfLoaded() + mAttributeSet->memUsageIfLoaded();
+}
+#endif
 
 template<typename T, Index Log2Dim>
 inline void

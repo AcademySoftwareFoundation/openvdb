@@ -173,15 +173,15 @@
 // directive. This can be suppressed by defining OPENVDB_USE_DEPRECATED_ABI_<VERSION>.
 // Note that, whilst the VDB CMake does not allow this option to be hit,
 // it exists to propagate this message to downstream targets
-#ifndef OPENVDB_USE_DEPRECATED_ABI_6
-    #if OPENVDB_ABI_VERSION_NUMBER == 6
-        PRAGMA(message("NOTE: ABI = 6 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_6 "
-            "to suppress this message"))
-    #endif
-#endif
 #ifndef OPENVDB_USE_DEPRECATED_ABI_7
     #if OPENVDB_ABI_VERSION_NUMBER == 7
         PRAGMA(message("NOTE: ABI = 7 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_7 "
+            "to suppress this message"))
+    #endif
+#endif
+#ifndef OPENVDB_USE_DEPRECATED_ABI_8
+    #if OPENVDB_ABI_VERSION_NUMBER == 8
+        PRAGMA(message("NOTE: ABI = 8 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_8 "
             "to suppress this message"))
     #endif
 #endif

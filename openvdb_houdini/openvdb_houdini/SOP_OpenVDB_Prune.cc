@@ -94,7 +94,7 @@ newSopOperator(OP_OperatorTable* table)
 @overview\n\
 \n\
 This node prunes branches of VDB\n\
-[trees|https://academysoftwarefoundation.github.io/openvdb/overview.html#secTree]\n\
+[trees|https://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
 where all voxels have the same or similar values.\n\
 This can help to reduce the memory footprint of a VDB, without changing its topology.\n\
 With a suitably high tolerance, pruning can function as a simple\n\

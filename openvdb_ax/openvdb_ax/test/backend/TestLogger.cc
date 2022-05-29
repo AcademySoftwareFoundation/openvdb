@@ -249,5 +249,7 @@ TestLogger::testMaxErrors()
     CPPUNIT_ASSERT(logger.error(message, location));
     CPPUNIT_ASSERT(!logger.error(message, location));
     CPPUNIT_ASSERT(!logger.error(message, location));
+    // setMaxErrors doesn't limit the error counter
+    CPPUNIT_ASSERT_EQUAL(size_t(3), logger.errors());
 }
 

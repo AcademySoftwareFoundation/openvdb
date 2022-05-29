@@ -1793,7 +1793,7 @@ returned, otherwise @b `c` is evaluated and returned. In this case, @b `a` and @
 @anchor axvecmatinit
 @par Vector/Matrix Initializer
 @ref axvecmats "Vectors and matrices" can be represented as local variables (e.g.
-@b `vec3f`), external attributes or parameters (e.g. @b `vec3f@attrib`) or as
+@b `vec3f`), external attributes or parameters (e.g. @b `vec3f\@attrib`) or as
 temporary values using the vector/matrix initializer syntax. This operator has
 the form:
 @par

@@ -13,7 +13,7 @@
 set -e
 
 ROOT="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )/../"
-VDB_AX=$ROOT/build/openvdb_ax/openvdb_ax/cmd/vdb_ax
+VDB_AX=$ROOT/build/openvdb_cmd/vdb_ax/vdb_ax
 
 DOCS=()
 DOCS+=($ROOT/doc/ax/ax.txt)

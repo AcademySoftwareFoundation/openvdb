@@ -32,7 +32,7 @@ These examples demonstrate how to use AX on OpenVDB points grids.
 Below is a small example which demonstrates working with a few point attributes.
 The @ symbol is the identifier for an AX attribute. The type of each attribute
 is specified before the @ symbol and the name is specified afterwards. For
-example: @b `int@count` would imply an @b integer attribute called @b count.
+example: @b `int\@count` would imply an @b integer attribute called @b count.
 @par
 In this example there are three point attributes: a @b float attribute @b speed,
 a @b vec3f float attribute @b velocity and a @b vec3f float attribute @b colour.
@@ -114,7 +114,7 @@ v@P += v@v * dt;
 @endcode
 @par
 The final AX command, `v@P += v@v * dt;` writes to the position attribute of
-the points @b `v@P`. Whenever position is written to in this way, the AX
+the points @b `v\@P`. Whenever position is written to in this way, the AX
 `PointExecutable` will move (re-bucket) points in PointDataGrids.
 
 @subsection axexamplepointcurlnoise Curl Noise
@@ -234,7 +234,7 @@ vec3f@vel += dt * massInverse * vec3f@force;
 @par
 Here we demonstrate how AX can be used to blend two volumes together. Note that
 only the volumes which are written to are executed over. In the below code,
-only @b `@surface_a` is written to. This means that the final blended result,
+only @b `\@surface_a` is written to. This means that the final blended result,
 stored in `surface_a`, will only be updated in `surface_a`'s topology. Should
 we want a combined blend of @b non @b overlapping areas of both surface a and b,
 we would need to activate a's topology with respect to b first.

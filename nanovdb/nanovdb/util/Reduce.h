@@ -29,6 +29,7 @@ namespace nanovdb {
 /// @return reduction
 ///
 /// @param range  RangeT can be Range<dim,T>, CoordBBox, tbb::blocked_range, blocked_range2D, or blocked_range3D.
+/// @param identity  initial value
 /// @param func   functor with signature T FuncT::operator()(const RangeT& range, const T& a) const
 /// @param join   functor with the signature T JoinT::operator()(const T& a, const T& b) const
 /// @code

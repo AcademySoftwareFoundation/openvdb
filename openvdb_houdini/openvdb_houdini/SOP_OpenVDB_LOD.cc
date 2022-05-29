@@ -188,7 +188,6 @@ struct MultiResGridFractionalOp
         } else {
             const size_t levels = openvdb::math::Ceil(level) + 1;
             const GridType* gridPtr = &grid;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
             // if grid already has MultiResGrid_Level metadata with type int64, remove it
             typename GridType::ConstPtr newGridPtr;
             auto meta = grid.template getMetadata<openvdb::Int64Metadata>("MultiResGrid_Level");
@@ -200,7 +199,6 @@ struct MultiResGridFractionalOp
                 newGridPtr = grid.copyReplacingMetadata(metaMap);
                 gridPtr = newGridPtr.get();
             }
-#endif
             openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
             outputGrid = mrg.template createGrid<Order>( level );
         }
@@ -223,7 +221,6 @@ struct MultiResGridRangeOp
         if ( end > 0.0f ) {
             const size_t levels = openvdb::math::Ceil(end) + 1;
             const GridType* gridPtr = &grid;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
             // if grid already has MultiResGrid_Level metadata with type int64, remove it
             typename GridType::ConstPtr newGridPtr;
             auto meta = grid.template getMetadata<openvdb::Int64Metadata>("MultiResGrid_Level");
@@ -235,7 +232,6 @@ struct MultiResGridRangeOp
                 newGridPtr = grid.copyReplacingMetadata(metaMap);
                 gridPtr = newGridPtr.get();
             }
-#endif
             openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
 
             // inclusive range
@@ -260,7 +256,6 @@ struct MultiResGridIntegerOp
     {
         using TreeT = typename GridType::TreeType;
         const GridType* gridPtr = &grid;
-#if OPENVDB_ABI_VERSION_NUMBER >= 7 // Grid::copyReplacingMetadata() only available in ABI>=7
         // if grid already has MultiResGrid_Level metadata with type float, remove it
         typename GridType::ConstPtr newGridPtr;
         auto meta = grid.template getMetadata<openvdb::FloatMetadata>("MultiResGrid_Level");
@@ -272,7 +267,6 @@ struct MultiResGridIntegerOp
             newGridPtr = grid.copyReplacingMetadata(metaMap);
             gridPtr = newGridPtr.get();
         }
-#endif
         openvdb::tools::MultiResGrid<TreeT> mrg( levels, *gridPtr );
         outputGrids = mrg.grids();
     }

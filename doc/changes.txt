@@ -12,14 +12,22 @@ Bug Fixes:
   This could potentially be a problem on Windows debug builds (unconfirmed).
 - Minor fix to range in openvdb/tools/LevelSetSphere.h. This could result
   in data races for multi-threaded execution (unconfirmed) [Reported by Tommy Hinks]
-- Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by @frapit]
+- Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.  [Reported by \@frapit]
 - Fix unit tests failures with Blosc versions >= 1.19.0.
+- Fixed a regression in ax::run which wouldn't propagate exceptions
+- Fixed a bug where ax::ast::parse could return a partially constructed but invalid AST on failure
+- Fixed AX logger exit handling in ax::Compiler::compile and ax::ast::parse
+- Fixed an issue which could result in significant compilation times when instantiating TypeList<>::Unique<>
 
 @par
 New features:
 - Added support for AMD's HIP API in NanoVDB [Contributed by Blender Foundation]
 - Added bindings mechanism to AX to allow differing data and AX attribute names (@) in Point and Volume executables.
 - Added support for OpenVDB AX on Windows.
+- Added tools::memUsageIfLoaded() which returns the memory consumption of a deserialized VDB tree, useful if delay-loading is enabled.
+- Added points::rasterizeSpheres() and points::rasterizeSmoothSpheres() variants, new kernels and improved performance for OpenVDB points to surface rasterization.
+- Added points::rasterizeTrilinear() for OpenVDB points, fast staggered or colocated trilinear rasterization for scalar and vector attributes.
+- Exposed TypeList declarations in openvdb.h which denote the default set of types supported by OpenVDB.
 
 @par
 Improvements:
@@ -27,12 +35,20 @@ Improvements:
 - Added a --copy-file-metadata option to vdb_ax. This behaviour is now off by default.
 - Added support for multiple input files with the vdb_ax binary using -i. Positional arguments as input files are deprecated.
 - Added tools::minMax() which supports multithreaded evaluation of active minimum and maximum values. Grid::evalMinMax() has been deprecated.  [Contributed by Greg Hurst]
+- Significant performance improvements to AX point kernels, primarily due to providing AX access to attribute buffers for superior code generation.
+- vdb_print now prints both the in-core memory and total memory usage for VDB grids.
+- Improved build support for MinGW [Contributed by Mehdi Chinoune]
+- Added a new foreach method to TypeList for iterating over types without constructing them.
+- Added TypeList::Transform declaration for transforming TypeLists into new types.
+- Moved Grid::apply implementation to TypeList::apply to allow for other polymorphic types to invoke it.
 
 @par
 Build:
 - Regenerated AX grammar with Flex 2.6.4 and Bison 3.8.2.
 - Improved locating NumPy in CMake when multiple python versions are installed.
 - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.  [Reported by Sam James]
+- Changed the way boost_python and boost_numpy are located. Both components must match the major/minor version of python in use. This can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.
+- Relocated OpenVDB binaries to a new openvdb_cmd root directory.
 
 @par
 Houdini:
@@ -56,7 +72,7 @@ preserve ABI compatibility it might be necessary to define the macro
 <BLOCKQUOTE>
 Official release of NanoVDB, which for the first time offers GPU support for
 static sparse volumes in OpenVDB. See the
-<A HREF="https://academysoftwarefoundation.github.io/openvdb/NanoVDB_MainPage.html">documentation</A>
+<A HREF="https://www.openvdb.org/documentation/doxygen/NanoVDB_MainPage.html">documentation</A>
 for details.
 </BLOCKQUOTE>
 
@@ -488,7 +504,7 @@ a domain specific JIT (just-in-time) compiled expression language,
 providing users with a new way of interacting with OpenVDB data. AX is
 tailored towards writing highly parallelizable and customizable OpenVDB
 volume and point kernel operations. See the
-<A HREF="https://academysoftwarefoundation.github.io/openvdb/openvdbax.html">documentation</A>
+<A HREF="https://www.openvdb.org/documentation/openvdbax.html">documentation</A>
 for more.
 </BLOCKQUOTE>
 
@@ -768,7 +784,7 @@ Improvements:
 - Removed Boost::thread as a dependency of vdb_view in favour of std::thread.
 - Removed usage of boost/integer.hpp and boost/math/constants/constants.hpp,
   the latter in favour of new openvdb math constants for pi
-- Removed usage of boost/mpl/*.hpp methods in favour of new template
+- Removed usage of boost/mpl/\*.hpp methods in favour of new template
   meta-programming methods on the @vdblink::TypeList TypeList@endlink struct.
   This now supports get, front, back, contains, index, unique, popback, popfront
   and range removal of types.
@@ -1234,7 +1250,7 @@ Bug fixes:
 @par
 API changes:
 - Moved the @vdblink::CopyConstness CopyConstness@endlink metafunction from
-  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h@endlink.
+  @link tree/TreeIterator.h TreeIterator.h@endlink to @link Types.h Types.h@endlink.
 
 @par
 Houdini:
@@ -2199,8 +2215,8 @@ Bug fixes:
 - Fixed memory leak in a @vdblink::tools::meshToVolume tools::meshToVolume@endlink
   sub-tool (expandNarrowband).
   <I>[Reported by K&eacute;vin&nbsp;Dietrich]</I>
-- Fixed parameter type inconsistencies in @link math/Stencils.h@endlink and
-  @link tools/RayIntersector.h@endlink.
+- Fixed parameter type inconsistencies in @link math/Stencils.h math/Stencils.h@endlink
+  and @link tools/RayIntersector.h tools/RayIntersector.h@endlink.
   <I>[Contributed by K&eacute;vin&nbsp;Dietrich and Nick&nbsp;Avramoussis]</I>
 - Fixed a bug in the @vdblink::tools::VolumeToMesh VolumeToMesh@endlink tool that
   produced artifacts for adaptive surface extraction on clipped level sets.
@@ -2514,7 +2530,7 @@ Houdini:
   for material color lookups.
 - Added @vdblink::getLibraryVersionString()
   getLibraryVersionString@endlink and
-  @link OPENVDB_LIBRARY_VERSION_STRING@endlink.
+  @link OPENVDB_LIBRARY_VERSION_STRING OPENVDB_LIBRARY_VERSION_STRING@endlink.
 - Modified the mesh to volume converter to always set the grid background
   value to the exterior narrow-band width, and added finite value checks
   to narrow band parameters.
