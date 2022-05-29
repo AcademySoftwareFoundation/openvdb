@@ -63,8 +63,8 @@ private:
     std::deque<math::Transform> mTransforms;
     std::deque<float> mWeights;
     // default to 180 degree film shutter
-    float mShutterStart = -0.25f;
-    float mShutterEnd = 0.25f;
+    float mShutterStart = -0.25f,
+          mShutterEnd = 0.25f;
 }; // class RasterCamera
 
 
@@ -92,18 +92,18 @@ struct FrustumRasterizerSettings
 
     math::Transform::Ptr transform;
     RasterCamera camera;
-    float threshold = 1e-6f;
-    bool scaleByVoxelVolume = false;
-    Name velocityAttribute = "v";
-    bool useRadius = false;
-    float radiusScale = 1.0f;
-    Name radiusAttribute = "pscale";
-    bool accurateFrustumRadius = false;
-    bool accurateSphereMotionBlur = false;
-    bool velocityMotionBlur = false;
-    float framesPerSecond = 24.0f;
+    bool scaleByVoxelVolume = false,
+         useRadius = false,
+         accurateFrustumRadius = false,
+         accurateSphereMotionBlur = false,
+         velocityMotionBlur = false,
+         threaded = true;
+    float threshold = 1e-6f,
+          radiusScale = 1.0f,
+          framesPerSecond = 24.0f;
+    Name velocityAttribute = "v",
+         radiusAttribute = "pscale";
     int motionSamples = 2;
-    bool threaded = true;
 }; // struct FrustumRasterizerSettings
 
 
@@ -382,6 +382,9 @@ struct RasterizeOp
     using VelocityHandleT = openvdb::points::AttributeHandle<Vec3f>;
     using RadiusHandleT = openvdb::points::AttributeHandle<float>;
 
+    // to prevent checking the interrupter too frequently, only check every 32 voxels cubed
+    static const int interruptThreshold = 32*32*32;
+
     RasterizeOp(
                 const PointDataGridT& grid,
                 const std::vector<Index64>& offsets,
@@ -442,7 +445,7 @@ struct RasterizeOp
         const int jmin=math::Floor(position[1]-radius), jmax=math::Ceil(position[1]+radius);
         const int kmin=math::Floor(position[2]-radius), kmax=math::Ceil(position[2]+radius);
 
-        const bool interrupt = interrupter && (imax-imin)*(jmax-jmin)*(kmax-kmin) > (32*32*32);
+        const bool interrupt = interrupter && (imax-imin)*(jmax-jmin)*(kmax-kmin) > interruptThreshold;
 
         for (i = imin; i <= imax; ++i) {
             if (interrupt && interrupter->wasInterrupted()) break;
@@ -476,7 +479,7 @@ struct RasterizeOp
         Vec3i outMin = frustumBBox.min().asVec3i();
         Vec3i outMax = frustumBBox.max().asVec3i();
 
-        const bool interrupt = interrupter && frustumBBox.volume() > (32*32*32);
+        const bool interrupt = interrupter && frustumBBox.volume() > interruptThreshold;
 
         // back-project each output voxel into the input tree.
         Vec3R xyz;
@@ -495,7 +498,7 @@ struct RasterizeOp
 
                     Vec3d offset = (xyz - position) * voxelSize;
 
-                    double distanceSqr = offset[0]*offset[0]+offset[1]*offset[1]+offset[2]*offset[2];
+                    double distanceSqr = offset.dot(offset);
 
                     op(outXYZ, scale, attributeScale, distanceSqr, radiusWS*radiusWS);
                 }
@@ -540,7 +543,7 @@ struct RasterizeOp
         Vec3i outMin = frustumBBox.min().asVec3i();
         Vec3i outMax = frustumBBox.max().asVec3i();
 
-        const bool interrupt = interrupter && frustumBBox.volume() > (32*32*32);
+        const bool interrupt = interrupter && frustumBBox.volume() > interruptThreshold;
 
         // back-project each output voxel into the input tree.
         Vec3R xyz;
@@ -578,7 +581,7 @@ struct RasterizeOp
         using AccessorT = tree::ValueAccessor<typename GridT::TreeType>;
         using MaskAccessorT = tree::ValueAccessor<const MaskTree>;
 
-        const bool isBool = BoolTraits<ValueT>::IsBool;
+        constexpr bool isBool = BoolTraits<ValueT>::IsBool;
         const bool isFrustum = !mSettings.transform->isLinear();
 
         const bool useRaytrace = mSettings.velocityMotionBlur || !mStaticCamera;
@@ -624,8 +627,8 @@ struct RasterizeOp
         // create a temporary tree when rasterizing with radius and accumulate
         // or weighted average methods
 
-        typename TreeT::Ptr tempTree;
-        typename TreeT::Ptr tempWeightTree;
+        std::unique_ptr<TreeT> tempTree;
+        std::unique_ptr<TreeT> tempWeightTree;
         std::unique_ptr<AccessorT> tempValueAccessor;
         std::unique_ptr<AccessorT> tempWeightAccessor;
         if (useRadius && !mComputeMax) {
@@ -637,6 +640,9 @@ struct RasterizeOp
             }
         }
 
+        // point rasterization
+
+        // impl - modify a single voxel by coord, handles temporary trees and all supported modes
         auto doModifyVoxelOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale,
             const bool isTemp, const bool forceSum)
         {
@@ -672,16 +678,21 @@ struct RasterizeOp
             }
         };
 
+        // modify a single voxel by coord, disable temporary trees
         auto modifyVoxelOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale)
         {
             doModifyVoxelOp(ijk, scale, attributeScale, /*isTemp=*/false, /*forceSum=*/false);
         };
 
+        // sum a single voxel by coord, no temporary trees or maximum mode
         auto sumVoxelOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale)
         {
             doModifyVoxelOp(ijk, scale, attributeScale, /*isTemp=*/false, /*forceSum=*/true);
         };
 
+        // sphere rasterization
+
+        // impl - modify a single voxel by coord based on distance from sphere origin
         auto doModifyVoxelByDistanceOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale,
             const double distanceSqr, const double radiusSqr, const bool isTemp)
         {
@@ -696,12 +707,14 @@ struct RasterizeOp
             }
         };
 
+        // modify a single voxel by coord based on distance from sphere origin, disable temporary trees
         auto modifyVoxelByDistanceOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale,
             const double distanceSqr, const double radiusSqr)
         {
             doModifyVoxelByDistanceOp(ijk, scale, attributeScale, distanceSqr, radiusSqr, /*isTemp=*/false);
         };
 
+        // modify a single voxel by coord based on distance from sphere origin, enable temporary trees
         auto modifyTempVoxelByDistanceOp = [&](const Coord& ijk, const double scale, const AttributeT& attributeScale,
             const double distanceSqr, const double radiusSqr)
         {
@@ -870,8 +883,8 @@ struct RasterizeOp
                     if (doRadius) {
                         distanceWeight = std::min(distanceWeight, 1.0);
 
-                        // this constant is how tightly spheres are packed together irrespective
-                        // of how large they are in index-space - if it is too low, the shape of
+                        // these arbitrary constants are how tightly spheres are packed together
+                        // irrespective of how large they are in index-space - if it is too low, the shape of
                         // the individual spheres becomes visible in the rasterized path,
                         // if it is too high, rasterization becomes less efficient with
                         // diminishing returns towards the accuracy of the rasterized path
@@ -998,6 +1011,8 @@ struct RasterizeOp
             (const_cast<PointLeafT&>(leaf)).swap(emptyBuffer);
         }
     }
+
+// TODO: would be better to move some of the immutable values into a shared struct
 
 private:
     mutable math::Ray<double> mDdaRay;
@@ -1603,6 +1618,8 @@ FrustumRasterizer<PointDataGridT>::rasterizeAttribute(
     if (stride == 1 && sourceType == typeNameAsString<float>()) {
         using GridT = typename PointDataGridT::template ValueConverter<float>::Type;
         return rasterizeAttribute<GridT, float>(attribute, mode, reduceMemory, scale, filter);
+// this define is for lowering compilation time when debugging by instantiating only the float
+// code path (default is to instantiate all code paths)
 #ifndef ONLY_RASTER_FLOAT
     } else if ( sourceType == typeNameAsString<Vec3f>() ||
                 (stride == 3 && sourceType == typeNameAsString<float>())) {
