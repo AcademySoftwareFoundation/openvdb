@@ -105,6 +105,14 @@ formatProperties["RuleList", props_List, measurements_] := Thread[props -> measu
 formatProperties[___] = $Failed
 
 
+validReturnFormatQ["Association"] = True;
+validReturnFormatQ["Dataset"] = True;
+validReturnFormatQ["List"] = True;
+validReturnFormatQ["RuleList"] = True;
+validReturnFormatQ[Automatic] = True;
+validReturnFormatQ[___] = False;
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBGrid overload*)
 
@@ -143,11 +151,27 @@ OpenVDBGrid[id_][___] = $Failed;
 (*Main*)
 
 
-OpenVDBProperty[vdb_?OpenVDBGridQ, props_, format_:Automatic] :=
+OpenVDBProperty[args__] /; !CheckArguments[OpenVDBProperty[args], {2, 3}] = $Failed;
+
+
+OpenVDBProperty[args___] :=
+	With[{res = iOpenVDBProperty[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBProperty[args___] := mOpenVDBProperty[args]
+
+
+(* ::Subsection::Closed:: *)
+(*iOpenVDBProperty*)
+
+
+iOpenVDBProperty[vdb_?OpenVDBGridQ, props_, format_:Automatic] :=
 	Block[{propfuncs, measurements, res},
 		propfuncs = getterPropertyFunctions[props];
 		(
-			measurements = iOpenVDBProperty[vdb, propfuncs];
+			measurements = queryVDBProperty[vdb, propfuncs];
 			(
 				res = formatProperties[format, props, measurements];
 				
@@ -159,14 +183,20 @@ OpenVDBProperty[vdb_?OpenVDBGridQ, props_, format_:Automatic] :=
 	]
 
 
-OpenVDBProperty[___] = $Failed;
+iOpenVDBProperty[___] = $Failed;
+
+
+queryVDBProperty[vdb_, pfunc_List] := Through[pfunc[vdb]]
+
+
+queryVDBProperty[vdb_, pfunc_] := pfunc[vdb]
 
 
 (* ::Subsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBProperty, 1];
+registerForLevelSet[iOpenVDBProperty, 1];
 
 
 SyntaxInformation[OpenVDBProperty] = {"ArgumentsPattern" -> {_, _, _.}};
@@ -176,13 +206,35 @@ addCodeCompletion[OpenVDBProperty][None, Keys[$getterPropertyAssoc], None];
 
 
 (* ::Subsection::Closed:: *)
-(*iOpenVDBProperty*)
+(*Messages*)
 
 
-iOpenVDBProperty[vdb_, pfunc_List] := Through[pfunc[vdb]]
+mOpenVDBProperty[expr_, ___] /; messageGridQ[expr, OpenVDBProperty] = $Failed;
 
 
-iOpenVDBProperty[vdb_, pfunc_] := pfunc[vdb]
+mOpenVDBProperty[_, props_, ___] /; getterPropertyFunctions[props] === $Failed := 
+	(
+		If[ListQ[props], 
+			Message[OpenVDBProperty::props, props],
+			Message[OpenVDBProperty::prop, props]
+		];
+		$Failed
+	)
+
+
+mOpenVDBProperty[_, _, format_] /; !validReturnFormatQ[format] := 
+	(
+		Message[OpenVDBProperty::frmt, format, 3];
+		$Failed
+	)
+
+
+mOpenVDBProperty[___] = $Failed;
+
+
+OpenVDBProperty::prop = "`1` is not a valid property. Use \"Properties\" to see the list of available properties.";
+OpenVDBProperty::props = "`1` is not a valid list of properties. Use \"Properties\" to see the list of available properties.";
+OpenVDBProperty::frmt = "`1` at position `2` is not one of \"Association\", \"Dataset\", \"List\", \"RuleList\", or Automatic."
 
 
 (* ::Section:: *)

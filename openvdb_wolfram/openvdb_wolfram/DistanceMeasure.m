@@ -517,7 +517,7 @@ mOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
 mOpenVDBFillWithBalls[___] = $Failed;
 
 
-OpenVDBFillWithBalls::rspec = "A list of two increasing non\[Hyphen]negative radii expected at position `1` in `2`.";
+OpenVDBFillWithBalls::rspec = "`1` at position `2` should be a list of two increasing non\[Hyphen]negative radii.";
 OpenVDBFillWithBalls::rettype = "The setting for \"ReturnType\" should be one of \"Regions\", \"PackedArray\", or Automatic.";
 OpenVDBFillWithBalls::seedcnt = "The setting for \"SeedCount\" should either be a positive integer or Automatic.";
 

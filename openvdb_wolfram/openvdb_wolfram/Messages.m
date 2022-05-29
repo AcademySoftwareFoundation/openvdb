@@ -19,6 +19,8 @@ PackageScope["messageGridQ"]
 PackageScope["messageScalarGridQ"]
 PackageScope["messageLevelSetGridQ"]
 PackageScope["messageNonMaskGridQ"]
+PackageScope["messagePixelGridQ"]
+PackageScope["messageNonEmptyGridQ"]
 
 
 PackageScope["messageCoordinateSpecQ"]
@@ -167,6 +169,70 @@ messageNonMaskGridQ[___] = False;
 
 
 General::nmsksupp = "`1` does not support mask grids.";
+
+
+(* ::Subsection::Closed:: *)
+(*messagePixelGridQ*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+messagePixelGridQ[_?carefulPixelGridQ, _] = False;
+
+
+messagePixelGridQ[expr_, head_] :=
+	Block[{regionQ},
+		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+		Which[
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
+			!TrueQ[$OpenVDBSpacing > 0],
+				Message[head::npxl, expr];
+				True, 
+			True,
+				Message[head::npxl2, expr];
+				True
+		]
+	]
+
+
+messagePixelGridQ[___] = False;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+General::npxl = "`1` is not a scalar, integer, Boolean, or mask grid.";
+General::npxl2 = "`1` is not a scalar, integer, Boolean, mask grid, or constant 3D region.";
+
+
+(* ::Subsection::Closed:: *)
+(*messageNonEmptyGridQ*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+messageNonEmptyGridQ[expr_?OpenVDBGridQ, head_] :=
+	If[emptyVDBQ[expr],
+		Message[head::empty, head];
+		True,
+		False
+	]
+
+
+messageNonEmptyGridQ[___] = False;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+General::empty = "`1` does not support empty grids.";
 
 
 (* ::Section:: *)
