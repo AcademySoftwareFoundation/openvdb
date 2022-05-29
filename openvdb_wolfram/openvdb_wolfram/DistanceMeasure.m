@@ -44,6 +44,9 @@ OpenVDBFillWithBalls::usage = "OpenVDBFillWithBalls[expr, n, {rmin, rmax}] fills
 Options[OpenVDBMember] = {"IsoValue" -> Automatic};
 
 
+OpenVDBMember[args___] /; !CheckArguments[OpenVDBMember[args], 2] = $Failed;
+
+
 OpenVDBMember[args___] :=
 	With[{res = iOpenVDBMember[args]},
 		res /; res =!= $Failed
@@ -118,6 +121,9 @@ OpenVDBDefaultSpace[OpenVDBMember] = $worldregime;
 
 
 Options[OpenVDBNearest] = {"IsoValue" -> Automatic};
+
+
+OpenVDBNearest[args___] /; !CheckArguments[OpenVDBNearest[args], 2] = $Failed;
 
 
 OpenVDBNearest[args___] :=
@@ -196,6 +202,9 @@ OpenVDBDefaultSpace[OpenVDBNearest] = $worldregime;
 Options[OpenVDBDistance] = {"IsoValue" -> Automatic};
 
 
+OpenVDBDistance[args___] /; !CheckArguments[OpenVDBDistance[args], 2] = $Failed;
+
+
 OpenVDBDistance[args___] :=
 	With[{res = iOpenVDBDistance[args]},
 		res /; res =!= $Failed
@@ -266,6 +275,9 @@ OpenVDBDefaultSpace[OpenVDBDistance] = $worldregime;
 
 
 Options[OpenVDBSignedDistance] = {"IsoValue" -> Automatic};
+
+
+OpenVDBSignedDistance[args___] /; !CheckArguments[OpenVDBSignedDistance[args], 2] = $Failed;
 
 
 OpenVDBSignedDistance[args___] :=
@@ -344,13 +356,16 @@ OpenVDBDefaultSpace[OpenVDBSignedDistance] = $worldregime;
 Options[OpenVDBFillWithBalls] = {"IsoValue" -> Automatic, "Overlapping" -> False, "ReturnType" -> Automatic, "SeedCount" -> Automatic};
 
 
+OpenVDBFillWithBalls[args___] /; !CheckArguments[OpenVDBFillWithBalls[args], {2, 3}] = $Failed;
+
+
 OpenVDBFillWithBalls[args___] :=
 	With[{res = iOpenVDBFillWithBalls[args]},
 		res /; res =!= $Failed
 	]
 
 
-OpenVDBFillWithBalls[args___] := messageOpenVDBFillWithBalls[args]
+OpenVDBFillWithBalls[args___] := mOpenVDBFillWithBalls[args]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -456,33 +471,30 @@ returnBalls[balls_, ret_] :=
 (*Messages*)
 
 
-Options[messageOpenVDBFillWithBalls] = Options[OpenVDBFillWithBalls];
+Options[mOpenVDBFillWithBalls] = Options[OpenVDBFillWithBalls];
 
 
-messageOpenVDBFillWithBalls[args___] /; !CheckArguments[OpenVDBFillWithBalls[args], {2, 3}] = $Failed;
+mOpenVDBFillWithBalls[expr_, ___] /; messageScalarGridQ[expr, OpenVDBFillWithBalls] = $Failed;
 
 
-messageOpenVDBFillWithBalls[expr_, ___] /; messageScalarGridQ[expr, OpenVDBFillWithBalls] = $Failed;
-
-
-messageOpenVDBFillWithBalls[vdb_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] := 
+mOpenVDBFillWithBalls[vdb_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] := 
 	(
 		Message[OpenVDBFillWithBalls::intpm, HoldForm[OpenVDBFillWithBalls[vdb, expr, rest]], 2];
 		$Failed
 	)
 
 
-messageOpenVDBFillWithBalls[vdb_, n_, rspec_List -> regime_, args___] := invalidRegimeSpecQ[regime, OpenVDBFillWithBalls] || messageOpenVDBFillWithBalls[vdb, n, rspec, args]
+mOpenVDBFillWithBalls[vdb_, n_, rspec_List -> regime_, args___] := invalidRegimeSpecQ[regime, OpenVDBFillWithBalls] || mOpenVDBFillWithBalls[vdb, n, rspec, args]
 
 
-messageOpenVDBFillWithBalls[vdb_, n_, rspec_, rest___] /; !MatchQ[rspec, {a_, b_} /; 0 <= a <= b] := 
+mOpenVDBFillWithBalls[vdb_, n_, rspec_, rest___] /; !MatchQ[rspec, {a_, b_} /; 0 <= a <= b] := 
 	(
 		Message[OpenVDBFillWithBalls::rspec, 3, HoldForm[OpenVDBFillWithBalls[vdb, n, rspec, rest]]];
 		$Failed
 	)
 
 
-messageOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
+mOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
 	(
 		If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBFillWithBalls], 
 			Return[$Failed]
@@ -502,7 +514,7 @@ messageOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
 	)
 
 
-messageOpenVDBFillWithBalls[___] = $Failed;
+mOpenVDBFillWithBalls[___] = $Failed;
 
 
 OpenVDBFillWithBalls::rspec = "A list of two increasing non\[Hyphen]negative radii expected at position `1` in `2`.";
@@ -519,9 +531,6 @@ OpenVDBFillWithBalls::seedcnt = "The setting for \"SeedCount\" should either be 
 
 
 Options[messageCPTFunction] = Options[OpenVDBMember];
-
-
-messageCPTFunction[head_, args___] /; !CheckArguments[head[args], 2] = $Failed;
 
 
 messageCPTFunction[head_, expr_, ___] /; messageScalarGridQ[expr, head] = $Failed;
