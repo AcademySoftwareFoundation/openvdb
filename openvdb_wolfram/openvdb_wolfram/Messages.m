@@ -15,22 +15,22 @@
 Package["OpenVDBLink`"]
 
 
-PackageExport["messageGridQ"]
-PackageExport["messageScalarGridQ"]
-PackageExport["messageNonMaskGridQ"]
+PackageScope["messageGridQ"]
+PackageScope["messageScalarGridQ"]
+PackageScope["messageNonMaskGridQ"]
 
 
-PackageExport["messageCoordinateSpecQ"]
-PackageExport["messagRegimeSpecQ"]
+PackageScope["messageCoordinateSpecQ"]
+PackageScope["messagRegimeSpecQ"]
 
 
-PackageExport["messageZSpecQ"]
-PackageExport["messageZSliceQ"]
-PackageExport["message2DBBoxQ"]
-PackageExport["message3DBBoxQ"]
+PackageScope["messageZSpecQ"]
+PackageScope["messageZSliceQ"]
+PackageScope["message2DBBoxQ"]
+PackageScope["message3DBBoxQ"]
 
 
-PackageExport["messageIsoValueQ"]
+PackageScope["messageIsoValueQ"]
 
 
 (* ::Section:: *)
