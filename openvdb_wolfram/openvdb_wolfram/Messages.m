@@ -24,7 +24,7 @@ PackageScope["messageNonEmptyGridQ"]
 
 
 PackageScope["messageCoordinateSpecQ"]
-PackageScope["messagRegimeSpecQ"]
+PackageScope["messageRegimeSpecQ"]
 
 
 PackageScope["messageZSpecQ"]
@@ -247,7 +247,7 @@ General::empty = "`1` does not support empty grids.";
 (*Main*)
 
 
-messageCoordinateSpecQ[expr_ -> regime_, head_] := messagRegimeSpecQ[regime, head] || messageCoordinateSpecQ[expr, head];
+messageCoordinateSpecQ[expr_ -> regime_, head_] := messageRegimeSpecQ[regime, head] || messageCoordinateSpecQ[expr, head];
 
 
 messageCoordinateSpecQ[expr_, head_] :=
@@ -266,17 +266,17 @@ General::coord = "`1` is not a 3D coordinate or collection of 3D coordinates.";
 
 
 (* ::Subsection::Closed:: *)
-(*messagRegimeSpecQ*)
+(*messageRegimeSpecQ*)
 
 
 (* ::Subsubsection::Closed:: *)
 (*Main*)
 
 
-messagRegimeSpecQ[_?regimeQ, _] = False;
+messageRegimeSpecQ[_?regimeQ, _] = False;
 
 
-messagRegimeSpecQ[expr_, head_] := (Message[head::gridspace, expr];True)
+messageRegimeSpecQ[expr_, head_] := (Message[head::gridspace, expr];True)
 
 
 (* ::Subsubsection::Closed:: *)
@@ -298,7 +298,7 @@ General::gridspace = "`1` is not one of \"Index\" or \"World\".";
 (*Main*)
 
 
-messageZSpecQ[zspec_List -> regime_, head_] := messagRegimeSpecQ[regime, head] || messageZSpecQ[zspec, head]
+messageZSpecQ[zspec_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || messageZSpecQ[zspec, head]
 
 
 messageZSpecQ[zspec_, head_] := 
@@ -327,7 +327,7 @@ General::zspec = "`1` does not represent valid z\[Hyphen]bounds.";
 (*Main*)
 
 
-messageZSliceQ[z_List -> regime_, head_] := messagRegimeSpecQ[regime, head] || messageZSliceQ[z, head]
+messageZSliceQ[z_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || messageZSliceQ[z, head]
 
 
 messageZSliceQ[z_, head_] := 
@@ -352,11 +352,11 @@ General::zslice = "`1` does not represent a valid z\[Hyphen]slice.";
 (*message2DBBoxQ*)
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Main*)
 
 
-message2DBBoxQ[bbox_List -> regime_, head_] := messagRegimeSpecQ[regime, head] || message2DBBoxQ[bbox, head]
+message2DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || message2DBBoxQ[bbox, head]
 
 
 message2DBBoxQ[bbox_, head_] := 
@@ -370,7 +370,7 @@ message2DBBoxQ[bbox_, head_] :=
 message2DBBoxQ[___] = False;
 
 
-(* ::Subsubsection:: *)
+(* ::Subsubsection::Closed:: *)
 (*Messages*)
 
 
@@ -385,7 +385,7 @@ General::bbox2d = "`1` does not represent valid 2D bunding box.";
 (*Main*)
 
 
-message3DBBoxQ[bbox_List -> regime_, head_] := messagRegimeSpecQ[regime, head] || message3DBBoxQ[bbox, head]
+message3DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || message3DBBoxQ[bbox, head]
 
 
 message3DBBoxQ[bbox_, head_] := 

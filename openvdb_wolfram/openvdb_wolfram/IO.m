@@ -35,13 +35,29 @@ OpenVDBExport::usage = "OpenVDBExport[\"file.vdb\", expr] exports data from an O
 (*Main*)
 
 
-OpenVDBImport[File[file_String], args___] := OpenVDBImport[file, args]
+OpenVDBImport[args__] /; !CheckArguments[OpenVDBImport[args], {1, 3}] = $Failed;
 
 
-OpenVDBImport[file_String] := OpenVDBImport[file, Automatic]
+OpenVDBImport[args___] :=
+	With[{res = iOpenVDBImport[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] := 
+OpenVDBImport[args___] := mOpenVDBImport[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBImport*)
+
+
+iOpenVDBImport[File[file_String], args___] := iOpenVDBImport[file, args]
+
+
+iOpenVDBImport[file_String] := iOpenVDBImport[file, Automatic]
+
+
+iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] := 
 	Block[{name, type, vdb, id, successQ},
 		name = If[StringQ[iname], iname, ""];
 		type = If[itype === Automatic, detectVDBType[file, name], itype];
@@ -56,7 +72,7 @@ OpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
 	]
 
 
-OpenVDBImport[___] = $Failed;
+iOpenVDBImport[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -91,6 +107,33 @@ detectVDBType[file_, name_] :=
 detectVDBType[___] = $Failed;
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBImport[expr_, ___] /; !FileExistsQ[expr] :=
+	(
+		Message[OpenVDBImport::nffil, expr, Import];
+		$Failed
+	)
+
+
+mOpenVDBImport[expr_, _, type_, ___] /; type =!= Automatic && !MemberQ[$gridTypeList, type] :=
+	(
+		Message[OpenVDBImport::type, type];
+		$Failed
+	)
+
+
+mOpenVDBImport[___] = $Failed;
+
+
+OpenVDBImport::nffil = "File `1` not found during `2`.";
+
+
+OpenVDBImport::type = "`1` is not a supported grid type. Evaluate OpenVDBGridTypes[] to see the list of supported types."
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBExport*)
 
@@ -102,10 +145,29 @@ detectVDBType[___] = $Failed;
 Options[OpenVDBExport] = {OverwriteTarget -> False};
 
 
-OpenVDBExport[File[file_String], args___] := OpenVDBExport[file, args]
+OpenVDBExport[args__] /; !CheckArguments[OpenVDBExport[args], {1, 2}] = $Failed;
 
 
-OpenVDBExport[file_String, vdb_?OpenVDBGridQ] := 
+OpenVDBExport[args___] :=
+	With[{res = iOpenVDBExport[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBExport[args___] := mOpenVDBExport[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBExport*)
+
+
+Options[iOpenVDBExport] = Options[OpenVDBExport];
+
+
+iOpenVDBExport[File[file_String], args___] := iOpenVDBExport[file, args]
+
+
+iOpenVDBExport[file_String, vdb_?OpenVDBGridQ, OptionsPattern[]] := 
 	If[fileExportQ[file, OptionValue[OverwriteTarget]],		
 		vdb["exportVDB"[file]];
 		file,
@@ -113,14 +175,14 @@ OpenVDBExport[file_String, vdb_?OpenVDBGridQ] :=
 	]
 
 
-OpenVDBExport[___] = $Failed;
+iOpenVDBExport[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBExport, 2];
+registerForLevelSet[iOpenVDBExport, 2];
 
 
 SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
@@ -130,4 +192,35 @@ SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
 (*fileExportQ*)
 
 
-fileExportQ[filename_, overwriteQ_] := !FileExistsQ[filename] || TrueQ[overwriteQ];
+fileExportQ[filename_, overwriteQ_] := 
+	If[!FileExistsQ[filename],
+		True,
+		If[TrueQ[overwriteQ],
+			True,
+			Message[OpenVDBExport::filex, filename];
+			False
+		]
+	 ];
+
+
+OpenVDBExport::filex = "Cannot overwrite existing file `1`.";
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBExport[expr_, ___] /; !MatchQ[expr, File[_String]|_String] :=
+	(
+		Message[OpenVDBExport::chtype, expr];
+		$Failed
+	)
+
+
+mOpenVDBExport[_, expr_, ___] /; messageGridQ[expr, OpenVDBExport] = $Failed;
+
+
+mOpenVDBExport[___] = $Failed;
+
+
+OpenVDBExport::chtype = "First argument `1` is not a valid file specification.";

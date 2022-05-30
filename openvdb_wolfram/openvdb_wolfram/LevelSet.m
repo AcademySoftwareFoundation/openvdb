@@ -32,13 +32,32 @@ OpenVDBLevelSet::usage = "OpenVDBLevelSet[reg] creates a signed distance level s
 Options[OpenVDBLevelSet] = {"Creator" :> $OpenVDBCreator, "Name" -> None, "ScalarType" -> "Float"};
 
 
-OpenVDBLevelSet[expr_, opts:OptionsPattern[]] := OpenVDBLevelSet[expr, $OpenVDBSpacing, $OpenVDBHalfWidth, opts]
+OpenVDBLevelSet[args__] /; !CheckArguments[OpenVDBLevelSet[args], {1, 3}] = $Failed;
 
 
-OpenVDBLevelSet[expr_, spacing_?Positive, opts:OptionsPattern[]] := OpenVDBLevelSet[expr, spacing, $OpenVDBHalfWidth, opts]
+OpenVDBLevelSet[args___] :=
+	With[{res = pOpenVDBLevelSet[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBLevelSet[expr_, spacing_?Positive, width_?Positive, OptionsPattern[]] :=
+OpenVDBLevelSet[args___] := mOpenVDBLevelSet[args]
+
+
+(* ::Subsection::Closed:: *)
+(*pOpenVDBLevelSet*)
+
+
+Options[pOpenVDBLevelSet] = Options[OpenVDBLevelSet];
+
+
+pOpenVDBLevelSet[expr_, opts:OptionsPattern[]] := pOpenVDBLevelSet[expr, $OpenVDBSpacing, $OpenVDBHalfWidth, opts]
+
+
+pOpenVDBLevelSet[expr_, spacing_?Positive, opts:OptionsPattern[]] := pOpenVDBLevelSet[expr, spacing, $OpenVDBHalfWidth, opts]
+
+
+pOpenVDBLevelSet[expr_, spacing_?Positive, width_?Positive, OptionsPattern[]] :=
 	Block[{reg, type, vdb},
 		reg = processSDFInput[expr];
 		type = OptionValue["ScalarType"];
@@ -56,7 +75,7 @@ OpenVDBLevelSet[expr_, spacing_?Positive, width_?Positive, OptionsPattern[]] :=
 	]
 
 
-OpenVDBLevelSet[___] = $Failed;
+pOpenVDBLevelSet[___] = $Failed;
 
 
 (* ::Subsection::Closed:: *)
@@ -343,6 +362,73 @@ iOpenVDBLevelSet[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBLevelSet] = {"ArgumentsPattern" -> {_, _., _., OptionsPattern[]}};
+
+
+(* ::Subsection::Closed:: *)
+(*Messages*)
+
+
+Options[mOpenVDBLevelSet] = Options[OpenVDBLevelSet];
+
+
+mOpenVDBLevelSet[expr_, ___] /; !validToLevelSetQ[expr] :=
+	(
+		Message[OpenVDBLevelSet::reg, expr, 1];
+		$Failed
+	)
+
+
+mOpenVDBLevelSet[_, OptionsPattern[]] /; !TrueQ[$OpenVDBSpacing > 0] :=
+	(
+		Message[OpenVDBLevelSet::novoxsz];
+		$Failed
+	)
+
+
+mOpenVDBLevelSet[_, _., OptionsPattern[]] /; !TrueQ[$OpenVDBHalfWidth > 0] :=
+	(
+		Message[OpenVDBLevelSet::nowidth];
+		$Failed
+	)
+
+
+mOpenVDBLevelSet[_, vx_, ___] /; !TrueQ[vx > 0] && !OptionQ[vx] :=
+	(
+		Message[OpenVDBLevelSet::nonpos, vx, 2];
+		$Failed
+	)
+
+
+mOpenVDBLevelSet[_, _, w_, ___] /; !TrueQ[w > 0] && !OptionQ[w] :=
+	(
+		Message[OpenVDBLevelSet::nonpos, w, 3];
+		$Failed
+	)
+
+
+mOpenVDBLevelSet[__, OptionsPattern[]] :=
+	Block[{validQ = validScalarTypeQ[OptionValue["ScalarType"]]},
+		(
+			Message[OpenVDBLevelSet::nonscalar, OptionValue["ScalarType"]];
+			$Failed
+		) /; !validQ
+	]
+
+
+mOpenVDBLevelSet[___] = $Failed;
+
+
+OpenVDBLevelSet::reg = "`1` at position `2` is not a constant 3D region.";
+
+
+OpenVDBLevelSet::novoxsz = "No grid spacing is provided since $OpenVDBSpacing is not a positive number.";
+OpenVDBLevelSet::nowidth = "No half band width is provided since $OpenVDBHalfWidth is not a positive number."
+
+
+OpenVDBLevelSet::nonpos = "`1` at position `2` is expected to be a positive number";
+
+
+OpenVDBLevelSet::nonscalar = "`1` is not a valid setting for \"ScalarType\". Evaluate OpenVDBGridTypes[\"Scalar\"] for a list of valid types.";
 
 
 (* ::Section:: *)
@@ -902,6 +988,28 @@ nestingDepths[np_Integer, adj_] :=
 		
 		df /@ Range[np]
 	]
+
+
+(* ::Subsection::Closed:: *)
+(*validToLevelSetQ*)
+
+
+validToLevelSetQ[reg_?RegionQ] := ConstantRegionQ[reg] && RegionEmbeddingDimension[reg] === 3
+
+
+validToLevelSetQ[{coords_?coordinatesQ, ocells:_List|_Polygon}] :=
+	With[{cells = stripPolygonCells[ocells]},
+		validTriangleCellsQ[cells, Length[coords]]
+	]
+
+
+validToLevelSetQ[{coords_?coordinatesQ, ocells:_List|_Polygon|_Line, r_?Positive}] :=
+	With[{cells = stripLineCells[stripPolygonCells[ocells]]},
+		validTriangleCellsQ[cells, Length[coords]] || validLineCellsQ[cells, Length[coords]]
+	]
+
+
+validToLevelSetQ[___] = False;
 
 
 (* ::Subsection::Closed:: *)
