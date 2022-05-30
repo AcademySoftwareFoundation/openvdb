@@ -21,6 +21,7 @@ PackageScope["messageLevelSetGridQ"]
 PackageScope["messageNonMaskGridQ"]
 PackageScope["messagePixelGridQ"]
 PackageScope["messageNonEmptyGridQ"]
+PackageScope["messageSameGridTypeQ"]
 
 
 PackageScope["messageCoordinateSpecQ"]
@@ -233,6 +234,36 @@ messageNonEmptyGridQ[___] = False;
 
 
 General::empty = "`1` does not support empty grids.";
+
+
+(* ::Subsection::Closed:: *)
+(*messageSameGridTypeQ*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+messageSameGridTypeQ[args___, head_] :=
+	Block[{grids},
+		grids = Select[{args}, OpenVDBGridQ];
+		If[TrueQ[$OpenVDBSpacing > 0] && Length[grids] =!= Length[{args}],
+			AppendTo[grids, OpenVDBCreateGrid[1.0, "Float"]]
+		];
+		
+		If[Not[sameGridTypeQ @@ grids],
+			Message[head::types];
+			True,
+			False
+		]
+	]
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+General::types = "All grids are not of the same type.";
 
 
 (* ::Section:: *)

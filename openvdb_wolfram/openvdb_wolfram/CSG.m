@@ -52,7 +52,26 @@ OpenVDBClip::usage = "OpenVDBClip[expr, bds] clips an OpenVDB grid over bounds b
 Options[OpenVDBUnion] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBUnion[OptionsPattern[]] := 
+OpenVDBUnion[args___] /; !CheckArguments[OpenVDBUnion[args], {0, \[Infinity]}] = $Failed;
+
+
+OpenVDBUnion[args___] :=
+	With[{res = iOpenVDBUnion[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBUnion[args___] := mOpenVDBUnion[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBUnion*)
+
+
+Options[iOpenVDBUnion] = Options[OpenVDBUnion];
+
+
+iOpenVDBUnion[OptionsPattern[]] := 
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -64,7 +83,7 @@ OpenVDBUnion[OptionsPattern[]] :=
 	]
 
 
-OpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	Block[{ivdb},
 		ivdb = OpenVDBCreateGrid[vdb];
 		ivdb["gridUnionCopy"[{vdb, vdbs}[[All, 1]]]];
@@ -75,17 +94,24 @@ OpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridType
 	]
 
 
-OpenVDBUnion[___] = $Failed;
+iOpenVDBUnion[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBUnion];
+registerForLevelSet[iOpenVDBUnion];
 
 
 SyntaxInformation[OpenVDBUnion] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBUnion[args___] := messageBooleanFunction[OpenVDBUnion, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -99,7 +125,26 @@ SyntaxInformation[OpenVDBUnion] = {"ArgumentsPattern" -> {___, OptionsPattern[]}
 Options[OpenVDBIntersection] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBIntersection[OptionsPattern[]] := 
+OpenVDBIntersection[args___] /; !CheckArguments[OpenVDBIntersection[args], {0, \[Infinity]}] = $Failed;
+
+
+OpenVDBIntersection[args___] :=
+	With[{res = iOpenVDBIntersection[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBIntersection[args___] := mOpenVDBIntersection[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBIntersection*)
+
+
+Options[iOpenVDBIntersection] = Options[OpenVDBIntersection];
+
+
+iOpenVDBIntersection[OptionsPattern[]] := 
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -111,7 +156,7 @@ OpenVDBIntersection[OptionsPattern[]] :=
 	]
 
 
-OpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	Block[{ivdb},
 		ivdb = OpenVDBCreateGrid[{vdb}[[1]]];
 		ivdb["gridIntersectionCopy"[{vdb, vdbs}[[All, 1]]]];
@@ -122,17 +167,24 @@ OpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameG
 	]
 
 
-OpenVDBIntersection[___] = $Failed;
+iOpenVDBIntersection[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBIntersection];
+registerForLevelSet[iOpenVDBIntersection];
 
 
 SyntaxInformation[OpenVDBIntersection] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBIntersection[args___] := messageBooleanFunction[OpenVDBIntersection, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -146,7 +198,26 @@ SyntaxInformation[OpenVDBIntersection] = {"ArgumentsPattern" -> {___, OptionsPat
 Options[OpenVDBDifference] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBDifference[OptionsPattern[]] := 
+OpenVDBDifference[args___] /; !CheckArguments[OpenVDBDifference[args], {0, \[Infinity]}] = $Failed;
+
+
+OpenVDBDifference[args___] :=
+	With[{res = iOpenVDBDifference[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBDifference[args___] := mOpenVDBDifference[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBDifference*)
+
+
+Options[iOpenVDBDifference] = Options[OpenVDBDifference];
+
+
+iOpenVDBDifference[OptionsPattern[]] := 
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -158,7 +229,7 @@ OpenVDBDifference[OptionsPattern[]] :=
 	]
 
 
-OpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -166,9 +237,9 @@ OpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-OpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	Block[{union, vdbdiff},
-		union = iOpenVDBUnion[vdbs];
+		union = vdbUnion[vdbs];
 		(
 			vdbdiff = OpenVDBCreateGrid[vdb];
 			vdbdiff["gridDifferenceCopy"[vdb[[1]], union[[1]]]];
@@ -181,14 +252,14 @@ OpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGrid
 	]
 
 
-OpenVDBDifference[___] = $Failed;
+iOpenVDBDifference[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBDifference];
+registerForLevelSet[iOpenVDBDifference];
 
 
 SyntaxInformation[OpenVDBDifference] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
@@ -198,8 +269,15 @@ SyntaxInformation[OpenVDBDifference] = {"ArgumentsPattern" -> {___, OptionsPatte
 (*Utilities*)
 
 
-iOpenVDBUnion[vdb_] := vdb
-iOpenVDBUnion[vdbs__] := OpenVDBUnion[vdbs]
+vdbUnion[vdb_] := vdb
+vdbUnion[vdbs__] := iOpenVDBUnion[vdbs]
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBDifference[args___] := messageBooleanFunction[OpenVDBDifference, args]
 
 
 (* ::Section:: *)
@@ -217,7 +295,26 @@ iOpenVDBUnion[vdbs__] := OpenVDBUnion[vdbs]
 Options[OpenVDBUnionTo] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+OpenVDBUnionTo[args___] /; !CheckArguments[OpenVDBUnionTo[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBUnionTo[args___] :=
+	With[{res = iOpenVDBUnionTo[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBUnionTo[args___] := mOpenVDBUnionTo[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBUnionTo*)
+
+
+Options[iOpenVDBUnionTo] = Options[OpenVDBUnionTo];
+
+
+iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -225,7 +322,7 @@ OpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-OpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	(
 		Scan[vdb["gridUnion"[#]]&, {vdbs}[[All, 1]]];
 		
@@ -235,17 +332,24 @@ OpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTyp
 	)
 
 
-OpenVDBUnionTo[___] = $Failed;
+iOpenVDBUnionTo[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBUnionTo];
+registerForLevelSet[iOpenVDBUnionTo];
 
 
 SyntaxInformation[OpenVDBUnionTo] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBUnionTo[args___] := messageBooleanFunction[OpenVDBUnionTo, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -259,7 +363,26 @@ SyntaxInformation[OpenVDBUnionTo] = {"ArgumentsPattern" -> {_, ___, OptionsPatte
 Options[OpenVDBIntersectWith] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+OpenVDBIntersectWith[args___] /; !CheckArguments[OpenVDBIntersectWith[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBIntersectWith[args___] :=
+	With[{res = iOpenVDBIntersectWith[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBIntersectWith[args___] := mOpenVDBIntersectWith[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBIntersectWith*)
+
+
+Options[iOpenVDBIntersectWith] = Options[OpenVDBIntersectWith];
+
+
+iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -267,7 +390,7 @@ OpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-OpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	(
 		Scan[vdb["gridIntersection"[#]]&, {vdbs}[[All, 1]]];
 		
@@ -277,17 +400,24 @@ OpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameG
 	)
 
 
-OpenVDBIntersectWith[___] = $Failed;
+iOpenVDBIntersectWith[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBIntersectWith];
+registerForLevelSet[iOpenVDBIntersectWith];
 
 
 SyntaxInformation[OpenVDBIntersectWith] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBIntersectWith[args___] := messageBooleanFunction[OpenVDBIntersectWith, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -301,7 +431,26 @@ SyntaxInformation[OpenVDBIntersectWith] = {"ArgumentsPattern" -> {_, ___, Option
 Options[OpenVDBDifferenceFrom] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+OpenVDBDifferenceFrom[args___] /; !CheckArguments[OpenVDBDifferenceFrom[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBDifferenceFrom[args___] :=
+	With[{res = iOpenVDBDifferenceFrom[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBDifferenceFrom[args___] := mOpenVDBDifferenceFrom[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBDifferenceFrom*)
+
+
+Options[iOpenVDBDifferenceFrom] = Options[OpenVDBDifferenceFrom];
+
+
+iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -309,7 +458,7 @@ OpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-OpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
 	Block[{vdbunion},
 		vdbunion = OpenVDBUnionTo[vdbs];
 		(
@@ -322,17 +471,24 @@ OpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; same
 	]
 
 
-OpenVDBDifferenceFrom[___] = $Failed;
+iOpenVDBDifferenceFrom[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBDifferenceFrom];
+registerForLevelSet[iOpenVDBDifferenceFrom];
 
 
 SyntaxInformation[OpenVDBDifferenceFrom] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBDifferenceFrom[args___] := messageBooleanFunction[OpenVDBUnion, args]
 
 
 (* ::Section:: *)
@@ -350,7 +506,26 @@ SyntaxInformation[OpenVDBDifferenceFrom] = {"ArgumentsPattern" -> {_, ___, Optio
 Options[OpenVDBClip] = {"CloseBoundary" -> True, "Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBClip[vdb_?OpenVDBScalarGridQ, bspec_List -> regime_?regimeQ, opts:OptionsPattern[]] :=
+OpenVDBClip[args___] /; !CheckArguments[OpenVDBClip[args], 2] = $Failed;
+
+
+OpenVDBClip[args___] :=
+	With[{res = pOpenVDBClip[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBClip[args___] := mOpenVDBClip[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*pOpenVDBClip*)
+
+
+Options[pOpenVDBClip] = Options[OpenVDBClip];
+
+
+pOpenVDBClip[vdb_?OpenVDBScalarGridQ, bspec_List -> regime_?regimeQ, opts:OptionsPattern[]] :=
 	Block[{bds, closeQ, clip},
 		bds = parseClipBounds[vdb, bspec, regime];
 		closeQ = TrueQ[OptionValue["CloseBoundary"]];
@@ -367,17 +542,17 @@ OpenVDBClip[vdb_?OpenVDBScalarGridQ, bspec_List -> regime_?regimeQ, opts:Options
 	]
 
 
-OpenVDBClip[vdb_, bds_List, opts:OptionsPattern[]] := OpenVDBClip[vdb, bds -> $worldregime, opts]
+pOpenVDBClip[vdb_, bds_List, opts:OptionsPattern[]] := pOpenVDBClip[vdb, bds -> $worldregime, opts]
 
 
-OpenVDBClip[___] = $Failed;
+pOpenVDBClip[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBClip, 1];
+registerForLevelSet[pOpenVDBClip, 1];
 
 
 SyntaxInformation[OpenVDBClip] = {"ArgumentsPattern" -> {_, _, OptionsPattern[]}};
@@ -475,3 +650,43 @@ boundingBoxIntersection[bds_] :=
 		{Max[bds[[All, 2, 1]]], Min[bds[[All, 2, 2]]]},
 		{Max[bds[[All, 3, 1]]], Min[bds[[All, 3, 2]]]}
 	}
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBClip[expr_, ___] /; messageScalarGridQ[expr, OpenVDBClip] = $Failed;
+
+
+mOpenVDBClip[_, bbox_, ___] /; message3DBBoxQ[bbox, OpenVDBClip] = $Failed;
+
+
+mOpenVDBClip[___] = $Failed;
+
+
+(* ::Section:: *)
+(*Utilities*)
+
+
+(* ::Subsection::Closed:: *)
+(*messageBooleanFunction*)
+
+
+Options[messageBooleanFunction] = Options[OpenVDBUnion];
+
+
+messageBooleanFunction[head_, vdbs___, OptionsPattern[]] :=
+	Catch[
+		Do[
+			If[messageScalarGridQ[vdb, head], Throw[$Failed]], 
+			{vdb, {vdbs}}
+		];
+		
+		messageSameGridTypeQ[vdbs, head];
+		
+		$Failed
+	]
+
+
+messageBooleanFunction[___] = $Failed;

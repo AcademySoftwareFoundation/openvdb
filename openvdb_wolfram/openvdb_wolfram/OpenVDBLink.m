@@ -913,6 +913,7 @@ tryToLevelSet[___] := $Failed
 
 
 tryOpenVDBLevelSet[vdb_?OpenVDBScalarGridQ] := vdb
+tryOpenVDBLevelSet[_?OpenVDBGridQ] = $Failed;
 tryOpenVDBLevelSet[{file_String?FileExistsQ, name_}] := 
 	Block[{vdb},
 		vdb = OpenVDBImport[file, name];
@@ -926,7 +927,7 @@ tryOpenVDBLevelSet[{File[file_], name_}] := tryOpenVDBLevelSet[{file, name}]
 tryOpenVDBLevelSet[File[file_]] := tryOpenVDBLevelSet[{file, Automatic}]
 tryOpenVDBLevelSet[opt_?OptionQ] := opt
 tryOpenVDBLevelSet[expr_] := 
-	With[{res = OpenVDBLevelSet[expr]},
+	With[{res = Quiet @ OpenVDBLevelSet[expr]},
 		res /; OpenVDBScalarGridQ[res]
 	]
 tryOpenVDBLevelSet[___] = $Failed;

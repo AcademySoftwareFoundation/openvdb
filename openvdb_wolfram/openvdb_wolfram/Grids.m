@@ -171,22 +171,38 @@ SyntaxInformation[OpenVDBGridQ] = {"ArgumentsPattern" -> {_}};
 (*Main*)
 
 
-OpenVDBGrids[] := OpenVDBGrids[Automatic]
+OpenVDBGrids[args___] /; !CheckArguments[OpenVDBImage3D[args], {0, 1}] = $Failed;
 
 
-OpenVDBGrids[Automatic] := Select[OpenVDBGrids[All], Length[#] > 0&]
-
-
-OpenVDBGrids[All] := 
-	With[{typesnoaliases = Join @@ Keys /@ $GridClassData},
-		Association[# -> OpenVDBGrids[#]& /@ typesnoaliases]
+OpenVDBGrids[args___] :=
+	With[{res = iOpenVDBGrids[args]},
+		res /; res =!= $Failed
 	]
 
 
-OpenVDBGrids[type_String?aliasTypeQ] := OpenVDBGrids[resolveAliasType[type]]
+OpenVDBGrids[args___] := mOpenVDBGrids[args]
 
 
-OpenVDBGrids[type_String] :=
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBGrids*)
+
+
+iOpenVDBGrids[] := iOpenVDBGrids[Automatic]
+
+
+iOpenVDBGrids[Automatic] := Select[iOpenVDBGrids[All], Length[#] > 0&]
+
+
+iOpenVDBGrids[All] := 
+	With[{typesnoaliases = Join @@ Keys /@ $GridClassData},
+		Association[# -> iOpenVDBGrids[#]& /@ typesnoaliases]
+	]
+
+
+iOpenVDBGrids[type_String?aliasTypeQ] := iOpenVDBGrids[resolveAliasType[type]]
+
+
+iOpenVDBGrids[type_String] :=
 	Block[{gridlist},
 		gridlist = Quiet @ LExpressionList[typeGridName[type]];
 		
@@ -197,13 +213,13 @@ OpenVDBGrids[type_String] :=
 	]
 
 
-OpenVDBGrids[types:{___String}] := 
-	With[{grids = OpenVDBGrids /@ types},
+iOpenVDBGrids[types:{___String}] := 
+	With[{grids = iOpenVDBGrids /@ types},
 		AssociationThread[types, grids] /; FreeQ[grids, $Failed]
 	]
 
 
-OpenVDBGrids[___] = $Failed;
+iOpenVDBGrids[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -216,6 +232,34 @@ SyntaxInformation[OpenVDBGrids] = {"ArgumentsPattern" -> {_.}};
 addCodeCompletion[OpenVDBGrids][$gridTypeList];
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBGrids[Automatic|All] = $Failed;
+
+
+mOpenVDBGrids[expr_List] /; Complement[expr, OpenVDBGridTypes[]] =!= {} :=
+	(
+		Message[OpenVDBGrids::type2, expr];
+		$Failed
+	)
+
+
+mOpenVDBGrids[expr_] /; !MemberQ[OpenVDBGridTypes[], expr] :=
+	(
+		Message[OpenVDBGrids::type, expr];
+		$Failed
+	)
+
+
+mOpenVDBGrids[___] = $Failed;
+
+
+OpenVDBGrids::type = "`1` is not a supported grid type. Evaluate OpenVDBGridTypes[] to see the list of supported types.";
+OpenVDBGrids::type2 = "`1` is not a list of supported grid types. Evaluate OpenVDBGridTypes[] to see the list of supported types.";
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBGridTypes*)
 
@@ -224,16 +268,32 @@ addCodeCompletion[OpenVDBGrids][$gridTypeList];
 (*Main*)
 
 
-Scan[(OpenVDBGridTypes[#] = Join[DeleteMissing[Values[$GridClassData[#]][[All, "Alias"]]], Keys[$GridClassData[#]]])&, $classTypeList]
+OpenVDBGridTypes[args___] /; !CheckArguments[OpenVDBImage3D[args], {0, 1}] = $Failed;
 
 
-OpenVDBGridTypes[All] = $gridTypeList;
+OpenVDBGridTypes[args___] :=
+	With[{res = iOpenVDBGridTypes[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBGridTypes[] = OpenVDBGridTypes[All];
+OpenVDBGridTypes[args___] := mOpenVDBGridTypes[args]
 
 
-OpenVDBGridTypes[___] = $Failed;
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBGridTypes*)
+
+
+Scan[(iOpenVDBGridTypes[#] = Join[DeleteMissing[Values[$GridClassData[#]][[All, "Alias"]]], Keys[$GridClassData[#]]])&, $classTypeList]
+
+
+iOpenVDBGridTypes[All] = $gridTypeList;
+
+
+iOpenVDBGridTypes[] = iOpenVDBGridTypes[All];
+
+
+iOpenVDBGridTypes[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -244,6 +304,26 @@ SyntaxInformation[OpenVDBGridTypes] = {"ArgumentsPattern" -> {_.}};
 
 
 addCodeCompletion[OpenVDBGridTypes][$classTypeList];
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBGridTypes[All] = $Failed;
+
+
+mOpenVDBGridTypes[expr_] /; !MemberQ[$classTypeList, expr] :=
+	(
+		Message[OpenVDBGridTypes::type, expr];
+		$Failed
+	)
+
+
+mOpenVDBGridTypes[___] = $Failed;
+
+
+OpenVDBGrids::type = "`1` is not a supported family of grids.";
 
 
 (* ::Section:: *)
@@ -370,32 +450,51 @@ SyntaxInformation[OpenVDBMaskGridQ] = {"ArgumentsPattern" -> {_}};
 Options[OpenVDBCreateGrid] = {"BackgroundValue" -> Automatic, "Creator" :> $OpenVDBCreator, "GridClass" -> None, "Name" -> None};
 
 
-OpenVDBCreateGrid[opts:OptionsPattern[]] := OpenVDBCreateGrid[$OpenVDBSpacing, $gridTypeList[[1]], opts]
+OpenVDBCreateGrid[args___] /; !CheckArguments[OpenVDBCreateGrid[args], {0, 2}] = $Failed;
 
 
-OpenVDBCreateGrid[spacing_?Positive, opts:OptionsPattern[]] := OpenVDBCreateGrid[spacing, $gridTypeList[[1]], opts]
+OpenVDBCreateGrid[args___] :=
+	With[{res = iOpenVDBCreateGrid[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] := 
+OpenVDBCreateGrid[args___] := mOpenVDBCreateGrid[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBCreateGrid*)
+
+
+Options[iOpenVDBCreateGrid] = Options[OpenVDBCreateGrid];
+
+
+iOpenVDBCreateGrid[opts:OptionsPattern[]] := iOpenVDBCreateGrid[$OpenVDBSpacing, $gridTypeList[[1]], opts]
+
+
+iOpenVDBCreateGrid[spacing_?Positive, opts:OptionsPattern[]] := iOpenVDBCreateGrid[spacing, $gridTypeList[[1]], opts]
+
+
+iOpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] := 
 	Block[{vdb = newVDB[type]},
 		(
-			iOpenVDBCreate[vdb, "VoxelSize" -> spacing, opts]
+			setVDBProperties[vdb, "VoxelSize" -> spacing, opts]
 		
 		) /; OpenVDBGridQ[vdb]
 	]
 
 
-OpenVDBCreateGrid[ovdb_?OpenVDBGridQ, opts:OptionsPattern[]] := 
+iOpenVDBCreateGrid[ovdb_?OpenVDBGridQ, opts:OptionsPattern[]] := 
 	Block[{vdb = newVDB[ovdb[[2]]], vdbprops},
 		vdbprops = OpenVDBProperty[ovdb, {"VoxelSize", "BackgroundValue", "Creator", "GridClass", "Name"}, "RuleList"];
 		(
-			iOpenVDBCreate[vdb, opts, Sequence @@ vdbprops]
+			setVDBProperties[vdb, opts, Sequence @@ vdbprops]
 		
 		) /; OpenVDBGridQ[vdb]
 	]
 
 
-OpenVDBCreateGrid[___] = $Failed;
+iOpenVDBCreateGrid[___] = $Failed;
 
 
 newVDB[type_?aliasTypeQ] := newVDB[resolveAliasType[type]]
@@ -411,13 +510,13 @@ newVDB[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
-(*iOpenVDBCreate*)
+(*setVDBProperties*)
 
 
-Options[iOpenVDBCreate] = Join[Options[OpenVDBCreateGrid], {"VoxelSize" :> $OpenVDBSpacing}];
+Options[setVDBProperties] = Join[Options[OpenVDBCreateGrid], {"VoxelSize" :> $OpenVDBSpacing}];
 
 
-iOpenVDBCreate[vdb_, OptionsPattern[]] :=
+setVDBProperties[vdb_, OptionsPattern[]] :=
 	Block[{bg, creator, gclass, name, spacing},
 		bg = OptionValue["BackgroundValue"];
 		creator = OptionValue["Creator"];
@@ -450,6 +549,44 @@ SyntaxInformation[OpenVDBCreateGrid] = {"ArgumentsPattern" -> {_., _., OptionsPa
 addCodeCompletion[OpenVDBCreateGrid][None, $gridTypeList];
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+Options[mOpenVDBCreateGrid] = Options[OpenVDBCreateGrid];
+
+
+mOpenVDBCreateGrid[OptionsPattern[]] /; !TrueQ[$OpenVDBSpacing > 0] := 
+	(
+		Message[OpenVDBCreateGrid::novoxsz];
+		$Failed
+	);
+
+
+mOpenVDBCreateGrid[vx_, ___] /; !TrueQ[vx > 0] && !OptionQ[vx] :=
+	(
+		Message[OpenVDBCreateGrid::nonpos, vx, 1];
+		$Failed
+	)
+
+
+mOpenVDBCreateGrid[_, type_, ___] /; !MemberQ[$gridTypeList, type] && !OptionQ[type] :=
+	(
+		Message[OpenVDBCreateGrid::type, type];
+		$Failed
+	)
+
+
+mOpenVDBCreateGrid[___] = $Failed;
+
+
+OpenVDBCreateGrid::novoxsz = "No grid spacing is provided since $OpenVDBSpacing is not a positive number.";
+OpenVDBCreateGrid::nonpos = "`1` at position `2` is expected to be a positive number";
+
+
+OpenVDBCreateGrid::type = "`1` is not a supported grid type. Evaluate OpenVDBGridTypes[] to see the list of supported types."
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBDeleteGrid*)
 
@@ -458,17 +595,33 @@ addCodeCompletion[OpenVDBCreateGrid][None, $gridTypeList];
 (*Main*)
 
 
-SetAttributes[OpenVDBDeleteGrid, Listable];
+OpenVDBDeleteGrid[args___] /; !CheckArguments[OpenVDBDeleteGrid[args], 1] = $Failed;
 
 
-OpenVDBDeleteGrid[vdb_?OpenVDBGridQ] := 
+OpenVDBDeleteGrid[args___] :=
+	With[{res = iOpenVDBDeleteGrid[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBDeleteGrid[args___] := mOpenVDBDeleteGrid[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBDeleteGrid*)
+
+
+SetAttributes[iOpenVDBDeleteGrid, Listable];
+
+
+iOpenVDBDeleteGrid[vdb_?OpenVDBGridQ] := 
 	(
 		vdb["createEmptyGrid"[]];
 		vdb
 	)
 
 
-OpenVDBDeleteGrid[___] = $Failed;
+iOpenVDBDeleteGrid[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -476,6 +629,23 @@ OpenVDBDeleteGrid[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBDeleteGrid] = {"ArgumentsPattern" -> {_}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBDeleteGrid[expr_] /; !OpenVDBGridQ[expr] && !VectorQ[expr, OpenVDBGridQ] :=
+	(
+		Message[OpenVDBDeleteGrid::grids, expr];
+		$Failed
+	)
+
+
+mOpenVDBDeleteGrid[___] = $Failed;
+
+
+OpenVDBDeleteGrid::grids = "`1` is not a grid or list of grids.";
 
 
 (* ::Subsection::Closed:: *)
@@ -489,7 +659,26 @@ SyntaxInformation[OpenVDBDeleteGrid] = {"ArgumentsPattern" -> {_}};
 Options[OpenVDBCopyGrid] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] := 
+OpenVDBCopyGrid[args___] /; !CheckArguments[OpenVDBCopyGrid[args], 1] = $Failed;
+
+
+OpenVDBCopyGrid[args___] :=
+	With[{res = iOpenVDBCopyGrid[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBCopyGrid[args___] := mOpenVDBCopyGrid[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBCopyGrid*)
+
+
+Options[iOpenVDBCopyGrid] = Options[OpenVDBCopyGrid];
+
+
+iOpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] := 
 	Block[{vdbcopy},
 		vdbcopy = newVDB[vdb[[2]]];
 		(
@@ -503,7 +692,7 @@ OpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
 	]
 
 
-OpenVDBCopyGrid[___] = $Failed;
+iOpenVDBCopyGrid[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -511,6 +700,16 @@ OpenVDBCopyGrid[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBCopyGrid] = {"ArgumentsPattern" -> {_, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBCopyGrid[expr_, ___] /; messageGridQ[expr, OpenVDBCopyGrid, False] = $Failed;
+
+
+mOpenVDBCopyGrid[___] = $Failed;
 
 
 (* ::Section:: *)
@@ -530,8 +729,6 @@ $OpenVDBSpacing /: SetDelayed[$OpenVDBSpacing, expr_] :=
 		OwnValues[$OpenVDBSpacing] = {HoldPattern[$OpenVDBSpacing] :> With[{w = expr}, w /; Positive[w]]};
 	)
 
-$OpenVDBSpacing /: SetDelayed[$OpenVDBSpacing, _] = $Failed;
-
 
 $OpenVDBSpacing /: Set[$OpenVDBSpacing, w_?Positive] := 
 	(
@@ -539,7 +736,14 @@ $OpenVDBSpacing /: Set[$OpenVDBSpacing, w_?Positive] :=
 		w
 	)
 
-$OpenVDBSpacing /: Set[$OpenVDBSpacing, _] = $Failed;
+$OpenVDBSpacing /: Set[$OpenVDBSpacing, _] := 
+	(
+		Message[$OpenVDBSpacing::setpos];
+		$Failed
+	)
+
+
+$OpenVDBSpacing::setpos = "$OpenVDBSpacing must be set to a positive number.";
 
 
 (* ::Subsection::Closed:: *)
@@ -551,16 +755,21 @@ $OpenVDBHalfWidth /: SetDelayed[$OpenVDBHalfWidth, expr_] :=
 		OwnValues[$OpenVDBHalfWidth] = {HoldPattern[$OpenVDBHalfWidth] :> With[{w = expr}, w /; w >= 1.05]};
 	)
 
-$OpenVDBHalfWidth /: SetDelayed[$OpenVDBHalfWidth, _] = $Failed;
 
-
-$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, w_ /; w >= 1.05] := 
+$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, w_ /; w > 0] := 
 	(
 		OwnValues[$OpenVDBHalfWidth] = {HoldPattern[$OpenVDBHalfWidth] :> w};
 		w
 	)
 
-$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, _] = $Failed;
+$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, e_] := 
+	(
+		Message[$OpenVDBHalfWidth::setpos];
+		$Failed
+	);
+
+
+$OpenVDBHalfWidth::setpos = "$OpenVDBHalfWidth must be set to a positive number.";
 
 
 (* ::Text:: *)
@@ -581,8 +790,6 @@ $OpenVDBCreator /: SetDelayed[$OpenVDBCreator, expr_] :=
 		OwnValues[$OpenVDBCreator] = {HoldPattern[$OpenVDBCreator] :> With[{c = expr}, c /; StringQ[c] || c === None]};
 	)
 
-$OpenVDBCreator /: SetDelayed[$OpenVDBCreator, _] = $Failed;
-
 
 $OpenVDBCreator /: Set[$OpenVDBCreator, c_ /; StringQ[c] || c === None] := 
 	(
@@ -590,7 +797,14 @@ $OpenVDBCreator /: Set[$OpenVDBCreator, c_ /; StringQ[c] || c === None] :=
 		c
 	)
 
-$OpenVDBCreator /: Set[$OpenVDBCreator, _] = $Failed;
+$OpenVDBCreator /: Set[$OpenVDBCreator, _] := 
+	(
+		Message[$OpenVDBCreator::badset];
+		$Failed
+	);
+
+
+$OpenVDBCreator::badset = "$OpenVDBCreator must be set to a string or None.";
 
 
 If[!ValueQ[$OpenVDBCreator],

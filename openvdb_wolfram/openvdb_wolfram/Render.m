@@ -72,29 +72,16 @@ Options[OpenVDBLevelSetRender] = Join[
 ];
 
 
-OpenVDBLevelSetRender[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
-	With[{res = iLevelSetRender[vdb, shading, opts]},
-		res /; ImageQ[res]
+OpenVDBLevelSetRender[args__] /; !CheckArguments[OpenVDBLevelSetRender[args], {1, 2}] = $Failed;
+
+
+OpenVDBLevelSetRender[args___] :=
+	With[{res = iLevelSetRender[args]},
+		res /; res =!= $Failed
 	]
 
 
-OpenVDBLevelSetRender[vdb_, opts:OptionsPattern[]] := OpenVDBLevelSetRender[vdb, Automatic, opts]
-
-
-OpenVDBLevelSetRender[___] = $Failed;
-
-
-(* ::Subsection::Closed:: *)
-(*Argument conform & completion*)
-
-
-registerForLevelSet[OpenVDBLevelSetRender, 1];
-
-
-SyntaxInformation[OpenVDBLevelSetRender] = {"ArgumentsPattern" -> {_, _., OptionsPattern[]}};
-
-
-addCodeCompletion[OpenVDBLevelSetRender][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
+OpenVDBLevelSetRender[args___] := mLevelSetRender[args]
 
 
 (* ::Subsection::Closed:: *)
@@ -104,7 +91,7 @@ addCodeCompletion[OpenVDBLevelSetRender][None, Join[Keys[$renderColorThemes], $d
 Options[iLevelSetRender] = Options[OpenVDBLevelSetRender];
 
 
-iLevelSetRender[vdb_, shading_, opts:OptionsPattern[]] :=
+iLevelSetRender[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
 	Block[{ropts, res},
 		ropts = parseRenderOptions[vdb, shading, opts];
 		(
@@ -116,7 +103,23 @@ iLevelSetRender[vdb_, shading_, opts:OptionsPattern[]] :=
 	]
 
 
+iLevelSetRender[vdb_, opts:OptionsPattern[]] := iLevelSetRender[vdb, Automatic, opts]
+
+
 iLevelSetRender[___] = $Failed;
+
+
+(* ::Subsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+registerForLevelSet[iLevelSetRender, 1];
+
+
+SyntaxInformation[OpenVDBLevelSetRender] = {"ArgumentsPattern" -> {_, _., OptionsPattern[]}};
+
+
+addCodeCompletion[OpenVDBLevelSetRender][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
 
 
 (* ::Subsection::Closed:: *)
@@ -162,6 +165,13 @@ oLevelSetRender[vdb_, ropts_] :=
 oLevelSetRender[___] = $Failed;
 
 
+(* ::Subsection::Closed:: *)
+(*Messages*)
+
+
+mLevelSetRender[args___] := messageRenderFunction[OpenVDBLevelSetRender, args]
+
+
 (* ::Section:: *)
 (*OpenVDBLevelSetViewer*)
 
@@ -170,13 +180,29 @@ oLevelSetRender[___] = $Failed;
 (*Main*)
 
 
-Clear[OpenVDBLevelSetViewer]
-
-
 Options[OpenVDBLevelSetViewer] = Options[OpenVDBLevelSetRender];
 
 
-OpenVDBLevelSetViewer[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
+OpenVDBLevelSetViewer[args__] /; !CheckArguments[OpenVDBLevelSetViewer[args], {1, 2}] = $Failed;
+
+
+OpenVDBLevelSetViewer[args___] :=
+	With[{res = iLevelSetViewer[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBLevelSetViewer[args___] := mLevelSetViewer[args]
+
+
+(* ::Subsection::Closed:: *)
+(*iLevelSetViewer*)
+
+
+Options[iLevelSetViewer] = Options[OpenVDBLevelSetViewer];
+
+
+iLevelSetViewer[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
 	Block[{ropts, args, im},
 		ropts = parseRenderOptions[vdb, shading, opts];
 		(
@@ -186,17 +212,17 @@ OpenVDBLevelSetViewer[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] 
 	]
 
 
-OpenVDBLevelSetViewer[vdb_, opts:OptionsPattern[]] := OpenVDBLevelSetViewer[vdb, Automatic, opts]
+iLevelSetViewer[vdb_, opts:OptionsPattern[]] := iLevelSetViewer[vdb, Automatic, opts]
 
 
-OpenVDBLevelSetViewer[___] = $Failed;
+iLevelSetViewer[___] = $Failed;
 
 
 (* ::Subsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBLevelSetViewer, 1];
+registerForLevelSet[iLevelSetViewer, 1];
 
 
 SyntaxInformation[OpenVDBLevelSetViewer] = {"ArgumentsPattern" -> {_, _., OptionsPattern[]}};
@@ -519,6 +545,13 @@ zoomViewPoint[vp_, vc_, dz_, vv_, va_, bds_] :=
 	]
 
 
+(* ::Subsection::Closed:: *)
+(*Messages*)
+
+
+mLevelSetViewer[args___] := messageRenderFunction[OpenVDBLevelSetViewer, args]
+
+
 (* ::Section:: *)
 (*Utilities*)
 
@@ -546,7 +579,25 @@ $PBRrenderLevelSetArgumentKeys = {"IsoValue", "Background", "Translate", "LookAt
 Options[parseRenderOptions] = Join[Options[iLevelSetRender], {"BoundingBox" -> Automatic}];
 
 
-parseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
+parseRenderOptions[vdb_, shading_, opts:OptionsPattern[]] :=
+	Block[{res},
+		res = iparseRenderOptions[vdb, shading, opts];
+		
+		res /; AssociationQ[res] && NoneTrue[res, FailureQ]
+	]
+
+
+parseRenderOptions[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*iparseRenderOptions*)
+
+
+Options[iparseRenderOptions] = Options[parseRenderOptions];
+
+
+iparseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
 	Block[{bds, translate, lookat1, \[Alpha], lookat, up, transdist, depthdata, imgresolution, shader, ropts},
 		bds = parseBoundingBox[vdb, OptionValue["BoundingBox"]];
 		
@@ -562,7 +613,7 @@ parseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
 		depthdata = parseDepthParameters[shader];
 		imgresolution = parseRenderImageResolution[OptionValue[ImageResolution]];
 		
-		ropts = <|
+		<|
 			"Bounds" -> bds,
 			"IsoValue" -> parseIsoValue[OptionValue["IsoValue"]],
 			"Background" -> parseRenderBackgroundColor[OptionValue[Background], shader],
@@ -585,11 +636,35 @@ parseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
 			"BaseColorBack" -> parseRenderColor2[shader],
 			"BaseColorClosed" -> parseRenderColor3[shader],
 			"IsClosed" -> TrueQ[OptionValue["ClosedClipping"]]
-		|>;
-		
-		ropts /; NoneTrue[ropts, FailureQ]
+		|>
 	]
-parseRenderOptions[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*renderFailureOption*)
+
+
+renderFailureOption[assoc_] :=
+	(
+		If[FailureQ[assoc["Bounds"]], Return["BoundingBox"]];
+		If[FailureQ[assoc["IsoValue"]], Return["IsoValue"]];
+		
+		If[FailureQ[assoc["Shader"]], Return["Shader"]];
+		If[FailureQ[assoc["Background"]], Return[Background]];
+		
+		If[FailureQ[assoc["Translate"]], Return[ViewPoint]];
+		If[FailureQ[assoc["Up"]], Return[ViewVertical]];
+		If[FailureQ[assoc["FOV"]], Return[ViewAngle]];
+		If[FailureQ[assoc["LookAt"]], Return[ViewCenter]];
+		If[FailureQ[assoc["Range"]], Return[ViewRange]];
+		
+		If[FailureQ[assoc["Camera"]], Return[ViewProjection]];
+		If[FailureQ[assoc["Samples"]], Return[PerformanceGoal]];
+		If[FailureQ[assoc["ImageResolution"]], Return[ImageResolution]];
+		If[FailureQ[assoc["ImageSize"]], Return[ImageSize]];
+		
+		$Failed
+	)
 
 
 (* ::Subsubsection::Closed:: *)
@@ -1355,3 +1430,44 @@ materialParameters["Satin"] = <|
 
 
 $baseMaterials = Keys[materialParameters];
+
+
+(* ::Subsection::Closed:: *)
+(*messageRenderFunction*)
+
+
+Options[messageRenderFunction] = Options[OpenVDBLevelSetRender];
+
+
+messageRenderFunction[head_, expr_, ___] /; messageScalarGridQ[expr, head] = $Failed;
+
+
+messageRenderFunction[head_, expr_, ___] /; messageLevelSetGridQ[expr, head] = $Failed;
+
+
+messageRenderFunction[head_, vdb_, opts:OptionsPattern[]] := messageRenderFunction[head, vdb, Automatic, opts]
+
+
+messageRenderFunction[head_, vdb_, shading_, opts:OptionsPattern[]] /; !OptionQ[shading] :=
+	Block[{assoc, opt},
+		assoc = iparseRenderOptions[vdb, shading, opts];
+		(
+			opt = renderFailureOption[assoc];
+			(	
+				If[opt === "Shader",
+					Message[head::shaderval, shading],
+					Message[head::renderval, opt -> OptionValue[opt]]
+				];
+				$Failed
+				
+			) /; opt =!= $Failed
+			
+		) /; AssociationQ[assoc]
+	]
+
+
+messageRenderFunction[___] = $Failed
+
+
+General::renderval = "`1` is an invalid render setting.";
+General::shaderval = "`1` is an invalid shader setting.";
