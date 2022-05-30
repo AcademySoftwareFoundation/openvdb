@@ -41,7 +41,7 @@ OpenVDBOpening::usage = "OpenVDBOpening[expr, r] gives the morphological opening
 (*Main*)
 
 
-OpenVDBResizeBandwidth[args__] /; !CheckArguments[OpenVDBResizeBandwidth[args], {1, 2}] = $Failed;
+OpenVDBResizeBandwidth[args___] /; !CheckArguments[OpenVDBResizeBandwidth[args], {1, 2}] = $Failed;
 
 
 OpenVDBResizeBandwidth[args___] :=
@@ -86,6 +86,9 @@ SyntaxInformation[OpenVDBResizeBandwidth] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBResizeBandwidth] = $indexregime;
 
 
+setReadProtected[OpenVDBResizeBandwidth];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -105,7 +108,7 @@ mOpenVDBResizeBandwidth[args___] := messageMorphologyFunction[OpenVDBResizeBandw
 (*Main*)
 
 
-OpenVDBDilation[args__] /; !CheckArguments[OpenVDBDilation[args], {1, 2}] = $Failed;
+OpenVDBDilation[args___] /; !CheckArguments[OpenVDBDilation[args], {1, 2}] = $Failed;
 
 
 OpenVDBDilation[args___] :=
@@ -150,6 +153,9 @@ SyntaxInformation[OpenVDBDilation] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBDilation] = $worldregime;
 
 
+setReadProtected[OpenVDBDilation];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -165,7 +171,7 @@ mOpenVDBDilation[args___] := messageMorphologyFunction[OpenVDBDilation, args]
 (*Main*)
 
 
-OpenVDBErosion[args__] /; !CheckArguments[OpenVDBErosion[args], {1, 2}] = $Failed;
+OpenVDBErosion[args___] /; !CheckArguments[OpenVDBErosion[args], {1, 2}] = $Failed;
 
 
 OpenVDBErosion[args___] :=
@@ -210,6 +216,9 @@ SyntaxInformation[OpenVDBErosion] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBErosion] = $worldregime;
 
 
+setReadProtected[OpenVDBErosion];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -225,7 +234,7 @@ mOpenVDBErosion[args___] := messageMorphologyFunction[OpenVDBErosion, args]
 (*Main*)
 
 
-OpenVDBClosing[args__] /; !CheckArguments[OpenVDBClosing[args], {1, 2}] = $Failed;
+OpenVDBClosing[args___] /; !CheckArguments[OpenVDBClosing[args], {1, 2}] = $Failed;
 
 
 OpenVDBClosing[args___] :=
@@ -264,6 +273,9 @@ SyntaxInformation[OpenVDBClosing] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBClosing] = $worldregime;
 
 
+setReadProtected[OpenVDBClosing];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -279,7 +291,7 @@ mOpenVDBClosing[args___] := messageMorphologyFunction[OpenVDBClosing, args]
 (*Main*)
 
 
-OpenVDBOpening[args__] /; !CheckArguments[OpenVDBOpening[args], {1, 2}] = $Failed;
+OpenVDBOpening[args___] /; !CheckArguments[OpenVDBOpening[args], {1, 2}] = $Failed;
 
 
 OpenVDBOpening[args___] :=
@@ -316,6 +328,9 @@ SyntaxInformation[OpenVDBOpening] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBOpening] = $worldregime;
+
+
+setReadProtected[OpenVDBOpening];
 
 
 (* ::Subsubsection::Closed:: *)

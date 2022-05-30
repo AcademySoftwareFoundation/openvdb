@@ -32,7 +32,7 @@ OpenVDBMesh::usage = "OpenVDBMesh[expr] creates a mesh representation of an Open
 Options[OpenVDBMesh] = {"Adaptivity" -> 0., "CloseBoundary" -> True, "IsoValue" -> Automatic, "ReturnQuads" -> False};
 
 
-OpenVDBMesh[args__] /; !CheckArguments[OpenVDBMesh[args], {1, 3}] = $Failed;
+OpenVDBMesh[args___] /; !CheckArguments[OpenVDBMesh[args], {1, 3}] = $Failed;
 
 
 OpenVDBMesh[args___] :=
@@ -108,6 +108,9 @@ addCodeCompletion[OpenVDBMesh][None, {"MeshRegion", "BoundaryMeshRegion", "Compl
 
 
 OpenVDBDefaultSpace[OpenVDBMesh] = $worldregime;
+
+
+setReadProtected[OpenVDBMesh];
 
 
 (* ::Subsection::Closed:: *)

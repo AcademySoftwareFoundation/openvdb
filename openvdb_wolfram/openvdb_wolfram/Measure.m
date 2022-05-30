@@ -35,7 +35,7 @@ OpenVDBVolume::usage = "OpenVDBVolume[expr] finds the volume of an OpenVDB level
 (*Main*)
 
 
-OpenVDBArea[args__] /; !CheckArguments[OpenVDBArea[args], {1, 2}] = $Failed;
+OpenVDBArea[args___] /; !CheckArguments[OpenVDBArea[args], {1, 2}] = $Failed;
 
 
 OpenVDBArea[args___] :=
@@ -82,6 +82,9 @@ SyntaxInformation[OpenVDBArea] = {"ArgumentsPattern" -> {_, _.}};
 OpenVDBDefaultSpace[OpenVDBArea] = $worldregime;
 
 
+setReadProtected[OpenVDBArea];
+
+
 (* ::Subsection::Closed:: *)
 (*Utilities*)
 
@@ -122,7 +125,7 @@ mOpenVDBArea[___] = $Failed;
 (*Main*)
 
 
-OpenVDBEulerCharacteristic[args__] /; !CheckArguments[OpenVDBEulerCharacteristic[args], 1] = $Failed;
+OpenVDBEulerCharacteristic[args___] /; !CheckArguments[OpenVDBEulerCharacteristic[args], 1] = $Failed;
 
 
 OpenVDBEulerCharacteristic[args___] :=
@@ -163,6 +166,9 @@ registerForLevelSet[iOpenVDBEulerCharacteristic, 1];
 SyntaxInformation[OpenVDBEulerCharacteristic] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBEulerCharacteristic];
+
+
 (* ::Subsection::Closed:: *)
 (*Messages*)
 
@@ -181,7 +187,7 @@ mOpenVDBEulerCharacteristic[___] = $Failed;
 (*Main*)
 
 
-OpenVDBGenus[args__] /; !CheckArguments[OpenVDBGenus[args], 1] = $Failed;
+OpenVDBGenus[args___] /; !CheckArguments[OpenVDBGenus[args], 1] = $Failed;
 
 
 OpenVDBGenus[args___] :=
@@ -222,6 +228,9 @@ registerForLevelSet[iOpenVDBGenus, 1];
 SyntaxInformation[OpenVDBGenus] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBGenus];
+
+
 (* ::Subsection::Closed:: *)
 (*Messages*)
 
@@ -240,7 +249,7 @@ mOpenVDBGenus[___] = $Failed;
 (*Main*)
 
 
-OpenVDBVolume[args__] /; !CheckArguments[OpenVDBVolume[args], {1, 2}] = $Failed;
+OpenVDBVolume[args___] /; !CheckArguments[OpenVDBVolume[args], {1, 2}] = $Failed;
 
 
 OpenVDBVolume[args___] :=
@@ -285,6 +294,9 @@ SyntaxInformation[OpenVDBVolume] = {"ArgumentsPattern" -> {_, _.}};
 
 
 OpenVDBDefaultSpace[OpenVDBVolume] = $worldregime;
+
+
+setReadProtected[OpenVDBVolume];
 
 
 (* ::Subsection::Closed:: *)

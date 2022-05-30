@@ -117,6 +117,17 @@ validReturnFormatQ[___] = False;
 (*OpenVDBGrid overload*)
 
 
+SetAttributes[unlockedBlock, HoldAll];
+
+
+unlockedBlock[sym_Symbol, body_] /; !FreeQ[Attributes[sym], Protected] := 
+	Internal`WithLocalSettings[Unprotect[sym], body, Protect[sym]]
+
+
+unlockedBlock[sym_, body_] := body
+
+
+unlockedBlock[OpenVDBGrid,
 (vdb_OpenVDBGrid)[key:(_List | _String)] := 
 	Block[{lookup, res},
 		lookup = Lookup[$getterPropertyAssoc, key];
@@ -129,18 +140,17 @@ validReturnFormatQ[___] = False;
 			res /; res =!= $Failed
 			
 		) /; !MissingQ[lookup]
-	]
-
+	];
 
 (vdb_OpenVDBGrid)[key:(_List | _String), format_] :=
 	Block[{res},
 		res = OpenVDBProperty[vdb, key, format];
 		
 		res /; res =!= $Failed
-	]
-
-
-OpenVDBGrid[id_][___] = $Failed;
+	];
+	
+(vdb_OpenVDBGrid)[args___] := mOpenVDBProperty[vdb, args];
+];
 
 
 (* ::Section:: *)
@@ -151,7 +161,7 @@ OpenVDBGrid[id_][___] = $Failed;
 (*Main*)
 
 
-OpenVDBProperty[args__] /; !CheckArguments[OpenVDBProperty[args], {2, 3}] = $Failed;
+OpenVDBProperty[args___] /; !CheckArguments[OpenVDBProperty[args], {2, 3}] = $Failed;
 
 
 OpenVDBProperty[args___] :=
@@ -203,6 +213,9 @@ SyntaxInformation[OpenVDBProperty] = {"ArgumentsPattern" -> {_, _, _.}};
 
 
 addCodeCompletion[OpenVDBProperty][None, Keys[$getterPropertyAssoc], None];
+
+
+setReadProtected[OpenVDBProperty];
 
 
 (* ::Subsection::Closed:: *)

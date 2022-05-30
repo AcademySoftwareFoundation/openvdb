@@ -108,6 +108,9 @@ addCodeCompletion[OpenVDBActiveVoxelSliceTotals][None, None, {"Value", "Count"}]
 OpenVDBDefaultSpace[OpenVDBActiveVoxelSliceTotals] = $indexregime;
 
 
+setReadProtected[OpenVDBActiveVoxelSliceTotals];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -209,6 +212,9 @@ SyntaxInformation[OpenVDBSlice] = {"ArgumentsPattern" -> {_, _, _., OptionsPatte
 OpenVDBDefaultSpace[OpenVDBSlice] = $indexregime;
 
 
+setReadProtected[OpenVDBSlice];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -298,6 +304,9 @@ SyntaxInformation[OpenVDBData] = {"ArgumentsPattern" -> {_, _.}};
 OpenVDBDefaultSpace[OpenVDBData] = $indexregime;
 
 
+setReadProtected[OpenVDBData];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -384,6 +393,9 @@ SyntaxInformation[OpenVDBActiveTiles] = {"ArgumentsPattern" -> {_, _., OptionsPa
 OpenVDBDefaultSpace[OpenVDBActiveTiles] = $indexregime;
 
 
+setReadProtected[OpenVDBActiveTiles];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -460,6 +472,9 @@ OpenVDBDefaultSpace[OpenVDBActiveVoxels] = $indexregime;
 
 
 addCodeCompletion[OpenVDBActiveVoxels][None, None, {"SparseArray", "Positions", "Values"}];
+
+
+setReadProtected[OpenVDBActiveVoxels];
 
 
 (* ::Subsubsection::Closed:: *)

@@ -32,7 +32,7 @@ OpenVDBLevelSet::usage = "OpenVDBLevelSet[reg] creates a signed distance level s
 Options[OpenVDBLevelSet] = {"Creator" :> $OpenVDBCreator, "Name" -> None, "ScalarType" -> "Float"};
 
 
-OpenVDBLevelSet[args__] /; !CheckArguments[OpenVDBLevelSet[args], {1, 3}] = $Failed;
+OpenVDBLevelSet[args___] /; !CheckArguments[OpenVDBLevelSet[args], {1, 3}] = $Failed;
 
 
 OpenVDBLevelSet[args___] :=
@@ -362,6 +362,9 @@ iOpenVDBLevelSet[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBLevelSet] = {"ArgumentsPattern" -> {_, _., _., OptionsPattern[]}};
+
+
+setReadProtected[OpenVDBLevelSet];
 
 
 (* ::Subsection::Closed:: *)

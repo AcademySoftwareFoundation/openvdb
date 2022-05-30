@@ -44,7 +44,7 @@ OpenVDBDynamicSliceImage::usage = "OpenVDBDynamicSliceImage[expr] returns a Dyna
 Options[OpenVDBImage3D] = {Resampling -> Automatic, "ScalingFactor" -> 1.0};
 
 
-OpenVDBImage3D[args__] /; !CheckArguments[OpenVDBImage3D[args], {1, 2}] = $Failed;
+OpenVDBImage3D[args___] /; !CheckArguments[OpenVDBImage3D[args], {1, 2}] = $Failed;
 
 
 OpenVDBImage3D[args___] :=
@@ -113,6 +113,9 @@ SyntaxInformation[OpenVDBImage3D] = {"ArgumentsPattern" -> {_, _., OptionsPatter
 
 
 OpenVDBDefaultSpace[OpenVDBImage3D] = $indexregime;
+
+
+setReadProtected[OpenVDBImage3D];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -192,7 +195,7 @@ OpenVDBImage3D::scale = "The setting for \"ScalingFactor\" should either be a po
 (*Main*)
 
 
-OpenVDBDepthImage[args__] /; !CheckArguments[OpenVDBDepthImage[args], {1, 4}] = $Failed;
+OpenVDBDepthImage[args___] /; !CheckArguments[OpenVDBDepthImage[args], {1, 4}] = $Failed;
 
 
 OpenVDBDepthImage[args___] :=
@@ -257,6 +260,9 @@ SyntaxInformation[OpenVDBDepthImage] = {"ArgumentsPattern" -> {_, _., _., _., Op
 OpenVDBDefaultSpace[OpenVDBDepthImage] = $indexregime;
 
 
+setReadProtected[OpenVDBDepthImage];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -303,7 +309,7 @@ OpenVDBDepthImage::range = "`1` at position `2` should be a list of two increasi
 (*Main*)
 
 
-OpenVDBProjectionImage[args__] /; !CheckArguments[OpenVDBProjectionImage[args], {1, 2}] = $Failed;
+OpenVDBProjectionImage[args___] /; !CheckArguments[OpenVDBProjectionImage[args], {1, 2}] = $Failed;
 
 
 OpenVDBProjectionImage[args___] :=
@@ -368,6 +374,9 @@ SyntaxInformation[OpenVDBProjectionImage] = {"ArgumentsPattern" -> {_, _., Optio
 OpenVDBDefaultSpace[OpenVDBProjectionImage] = $indexregime;
 
 
+setReadProtected[OpenVDBProjectionImage];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -399,7 +408,7 @@ mOpenVDBProjectionImage[___] = $Failed;
 Options[OpenVDBSliceImage] = {"MirrorSlice" -> False};
 
 
-OpenVDBSliceImage[args__] /; !CheckArguments[OpenVDBSliceImage[args], {1, 3}] = $Failed;
+OpenVDBSliceImage[args___] /; !CheckArguments[OpenVDBSliceImage[args], {1, 3}] = $Failed;
 
 
 OpenVDBSliceImage[args___] :=
@@ -464,6 +473,9 @@ SyntaxInformation[OpenVDBSliceImage] = {"ArgumentsPattern" -> {_, _, _., Options
 OpenVDBDefaultSpace[OpenVDBSliceImage] = $indexregime;
 
 
+setReadProtected[OpenVDBSliceImage];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -494,7 +506,7 @@ mOpenVDBSliceImage[___] = $Failed;
 Options[OpenVDBDynamicSliceImage] = {DisplayFunction -> Identity, ImageSize -> Automatic};
 
 
-OpenVDBDynamicSliceImage[args__] /; !CheckArguments[OpenVDBDynamicSliceImage[args], 1] = $Failed;
+OpenVDBDynamicSliceImage[args___] /; !CheckArguments[OpenVDBDynamicSliceImage[args], 1] = $Failed;
 
 
 OpenVDBDynamicSliceImage[args___] :=
@@ -570,6 +582,9 @@ iOpenVDBDynamicSliceImage[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBDynamicSliceImage] = {"ArgumentsPattern" -> {_, OptionsPattern[]}};
+
+
+setReadProtected[OpenVDBDynamicSliceImage];
 
 
 (* ::Subsubsection::Closed:: *)

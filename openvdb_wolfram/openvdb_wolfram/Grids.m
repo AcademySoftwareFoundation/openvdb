@@ -70,6 +70,10 @@ OpenVDBDefaultSpace::usage = "OpenVDBDefaultSpace[f] returns the default coordin
 (*OpenVDBGrid*)
 
 
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
 OpenVDBGrid[i_, type_][(func_String)[args___]] := typeClass[type][i][func[args]]
 
 
@@ -142,6 +146,13 @@ formatTreeType[type_String] /; StringMatchQ[type, "Tree_" ~~ t__ ~~ ("_" ~~ (Dig
 formatTreeType[expr_] := expr
 
 
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+setReadProtected[OpenVDBGrid];
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBGridQ*)
 
@@ -161,6 +172,9 @@ OpenVDBGridQ[___] = False;
 
 
 SyntaxInformation[OpenVDBGridQ] = {"ArgumentsPattern" -> {_}};
+
+
+setReadProtected[OpenVDBGridQ];
 
 
 (* ::Subsection::Closed:: *)
@@ -230,6 +244,9 @@ SyntaxInformation[OpenVDBGrids] = {"ArgumentsPattern" -> {_.}};
 
 
 addCodeCompletion[OpenVDBGrids][$gridTypeList];
+
+
+setReadProtected[OpenVDBGrids];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -306,6 +323,9 @@ SyntaxInformation[OpenVDBGridTypes] = {"ArgumentsPattern" -> {_.}};
 addCodeCompletion[OpenVDBGridTypes][$classTypeList];
 
 
+setReadProtected[OpenVDBGridTypes];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -351,6 +371,9 @@ OpenVDBScalarGridQ[___] = False;
 SyntaxInformation[OpenVDBScalarGridQ] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBScalarGridQ];
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBIntegerGridQ*)
 
@@ -370,6 +393,9 @@ OpenVDBIntegerGridQ[___] = False;
 
 
 SyntaxInformation[OpenVDBIntegerGridQ] = {"ArgumentsPattern" -> {_}};
+
+
+setReadProtected[OpenVDBIntegerGridQ];
 
 
 (* ::Subsection::Closed:: *)
@@ -393,6 +419,9 @@ OpenVDBVectorGridQ[___] = False;
 SyntaxInformation[OpenVDBVectorGridQ] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBVectorGridQ];
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBBooleanGridQ*)
 
@@ -414,6 +443,9 @@ OpenVDBBooleanGridQ[___] = False;
 SyntaxInformation[OpenVDBBooleanGridQ] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBBooleanGridQ];
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBMaskGridQ*)
 
@@ -433,6 +465,9 @@ OpenVDBMaskGridQ[___] = False;
 
 
 SyntaxInformation[OpenVDBMaskGridQ] = {"ArgumentsPattern" -> {_}};
+
+
+setReadProtected[OpenVDBMaskGridQ];
 
 
 (* ::Section:: *)
@@ -549,6 +584,9 @@ SyntaxInformation[OpenVDBCreateGrid] = {"ArgumentsPattern" -> {_., _., OptionsPa
 addCodeCompletion[OpenVDBCreateGrid][None, $gridTypeList];
 
 
+setReadProtected[OpenVDBCreateGrid];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -631,6 +669,9 @@ iOpenVDBDeleteGrid[___] = $Failed;
 SyntaxInformation[OpenVDBDeleteGrid] = {"ArgumentsPattern" -> {_}};
 
 
+setReadProtected[OpenVDBDeleteGrid];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -700,6 +741,9 @@ iOpenVDBCopyGrid[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBCopyGrid] = {"ArgumentsPattern" -> {_, OptionsPattern[]}};
+
+
+setReadProtected[OpenVDBCopyGrid];
 
 
 (* ::Subsubsection::Closed:: *)

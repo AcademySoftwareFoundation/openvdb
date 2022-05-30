@@ -35,7 +35,7 @@ OpenVDBFogVolume::usage = "OpenVDBFogVolume[expr] creates a fog volume represent
 (*Main*)
 
 
-OpenVDBToFogVolume[args__] /; !CheckArguments[OpenVDBToFogVolume[args], {1, 2}] = $Failed;
+OpenVDBToFogVolume[args___] /; !CheckArguments[OpenVDBToFogVolume[args], {1, 2}] = $Failed;
 
 
 OpenVDBToFogVolume[args___] :=
@@ -88,6 +88,9 @@ SyntaxInformation[OpenVDBToFogVolume] = {"ArgumentsPattern" -> {_, _.}};
 OpenVDBDefaultSpace[OpenVDBToFogVolume] = $indexregime;
 
 
+setReadProtected[OpenVDBToFogVolume];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -109,7 +112,7 @@ mOpenVDBToFogVolume[___] = $Failed;
 (*Main*)
 
 
-OpenVDBFogVolume[args__] /; !CheckArguments[OpenVDBFogVolume[args], {1, 2}] = $Failed;
+OpenVDBFogVolume[args___] /; !CheckArguments[OpenVDBFogVolume[args], {1, 2}] = $Failed;
 
 
 OpenVDBFogVolume[args___] :=
@@ -155,6 +158,9 @@ SyntaxInformation[OpenVDBFogVolume] = {"ArgumentsPattern" -> {_, _.}};
 
 
 OpenVDBDefaultSpace[OpenVDBFogVolume] = $indexregime;
+
+
+setReadProtected[OpenVDBFogVolume];
 
 
 (* ::Subsubsection::Closed:: *)

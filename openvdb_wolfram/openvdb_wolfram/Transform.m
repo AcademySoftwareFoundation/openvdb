@@ -42,7 +42,7 @@ OpenVDBGammaAdjust::usage = "OpenVDBGammaAdjust[expr, \[Gamma]] applies gamma ad
 Options[OpenVDBTransform] = {Resampling -> Automatic};
 
 
-OpenVDBTransform[args__] /; !CheckArguments[OpenVDBTransform[args], 2] = $Failed;
+OpenVDBTransform[args___] /; !CheckArguments[OpenVDBTransform[args], 2] = $Failed;
 
 
 OpenVDBTransform[args___] :=
@@ -98,6 +98,9 @@ SyntaxInformation[OpenVDBTransform] = {"ArgumentsPattern" -> {_, _, OptionsPatte
 
 
 OpenVDBDefaultSpace[OpenVDBTransform] = $worldregime;
+
+
+setReadProtected[OpenVDBTransform];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -182,7 +185,7 @@ OpenVDBTransform::resamp = "The setting for Resampling should be one of \"Neares
 (*Main*)
 
 
-OpenVDBMultiply[args__] /; !CheckArguments[OpenVDBMultiply[args], 2] = $Failed;
+OpenVDBMultiply[args___] /; !CheckArguments[OpenVDBMultiply[args], 2] = $Failed;
 
 
 OpenVDBMultiply[args___] :=
@@ -220,6 +223,9 @@ registerForLevelSet[iOpenVDBMultiply, 1];
 SyntaxInformation[OpenVDBMultiply] = {"ArgumentsPattern" -> {_, _}};
 
 
+setReadProtected[OpenVDBMultiply];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -248,7 +254,7 @@ OpenVDBMultiply::real = "`1` at position `2` is not real number.";
 (*Main*)
 
 
-OpenVDBGammaAdjust[args__] /; !CheckArguments[OpenVDBGammaAdjust[args], 2] = $Failed;
+OpenVDBGammaAdjust[args___] /; !CheckArguments[OpenVDBGammaAdjust[args], 2] = $Failed;
 
 
 OpenVDBGammaAdjust[args___] :=
@@ -291,6 +297,9 @@ registerForLevelSet[iOpenVDBGammaAdjust, 1];
 
 
 SyntaxInformation[OpenVDBGammaAdjust] = {"ArgumentsPattern" -> {_, _}};
+
+
+setReadProtected[OpenVDBGammaAdjust];
 
 
 (* ::Subsubsection::Closed:: *)

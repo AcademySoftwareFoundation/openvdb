@@ -72,7 +72,7 @@ Options[OpenVDBLevelSetRender] = Join[
 ];
 
 
-OpenVDBLevelSetRender[args__] /; !CheckArguments[OpenVDBLevelSetRender[args], {1, 2}] = $Failed;
+OpenVDBLevelSetRender[args___] /; !CheckArguments[OpenVDBLevelSetRender[args], {1, 2}] = $Failed;
 
 
 OpenVDBLevelSetRender[args___] :=
@@ -120,6 +120,9 @@ SyntaxInformation[OpenVDBLevelSetRender] = {"ArgumentsPattern" -> {_, _., Option
 
 
 addCodeCompletion[OpenVDBLevelSetRender][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
+
+
+setReadProtected[OpenVDBLevelSetRender];
 
 
 (* ::Subsection::Closed:: *)
@@ -183,7 +186,7 @@ mLevelSetRender[args___] := messageRenderFunction[OpenVDBLevelSetRender, args]
 Options[OpenVDBLevelSetViewer] = Options[OpenVDBLevelSetRender];
 
 
-OpenVDBLevelSetViewer[args__] /; !CheckArguments[OpenVDBLevelSetViewer[args], {1, 2}] = $Failed;
+OpenVDBLevelSetViewer[args___] /; !CheckArguments[OpenVDBLevelSetViewer[args], {1, 2}] = $Failed;
 
 
 OpenVDBLevelSetViewer[args___] :=
@@ -229,6 +232,9 @@ SyntaxInformation[OpenVDBLevelSetViewer] = {"ArgumentsPattern" -> {_, _., Option
 
 
 addCodeCompletion[OpenVDBLevelSetViewer][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
+
+
+setReadProtected[OpenVDBLevelSetViewer];
 
 
 (* ::Subsection::Closed:: *)

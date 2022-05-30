@@ -862,6 +862,19 @@ addCodeCompletion[function_String][args___] :=
 
 
 (* ::Subsection::Closed:: *)
+(*setReadProtected*)
+
+
+PackageScope["setReadProtected"]
+
+
+SetAttributes[setReadProtected, HoldFirst];
+
+
+setReadProtected[sym_Symbol] := SetAttributes[sym, {Protected, ReadProtected}]
+
+
+(* ::Subsection::Closed:: *)
 (*registerForLevelSet*)
 
 

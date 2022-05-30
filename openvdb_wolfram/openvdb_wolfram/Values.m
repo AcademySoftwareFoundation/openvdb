@@ -41,7 +41,7 @@ OpenVDBValues::usage = "OpenVDBValues[expr, coords] returns the values at coordi
 (*Main*)
 
 
-OpenVDBSetStates[args__] /; !CheckArguments[OpenVDBSetStates[args], 3] = $Failed;
+OpenVDBSetStates[args___] /; !CheckArguments[OpenVDBSetStates[args], 3] = $Failed;
 
 
 OpenVDBSetStates[args___] :=
@@ -96,6 +96,9 @@ SyntaxInformation[OpenVDBSetStates] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetStates] = $indexregime;
 
 
+setReadProtected[OpenVDBSetStates];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -117,7 +120,7 @@ mOpenVDBSetStates[___] = $Failed;
 (*Main*)
 
 
-OpenVDBStates[args__] /; !CheckArguments[OpenVDBStates[args], 2] = $Failed;
+OpenVDBStates[args___] /; !CheckArguments[OpenVDBStates[args], 2] = $Failed;
 
 
 OpenVDBStates[args___] :=
@@ -161,6 +164,9 @@ SyntaxInformation[OpenVDBStates] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBStates] = $indexregime;
 
 
+setReadProtected[OpenVDBStates];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -186,7 +192,7 @@ mOpenVDBStates[___] = $Failed;
 (*Main*)
 
 
-OpenVDBSetValues[args__] /; !CheckArguments[OpenVDBSetValues[args], 3] = $Failed;
+OpenVDBSetValues[args___] /; !CheckArguments[OpenVDBSetValues[args], 3] = $Failed;
 
 
 OpenVDBSetValues[args___] :=
@@ -263,6 +269,9 @@ SyntaxInformation[OpenVDBSetValues] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetValues] = $indexregime;
 
 
+setReadProtected[OpenVDBSetValues];
+
+
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -284,7 +293,7 @@ mOpenVDBSetValues[___] = $Failed;
 (*Main*)
 
 
-OpenVDBValues[args__] /; !CheckArguments[OpenVDBValues[args], 2] = $Failed;
+OpenVDBValues[args___] /; !CheckArguments[OpenVDBValues[args], 2] = $Failed;
 
 
 OpenVDBValues[args___] :=
@@ -326,6 +335,9 @@ SyntaxInformation[OpenVDBValues] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBValues] = $indexregime;
+
+
+setReadProtected[OpenVDBValues];
 
 
 (* ::Subsubsection::Closed:: *)
