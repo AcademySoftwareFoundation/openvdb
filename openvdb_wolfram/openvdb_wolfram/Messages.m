@@ -48,18 +48,18 @@ PackageScope["messageIsoValueQ"]
 (*Main*)
 
 
-messageGridQ[_?OpenVDBGridQ, _] = False;
+messageGridQ[_?OpenVDBGridQ, __] = False;
 
 
-messageGridQ[expr_, head_] :=
+messageGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 	Block[{regionQ},
 		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
 		Which[
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
-			!TrueQ[$OpenVDBSpacing > 0],
+			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::grid, expr];
 				True, 
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
 			True,
 				Message[head::grid2, expr];
 				True
@@ -83,18 +83,18 @@ General::grid2 = "`1` is not a grid or constant 3D region.";
 (*Main*)
 
 
-messageScalarGridQ[_?OpenVDBScalarGridQ, _] = False;
+messageScalarGridQ[_?OpenVDBScalarGridQ, __] = False;
 
 
-messageScalarGridQ[expr_, head_] :=
+messageScalarGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 	Block[{regionQ},
 		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
 		Which[
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
-			!TrueQ[$OpenVDBSpacing > 0],
+			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::scalargrid, expr];
 				True, 
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
 			True,
 				Message[head::scalargrid2, expr];
 				True
@@ -118,18 +118,18 @@ General::scalargrid2 = "`1` is not a scalar grid or constant 3D region.";
 (*Main*)
 
 
-messageLevelSetGridQ[vdb_?OpenVDBScalarGridQ, _] /; levelSetQ[vdb] = False;
+messageLevelSetGridQ[vdb_?OpenVDBScalarGridQ, __] /; levelSetQ[vdb] = False;
 
 
-messageLevelSetGridQ[expr_, head_] :=
+messageLevelSetGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 	Block[{regionQ},
 		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
 		Which[
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
-			!TrueQ[$OpenVDBSpacing > 0],
+			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::lvlsetgrid, expr];
 				True, 
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
 			True,
 				Message[head::lvlsetgrid2, expr];
 				True
@@ -179,18 +179,18 @@ General::nmsksupp = "`1` does not support mask grids.";
 (*Main*)
 
 
-messagePixelGridQ[_?carefulPixelGridQ, _] = False;
+messagePixelGridQ[_?carefulPixelGridQ, __] = False;
 
 
-messagePixelGridQ[expr_, head_] :=
+messagePixelGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 	Block[{regionQ},
 		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
 		Which[
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
-			!TrueQ[$OpenVDBSpacing > 0],
+			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::npxl, expr];
 				True, 
+			TrueQ[$OpenVDBSpacing > 0] && regionQ,
+				False, 
 			True,
 				Message[head::npxl2, expr];
 				True

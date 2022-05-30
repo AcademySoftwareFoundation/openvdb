@@ -32,16 +32,35 @@ OpenVDBMesh::usage = "OpenVDBMesh[expr] creates a mesh representation of an Open
 Options[OpenVDBMesh] = {"Adaptivity" -> 0., "CloseBoundary" -> True, "IsoValue" -> Automatic, "ReturnQuads" -> False};
 
 
-OpenVDBMesh[expr_, opts:OptionsPattern[]] := OpenVDBMesh[expr, Automatic, opts]
+OpenVDBMesh[args__] /; !CheckArguments[OpenVDBMesh[args], {1, 3}] = $Failed;
 
 
-OpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] := 
+OpenVDBMesh[args___] :=
+	With[{res = iOpenVDBMesh[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBMesh[args___] := mOpenVDBMesh[args]
+
+
+(* ::Subsection::Closed:: *)
+(*iOpenVDBMesh*)
+
+
+Options[iOpenVDBMesh] = Options[OpenVDBMesh];
+
+
+iOpenVDBMesh[expr_, opts:OptionsPattern[]] := iOpenVDBMesh[expr, Automatic, opts]
+
+
+iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] := 
 	Block[{type, adaptivity, isovalue, quadQ, data, res},
 		type = parseLevelSetMeshType[itype];
 		(
 			{adaptivity, isovalue, quadQ} = OptionValue[{"Adaptivity", "IsoValue", "ReturnQuads"}];
 			
-			adaptivity = If[realQ[#], #, 0.]&[Clip[adaptivity, {0., 1.}]];
+			adaptivity = Clip[adaptivity, {0., 1.}];
 			isovalue = gridIsoValue[isovalue, vdb];
 			quadQ = TrueQ[quadQ];
 			(
@@ -53,33 +72,33 @@ OpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] :=
 					
 				) /; data =!= $Failed
 				
-			) /; realQ[isovalue]
+			) /; realQ[isovalue] && 0 <= adaptivity <= 1
 			
 		) /; StringQ[type]
 	]
 
 
-OpenVDBMesh[vdb_, itype_, bds_List, opts:OptionsPattern[]] /; MatrixQ[bds, realQ] := OpenVDBMesh[vdb, itype, bds -> $worldregime, opts]
+iOpenVDBMesh[vdb_, itype_, bds_List, opts:OptionsPattern[]] /; MatrixQ[bds, realQ] := iOpenVDBMesh[vdb, itype, bds -> $worldregime, opts]
 
 
-OpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, bds_List -> regime_?regimeQ, opts:OptionsPattern[]] := 
+iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, bds_List -> regime_?regimeQ, opts:OptionsPattern[]] := 
 	Block[{clipopts, clip},
 		clipopts = FilterRules[{opts, Options[OpenVDBMesh]}, Options[OpenVDBClip]];
 		
 		clip = OpenVDBClip[vdb, bds -> regime, Sequence @@ clipopts];
 		
-		OpenVDBMesh[clip, itype, opts] /; OpenVDBScalarGridQ[clip]
+		iOpenVDBMesh[clip, itype, opts] /; OpenVDBScalarGridQ[clip]
 	]
 
 
-OpenVDBMesh[___] = $Failed;
+iOpenVDBMesh[___] = $Failed;
 
 
 (* ::Subsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBMesh, 1];
+registerForLevelSet[iOpenVDBMesh, 1];
 
 
 SyntaxInformation[OpenVDBMesh] = {"ArgumentsPattern" -> {_, _., _., OptionsPattern[]}};
@@ -191,3 +210,47 @@ constructLevelSetMesh[FullRegion[3], "FaceData"] = {};
 
 
 constructLevelSetMesh[___] = $Failed;
+
+
+(* ::Subsection::Closed:: *)
+(*Messages*)
+
+
+Options[mOpenVDBMesh] = Options[OpenVDBMesh];
+
+
+mOpenVDBMesh[expr_, ___] /; messageScalarGridQ[expr, OpenVDBMesh] = $Failed;
+
+
+mOpenVDBMesh[_, type_, ___] /; parseLevelSetMeshType[type] === $Failed := 
+	(
+		Message[OpenVDBMesh::ret, type, 2];
+		$Failed
+	)
+
+
+mOpenVDBMesh[_, _, bbox:Except[_?OptionQ], ___] /; message3DBBoxQ[bbox, OpenVDBMesh] = $Failed;
+
+
+mOpenVDBMesh[__, OptionsPattern[]] :=
+	(
+		If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBMesh],
+			Return[$Failed]
+		];
+		
+		If[!TrueQ[0 <= OptionValue["Adaptivity"] <= 1],
+			Message[OpenVDBMesh::adapt];
+			Return[$Failed]
+		];
+		
+		$Failed
+	)
+
+
+mOpenVDBMesh[___] = $Failed;
+
+
+OpenVDBMesh::ret = "`1` at position `2` is not one of \"MeshRegion\", \"BoundaryMeshRegion\", \"ComplexData\", \"FaceData\", or Automatic.";
+
+
+OpenVDBMesh::adapt = "The setting for \"Adaptivity\" must be a number between 0 and 1, inclusively.";

@@ -42,7 +42,26 @@ OpenVDBGammaAdjust::usage = "OpenVDBGammaAdjust[expr, \[Gamma]] applies gamma ad
 Options[OpenVDBTransform] = {Resampling -> Automatic};
 
 
-OpenVDBTransform[vdb_?OpenVDBGridQ, tf_, OptionsPattern[]] :=
+OpenVDBTransform[args__] /; !CheckArguments[OpenVDBTransform[args], 2] = $Failed;
+
+
+OpenVDBTransform[args___] :=
+	With[{res = iOpenVDBTransform[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBTransform[args___] := mOpenVDBTransform[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBTransform*)
+
+
+Options[iOpenVDBTransform] = Options[OpenVDBTransform];
+
+
+iOpenVDBTransform[vdb_?OpenVDBGridQ, tf_, OptionsPattern[]] :=
 	Block[{ptf, mat, regime, vx, tvdb, resampling, tfunc},
 		ptf = ParseTransformationMatrix[tf];
 		resampling = resamplingMethod[OptionValue[Resampling]];
@@ -65,14 +84,14 @@ OpenVDBTransform[vdb_?OpenVDBGridQ, tf_, OptionsPattern[]] :=
 	]
 
 
-OpenVDBTransform[___] = $Failed;
+iOpenVDBTransform[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBTransform, 1];
+registerForLevelSet[iOpenVDBTransform, 1];
 
 
 SyntaxInformation[OpenVDBTransform] = {"ArgumentsPattern" -> {_, _, OptionsPattern[]}};
@@ -115,6 +134,42 @@ iParseTransformationMatrix[scale_?Positive] := iParseTransformationMatrix[Scalin
 iParseTransformationMatrix[___] := Throw[$Failed]
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+Options[mOpenVDBTransform] = Options[OpenVDBTransform];
+
+
+mOpenVDBTransform[expr_, ___] /; messageGridQ[expr, OpenVDBTransform] = $Failed;
+
+
+mOpenVDBTransform[_, tf_, ___] /; ParseTransformationMatrix[tf] === $Failed := 
+	(
+		Message[OpenVDBTransform::trans, tf, 2];
+		$Failed
+	)
+
+
+mOpenVDBTransform[__, OptionsPattern[]] :=
+	Block[{resampling},
+		resampling = resamplingMethod[OptionValue[Resampling]];
+		(
+			Message[OpenVDBTransform::resamp];
+			$Failed
+		) /; resampling === $Failed
+	]
+
+
+mOpenVDBTransform[___] = $Failed;
+
+
+OpenVDBTransform::trans = "`1` at position `2` does not represent a valid geometric transformation.";
+
+
+OpenVDBTransform::resamp = "The setting for Resampling should be one of \"Nearest\", \"Linear\", \"Quadratic\", or Automatic.";
+
+
 (* ::Section:: *)
 (*Value transformation*)
 
@@ -127,7 +182,23 @@ iParseTransformationMatrix[___] := Throw[$Failed]
 (*Main*)
 
 
-OpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] := 
+OpenVDBMultiply[args__] /; !CheckArguments[OpenVDBMultiply[args], 2] = $Failed;
+
+
+OpenVDBMultiply[args___] :=
+	With[{res = iOpenVDBMultiply[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBMultiply[args___] := mOpenVDBMultiply[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBMultiply*)
+
+
+iOpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] := 
 	(
 		If[s != 1.0, 
 			vdb["scalarMultiply"[s]]
@@ -136,17 +207,37 @@ OpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] :=
 	)
 
 
-OpenVDBMultiply[___] = $Failed;
+iOpenVDBMultiply[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBMultiply, 1];
+registerForLevelSet[iOpenVDBMultiply, 1];
 
 
 SyntaxInformation[OpenVDBMultiply] = {"ArgumentsPattern" -> {_, _}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBMultiply[expr_, ___] /; messageScalarGridQ[expr, OpenVDBMultiply] = $Failed;
+
+
+mOpenVDBMultiply[_, s_] /; !realQ[s] := 
+	(
+		Message[OpenVDBMultiply::real, s, 2];
+		$Failed
+	)
+
+
+mOpenVDBMultiply[___] = $Failed;
+
+
+OpenVDBMultiply::real = "`1` at position `2` is not real number.";
 
 
 (* ::Subsection::Closed:: *)
@@ -157,7 +248,23 @@ SyntaxInformation[OpenVDBMultiply] = {"ArgumentsPattern" -> {_, _}};
 (*Main*)
 
 
-OpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vdb] := 
+OpenVDBGammaAdjust[args__] /; !CheckArguments[OpenVDBGammaAdjust[args], 2] = $Failed;
+
+
+OpenVDBGammaAdjust[args___] :=
+	With[{res = iOpenVDBGammaAdjust[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBGammaAdjust[args___] := mOpenVDBGammaAdjust[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBGammaAdjust*)
+
+
+iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vdb] := 
 	(
 		If[\[Gamma] != 1.0, 
 			vdb["gammaAdjustment"[\[Gamma]]]
@@ -166,21 +273,41 @@ OpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vd
 	)
 
 
-OpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, args___] /; levelSetQ[vdb] :=
+iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, args___] /; levelSetQ[vdb] :=
 	(
 		OpenVDBToFogVolume[vdb];
-		OpenVDBGammaAdjust[vdb, args]
+		iOpenVDBGammaAdjust[vdb, args]
 	)
 
 
-OpenVDBGammaAdjust[___] = $Failed;
+iOpenVDBGammaAdjust[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBGammaAdjust, 1];
+registerForLevelSet[iOpenVDBGammaAdjust, 1];
 
 
 SyntaxInformation[OpenVDBGammaAdjust] = {"ArgumentsPattern" -> {_, _}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBGammaAdjust[expr_, ___] /; messageScalarGridQ[expr, OpenVDBGammaAdjust] = $Failed;
+
+
+mOpenVDBGammaAdjust[_, \[Gamma]_] /; !TrueQ[\[Gamma] > 0] := 
+	(
+		Message[OpenVDBGammaAdjust::pos, \[Gamma], 2];
+		$Failed
+	)
+
+
+mOpenVDBGammaAdjust[___] = $Failed;
+
+
+OpenVDBGammaAdjust::pos = "`1` at position `2` is not a positive number.";

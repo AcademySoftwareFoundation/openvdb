@@ -41,7 +41,23 @@ OpenVDBValues::usage = "OpenVDBValues[expr, coords] returns the values at coordi
 (*Main*)
 
 
-OpenVDBSetStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ, states_] /; VectorQ[states, realQ] && Length[coords] === Length[states] :=
+OpenVDBSetStates[args__] /; !CheckArguments[OpenVDBSetStates[args], 3] = $Failed;
+
+
+OpenVDBSetStates[args___] :=
+	With[{res = iOpenVDBSetStates[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBSetStates[args___] := mOpenVDBSetStates[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBSetStates*)
+
+
+iOpenVDBSetStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ, states_] /; VectorQ[states, realQ] && Length[coords] === Length[states] :=
 	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
 		vdb["setActiveStates"[indexcoordinates, states]];
 		
@@ -49,25 +65,25 @@ OpenVDBSetStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ, sta
 	]
 
 
-OpenVDBSetStates[expr_, coord_?coordinateQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
-	With[{res = OpenVDBSetStates[expr, {coord} -> regime, {state}]},
+iOpenVDBSetStates[expr_, coord_?coordinateQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
+	With[{res = iOpenVDBSetStates[expr, {coord} -> regime, {state}]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetStates[expr_, coords_ -> regime_, states_List, args___] /; VectorQ[states, BooleanQ] := OpenVDBSetStates[expr, coords -> regime, Boole[states], args]
+iOpenVDBSetStates[expr_, coords_ -> regime_, states_List, args___] /; VectorQ[states, BooleanQ] := iOpenVDBSetStates[expr, coords -> regime, Boole[states], args]
 
 
-OpenVDBSetStates[expr_, coords_?MatrixQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
-	With[{res = OpenVDBSetStates[expr, coords -> regime, ConstantArray[state, Length[coords]]]},
+iOpenVDBSetStates[expr_, coords_?MatrixQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
+	With[{res = iOpenVDBSetStates[expr, coords -> regime, ConstantArray[state, Length[coords]]]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetStates[expr_, coords_List, args___] := OpenVDBSetStates[expr, coords -> $indexregime, args]
+iOpenVDBSetStates[expr_, coords_List, args___] := iOpenVDBSetStates[expr, coords -> $indexregime, args]
 
 
-OpenVDBSetStates[___] = $Failed;
+iOpenVDBSetStates[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -80,6 +96,19 @@ SyntaxInformation[OpenVDBSetStates] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetStates] = $indexregime;
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBSetStates[expr_, ___] /; messageGridQ[expr, OpenVDBSetStates, False] = $Failed;
+
+
+mOpenVDBSetStates[_, coords_, ___] /; messageCoordinateSpecQ[coords, OpenVDBSetStates] = $Failed;
+
+
+mOpenVDBSetStates[___] = $Failed;
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBStates*)
 
@@ -88,22 +117,38 @@ OpenVDBDefaultSpace[OpenVDBSetStates] = $indexregime;
 (*Main*)
 
 
-OpenVDBStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
+OpenVDBStates[args__] /; !CheckArguments[OpenVDBStates[args], 2] = $Failed;
+
+
+OpenVDBStates[args___] :=
+	With[{res = iOpenVDBStates[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBStates[args___] := mOpenVDBStates[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBStates*)
+
+
+iOpenVDBStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
 	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
 		vdb["getActiveStates"[indexcoordinates]]
 	]
 
 
-OpenVDBStates[expr_, coord_?coordinateQ -> regime_] :=
-	With[{vals = OpenVDBStates[expr, {coord} -> regime]},
+iOpenVDBStates[expr_, coord_?coordinateQ -> regime_] :=
+	With[{vals = iOpenVDBStates[expr, {coord} -> regime]},
 		vals[[1]] /; vals =!= $Failed
 	]
 
 
-OpenVDBStates[expr_, coords_List] := OpenVDBStates[expr, coords -> $indexregime]
+iOpenVDBStates[expr_, coords_List] := iOpenVDBStates[expr, coords -> $indexregime]
 
 
-OpenVDBStates[___] = $Failed;
+iOpenVDBStates[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -114,6 +159,19 @@ SyntaxInformation[OpenVDBStates] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBStates] = $indexregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBStates[expr_, ___] /; messageGridQ[expr, OpenVDBStates, False] = $Failed;
+
+
+mOpenVDBStates[_, coords_] /; messageCoordinateSpecQ[coords, OpenVDBStates] = $Failed;
+
+
+mOpenVDBStates[___] = $Failed;
 
 
 (* ::Section:: *)
@@ -128,7 +186,23 @@ OpenVDBDefaultSpace[OpenVDBStates] = $indexregime;
 (*Main*)
 
 
-OpenVDBSetValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ, values_] /; ArrayQ[values, _, realQ] && Length[coords] === Length[values] :=
+OpenVDBSetValues[args__] /; !CheckArguments[OpenVDBSetValues[args], 3] = $Failed;
+
+
+OpenVDBSetValues[args___] :=
+	With[{res = iOpenVDBSetValues[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBSetValues[args___] := mOpenVDBSetValues[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBSetValues*)
+
+
+iOpenVDBSetValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ, values_] /; ArrayQ[values, _, realQ] && Length[coords] === Length[values] :=
 	Block[{indexcoordinates, res},
 		indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime];
 		
@@ -145,38 +219,38 @@ OpenVDBSetValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regim
 	]
 
 
-OpenVDBSetValues[expr_?OpenVDBVectorGridQ, coord_?coordinateQ -> regime_, value_?VectorQ] :=
-	With[{res = OpenVDBSetValues[expr, {coord} -> regime, {value}]},
+iOpenVDBSetValues[expr_?OpenVDBVectorGridQ, coord_?coordinateQ -> regime_, value_?VectorQ] :=
+	With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetValues[expr_?OpenVDBVectorGridQ, coords_?MatrixQ -> regime_, value_?VectorQ] :=
-	With[{res = OpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
+iOpenVDBSetValues[expr_?OpenVDBVectorGridQ, coords_?MatrixQ -> regime_, value_?VectorQ] :=
+	With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetValues[expr_, coord_?coordinateQ -> regime_, value_?realQ] :=
-	With[{res = OpenVDBSetValues[expr, {coord} -> regime, {value}]},
+iOpenVDBSetValues[expr_, coord_?coordinateQ -> regime_, value_?realQ] :=
+	With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetValues[expr_, coords_?MatrixQ -> regime_, value_?realQ] :=
-	With[{res = OpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
+iOpenVDBSetValues[expr_, coords_?MatrixQ -> regime_, value_?realQ] :=
+	With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
 		res[[1]] /; res =!= $Failed
 	]
 
 
-OpenVDBSetValues[expr_, coords_List, args___] := OpenVDBSetValues[expr, coords -> $indexregime, args]
+iOpenVDBSetValues[expr_, coords_List, args___] := iOpenVDBSetValues[expr, coords -> $indexregime, args]
 
 
-OpenVDBSetValues[vdb_?OpenVDBBooleanGridQ, coords_?coordinatesQ -> regime_?regimeQ, values:{(True|False)..}] :=
-	OpenVDBSetValues[vdb, coords -> regime, Boole[values]]
+iOpenVDBSetValues[vdb_?OpenVDBBooleanGridQ, coords_?coordinatesQ -> regime_?regimeQ, values:{(True|False)..}] :=
+	iOpenVDBSetValues[vdb, coords -> regime, Boole[values]]
 
 
-OpenVDBSetValues[___] = $Failed;
+iOpenVDBSetValues[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -189,6 +263,19 @@ SyntaxInformation[OpenVDBSetValues] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetValues] = $indexregime;
 
 
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBSetValues[expr_, ___] /; messageNonMaskGridQ[expr, OpenVDBSetValues] = $Failed;
+
+
+mOpenVDBSetValues[_, coords_, ___] /; messageCoordinateSpecQ[coords, OpenVDBSetValues] = $Failed;
+
+
+mOpenVDBSetValues[___] = $Failed;
+
+
 (* ::Subsection::Closed:: *)
 (*OpenVDBValues*)
 
@@ -197,22 +284,38 @@ OpenVDBDefaultSpace[OpenVDBSetValues] = $indexregime;
 (*Main*)
 
 
-OpenVDBValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
+OpenVDBValues[args__] /; !CheckArguments[OpenVDBValues[args], 2] = $Failed;
+
+
+OpenVDBValues[args___] :=
+	With[{res = iOpenVDBValues[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBValues[args___] := mOpenVDBValues[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBValues*)
+
+
+iOpenVDBValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
 	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
 		vdb["getValues"[indexcoordinates]]
 	]
 
 
-OpenVDBValues[expr_, coord_?coordinateQ -> regime_] :=
-	With[{vals = OpenVDBValues[expr, {coord} -> regime]},
+iOpenVDBValues[expr_, coord_?coordinateQ -> regime_] :=
+	With[{vals = iOpenVDBValues[expr, {coord} -> regime]},
 		vals[[1]] /; vals =!= $Failed
 	]
 
 
-OpenVDBValues[expr_, coords_List] := OpenVDBValues[expr, coords -> $indexregime]
+iOpenVDBValues[expr_, coords_List] := iOpenVDBValues[expr, coords -> $indexregime]
 
 
-OpenVDBValues[___] = $Failed;
+iOpenVDBValues[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
@@ -223,3 +326,16 @@ SyntaxInformation[OpenVDBValues] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBValues] = $indexregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBValues[expr_, ___] /; messageNonMaskGridQ[expr, OpenVDBValues] = $Failed;
+
+
+mOpenVDBValues[_, coords_] /; messageCoordinateSpecQ[coords, OpenVDBValues] = $Failed;
+
+
+mOpenVDBValues[___] = $Failed;

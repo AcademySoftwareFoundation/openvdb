@@ -41,7 +41,23 @@ OpenVDBOpening::usage = "OpenVDBOpening[expr, r] gives the morphological opening
 (*Main*)
 
 
-OpenVDBResizeBandwidth[vdb_?OpenVDBScalarGridQ, width_?Positive -> regime_?regimeQ] /; levelSetQ[vdb] :=
+OpenVDBResizeBandwidth[args__] /; !CheckArguments[OpenVDBResizeBandwidth[args], {1, 2}] = $Failed;
+
+
+OpenVDBResizeBandwidth[args___] :=
+	With[{res = iOpenVDBResizeBandwidth[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBResizeBandwidth[args___] := mOpenVDBResizeBandwidth[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBResizeBandwidth*)
+
+
+iOpenVDBResizeBandwidth[vdb_?OpenVDBScalarGridQ, width_?Positive -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	Block[{w},
 		w = regimeConvert[vdb, width, regime -> $indexregime];
 		(
@@ -51,23 +67,30 @@ OpenVDBResizeBandwidth[vdb_?OpenVDBScalarGridQ, width_?Positive -> regime_?regim
 	]
 
 
-OpenVDBResizeBandwidth[vdb_, width_?Positive] := OpenVDBResizeBandwidth[vdb, width -> $indexregime]
+iOpenVDBResizeBandwidth[vdb_, width_?Positive] := iOpenVDBResizeBandwidth[vdb, width -> $indexregime]
 
 
-OpenVDBResizeBandwidth[___] = $Failed;
+iOpenVDBResizeBandwidth[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBResizeBandwidth, 1];
+registerForLevelSet[iOpenVDBResizeBandwidth, 1];
 
 
 SyntaxInformation[OpenVDBResizeBandwidth] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBResizeBandwidth] = $indexregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBResizeBandwidth[args___] := messageMorphologyFunction[OpenVDBResizeBandwidth, args]
 
 
 (* ::Section:: *)
@@ -82,7 +105,23 @@ OpenVDBDefaultSpace[OpenVDBResizeBandwidth] = $indexregime;
 (*Main*)
 
 
-OpenVDBDilation[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
+OpenVDBDilation[args__] /; !CheckArguments[OpenVDBDilation[args], {1, 2}] = $Failed;
+
+
+OpenVDBDilation[args___] :=
+	With[{res = iOpenVDBDilation[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBDilation[args___] := mOpenVDBDilation[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBDilation*)
+
+
+iOpenVDBDilation[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	Block[{offset},
 		offset = regimeConvert[vdb, -r, regime -> $worldregime];
 		
@@ -92,23 +131,30 @@ OpenVDBDilation[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSe
 	]
 
 
-OpenVDBDilation[vdb_, r_?realQ] := OpenVDBDilation[vdb, r -> $worldregime]
+iOpenVDBDilation[vdb_, r_?realQ] := iOpenVDBDilation[vdb, r -> $worldregime]
 
 
-OpenVDBDilation[___] = $Failed;
+iOpenVDBDilation[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBDilation, 1];
+registerForLevelSet[iOpenVDBDilation, 1];
 
 
 SyntaxInformation[OpenVDBDilation] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBDilation] = $worldregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBDilation[args___] := messageMorphologyFunction[OpenVDBDilation, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -119,7 +165,23 @@ OpenVDBDefaultSpace[OpenVDBDilation] = $worldregime;
 (*Main*)
 
 
-OpenVDBErosion[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
+OpenVDBErosion[args__] /; !CheckArguments[OpenVDBErosion[args], {1, 2}] = $Failed;
+
+
+OpenVDBErosion[args___] :=
+	With[{res = iOpenVDBErosion[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBErosion[args___] := mOpenVDBErosion[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBErosion*)
+
+
+iOpenVDBErosion[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	Block[{offset},
 		offset = regimeConvert[vdb, r, regime -> $worldregime];
 		
@@ -129,23 +191,30 @@ OpenVDBErosion[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSet
 	]
 
 
-OpenVDBErosion[vdb_, r_?realQ] := OpenVDBErosion[vdb, r -> $worldregime]
+iOpenVDBErosion[vdb_, r_?realQ] := iOpenVDBErosion[vdb, r -> $worldregime]
 
 
-OpenVDBErosion[___] = $Failed;
+iOpenVDBErosion[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBErosion, 1];
+registerForLevelSet[iOpenVDBErosion, 1];
 
 
 SyntaxInformation[OpenVDBErosion] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBErosion] = $worldregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBErosion[args___] := messageMorphologyFunction[OpenVDBErosion, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -156,27 +225,50 @@ OpenVDBDefaultSpace[OpenVDBErosion] = $worldregime;
 (*Main*)
 
 
-OpenVDBClosing[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
-	OpenVDBErosion[OpenVDBDilation[vdb, r -> regime], r -> regime]
+OpenVDBClosing[args__] /; !CheckArguments[OpenVDBClosing[args], {1, 2}] = $Failed;
 
 
-OpenVDBClosing[vdb_, r_?NonNegative] := OpenVDBClosing[vdb, r -> $worldregime]
+OpenVDBClosing[args___] :=
+	With[{res = iOpenVDBClosing[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBClosing[___] = $Failed;
+OpenVDBClosing[args___] := mOpenVDBClosing[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBClosing*)
+
+
+iOpenVDBClosing[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
+	iOpenVDBErosion[iOpenVDBDilation[vdb, r -> regime], r -> regime]
+
+
+iOpenVDBClosing[vdb_, r_?NonNegative] := iOpenVDBClosing[vdb, r -> $worldregime]
+
+
+iOpenVDBClosing[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBClosing, 1];
+registerForLevelSet[iOpenVDBClosing, 1];
 
 
 SyntaxInformation[OpenVDBClosing] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBClosing] = $worldregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBClosing[args___] := messageMorphologyFunction[OpenVDBClosing, args]
 
 
 (* ::Subsection::Closed:: *)
@@ -187,24 +279,83 @@ OpenVDBDefaultSpace[OpenVDBClosing] = $worldregime;
 (*Main*)
 
 
-OpenVDBOpening[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
-	OpenVDBDilation[OpenVDBErosion[vdb, r -> regime], r -> regime]
+OpenVDBOpening[args__] /; !CheckArguments[OpenVDBOpening[args], {1, 2}] = $Failed;
 
 
-OpenVDBOpening[vdb_, r_?NonNegative] := OpenVDBOpening[vdb, r -> $worldregime]
+OpenVDBOpening[args___] :=
+	With[{res = iOpenVDBOpening[args]},
+		res /; res =!= $Failed
+	]
 
 
-OpenVDBOpening[___] = $Failed;
+OpenVDBOpening[args___] := mOpenVDBOpening[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBOpening*)
+
+
+iOpenVDBOpening[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
+	iOpenVDBDilation[iOpenVDBErosion[vdb, r -> regime], r -> regime]
+
+
+iOpenVDBOpening[vdb_, r_?NonNegative] := iOpenVDBOpening[vdb, r -> $worldregime]
+
+
+iOpenVDBOpening[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-registerForLevelSet[OpenVDBOpening, 1];
+registerForLevelSet[iOpenVDBOpening, 1];
 
 
 SyntaxInformation[OpenVDBOpening] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBOpening] = $worldregime;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBOpening[args___] := messageMorphologyFunction[OpenVDBOpening, args]
+
+
+(* ::Section:: *)
+(*Utilities*)
+
+
+(* ::Subsection::Closed:: *)
+(*messageMorphologyFunction*)
+
+
+messageMorphologyFunction[head_, expr_, ___] /; messageScalarGridQ[expr, head] = $Failed;
+
+
+messageMorphologyFunction[head_, expr_, ___] /; messageLevelSetGridQ[expr, head] = $Failed;
+
+
+messageMorphologyFunction[head_, _, w_] /; messagePositiveDistanceQ[w, 2, head] = $Failed;
+
+
+messageMorphologyFunction[___] = $Failed;
+
+
+messagePositiveDistanceQ[w_ -> regime_, pos_, head_] := messageRegimeSpecQ[regime, head] || messagePositiveDistanceQ[w, pos, head]
+
+
+messagePositiveDistanceQ[w_, pos_, head_] /; !TrueQ[NonNegative[w]] :=
+	(
+		Message[head::nonneg, w, pos];
+		True
+	)
+
+
+messagePositiveDistanceQ[___] = False;
+
+
+General::nonneg = "`1` at position `2` should be a non\[Hyphen]negative number.";

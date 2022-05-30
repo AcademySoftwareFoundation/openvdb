@@ -29,7 +29,23 @@ OpenVDBSetProperty::usage = "OpenVDBSetProperty[expr, \"prop\", val] sets the va
 (*Main*)
 
 
-OpenVDBSetProperty[vdb_?OpenVDBGridQ, args__] :=
+OpenVDBSetProperty[args__] /; !CheckArguments[OpenVDBSetProperty[args], {2, 3}] = $Failed;
+
+
+OpenVDBSetProperty[args___] :=
+	With[{res = iOpenVDBSetProperty[args]},
+		res /; res =!= $Failed
+	]
+
+
+OpenVDBSetProperty[args___] := mOpenVDBSetProperty[args]
+
+
+(* ::Subsection::Closed:: *)
+(*iOpenVDBSetProperty*)
+
+
+iOpenVDBSetProperty[vdb_?OpenVDBGridQ, args__] :=
 	Block[{parsedargs, res},
 		parsedargs = setterArguments[args];
 		(
@@ -44,7 +60,7 @@ OpenVDBSetProperty[vdb_?OpenVDBGridQ, args__] :=
 	]
 
 
-OpenVDBSetProperty[___] = $Failed;
+iOpenVDBSetProperty[___] = $Failed;
 
 
 (* ::Subsection::Closed:: *)
@@ -52,6 +68,40 @@ OpenVDBSetProperty[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBSetProperty] = {"ArgumentsPattern" -> {_, _, _.}};
+
+
+(* ::Subsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBSetProperty[expr_, ___] /; messageGridQ[expr, OpenVDBSetProperty, False] = $Failed;
+
+
+mOpenVDBSetProperty[_, args__] /; setterArguments[args] === $Failed := 
+	(
+		Message[OpenVDBSetProperty::spec];
+		$Failed
+	)
+
+
+mOpenVDBSetProperty[_, args__] := 
+	Block[{parsed, props},
+		parsed = setterArguments[args][[1]];
+		props = Pick[parsed, Lookup[$setterPropertyAssoc, parsed, $Failed], $Failed];
+		(
+			Message[OpenVDBSetProperty::prop, First[props]];
+			$Failed
+		) /; Length[props] > 0
+	]
+
+
+mOpenVDBSetProperty[___] = $Failed;
+
+
+OpenVDBSetProperty::spec = "Invalid property\[Hyphen]value specification.";
+
+
+OpenVDBSetProperty::prop = "`1` is not a valid property to set.";
 
 
 (* ::Section:: *)
