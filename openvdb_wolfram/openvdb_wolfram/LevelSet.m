@@ -718,7 +718,7 @@ triangleSurfaceComplexSignedDistanceField[coords_, cells_, C12_, spacing_, width
 		vdb["meshLevelSet"[coords, nestedcells[[1]] - 1, spacing, width, signedQ]];
 		
 		Do[
-			nestedvdb = OpenVDBCreateGrid[spacing];
+			nestedvdb = OpenVDBCreateGrid[spacing, type];
 			nestedvdb["meshLevelSet"[coords, nestedcells[[i]] - 1, spacing, width, signedQ]];
 			If[EvenQ[i],
 				OpenVDBDifferenceFrom[vdb, nestedvdb],
