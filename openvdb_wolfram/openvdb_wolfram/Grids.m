@@ -185,7 +185,7 @@ setReadProtected[OpenVDBGridQ];
 (*Main*)
 
 
-OpenVDBGrids[args___] /; !CheckArguments[OpenVDBImage3D[args], {0, 1}] = $Failed;
+OpenVDBGrids[args___] /; !CheckArguments[OpenVDBGrids[args], {0, 1}] = $Failed;
 
 
 OpenVDBGrids[args___] :=
@@ -285,7 +285,7 @@ OpenVDBGrids::type2 = "`1` is not a list of supported grid types. Evaluate OpenV
 (*Main*)
 
 
-OpenVDBGridTypes[args___] /; !CheckArguments[OpenVDBImage3D[args], {0, 1}] = $Failed;
+OpenVDBGridTypes[args___] /; !CheckArguments[OpenVDBGridTypes[args], {0, 1}] = $Failed;
 
 
 OpenVDBGridTypes[args___] :=
@@ -343,7 +343,7 @@ mOpenVDBGridTypes[expr_] /; !MemberQ[$classTypeList, expr] :=
 mOpenVDBGridTypes[___] = $Failed;
 
 
-OpenVDBGrids::type = "`1` is not a supported family of grids.";
+OpenVDBGridTypes::type = "`1` is not a supported family of grids.";
 
 
 (* ::Section:: *)
