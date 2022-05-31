@@ -288,20 +288,8 @@ struct RasterizeOp
         // and compute the enclosing bounding box in the output tree.
         Vec3R frustumMin;
         Vec3R frustumMax;
-        for (int i = 0; i < 8; ++i) {
-            Vec3R cornerWS(
-                i & 1 ? inputBBoxWS.max().x() : inputBBoxWS.min().x(),
-                i & 2 ? inputBBoxWS.max().y() : inputBBoxWS.min().y(),
-                i & 4 ? inputBBoxWS.max().z() : inputBBoxWS.min().z());
-            Vec3R corner = frustum.worldToIndex(cornerWS);
-            if (i == 0) {
-                 frustumMin = corner;
-                 frustumMax = corner;
-            } else {
-                frustumMin = math::minComponent(frustumMin, corner);
-                frustumMax = math::maxComponent(frustumMax, corner);
-            }
-        }
+        math::calculateBounds(frustum, inputBBoxWS.min(), inputBBoxWS.max(),
+            frustumMin, frustumMax);
         CoordBBox frustumBBox(Coord::floor(frustumMin), Coord::ceil(frustumMax));
 
         // if clipping to frustum is enabled, clip the index bounding box
