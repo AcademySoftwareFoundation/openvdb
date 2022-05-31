@@ -213,10 +213,41 @@ iOpenVDBLevelSet[ball:(Ball|Sphere)[___]?ConstantRegionQ, spacing_, width_, type
 	]
 
 
+singleBallData[] = {{0, 0, 0}, 1};
 singleBallData[3] = {{0, 0, 0}, 1}
 singleBallData[c_?VectorQ] := {c, 1}
 singleBallData[c_?VectorQ, r_?Positive] := {c, r}
 singleBallData[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*SphericalShell*)
+
+
+iOpenVDBLevelSet[shell:HoldPattern[SphericalShell][___]?ConstantRegionQ, args___] /; RegionEmbeddingDimension[shell] == 3 := 
+	Block[{shellspec, c, r1, r2, ballout, ballin},
+		shellspec = sphericalShellData @@ shell;
+		(
+			{c, {r1, r2}} = shellspec;
+			ballout = iOpenVDBLevelSet[Ball[c, r2], args];
+			(
+				ballin = iOpenVDBLevelSet[Ball[c, r1], args];
+				
+				OpenVDBDifferenceFrom[ballout, ballin] /; OpenVDBScalarGridQ[ballin]
+				
+			) /; OpenVDBScalarGridQ[ballout]
+			
+		) /; shellspec =!= $Failed
+	]
+
+
+sphericalShellData[] = {{0, 0, 0}, {1/2, 1}};
+sphericalShellData[{r1_, r2_}] := {{0, 0, 0}, {r1, r2}}
+sphericalShellData[c_?VectorQ] := {c, {1/2, 1}}
+sphericalShellData[c_?VectorQ, r_?Positive] := {c, {r/2, r}}
+sphericalShellData[c_?VectorQ, {r1_, r2_}] := {c, {r1, r2}}
+sphericalShellData[r_] := {{0, 0, 0}, {r/2, r}}
+sphericalShellData[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
