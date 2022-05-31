@@ -100,9 +100,6 @@ SyntaxInformation[OpenVDBTransform] = {"ArgumentsPattern" -> {_, _, OptionsPatte
 OpenVDBDefaultSpace[OpenVDBTransform] = $worldregime;
 
 
-setReadProtected[OpenVDBTransform];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Utilities*)
 
@@ -223,9 +220,6 @@ registerForLevelSet[iOpenVDBMultiply, 1];
 SyntaxInformation[OpenVDBMultiply] = {"ArgumentsPattern" -> {_, _}};
 
 
-setReadProtected[OpenVDBMultiply];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -297,9 +291,6 @@ registerForLevelSet[iOpenVDBGammaAdjust, 1];
 
 
 SyntaxInformation[OpenVDBGammaAdjust] = {"ArgumentsPattern" -> {_, _}};
-
-
-setReadProtected[OpenVDBGammaAdjust];
 
 
 (* ::Subsubsection::Closed:: *)

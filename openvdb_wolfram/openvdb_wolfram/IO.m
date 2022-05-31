@@ -87,9 +87,6 @@ SyntaxInformation[OpenVDBImport] = {"ArgumentsPattern" -> {_, _., _.}};
 addCodeCompletion[OpenVDBImport][None, None, $gridTypeList];
 
 
-setReadProtected[OpenVDBImport];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Utilities*)
 
@@ -191,9 +188,6 @@ registerForLevelSet[iOpenVDBExport, 2];
 
 
 SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
-
-
-setReadProtected[OpenVDBExport];
 
 
 (* ::Subsubsection::Closed:: *)

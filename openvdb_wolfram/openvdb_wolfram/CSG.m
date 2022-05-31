@@ -107,9 +107,6 @@ registerForLevelSet[iOpenVDBUnion];
 SyntaxInformation[OpenVDBUnion] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
 
 
-setReadProtected[OpenVDBUnion];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -181,9 +178,6 @@ registerForLevelSet[iOpenVDBIntersection];
 
 
 SyntaxInformation[OpenVDBIntersection] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
-
-
-setReadProtected[OpenVDBIntersection];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -271,9 +265,6 @@ registerForLevelSet[iOpenVDBDifference];
 SyntaxInformation[OpenVDBDifference] = {"ArgumentsPattern" -> {___, OptionsPattern[]}};
 
 
-setReadProtected[OpenVDBDifference];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Utilities*)
 
@@ -354,9 +345,6 @@ registerForLevelSet[iOpenVDBUnionTo];
 SyntaxInformation[OpenVDBUnionTo] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
 
 
-setReadProtected[OpenVDBUnionTo];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -423,9 +411,6 @@ registerForLevelSet[iOpenVDBIntersectWith];
 
 
 SyntaxInformation[OpenVDBIntersectWith] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
-
-
-setReadProtected[OpenVDBIntersectWith];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -497,9 +482,6 @@ registerForLevelSet[iOpenVDBDifferenceFrom];
 
 
 SyntaxInformation[OpenVDBDifferenceFrom] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
-
-
-setReadProtected[OpenVDBDifferenceFrom];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -577,9 +559,6 @@ SyntaxInformation[OpenVDBClip] = {"ArgumentsPattern" -> {_, _, OptionsPattern[]}
 
 
 OpenVDBDefaultSpace[OpenVDBClip] = $worldregime;
-
-
-setReadProtected[OpenVDBClip];
 
 
 (* ::Subsubsection::Closed:: *)

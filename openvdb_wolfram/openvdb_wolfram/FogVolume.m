@@ -88,9 +88,6 @@ SyntaxInformation[OpenVDBToFogVolume] = {"ArgumentsPattern" -> {_, _.}};
 OpenVDBDefaultSpace[OpenVDBToFogVolume] = $indexregime;
 
 
-setReadProtected[OpenVDBToFogVolume];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -158,9 +155,6 @@ SyntaxInformation[OpenVDBFogVolume] = {"ArgumentsPattern" -> {_, _.}};
 
 
 OpenVDBDefaultSpace[OpenVDBFogVolume] = $indexregime;
-
-
-setReadProtected[OpenVDBFogVolume];
 
 
 (* ::Subsubsection::Closed:: *)

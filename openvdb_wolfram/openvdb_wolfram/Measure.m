@@ -82,9 +82,6 @@ SyntaxInformation[OpenVDBArea] = {"ArgumentsPattern" -> {_, _.}};
 OpenVDBDefaultSpace[OpenVDBArea] = $worldregime;
 
 
-setReadProtected[OpenVDBArea];
-
-
 (* ::Subsection::Closed:: *)
 (*Utilities*)
 
@@ -166,9 +163,6 @@ registerForLevelSet[iOpenVDBEulerCharacteristic, 1];
 SyntaxInformation[OpenVDBEulerCharacteristic] = {"ArgumentsPattern" -> {_}};
 
 
-setReadProtected[OpenVDBEulerCharacteristic];
-
-
 (* ::Subsection::Closed:: *)
 (*Messages*)
 
@@ -226,9 +220,6 @@ registerForLevelSet[iOpenVDBGenus, 1];
 
 
 SyntaxInformation[OpenVDBGenus] = {"ArgumentsPattern" -> {_}};
-
-
-setReadProtected[OpenVDBGenus];
 
 
 (* ::Subsection::Closed:: *)
@@ -294,9 +285,6 @@ SyntaxInformation[OpenVDBVolume] = {"ArgumentsPattern" -> {_, _.}};
 
 
 OpenVDBDefaultSpace[OpenVDBVolume] = $worldregime;
-
-
-setReadProtected[OpenVDBVolume];
 
 
 (* ::Subsection::Closed:: *)

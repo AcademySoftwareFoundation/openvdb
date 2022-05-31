@@ -115,9 +115,6 @@ SyntaxInformation[OpenVDBImage3D] = {"ArgumentsPattern" -> {_, _., OptionsPatter
 OpenVDBDefaultSpace[OpenVDBImage3D] = $indexregime;
 
 
-setReadProtected[OpenVDBImage3D];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Utilities*)
 
@@ -260,9 +257,6 @@ SyntaxInformation[OpenVDBDepthImage] = {"ArgumentsPattern" -> {_, _., _., _., Op
 OpenVDBDefaultSpace[OpenVDBDepthImage] = $indexregime;
 
 
-setReadProtected[OpenVDBDepthImage];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -374,9 +368,6 @@ SyntaxInformation[OpenVDBProjectionImage] = {"ArgumentsPattern" -> {_, _., Optio
 OpenVDBDefaultSpace[OpenVDBProjectionImage] = $indexregime;
 
 
-setReadProtected[OpenVDBProjectionImage];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -471,9 +462,6 @@ SyntaxInformation[OpenVDBSliceImage] = {"ArgumentsPattern" -> {_, _, _., Options
 
 
 OpenVDBDefaultSpace[OpenVDBSliceImage] = $indexregime;
-
-
-setReadProtected[OpenVDBSliceImage];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -582,9 +570,6 @@ iOpenVDBDynamicSliceImage[___] = $Failed;
 
 
 SyntaxInformation[OpenVDBDynamicSliceImage] = {"ArgumentsPattern" -> {_, OptionsPattern[]}};
-
-
-setReadProtected[OpenVDBDynamicSliceImage];
 
 
 (* ::Subsubsection::Closed:: *)

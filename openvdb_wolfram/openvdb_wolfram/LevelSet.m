@@ -395,9 +395,6 @@ iOpenVDBLevelSet[___] = $Failed;
 SyntaxInformation[OpenVDBLevelSet] = {"ArgumentsPattern" -> {_, _., _., OptionsPattern[]}};
 
 
-setReadProtected[OpenVDBLevelSet];
-
-
 (* ::Subsection::Closed:: *)
 (*Messages*)
 

@@ -79,9 +79,6 @@ SyntaxInformation[OpenVDBFilter] = {"ArgumentsPattern" -> {_, _, _.}};
 addCodeCompletion[OpenVDBFilter][None, {"Mean", "Median", "Gaussian", "Laplacian", "MeanCurvature"}, None];
 
 
-setReadProtected[OpenVDBFilter];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Utilities*)
 

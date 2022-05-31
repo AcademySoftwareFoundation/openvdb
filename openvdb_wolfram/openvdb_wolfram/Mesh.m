@@ -110,9 +110,6 @@ addCodeCompletion[OpenVDBMesh][None, {"MeshRegion", "BoundaryMeshRegion", "Compl
 OpenVDBDefaultSpace[OpenVDBMesh] = $worldregime;
 
 
-setReadProtected[OpenVDBMesh];
-
-
 (* ::Subsection::Closed:: *)
 (*Utilities*)
 

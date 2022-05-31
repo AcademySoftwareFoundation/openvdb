@@ -70,9 +70,6 @@ iOpenVDBSetProperty[___] = $Failed;
 SyntaxInformation[OpenVDBSetProperty] = {"ArgumentsPattern" -> {_, _, _.}};
 
 
-setReadProtected[OpenVDBSetProperty];
-
-
 (* ::Subsection::Closed:: *)
 (*Messages*)
 

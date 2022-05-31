@@ -86,9 +86,6 @@ SyntaxInformation[OpenVDBResizeBandwidth] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBResizeBandwidth] = $indexregime;
 
 
-setReadProtected[OpenVDBResizeBandwidth];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -153,9 +150,6 @@ SyntaxInformation[OpenVDBDilation] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBDilation] = $worldregime;
 
 
-setReadProtected[OpenVDBDilation];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -216,9 +210,6 @@ SyntaxInformation[OpenVDBErosion] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBErosion] = $worldregime;
 
 
-setReadProtected[OpenVDBErosion];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -273,9 +264,6 @@ SyntaxInformation[OpenVDBClosing] = {"ArgumentsPattern" -> {_, _}};
 OpenVDBDefaultSpace[OpenVDBClosing] = $worldregime;
 
 
-setReadProtected[OpenVDBClosing];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -328,9 +316,6 @@ SyntaxInformation[OpenVDBOpening] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBOpening] = $worldregime;
-
-
-setReadProtected[OpenVDBOpening];
 
 
 (* ::Subsubsection::Closed:: *)

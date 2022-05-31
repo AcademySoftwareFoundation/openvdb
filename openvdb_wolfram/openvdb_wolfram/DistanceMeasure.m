@@ -108,9 +108,6 @@ SyntaxInformation[OpenVDBMember] = {"ArgumentsPattern" -> {_, _, OptionsPattern[
 OpenVDBDefaultSpace[OpenVDBMember] = $worldregime;
 
 
-setReadProtected[OpenVDBMember];
-
-
 (* ::Section:: *)
 (*Nearest*)
 
@@ -188,9 +185,6 @@ SyntaxInformation[OpenVDBNearest] = {"ArgumentsPattern" -> {_, _, OptionsPattern
 
 
 OpenVDBDefaultSpace[OpenVDBNearest] = $worldregime;
-
-
-setReadProtected[OpenVDBNearest];
 
 
 (* ::Section:: *)
@@ -272,9 +266,6 @@ SyntaxInformation[OpenVDBDistance] = {"ArgumentsPattern" -> {_, _, OptionsPatter
 OpenVDBDefaultSpace[OpenVDBDistance] = $worldregime;
 
 
-setReadProtected[OpenVDBDistance];
-
-
 (* ::Subsection::Closed:: *)
 (*OpenVDBSignedDistance*)
 
@@ -350,9 +341,6 @@ SyntaxInformation[OpenVDBSignedDistance] = {"ArgumentsPattern" -> {_, _, Options
 OpenVDBDefaultSpace[OpenVDBSignedDistance] = $worldregime;
 
 
-setReadProtected[OpenVDBSignedDistance];
-
-
 (* ::Section:: *)
 (*Balls*)
 
@@ -423,9 +411,6 @@ SyntaxInformation[OpenVDBFillWithBalls] = {"ArgumentsPattern" -> {_, _, _., Opti
 
 
 OpenVDBDefaultSpace[OpenVDBFillWithBalls] = $worldregime;
-
-
-setReadProtected[OpenVDBFillWithBalls];
 
 
 (* ::Subsubsection::Closed:: *)

@@ -122,9 +122,6 @@ SyntaxInformation[OpenVDBLevelSetRender] = {"ArgumentsPattern" -> {_, _., Option
 addCodeCompletion[OpenVDBLevelSetRender][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
 
 
-setReadProtected[OpenVDBLevelSetRender];
-
-
 (* ::Subsection::Closed:: *)
 (*oLevelSetRender*)
 
@@ -232,9 +229,6 @@ SyntaxInformation[OpenVDBLevelSetViewer] = {"ArgumentsPattern" -> {_, _., Option
 
 
 addCodeCompletion[OpenVDBLevelSetViewer][None, Join[Keys[$renderColorThemes], $dielectricList, $metalList], None];
-
-
-setReadProtected[OpenVDBLevelSetViewer];
 
 
 (* ::Subsection::Closed:: *)

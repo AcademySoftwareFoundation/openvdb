@@ -96,9 +96,6 @@ SyntaxInformation[OpenVDBSetStates] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetStates] = $indexregime;
 
 
-setReadProtected[OpenVDBSetStates];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -162,9 +159,6 @@ SyntaxInformation[OpenVDBStates] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBStates] = $indexregime;
-
-
-setReadProtected[OpenVDBStates];
 
 
 (* ::Subsubsection::Closed:: *)
@@ -269,9 +263,6 @@ SyntaxInformation[OpenVDBSetValues] = {"ArgumentsPattern" -> {_, _, _}};
 OpenVDBDefaultSpace[OpenVDBSetValues] = $indexregime;
 
 
-setReadProtected[OpenVDBSetValues];
-
-
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
@@ -335,9 +326,6 @@ SyntaxInformation[OpenVDBValues] = {"ArgumentsPattern" -> {_, _}};
 
 
 OpenVDBDefaultSpace[OpenVDBValues] = $indexregime;
-
-
-setReadProtected[OpenVDBValues];
 
 
 (* ::Subsubsection::Closed:: *)
