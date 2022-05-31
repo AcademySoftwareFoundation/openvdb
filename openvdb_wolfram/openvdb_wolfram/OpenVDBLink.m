@@ -745,6 +745,12 @@ testToCellGroup[
 
 (* Handle 1-arg tests *)
 testToCellGroup[
+	HoldComplete[test : VerificationTest[fst_, {}, args___]],
+	cellids_
+] /; Quiet @ CheckArguments[test, 1] := testToCellGroup[VerificationTest[fst, {}, {}], cellids];
+
+(* Handle 1-arg tests *)
+testToCellGroup[
 	HoldComplete[test : VerificationTest[fst_, args___]],
 	cellids_
 ] /; Quiet @ CheckArguments[test, 1] := testToCellGroup[VerificationTest[fst, True, {}, args], cellids];
