@@ -61,14 +61,16 @@ iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
 	Block[{name, type, vdb, id, successQ},
 		name = If[StringQ[iname], iname, ""];
 		type = If[itype === Automatic, detectVDBType[file, name], itype];
-		
-		vdb = OpenVDBCreateGrid[1.0, type];
-		(	
-			successQ = vdb["importVDB"[file, name]];
+		(
+			vdb = OpenVDBCreateGrid[1.0, type];
+			(	
+				successQ = vdb["importVDB"[file, name]];
+				
+				vdb /; successQ
+				
+			) /; OpenVDBGridQ[vdb]
 			
-			vdb /; successQ
-			
-		) /; OpenVDBGridQ[vdb]
+		) /; type =!= $Failed
 	]
 
 
