@@ -146,6 +146,7 @@ else()
     TestPointMask.cc
     TestPointMove.cc
     TestPointPartitioner.cc
+    TestPointRasterizeFrustum.cc
     TestPointRasterizeSDF.cc
     TestPointRasterizeTrilinear.cc
     TestPointSample.cc

@@ -449,6 +449,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeFrustum.h
   points/PointRasterizeSDF.h
   points/PointRasterizeTrilinear.h
   points/PointSample.h
@@ -459,6 +460,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
 )
 
 set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointRasterizeFrustumImpl.h
   points/impl/PointRasterizeSDFImpl.h
   points/impl/PointRasterizeTrilinearImpl.h
 )
