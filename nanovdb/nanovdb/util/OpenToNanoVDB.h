@@ -430,7 +430,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
     static_assert(is_same<FpN,   NanoBuildT>::value, "compression: expected NanoBuildT == FpN");
     if (is_same<AbsDiff, OracleT>::value && mOracle.getTolerance() < 0.0f) {// default tolerance for level set and fog volumes
         if (openGrid.getGridClass() == openvdb::GRID_LEVEL_SET) {
-            mOracle.setTolerance(0.1f * openGrid.voxelSize()[0]);// range of ls: [-3dx; 3dx]
+            mOracle.setTolerance(0.1f * float(openGrid.voxelSize()[0]));// range of ls: [-3dx; 3dx]
         } else if (openGrid.getGridClass() == openvdb::GRID_FOG_VOLUME) {
             mOracle.setTolerance(0.01f);// range of FOG volumes: [0;1]
         } else {
@@ -443,7 +443,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
 
     DitherLUT lut(mDitherOn);
     auto kernel = [&](const auto &r) {
-        const OracleT oracle = mOracle;
+        const OracleT oracle = mOracle;// local copy since it's very lightweight
         for (auto i=r.begin(); i!=r.end(); ++i) {
             const float *data = mArray0[i].node->buffer().data();
             float min = std::numeric_limits<float>::max(), max = -min;
@@ -465,7 +465,7 @@ OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>::
                     const float exact  = data[j];// exact value
                     const uint32_t code = uint32_t(encode*(exact - min) + lut(j));
                     const float approx = code * decode + min;// approximate value
-                    j += mOracle(exact, approx) ? 1 : 513;
+                    j += oracle(exact, approx) ? 1 : 513;
                 } while(j < 512);
                 if (j == 512) break;
                 ++logBitWidth;
@@ -692,9 +692,9 @@ NanoTree<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
     NanoLeafT  *nanoLeaf  = mArray0.empty() ? nullptr : reinterpret_cast<NanoLeafT*>(mBufferPtr + mBufferOffsets[5]);
     data->setFirstNode(nanoLeaf);
 
-    data->mNodeCount[0] = mArray0.size();
-    data->mNodeCount[1] = mArray1.size();
-    data->mNodeCount[2] = mArray2.size();
+    data->mNodeCount[0] = static_cast<uint32_t>(mArray0.size());
+    data->mNodeCount[1] = static_cast<uint32_t>(mArray1.size());
+    data->mNodeCount[2] = static_cast<uint32_t>(mArray2.size());
 
 #if 1// count active tiles and voxels
 

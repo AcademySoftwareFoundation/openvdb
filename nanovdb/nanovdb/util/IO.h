@@ -107,10 +107,10 @@ inline uint64_t reverseEndianness(uint64_t val)
 //        one or more grids.
 // Magic number of NanoVDB files   (uint64_t) |
 // Version numbers of this file    (uint32_t) | one header for each segment
-// Compression mode                (uint16_t) |
 // Number of grids in this segment (uint16_t) |
+// Compression mode                (uint16_t) |
 struct Header
-{
+{// 16 bytes
     uint64_t magic; // 8 bytes
     Version  version;// 4 bytes version numbers
     uint16_t gridCount; // 2 bytes
@@ -142,7 +142,7 @@ struct Header
 // Padding due to 8B alignment     (uint16_t)   |
 // Version number                  (uint32_t)   |
 struct MetaData
-{
+{// 176 bytes
     uint64_t    gridSize, fileSize, nameKey, voxelCount; // 4 * 8 = 32B.
     GridType    gridType;  // 4B.
     GridClass   gridClass; // 4B.

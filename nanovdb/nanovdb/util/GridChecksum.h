@@ -212,7 +212,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = mgr.upper(i);
+            const auto *node = mgr.upper(static_cast<uint32_t>(i));
             local(node, sizeof(*node) );
             *p++ = local.checksum();
             local.reset();
@@ -224,7 +224,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = mgr.lower(i);
+            const auto *node = mgr.lower(static_cast<uint32_t>(i));
             local(node, sizeof(*node) );
             *p++ = local.checksum();
             local.reset();
@@ -236,7 +236,7 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(1) + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *leaf = mgr.leaf(i);
+            const auto *leaf = mgr.leaf(static_cast<uint32_t>(i));
             local(leaf, sizeof(*leaf) );
             *p++ = local.checksum();
             local.reset();
