@@ -59,6 +59,14 @@ volumeToMesh(
 
 
 /// @brief Adaptively mesh any scalar grid that has a continuous isosurface.
+/// @details When converting to polygons, the adaptivity threshold determines
+///   how closely the isosurface is matched by the resulting mesh. Higher
+///   thresholds will allow more variation in polygon size, using fewer
+///   polygons to express the surface. Triangles will only be created for
+///   areas of the mesh which hit the adaptivity threshold and can't be
+///   represented as quads.
+/// @note Do not use this method just to get a triangle mesh - use the above
+///   method and post process the quad index list.
 ///
 /// @param grid                       a scalar grid to mesh
 /// @param points                     output list of world space points
