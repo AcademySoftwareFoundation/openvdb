@@ -47,11 +47,14 @@ Version 9.0.1 - In development
     - Fixed an issue which could report Python as missing when using CMake 3.18 and later on some systems.  [Reported by Sam James]
     - Changed the way boost_python and boost_numpy are located. Both components must match the major/minor version of python in use. This can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.
     - Relocated OpenVDB binaries to a new openvdb_cmd root directory.
+    - FindTBB.cmake now prioritises newer TBB installations.
 
     Houdini:
     - Added Attribute Bindings to AX SOP to allow differently named AX attributes (@) and target point attributes/volumes.
     - Fix race condition in OpenVDB Merge SOP that could cause crashes
       or merged VDBs to not be deleted.
+    - VDB Activate SOP no longer stops at the first non-VDB primitive,
+      but instead just skips such primitives.
 
 
 Version 9.0.0 - October 29, 2021
