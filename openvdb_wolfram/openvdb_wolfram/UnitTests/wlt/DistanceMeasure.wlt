@@ -23,7 +23,9 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBMember]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 4 *)
@@ -39,23 +41,19 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBMember[], 
-OpenVDBLink`OpenVDBMember["error"],
-OpenVDBLink`OpenVDBMember[bmr],
-OpenVDBLink`OpenVDBMember[bmr, "error"],
-OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0, 0}}],
-OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0}}->"error"],
-OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0}}, "error"]
-}
+	{OpenVDBLink`OpenVDBMember[], OpenVDBLink`OpenVDBMember["error"], OpenVDBLink`OpenVDBMember[bmr], OpenVDBLink`OpenVDBMember[bmr, "error"], OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0, 0}}], OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0}}->"error"], OpenVDBLink`OpenVDBMember[bmr, {{0, 0, 0}}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBMember::argrx, OpenVDBMember::argr, OpenVDBMember::argr, OpenVDBMember::coord, OpenVDBMember::coord, OpenVDBMember::gridspace, OpenVDBMember::nonopt}
 ]
 
 VerificationTest[(* 7 *)
 	(OpenVDBLink`OpenVDBMember[OpenVDBLink`OpenVDBCreateGrid[1., #1], {0, 0, 0}]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBMember::scalargrid2, OpenVDBMember::scalargrid2, OpenVDBMember::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -71,7 +69,9 @@ VerificationTest[(* 8 *)
 VerificationTest[(* 9 *)
 	Attributes[OpenVDBLink`OpenVDBNearest]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 10 *)
@@ -87,23 +87,19 @@ VerificationTest[(* 11 *)
 ]
 
 VerificationTest[(* 12 *)
-	{
-OpenVDBLink`OpenVDBNearest[], 
-OpenVDBLink`OpenVDBNearest["error"],
-OpenVDBLink`OpenVDBNearest[bmr],
-OpenVDBLink`OpenVDBNearest[bmr, "error"],
-OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0, 0}}],
-OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0}}->"error"],
-OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0}}, "error"]
-}
+	{OpenVDBLink`OpenVDBNearest[], OpenVDBLink`OpenVDBNearest["error"], OpenVDBLink`OpenVDBNearest[bmr], OpenVDBLink`OpenVDBNearest[bmr, "error"], OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0, 0}}], OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0}}->"error"], OpenVDBLink`OpenVDBNearest[bmr, {{0, 0, 0}}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBNearest::argrx, OpenVDBNearest::argr, OpenVDBNearest::argr, OpenVDBNearest::coord, OpenVDBNearest::coord, OpenVDBNearest::gridspace, OpenVDBNearest::nonopt}
 ]
 
 VerificationTest[(* 13 *)
 	(OpenVDBLink`OpenVDBNearest[OpenVDBLink`OpenVDBCreateGrid[1., #1], {0, 0, 0}]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBNearest::scalargrid2, OpenVDBNearest::scalargrid2, OpenVDBNearest::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -119,7 +115,9 @@ VerificationTest[(* 14 *)
 VerificationTest[(* 15 *)
 	Attributes[OpenVDBLink`OpenVDBDistance]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 16 *)
@@ -135,23 +133,19 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	{
-OpenVDBLink`OpenVDBDistance[], 
-OpenVDBLink`OpenVDBDistance["error"],
-OpenVDBLink`OpenVDBDistance[bmr],
-OpenVDBLink`OpenVDBDistance[bmr, "error"],
-OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0, 0}}],
-OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0}}->"error"],
-OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0}}, "error"]
-}
+	{OpenVDBLink`OpenVDBDistance[], OpenVDBLink`OpenVDBDistance["error"], OpenVDBLink`OpenVDBDistance[bmr], OpenVDBLink`OpenVDBDistance[bmr, "error"], OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0, 0}}], OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0}}->"error"], OpenVDBLink`OpenVDBDistance[bmr, {{0, 0, 0}}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDistance::argrx, OpenVDBDistance::argr, OpenVDBDistance::argr, OpenVDBDistance::coord, OpenVDBDistance::coord, OpenVDBDistance::gridspace, OpenVDBDistance::nonopt}
 ]
 
 VerificationTest[(* 19 *)
 	(OpenVDBLink`OpenVDBDistance[OpenVDBLink`OpenVDBCreateGrid[1., #1], {0, 0, 0}]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDistance::scalargrid2, OpenVDBDistance::scalargrid2, OpenVDBDistance::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -167,7 +161,9 @@ VerificationTest[(* 20 *)
 VerificationTest[(* 21 *)
 	Attributes[OpenVDBLink`OpenVDBSignedDistance]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 22 *)
@@ -183,23 +179,19 @@ VerificationTest[(* 23 *)
 ]
 
 VerificationTest[(* 24 *)
-	{
-OpenVDBLink`OpenVDBSignedDistance[], 
-OpenVDBLink`OpenVDBSignedDistance["error"],
-OpenVDBLink`OpenVDBSignedDistance[bmr],
-OpenVDBLink`OpenVDBSignedDistance[bmr, "error"],
-OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0, 0}}],
-OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0}}->"error"],
-OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0}}, "error"]
-}
+	{OpenVDBLink`OpenVDBSignedDistance[], OpenVDBLink`OpenVDBSignedDistance["error"], OpenVDBLink`OpenVDBSignedDistance[bmr], OpenVDBLink`OpenVDBSignedDistance[bmr, "error"], OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0, 0}}], OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0}}->"error"], OpenVDBLink`OpenVDBSignedDistance[bmr, {{0, 0, 0}}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBSignedDistance::argrx, OpenVDBSignedDistance::argr, OpenVDBSignedDistance::argr, OpenVDBSignedDistance::coord, OpenVDBSignedDistance::coord, OpenVDBSignedDistance::gridspace, OpenVDBSignedDistance::nonopt}
 ]
 
 VerificationTest[(* 25 *)
 	(OpenVDBLink`OpenVDBSignedDistance[OpenVDBLink`OpenVDBCreateGrid[1., #1], {0, 0, 0}]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBSignedDistance::scalargrid2, OpenVDBSignedDistance::scalargrid2, OpenVDBSignedDistance::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -215,7 +207,9 @@ VerificationTest[(* 26 *)
 VerificationTest[(* 27 *)
 	Attributes[OpenVDBLink`OpenVDBFillWithBalls]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 28 *)
@@ -231,23 +225,19 @@ VerificationTest[(* 29 *)
 ]
 
 VerificationTest[(* 30 *)
-	{
-OpenVDBLink`OpenVDBFillWithBalls[], 
-OpenVDBLink`OpenVDBFillWithBalls["error"],
-OpenVDBLink`OpenVDBFillWithBalls[bmr],
-OpenVDBLink`OpenVDBFillWithBalls[bmr, "error"],
-OpenVDBLink`OpenVDBFillWithBalls[bmr, 10, "error"],
-OpenVDBLink`OpenVDBSignedDistance[bmr, 10, 1->"error"],
-OpenVDBLink`OpenVDBSignedDistance[bmr, 10, 3->"World", "error"]
-}
+	{OpenVDBLink`OpenVDBFillWithBalls[], OpenVDBLink`OpenVDBFillWithBalls["error"], OpenVDBLink`OpenVDBFillWithBalls[bmr], OpenVDBLink`OpenVDBFillWithBalls[bmr, "error"], OpenVDBLink`OpenVDBFillWithBalls[bmr, 10, "error"], OpenVDBLink`OpenVDBSignedDistance[bmr, 10, 1->"error"], OpenVDBLink`OpenVDBSignedDistance[bmr, 10, 3->"World", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFillWithBalls::argt, OpenVDBFillWithBalls::argtu, OpenVDBFillWithBalls::argtu, OpenVDBFillWithBalls::intpm, OpenVDBFillWithBalls::rspec, OpenVDBSignedDistance::optrs, OpenVDBSignedDistance::nonopt}
 ]
 
 VerificationTest[(* 31 *)
 	(OpenVDBLink`OpenVDBFillWithBalls[OpenVDBLink`OpenVDBCreateGrid[1., #1], 10, 3]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFillWithBalls::scalargrid2, OpenVDBFillWithBalls::scalargrid2, OpenVDBFillWithBalls::scalargrid2, General::stop}
 ]
 
 EndTestSection[]

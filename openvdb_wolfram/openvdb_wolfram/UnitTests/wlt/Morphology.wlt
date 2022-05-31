@@ -23,7 +23,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBResizeBandwidth]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 4 *)
@@ -39,20 +39,19 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBResizeBandwidth[], 
-OpenVDBLink`OpenVDBResizeBandwidth["error"],
-OpenVDBLink`OpenVDBResizeBandwidth[vdb, "error"],
-OpenVDBLink`OpenVDBResizeBandwidth[vdb, 2, "error"]
-}
+	{OpenVDBLink`OpenVDBResizeBandwidth[], OpenVDBLink`OpenVDBResizeBandwidth["error"], OpenVDBLink`OpenVDBResizeBandwidth[vdb, "error"], OpenVDBLink`OpenVDBResizeBandwidth[vdb, 2, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBResizeBandwidth::argt, OpenVDBResizeBandwidth::scalargrid2, OpenVDBResizeBandwidth::nonneg, OpenVDBResizeBandwidth::argt}
 ]
 
 VerificationTest[(* 7 *)
 	(OpenVDBLink`OpenVDBResizeBandwidth[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBResizeBandwidth::scalargrid2, OpenVDBResizeBandwidth::scalargrid2, OpenVDBResizeBandwidth::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -68,7 +67,7 @@ VerificationTest[(* 8 *)
 VerificationTest[(* 9 *)
 	Attributes[OpenVDBLink`OpenVDBDilation]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 10 *)
@@ -84,20 +83,19 @@ VerificationTest[(* 11 *)
 ]
 
 VerificationTest[(* 12 *)
-	{
-OpenVDBLink`OpenVDBDilation[], 
-OpenVDBLink`OpenVDBDilation["error"],
-OpenVDBLink`OpenVDBDilation[vdb, "error"],
-OpenVDBLink`OpenVDBDilation[vdb, 2->"Index", "error"]
-}
+	{OpenVDBLink`OpenVDBDilation[], OpenVDBLink`OpenVDBDilation["error"], OpenVDBLink`OpenVDBDilation[vdb, "error"], OpenVDBLink`OpenVDBDilation[vdb, 2->"Index", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDilation::argt, OpenVDBDilation::scalargrid2, OpenVDBDilation::nonneg, OpenVDBDilation::argt}
 ]
 
 VerificationTest[(* 13 *)
 	(OpenVDBLink`OpenVDBDilation[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2->"Index"]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDilation::scalargrid2, OpenVDBDilation::scalargrid2, OpenVDBDilation::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -113,7 +111,7 @@ VerificationTest[(* 14 *)
 VerificationTest[(* 15 *)
 	Attributes[OpenVDBLink`OpenVDBErosion]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 16 *)
@@ -129,20 +127,19 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	{
-OpenVDBLink`OpenVDBErosion[], 
-OpenVDBLink`OpenVDBErosion["error"],
-OpenVDBLink`OpenVDBErosion[vdb, "error"],
-OpenVDBLink`OpenVDBErosion[vdb, 2->"Index", "error"]
-}
+	{OpenVDBLink`OpenVDBErosion[], OpenVDBLink`OpenVDBErosion["error"], OpenVDBLink`OpenVDBErosion[vdb, "error"], OpenVDBLink`OpenVDBErosion[vdb, 2->"Index", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBErosion::argt, OpenVDBErosion::scalargrid2, OpenVDBErosion::nonneg, OpenVDBErosion::argt}
 ]
 
 VerificationTest[(* 19 *)
 	(OpenVDBLink`OpenVDBErosion[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2->"Index"]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBErosion::scalargrid2, OpenVDBErosion::scalargrid2, OpenVDBErosion::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -158,7 +155,7 @@ VerificationTest[(* 20 *)
 VerificationTest[(* 21 *)
 	Attributes[OpenVDBLink`OpenVDBClosing]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 22 *)
@@ -174,20 +171,19 @@ VerificationTest[(* 23 *)
 ]
 
 VerificationTest[(* 24 *)
-	{
-OpenVDBLink`OpenVDBClosing[], 
-OpenVDBLink`OpenVDBClosing["error"],
-OpenVDBLink`OpenVDBClosing[vdb, "error"],
-OpenVDBLink`OpenVDBClosing[vdb, 2->"Index", "error"]
-}
+	{OpenVDBLink`OpenVDBClosing[], OpenVDBLink`OpenVDBClosing["error"], OpenVDBLink`OpenVDBClosing[vdb, "error"], OpenVDBLink`OpenVDBClosing[vdb, 2->"Index", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBClosing::argt, OpenVDBClosing::scalargrid2, OpenVDBClosing::nonneg, OpenVDBClosing::argt}
 ]
 
 VerificationTest[(* 25 *)
 	(OpenVDBLink`OpenVDBClosing[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2->"Index"]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBClosing::scalargrid2, OpenVDBClosing::scalargrid2, OpenVDBClosing::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -203,7 +199,7 @@ VerificationTest[(* 26 *)
 VerificationTest[(* 27 *)
 	Attributes[OpenVDBLink`OpenVDBOpening]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 28 *)
@@ -219,20 +215,19 @@ VerificationTest[(* 29 *)
 ]
 
 VerificationTest[(* 30 *)
-	{
-OpenVDBLink`OpenVDBOpening[], 
-OpenVDBLink`OpenVDBOpening["error"],
-OpenVDBLink`OpenVDBOpening[vdb, "error"],
-OpenVDBLink`OpenVDBOpening[vdb, 2->"Index", "error"]
-}
+	{OpenVDBLink`OpenVDBOpening[], OpenVDBLink`OpenVDBOpening["error"], OpenVDBLink`OpenVDBOpening[vdb, "error"], OpenVDBLink`OpenVDBOpening[vdb, 2->"Index", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBOpening::argt, OpenVDBOpening::scalargrid2, OpenVDBOpening::nonneg, OpenVDBOpening::argt}
 ]
 
 VerificationTest[(* 31 *)
 	(OpenVDBLink`OpenVDBOpening[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2->"Index"]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBOpening::scalargrid2, OpenVDBOpening::scalargrid2, OpenVDBOpening::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -244,7 +239,7 @@ BeginTestSection["Float"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 32 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb],    OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True}	
 ]
@@ -260,8 +255,7 @@ VerificationTest[(* 33 *)
 ]
 
 VerificationTest[(* 34 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
 	,
 	18602	
 ]
@@ -269,7 +263,9 @@ OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
 VerificationTest[(* 35 *)
 	OpenVDBLink`OpenVDBResizeBandwidth[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBResizeBandwidth::lvlsetgrid2}
 ]
 
 VerificationTest[(* 36 *)
@@ -295,8 +291,7 @@ VerificationTest[(* 38 *)
 ]
 
 VerificationTest[(* 39 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	37723	
 ]
@@ -304,7 +299,9 @@ OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 40 *)
 	OpenVDBLink`OpenVDBDilation[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBDilation::lvlsetgrid2}
 ]
 
 VerificationTest[(* 41 *)
@@ -336,8 +333,7 @@ VerificationTest[(* 44 *)
 ]
 
 VerificationTest[(* 45 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	14734	
 ]
@@ -345,7 +341,9 @@ OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 46 *)
 	OpenVDBLink`OpenVDBErosion[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBErosion::lvlsetgrid2}
 ]
 
 VerificationTest[(* 47 *)
@@ -377,8 +375,7 @@ VerificationTest[(* 50 *)
 ]
 
 VerificationTest[(* 51 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	25620	
 ]
@@ -386,7 +383,9 @@ OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 52 *)
 	OpenVDBLink`OpenVDBClosing[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBClosing::lvlsetgrid2}
 ]
 
 VerificationTest[(* 53 *)
@@ -418,8 +417,7 @@ VerificationTest[(* 56 *)
 ]
 
 VerificationTest[(* 57 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	22092	
 ]
@@ -427,7 +425,9 @@ OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 58 *)
 	OpenVDBLink`OpenVDBOpening[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBOpening::lvlsetgrid2}
 ]
 
 VerificationTest[(* 59 *)
@@ -457,7 +457,7 @@ BeginTestSection["Double"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 62 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty],    OpenVDBLink`OpenVDBScalarGridQ[vdb],OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True}	
 ]
@@ -467,8 +467,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBResizeBandwidth"]
 
 VerificationTest[(* 63 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
 	,
 	18602	
 ]
@@ -476,20 +475,19 @@ OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 2]["ActiveVoxelCount"]
 VerificationTest[(* 64 *)
 	OpenVDBLink`OpenVDBResizeBandwidth[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBResizeBandwidth::lvlsetgrid2}
 ]
 
 VerificationTest[(* 65 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 0.2->"World"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 0.2->"World"]["ActiveVoxelCount"]
 	,
 	18602	
 ]
 
 VerificationTest[(* 66 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-vdb3=OpenVDBLink`OpenVDBCopyGrid[vdb];
-{OpenVDBLink`OpenVDBResizeBandwidth[vdb2, .2], OpenVDBLink`OpenVDBResizeBandwidth[vdb3, .51]["ActiveVoxelCount"]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb3=OpenVDBLink`OpenVDBCopyGrid[vdb];{OpenVDBLink`OpenVDBResizeBandwidth[vdb2, 0.2], OpenVDBLink`OpenVDBResizeBandwidth[vdb3, 0.51]["ActiveVoxelCount"]}
 	,
 	{$Failed, 11650}	
 ]
@@ -499,8 +497,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBDilation"]
 
 VerificationTest[(* 67 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	37723	
 ]
@@ -508,26 +505,25 @@ OpenVDBLink`OpenVDBDilation[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 68 *)
 	OpenVDBLink`OpenVDBDilation[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBDilation::lvlsetgrid2}
 ]
 
 VerificationTest[(* 69 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDilation[vdb2, 0.2->"World"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDilation[vdb2, 0.2->"World"]["ActiveVoxelCount"]
 	,
 	37723	
 ]
 
 VerificationTest[(* 70 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDilation[vdb2, 1->"Index"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDilation[vdb2, 1->"Index"]["ActiveVoxelCount"]
 	,
 	31851	
 ]
 
 VerificationTest[(* 71 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBDilation[vdb2, 0]["ActiveVoxelCount"]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBDilation[vdb2, 0]["ActiveVoxelCount"]}
 	,
 	{26073, 26073}	
 ]
@@ -537,8 +533,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBErosion"]
 
 VerificationTest[(* 72 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	14734	
 ]
@@ -546,26 +541,25 @@ OpenVDBLink`OpenVDBErosion[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 73 *)
 	OpenVDBLink`OpenVDBErosion[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBErosion::lvlsetgrid2}
 ]
 
 VerificationTest[(* 74 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBErosion[vdb2, 0.2->"World"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBErosion[vdb2, 0.2->"World"]["ActiveVoxelCount"]
 	,
 	14734	
 ]
 
 VerificationTest[(* 75 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBErosion[vdb2, 1->"Index"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBErosion[vdb2, 1->"Index"]["ActiveVoxelCount"]
 	,
 	20219	
 ]
 
 VerificationTest[(* 76 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBErosion[vdb2, 0]["ActiveVoxelCount"]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBErosion[vdb2, 0]["ActiveVoxelCount"]}
 	,
 	{26073, 26073}	
 ]
@@ -575,8 +569,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBClosing"]
 
 VerificationTest[(* 77 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	25620	
 ]
@@ -584,26 +577,25 @@ OpenVDBLink`OpenVDBClosing[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 78 *)
 	OpenVDBLink`OpenVDBClosing[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBClosing::lvlsetgrid2}
 ]
 
 VerificationTest[(* 79 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBClosing[vdb2, 0.2->"World"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBClosing[vdb2, 0.2->"World"]["ActiveVoxelCount"]
 	,
 	25620	
 ]
 
 VerificationTest[(* 80 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBClosing[vdb2, 1->"Index"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBClosing[vdb2, 1->"Index"]["ActiveVoxelCount"]
 	,
 	25659	
 ]
 
 VerificationTest[(* 81 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBClosing[vdb2, 0]["ActiveVoxelCount"]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBClosing[vdb2, 0]["ActiveVoxelCount"]}
 	,
 	{26073, 26073}	
 ]
@@ -613,8 +605,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBOpening"]
 
 VerificationTest[(* 82 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
 	,
 	22092	
 ]
@@ -622,26 +613,25 @@ OpenVDBLink`OpenVDBOpening[vdb2, 0.2]["ActiveVoxelCount"]
 VerificationTest[(* 83 *)
 	OpenVDBLink`OpenVDBOpening[fog, 0.2]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBOpening::lvlsetgrid2}
 ]
 
 VerificationTest[(* 84 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBOpening[vdb2, 0.2->"World"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBOpening[vdb2, 0.2->"World"]["ActiveVoxelCount"]
 	,
 	22092	
 ]
 
 VerificationTest[(* 85 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBOpening[vdb2, 1->"Index"]["ActiveVoxelCount"]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBOpening[vdb2, 1->"Index"]["ActiveVoxelCount"]
 	,
 	24742	
 ]
 
 VerificationTest[(* 86 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBOpening[vdb2, 0]["ActiveVoxelCount"]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb["ActiveVoxelCount"], OpenVDBLink`OpenVDBOpening[vdb2, 0]["ActiveVoxelCount"]}
 	,
 	{26073, 26073}	
 ]

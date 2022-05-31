@@ -23,7 +23,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBSetStates]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 4 *)
@@ -39,21 +39,16 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBSetStates[], 
-OpenVDBLink`OpenVDBSetStates["error"],
-OpenVDBLink`OpenVDBSetStates[vdb, "error"],
-OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, "error"],
-OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1, "error"],
-OpenVDBLink`OpenVDBSetStates[vdb, {{0, 0, 0}, {1, 1, 1}}, {1}]
-}
+	{OpenVDBLink`OpenVDBSetStates[], OpenVDBLink`OpenVDBSetStates["error"], OpenVDBLink`OpenVDBSetStates[vdb, "error"], OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, "error"], OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1, "error"], OpenVDBLink`OpenVDBSetStates[vdb, {{0, 0, 0}, {1, 1, 1}}, {1}]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBSetStates::argrx, OpenVDBSetStates::argr, OpenVDBSetStates::argrx, OpenVDBSetStates::argrx}
 ]
 
 EndTestSection[]
 
-BeginTestSection["OpenVDBStates"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 7 *)
 	OpenVDBLink`OpenVDBDefaultSpace[OpenVDBLink`OpenVDBStates]
@@ -64,7 +59,7 @@ VerificationTest[(* 7 *)
 VerificationTest[(* 8 *)
 	Attributes[OpenVDBLink`OpenVDBStates]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 9 *)
@@ -80,14 +75,11 @@ VerificationTest[(* 10 *)
 ]
 
 VerificationTest[(* 11 *)
-	{
-OpenVDBLink`OpenVDBStates[], 
-OpenVDBLink`OpenVDBStates["error"],
-OpenVDBLink`OpenVDBStates[vdb, "error"],
-OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}, "error"]
-}
+	{OpenVDBLink`OpenVDBStates[], OpenVDBLink`OpenVDBStates["error"], OpenVDBLink`OpenVDBStates[vdb, "error"], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBStates::argrx, OpenVDBStates::argr, OpenVDBStates::coord, OpenVDBStates::argrx}
 ]
 
 EndTestSection[]
@@ -103,7 +95,7 @@ VerificationTest[(* 12 *)
 VerificationTest[(* 13 *)
 	Attributes[OpenVDBLink`OpenVDBSetValues]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 14 *)
@@ -119,21 +111,16 @@ VerificationTest[(* 15 *)
 ]
 
 VerificationTest[(* 16 *)
-	{
-OpenVDBLink`OpenVDBSetValues[], 
-OpenVDBLink`OpenVDBSetValues["error"],
-OpenVDBLink`OpenVDBSetValues[vdb, "error"],
-OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, "error"],
-OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1, "error"],
-OpenVDBLink`OpenVDBSetValues[vdb, {{0, 0, 0}, {1, 1, 1}}, {1}]
-}
+	{OpenVDBLink`OpenVDBSetValues[], OpenVDBLink`OpenVDBSetValues["error"], OpenVDBLink`OpenVDBSetValues[vdb, "error"], OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, "error"], OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1, "error"], OpenVDBLink`OpenVDBSetValues[vdb, {{0, 0, 0}, {1, 1, 1}}, {1}]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBSetValues::argrx, OpenVDBSetValues::argr, OpenVDBSetValues::argrx, OpenVDBSetValues::argrx}
 ]
 
 EndTestSection[]
 
-BeginTestSection["OpenVDBValues"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 17 *)
 	OpenVDBLink`OpenVDBDefaultSpace[OpenVDBLink`OpenVDBValues]
@@ -144,7 +131,7 @@ VerificationTest[(* 17 *)
 VerificationTest[(* 18 *)
 	Attributes[OpenVDBLink`OpenVDBValues]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 19 *)
@@ -160,14 +147,11 @@ VerificationTest[(* 20 *)
 ]
 
 VerificationTest[(* 21 *)
-	{
-OpenVDBLink`OpenVDBValues[], 
-OpenVDBLink`OpenVDBValues["error"],
-OpenVDBLink`OpenVDBValues[vdb, "error"],
-OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}, "error"]
-}
+	{OpenVDBLink`OpenVDBValues[], OpenVDBLink`OpenVDBValues["error"], OpenVDBLink`OpenVDBValues[vdb, "error"], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBValues::argrx, OpenVDBValues::argr, OpenVDBValues::coord, OpenVDBValues::argrx}
 ]
 
 EndTestSection[]
@@ -186,7 +170,7 @@ VerificationTest[(* 22 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 23 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -220,7 +204,7 @@ VerificationTest[(* 27 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 28 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
@@ -268,7 +252,7 @@ VerificationTest[(* 33 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 34 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -302,7 +286,7 @@ VerificationTest[(* 38 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 39 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
@@ -350,7 +334,7 @@ VerificationTest[(* 44 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 45 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -378,7 +362,7 @@ VerificationTest[(* 48 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 49 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
@@ -432,7 +416,7 @@ VerificationTest[(* 55 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 56 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -460,7 +444,7 @@ VerificationTest[(* 59 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 60 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, {1, 1, 1}], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
@@ -520,7 +504,7 @@ VerificationTest[(* 67 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 68 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -548,7 +532,7 @@ VerificationTest[(* 71 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 72 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
@@ -608,7 +592,7 @@ VerificationTest[(* 79 *)
 
 EndTestSection[]
 
-BeginTestSection["States"]
+BeginTestSection["OpenVDB*States"]
 
 VerificationTest[(* 80 *)
 	{OpenVDBLink`OpenVDBSetStates[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBStates[vdb, {0, 0, 0}]}
@@ -636,48 +620,62 @@ VerificationTest[(* 83 *)
 
 EndTestSection[]
 
-BeginTestSection["Values"]
+BeginTestSection["OpenVDB*Values"]
 
 VerificationTest[(* 84 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {0, 0, 0}, 1], OpenVDBLink`OpenVDBValues[vdb, {0, 0, 0}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 85 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {{2, 2, 2}, {1, 1, 1}, {3, 3, 3}}, {0, 1, 1}], OpenVDBLink`OpenVDBValues[vdb, {{2, 2, 2}, {1, 1, 1}, {3, 3, 3}}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 86 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {{2, 2, 2}, {1, 1, 1}, {3, 3, 3}}, 1], OpenVDBLink`OpenVDBValues[vdb, {{2, 2, 2}, {1, 1, 1}, {3, 3, 3}}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 87 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {{4, 4, 4}, {5, 5, 5}, {3, 2, 4}}, {0.45, EulerGamma, 1.87}], OpenVDBLink`OpenVDBValues[vdb, {{4, 4, 4}, {5, 5, 5}, {3, 2, 4}}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 88 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {{4, 4, 4}, {5, 5, 5}, {3, 2, 4}}, N[{1, 2, 4}]], OpenVDBLink`OpenVDBValues[vdb, {{4, 4, 4}, {5, 5, 5}, {3, 2, 4}}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 89 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {{6, 6, 6}, {3, 5, 5}, {6, 6, 6}}, {True, False, True}], OpenVDBLink`OpenVDBValues[vdb, {{6, 6, 6}, {3, 5, 5}, {6, 6, 6}}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 VerificationTest[(* 90 *)
 	{OpenVDBLink`OpenVDBSetValues[vdb, {6, 6, 6}, {0, 1, 3, 4}], OpenVDBLink`OpenVDBValues[vdb, {6, 6, 6}]}
 	,
-	{$Failed, $Failed}	
+	{$Failed, $Failed}
+	,
+	{OpenVDBSetValues::nmsksupp, OpenVDBValues::nmsksupp}
 ]
 
 EndTestSection[]

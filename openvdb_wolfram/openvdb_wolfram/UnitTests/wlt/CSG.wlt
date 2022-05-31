@@ -23,7 +23,9 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBUnion]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 4 *)
@@ -45,19 +47,19 @@ VerificationTest[(* 6 *)
 ]
 
 VerificationTest[(* 7 *)
-	{
-OpenVDBLink`OpenVDBUnion["error"], 
-OpenVDBLink`OpenVDBUnion[bmr, "error"],
-OpenVDBLink`OpenVDBUnion[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBUnion["error"], OpenVDBLink`OpenVDBUnion[bmr, "error"], OpenVDBLink`OpenVDBUnion[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed}
+	,
+	{OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 8 *)
-	(OpenVDBLink`OpenVDBUnion[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBUnion[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S",    "Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -73,7 +75,9 @@ VerificationTest[(* 9 *)
 VerificationTest[(* 10 *)
 	Attributes[OpenVDBLink`OpenVDBIntersection]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 11 *)
@@ -95,19 +99,19 @@ VerificationTest[(* 13 *)
 ]
 
 VerificationTest[(* 14 *)
-	{
-OpenVDBLink`OpenVDBIntersection["error"], 
-OpenVDBLink`OpenVDBIntersection[bmr, "error"],
-OpenVDBLink`OpenVDBIntersection[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBIntersection["error"], OpenVDBLink`OpenVDBIntersection[bmr, "error"], OpenVDBLink`OpenVDBIntersection[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed}
+	,
+	{OpenVDBIntersection::scalargrid2, OpenVDBIntersection::scalargrid2, OpenVDBIntersection::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 15 *)
-	(OpenVDBLink`OpenVDBIntersection[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBIntersection[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S",    "Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBIntersection::scalargrid2, OpenVDBIntersection::scalargrid2, OpenVDBIntersection::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -123,7 +127,9 @@ VerificationTest[(* 16 *)
 VerificationTest[(* 17 *)
 	Attributes[OpenVDBLink`OpenVDBDifference]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 18 *)
@@ -145,19 +151,19 @@ VerificationTest[(* 20 *)
 ]
 
 VerificationTest[(* 21 *)
-	{
-OpenVDBLink`OpenVDBDifference["error"], 
-OpenVDBLink`OpenVDBDifference[bmr, "error"],
-OpenVDBLink`OpenVDBDifference[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBDifference["error"], OpenVDBLink`OpenVDBDifference[bmr, "error"], OpenVDBLink`OpenVDBDifference[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed}
+	,
+	{OpenVDBDifference::scalargrid2, OpenVDBDifference::scalargrid2, OpenVDBDifference::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 22 *)
-	(OpenVDBLink`OpenVDBDifference[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBDifference[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S",    "Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDifference::scalargrid2, OpenVDBDifference::scalargrid2, OpenVDBDifference::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -173,7 +179,9 @@ VerificationTest[(* 23 *)
 VerificationTest[(* 24 *)
 	Attributes[OpenVDBLink`OpenVDBUnionTo]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 25 *)
@@ -195,20 +203,19 @@ VerificationTest[(* 27 *)
 ]
 
 VerificationTest[(* 28 *)
-	{
-OpenVDBLink`OpenVDBUnionTo[], 
-OpenVDBLink`OpenVDBUnionTo["error"],
-OpenVDBLink`OpenVDBUnionTo[bmr, "error"],
-OpenVDBLink`OpenVDBUnionTo[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBUnionTo[], OpenVDBLink`OpenVDBUnionTo["error"], OpenVDBLink`OpenVDBUnionTo[bmr, "error"], OpenVDBLink`OpenVDBUnionTo[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBUnionTo::argm, OpenVDBUnionTo::scalargrid2, OpenVDBUnionTo::scalargrid2, OpenVDBUnionTo::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 29 *)
-	(OpenVDBLink`OpenVDBUnionTo[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBUnionTo[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S",    "Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBUnionTo::scalargrid2, OpenVDBUnionTo::scalargrid2, OpenVDBUnionTo::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -224,7 +231,9 @@ VerificationTest[(* 30 *)
 VerificationTest[(* 31 *)
 	Attributes[OpenVDBLink`OpenVDBIntersectWith]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 32 *)
@@ -246,20 +255,19 @@ VerificationTest[(* 34 *)
 ]
 
 VerificationTest[(* 35 *)
-	{
-OpenVDBLink`OpenVDBIntersectWith[], 
-OpenVDBLink`OpenVDBIntersectWith["error"],
-OpenVDBLink`OpenVDBIntersectWith[bmr, "error"],
-OpenVDBLink`OpenVDBIntersectWith[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBIntersectWith[], OpenVDBLink`OpenVDBIntersectWith["error"], OpenVDBLink`OpenVDBIntersectWith[bmr, "error"], OpenVDBLink`OpenVDBIntersectWith[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBIntersectWith::argm, OpenVDBIntersectWith::scalargrid2, OpenVDBIntersectWith::scalargrid2, OpenVDBIntersectWith::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 36 *)
-	(OpenVDBLink`OpenVDBIntersectWith[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBIntersectWith[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I",    "Vec3S","Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBIntersectWith::scalargrid2, OpenVDBIntersectWith::scalargrid2, OpenVDBIntersectWith::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -275,7 +283,9 @@ VerificationTest[(* 37 *)
 VerificationTest[(* 38 *)
 	Attributes[OpenVDBLink`OpenVDBDifferenceFrom]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 39 *)
@@ -297,20 +307,19 @@ VerificationTest[(* 41 *)
 ]
 
 VerificationTest[(* 42 *)
-	{
-OpenVDBLink`OpenVDBDifferenceFrom[], 
-OpenVDBLink`OpenVDBDifferenceFrom["error"],
-OpenVDBLink`OpenVDBDifferenceFrom[bmr, "error"],
-OpenVDBLink`OpenVDBDifferenceFrom[bmr, bmr2, "error"]
-}
+	{OpenVDBLink`OpenVDBDifferenceFrom[], OpenVDBLink`OpenVDBDifferenceFrom["error"], OpenVDBLink`OpenVDBDifferenceFrom[bmr, "error"], OpenVDBLink`OpenVDBDifferenceFrom[bmr, bmr2, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBDifferenceFrom::argm, OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, General::stop}
 ]
 
 VerificationTest[(* 43 *)
-	(OpenVDBLink`OpenVDBDifferenceFrom[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+	(OpenVDBLink`OpenVDBDifferenceFrom[OpenVDBLink`OpenVDBCreateGrid[1., #1], OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I",    "Vec3S","Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, OpenVDBUnion::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -326,7 +335,9 @@ VerificationTest[(* 44 *)
 VerificationTest[(* 45 *)
 	Attributes[OpenVDBLink`OpenVDBClip]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 46 *)
@@ -342,21 +353,19 @@ VerificationTest[(* 47 *)
 ]
 
 VerificationTest[(* 48 *)
-	{
-OpenVDBLink`OpenVDBClip[], 
-OpenVDBLink`OpenVDBClip["error"],
-OpenVDBLink`OpenVDBClip[bmr, "error"],
-OpenVDBLink`OpenVDBClip[bmr, {{0, 1}, {0, 1}, {0, 1}}->"error"],
-OpenVDBLink`OpenVDBClip[bmr, {{0, 1}, {0, 1}, {0, 1}}, "error"]
-}
+	{OpenVDBLink`OpenVDBClip[], OpenVDBLink`OpenVDBClip["error"], OpenVDBLink`OpenVDBClip[bmr, "error"], OpenVDBLink`OpenVDBClip[bmr, {{0, 1}, {0, 1}, {0, 1}}->"error"], OpenVDBLink`OpenVDBClip[bmr, {{0, 1}, {0, 1}, {0, 1}}, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBClip::argrx, OpenVDBClip::argr, OpenVDBClip::bbox3d, OpenVDBClip::gridspace, OpenVDBClip::nonopt}
 ]
 
 VerificationTest[(* 49 *)
 	(OpenVDBLink`OpenVDBClip[OpenVDBLink`OpenVDBCreateGrid[1., #1], {{0, 1}, {0, 1}, {0, 1}}]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBClip::scalargrid2, OpenVDBClip::scalargrid2, OpenVDBClip::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -368,7 +377,7 @@ BeginTestSection["Float"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 50 *)
-	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox", "IndexDimensions", "MinMaxValues", "UniformVoxels", "VoxelSize", "WorldBoundingBox", "WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "MeshRegion"];bmr2=TransformedRegion[bmr, TranslationTransform[{1, 1, 1}]];bmr3=TransformedRegion[bmr, TranslationTransform[{2, -1, 2}]];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "Creator"->"initC", "Name"->"initN"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{MeshRegionQ[bmr], MeshRegionQ[bmr2], MeshRegionQ[bmr3], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox",     "IndexDimensions","MinMaxValues","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "MeshRegion"];bmr2=TransformedRegion[bmr, TranslationTransform[{1, 1, 1}]];bmr3=TransformedRegion[bmr, TranslationTransform[{2, -1, 2}]];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "Creator"->"initC", "Name"->"initN"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{MeshRegionQ[bmr], MeshRegionQ[bmr2], MeshRegionQ[bmr3], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True, True}	
 ]
@@ -498,25 +507,21 @@ VerificationTest[(* 68 *)
 ]
 
 VerificationTest[(* 69 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBUnionTo[vdb2, bmr2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBUnionTo[vdb2, bmr2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 70 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBUnionTo[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBUnionTo[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 71 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];
-{OpenVDBLink`OpenVDBUnionTo[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];{OpenVDBLink`OpenVDBUnionTo[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
 	,
-	{{44609, 0, 44609, 0.30000001192092896, 201348, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 45}, {-16, 25}, {-19, 31}}, {94, 42, 51}, {-0.2999959886074066, 0.299950510263443}, True, 0.1, {{-4.800000000000001, 4.5}, {-1.6, 2.5}, {-1.9000000000000001, 3.1}}, {9.4, 4.2, 5.1000000000000005}}, {12000, 0, 12000, 0.30000001192092896, 55176, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-36, 39}, {-6, 15}, {-9, 23}}, {76, 22, 33}, {-0.29999592900276184, 0.299932062625885}, True, 0.1, {{-3.6, 3.9000000000000004}, {-0.6000000000000001, 1.5}, {-0.9, 2.3000000000000003}}, {7.6000000000000005, 2.2, 3.3000000000000003}}}	
+	{{44609, 0, 44609, 0.30000001192092896, 201348, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 45}, {-16, 25}, {-19, 31}}, {94, 42, 51}, {-0.2999959886074066, 0.299950510263443},    True,0.1,{{-4.800000000000001, 4.5}, {-1.6, 2.5}, {-1.9000000000000001, 3.1}},{9.4, 4.2, 5.1000000000000005}}, {12000, 0, 12000, 0.30000001192092896, 55176, False, "LevelSet",    "Tree_float_5_4_3",3.0000001192092896,{{-36, 39}, {-6, 15}, {-9, 23}},{76, 22, 33},{-0.29999592900276184, 0.299932062625885},True,0.1,   {{-3.6, 3.9000000000000004}, {-0.6000000000000001, 1.5}, {-0.9, 2.3000000000000003}},{7.6000000000000005, 2.2, 3.3000000000000003}}}	
 ]
 
 EndTestSection[]
@@ -542,25 +547,21 @@ VerificationTest[(* 74 *)
 ]
 
 VerificationTest[(* 75 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBIntersectWith[vdb2, bmr2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBIntersectWith[vdb2, bmr2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 76 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBIntersectWith[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBIntersectWith[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 77 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];
-{OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];{OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
 	,
-	{{7537, 0, 7537, 0.30000001192092896, 30240, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-20, 35}, {-5, 12}, {-8, 21}}, {56, 18, 30}, {-0.29793617129325867, 0.299932062625885}, True, 0.1, {{-2., 3.5}, {-0.5, 1.2000000000000002}, {-0.8, 2.1}}, {5.6000000000000005, 1.8, 3.}}, {12000, 0, 12000, 0.30000001192092896, 55176, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-36, 39}, {-6, 15}, {-9, 23}}, {76, 22, 33}, {-0.29999592900276184, 0.299932062625885}, True, 0.1, {{-3.6, 3.9000000000000004}, {-0.6000000000000001, 1.5}, {-0.9, 2.3000000000000003}}, {7.6000000000000005, 2.2, 3.3000000000000003}}}	
+	{{7537, 0, 7537, 0.30000001192092896, 30240, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-20, 35}, {-5, 12}, {-8, 21}}, {56, 18, 30}, {-0.29793617129325867, 0.299932062625885}, True,    0.1,{{-2., 3.5}, {-0.5, 1.2000000000000002}, {-0.8, 2.1}},{5.6000000000000005, 1.8, 3.}}, {12000, 0, 12000, 0.30000001192092896, 55176, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896,    {{-36, 39}, {-6, 15}, {-9, 23}},{76, 22, 33},{-0.29999592900276184, 0.299932062625885},True,0.1,{{-3.6, 3.9000000000000004}, {-0.6000000000000001, 1.5}, {-0.9, 2.3000000000000003}},   {7.6000000000000005, 2.2, 3.3000000000000003}}}	
 ]
 
 EndTestSection[]
@@ -586,25 +587,21 @@ VerificationTest[(* 80 *)
 ]
 
 VerificationTest[(* 81 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDifferenceFrom[vdb2, bmr2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDifferenceFrom[vdb2, bmr2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 82 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBDifferenceFrom[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBDifferenceFrom[vdb2, bmr2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 83 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];
-{OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb3=OpenVDBLink`OpenVDBLevelSet[bmr2];{OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb3][$propertyList], vdb3[$propertyList]}
 	,
-	{{26774, 0, 26774, 0.30000001192092896, 110208, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, {-0.2999959886074066, 0.299950510263443}, True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}, {26073, 0, 26073, 0.30000001192092896, 110208, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-38, 45}, {-6, 25}, {-9, 31}}, {84, 32, 41}, {-0.29999592900276184, 0.29995036125183105}, True, 0.1, {{-3.8000000000000003, 4.5}, {-0.6000000000000001, 2.5}, {-0.9, 3.1}}, {8.4, 3.2, 4.1000000000000005}}}	
+	{{26774, 0, 26774, 0.30000001192092896, 110208, False, "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, {-0.2999959886074066, 0.299950510263443},    True,0.1,{{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}},{8.4, 3.2, 4.1000000000000005}}, {26073, 0, 26073, 0.30000001192092896, 110208, False, "LevelSet",    "Tree_float_5_4_3",3.0000001192092896,{{-38, 45}, {-6, 25}, {-9, 31}},{84, 32, 41},{-0.29999592900276184, 0.29995036125183105},True,0.1,   {{-3.8000000000000003, 4.5}, {-0.6000000000000001, 2.5}, {-0.9, 3.1}},{8.4, 3.2, 4.1000000000000005}}}	
 ]
 
 EndTestSection[]
@@ -656,7 +653,7 @@ BeginTestSection["Double"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 90 *)
-	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox", "IndexDimensions", "MinMaxValues", "UniformVoxels", "VoxelSize", "WorldBoundingBox", "WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "MeshRegion"];bmr2=TransformedRegion[bmr, TranslationTransform[{1, 1, 1}]];bmr3=TransformedRegion[bmr, TranslationTransform[{2, -1, 2}]];vdb1=OpenVDBLink`OpenVDBLevelSet[bmr, "Creator"->"initC", "Name"->"initN", "ScalarType"->"Double"];vdb2=OpenVDBLink`OpenVDBLevelSet[bmr2, "ScalarType"->"Double"];vdb3=OpenVDBLink`OpenVDBLevelSet[bmr3, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb1];{OpenVDBLink`OpenVDBScalarGridQ[vdb1], OpenVDBLink`OpenVDBScalarGridQ[vdb2], OpenVDBLink`OpenVDBScalarGridQ[vdb3], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox",     "IndexDimensions","MinMaxValues","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "MeshRegion"];bmr2=TransformedRegion[bmr, TranslationTransform[{1, 1, 1}]];bmr3=TransformedRegion[bmr, TranslationTransform[{2, -1, 2}]];vdb1=OpenVDBLink`OpenVDBLevelSet[bmr, "Creator"->"initC", "Name"->"initN", "ScalarType"->"Double"];vdb2=OpenVDBLink`OpenVDBLevelSet[bmr2, "ScalarType"->"Double"];vdb3=OpenVDBLink`OpenVDBLevelSet[bmr3, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb1];{OpenVDBLink`OpenVDBScalarGridQ[vdb1], OpenVDBLink`OpenVDBScalarGridQ[vdb2],    OpenVDBLink`OpenVDBScalarGridQ[vdb3],OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True}	
 ]
@@ -786,25 +783,21 @@ VerificationTest[(* 108 *)
 ]
 
 VerificationTest[(* 109 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBUnionTo[vdb2, vdb2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBUnionTo[vdb2, vdb2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 110 *)
-	vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBUnionTo[vdb2, vdbb, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBUnionTo[vdb2, vdbb, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 111 *)
-	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];
-{OpenVDBLink`OpenVDBUnionTo[vdba, vdbb][$propertyList], vdbb[$propertyList]}
+	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];{OpenVDBLink`OpenVDBUnionTo[vdba, vdbb][$propertyList], vdbb[$propertyList]}
 	,
-	{{67281, 0, 67281, 0.30000000000000004, 329888, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 55}, {-26, 25}, {-19, 41}}, {104, 52, 61}, {-0.29999599125227844, 0.2999503432672819}, True, 0.1, {{-4.800000000000001, 5.5}, {-2.6, 2.5}, {-1.9000000000000001, 4.1000000000000005}}, {10.4, 5.2, 6.1000000000000005}}, {67281, 0, 67281, 0.30000000000000004, 329888, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 55}, {-26, 25}, {-19, 41}}, {104, 52, 61}, {-0.29999599125227844, 0.2999503432672819}, True, 0.1, {{-4.800000000000001, 5.5}, {-2.6, 2.5}, {-1.9000000000000001, 4.1000000000000005}}, {10.4, 5.2, 6.1000000000000005}}}	
+	{{67281, 0, 67281, 0.30000000000000004, 329888, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 55}, {-26, 25}, {-19, 41}}, {104, 52, 61},    {-0.29999599125227844, 0.2999503432672819},True,0.1,{{-4.800000000000001, 5.5}, {-2.6, 2.5}, {-1.9000000000000001, 4.1000000000000005}},{10.4, 5.2, 6.1000000000000005}}, {67281, 0, 67281, 0.30000000000000004, 329888, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 55}, {-26, 25}, {-19, 41}}, {104, 52, 61},    {-0.29999599125227844, 0.2999503432672819},True,0.1,{{-4.800000000000001, 5.5}, {-2.6, 2.5}, {-1.9000000000000001, 4.1000000000000005}},{10.4, 5.2, 6.1000000000000005}}}	
 ]
 
 EndTestSection[]
@@ -830,25 +823,21 @@ VerificationTest[(* 114 *)
 ]
 
 VerificationTest[(* 115 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 116 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBIntersectWith[vdb2, vdb2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 117 *)
-	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];
-{OpenVDBLink`OpenVDBIntersectWith[vdba, vdbb][$propertyList], vdbb[$propertyList]}
+	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];{OpenVDBLink`OpenVDBIntersectWith[vdba, vdbb][$propertyList], vdbb[$propertyList]}
 	,
-	{{7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {-0.2999200398082843, 0.2999321068403735}, True, 0.1, {{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}}, {6.800000000000001, 2.2, 3.1}}, {7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {-0.2999200398082843, 0.2999321068403735}, True, 0.1, {{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}}, {6.800000000000001, 2.2, 3.1}}}	
+	{{7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {-0.2999200398082843, 0.2999321068403735}, True,    0.1,{{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}},{6.800000000000001, 2.2, 3.1}}, {7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004,    {{-24, 43}, {-16, 5}, {1, 31}},{68, 22, 31},{-0.2999200398082843, 0.2999321068403735},True,0.1,{{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}},{6.800000000000001, 2.2, 3.1}}}	
 ]
 
 EndTestSection[]
@@ -874,25 +863,21 @@ VerificationTest[(* 120 *)
 ]
 
 VerificationTest[(* 121 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb2][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb2][{"Creator", "Name"}]
 	,
 	{"initC", "initN"}	
 ]
 
 VerificationTest[(* 122 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb1];OpenVDBLink`OpenVDBDifferenceFrom[vdb2, vdb2, "Creator"->"test!", "Name"->"test2!"][{"Creator", "Name"}]
 	,
 	{"test!", "test2!"}	
 ]
 
 VerificationTest[(* 123 *)
-	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];
-vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];
-{OpenVDBLink`OpenVDBDifferenceFrom[vdba, vdbb][$propertyList], vdbb[$propertyList]}
+	vdba=OpenVDBLink`OpenVDBCopyGrid[vdb1];vdbb=OpenVDBLink`OpenVDBCopyGrid[vdb2];{OpenVDBLink`OpenVDBDifferenceFrom[vdba, vdbb][$propertyList], vdbb[$propertyList]}
 	,
-	{{7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {0.000030273042506981374, 0.2999321068403735}, True, 0.1, {{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}}, {6.800000000000001, 2.2, 3.1}}, {7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {0.000030273042506981374, 0.2999321068403735}, True, 0.1, {{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}}, {6.800000000000001, 2.2, 3.1}}}	
+	{{7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-24, 43}, {-16, 5}, {1, 31}}, {68, 22, 31}, {0.000030273042506981374, 0.2999321068403735},    True,0.1,{{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}},{6.800000000000001, 2.2, 3.1}}, {7948, 0, 7948, 0.30000000000000004, 46376, False, "LevelSet", "Tree_double_5_4_3",    3.0000000000000004,{{-24, 43}, {-16, 5}, {1, 31}},{68, 22, 31},{0.000030273042506981374, 0.2999321068403735},True,0.1,{{-2.4000000000000004, 4.3}, {-1.6, 0.5}, {0.1, 3.1}},   {6.800000000000001, 2.2, 3.1}}}	
 ]
 
 EndTestSection[]

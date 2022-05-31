@@ -23,13 +23,17 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBFogVolume]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 4 *)
 	Options[OpenVDBLink`OpenVDBFogVolume]
 	,
 	{}	
+	,
+	{}
 ]
 
 VerificationTest[(* 5 *)
@@ -39,20 +43,19 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBFogVolume[], 
-OpenVDBLink`OpenVDBFogVolume["error"],
-OpenVDBLink`OpenVDBFogVolume[bmr, "error"],
-OpenVDBLink`OpenVDBFogVolume[bmr, 0, "error"]
-}
+	{OpenVDBLink`OpenVDBFogVolume[], OpenVDBLink`OpenVDBFogVolume["error"], OpenVDBLink`OpenVDBFogVolume[bmr, "error"], OpenVDBLink`OpenVDBFogVolume[bmr, 0, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFogVolume::argt, OpenVDBFogVolume::scalargrid2, OpenVDBFogVolume::argt}
 ]
 
 VerificationTest[(* 7 *)
 	(OpenVDBLink`OpenVDBFogVolume[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFogVolume::scalargrid2, OpenVDBFogVolume::scalargrid2, OpenVDBFogVolume::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -68,13 +71,17 @@ VerificationTest[(* 8 *)
 VerificationTest[(* 9 *)
 	Attributes[OpenVDBLink`OpenVDBToFogVolume]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 10 *)
 	Options[OpenVDBLink`OpenVDBToFogVolume]
 	,
 	{}	
+	,
+	{}
 ]
 
 VerificationTest[(* 11 *)
@@ -84,20 +91,19 @@ VerificationTest[(* 11 *)
 ]
 
 VerificationTest[(* 12 *)
-	{
-OpenVDBLink`OpenVDBToFogVolume[], 
-OpenVDBLink`OpenVDBToFogVolume["error"],
-OpenVDBLink`OpenVDBToFogVolume[bmr, "error"],
-OpenVDBLink`OpenVDBToFogVolume[bmr, 0, "error"]
-}
+	{OpenVDBLink`OpenVDBToFogVolume[], OpenVDBLink`OpenVDBToFogVolume["error"], OpenVDBLink`OpenVDBToFogVolume[bmr, "error"], OpenVDBLink`OpenVDBToFogVolume[bmr, 0, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBToFogVolume::argt, OpenVDBToFogVolume::scalargrid2, OpenVDBToFogVolume::argt}
 ]
 
 VerificationTest[(* 13 *)
 	(OpenVDBLink`OpenVDBToFogVolume[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBToFogVolume::scalargrid2, OpenVDBToFogVolume::scalargrid2, OpenVDBToFogVolume::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -149,9 +155,7 @@ VerificationTest[(* 19 *)
 ]
 
 VerificationTest[(* 20 *)
-	vdb=OpenVDBLink`OpenVDBLevelSet[bmr];
-OpenVDBLink`OpenVDBToFogVolume[vdb, 1->"Index"];
-vdb[$propertyList]
+	vdb=OpenVDBLink`OpenVDBLevelSet[bmr];OpenVDBLink`OpenVDBToFogVolume[vdb, 1->"Index"];vdb[$propertyList]
 	,
 	{12052, 0, 12052, 0., 66300, False, "FogVolume", "Tree_float_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, {0.00030271708965301514, 3.}, True, 0.1, {{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}}, {7.800000000000001, 2.5, 3.4000000000000004}}	
 ]
@@ -205,11 +209,9 @@ VerificationTest[(* 26 *)
 ]
 
 VerificationTest[(* 27 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBToFogVolume[vdb2, 1->"Index"];
-{vdb[$propertyList], vdb2[$propertyList]}
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBToFogVolume[vdb2, 1->"Index"];{vdb[$propertyList], vdb2[$propertyList]}
 	,
-	{{26073, 0, 26073, 0.30000000000000004, 110208, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41},    {-0.29999599125227844, 0.29995050821018665},True,0.1,{{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}},{8.4, 3.2, 4.1000000000000005}}, {12052, 0, 12052, 0., 66300, False, "FogVolume", "Tree_double_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, {0.00030273502515595907, 3.0000000000000004},    True,0.1,{{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}},{7.800000000000001, 2.5, 3.4000000000000004}}}	
+	{{26073, 0, 26073, 0.30000000000000004, 110208, False, "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41},    {-0.29999599125227844, 0.29995050821018665},True,0.1,{{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}},{8.4, 3.2, 4.1000000000000005}}, {12052, 0, 12052, 0., 66300, False, "FogVolume", "Tree_double_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, {0.00030273502515595907, 3.0000000000000004}, True,    0.1,{{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}},{7.800000000000001, 2.5, 3.4000000000000004}}}	
 ]
 
 EndTestSection[]

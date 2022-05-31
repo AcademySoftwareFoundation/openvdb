@@ -1,59 +1,47 @@
-BeginTestSection["Mesh Tests"]
+BeginTestSection["Level Set Creation Tests"]
 
 BeginTestSection["Generic"]
 
-BeginTestSection["Initialization"]
+BeginTestSection["OpenVDBLevelSet"]
 
 VerificationTest[(* 1 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;vdb=OpenVDBLink`OpenVDBLevelSet[ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"]];OpenVDBLink`OpenVDBScalarGridQ[vdb]
+	OpenVDBLink`OpenVDBDefaultSpace[OpenVDBLink`OpenVDBLevelSet]
 	,
-	True	
+	Missing["NotApplicable"]	
 ]
 
-EndTestSection[]
-
-BeginTestSection["OpenVDBMesh"]
-
 VerificationTest[(* 2 *)
-	OpenVDBLink`OpenVDBDefaultSpace[OpenVDBLink`OpenVDBMesh]
+	Attributes[OpenVDBLink`OpenVDBLevelSet]
 	,
-	"World"	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 3 *)
-	Attributes[OpenVDBLink`OpenVDBMesh]
+	Options[OpenVDBLink`OpenVDBLevelSet]
 	,
-	{}	
+	{"Creator":>OpenVDBLink`$OpenVDBCreator, "Name"->None, "ScalarType"->"Float"}	
 ]
 
 VerificationTest[(* 4 *)
-	Options[OpenVDBLink`OpenVDBMesh]
-	,
-	{"Adaptivity"->0., "CloseBoundary"->True, "IsoValue"->Automatic, "ReturnQuads"->False}	
-]
-
-VerificationTest[(* 5 *)
-	SyntaxInformation[OpenVDBLink`OpenVDBMesh]
+	SyntaxInformation[OpenVDBLink`OpenVDBLevelSet]
 	,
 	{"ArgumentsPattern"->{_, _., _., OptionsPattern[]}}	
 ]
 
-VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBMesh[], 
-OpenVDBLink`OpenVDBMesh["error"],
-OpenVDBLink`OpenVDBMesh[vdb, "error"],
-OpenVDBLink`OpenVDBMesh[vdb, "ComplexData", "error"],
-OpenVDBLink`OpenVDBMesh[vdb, "ComplexData", {{0, 1}, {0, 1}, {0, 1}}, "error"]
-}
+VerificationTest[(* 5 *)
+	{OpenVDBLink`OpenVDBLevelSet[], OpenVDBLink`OpenVDBLevelSet["error"], OpenVDBLink`OpenVDBLevelSet[Ball[], "error"], OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, "error"], OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, 3., "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBLevelSet::argb, OpenVDBLevelSet::reg, OpenVDBLevelSet::nonpos, OpenVDBLevelSet::nonpos, OpenVDBLevelSet::nonopt}
 ]
 
-VerificationTest[(* 7 *)
-	(OpenVDBLink`OpenVDBMesh[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
+VerificationTest[(* 6 *)
+	(OpenVDBLink`OpenVDBLevelSet[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D",    "Vec3I","Vec3S","Boolean","Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBLevelSet::reg, OpenVDBLevelSet::reg, OpenVDBLevelSet::reg, General::stop}
 ]
 
 EndTestSection[]
@@ -62,95 +50,72 @@ EndTestSection[]
 
 BeginTestSection["Float"]
 
-BeginTestSection["Initialization"]
+BeginTestSection["OpenVDBLevelSet"]
 
-VerificationTest[(* 8 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+VerificationTest[(* 7 *)
+	OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, 3.]["ActiveVoxelCount"]
 	,
-	{True, True, True, True}	
+	7674	
 ]
 
-EndTestSection[]
-
-BeginTestSection["OpenVDBMesh"]
+VerificationTest[(* 8 *)
+	OpenVDBLink`$OpenVDBHalfWidth=3.;OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1]["ActiveVoxelCount"]
+	,
+	7674	
+]
 
 VerificationTest[(* 9 *)
-	OpenVDBLink`OpenVDBMesh[vdbempty]
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`OpenVDBLevelSet[Ball[]]["ActiveVoxelCount"]
 	,
-	EmptyRegion[3]	
+	7674	
 ]
 
 VerificationTest[(* 10 *)
-	(MeshCellCount[OpenVDBLink`OpenVDBMesh[#1], 2]&)/@{bmr, vdb, fog}
+	specialRegions={EmptyRegion[3], Cube[], Dodecahedron[], Icosahedron[], Octahedron[], Tetrahedron[], Hexahedron[], Pyramid[], Prism[],     Cuboid[],Parallelepiped[],Simplex[3],Sphere[],Ball[],Ellipsoid[{0, 0, 0}, {1, 2, 3}],Cylinder[],Cone[],CapsuleShape[],    Tube[{{0, 0, 0}, {1, 0, 0}}, 0.3],SphericalShell[],Torus[],FilledTorus[],Polyhedron[{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}},      {{2, 3, 4}, {3, 2, 1}, {4, 1, 2}, {1, 4, 3}}]};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@specialRegions
 	,
-	{12244, 12244, 7620}	
+	{0, 3086, 12448, 5382, 2426, 1254, 3086, 5220, 2397, 3086, 4532, 1444, 7674, 7674, 29581, 10638, 5834, 14743, 2015, 9063, 4275, 4275, 1444}	
 ]
 
 VerificationTest[(* 11 *)
-	(MeshCellCount[OpenVDBLink`OpenVDBMesh[#1, "ReturnQuads"->True, "IsoValue"->0.1, "Adaptivity"->0.6], 2]&)/@{bmr, vdb, fog}
+	multiSetRegions={Ball[{{0, 0, 0}, {2, 0, 0}}, 1],     Hexahedron[(#1 + {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}&)/@{0, 3}],    Cone[(#1 + {{0, 0, -1}, {0, 0, 1}}&)/@{0, 3}]};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@multiSetRegions
 	,
-	{1539, 1539, 2246}	
+	{14699, 6172, 11668}	
 ]
 
 VerificationTest[(* 12 *)
-	MeshRegionQ[OpenVDBLink`OpenVDBMesh[vdb, "MeshRegion", "ReturnQuads"->True, "Adaptivity"->1]]
+	formulaRegions={ImplicitRegion[x^6 - 5*x^4*y + 3*x^4*y^2 + 10*x^2*y^3 + 3*x^2*y^4 - y^5 + y^6 + z^2<=1, {x, y, z}],     ParametricRegion[{{x, y, z + y*x}, x^2 + y^2 + z^2<=1}, {x, y, z}]};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@   formulaRegions
 	,
-	True	
+	{11638, 8035}	
 ]
 
 VerificationTest[(* 13 *)
-	BoundaryMeshRegionQ[OpenVDBLink`OpenVDBMesh[vdb, "BoundaryMeshRegion", "ReturnQuads"->True, "Adaptivity"->1]]
+	meshRegions=(ExampleData[{"Geometry3D", "Triceratops"}, #1]&)/@{"MeshRegion", "BoundaryMeshRegion"};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@meshRegions
 	,
-	True	
+	{26073, 26073}	
 ]
 
 VerificationTest[(* 14 *)
-	MatchQ[
-OpenVDBLink`OpenVDBMesh[vdb, "ComplexData", "ReturnQuads"->True, "Adaptivity"->1], 
-{coords_?MatrixQ, {tris_?MatrixQ, quads_?MatrixQ}}/;And[
-Dimensions[coords][[2]]==Dimensions[tris][[2]]==3, 
-Dimensions[quads][[2]]==4,
-Developer`PackedArrayQ[coords, Real],
-Developer`PackedArrayQ[tris, Integer],
-Developer`PackedArrayQ[quads, Integer],
-Min[{tris, quads}]>0&&Max[{tris, quads}]\[LessEqual]Length[coords]
-]
-]
+	derivedRegions={RegionUnion[Ball[], Cuboid[]], RegionIntersection[Ball[], Cuboid[]], RegionDifference[Ball[], Cuboid[]],     RegionSymmetricDifference[Ball[], Cuboid[]],    RegionProduct[ImplicitRegion[x^6 - 5*x^4*y + 3*x^4*y^2 + 10*x^2*y^3 + 3*x^2*y^4 - y^5 + y^6<=1/100, {x, y}], Line[{{0}, {1}}]]};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]>0&)/@derivedRegions
 	,
-	True	
+	{True, True, True, True, True}	
 ]
 
 VerificationTest[(* 15 *)
-	MatchQ[
-OpenVDBLink`OpenVDBMesh[vdb, "FaceData", "ReturnQuads"->True, "Adaptivity"->1], 
-{tris_List, quads_List}/;And[
-ArrayQ[tris, 3], ArrayQ[quads, 3], 
-Dimensions[tris][[2;;-1]]=={3, 3},
-Dimensions[quads][[2;;-1]]=={4, 3},
-Developer`PackedArrayQ[tris, Real],
-Developer`PackedArrayQ[quads, Real]
-]
-]
+	meshComplexes={{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}},     {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Polygon[{{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}]},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {Polygon[{{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}]}},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {Polygon[{1, 2, 3}], Polygon[{2, 3, 4}], Polygon[{1, 3, 4}], Polygon[{1, 2, 4}]}}};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@meshComplexes
 	,
-	True	
+	{1444, 1444, 1444, 1444}	
 ]
 
 VerificationTest[(* 16 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[vdb, Automatic, {{-2, 2}, {-2, 2}, {-2, 2}}->"World"]]
+	tubeComplexes={{MeshRegion[{{0, 0, 0}, {1, 0, 0}}, Line[{1, 2}]], 0.3}, {{{0, 0, 0}, {1, 0, 0}}, {1, 2}, 0.3},     {{{0, 0, 0}, {1, 0, 0}}, {{1, 2}}, 0.3},{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, {{1, 2}, {2, 3}}, 0.3},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, Line[{{1, 2}, {2, 3}}], 0.3},{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, {Line[{1, 2}], Line[{2, 3}]}, 0.3}};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@tubeComplexes
 	,
-	{5124, 15366, 10244}	
+	{2015, 2015, 2015, 3201, 3201, 3201}	
 ]
 
 VerificationTest[(* 17 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[vdb, Automatic, {{0, 20}, {-10, 10}, {-20, 20}}->"Index", "CloseBoundary"->False]]
+	thickMeshComplexes={{MeshRegion[{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}, Polygon[{{1, 2, 3}, {1, 3, 4}}]], 0.3},     {{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}, Polygon[{{1, 2, 3}, {1, 3, 4}}], 0.3},{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},      {{1, 2, 3}, {1, 3, 4}},0.3}};(OpenVDBLink`OpenVDBLevelSet[#1]["ActiveVoxelCount"]&)/@thickMeshComplexes
 	,
-	{1546, 4544, 2998}	
-]
-
-VerificationTest[(* 18 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[fog, Automatic, {{-2, 2}, {-2, 2}, {-2, 2}}]]
-	,
-	{3096, 9258, 6172}	
+	{4175, 4175, 4175}	
 ]
 
 EndTestSection[]
@@ -159,95 +124,72 @@ EndTestSection[]
 
 BeginTestSection["Double"]
 
-BeginTestSection["Initialization"]
+BeginTestSection["OpenVDBLevelSet"]
 
-VerificationTest[(* 19 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+VerificationTest[(* 18 *)
+	OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, 3., "ScalarType"->"Double"]["ActiveVoxelCount"]
 	,
-	{True, True, True, True}	
+	7728	
 ]
 
-EndTestSection[]
-
-BeginTestSection["OpenVDBMesh"]
+VerificationTest[(* 19 *)
+	OpenVDBLink`$OpenVDBHalfWidth=3.;OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, "ScalarType"->"Double"]["ActiveVoxelCount"]
+	,
+	7728	
+]
 
 VerificationTest[(* 20 *)
-	OpenVDBLink`OpenVDBMesh[vdbempty]
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`OpenVDBLevelSet[Ball[], "ScalarType"->"Double"]["ActiveVoxelCount"]
 	,
-	EmptyRegion[3]	
+	7728	
 ]
 
 VerificationTest[(* 21 *)
-	(MeshCellCount[OpenVDBLink`OpenVDBMesh[#1], 2]&)/@{bmr, vdb, fog}
+	specialRegions={EmptyRegion[3], Cube[], Dodecahedron[], Icosahedron[], Octahedron[], Tetrahedron[], Hexahedron[], Pyramid[], Prism[],     Cuboid[],Parallelepiped[],Simplex[3],Sphere[],Ball[],Ellipsoid[{0, 0, 0}, {1, 2, 3}],Cylinder[],Cone[],CapsuleShape[],    Tube[{{0, 0, 0}, {1, 0, 0}}, 0.3],SphericalShell[],Torus[],FilledTorus[],Polyhedron[{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}},      {{2, 3, 4}, {3, 2, 1}, {4, 1, 2}, {1, 4, 3}}]};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@   specialRegions
 	,
-	{12244, 12244, 7620}	
+	{0, 3086, 12448, 5382, 2426, 1254, 3086, 5220, 2397, 3086, 4532, 1444, 7728, 7728, 29581, 10638, 5834, 14743, 2017, 9063, 4275, 4275, 1444}	
 ]
 
 VerificationTest[(* 22 *)
-	(MeshCellCount[OpenVDBLink`OpenVDBMesh[#1, "ReturnQuads"->True, "IsoValue"->0.1, "Adaptivity"->0.6], 2]&)/@{bmr, vdb, fog}
+	multiSetRegions={Ball[{{0, 0, 0}, {2, 0, 0}}, 1],     Hexahedron[(#1 + {{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}, {0, 0, 1}, {1, 0, 1}, {1, 1, 1}, {0, 1, 1}}&)/@{0, 3}],    Cone[(#1 + {{0, 0, -1}, {0, 0, 1}}&)/@{0, 3}]};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@   multiSetRegions
 	,
-	{1539, 1539, 2246}	
+	{14798, 6172, 11668}	
 ]
 
 VerificationTest[(* 23 *)
-	MeshRegionQ[OpenVDBLink`OpenVDBMesh[vdb, "MeshRegion", "ReturnQuads"->True, "Adaptivity"->1]]
+	formulaRegions={ImplicitRegion[x^6 - 5*x^4*y + 3*x^4*y^2 + 10*x^2*y^3 + 3*x^2*y^4 - y^5 + y^6 + z^2<=1, {x, y, z}],     ParametricRegion[{{x, y, z + y*x}, x^2 + y^2 + z^2<=1}, {x, y, z}]};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@formulaRegions
 	,
-	True	
+	{11638, 8035}	
 ]
 
 VerificationTest[(* 24 *)
-	BoundaryMeshRegionQ[OpenVDBLink`OpenVDBMesh[vdb, "BoundaryMeshRegion", "ReturnQuads"->True, "Adaptivity"->1]]
+	meshRegions=(ExampleData[{"Geometry3D", "Triceratops"}, #1]&)/@{"MeshRegion", "BoundaryMeshRegion"};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@meshRegions
 	,
-	True	
+	{26073, 26073}	
 ]
 
 VerificationTest[(* 25 *)
-	MatchQ[
-OpenVDBLink`OpenVDBMesh[vdb, "ComplexData", "ReturnQuads"->True, "Adaptivity"->1], 
-{coords_?MatrixQ, {tris_?MatrixQ, quads_?MatrixQ}}/;And[
-Dimensions[coords][[2]]==Dimensions[tris][[2]]==3, 
-Dimensions[quads][[2]]==4,
-Developer`PackedArrayQ[coords, Real],
-Developer`PackedArrayQ[tris, Integer],
-Developer`PackedArrayQ[quads, Integer],
-Min[{tris, quads}]>0&&Max[{tris, quads}]\[LessEqual]Length[coords]
-]
-]
+	derivedRegions={RegionUnion[Ball[], Cuboid[]], RegionIntersection[Ball[], Cuboid[]], RegionDifference[Ball[], Cuboid[]],     RegionSymmetricDifference[Ball[], Cuboid[]],    RegionProduct[ImplicitRegion[x^6 - 5*x^4*y + 3*x^4*y^2 + 10*x^2*y^3 + 3*x^2*y^4 - y^5 + y^6<=1/100, {x, y}], Line[{{0}, {1}}]]};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]>0&)/@derivedRegions
 	,
-	True	
+	{True, True, True, True, True}	
 ]
 
 VerificationTest[(* 26 *)
-	MatchQ[
-OpenVDBLink`OpenVDBMesh[vdb, "FaceData", "ReturnQuads"->True, "Adaptivity"->1], 
-{tris_List, quads_List}/;And[
-ArrayQ[tris, 3], ArrayQ[quads, 3], 
-Dimensions[tris][[2;;-1]]=={3, 3},
-Dimensions[quads][[2;;-1]]=={4, 3},
-Developer`PackedArrayQ[tris, Real],
-Developer`PackedArrayQ[quads, Real]
-]
-]
+	meshComplexes={{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}},     {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, Polygon[{{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}]},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {Polygon[{{1, 2, 3}, {2, 3, 4}, {1, 3, 4}, {1, 2, 4}}]}},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1}}, {Polygon[{1, 2, 3}], Polygon[{2, 3, 4}], Polygon[{1, 3, 4}], Polygon[{1, 2, 4}]}}};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@meshComplexes
 	,
-	True	
+	{1444, 1444, 1444, 1444}	
 ]
 
 VerificationTest[(* 27 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[vdb, Automatic, {{-2, 2}, {-2, 2}, {-2, 2}}->"World"]]
+	tubeComplexes={{MeshRegion[{{0, 0, 0}, {1, 0, 0}}, Line[{1, 2}]], 0.3}, {{{0, 0, 0}, {1, 0, 0}}, {1, 2}, 0.3},     {{{0, 0, 0}, {1, 0, 0}}, {{1, 2}}, 0.3},{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, {{1, 2}, {2, 3}}, 0.3},    {{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, Line[{{1, 2}, {2, 3}}], 0.3},{{{0, 0, 0}, {1, 0, 0}, {0, 1, 0}}, {Line[{1, 2}], Line[{2, 3}]}, 0.3}};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@tubeComplexes
 	,
-	{5124, 15366, 10244}	
+	{2017, 2017, 2017, 3203, 3203, 3203}	
 ]
 
 VerificationTest[(* 28 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[vdb, Automatic, {{0, 20}, {-10, 10}, {-20, 20}}->"Index", "CloseBoundary"->False]]
+	thickMeshComplexes={{MeshRegion[{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}, Polygon[{{1, 2, 3}, {1, 3, 4}}]], 0.3},     {{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}}, Polygon[{{1, 2, 3}, {1, 3, 4}}], 0.3},{{{0, 0, 0}, {1, 0, 0}, {1, 1, 0}, {0, 1, 0}},      {{1, 2, 3}, {1, 3, 4}},0.3}};(OpenVDBLink`OpenVDBLevelSet[#1, "ScalarType"->"Double"]["ActiveVoxelCount"]&)/@thickMeshComplexes
 	,
-	{1546, 4544, 2998}	
-]
-
-VerificationTest[(* 29 *)
-	MeshCellCount[OpenVDBLink`OpenVDBMesh[fog, Automatic, {{-2, 2}, {-2, 2}, {-2, 2}}]]
-	,
-	{3096, 9258, 6172}	
+	{4175, 4175, 4175}	
 ]
 
 EndTestSection[]

@@ -825,8 +825,11 @@ createCellGroup[cells_, section_] :=
 				splitcells[[1, 1]]
 			]
 		
-		) /; OddQ[Length[splitcells]] && MatchQ[splitcells, {{_}, _, _, __}]
+		) /; OddQ[Length[splitcells]] && MatchQ[splitcells, {{_}, _, _, ___}]
 	];
+
+
+createCellGroup[args___] := $Failed
 
 
 (* ::Subsubsection::Closed:: *)

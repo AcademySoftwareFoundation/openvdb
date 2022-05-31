@@ -23,7 +23,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBArea]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 4 *)
@@ -39,20 +39,19 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBArea[], 
-OpenVDBLink`OpenVDBArea["error"],
-OpenVDBLink`OpenVDBArea[bmr, "error"],
-OpenVDBLink`OpenVDBArea[bmr, "World", "error"]
-}
+	{OpenVDBLink`OpenVDBArea[], OpenVDBLink`OpenVDBArea["error"], OpenVDBLink`OpenVDBArea[bmr, "error"], OpenVDBLink`OpenVDBArea[bmr, "World", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBArea::argt, OpenVDBArea::scalargrid2, OpenVDBArea::gridspace, OpenVDBArea::argt}
 ]
 
 VerificationTest[(* 7 *)
 	(OpenVDBLink`OpenVDBArea[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBArea::scalargrid2, OpenVDBArea::scalargrid2, OpenVDBArea::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -68,7 +67,7 @@ VerificationTest[(* 8 *)
 VerificationTest[(* 9 *)
 	Attributes[OpenVDBLink`OpenVDBEulerCharacteristic]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 10 *)
@@ -84,19 +83,19 @@ VerificationTest[(* 11 *)
 ]
 
 VerificationTest[(* 12 *)
-	{
-OpenVDBLink`OpenVDBEulerCharacteristic[], 
-OpenVDBLink`OpenVDBEulerCharacteristic["error"],
-OpenVDBLink`OpenVDBEulerCharacteristic[bmr, "error"]
-}
+	{OpenVDBLink`OpenVDBEulerCharacteristic[], OpenVDBLink`OpenVDBEulerCharacteristic["error"], OpenVDBLink`OpenVDBEulerCharacteristic[bmr, "error"]}
 	,
-	{$Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed}
+	,
+	{OpenVDBEulerCharacteristic::argx, OpenVDBEulerCharacteristic::scalargrid2, OpenVDBEulerCharacteristic::argx}
 ]
 
 VerificationTest[(* 13 *)
 	(OpenVDBLink`OpenVDBEulerCharacteristic[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBEulerCharacteristic::scalargrid2, OpenVDBEulerCharacteristic::scalargrid2, OpenVDBEulerCharacteristic::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -112,7 +111,7 @@ VerificationTest[(* 14 *)
 VerificationTest[(* 15 *)
 	Attributes[OpenVDBLink`OpenVDBGenus]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 16 *)
@@ -128,19 +127,19 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	{
-OpenVDBLink`OpenVDBGenus[], 
-OpenVDBLink`OpenVDBGenus["error"],
-OpenVDBLink`OpenVDBGenus[bmr, "error"]
-}
+	{OpenVDBLink`OpenVDBGenus[], OpenVDBLink`OpenVDBGenus["error"], OpenVDBLink`OpenVDBGenus[bmr, "error"]}
 	,
-	{$Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed}
+	,
+	{OpenVDBGenus::argx, OpenVDBGenus::scalargrid2, OpenVDBGenus::argx}
 ]
 
 VerificationTest[(* 19 *)
 	(OpenVDBLink`OpenVDBGenus[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBGenus::scalargrid2, OpenVDBGenus::scalargrid2, OpenVDBGenus::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -156,7 +155,7 @@ VerificationTest[(* 20 *)
 VerificationTest[(* 21 *)
 	Attributes[OpenVDBLink`OpenVDBVolume]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 22 *)
@@ -172,20 +171,19 @@ VerificationTest[(* 23 *)
 ]
 
 VerificationTest[(* 24 *)
-	{
-OpenVDBLink`OpenVDBVolume[], 
-OpenVDBLink`OpenVDBVolume["error"],
-OpenVDBLink`OpenVDBVolume[bmr, "error"],
-OpenVDBLink`OpenVDBVolume[bmr, "World", "error"]
-}
+	{OpenVDBLink`OpenVDBVolume[], OpenVDBLink`OpenVDBVolume["error"], OpenVDBLink`OpenVDBVolume[bmr, "error"], OpenVDBLink`OpenVDBVolume[bmr, "World", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBVolume::argt, OpenVDBVolume::scalargrid2, OpenVDBVolume::gridspace, OpenVDBVolume::argt}
 ]
 
 VerificationTest[(* 25 *)
 	(OpenVDBLink`OpenVDBVolume[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBVolume::scalargrid2, OpenVDBVolume::scalargrid2, OpenVDBVolume::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -197,7 +195,7 @@ BeginTestSection["Float"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 26 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb],    OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True}	
 ]
@@ -209,7 +207,7 @@ BeginTestSection["OpenVDBArea"]
 VerificationTest[(* 27 *)
 	OpenVDBLink`OpenVDBArea/@{bmr, vdbempty, vdb, fog}
 	,
-	{41.20717458005259, Indeterminate, 41.20717458005259, Indeterminate}	
+	{41.20717458005259, 0., 41.20717458005259, Indeterminate}	
 ]
 
 EndTestSection[]
@@ -239,7 +237,7 @@ BeginTestSection["OpenVDBVolume"]
 VerificationTest[(* 30 *)
 	OpenVDBLink`OpenVDBVolume/@{bmr, vdbempty, vdb, fog}
 	,
-	{12.213059193871851, Indeterminate, 12.213059193871851, Indeterminate}	
+	{12.213059193871851, 0., 12.213059193871851, 7.210150873661043}	
 ]
 
 EndTestSection[]
@@ -251,7 +249,7 @@ BeginTestSection["Double"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 31 *)
-	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty],    OpenVDBLink`OpenVDBScalarGridQ[vdb],OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
 	{True, True, True, True}	
 ]
@@ -263,7 +261,7 @@ BeginTestSection["OpenVDBArea"]
 VerificationTest[(* 32 *)
 	OpenVDBLink`OpenVDBArea/@{bmr, vdbempty, vdb, fog}
 	,
-	{41.20717458005259, Indeterminate, 41.20717496672823, Indeterminate}	
+	{41.20717458005259, 0., 41.20717496672823, Indeterminate}	
 ]
 
 EndTestSection[]
@@ -293,7 +291,7 @@ BeginTestSection["OpenVDBVolume"]
 VerificationTest[(* 35 *)
 	OpenVDBLink`OpenVDBVolume/@{bmr, vdbempty, vdb, fog}
 	,
-	{12.213059193871851, Indeterminate, 12.213059351349573, Indeterminate}	
+	{12.213059193871851, 0., 12.213059351349573, 7.210149489096997}	
 ]
 
 EndTestSection[]

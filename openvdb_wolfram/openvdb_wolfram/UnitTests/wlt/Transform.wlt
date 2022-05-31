@@ -23,7 +23,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBTransform]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 4 *)
@@ -39,14 +39,11 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBTransform[], 
-OpenVDBLink`OpenVDBTransform["error"],
-OpenVDBLink`OpenVDBTransform[vdb, "error"],
-OpenVDBLink`OpenVDBTransform[vdb, ScalingTransform[{1, 1, 2}], "error"]
-}
+	{OpenVDBLink`OpenVDBTransform[], OpenVDBLink`OpenVDBTransform["error"], OpenVDBLink`OpenVDBTransform[vdb, "error"], OpenVDBLink`OpenVDBTransform[vdb, ScalingTransform[{1, 1, 2}], "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBTransform::argrx, OpenVDBTransform::argr, OpenVDBTransform::trans, OpenVDBTransform::nonopt}
 ]
 
 VerificationTest[(* 7 *)
@@ -68,7 +65,7 @@ VerificationTest[(* 8 *)
 VerificationTest[(* 9 *)
 	Attributes[OpenVDBLink`OpenVDBMultiply]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 10 *)
@@ -84,20 +81,19 @@ VerificationTest[(* 11 *)
 ]
 
 VerificationTest[(* 12 *)
-	{
-OpenVDBLink`OpenVDBMultiply[], 
-OpenVDBLink`OpenVDBMultiply["error"],
-OpenVDBLink`OpenVDBMultiply[vdb, "error"],
-OpenVDBLink`OpenVDBMultiply[vdb, 3, "error"]
-}
+	{OpenVDBLink`OpenVDBMultiply[], OpenVDBLink`OpenVDBMultiply["error"], OpenVDBLink`OpenVDBMultiply[vdb, "error"], OpenVDBLink`OpenVDBMultiply[vdb, 3, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBMultiply::argrx, OpenVDBMultiply::argr, OpenVDBMultiply::real, OpenVDBMultiply::argrx}
 ]
 
 VerificationTest[(* 13 *)
 	(OpenVDBLink`OpenVDBMultiply[OpenVDBLink`OpenVDBCreateGrid[1., #1], 3]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBMultiply::scalargrid2, OpenVDBMultiply::scalargrid2, OpenVDBMultiply::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -113,7 +109,7 @@ VerificationTest[(* 14 *)
 VerificationTest[(* 15 *)
 	Attributes[OpenVDBLink`OpenVDBGammaAdjust]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 16 *)
@@ -129,20 +125,19 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	{
-OpenVDBLink`OpenVDBGammaAdjust[], 
-OpenVDBLink`OpenVDBGammaAdjust["error"],
-OpenVDBLink`OpenVDBGammaAdjust[vdb, "error"],
-OpenVDBLink`OpenVDBGammaAdjust[vdb, 3, "error"]
-}
+	{OpenVDBLink`OpenVDBGammaAdjust[], OpenVDBLink`OpenVDBGammaAdjust["error"], OpenVDBLink`OpenVDBGammaAdjust[vdb, "error"], OpenVDBLink`OpenVDBGammaAdjust[vdb, 3, "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBGammaAdjust::argrx, OpenVDBGammaAdjust::argr, OpenVDBGammaAdjust::pos, OpenVDBGammaAdjust::argrx}
 ]
 
 VerificationTest[(* 19 *)
 	(OpenVDBLink`OpenVDBGammaAdjust[OpenVDBLink`OpenVDBCreateGrid[1., #1], 2]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBGammaAdjust::scalargrid2, OpenVDBGammaAdjust::scalargrid2, OpenVDBGammaAdjust::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -210,15 +205,13 @@ VerificationTest[(* 27 *)
 ]
 
 VerificationTest[(* 28 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBMultiply[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBMultiply[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0.30000001192092896, {-0.5999919772148132, 0.599901020526886}}	
 ]
 
 VerificationTest[(* 29 *)
-	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];
-OpenVDBLink`OpenVDBMultiply[fog2, 3][{"BackgroundValue", "MaxValue"}]
+	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];OpenVDBLink`OpenVDBMultiply[fog2, 3][{"BackgroundValue", "MaxValue"}]
 	,
 	{0., 1.}	
 ]
@@ -234,15 +227,13 @@ VerificationTest[(* 30 *)
 ]
 
 VerificationTest[(* 31 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBGammaAdjust[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBGammaAdjust[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0., {1.0181959275712416*^-8, 1.}}	
 ]
 
 VerificationTest[(* 32 *)
-	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];
-OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
+	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0., {1.0181959275712416*^-8, 1.}}	
 ]
@@ -250,13 +241,17 @@ OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
 VerificationTest[(* 33 *)
 	OpenVDBLink`OpenVDBGammaAdjust[fog, 0]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBGammaAdjust::pos}
 ]
 
 VerificationTest[(* 34 *)
 	OpenVDBLink`OpenVDBGammaAdjust[fog, -1]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBGammaAdjust::pos}
 ]
 
 EndTestSection[]
@@ -312,15 +307,13 @@ EndTestSection[]
 BeginTestSection["OpenVDBMultiply"]
 
 VerificationTest[(* 41 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBMultiply[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBMultiply[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0.30000000000000004, {-0.5999919825045569, 0.5999010164203733}}	
 ]
 
 VerificationTest[(* 42 *)
-	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];
-OpenVDBLink`OpenVDBMultiply[fog2, 3][{"BackgroundValue", "MaxValue"}]
+	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];OpenVDBLink`OpenVDBMultiply[fog2, 3][{"BackgroundValue", "MaxValue"}]
 	,
 	{0., 1.}	
 ]
@@ -330,15 +323,13 @@ EndTestSection[]
 BeginTestSection["OpenVDBGammaAdjust"]
 
 VerificationTest[(* 43 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];
-OpenVDBLink`OpenVDBGammaAdjust[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
+	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];OpenVDBLink`OpenVDBGammaAdjust[vdb2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0., {1.0183166161797685*^-8, 1.}}	
 ]
 
 VerificationTest[(* 44 *)
-	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];
-OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
+	fog2=OpenVDBLink`OpenVDBCopyGrid[fog];OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
 	,
 	{0., {1.0183166161797685*^-8, 1.}}	
 ]
@@ -346,13 +337,17 @@ OpenVDBLink`OpenVDBGammaAdjust[fog2, 2][{"BackgroundValue", "MinMaxValues"}]
 VerificationTest[(* 45 *)
 	OpenVDBLink`OpenVDBGammaAdjust[fog, 0]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBGammaAdjust::pos}
 ]
 
 VerificationTest[(* 46 *)
 	OpenVDBLink`OpenVDBGammaAdjust[fog, -1]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBGammaAdjust::pos}
 ]
 
 EndTestSection[]

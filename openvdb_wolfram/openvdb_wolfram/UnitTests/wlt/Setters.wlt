@@ -23,7 +23,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBSetProperty]
 	,
-	{}	
+	{Protected, ReadProtected}	
 ]
 
 VerificationTest[(* 4 *)
@@ -39,15 +39,11 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBSetProperty[], 
-OpenVDBLink`OpenVDBSetProperty["error"],
-OpenVDBLink`OpenVDBSetProperty[vdb, "error"],
-OpenVDBLink`OpenVDBSetProperty[vdb, "error", "error"],
-OpenVDBLink`OpenVDBSetProperty[vdb, "Name", "Dino", "error"]
-}
+	{OpenVDBLink`OpenVDBSetProperty[], OpenVDBLink`OpenVDBSetProperty["error"], OpenVDBLink`OpenVDBSetProperty[vdb, "error"], OpenVDBLink`OpenVDBSetProperty[vdb, "error", "error"], OpenVDBLink`OpenVDBSetProperty[vdb, "Name", "Dino", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBSetProperty::argt, OpenVDBSetProperty::argtu, OpenVDBSetProperty::spec, OpenVDBSetProperty::prop, OpenVDBSetProperty::argt}
 ]
 
 VerificationTest[(* 7 *)

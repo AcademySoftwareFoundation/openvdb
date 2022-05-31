@@ -23,13 +23,17 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBProperty]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 4 *)
 	Options[OpenVDBLink`OpenVDBProperty]
 	,
 	{}	
+	,
+	{}
 ]
 
 VerificationTest[(* 5 *)
@@ -39,15 +43,11 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBProperty[], 
-OpenVDBLink`OpenVDBProperty["error"],
-OpenVDBLink`OpenVDBProperty[bmr, "error"],
-OpenVDBLink`OpenVDBProperty[bmr, "ActiveVoxelCount", "error"],
-OpenVDBLink`OpenVDBProperty[bmr, "ActiveVoxelCount", "RuleList", "error"]
-}
+	{OpenVDBLink`OpenVDBProperty[], OpenVDBLink`OpenVDBProperty["error"], OpenVDBLink`OpenVDBProperty[bmr, "error"], OpenVDBLink`OpenVDBProperty[bmr, "ActiveVoxelCount", "error"], OpenVDBLink`OpenVDBProperty[bmr, "ActiveVoxelCount", "RuleList", "error"]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBProperty::argt, OpenVDBProperty::argtu, OpenVDBProperty::prop, OpenVDBProperty::frmt, OpenVDBProperty::argt}
 ]
 
 VerificationTest[(* 7 *)
@@ -87,21 +87,21 @@ VerificationTest[(* 10 *)
 ]
 
 VerificationTest[(* 11 *)
-	OpenVDBLink`OpenVDBProperty[bmr, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[bmr, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
 	,
-	{26073, 0, 26073, 0.30000001192092896, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.299950510263443, 2753912, -0.2999959886074066, {-0.2999959886074066, 0.299950510263443}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
+	{26073, 0, 26073, 0.30000001192092896, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.299950510263443, -0.2999959886074066, {-0.2999959886074066, 0.299950510263443}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
 ]
 
 VerificationTest[(* 12 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{26073, 0, 26073, 0.30000001192092896, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.299950510263443, 2753912, -0.2999959886074066, {-0.2999959886074066, 0.299950510263443}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
+	{26073, 0, 26073, 0.30000001192092896, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_float_5_4_3", 3.0000001192092896, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.299950510263443, -0.2999959886074066, {-0.2999959886074066, 0.299950510263443}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
 ]
 
 VerificationTest[(* 13 *)
-	fog[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	fog[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{12052, 0, 12052, 0., 66300, Missing["NotAvailable"], Missing["NotAvailable"], False, 1., 3., "FogVolume", "Tree_float_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, 1., 2614552, 0.00010090569412568584, {0.00010090569412568584, 1.}, Missing["NotAvailable"], True, 0.1, {{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}}, {7.800000000000001, 2.5, 3.4000000000000004}}	
+	{12052, 0, 12052, 0., 66300, Missing["NotAvailable"], Missing["NotAvailable"], False, 1., 3., "FogVolume", "Tree_float_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, 1., 0.00010090569412568584, {0.00010090569412568584, 1.}, Missing["NotAvailable"], True, 0.1, {{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}}, {7.800000000000001, 2.5, 3.4000000000000004}}	
 ]
 
 VerificationTest[(* 14 *)
@@ -141,21 +141,21 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels",   "VoxelSize","WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
 	,
-	{26073, 0, 26073, 0.30000000000000004, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.29995050821018665, 3059080, -0.29999599125227844, {-0.29999599125227844, 0.29995050821018665}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
+	{26073, 0, 26073, 0.30000000000000004, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.29995050821018665, -0.29999599125227844, {-0.29999599125227844, 0.29995050821018665}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
 ]
 
 VerificationTest[(* 19 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{26073, 0, 26073, 0.30000000000000004, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.29995050821018665, 3059080, -0.29999599125227844, {-0.29999599125227844, 0.29995050821018665}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
+	{26073, 0, 26073, 0.30000000000000004, 110208, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], "LevelSet", "Tree_double_5_4_3", 3.0000000000000004, {{-48, 35}, {-16, 15}, {-19, 21}}, {84, 32, 41}, 0.29995050821018665, -0.29999599125227844, {-0.29999599125227844, 0.29995050821018665}, Missing["NotAvailable"], True, 0.1, {{-4.800000000000001, 3.5}, {-1.6, 1.5}, {-1.9000000000000001, 2.1}}, {8.4, 3.2, 4.1000000000000005}}	
 ]
 
 VerificationTest[(* 20 *)
-	fog[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	fog[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{12052, 0, 12052, 0., 66300, Missing["NotAvailable"], Missing["NotAvailable"], False, 1., 3., "FogVolume", "Tree_double_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, 1., 2786600, 0.00010091167505198635, {0.00010091167505198635, 1.}, Missing["NotAvailable"], True, 0.1, {{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}}, {7.800000000000001, 2.5, 3.4000000000000004}}	
+	{12052, 0, 12052, 0., 66300, Missing["NotAvailable"], Missing["NotAvailable"], False, 1., 3., "FogVolume", "Tree_double_5_4_3", Missing["NotApplicable"], {{-45, 32}, {-12, 12}, {-16, 17}}, {78, 25, 34}, 1., 0.00010091167505198635, {0.00010091167505198635, 1.}, Missing["NotAvailable"], True, 0.1, {{-4.5, 3.2}, {-1.2000000000000002, 1.2000000000000002}, {-1.6, 1.7000000000000002}}, {7.800000000000001, 2.5, 3.4000000000000004}}	
 ]
 
 VerificationTest[(* 21 *)
@@ -195,15 +195,15 @@ VerificationTest[(* 24 *)
 ]
 
 VerificationTest[(* 25 *)
-	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
 	,
-	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_int64_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 10, 322176, 1, {1, 10}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_int64_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 10, 1, {1, 10}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 26 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_int64_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 10, 322176, 1, {1, 10}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_int64_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 10, 1, {1, 10}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 27 *)
@@ -243,15 +243,15 @@ VerificationTest[(* 30 *)
 ]
 
 VerificationTest[(* 31 *)
-	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
 	,
-	{20, 0, 20, {0., 0., 0.}, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_vec3s_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, {11., 12., 1.}, 625280, {2., 3., 10.}, {{2., 3., 10.}, {11., 12., 1.}}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, {0., 0., 0.}, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_vec3s_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, {11., 12., 1.}, {2., 3., 10.}, {{2., 3., 10.}, {11., 12., 1.}}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 32 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{20, 0, 20, {0., 0., 0.}, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_vec3s_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, {11., 12., 1.}, 625280, {2., 3., 10.}, {{2., 3., 10.}, {11., 12., 1.}}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, {0., 0., 0.}, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_vec3s_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, {11., 12., 1.}, {2., 3., 10.}, {{2., 3., 10.}, {11., 12., 1.}}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 33 *)
@@ -291,15 +291,15 @@ VerificationTest[(* 36 *)
 ]
 
 VerificationTest[(* 37 *)
-	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
 	,
-	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_bool_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 1, 305968, 0, {0, 1}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_bool_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 1, 0, {0, 1}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 38 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_bool_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 1, 305968, 0, {0, 1}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{20, 0, 20, 0, 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_bool_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, 1, 0, {0, 1}, Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 39 *)
@@ -339,15 +339,15 @@ VerificationTest[(* 42 *)
 ]
 
 VerificationTest[(* 43 *)
-	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize",   "WorldBoundingBox","WorldDimensions"}]
+	OpenVDBLink`OpenVDBProperty[vdb, {"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment",    "GrayscaleWidth","GridClass","GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
 	,
-	{12, 0, 12, Missing["NotApplicable"], 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_mask_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, Missing["NotApplicable"], 305712, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{12, 0, 12, Missing["NotApplicable"], 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_mask_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 44 *)
-	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MemoryUsage","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox",   "WorldDimensions"}]
+	vdb[{"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Creator", "Description", "Empty", "GammaAdjustment", "GrayscaleWidth", "GridClass",    "GridType","HalfWidth","IndexBoundingBox","IndexDimensions","MaxValue","MinValue","MinMaxValues","Name","UniformVoxels","VoxelSize","WorldBoundingBox","WorldDimensions"}]
 	,
-	{12, 0, 12, Missing["NotApplicable"], 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_mask_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, Missing["NotApplicable"], 305712, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
+	{12, 0, 12, Missing["NotApplicable"], 1000, Missing["NotAvailable"], Missing["NotAvailable"], False, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], "Tree_mask_5_4_3", Missing["NotApplicable"], {{1, 10}, {1, 10}, {1, 10}}, {10, 10, 10}, Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotApplicable"], Missing["NotAvailable"], True, 1., {{1., 10.}, {1., 10.}, {1., 10.}}, {10., 10., 10.}}	
 ]
 
 VerificationTest[(* 45 *)

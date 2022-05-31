@@ -23,13 +23,17 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBFogVolume]
 	,
-	{}	
+	{Protected, ReadProtected}	
+	,
+	{}
 ]
 
 VerificationTest[(* 4 *)
 	Options[OpenVDBLink`OpenVDBFilter]
 	,
 	{}	
+	,
+	{}
 ]
 
 VerificationTest[(* 5 *)
@@ -39,23 +43,19 @@ VerificationTest[(* 5 *)
 ]
 
 VerificationTest[(* 6 *)
-	{
-OpenVDBLink`OpenVDBFilter[], 
-OpenVDBLink`OpenVDBFilter["error"],
-OpenVDBLink`OpenVDBFilter[bmr],
-OpenVDBLink`OpenVDBFilter[bmr, "error"],
-OpenVDBLink`OpenVDBFilter[bmr, {"Laplacian", 3}],
-OpenVDBLink`OpenVDBFilter[bmr, "Mean", "error"],
-OpenVDBLink`OpenVDBFilter[bmr, "Mean", -3]
-}
+	{OpenVDBLink`OpenVDBFilter[], OpenVDBLink`OpenVDBFilter["error"], OpenVDBLink`OpenVDBFilter[bmr], OpenVDBLink`OpenVDBFilter[bmr, "error"], OpenVDBLink`OpenVDBFilter[bmr, {"Laplacian", 3}], OpenVDBLink`OpenVDBFilter[bmr, "Mean", "error"], OpenVDBLink`OpenVDBFilter[bmr, "Mean", -3]}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFilter::argt, OpenVDBFilter::argtu, OpenVDBFilter::argtu, OpenVDBFilter::filter, OpenVDBFilter::filter, OpenVDBFilter::intpm, OpenVDBFilter::intpm}
 ]
 
 VerificationTest[(* 7 *)
 	(OpenVDBLink`OpenVDBFilter[OpenVDBLink`OpenVDBCreateGrid[1., #1], "Mean"]&)/@{"Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}
 	,
-	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}	
+	{$Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed, $Failed}
+	,
+	{OpenVDBFilter::scalargrid2, OpenVDBFilter::scalargrid2, OpenVDBFilter::scalargrid2, General::stop}
 ]
 
 EndTestSection[]
@@ -79,7 +79,9 @@ BeginTestSection["OpenVDBFilter"]
 VerificationTest[(* 9 *)
 	OpenVDBLink`OpenVDBFilter[OpenVDBLink`OpenVDBFogVolume[bmr], "Mean"]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBFilter::lvlsetgrid2}
 ]
 
 VerificationTest[(* 10 *)
@@ -181,7 +183,9 @@ BeginTestSection["OpenVDBFilter"]
 VerificationTest[(* 24 *)
 	OpenVDBLink`OpenVDBFilter[OpenVDBLink`OpenVDBFogVolume[vdb], "Mean"]
 	,
-	$Failed	
+	$Failed
+	,
+	{OpenVDBFilter::lvlsetgrid2}
 ]
 
 VerificationTest[(* 25 *)
