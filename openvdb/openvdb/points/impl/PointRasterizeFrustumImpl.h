@@ -331,7 +331,7 @@ struct RasterizeOp
     void operator()(const PointLeafT& leaf, size_t) const
     {
         if (mInterrupter && mInterrupter->wasInterrupted()) {
-            tbb::task::self().cancel_group_execution();
+            thread::cancelGroupExecution();
             return;
         }
 
