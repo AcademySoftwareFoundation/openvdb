@@ -1798,7 +1798,7 @@ struct HaltOnSecondInterrupt : public util::NullInterrupter
         mInterrupt = true;
         return false;
     }
-    tbb::atomic<bool> mInterrupt = false;
+    std::atomic<bool> mInterrupt{false};
 };
 
 } // namespace
@@ -2332,127 +2332,130 @@ TEST_F(TestPointRasterizeFrustum, testStreaming)
 #ifndef ONLY_RASTER_FLOAT
     // memory tests
 
-    FloatGrid::Ptr density1, density2, density3;
-    Vec3SGrid::Ptr velocity1, velocity2, velocity3;
+    if (io::Archive::isDelayedLoadingEnabled() && io::Archive::hasBloscCompression()) {
 
-    const size_t mb = 1024*1024;
-    const size_t tinyMemory = static_cast<size_t>(0.1*mb);
+        FloatGrid::Ptr density1, density2, density3;
+        Vec3SGrid::Ptr velocity1, velocity2, velocity3;
 
-    size_t initialMemory;
+        const size_t mb = 1024*1024;
+        const size_t tinyMemory = static_cast<size_t>(0.1*mb);
 
-    { // memory test 1 - retain caches and streaming disabled
-        Rasterizer rasterizer(settings);
+        size_t initialMemory;
 
-        rasterizer.addPoints(points, /*stream=*/false);
-        rasterizer.addPoints(points2, /*stream=*/false);
+        { // memory test 1 - retain caches and streaming disabled
+            Rasterizer rasterizer(settings);
 
-        initialMemory = rasterizer.memUsage();
+            rasterizer.addPoints(points, /*stream=*/false);
+            rasterizer.addPoints(points2, /*stream=*/false);
 
-        EXPECT_TRUE(initialMemory > size_t(4*mb) && initialMemory < size_t(16*mb));
+            initialMemory = rasterizer.memUsage();
 
-        EXPECT_EQ(size_t(2), rasterizer.size());
+            EXPECT_TRUE(initialMemory > size_t(4*mb) && initialMemory < size_t(16*mb));
 
-        velocity1 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
-        EXPECT_EQ(Index64(219780), velocity1->activeVoxelCount());
+            EXPECT_EQ(size_t(2), rasterizer.size());
 
-        EXPECT_TRUE(rasterizer.memUsage() > size_t(71*mb) &&
-            rasterizer.memUsage() < size_t(91*mb));
+            velocity1 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
+            EXPECT_EQ(Index64(219780), velocity1->activeVoxelCount());
 
-        density1 = rasterizer.rasterizeDensity("density");
-        EXPECT_EQ(Index64(219780), density1->activeVoxelCount());
+            EXPECT_TRUE(rasterizer.memUsage() > size_t(71*mb) &&
+                rasterizer.memUsage() < size_t(91*mb));
 
-        // no data is discarded so expect a fairly high memory footprint
+            density1 = rasterizer.rasterizeDensity("density");
+            EXPECT_EQ(Index64(219780), density1->activeVoxelCount());
 
-        EXPECT_TRUE(rasterizer.memUsage() > size_t(80*mb) &&
-            rasterizer.memUsage() < size_t(100*mb));
-    }
+            // no data is discarded so expect a fairly high memory footprint
 
-    { // memory test 2 - retain caches and streaming enabled
-
-        { // reopen file and deep copy while setting transform
-            io::File file(filename);
-            file.open();
-            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-            file.close();
-
-            points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-            points2 = points->deepCopy();
-            points2->setTransform(transform);
+            EXPECT_TRUE(rasterizer.memUsage() > size_t(80*mb) &&
+                rasterizer.memUsage() < size_t(100*mb));
         }
 
-        Rasterizer rasterizer(settings);
+        { // memory test 2 - retain caches and streaming enabled
 
-        rasterizer.addPoints(points, /*stream=*/true);
-        rasterizer.addPoints(points2, /*stream=*/true);
+            { // reopen file and deep copy while setting transform
+                io::File file(filename);
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
 
-        EXPECT_EQ(initialMemory, rasterizer.memUsage());
+                points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+                points2 = points->deepCopy();
+                points2->setTransform(transform);
+            }
 
-        EXPECT_EQ(size_t(2), rasterizer.size());
+            Rasterizer rasterizer(settings);
 
-        velocity2 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
-        EXPECT_EQ(Index64(219780), velocity2->activeVoxelCount());
+            rasterizer.addPoints(points, /*stream=*/true);
+            rasterizer.addPoints(points2, /*stream=*/true);
 
-        size_t postRasterMemory = rasterizer.memUsage();
+            EXPECT_EQ(initialMemory, rasterizer.memUsage());
 
-        EXPECT_TRUE(postRasterMemory > size_t(70*mb) && postRasterMemory < size_t(85*mb));
+            EXPECT_EQ(size_t(2), rasterizer.size());
 
-        density2 = rasterizer.rasterizeDensity("density");
-        EXPECT_EQ(Index64(219780), density2->activeVoxelCount());
+            velocity2 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v");
+            EXPECT_EQ(Index64(219780), velocity2->activeVoxelCount());
 
-        // as data is being streamed, second attribute shouldn't change memory usage very much
+            size_t postRasterMemory = rasterizer.memUsage();
 
-        EXPECT_TRUE(rasterizer.memUsage() < (postRasterMemory + tinyMemory));
-    }
+            EXPECT_TRUE(postRasterMemory > size_t(70*mb) && postRasterMemory < size_t(85*mb));
 
-    { // memory test 3 - release caches and streaming enabled
+            density2 = rasterizer.rasterizeDensity("density");
+            EXPECT_EQ(Index64(219780), density2->activeVoxelCount());
 
-        { // reopen file and deep copy while setting transform
-            io::File file(filename);
-            file.open();
-            openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
-            file.close();
+            // as data is being streamed, second attribute shouldn't change memory usage very much
 
-            points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
-            points2 = points->deepCopy();
-            points2->setTransform(transform);
+            EXPECT_TRUE(rasterizer.memUsage() < (postRasterMemory + tinyMemory));
         }
 
-        auto points3 = points->deepCopy();
-        auto points4 = points2->deepCopy();
+        { // memory test 3 - release caches and streaming enabled
 
-        Settings settings2(*frustum);
-        settings2.threshold = 0.0f;
+            { // reopen file and deep copy while setting transform
+                io::File file(filename);
+                file.open();
+                openvdb::GridBase::Ptr baseGrid = file.readGrid("points");
+                file.close();
 
-        Mask mask2(*frustum, nullptr, BBoxd(), /*clipToFrustum=*/false);
+                points = openvdb::gridPtrCast<PointDataGrid>(baseGrid);
+                points2 = points->deepCopy();
+                points2->setTransform(transform);
+            }
 
-        Rasterizer rasterizer(settings2, mask2);
+            auto points3 = points->deepCopy();
+            auto points4 = points2->deepCopy();
 
-        rasterizer.addPoints(points, /*stream=*/true);
-        rasterizer.addPoints(points2, /*stream=*/true);
+            Settings settings2(*frustum);
+            settings2.threshold = 0.0f;
 
-        EXPECT_EQ(initialMemory, rasterizer.memUsage());
-        EXPECT_EQ(size_t(2), rasterizer.size());
+            Mask mask2(*frustum, nullptr, BBoxd(), /*clipToFrustum=*/false);
 
-        density3 = rasterizer.rasterizeDensity("density", RasterMode::ACCUMULATE, true);
-        EXPECT_EQ(Index64(219780), density3->activeVoxelCount());
+            Rasterizer rasterizer(settings2, mask2);
 
-        // all voxel data, attribute data and caches are being discarded,
-        // so memory after rasterizing shouldn't change very much
+            rasterizer.addPoints(points, /*stream=*/true);
+            rasterizer.addPoints(points2, /*stream=*/true);
 
-        EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
+            EXPECT_EQ(initialMemory, rasterizer.memUsage());
+            EXPECT_EQ(size_t(2), rasterizer.size());
 
-        // deep-copies of delay-loaded point grids need to be used for repeat rasterization
+            density3 = rasterizer.rasterizeDensity("density", RasterMode::ACCUMULATE, true);
+            EXPECT_EQ(Index64(219780), density3->activeVoxelCount());
 
-        rasterizer.clear();
-        rasterizer.addPoints(points3, /*stream=*/true);
-        rasterizer.addPoints(points4, /*stream=*/true);
+            // all voxel data, attribute data and caches are being discarded,
+            // so memory after rasterizing shouldn't change very much
 
-        EXPECT_EQ(size_t(2), rasterizer.size());
+            EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
 
-        EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
+            // deep-copies of delay-loaded point grids need to be used for repeat rasterization
 
-        velocity3 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v", RasterMode::ACCUMULATE, true);
-        EXPECT_EQ(Index64(219780), velocity3->activeVoxelCount());
+            rasterizer.clear();
+            rasterizer.addPoints(points3, /*stream=*/true);
+            rasterizer.addPoints(points4, /*stream=*/true);
+
+            EXPECT_EQ(size_t(2), rasterizer.size());
+
+            EXPECT_TRUE(rasterizer.memUsage() < (initialMemory + tinyMemory));
+
+            velocity3 = rasterizer.rasterizeAttribute<Vec3SGrid, Vec3s>("v", RasterMode::ACCUMULATE, true);
+            EXPECT_EQ(Index64(219780), velocity3->activeVoxelCount());
+        }
     }
 #endif
 
