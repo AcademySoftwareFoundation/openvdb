@@ -1,7 +1,7 @@
 OpenVDB Version History
 =======================
 
-Version 9.1.0 - June 1, 2022
+Version 9.1.0 - June 9, 2022
 
     Bug Fixes:
     - Minor fix to move assignment operator in nanovdb/util/HostBuffer.h.
