@@ -183,7 +183,7 @@ else()
   )
 endif()
 
-add_executable(vdb_test ${UNITTEST_SOURCE_FILES})
+add_library(vdb_test_obj OBJECT ${UNITTEST_SOURCE_FILES})
 
 # Blosc and ZLib are hidden dependencies for the core library
 # (not exposed in headers), so we need to manually link them in
@@ -210,6 +210,14 @@ if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   endif()
   list(APPEND OPENVDB_CORE_DEPENDENT_LIBS ZLIB::ZLIB)
 endif()
+
+# Propagate interface include directories from the dependencies to the object library
+
+foreach(DEP ${OPENVDB_TEST_DEPENDENT_LIBS})
+  target_include_directories(vdb_test_obj PUBLIC $<TARGET_PROPERTY:${DEP},INTERFACE_INCLUDE_DIRECTORIES>)
+endforeach()
+
+add_executable(vdb_test $<TARGET_OBJECTS:vdb_test_obj>)
 
 target_link_libraries(vdb_test ${OPENVDB_TEST_DEPENDENT_LIBS})
 add_test(NAME vdb_unit_test COMMAND $<TARGET_FILE:vdb_test> -v)
