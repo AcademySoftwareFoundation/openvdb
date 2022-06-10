@@ -13,4 +13,4 @@ The current OpenVDB maintainers are:
 | Nick Avramoussis | navramoussis@wetafx.co.nz
 | Ken Museth       | ken.museth@gmail.com
 | Andre Pradhana   | andre.pradhana@dreamworks.com
-| Richard Jones    | rhj@dneg.com
+| Richard Jones    | richardj@ilm.com
