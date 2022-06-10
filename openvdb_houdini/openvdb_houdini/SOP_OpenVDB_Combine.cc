@@ -399,6 +399,14 @@ Activity Difference:\n\
             " voxel values are considered equal to the background"
             " if they differ by less than this tolerance."));
 
+    // Prune Degenerate Tiles
+    parms.add(hutil::ParmFactory(PRM_TOGGLE, "prunedegenerate", "Prune Degenerate Tiles")
+        .setDefault(PRMzeroDefaults)
+        .setDocumentation(
+            "When SDF CSG operations result in a degenerancy, such as a VDB\n"
+            "subtracted from itself, clear the tile rather than having ghost\n"
+            "bands.\n"));
+
     // Prune toggle
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "prune", "Prune")
         .setDefault(PRMoneDefaults)
@@ -1159,19 +1167,19 @@ struct SOP_OpenVDB_Combine::CombineOp
     }
 
     template <typename GridT>
-    void doUnion(GridT &result, GridT &temp)
+    void doUnion(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgUnion(result, temp);
+        openvdb::tools::csgUnion(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
     template <typename GridT>
-    void doIntersection(GridT &result, GridT &temp)
+    void doIntersection(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgIntersection(result, temp);
+        openvdb::tools::csgIntersection(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
     template <typename GridT>
-    void doDifference(GridT &result, GridT &temp)
+    void doDifference(GridT &result, GridT &temp, bool prunedegen)
     {
-        openvdb::tools::csgDifference(result, temp);
+        openvdb::tools::csgDifference(result, temp, /*prune*/true, /*prunedgen*/prunedegen);
     }
 
     // Combine two grids of the same type.
@@ -1281,19 +1289,22 @@ struct SOP_OpenVDB_Combine::CombineOp
             case OP_UNION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doUnion(*resultGrid, *tempGrid);
+                doUnion(*resultGrid, *tempGrid,
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_INTERSECTION:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doIntersection(*resultGrid, *tempGrid);
+                doIntersection(*resultGrid, *tempGrid,
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_DIFFERENCE:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doDifference(*resultGrid, *tempGrid);
+                doDifference(*resultGrid, *tempGrid, 
+                        self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
             case OP_REPLACE:
@@ -1445,15 +1456,15 @@ struct SOP_OpenVDB_Combine::CombineOp
 }; // struct CombineOp
 
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doUnion(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doUnion(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doIntersection(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doIntersection(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 template <>
-void SOP_OpenVDB_Combine::CombineOp::doDifference(openvdb::BoolGrid &result, openvdb::BoolGrid &temp)
+void SOP_OpenVDB_Combine::CombineOp::doDifference(openvdb::BoolGrid &result, openvdb::BoolGrid &temp, bool prunedegen)
 {
 }
 
