@@ -1285,7 +1285,6 @@ bool SumMergeOp<TreeT>::operator()(RootT& root, size_t) const
         for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
             const auto* mergeRoot = mergeTree.rootPtr();
             if (!mergeRoot)                            continue;
-            if (!keyExistsInRoot(*mergeRoot, key))     continue;
 
             // steal or deep-copy the first child node that is encountered,
             // then cease processing of this root node coord as merge recursion
@@ -1294,7 +1293,6 @@ bool SumMergeOp<TreeT>::operator()(RootT& root, size_t) const
             const auto* mergeNode = mergeRoot->template probeConstNode<ChildT>(key);
             if (mergeNode) {
                 auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(key);
-                childPtr->resetBackground(mergeRoot->background(), root.background());
                 if (childPtr) {
                     // apply tile value and active state to the sub-tree
                     merge_internal::ApplyTileToNodeOp<TreeT> applyOp(value, active);
@@ -1320,6 +1318,18 @@ bool SumMergeOp<TreeT>::operator()(RootT& root, size_t) const
         }
     }
 
+    // set root background to be the sum of all other root backgrounds
+
+    ValueT background = root.background();
+
+    for (TreeToMerge<TreeT>& mergeTree : mTreesToMerge) {
+        const auto* mergeRoot = mergeTree.rootPtr();
+        if (!mergeRoot)     continue;
+        background += mergeRoot->background();
+    }
+
+    root.setBackground(background, /*updateChildNodes=*/false);
+
     return true;
 }
 
@@ -1344,7 +1354,6 @@ bool SumMergeOp<TreeT>::operator()(NodeT& node, size_t) const
                 if (mergeNode->isChildMaskOn(iter.pos())) {
                     // steal child node
                     auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(iter.getCoord());
-                    childPtr->resetBackground(mergeRoot->background(), this->background());
                     if (childPtr) {
                         // apply tile value and active state to the sub-tree
                         merge_internal::ApplyTileToNodeOp<TreeT> applyOp(*iter, iter.isValueOn());
