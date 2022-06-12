@@ -15,19 +15,19 @@
 #include <boost/python/numpy.hpp>
 //#include <arrayobject.h> // for PyArray_Descr (see pyGrid::arrayTypeId())
 #define PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-  #include "openvdb/tools/MeshToVolume.h"
-  #include "openvdb/tools/VolumeToMesh.h" // for tools::volumeToMesh()
+  #include <openvdb/tools/MeshToVolume.h>
+  #include <openvdb/tools/VolumeToMesh.h> // for tools::volumeToMesh()
 #endif
-#include "openvdb/openvdb.h"
-#include "openvdb/io/Stream.h"
-#include "openvdb/math/Math.h" // for math::isExactlyEqual()
-#include "openvdb/points/PointDataGrid.h"
-#include "openvdb/tools/LevelSetSphere.h"
-#include "openvdb/tools/Count.h"
-#include "openvdb/tools/Dense.h"
-#include "openvdb/tools/ChangeBackground.h"
-#include "openvdb/tools/Prune.h"
-#include "openvdb/tools/SignedFloodFill.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/io/Stream.h>
+#include <openvdb/math/Math.h> // for math::isExactlyEqual()
+#include <openvdb/points/PointDataGrid.h>
+#include <openvdb/tools/LevelSetSphere.h>
+#include <openvdb/tools/Count.h>
+#include <openvdb/tools/Dense.h>
+#include <openvdb/tools/ChangeBackground.h>
+#include <openvdb/tools/Prune.h>
+#include <openvdb/tools/SignedFloodFill.h>
 #include "pyutil.h"
 #include "pyAccessor.h" // for pyAccessor::AccessorWrap
 #include "pyopenvdb.h"

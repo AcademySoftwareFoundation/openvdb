@@ -58,7 +58,7 @@
 #define PYOPENVDB_HAS_BEEN_INCLUDED
 
 #include <boost/python.hpp>
-#include "openvdb/Grid.h"
+#include <openvdb/Grid.h>
 
 
 namespace pyopenvdb {

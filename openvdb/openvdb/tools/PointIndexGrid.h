@@ -16,9 +16,9 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
+#include <openvdb/thread/Threading.h>
 #include <openvdb/version.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Grid.h>

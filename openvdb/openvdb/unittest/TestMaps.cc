@@ -4,7 +4,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Maps.h>
 #include <openvdb/util/MapsUtil.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 
 class TestMaps: public ::testing::Test

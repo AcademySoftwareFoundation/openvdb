@@ -9,7 +9,7 @@
 #include <openvdb/Grid.h>
 #include <openvdb/tree/Tree.h>
 #include <openvdb/util/CpuTimer.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <iostream>
 #include <memory> // for std::make_unique
 

@@ -15,8 +15,9 @@
 #include <openvdb/Types.h>
 #include <openvdb/Grid.h>
 #include <openvdb/tree/NodeManager.h>
-#include <openvdb/tools/NodeVisitor.h>
 #include <openvdb/openvdb.h>
+
+#include "NodeVisitor.h"
 
 #include <memory>
 #include <unordered_map>

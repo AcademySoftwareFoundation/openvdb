@@ -18,9 +18,11 @@
 #include <openvdb/Types.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
-#include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/openvdb.h>
+
+#include "MeshToVolume.h"
+
 #include <type_traits>
 #include <vector>
 

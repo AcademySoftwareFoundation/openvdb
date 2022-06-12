@@ -3,7 +3,7 @@
 
 /// @file points/points.cc
 
-#include "openvdb.h"
+#include <openvdb/openvdb.h>
 #include "PointDataGrid.h"
 
 namespace openvdb {
