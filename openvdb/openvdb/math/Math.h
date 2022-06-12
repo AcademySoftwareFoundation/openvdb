@@ -307,11 +307,9 @@ SmoothUnitStep(Type x, Type min, Type max)
 inline int32_t Abs(int32_t i) { return abs(i); }
 inline int64_t Abs(int64_t i)
 {
-#ifdef _MSC_VER
-    return (i < int64_t(0) ? -i : i);
-#else
-    return labs(i);
-#endif
+    static_assert(sizeof(decltype(std::abs(i))) == sizeof(int64_t),
+                  "std::abs(int64) broken");
+    return std::abs(i);
 }
 inline float Abs(float x) { return std::fabs(x); }
 inline double Abs(double x) { return std::fabs(x); }
@@ -517,7 +515,7 @@ isUlpsEqual(const double aLeft, const double aRight, const int64_t aUnitsInLastP
         longRight = INT64_C(0x8000000000000000) - longRight;
     }
 
-    int64_t difference = labs(longLeft - longRight);
+    int64_t difference = Abs(longLeft - longRight);
     return (difference <= aUnitsInLastPlace);
 }
 
