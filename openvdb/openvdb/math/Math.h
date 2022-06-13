@@ -304,7 +304,7 @@ SmoothUnitStep(Type x, Type min, Type max)
 
 //@{
 /// Return the absolute value of the given quantity.
-inline int32_t Abs(int32_t i) { return abs(i); }
+inline int32_t Abs(int32_t i) { return std::abs(i); }
 inline int64_t Abs(int64_t i)
 {
     static_assert(sizeof(decltype(std::abs(i))) == sizeof(int64_t),
@@ -534,7 +534,7 @@ isUlpsEqual(const float aLeft, const float aRight, const int32_t aUnitsInLastPla
         intRight = 0x80000000 - intRight;
     }
 
-    int32_t difference = abs(intLeft - intRight);
+    int32_t difference = Abs(intLeft - intRight);
     return (difference <= aUnitsInLastPlace);
 }
 
