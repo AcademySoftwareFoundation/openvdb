@@ -146,6 +146,10 @@ option(USE_EXPLICIT_INSTANTIATION "Use explicit instantiation for all supported 
 pre-defined list of OpenVDB trees. This makes the core library larger and slower to compile, but speeds up
 the compilation of all dependent code by bypassing the expensive template instantation." ON)
 
+option(USE_PIC_IN_STATIC_LIBS "Use position-independent code in static libs. This allows sharing of the
+object files with both static and shared libs to accelerate compilation times at the cost of potentially
+slower performance in the static library at runtime." OFF)
+
 set(SYSTEM_LIBRARY_PATHS "" CACHE STRING [=[
 A global list of library paths to additionally use into when searching for dependencies.]=])
 set(MSVC_MP_THREAD_COUNT "" CACHE STRING [=[

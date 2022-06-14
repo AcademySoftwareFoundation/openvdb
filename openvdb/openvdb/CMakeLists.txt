@@ -635,6 +635,8 @@ target_link_libraries(openvdb_obj
   PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
 )
 
+set_target_properties(openvdb_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
+
 ##########################################################################
 
 # Configure shared library
@@ -672,33 +674,35 @@ endif()
 # Configure static library
 
 if(OPENVDB_CORE_STATIC)
-  if(WIN32)
-    # configure static library object library for Windows
-    add_library(openvdb_obj_win_static OBJECT ${OPENVDB_LIBRARY_SOURCE_FILES})
+  if(NOT USE_PIC_IN_STATIC_LIBS OR WIN32)
+    # configure static library object library for non-PIC or Windows
+    add_library(openvdb_obj_static OBJECT ${OPENVDB_LIBRARY_SOURCE_FILES})
 
-    target_include_directories(openvdb_obj_win_static
+    target_include_directories(openvdb_obj_static
       PUBLIC ../ ${CMAKE_CURRENT_BINARY_DIR} ${CMAKE_CURRENT_BINARY_DIR}/openvdb
       PRIVATE .
     )
 
-    target_compile_definitions(openvdb_obj_win_static
+    target_compile_definitions(openvdb_obj_static
       PUBLIC ${OPENVDB_CORE_PUBLIC_DEFINES} -DOPENVDB_STATICLIB
       PRIVATE ${OPENVDB_CORE_PRIVATE_DEFINES}
     )
 
-    target_link_libraries(openvdb_obj_win_static
+    target_link_libraries(openvdb_obj_static
       PUBLIC ${OPENVDB_CORE_DEPENDENT_LIBS}
     )
 
-    add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj_win_static>)
+    add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj_static>)
 
     target_include_directories(openvdb_static
-      PUBLIC $<TARGET_PROPERTY:openvdb_obj_win_static,INCLUDE_DIRECTORIES>
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj_static,INCLUDE_DIRECTORIES>
     )
     target_link_libraries(openvdb_static
-      PUBLIC $<TARGET_PROPERTY:openvdb_obj_win_static,LINK_LIBRARIES>
+      PUBLIC $<TARGET_PROPERTY:openvdb_obj_static,LINK_LIBRARIES>
     )
   else()
+    # NOTE: this may result in slower performance due to using position-independent code
+    # in the static library.
     add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj>)
 
     target_include_directories(openvdb_static
