@@ -96,6 +96,15 @@ struct TreeToMerge
     template<typename NodeT>
     const NodeT* probeConstNode(const Coord& ijk) const;
 
+    /// @brief Prune the mask and remove the node associated with this coord.
+    void pruneMask(Index level, const Coord& ijk);
+
+    /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z).
+    /// If the tree is non-const, steal the node and replace it with the value provided.
+    /// If the tree is const, deep-copy the node and modify the mask tree to prune the node.
+    template <typename NodeT>
+    std::unique_ptr<NodeT> stealOrDeepCopyNode(const Coord& ijk, const ValueType& value);
+
     /// @brief Return a pointer to the node of type @c NodeT that contains voxel (x, y, z).
     /// If the tree is non-const, steal the node and replace it with an inactive
     /// background-value tile.
@@ -424,26 +433,42 @@ TreeToMerge<TreeT>::probeConstNode(const Coord& ijk) const
 }
 
 template<typename TreeT>
+void
+TreeToMerge<TreeT>::pruneMask(Index level, const Coord& ijk)
+{
+    if (!mSteal) {
+        assert(this->hasMask());
+        this->mask()->addTile(level, ijk, false, false);
+    }
+}
+
+template<typename TreeT>
 template<typename NodeT>
 std::unique_ptr<NodeT>
-TreeToMerge<TreeT>::stealOrDeepCopyNode(const Coord& ijk)
+TreeToMerge<TreeT>::stealOrDeepCopyNode(const Coord& ijk, const ValueType& value)
 {
     if (mSteal) {
         TreeType* tree = const_cast<TreeType*>(mTree);
         return std::unique_ptr<NodeT>(
-            tree->root().template stealNode<NodeT>(ijk, mTree->root().background(), false)
+            tree->root().template stealNode<NodeT>(ijk, value, false)
         );
     } else {
         auto* child = this->probeConstNode<NodeT>(ijk);
         if (child) {
-            assert(this->hasMask());
             auto result = std::make_unique<NodeT>(*child);
-            // prune mask tree
-            this->mask()->addTile(NodeT::LEVEL+1, ijk, false, false);
+            this->pruneMask(NodeT::LEVEL+1, ijk);
             return result;
         }
     }
     return std::unique_ptr<NodeT>();
+}
+
+template<typename TreeT>
+template<typename NodeT>
+std::unique_ptr<NodeT>
+TreeToMerge<TreeT>::stealOrDeepCopyNode(const Coord& ijk)
+{
+    return this->stealOrDeepCopyNode<NodeT>(ijk, mTree->root().background());
 }
 
 template<typename TreeT>
@@ -463,11 +488,7 @@ TreeToMerge<TreeT>::addTile(const Coord& ijk, const ValueType& value, bool activ
         }
     } else {
         auto* node = mTree->template probeConstNode<NodeT>(ijk);
-        // prune mask tree
-        if (node) {
-            assert(this->hasMask());
-            this->mask()->addTile(NodeT::LEVEL, ijk, false, false);
-        }
+        if (node)   this->pruneMask(NodeT::LEVEL, ijk);
     }
 }
 
@@ -577,7 +598,8 @@ struct Dispatch
     template <typename NodeT, typename OpT>
     static void run(NodeT& node, OpT& op)
     {
-        using ChildT = typename NodeT::ChildNodeType;
+        using NonConstChildT = typename NodeT::ChildNodeType;
+        using ChildT = typename CopyConstness<NodeT, NonConstChildT>::Type;
 
         // use nested parallelism if there is more than one child
 
@@ -622,12 +644,12 @@ struct Dispatch<0>
 // an DynamicNodeManager operator to add a value and modify active state
 // for every tile and voxel in a given subtree
 template <typename TreeT>
-struct ApplyTileToNodeOp
+struct ApplyTileSumToNodeOp
 {
     using LeafT = typename TreeT::LeafNodeType;
     using ValueT = typename TreeT::ValueType;
 
-    ApplyTileToNodeOp(const ValueT& value, const bool active):
+    ApplyTileSumToNodeOp(const ValueT& value, const bool active):
         mValue(value), mActive(active) { }
 
     template <typename NodeT>
@@ -664,7 +686,8 @@ struct ApplyTileToNodeOp
 private:
     ValueT mValue;
     bool mActive;
-}; // struct ApplyTileToNodeOp
+}; // struct ApplyTileSumToNodeOp
+
 
 
 } // namespace merge_internal
@@ -1295,7 +1318,7 @@ bool SumMergeOp<TreeT>::operator()(RootT& root, size_t) const
                 auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(key);
                 if (childPtr) {
                     // apply tile value and active state to the sub-tree
-                    merge_internal::ApplyTileToNodeOp<TreeT> applyOp(value, active);
+                    merge_internal::ApplyTileSumToNodeOp<TreeT> applyOp(value, active);
                     applyOp.run(*childPtr);
                     root.addChild(childPtr.release());
                 }
@@ -1356,7 +1379,7 @@ bool SumMergeOp<TreeT>::operator()(NodeT& node, size_t) const
                     auto childPtr = mergeTree.template stealOrDeepCopyNode<ChildT>(iter.getCoord());
                     if (childPtr) {
                         // apply tile value and active state to the sub-tree
-                        merge_internal::ApplyTileToNodeOp<TreeT> applyOp(*iter, iter.isValueOn());
+                        merge_internal::ApplyTileSumToNodeOp<TreeT> applyOp(*iter, iter.isValueOn());
                         applyOp.run(*childPtr);
                         node.addChild(childPtr.release());
                     }
@@ -1474,7 +1497,6 @@ SumMergeOp<TreeT>::background() const
 
 
 ////////////////////////////////////////
-
 
 // Explicit Template Instantiation
 
