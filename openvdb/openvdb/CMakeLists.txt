@@ -644,6 +644,11 @@ set_target_properties(openvdb_obj PROPERTIES POSITION_INDEPENDENT_CODE ON)
 if(OPENVDB_CORE_SHARED)
   add_library(openvdb_shared SHARED $<TARGET_OBJECTS:openvdb_obj>)
 
+  # Alias the shared library to the generic OpenVDB target. Dependent components
+  # should use this target to build against such that they are always able to find
+  # a valid build of OpenVDB
+  add_library(openvdb ALIAS openvdb_shared)
+
   target_include_directories(openvdb_shared
     PUBLIC $<TARGET_PROPERTY:openvdb_obj,INCLUDE_DIRECTORIES>
   )
@@ -694,6 +699,13 @@ if(OPENVDB_CORE_STATIC)
 
     add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj_static>)
 
+    if(NOT OPENVDB_CORE_SHARED)
+      # Alias the static library to the generic OpenVDB target. Dependent components
+      # should use this target to build against such that they are always able to find
+      # a valid build of OpenVDB
+      add_library(openvdb ALIAS openvdb_static)
+    endif()
+
     target_include_directories(openvdb_static
       PUBLIC $<TARGET_PROPERTY:openvdb_obj_static,INCLUDE_DIRECTORIES>
     )
@@ -704,6 +716,13 @@ if(OPENVDB_CORE_STATIC)
     # NOTE: this may result in slower performance due to using position-independent code
     # in the static library.
     add_library(openvdb_static STATIC $<TARGET_OBJECTS:openvdb_obj>)
+
+    if(NOT OPENVDB_CORE_SHARED)
+      # Alias the static library to the generic OpenVDB target. Dependent components
+      # should use this target to build against such that they are always able to find
+      # a valid build of OpenVDB
+      add_library(openvdb ALIAS openvdb_static)
+    endif()
 
     target_include_directories(openvdb_static
       PUBLIC $<TARGET_PROPERTY:openvdb_obj,INCLUDE_DIRECTORIES>
@@ -727,18 +746,6 @@ if(OPENVDB_CORE_STATIC)
     endif()
     set_target_properties(openvdb_static PROPERTIES PREFIX "lib")
   endif()
-endif()
-
-##########################################################################
-
-# Alias either the shared or static library to the generic OpenVDB
-# target. Dependent components should use this target to build against
-# such that they are always able to find a valid build of OpenVDB
-
-if(OPENVDB_CORE_SHARED)
-  add_library(openvdb ALIAS openvdb_shared)
-else()
-  add_library(openvdb ALIAS openvdb_static)
 endif()
 
 ##########################################################################
