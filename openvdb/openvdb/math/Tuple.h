@@ -85,25 +85,25 @@ public:
 
     // @brief  const access to an element in the tuple. The offset idx must be
     //   an integral type. A copy of the tuple data is returned.
-    template <typename IdxT>
+    template <typename IdxT,
+        typename std::enable_if<std::is_integral<IdxT>::value, bool>::type = true>
     T operator[](IdxT i) const {
-        static_assert(std::is_integral<IdxT>::value, "Expected integer type for Tuple[] access.");
         assert(i >= IdxT(0) && i < IdxT(SIZE));
         return mm[i];
     }
 
     // @brief  non-const access to an element in the tuple. The offset idx must be
     //   an integral type. A reference to the tuple data is returned.
-    template <typename IdxT>
+    template <typename IdxT,
+        typename std::enable_if<std::is_integral<IdxT>::value, bool>::type = true>
     T& operator[](IdxT i) {
-        static_assert(std::is_integral<IdxT>::value, "Expected integer type for Tuple[] access.");
         assert(i >= IdxT(0) && i < IdxT(SIZE));
         return mm[i];
     }
 
     // These exist solely to provide backwards compatibility with [] access of
-    // types that were castable to 'int' (such as floating point type). The
-    // above templates allow for any integer type to be used as an offset into
+    // non-integer types that were castable to 'int' (such as floating point type).
+    // The above templates allow for any integer type to be used as an offset into
     // the tuple data.
     T operator[](int i) const { return this->operator[]<int>(i); }
     T& operator[](int i) { return this->operator[]<int>(i); }
