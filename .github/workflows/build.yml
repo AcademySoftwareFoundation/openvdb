@@ -125,8 +125,9 @@ jobs:
           # Boost as both shared and static libs are installed.
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
+          # @note  Commented out the static debug build due to linker OOM LNK1102
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+          #- { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
