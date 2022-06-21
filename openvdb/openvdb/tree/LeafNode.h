@@ -245,6 +245,48 @@ protected:
         void modifyValue(const ModifyOp& op) const { this->parent().modifyValue(this->pos(), op); }
     };
 
+
+    template<typename MaskIterT, typename ValueT, typename TagT>
+    struct ValueIter<MaskIterT, LeafNode, ValueT, TagT> :
+        // Derives from SparseIteratorBase, but can also be used as a dense iterator,
+        // if MaskIterT is a dense mask iterator type.
+        public SparseIteratorBase<
+            MaskIterT, ValueIter<MaskIterT, LeafNode, ValueT, TagT>, LeafNode, ValueT>
+    {
+        using TT = typename std::remove_const<ValueT>::type;
+        using BaseT = SparseIteratorBase<MaskIterT, ValueIter, LeafNode, ValueT>;
+
+        ValueIter() {}
+        ValueIter(const MaskIterT& iter, LeafNode* parent)
+            : BaseT(iter, parent), mData(parent->buffer().data()) {}
+
+        ValueT& getItem(Index pos) const { return mData[pos]; }
+        ValueT& getValue() const { return mData[this->pos()]; }
+
+        // Note: setItem() can't be called on const iterators.
+        void setItem(Index pos, const ValueT& value) const { mData[pos] = value; }
+        // Note: setValue() can't be called on const iterators.
+        void setValue(const ValueT& value) const { mData[this->pos()] = value; }
+
+        // Note: modifyItem() can't be called on const iterators.
+        template<typename ModifyOp>
+        void modifyItem(Index n, const ModifyOp& op) const
+        {
+            op(mData[n]);
+            this->parent().setValueOn();
+        }
+        // Note: modifyValue() can't be called on const iterators.
+        template<typename ModifyOp>
+        void modifyValue(const ModifyOp& op) const
+        {
+            op(mData[this->pos()]);
+            this->parent().setValueOn();
+        }
+    private:
+        TT* mData;
+    };
+
+
     /// Leaf nodes have no children, so their child iterators have no get/set accessors.
     template<typename MaskIterT, typename NodeT, typename TagT>
     struct ChildIter:

@@ -11,6 +11,7 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Count.h>
 #include <openvdb/util/logging.h>
+#include <openvdb/util/CpuTimer.h>
 
 
 namespace {
@@ -258,6 +259,32 @@ printShortListing(const StringVec& filenames, bool metadata)
 
 } // unnamed namespace
 
+extern float* gvalue;
+float* gvalue = nullptr;
+
+void test()
+{
+    openvdb::FloatTree::LeafNodeType a;
+    double t = 0;
+    for (size_t iter = 0; iter < 100000ul; ++iter) {
+        gvalue = new float();
+        openvdb::util::CpuTimer timer;
+        for (auto v = a.beginValueAll(); v; ++v) {
+            v.setValue(v.getValue() + *gvalue);
+        }
+        t += timer.milliseconds();
+        delete gvalue;
+    }
+
+    std::cerr << "took " << t << std::endl;
+
+    float total = 0;
+    for (auto v = a.beginValueAll(); v; ++v) {
+        total += v.getValue();
+    }
+    std::cerr << "dummy value, ignore " << total << std::endl;
+}
+
 
 int
 main(int argc, char *argv[])
@@ -268,6 +295,10 @@ main(int argc, char *argv[])
     OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
 
     int exitStatus = EXIT_SUCCESS;
+
+    test();
+
+    return 0;
 
     if (argc == 1) usage();
 
