@@ -615,7 +615,7 @@ template<>
 inline bool isInsideValue<bool>(bool value, bool /*isovalue*/) { return value; }
 
 
-/// @brief  Minor wrapper around the Leaf API to avoid atmoic access with
+/// @brief  Minor wrapper around the Leaf API to avoid atomic access with
 ///   delayed loading.
 template <typename LeafT,
     bool IsBool = std::is_same<typename LeafT::ValueType, bool>::value>
@@ -639,7 +639,7 @@ struct LeafBufferAccessor<LeafT, true>
 
 /// @brief  Whether a coordinate does not lie at the positive edge of a leaf node.
 template <typename LeafT>
-inline bool isInternalLeafCoord(const Coord& ijk)
+bool isInternalLeafCoord(const Coord& ijk)
 {
     return
         ijk[0] < int(LeafT::DIM - 1) &&
@@ -971,7 +971,7 @@ mergeVoxels(LeafType& leaf, const Coord& start, const int dim, const int regionI
 // thinking that it is a constructor.
 template <class LeafType>
 inline bool
-isMergable(const LeafType& leaf,
+isMergeable(const LeafType& leaf,
     const Coord& start,
     const int dim,
     typename LeafType::ValueType::value_type adaptivity)
@@ -2326,7 +2326,7 @@ MergeVoxelRegions<InputGridType>::operator()(const tbb::blocked_range<size_t>& r
 
                         if (mask.isValueOn(ijk)
                             || isNonManifold(inputAcc, ijk, mIsovalue, dim)
-                            || (useGradients && !isMergable(*gradientNode, ijk, dim, adaptivity)))
+                            || (useGradients && !isMergeable(*gradientNode, ijk, dim, adaptivity)))
                         {
                             mask.setActiveState(ijk & coordMask, true);
                         } else {
@@ -3107,7 +3107,7 @@ evalInternalVoxelEdges(VoxelEdgeAcc& edgeAcc,
 /// specified leafnode face: back, top or right are evaluated.
 template<typename LeafNodeT, typename TreeAcc, typename VoxelEdgeAcc>
 void
-evalExtrenalVoxelEdges(VoxelEdgeAcc& edgeAcc,
+evalExternalVoxelEdges(VoxelEdgeAcc& edgeAcc,
     const TreeAcc& acc,
     const LeafNodeT& lhsNode,
     const LeafNodeVoxelOffsets& voxels,
@@ -3162,7 +3162,7 @@ evalExtrenalVoxelEdges(VoxelEdgeAcc& edgeAcc,
 /// specified leafnode face: front, bottom or left are evaluated.
 template<typename LeafNodeT, typename TreeAcc, typename VoxelEdgeAcc>
 void
-evalExtrenalVoxelEdgesInv(VoxelEdgeAcc& edgeAcc,
+evalExternalVoxelEdgesInv(VoxelEdgeAcc& edgeAcc,
     const TreeAcc& acc,
     const LeafNodeT& leafnode,
     const LeafNodeVoxelOffsets& voxels,
@@ -3284,21 +3284,21 @@ IdentifyIntersectingVoxels<InputTreeType>::operator()(const tbb::blocked_range<s
         evalInternalVoxelEdges(zEdgeAcc, node, mOffsets, mIsovalue);
 
         // external x + 1 voxels edges (back face)
-        evalExtrenalVoxelEdges(xEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdges(xEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
         // external y + 1 voxels edges (top face)
-        evalExtrenalVoxelEdges(yEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdges(yEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
         // external z + 1 voxels edges (right face)
-        evalExtrenalVoxelEdges(zEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdges(zEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
 
         // The remaining edges are only checked if the leafnode neighbour, in the
         // corresponding direction, is an inactive tile.
 
         // external x - 1 voxels edges (front face)
-        evalExtrenalVoxelEdgesInv(xEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdgesInv(xEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
         // external y - 1 voxels edges (bottom face)
-        evalExtrenalVoxelEdgesInv(yEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdgesInv(yEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
         // external z - 1 voxels edges (left face)
-        evalExtrenalVoxelEdgesInv(zEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
+        evalExternalVoxelEdgesInv(zEdgeAcc, mInputAccessor, node, mOffsets, mIsovalue);
     }
 } // IdentifyIntersectingVoxels::operator()
 
@@ -4608,7 +4608,7 @@ relaxDisorientedTriangles(
 
 
 template<typename GridType>
-inline void
+void
 doVolumeToMesh(
     const GridType& grid,
     std::vector<Vec3s>& points,
