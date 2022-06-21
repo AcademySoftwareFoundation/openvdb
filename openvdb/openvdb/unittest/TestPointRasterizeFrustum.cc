@@ -1798,7 +1798,7 @@ struct HaltOnSecondInterrupt : public util::NullInterrupter
         mInterrupt = true;
         return false;
     }
-    tbb::atomic<bool> mInterrupt = false;
+    std::atomic<bool> mInterrupt{false};
 };
 
 } // namespace

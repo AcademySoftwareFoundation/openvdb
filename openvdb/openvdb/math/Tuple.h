@@ -83,22 +83,33 @@ public:
         }
     }
 
-    T operator[](int i) const {
-        // we'd prefer to use size_t, but can't because gcc3.2 doesn't like
-        // it - it conflicts with child class conversion operators to
-        // pointer types.
-//             assert(i >= 0 && i < SIZE);
+    // @brief  const access to an element in the tuple. The offset idx must be
+    //   an integral type. A copy of the tuple data is returned.
+    template <typename IdxT,
+        typename std::enable_if<std::is_integral<IdxT>::value, bool>::type = true>
+    T operator[](IdxT i) const {
+        assert(i >= IdxT(0) && i < IdxT(SIZE));
         return mm[i];
     }
 
-    T& operator[](int i) {
-        // see above for size_t vs int
-//             assert(i >= 0 && i < SIZE);
+    // @brief  non-const access to an element in the tuple. The offset idx must be
+    //   an integral type. A reference to the tuple data is returned.
+    template <typename IdxT,
+        typename std::enable_if<std::is_integral<IdxT>::value, bool>::type = true>
+    T& operator[](IdxT i) {
+        assert(i >= IdxT(0) && i < IdxT(SIZE));
         return mm[i];
     }
+
+    // These exist solely to provide backwards compatibility with [] access of
+    // non-integer types that were castable to 'int' (such as floating point type).
+    // The above templates allow for any integer type to be used as an offset into
+    // the tuple data.
+    T operator[](int i) const { return this->operator[]<int>(i); }
+    T& operator[](int i) { return this->operator[]<int>(i); }
 
     /// @name Compatibility
-    /// These are mostly for backwards compability with functions that take
+    /// These are mostly for backwards compatibility with functions that take
     /// old-style Vs (which are just arrays).
     //@{
     /// Copies this tuple into an array of a compatible type

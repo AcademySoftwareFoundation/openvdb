@@ -2,9 +2,12 @@
 
 @page changes Release Notes
 
-@htmlonly <a name="v9_0_1_changes"></a>@endhtmlonly
+@htmlonly <a name="v9_1_1_changes"></a>@endhtmlonly
 @par
-<B>Version 9.0.1</B> - <I>In Development</I>
+<B>Version 9.1.1</B> - <I>In development</I>
+
+@par
+<B>Version 9.1.0</B> - <I>June 9, 2022</I>
 
 @par
 Bug Fixes:
@@ -28,6 +31,7 @@ New features:
 - Added points::rasterizeSpheres() and points::rasterizeSmoothSpheres() variants, new kernels and improved performance for OpenVDB points to surface rasterization.
 - Added points::rasterizeTrilinear() for OpenVDB points, fast staggered or colocated trilinear rasterization for scalar and vector attributes.
 - Exposed TypeList declarations in openvdb.h which denote the default set of types supported by OpenVDB.
+- Added points::FrustumRasterizer for efficient rasterization of OpenVDB points to frustum volumes with optional motion blur.
 
 @par
 Improvements:
@@ -41,6 +45,7 @@ Improvements:
 - Added a new foreach method to TypeList for iterating over types without constructing them.
 - Added TypeList::Transform declaration for transforming TypeLists into new types.
 - Moved Grid::apply implementation to TypeList::apply to allow for other polymorphic types to invoke it.
+- Minor updates to NanoVDB to remove compiler warnings.
 
 @par
 Build:
@@ -50,6 +55,7 @@ Build:
 - Changed the way boost_python and boost_numpy are located. Both components must match the major/minor version of python in use. This can be circumvented by providing Boost_PYTHON_VERSION or Boost_PYTHON_VERSION_MAJOR.
 - Relocated OpenVDB binaries to a new openvdb_cmd root directory.
 - FindTBB.cmake now prioritises newer TBB installations.
+- Added option to compress PDB data in MSVC debug builds.
 
 @par
 Houdini:
@@ -57,6 +63,7 @@ Houdini:
 - Fix race condition in OpenVDB Merge SOP that could cause crashes
   or merged VDBs to not be deleted.
 - VDB Activate SOP no longer stops at the first non-VDB primitive, but instead just skips such primitives.
+- Added VDB Rasterize Frustum SOP for efficient rasterization of OpenVDB points into frustum volumes with optional motion blur.
 
 @htmlonly <a name="v9_0_0_changes"></a>@endhtmlonly
 @par
