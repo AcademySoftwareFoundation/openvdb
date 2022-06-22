@@ -35,7 +35,7 @@ namespace points {
 ///                          index. This can be subsequently used to modify
 ///                          the replicated points as a post process.
 template <typename PointDataGridT>
-inline typename PointDataGridT::Ptr
+typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
           const Index multiplier,
           const std::vector<std::string>& attributes,
@@ -56,7 +56,7 @@ replicate(const PointDataGridT& source,
 ///                          index. This can be subsequently used to modify
 ///                          the replicated points as a post process.
 template <typename PointDataGridT>
-inline typename PointDataGridT::Ptr
+typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
           const Index multiplier,
           const std::string& scaleAttribute = "",
@@ -67,7 +67,7 @@ replicate(const PointDataGridT& source,
 
 
 template <typename PointDataGridT>
-inline typename PointDataGridT::Ptr
+typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
           const Index multiplier,
           const std::vector<std::string>& attributes,
@@ -279,19 +279,21 @@ replicate(const PointDataGridT& source,
             idxHandle.expand(/*fill*/false);
             assert(idxHandle.size() == total);
 
+
+            Index offset = 0;
+
             if (useScale) {
-                Index offset = 0;
                 for (Index i = 0; i < sourceCount; ++i) {
                     const Index pointRepCount = getPointsToGenerate(i);
-                    for (Index j = 0; j < pointRepCount; ++j, ++offset) {
-                        idxHandle.set(offset, j);
+                    for (Index j = 0; j < pointRepCount; ++j) {
+                        idxHandle.set(offset++, j);
                     }
                 }
             }
             else {
-                for (Index i = 0; i < total;) {
-                    for (Index j = 0; j < uniformMultiplier; ++j, ++i) {
-                        idxHandle.set(i, j);
+                while (offset < total) {
+                    for (Index j = 0; j < uniformMultiplier; ++j) {
+                        idxHandle.set(offset++, j);
                     }
                 }
             }
@@ -308,7 +310,7 @@ replicate(const PointDataGridT& source,
 }
 
 template <typename PointDataGridT>
-inline typename PointDataGridT::Ptr
+typename PointDataGridT::Ptr
 replicate(const PointDataGridT& source,
           const Index multiplier,
           const std::string& scaleAttribute,
