@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 9.1.1 - In development
 
+    New features:
+    - Added nanovdb::getExtrema, which computes the min/max of all the values
+      in a NanoVDB grid that intersects a specified index bounding box.
+
 Version 9.1.0 - June 9, 2022
 
     Bug Fixes:

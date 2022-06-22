@@ -7,6 +7,11 @@
 <B>Version 9.1.1</B> - <I>In development</I>
 
 @par
+New features:
+- Added nanovdb::getExtrema, which computes the min/max of all the values
+  in a NanoVDB grid that intersects a specified index bounding box.
+
+@par
 <B>Version 9.1.0</B> - <I>June 9, 2022</I>
 
 @par
