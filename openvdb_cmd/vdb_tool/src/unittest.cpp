@@ -489,8 +489,6 @@ TEST_F(Test_vdb_tool, Computer)
     EXPECT_THROW({comp("{drop}");},  std::invalid_argument);
     EXPECT_THROW({comp("{swap}");},  std::invalid_argument);
 
-    EXPECT_NO_THROW({// everything below should pass and not throw!
-
     EXPECT_EQ(0, comp.memory().size());
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{$pi}"));
     EXPECT_EQ(std::to_string(openvdb::math::pi<float>()), comp("{pi:get}"));
@@ -768,7 +766,6 @@ TEST_F(Test_vdb_tool, Computer)
     EXPECT_EQ("_bar", comp("{foo_bar:foo:erase}"));
     EXPECT_EQ("f_bar", comp("{foo_bar:o:erase}"));
     EXPECT_EQ("foobar", comp("{foo bar: :erase}"));
-    });// end EXPECT_NO_THROW
 }// Computer
 
 TEST_F(Test_vdb_tool, ToolParser)
