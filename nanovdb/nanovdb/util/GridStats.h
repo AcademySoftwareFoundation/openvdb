@@ -730,6 +730,117 @@ void gridStats(NanoGrid<BuildT>& grid, StatsMode mode)
     }
 }
 
+//================================================================================================
+
+namespace {
+
+// returns a bitmask (of size 32^3 or 16^3) that marks all the entries
+// in a node table which intersects with the specified bounding box.
+template<typename NodeT>
+Mask<NodeT::LOG2DIM> getBBoxMask(const CoordBBox &bbox, const NodeT* node)
+{
+    Mask<NodeT::LOG2DIM> mask;// typically 32^3 or 16^3 bit mask
+    auto b = CoordBBox::createCube(node->origin(), node->dim());
+    assert( bbox.hasOverlap(b) );
+    if ( bbox.isInside(b) ) {
+        mask.setOn();//node is completely inside the bbox so early out
+    } else {
+        b.intersect(bbox);// trim bounding box
+        // transform bounding box from global to local coordinates
+        b.min() &=  NodeT::DIM-1u;
+        b.min() >>= NodeT::ChildNodeType::TOTAL;
+        b.max() &=  NodeT::DIM-1u;
+        b.max() >>= NodeT::ChildNodeType::TOTAL;
+        assert( !b.empty() );
+        auto it = b.begin();// iterates over all the child nodes or tiles that intersects bbox
+        for (const Coord& ijk = *it; it; ++it) {
+            mask.setOn(ijk[2] + (ijk[1] << NodeT::LOG2DIM) + (ijk[0] << 2*NodeT::LOG2DIM));
+        }
+    }
+    return mask;
+}
+}// end of unnamed namespace
+
+/// @brief return the extrema of all the values in a grid that
+///        intersects the specified bounding box.
+template<typename BuildT>
+Extrema<typename NanoGrid<BuildT>::ValueType>
+getExtrema(const NanoGrid<BuildT>& grid, const CoordBBox &bbox)
+{
+    using GridT  = NanoGrid<BuildT>;
+    using ValueT = typename GridT::ValueType;
+    using TreeT = typename GridTree<GridT>::type;
+    using RootT = typename NodeTrait<TreeT, 3>::type;// root node
+    using Node2 = typename NodeTrait<TreeT, 2>::type;// upper internal node
+    using Node1 = typename NodeTrait<TreeT, 1>::type;// lower internal node
+    using Node0 = typename NodeTrait<TreeT, 0>::type;// leaf node
+
+    Extrema<ValueT> extrema;
+    const RootT &root = grid.tree().root();
+    const auto &bbox3 = root.bbox();
+    if (bbox.isInside(bbox3)) {// bbox3 is contained inside bbox
+        extrema.min(root.minimum());
+        extrema.max(root.maximum());
+        extrema.add(root.background());
+    } else if (bbox.hasOverlap(bbox3)) {
+        const auto *data3 = root.data();
+        for (uint32_t i=0; i<data3->mTableSize; ++i) {
+            const auto *tile = data3->tile(i);
+            CoordBBox bbox2 = CoordBBox::createCube(tile->origin(), Node2::dim());
+            if (!bbox.hasOverlap(bbox2)) continue;
+            if (tile->isChild()) {
+                const Node2 *node2 = data3->getChild(tile);
+                if (bbox.isInside(bbox2)) {
+                    extrema.min(node2->minimum());
+                    extrema.max(node2->maximum());
+                } else {// partial intersections at level 2
+                    auto *data2 = node2->data();
+                    const auto bboxMask2 = getBBoxMask(bbox, node2);
+                    for (auto it2 = bboxMask2.beginOn(); it2; ++it2) {
+                        if (data2->mChildMask.isOn(*it2)) {
+                            const Node1* node1 = data2->getChild(*it2);
+                            CoordBBox bbox1 = CoordBBox::createCube(node1->origin(), Node1::dim());
+                            if (bbox.isInside(bbox1)) {
+                                extrema.min(node1->minimum());
+                                extrema.max(node1->maximum());
+                            } else {// partial intersection at level 1
+                                auto *data1 = node1->data();
+                                const auto bboxMask1 = getBBoxMask(bbox, node1);
+                                for (auto it1 = bboxMask1.beginOn(); it1; ++it1) {
+                                    if (data1->mChildMask.isOn(*it1)) {
+                                        const Node0* node0 = data1->getChild(*it1);
+                                        CoordBBox bbox0 = CoordBBox::createCube(node0->origin(), Node0::dim());
+                                        if (bbox.isInside(bbox0)) {
+                                            extrema.min(node0->minimum());
+                                            extrema.max(node0->maximum());
+                                        } else {
+                                            auto *data0 = node0->data();
+                                            const auto bboxMask0 = getBBoxMask(bbox, node0);
+                                            for (auto it0 = bboxMask0.beginOn(); it0; ++it0) {
+                                                extrema.add(data0->getValue(*it0));
+                                            }
+                                        }
+                                    } else {// tile at level 1
+                                        extrema.add(data1->mTable[*it1].value);
+                                    }
+                                }
+                            }// end of partial intersection at level 1
+                        } else {// tile at level 2
+                           extrema.add(data2->mTable[*it2].value);
+                        }
+                    }// loop over tiles and nodes at level 2
+                }// end of partial intersection at level 1
+            } else {// tile at root level
+                extrema.add(tile->value);
+            }
+        }// loop over root table
+    } else {// bbox does not overlap the grid
+        extrema.add(root.background());
+    }
+    return extrema;
+}// getExtrema
+
+
 } // namespace nanovdb
 
 #endif // NANOVDB_GRIDSTATS_H_HAS_BEEN_INCLUDED

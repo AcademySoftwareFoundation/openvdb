@@ -15,6 +15,7 @@
 #include <nanovdb/util/NodeManager.h>
 #include <nanovdb/util/GridBuilder.h>
 #include <nanovdb/util/Ray.h>
+#include <nanovdb/util/GridStats.h>
 #include <nanovdb/util/HDDA.h>
 
 #if !defined(_MSC_VER) // does not compile in msvc c++ due to zero-sized arrays.
@@ -205,6 +206,44 @@ protected:
 
     openvdb::util::CpuTimer mTimer;
 }; // TestOpenVDB
+
+// make -j && ./unittest/testOpenVDB --gtest_break_on_failure --gtest_filter="*getExtrema"
+TEST_F(TestOpenVDB, getExtrema)
+{
+    using wBBoxT = openvdb::math::BBox<openvdb::Vec3d>;
+    auto srcGrid = this->getSrcGrid(false, 0, 3);// level set of a bunny if available, else an octahedron
+    auto handle = nanovdb::openToNanoVDB(*srcGrid, nanovdb::StatsMode::All);
+    EXPECT_TRUE(handle);
+    auto* dstGrid = handle.grid<float>();
+    EXPECT_TRUE(dstGrid);
+    auto dstAcc = dstGrid->getAccessor();
+    auto indexToWorldMap = srcGrid->transform().baseMap();
+    const auto a = srcGrid->evalActiveVoxelBoundingBox();
+    const auto b = wBBoxT(a.min().asVec3d(),a.max().asVec3d()).applyMap(*indexToWorldMap);
+    //std::cerr << "Grid index bbox of all active values: " << a << std::endl;
+    //std::cerr << "Grid world bbox of all active values: " << b << std::endl;
+
+    const wBBoxT wBBox(b.min(), 0.5*b.extents()[b.maxExtent()]);
+    const wBBoxT iBBox = wBBox.applyInverseMap(*indexToWorldMap);
+    //std::cerr << "Query bbox: iBBox = " << iBBox << ", wBBox = " << wBBox << std::endl;
+
+    const nanovdb::CoordBBox bbox(nanovdb::Round<nanovdb::Coord>(iBBox.min()),
+                                  nanovdb::Round<nanovdb::Coord>(iBBox.max()));
+    //std::cerr << "Query index bbox = " << bbox << std::endl;
+
+    nanovdb::NodeManager<nanovdb::FloatGrid> mgr(*dstGrid);
+    //std::cerr << "Root child nodes: " << mgr.nodeCount(2) << std::endl;
+
+    //mTimer.start("getExtrema");
+    nanovdb::Extrema<float> ext1 = nanovdb::getExtrema(*dstGrid, bbox), ext2;
+    //mTimer.restart("naive approach");
+    for (auto it = bbox.begin(); it; ++it) ext2.add(dstAcc.getValue(*it));
+    //mTimer.stop();
+    //std::cerr << "min = " << ext1.min() << ", max = " << ext1.max() << std::endl;
+    //std::cerr << "min = " << ext2.min() << ", max = " << ext2.max() << std::endl;
+    EXPECT_EQ(ext1.min(), ext2.min());
+    EXPECT_EQ(ext1.max(), ext2.max());
+}
 
 TEST_F(TestOpenVDB, Basic)
 {

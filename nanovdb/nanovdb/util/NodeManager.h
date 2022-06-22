@@ -94,6 +94,7 @@ public:
     RootT* root() { return mRoot; }
 
     /// @brief Return the number of tree nodes at the specified level
+    /// @details 0 is leaf, 1 is lower internal, 2 is upper internal and 3 is root
     uint64_t nodeCount(int level) const { return mNodeCount[level]; }
 
     /// @brief Return the i'th leaf node

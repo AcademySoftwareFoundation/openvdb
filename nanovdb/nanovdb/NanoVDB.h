@@ -951,6 +951,13 @@ public:
         mVec[2] <<= n;
         return *this;
     }
+    __hostdev__ Coord& operator>>=(uint32_t n)
+    {
+        mVec[0] >>= n;
+        mVec[1] >>= n;
+        mVec[2] >>= n;
+        return *this;
+    }
     __hostdev__ Coord& operator+=(int n)
     {
         mVec[0] += n;
@@ -1499,6 +1506,15 @@ struct BaseBBox
         mCoord[1].maxComponent(xyz);
         return *this;
     }
+
+    /// @brief Intersect this bounding box with the given bounding box.
+    __hostdev__ BaseBBox& intersect(const BaseBBox& bbox)
+    {
+        mCoord[0].maxComponent(bbox.min());
+        mCoord[1].minComponent(bbox.max());
+        return *this;
+    }
+
     //__hostdev__ BaseBBox expandBy(typename Vec3T::ValueType padding) const
     //{
     //    return BaseBBox(mCoord[0].offsetBy(-padding),mCoord[1].offsetBy(padding));
@@ -1549,6 +1565,11 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
                 Vec3T(ValueType(max[0] + 1), ValueType(max[1] + 1), ValueType(max[2] + 1)))
     {
     }
+    __hostdev__  static BBox createCube(const Coord& min, typename Coord::ValueType dim)
+    {
+        return BBox(min, min.offsetBy(dim));
+    }
+
     __hostdev__ BBox(const BaseBBox<Coord>& bbox) : BBox(bbox[0], bbox[1]) {}
     __hostdev__ bool  empty() const { return mCoord[0][0] >= mCoord[1][0] ||
                                              mCoord[0][1] >= mCoord[1][1] ||
@@ -1559,6 +1580,7 @@ struct BBox<Vec3T, true> : public BaseBBox<Vec3T>
         return p[0] > mCoord[0][0] && p[1] > mCoord[0][1] && p[2] > mCoord[0][2] &&
                p[0] < mCoord[1][0] && p[1] < mCoord[1][1] && p[2] < mCoord[1][2];
     }
+
 };// BBox<Vec3T, true>
 
 /// @brief Partial template specialization for integer coordinate types
@@ -1616,6 +1638,7 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         : BaseT(min, max)
     {
     }
+
     template<typename SplitT>
     __hostdev__ BBox(BBox& other, const SplitT&)
         : BaseT(other.mCoord[0], other.mCoord[1])
@@ -1625,6 +1648,12 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
         mCoord[1][n] = (mCoord[0][n] + mCoord[1][n]) >> 1;
         other.mCoord[0][n] = mCoord[1][n] + 1;
     }
+
+    __hostdev__  static BBox createCube(const CoordT& min, typename CoordT::ValueType dim)
+    {
+        return BBox(min, min.offsetBy(dim - 1));
+    }
+
     __hostdev__ bool is_divisible() const { return mCoord[0][0] < mCoord[1][0] &&
                                                    mCoord[0][1] < mCoord[1][1] &&
                                                    mCoord[0][2] < mCoord[1][2]; }
@@ -1635,9 +1664,16 @@ struct BBox<CoordT, false> : public BaseBBox<CoordT>
     __hostdev__ CoordT dim() const { return this->empty() ? Coord(0) : this->max() - this->min() + Coord(1); }
     __hostdev__ uint64_t volume() const { auto d = this->dim(); return uint64_t(d[0])*uint64_t(d[1])*uint64_t(d[2]); }
     __hostdev__ bool   isInside(const CoordT& p) const { return !(CoordT::lessThan(p, this->min()) || CoordT::lessThan(this->max(), p)); }
+    /// @brief Return @c true if the given bounding box is inside this bounding box.
     __hostdev__ bool   isInside(const BBox& b) const
     {
         return !(CoordT::lessThan(b.min(), this->min()) || CoordT::lessThan(this->max(), b.max()));
+    }
+
+    /// @brief Return @c true if the given bounding box overlaps with this bounding box.
+    __hostdev__ bool hasOverlap(const BBox& b) const
+    {
+        return !(CoordT::lessThan(this->max(), b.min()) || CoordT::lessThan(b.max(), this->min()));
     }
 
     /// @warning This converts a CoordBBox into a floating-point bounding box which implies that max += 1 !
@@ -2503,7 +2539,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) TreeData
     static_assert(ROOT_LEVEL == 3, "Root level is assumed to be three");
     uint64_t mNodeOffset[4];//32B, byte offset from this tree to first leaf, lower, upper and root node
     uint32_t mNodeCount[3];// 12B, total number of nodes of type: leaf, lower internal, upper internal
-    uint32_t mTileCount[3];// 12B, total number of tiles of type: leaf, lower internal, upper internal (node, only active tiles!)
+    uint32_t mTileCount[3];// 12B, total number of active tile values at the lower internal, upper internal and root node levels
     uint64_t mVoxelCount;//    8B, total number of active voxels in the root and all its child nodes.
 
     template <typename RootT>
@@ -2606,11 +2642,13 @@ public:
 
     /// @brief   Return the total number of active tiles at the specified level of the tree.
     ///
-    /// @details n = 0 corresponds to leaf level tiles.
-    __hostdev__ const uint32_t& activeTileCount(uint32_t n) const
+    /// @details level = 1,2,3 corresponds to active tile count in lower internal nodes, upper
+    ///          internal nodes, and the root level. Note active values at the leaf level are
+    ///          referred to as active voxels (see activeVoxelCount defined above).
+    __hostdev__ const uint32_t& activeTileCount(uint32_t level) const
     {
-        NANOVDB_ASSERT(n < 3);
-        return DataType::mTileCount[n];
+        NANOVDB_ASSERT(level > 0 && level <= 3);// 1, 2, or 3
+        return DataType::mTileCount[level - 1];
     }
 
     template<typename NodeT>
@@ -2809,6 +2847,7 @@ public:
     using BuildType = typename DataType::BuildT;// in rare cases BuildType != ValueType, e.g. then BuildType = ValueMask and ValueType = bool
 
     using CoordType = typename ChildT::CoordType;
+    using BBoxType  = BBox<CoordType>;
     using AccessorType = DefaultReadAccessor<BuildType>;
     using Tile = typename DataType::Tile;
     static constexpr bool FIXED_SIZE = DataType::FIXED_SIZE;
@@ -2828,7 +2867,7 @@ public:
     __hostdev__ const DataType* data() const { return reinterpret_cast<const DataType*>(this); }
 
     /// @brief Return a const reference to the index bounding box of all the active values in this tree, i.e. in all nodes of the tree
-    __hostdev__ const BBox<CoordType>& bbox() const { return DataType::mBBox; }
+    __hostdev__ const BBoxType& bbox() const { return DataType::mBBox; }
 
     /// @brief Return the total number of active voxels in the root and all its child nodes.
 
@@ -3030,6 +3069,7 @@ private:
         }
         return ChildNodeType::dim(); // background
     }
+
 }; // RootNode class
 
 // After the RootNode the memory layout is assumed to be the sorted Tiles
@@ -3219,11 +3259,11 @@ public:
 #if 0
         return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) +
                (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) +
-               ((ijk[2] & MASK) >> ChildT::TOTAL);
+                ((ijk[2] & MASK) >> ChildT::TOTAL);
 #else
         return (((ijk[0] & MASK) >> ChildT::TOTAL) << (2 * LOG2DIM)) |
                (((ijk[1] & MASK) >> ChildT::TOTAL) << (LOG2DIM)) |
-               ((ijk[2] & MASK) >> ChildT::TOTAL);
+                ((ijk[2] & MASK) >> ChildT::TOTAL);
 #endif
     }
 
@@ -3686,6 +3726,8 @@ class LeafNode : private LeafData<BuildT, CoordT, MaskT, Log2Dim>
 public:
     struct ChildNodeType
     {
+        static constexpr uint32_t TOTAL = 0;
+        static constexpr uint32_t DIM   = 1;
         __hostdev__ static uint32_t dim() { return 1u; }
     }; // Voxel
     using LeafNodeType = LeafNode<BuildT, CoordT, MaskT, Log2Dim>;
@@ -4709,7 +4751,7 @@ public:
     __hostdev__ int                blindDataCount() const { return this->grid().blindDataCount(); }
     __hostdev__ const GridBlindMetaData& blindMetaData(int n) const { return this->grid().blindMetaData(n); }
     __hostdev__ uint64_t                 activeVoxelCount() const { return this->grid().activeVoxelCount(); }
-    __hostdev__ uint32_t                 activeTileCount(uint32_t n) const { return this->grid().tree().activeTileCount(n); }
+    __hostdev__ const uint32_t&          activeTileCount(uint32_t level) const { return this->grid().tree().activeTileCount(level); }
     __hostdev__ uint32_t                 nodeCount(uint32_t level) const { return this->grid().tree().nodeCount(level); }
     __hostdev__ uint64_t                 checksum() const { return this->grid().checksum(); }
     __hostdev__ bool                     isEmpty() const { return this->grid().isEmpty(); }

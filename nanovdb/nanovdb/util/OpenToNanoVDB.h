@@ -698,17 +698,17 @@ NanoTree<NanoBuildT>* OpenToNanoVDB<OpenBuildT,  NanoBuildT,  OracleT, BufferT>:
 
 #if 1// count active tiles and voxels
 
-    // Count number of active leaf level tiles
+    // Count number of active tiles in the lower internal nodes
     data->mTileCount[0] = reduce(mArray1, uint32_t(0), [&](auto &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray1[i].node->getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
-    // Count number of active lower internal node tiles
+    // Count number of active tiles in the upper internal nodes
     data->mTileCount[1] = reduce(mArray2, uint32_t(0), [&](auto &r, uint32_t sum){
         for (auto i=r.begin(); i!=r.end(); ++i) sum += mArray2[i].node->getValueMask().countOn();
         return sum;}, std::plus<uint32_t>());
 
-    // Count number of active upper internal node tiles
+    // Count number of active tile in the root node
     uint32_t sum = 0;
     for (auto it = openTree.root().cbeginValueOn(); it; ++it) ++sum;
     data->mTileCount[2] = sum;
