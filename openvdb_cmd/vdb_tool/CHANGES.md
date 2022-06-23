@@ -99,6 +99,7 @@
 - [X] -print mem=1 prints variables saved to memory, e.g. loop variables
 - [X] use cmake (thanks to Greg Klar!)
 - [X] read NanoVDB voxel volumes (thanks to Greg Klar)
+- [x] -ls2mesh iso=0.1 mask=1 invert=true
 - [ ] -merge
 - [ ] -points2mask
 - [ ] -erodeTopology

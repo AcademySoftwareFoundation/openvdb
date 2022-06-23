@@ -7,8 +7,8 @@
 ///
 /// @file Parser.h
 ///
-/// @brief Defines various classes (Computer, Parser, Option, Action, Loop) for processing
-///        command-line arguments.
+/// @brief Defines various classes (Processor, Parser, Option, Action, Loop)
+///        for processing of command-line arguments.
 ///
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -194,12 +194,12 @@ public:
 /// @brief   Implements a light-weight stack-oriented programming language (very loosely) inspired by Forth
 /// @details Specifically, it uses Reverse Polish Notation to define operations that are evaluated during
 ///          paring of the command-line arguments (options to be precise).
-class Computer
+class Processor
 {
     struct Instruction {std::string doc; std::function<void()> callback;};// documentation and callback for instruction
     using Instructions = std::unordered_map<std::string, Instruction>;
 
-    Stack        mCallStack;// computer stack for data and instructions
+    Stack        mCallStack;// processor stack for data and instructions
     Instructions mInstructions;// map of all supported instructions
     Memory       mMemory;
 
@@ -258,8 +258,8 @@ public:
     Memory& memory() {return mMemory;}
     void add(const std::string &name, std::string &&doc, std::function<void()> &&func) {mInstructions[name]={std::move(doc),std::move(func)};}
 
-    /// @brief c-tor
-    Computer()
+    /// @brief default c-tor for Processor. Add all the instructions required by the tool
+    Processor()
     {
         // file-name operations
         add("path","extract file path from string, e.g. {path/base0123.ext:path} -> {path}",
@@ -453,20 +453,20 @@ public:
     {
         try {
         for (size_t pos = str.find_first_of("{}"); pos != std::string::npos; pos = str.find_first_of("{}", pos)) {
-            if (str[pos]=='}') throw std::invalid_argument("Computer(): expected \"{\" before \"}\" in \""+str.substr(pos)+"\"");
+            if (str[pos]=='}') throw std::invalid_argument("Processor(): expected \"{\" before \"}\" in \""+str.substr(pos)+"\"");
             size_t end = str.find_first_of("{}", pos + 1);
-            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Computer(): nested \"{}\" is not allowed in \""+str.substr(pos)+"\"");
+            if (end == std::string::npos || str[end]=='{') throw std::invalid_argument("Processor(): nested \"{}\" is not allowed in \""+str.substr(pos)+"\"");
             for (size_t p=str.find_first_of(":}",pos+1), q=pos+1; p<=end; q=p+1, p=str.find_first_of(":}",q)) {
                 if (p == q) {// ignores {:} and {::}
                     continue;
                 } else if (str[q]=='$') {// get value
                     mCallStack.push(mMemory.get(str.substr(q + 1, p - q - 1)));
                 } else if (str[q]=='@') {// set value
-                    if (mCallStack.empty()) throw std::invalid_argument("Computer::(): cannot evaluate \""+str.substr(q,p-q)+"\" when the stack is empty");
+                    if (mCallStack.empty()) throw std::invalid_argument("Processor::(): cannot evaluate \""+str.substr(q,p-q)+"\" when the stack is empty");
                     mMemory.set(str.substr(q + 1, p - q - 1), mCallStack.pop());
                 } else if (str.compare(q,3,"if(")==0) {// if-statement: 0|1:if(a) or 0|1:if(a?b)}
                     const size_t i = str.find_first_of("(){}", q+3);
-                    if (str[i]!=')') throw std::invalid_argument("Computer():: missing \")\" in if-statement \""+str.substr(q)+"\"");
+                    if (str[i]!=')') throw std::invalid_argument("Processor():: missing \")\" in if-statement \""+str.substr(q)+"\"");
                     const auto v = tokenize(str.substr(q+3, i-q-3), "?");
                     if (v.size() == 1) {
                         if (str2bool(mCallStack.pop())) {
@@ -477,7 +477,7 @@ public:
                     } else if (v.size() == 2) {
                         str.replace(q, i - q + 1, v[str2bool(mCallStack.pop()) ? 0 : 1]);
                     } else {
-                        throw std::invalid_argument("Computer():: invalid if-statement \""+str.substr(q)+"\"");
+                        throw std::invalid_argument("Processor():: invalid if-statement \""+str.substr(q)+"\"");
                     }
                     end = str.find('}', pos + 1);// needs to be recomputed since str was modified
                     p = q - 1;// rewind
@@ -485,10 +485,10 @@ public:
                     break;
                 } else if (str.compare(q,7,"switch(")==0) {//switch-statement: $1:switch(a:case_a?b:case_b?c:case_c)
                     const size_t i = str.find_first_of("(){}", q+7);
-                    if (str[i]!=')') throw std::invalid_argument("Computer():: missing \")\" in switch-statement \""+str.substr(q)+"\"");
+                    if (str[i]!=')') throw std::invalid_argument("Processor():: missing \")\" in switch-statement \""+str.substr(q)+"\"");
                     for (auto s : tokenize(str.substr(q+7, i-q-7), "?")) {
                         const size_t j = s.find(':');
-                        if (j==std::string::npos) throw std::invalid_argument("Computer():: missing \":\" in switch-statement \""+str.substr(q)+"\"");
+                        if (j==std::string::npos) throw std::invalid_argument("Processor():: missing \":\" in switch-statement \""+str.substr(q)+"\"");
                         if (mCallStack.top() == s.substr(0,j)) {
                             str.replace(q, i - q + 1, s.substr(j + 1));
                             end = str.find('}', pos + 1);// needs to be recomputed since str was modified
@@ -497,7 +497,7 @@ public:
                             break;
                         }
                     }
-                    if (str.compare(q,7,"switch(")==0) throw std::invalid_argument("Computer():: no match in switch-statement \""+str.substr(q)+"\"");
+                    if (str.compare(q,7,"switch(")==0) throw std::invalid_argument("Processor():: no match in switch-statement \""+str.substr(q)+"\"");
                 } else {// apply callback or push
                     const std::string s = str.substr(q, p - q);
                     auto it = mInstructions.find(s);
@@ -515,7 +515,7 @@ public:
             } else {// more than one entry in the call stack is considered an error
                 std::stringstream ss;
                 mCallStack.print(ss);
-                throw std::invalid_argument("Computer::(): compute stack contains more than one entry: " + ss.str());
+                throw std::invalid_argument("Processor::(): compute stack contains more than one entry: " + ss.str());
             }
         }// for-loop over "{}" in string
         } catch (const std::exception& e) {
@@ -545,11 +545,11 @@ public:
             if (it != mInstructions.end()) {
                 os << std::left << std::setw(w) << it->first << it->second.doc << "\n\n";
             } else {
-                throw std::invalid_argument("Computer::help:: unknown operation \"" + s + "\"");
+                throw std::invalid_argument("Processor::help:: unknown operation \"" + s + "\"");
             }
         }
     }
-};// Computer
+};// Processor class
 
 // ==============================================================================================================
 
@@ -577,7 +577,7 @@ struct BaseLoop
     void print(std::ostream& os = std::cerr) const {
         os << "Processing: " << name << " = " << memory.get(name) << " counter = " << pos <<std::endl;
     }
-};
+};// BaseLoop struct
 
 // ==============================================================================================================
 
@@ -600,7 +600,7 @@ public:
         if (vec[0] < vec[1]) this->set(vec[0]);
         return vec[0] < vec[1];
     }
-};// ForLoop
+};// ForLoop struct
 
 // ==============================================================================================================
 
@@ -618,7 +618,7 @@ public:
         if (++pos < vec.size()) this->set(vec[pos]);
         return pos < vec.size();
     }
-};// EachLoop
+};// EachLoop class
 
 // ==============================================================================================================
 
@@ -629,7 +629,7 @@ public:
     virtual ~IfLoop() {}
     bool valid() override {return true;}
     bool next() override {return false;}
-};// IfLoop
+};// IfLoop class
 
 // ==============================================================================================================
 
@@ -641,7 +641,7 @@ struct Parser {
     std::vector<Option> defaults;
     int                 verbose;
     mutable size_t      counter;// loop counter used to validate matching "-for/each" and "-end" actions
-    mutable Computer    computer;// responsible for storing local variables and executing string expressions
+    mutable Processor   processor;// responsible for storing local variables and executing string expressions
 
     Parser(std::vector<Option> &&def);
     void parse(int argc, char *argv[]);
@@ -685,7 +685,7 @@ std::string Parser::getStr(const std::string &name) const
   for (auto &opt : iter->options) {
       if (opt.name != name) continue;// linear search
       std::string str = opt.value;// deep copy since it might get modified by map
-      computer(str);
+      processor(str);
       return str;
   }
   throw std::invalid_argument(iter->name+": Parser::getStr: no option named \""+name+"\"");
@@ -781,13 +781,13 @@ Parser::Parser(std::vector<Option> &&def)
             assert(iter->name == "eval");
             if (!iter->options[1].value.empty()) {
                 if (iter->options[1].value=="*") {
-                    computer.help();
+                    processor.help();
                 } else {
-                    computer.help(tokenize(iter->options[1].value, ","));
+                    processor.help(tokenize(iter->options[1].value, ","));
                 }
             }
             std::string str = iter->options[0].value;// copy
-            computer(str);// <- evaluate string
+            processor(str);// <- evaluate string
             for (auto s : tokenize(str, ",")) std::cerr << s << std::endl;// split and print
         }, 0
     );
@@ -842,9 +842,9 @@ Parser::Parser(std::vector<Option> &&def)
             const std::string &name = iter->options[0].name;
             std::shared_ptr<BaseLoop> loop;
             try {
-                loop=std::make_shared<ForLoop<int>>(computer.memory(), iter, name, this->getVec<int>(name,","));
+                loop=std::make_shared<ForLoop<int>>(processor.memory(), iter, name, this->getVec<int>(name,","));
             } catch (const std::invalid_argument &){
-                loop=std::make_shared<ForLoop<float>>(computer.memory(), iter, name, this->getVec<float>(name,","));
+                loop=std::make_shared<ForLoop<float>>(processor.memory(), iter, name, this->getVec<float>(name,","));
             }
             if (loop->valid()) {
                 loops.push_back(loop);
@@ -862,7 +862,7 @@ Parser::Parser(std::vector<Option> &&def)
         [&](){
             assert(iter->name == "each");
             const std::string &name = iter->options[0].name;
-            auto loop = std::make_shared<EachLoop>(computer.memory(), iter, name, this->getVec<std::string>(name,","));
+            auto loop = std::make_shared<EachLoop>(processor.memory(), iter, name, this->getVec<std::string>(name,","));
             if (loop->valid()) {
                 loops.push_back(loop);
                 if (verbose) loop->print();
@@ -879,7 +879,7 @@ Parser::Parser(std::vector<Option> &&def)
         [&](){
             assert(iter->name == "if");
             if (this->get<bool>("test")) {
-                loops.push_back(std::make_shared<IfLoop>(computer.memory(), iter));
+                loops.push_back(std::make_shared<IfLoop>(processor.memory(), iter));
             } else {
                 skip2end(iter);// skip to matching -end
             }

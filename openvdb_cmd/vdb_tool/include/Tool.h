@@ -43,6 +43,7 @@
 #include <openvdb/tools/FastSweeping.h>
 #include <openvdb/tools/Prune.h>
 #include <openvdb/tools/Clip.h>
+#include <openvdb/tools/Mask.h> // for tools::interiorMask()
 #include <openvdb/tools/MultiResGrid.h>
 #include <openvdb/tools/SignedFloodFill.h>
 #include <openvdb/points/PointConversion.h>
@@ -88,8 +89,8 @@ namespace vdb_tool {
 class Tool
 {
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 0;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 2;// incremented for backwards-compatible bug fixes.
+    static const int sMinor = 2;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = tools::LevelSetFilter<GridT>;
@@ -141,7 +142,7 @@ class Tool
     /// @brief Converts an iso-surface of a scalar field into a level set (i.e. SDF)
     void isoToLevelSet();
 
-    /// @brief Convert a level set to an adaptive polygen mesh
+    /// @brief Convert a level set to an adaptive polygon mesh
     void levelSetToMesh();
 
     /// @brief Create a level set sphere, i.e. a narrow-band signed distance to a sphere
@@ -275,7 +276,7 @@ auto Tool::getGrid(size_t age) const
 
 auto Tool::getGeom(size_t age) const
 {
-    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGrid.size()));
+    if (age>=mGeom.size()) throw std::invalid_argument("-"+mParser.getAction().name+" called getGeom("+std::to_string(age)+"), but geometry count = "+std::to_string(mGeom.size()));
     auto it = mGeom.crbegin();
     std::advance(it, age);
     return it;
@@ -408,7 +409,10 @@ void Tool::init()
   mParser.addAction(
       "ls2mesh", "l2m", "Convert a level set to an adaptive polygen mesh",
     {{"adapt", "0.0", "0.9", "normalized metric for the adaptive meshing. 0 is uniform and 1 is fully adaptive mesh. Defaults to 0."},
-     {"vdb", "0", "0", "age (i.e. stack index) of the VDB grid to be processed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
+     {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
+     {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
+     {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
      {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
      {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
@@ -728,105 +732,105 @@ void Tool::init()
       "examples", "", "print examples to the terminal and terminate", {},
       [&](){std::cerr << this->examples() << std::endl; std::exit(EXIT_SUCCESS);}, [](){});
 
-  Computer &comp = mParser.computer;
+  Processor &proc = mParser.processor;
 
   // operations related to VDB grids
-  comp.add("voxelSize", "voxel size of specified vdb grid, e.g. {0:voxelSize} -> {0.01}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->voxelSize()[0]);}
+  proc.add("voxelSize", "voxel size of specified vdb grid, e.g. {0:voxelSize} -> {0.01}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->voxelSize()[0]);}
   );
 
-  comp.add("voxelCount", "number of active voxels of specified VDB grid, e.g. {0:voxelCount} -> {3269821}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->activeVoxelCount());}
+  proc.add("voxelCount", "number of active voxels of specified VDB grid, e.g. {0:voxelCount} -> {3269821}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->activeVoxelCount());}
   );
 
-  comp.add("gridCount", "push the number of loaded VDB grids onto the stack, e.g. {gridCount} -> {1}",
-      [&](){comp.push(mGrid.size());});
+  proc.add("gridCount", "push the number of loaded VDB grids onto the stack, e.g. {gridCount} -> {1}",
+      [&](){proc.push(mGrid.size());});
 
-  comp.add("gridName", "name of a specified VDB grid, e.g. {0:gridName} -> {sphere}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->getName());});
+  proc.add("gridName", "name of a specified VDB grid, e.g. {0:gridName} -> {sphere}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->getName());});
 
-  comp.add("isGridEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->empty());});
+  proc.add("isGridEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->empty());});
 
-  comp.add("gridType", "value type of a specified VDB grid, e.g. {0:gridType} -> {float}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->valueType());});
+  proc.add("gridType", "value type of a specified VDB grid, e.g. {0:gridType} -> {float}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->valueType());});
 
-  comp.add("gridClass", "class of a specified VDB grid, e.g. {0:gridClass} -> {ls}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
+  proc.add("gridClass", "class of a specified VDB grid, e.g. {0:gridClass} -> {ls}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
             switch ((*it)->getGridClass()) {
-                case GRID_LEVEL_SET: comp.set("ls"); break;
-                case GRID_FOG_VOLUME: comp.set("fog"); break;
-                default: comp.set("unknown");
+                case GRID_LEVEL_SET: proc.set("ls"); break;
+                case GRID_FOG_VOLUME: proc.set("fog"); break;
+                default: proc.set("unknown");
       }});
 
-  comp.add("isLS", "test if a specified VDB grid is a level set or not, e.g. {0:isLS} -> {1}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->getGridClass()==GRID_LEVEL_SET);
+  proc.add("isLS", "test if a specified VDB grid is a level set or not, e.g. {0:isLS} -> {1}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->getGridClass()==GRID_LEVEL_SET);
       });
 
-  comp.add("isFOG", "test if a specified VDB grid is a fog volume or not, e.g. {0:isFOG} -> {0}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
-            comp.set((*it)->getGridClass()==GRID_FOG_VOLUME);
+  proc.add("isFOG", "test if a specified VDB grid is a fog volume or not, e.g. {0:isFOG} -> {0}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            proc.set((*it)->getGridClass()==GRID_FOG_VOLUME);
       });
 
-  comp.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0|gridDim} -> {[255,255,255]}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
+  proc.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0|gridDim} -> {[255,255,255]}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             std::stringstream ss;
             ss << bbox.dim();
-            comp.set(ss.str());
+            proc.set(ss.str());
       });
 
-  comp.add("gridBBox", "world bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
-      [&](){auto it = this->getGrid(str2int(comp.get()));
+  proc.add("gridBBox", "world bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
             std::stringstream ss;
             ss << bboxWorld;
-            comp.set(ss.str());
+            proc.set(ss.str());
       });
 
    // operations related to geometry
-  comp.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
-            comp.set((*it)->vtxCount());});
+  proc.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            proc.set((*it)->vtxCount());});
 
-  comp.add("polyCount", "number of polygons of a specified geometry, e.g. {0:polyCount} -> {23560}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
-            comp.set((*it)->polyCount());});
+  proc.add("polyCount", "number of polygons of a specified geometry, e.g. {0:polyCount} -> {23560}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            proc.set((*it)->polyCount());});
 
-  comp.add("geomCount", "push the number of loaded geometries onto the stack, e.g. {geomCount} -> {1}",
-      [&](){comp.push(mGrid.size());});
+  proc.add("geomCount", "push the number of loaded geometries onto the stack, e.g. {geomCount} -> {1}",
+      [&](){proc.push(mGrid.size());});
 
-  comp.add("geomName", "name of a specified geometry, e.g. {0:geomName} -> {bunny}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
-            comp.set((*it)->getName());});
+  proc.add("geomName", "name of a specified geometry, e.g. {0:geomName} -> {bunny}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            proc.set((*it)->getName());});
 
-  comp.add("isGeomEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
-            comp.set((*it)->isEmpty());});
+  proc.add("isGeomEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            proc.set((*it)->isEmpty());});
 
-  comp.add("geomClass", "class of a specified geometry, e.g. {0:geomClass} -> {points}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
+  proc.add("geomClass", "class of a specified geometry, e.g. {0:geomClass} -> {points}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
             if ((*it)->isPoints()) {
-                comp.set("points");
+                proc.set("points");
             } else if ((*it)->isMesh()) {
-                comp.set("mesh");
+                proc.set("mesh");
             } else {
-                comp.set("unknown");
+                proc.set("unknown");
       }});
 
-  comp.add("geomBBox", "world bounding box of specifiedgeometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
-      [&](){auto it = this->getGeom(str2int(comp.get()));
+  proc.add("geomBBox", "world bounding box of specifiedgeometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
             std::stringstream ss;
             ss << (*it)->bbox();
-            comp.set(ss.str());
+            proc.set(ss.str());
       });
 
 }// Tool::init()
@@ -915,7 +919,7 @@ void Tool::clear()
     }
   }
   if (mParser.get<bool>("variables")) {
-    mParser.computer.memory().clear();
+    mParser.processor.memory().clear();
   }
   mFilter.reset();
 }// Tool::clear
@@ -1989,27 +1993,76 @@ void Tool::csg()
 
 void Tool::levelSetToMesh()
 {
-  const std::string &name = mParser.getAction().name;
-  assert(name == "ls2mesh");
+  const std::string &action_name = mParser.getAction().name;
+  assert(action_name == "ls2mesh");
   try {
     mParser.printAction();
-    const float adaptivity = mParser.get<float>("adapt");
+    const double adaptivity = mParser.get<float>("adapt");
+    const double iso = mParser.get<float>("iso");
     const int age = mParser.get<int>("vdb");
+    const int mask = mParser.get<int>("mask");
+    const bool invert = mParser.get<bool>("invert");
     const bool keep = mParser.get<bool>("keep");
     std::string grid_name = mParser.get<std::string>("name");
+
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
-    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set with age "+std::to_string(age));
+    if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("levelSetToMesh: no level set grid with age "+std::to_string(age));
     if (mParser.verbose) mTimer.start("SDF -> mesh");
+
+    tools::VolumeToMesh mesher(iso, adaptivity, /*relaxDisorientedTriangles*/true);
+    if (mask >= 0) {
+      auto base = *this->getGrid(mask);// might throw
+      if (base->isType<BoolGrid>()) {
+        mesher.setSurfaceMask(base, invert);
+      } else if (base->isType<FloatGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<FloatGrid>(base), 0.0), invert);
+      } else if (base->isType<Vec3fGrid>()) {
+        mesher.setSurfaceMask(tools::interiorMask(*gridPtrCast<Vec3fGrid>(base)), invert);
+      } else {
+        throw std::invalid_argument("levelSetToMesh: unsupported mask type with age "+std::to_string(mask));
+      }
+    }
+    mesher(*grid);
+
     Geometry::Ptr geom(new Geometry());
-    tools::volumeToMesh(*grid, geom->vtx(), geom->tri(), geom->quad(), 0.0, adaptivity, true);
+
+    {// allocate and copy vertices
+      auto &vtx = geom->vtx();
+      vtx.resize(mesher.pointListSize());
+      tools::volume_to_mesh_internal::PointListCopy ptnCpy(mesher.pointList(), vtx);
+      tbb::parallel_for(tbb::blocked_range<size_t>(0, vtx.size()), ptnCpy);
+      mesher.pointList().reset(nullptr);
+    }
+
+    {// allocate and copy polygons
+      auto& polygonPoolList = mesher.polygonPoolList();
+      size_t numQuad = 0, numTri = 0;
+      for (size_t i = 0, N = mesher.polygonPoolListSize(); i < N; ++i) {
+        auto &polygons = polygonPoolList[i];
+        numTri  += polygons.numTriangles();
+        numQuad += polygons.numQuads();
+      }
+      auto &tri  = geom->tri();
+      auto &quad = geom->quad();
+      tri.resize(numTri);
+      quad.resize(numQuad);
+      size_t qIdx = 0, tIdx = 0;
+      for (size_t n = 0, N = mesher.polygonPoolListSize(); n < N; ++n) {
+        auto &poly = polygonPoolList[n];
+        for (size_t i = 0, I = poly.numQuads(); i < I; ++i) quad[qIdx++] = poly.quad(i);
+        for (size_t i = 0, I = poly.numTriangles(); i < I; ++i) tri[tIdx++] = poly.triangle(i);
+      }
+    }
+
     if (!keep) mGrid.erase(std::next(it).base());
     if (grid_name.empty()) grid_name = "ls2mesh_"+grid->getName();
     geom->setName(grid_name);
     mGeom.push_back(geom);
+
     if (mParser.verbose) mTimer.stop();
   } catch (const std::exception& e) {
-    throw std::invalid_argument(name+": "+e.what());
+    throw std::invalid_argument(action_name+": "+e.what());
   }
 }// Tool::levelSetToMesh
 
@@ -2701,7 +2754,7 @@ void Tool::print(std::ostream& os) const
     mParser.print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
     os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
-    mParser.computer.memory().print(os);
+    mParser.processor.memory().print(os);
     os << std::setw(80) << std::setfill('=') << "\n" << std::endl;
   }
 
@@ -2752,7 +2805,7 @@ void Tool::print(std::ostream& os) const
 
     if (mParser.get<bool>("mem")) {
       os << "\n" << std::setw(40) << std::setfill('=') << "> Variables <" << std::setw(40) << "\n";
-      mParser.computer.memory().print(os);
+      mParser.processor.memory().print(os);
     }
 
     os << std::setw(80) << std::setfill('=') << "\n\n" << std::endl;
