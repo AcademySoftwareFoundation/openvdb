@@ -11,7 +11,7 @@ This command-line tool, dubbed vdb_tool, can combine any number of the of high-l
 | **config** | Load a configuration file and add the actions for processing |
 | **default** | Set default values used by all subsequent actions |
 | **read** | Read mesh, points and level sets as obj, ply, abc, stl, pts, vdb or nvdb files |
-| **write** | Write a polygon mesh, points or level set as a obj, ply, stl or vdb file |
+| **write** | Write a polygon mesh, points or level set as a obj, ply, stl, abc or vdb file |
 | **vdb2points** | Extracts points from a VDB grid |
 | **mesh2ls** | Convert a polygon mesh to a narrow-band level set |
 | **points2ls** | Convert points into a narrow-band level set |
@@ -63,7 +63,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 | ply | read and write | Binary and ASCII PLY mesh files with triangle, quad or points |
 | stl | read and write | Binary STL mesh files with triangles |
 | pts | read | ASCII PTS points files with one or more point clouds |
-| abc | optional read | Alembic binary mesh files |
+| abc | optional read and write | Alembic binary mesh files |
 | nvdb| optional read and write | NanoVDB file with voxels or points |
 | txt | read and write | ASCII configuration file for this tool |
 | ppm | write | Binary PPM image file |
@@ -200,9 +200,9 @@ vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write v
 vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center='({$radian:cos},{$radian:sin},0)' name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
 ```
 
-* Converts input points in the file points.[vdb/ply/abc/obj/pts] to a level set, perform level set actions, and written to it the file surface.vdb:
+* Converts input points in the file points.[obj|ply|abc|pts] to a level set, perform level set actions, and written to it the file surface.vdb:
 ```
-vdb_tool -read points.[obj/ply/abc/vdb/pts] -points2ls -dilate -gauss -erode -write surface.vdb
+vdb_tool -read points.[obj|ply|abc|pts] -points2ls -dilate -gauss -erode -write surface.vdb
 ```
 
 * Example with many properties of scalar and vector fields

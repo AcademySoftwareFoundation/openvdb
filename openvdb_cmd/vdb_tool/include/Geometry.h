@@ -39,6 +39,7 @@
 #include <Alembic/Abc/TypedPropertyTraits.h>
 #include <Alembic/AbcCoreAbstract/All.h>
 #include <Alembic/AbcCoreFactory/All.h>
+#include <Alembic/AbcCoreOgawa/All.h>
 #include <Alembic/AbcGeom/All.h>
 #include <Alembic/Util/All.h>
 #endif
@@ -97,6 +98,7 @@ public:
     void writePLY(const std::string &fileName) const;
     void writeSTL(const std::string &fileName) const;
     void writeGEO(const std::string &fileName) const;
+    void writeABC(const std::string &fileName) const;
 
     void writeOBJ(std::ostream &os) const;
     void writePLY(std::ostream &os) const;
@@ -208,7 +210,7 @@ const math::BBox<Vec3s>& Geometry::bbox() const
 
 void Geometry::write(const std::string &fileName) const
 {
-    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl"})) {
+    switch (findFileExt(fileName, {"geo", "obj", "ply", "stl", "abc"})) {
     case 1:
         this->writeGEO(fileName);
         break;
@@ -220,6 +222,9 @@ void Geometry::write(const std::string &fileName) const
         break;
     case 4:
         this->writeSTL(fileName);
+        break;
+    case 5:
+        this->writeABC(fileName);
         break;
     default:
         throw std::invalid_argument("Geometry file \"" + fileName + "\" has an invalid extension");
@@ -1036,12 +1041,60 @@ void Geometry::readABC(const std::string &fileName)
         tmp.visit(fileName);
         mBBox = BBoxT();//invalidate BBox
 }// Geometry::readABC
-#else
-void Geometry::readABC(const std::string &fileName)
+
+void Geometry::writeABC(const std::string &fileName) const
 {
-    throw std::runtime_error("Alembic support was disabled during compilation!");
+    std::vector<int32_t> abcCounts;
+    std::vector<int32_t> abcIndices;
+
+    abcCounts.reserve(mTri.size() + mQuad.size());
+    abcIndices.reserve(3 * mTri.size() + 4 * mQuad.size());
+
+    for (const auto &tri : mTri) {
+        abcCounts.push_back(3);
+        abcIndices.push_back(tri.x());
+        abcIndices.push_back(tri.y());
+        abcIndices.push_back(tri.z());
+    }
+
+    for (const auto &quad : mQuad) {
+        abcCounts.push_back(4);
+        abcIndices.push_back(quad.x());
+        abcIndices.push_back(quad.y());
+        abcIndices.push_back(quad.z());
+        abcIndices.push_back(quad.w());
+    }
+
+    {
+        using namespace Alembic::AbcGeom;
+
+        P3fArraySample pointsArraySample{reinterpret_cast<const Alembic::Abc::V3f*>(mVtx.data()), mVtx.size()};
+        Int32ArraySample indicesArraySample{reinterpret_cast<const int32_t*>(abcIndices.data()), abcIndices.size()};
+        Int32ArraySample countsArraySample{reinterpret_cast<const int32_t*>(abcCounts.data()), abcCounts.size()};
+        OPolyMeshSchema::Sample meshSample{pointsArraySample, indicesArraySample, countsArraySample};
+
+        OArchive archive{Alembic::AbcCoreOgawa::WriteArchive(), fileName.c_str()};
+        OObject topObject{archive, kTop};
+        OPolyMesh meshObject{topObject, "vdb_mesh"};
+        auto &mesh = meshObject.getSchema();
+
+        mesh.set(meshSample);
+    }
+} // Geometry::writeABC
+
+#else
+
+void Geometry::readABC(const std::string&)
+{
+    throw std::runtime_error("Alembic read support was disabled during compilation!");
 }
-#endif
+
+void Geometry::writeABC(const std::string&) const
+{
+    throw std::runtime_error("Alembic write support was disabled during compilation!");
+}
+
+#endif// VDB_TOOL_USE_ABC
 
 Geometry::Ptr Geometry::copyGeom() const
 {

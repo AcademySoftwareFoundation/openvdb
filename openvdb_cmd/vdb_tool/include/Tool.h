@@ -89,8 +89,8 @@ namespace vdb_tool {
 class Tool
 {
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 2;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
+    static const int sMinor = 4;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
     using FilterT = tools::LevelSetFilter<GridT>;
@@ -778,7 +778,7 @@ void Tool::init()
             proc.set((*it)->getGridClass()==GRID_FOG_VOLUME);
       });
 
-  proc.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0|gridDim} -> {[255,255,255]}",
+  proc.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0:gridDim} -> {[255,255,255]}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             std::stringstream ss;
@@ -786,17 +786,38 @@ void Tool::init()
             proc.set(ss.str());
       });
 
-  proc.add("gridBBox", "world bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+  proc.add("gridBBox", "world space bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
+            const auto &min = bboxWorld.min(), &max = bboxWorld.max();
             std::stringstream ss;
-            ss << bboxWorld;
+            ss << "["<<min[0]<<","<<min[1]<<","<<min[2]<<"] "
+               << "["<<max[0]<<","<<max[1]<<","<<max[2]<<"]";
             proc.set(ss.str());
       });
 
-   // operations related to geometry
+  proc.add("gridCenter", "world space center of bounding box of specified VDB grid, e.g. {0:gridCenter} -> {[0.0,0.0,0.0]}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
+            const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+            const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
+            const auto center = 0.5*(bboxWorld.max() + bboxWorld.min());
+            std::stringstream ss;
+            ss << "["<<center[0]<<","<<center[1]<<","<<center[2]<<"]";
+            proc.set(ss.str());
+      });
+
+  proc.add("gridRadius", "world space radius of bounding box of specified VDB grid, e.g. {0:gridRadius} -> {1.73}",
+      [&](){auto it = this->getGrid(str2int(proc.get()));
+            const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
+            const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
+            const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
+            proc.set(0.5*(bboxWorld.max() - bboxWorld.min()).length());
+      });
+
+  // operations related to geometry
   proc.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
             proc.set((*it)->vtxCount());});
@@ -826,7 +847,7 @@ void Tool::init()
                 proc.set("unknown");
       }});
 
-  proc.add("geomBBox", "world bounding box of specifiedgeometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+  proc.add("geomBBox", "world bounding box of specified geometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
             std::stringstream ss;
             ss << (*it)->bbox();
@@ -1091,7 +1112,7 @@ void Tool::write() const
 {
   assert(mParser.getAction().name == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
-    switch (findFileExt(fileName, {"geo,obj,ply,stl", "vdb", "nvdb", "txt"})) {
+    switch (findFileExt(fileName, {"geo,obj,ply,stl,abc", "vdb", "nvdb", "txt"})) {
     case 1:
       this->writeGeo(fileName);
       break;
