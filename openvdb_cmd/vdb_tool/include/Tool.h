@@ -847,11 +847,26 @@ void Tool::init()
                 proc.set("unknown");
       }});
 
-  proc.add("geomBBox", "world bounding box of specified geometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] -> [1.016,1.016,1.016]}",
+  proc.add("geomBBox", "world space bounding box of specified geometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
+            const auto &min = (*it)->bbox().min(), &max = (*it)->bbox().max();
             std::stringstream ss;
-            ss << (*it)->bbox();
+            ss << "["<<min[0]<<","<<min[1]<<","<<min[2]<<"] "
+               << "["<<max[0]<<","<<max[1]<<","<<max[2]<<"]";
             proc.set(ss.str());
+      });
+
+  proc.add("geomCenter", "world space center of bounding box of specified geometry, e.g. {0:geomCenter} -> {[0.0,0.0,0.0]}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            const auto center = 0.5*((*it)->bbox().max() + (*it)->bbox().min());
+            std::stringstream ss;
+            ss << "["<<center[0]<<","<<center[1]<<","<<center[2]<<"]";
+            proc.set(ss.str());
+      });
+
+  proc.add("geomRadius", "world space radius of bounding box of specified geometry, e.g. {0:geomRadius} -> {1.73}",
+      [&](){auto it = this->getGeom(str2int(proc.get()));
+            proc.set(0.5*((*it)->bbox().max() - (*it)->bbox().min()).length());
       });
 
 }// Tool::init()
