@@ -151,7 +151,7 @@ public:
         ~CLI();
         CLI(CLI&&);
         CLI& operator=(CLI&&);
-        static CLI create(int argc, const char* argv[], bool* used=nullptr);
+        static CLI create(size_t argc, const char* argv[], bool* used=nullptr);
         static void usage(std::ostream& os, const bool verbose);
     private:
         friend class PointExecutable;

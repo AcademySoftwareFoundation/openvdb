@@ -1107,7 +1107,7 @@ PointExecutable::CLI& PointExecutable::CLI::operator=(CLI&& other) {
 }
 
 PointExecutable::CLI
-PointExecutable::CLI::create(int argc, const char* argv[], bool* flags)
+PointExecutable::CLI::create(size_t argc, const char* argv[], bool* flags)
 {
     CLI cli;
     openvdb::ax::cli::init(argc, argv, {}, cli.mSettings->optional(), flags);

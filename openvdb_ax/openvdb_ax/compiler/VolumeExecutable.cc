@@ -1488,7 +1488,7 @@ VolumeExecutable::CLI& VolumeExecutable::CLI::operator=(CLI&& other) {
 }
 
 VolumeExecutable::CLI
-VolumeExecutable::CLI::create(int argc, const char* argv[], bool* flags)
+VolumeExecutable::CLI::create(size_t argc, const char* argv[], bool* flags)
 {
     CLI cli;
     openvdb::ax::cli::init(argc, argv, {}, cli.mSettings->optional(), flags);

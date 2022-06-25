@@ -331,12 +331,12 @@ private:
     ParamT mParam;
 };
 
-inline void init(int argc, const char* argv[],
+inline void init(const size_t argc, const char* argv[],
     const std::vector<ParamBase*>& positional,
     const std::vector<ParamBase*>& optional,
     bool* used = nullptr)
 {
-    int i = 0;
+    size_t i = 0;
     for (auto& P : positional) {
         if (i >= argc) return;
         const char* arg = argv[i];
