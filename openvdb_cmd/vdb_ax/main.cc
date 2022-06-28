@@ -618,12 +618,12 @@ inline auto parseCliComponents(int argc, char *argv[])
     argc-=1;
     ++argv;
 
-    bool flags[argc];
-    std::fill(flags, flags+argc, false);
+    std::unique_ptr<bool[]> flags(new bool[argc]);
+    std::fill(flags.get(), flags.get()+argc, false);
 
     int32_t optionalArgc = argc;
     const char** optionalArgv = const_cast<const char**>(argv);
-    bool* optionalFlags = flags;
+    bool* optionalFlags = flags.get();
     // skip positional arguments (if any) for executables
     while (optionalArgc && optionalArgv[0][0] != '-') {
         optionalArgc-=1;
@@ -632,7 +632,7 @@ inline auto parseCliComponents(int argc, char *argv[])
     }
 
     try {
-        openvdb::ax::cli::init(argc, const_cast<const char**>(argv), opts.positional(), opts.optional(), flags);
+        openvdb::ax::cli::init(argc, const_cast<const char**>(argv), opts.positional(), opts.optional(), flags.get());
         auto volumecli = openvdb::ax::VolumeExecutable::CLI::create(optionalArgc, optionalArgv, optionalFlags);
         auto pointcli = openvdb::ax::PointExecutable::CLI::create(optionalArgc, optionalArgv, optionalFlags);
 

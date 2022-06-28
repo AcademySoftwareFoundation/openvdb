@@ -66,7 +66,7 @@ inline void oswrap(std::ostream& os,
         if (!ignoreNewLines) {
             // scane for new line in this range (memchr doesn't stop on \0)
             // hence the std::min on the max width
-            const char* nl = (char*)std::memchr(start, '\n',
+            const char* nl = (const char*)std::memchr(start, '\n',
                 std::min(lineMaxWidth, nchars-pos));
             if (nl) {
                 while (start <= nl) { os << *start; ++start; ++pos; }
@@ -135,7 +135,7 @@ inline void usage(std::ostream& os,
     size_t doclen = std::strlen(doc);
     if (!verbose) {
         // memchr doesn't stop on '\0' so needs max size
-        const char* stop = (char*)std::memchr(doc, '.', doclen);
+        const char* stop = (const char*)std::memchr(doc, '.', doclen);
         if (stop) doclen = stop - doc;
     }
 

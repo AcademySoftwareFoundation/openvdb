@@ -1035,9 +1035,10 @@ TestVolumeExecutable::testCLI()
         std::vector<const char*> args;
         for (auto& str : strs) args.emplace_back(str.c_str());
 
-        bool flags[args.size()];
-        std::fill(flags, flags+args.size(), false);
-        auto cli = CLI::create(args.size(), args.data(), flags);
+        std::unique_ptr<bool[]> flags(new bool[args.size()]);
+        std::fill(flags.get(), flags.get()+args.size(), false);
+
+        auto cli = CLI::create(args.size(), args.data(), flags.get());
         if (throwIfUnused) {
             for (size_t i = 0; i < args.size(); ++i) {
                 if (!flags[i]) OPENVDB_THROW(UnusedCLIParam, "unused param");
@@ -1168,7 +1169,7 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
 
-        cli = std::move(CreateCLI("--tree-level 1:2"));
+        cli = CreateCLI("--tree-level 1:2");
         CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
 
         exe->getTreeExecutionLevel(min, max);
@@ -1203,7 +1204,7 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
 
-        cli = std::move(CreateCLI("--volume-grain 1:2"));
+        cli = CreateCLI("--volume-grain 1:2");
         CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
 
         exe->getTreeExecutionLevel(min, max);
@@ -1266,7 +1267,7 @@ TestVolumeExecutable::testCLI()
         CPPUNIT_ASSERT_EQUAL(size_t(10), exe->getActiveTileStreamingGrainSize());
         CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
 
-        cli = std::move(CreateCLI("--tile-stream ON --node-iter OFF --tree-level 2:3 --volume-grain 10:20 --create-missing ON --bindings a:b"));
+        cli = CreateCLI("--tile-stream ON --node-iter OFF --tree-level 2:3 --volume-grain 10:20 --create-missing ON --bindings a:b");
         ax::AttributeBindings bindings;
         bindings.set("a", "b");
 

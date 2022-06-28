@@ -782,9 +782,10 @@ TestPointExecutable::testCLI()
         std::vector<const char*> args;
         for (auto& str : strs) args.emplace_back(str.c_str());
 
-        bool flags[args.size()];
-        std::fill(flags, flags+args.size(), false);
-        auto cli = CLI::create(args.size(), args.data(), flags);
+        std::unique_ptr<bool[]> flags(new bool[args.size()]);
+        std::fill(flags.get(), flags.get()+args.size(), false);
+
+        auto cli = CLI::create(args.size(), args.data(), flags.get());
         if (throwIfUnused) {
             for (size_t i = 0; i < args.size(); ++i) {
                 if (!flags[i]) OPENVDB_THROW(UnusedCLIParam, "unused param");
