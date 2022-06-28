@@ -140,7 +140,10 @@ OpenVDBGrid<V>::clipGrid(OpenVDBGrid<V>& vdb, mma::RealBounds3DRef bds)
 {
     scalar_type_assert<V>();
     
-    const BBoxd bbox(bds.data());
+    const Vec3d xyzMin(bds.xmin(), bds.ymin(), bds.zmin());
+    const Vec3d xyzMax(bds.xmax(), bds.ymax(), bds.zmax());
+    
+    const BBoxd bbox(xyzMin, xyzMax);
     
     const wlGridPtr gridclipped = openvdb::tools::clip(*vdb.grid(), bbox);
     
