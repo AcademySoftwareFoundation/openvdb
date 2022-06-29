@@ -287,16 +287,16 @@ R"(If turned on, only convex hull fo points are used for activation.)"));
 R"(Which points of the second input contribute to the convex hull
 computation.)"));
     parms.add(hutil::ParmFactory(PRM_FLT, "voxeloffset", "Voxel Offset")
-	      .setDefault(PRMzeroDefaults)
-	      .setRange(PRM_RANGE_UI, -10.0f, PRM_RANGE_UI, 10.0f)
-	      .setTooltip("Expand the convex hull by this number of voxels.")
-	      .setDocumentation(
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, -10.0f, PRM_RANGE_UI, 10.0f)
+              .setTooltip("Expand the convex hull by this number of voxels.")
+              .setDocumentation(
 R"(Expand the convex hull by the specified number of voxels.)"));
     parms.add(hutil::ParmFactory(PRM_FLT, "worldoffset", "World Offset")
-	      .setDefault(PRMzeroDefaults)
-	      .setRange(PRM_RANGE_UI, -1.0f, PRM_RANGE_UI, 1.0f)
-	      .setTooltip("Expand the convex hull by this distance.")
-	      .setDocumentation(
+              .setDefault(PRMzeroDefaults)
+              .setRange(PRM_RANGE_UI, -1.0f, PRM_RANGE_UI, 1.0f)
+              .setTooltip("Expand the convex hull by this distance.")
+              .setDocumentation(
 R"(Expand the convex hull by the specified distance.)"));
 #endif
 
@@ -672,7 +672,7 @@ public:
         {
             typename NodeT::ChildNodeType    *child;
             ValueT               value;
-            
+
             iter.getItem(iter.pos(), child, value);
 
             if (!child) // Tile
@@ -856,7 +856,7 @@ public:
 
         UT_SmallArray<int>      activeplanes;
         bool inside = myHull.findActivePlanes(
-                activeplanes, 
+                activeplanes,
                 UT_Vector3( 0.5 * (coordbbox.max().x() + coordbbox.min().x()),
                             0.5 * (coordbbox.max().y() + coordbbox.min().y()),
                             0.5 * (coordbbox.max().z() + coordbbox.min().z()) ),
