@@ -267,7 +267,7 @@ if(HAS_DOWNLOAD_VDBS)
   # fail tests
   run_test(FAIL GENERATES_OUTPUT
       FILE_SUFFIX attr_create
-      ARGS ${SPHERE_POINTS_VDB} --create-attributes "OFF"
+      ARGS ${SPHERE_POINTS_VDB} --create-missing "OFF"
       AX "@nonexist = 1;")
 endif()
 
