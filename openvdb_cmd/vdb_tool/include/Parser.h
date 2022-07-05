@@ -114,7 +114,10 @@ public:
     void set(const std::string &name, const char *value) {mData[name]=value;}
     template <typename T>
     void set(const std::string &name, const T &value) {mData[name]=std::to_string(value);}
-    void print(std::ostream& os = std::cerr) const {for (auto &d : mData) os << d.first <<"="<<d.second<<std::endl;}
+    void print(std::ostream& os = std::cerr) const {
+        std::map<std::string, std::string> tmp(mData.begin(),mData.end());// sort output
+        for (auto &d : tmp) os << d.first <<"="<<d.second<<std::endl;
+    }
     size_t size() const {return mData.size();}
     bool isSet(const std::string &name) const {return mData.find(name)!=mData.end();}
 };// Memory
@@ -364,7 +367,7 @@ public:
             [&](){mCallStack.dup();});
         add("nip","remove the entry below the top, e.g. {x:y:nip} -> {y}",
             [&](){mCallStack.nip();});
-        add("drop","remove the top entry, e.g. {x:y:drop} -> {x}",
+        add("drop","remove/pop the top entry, e.g. {x:y:drop} -> {x}",
             [&](){mCallStack.drop();});
         add("swap","swap the two top entries, e.g. {x:y:swap} -> {y:x}",
             [&](){mCallStack.swap();});
@@ -425,9 +428,9 @@ public:
                   mCallStack.top() = ss.str();
         });
 
-        add("get","get the value of a variable from memory, e.g. {pi:get} -> {3.141593",
+        add("get","get the value of a variable from memory, e.g. {pi:get} -> {3.141593}, equal to {$pi}",
             [&](){mCallStack.top() = mMemory.get(mCallStack.top());});
-        add("set","set a variable to a value and save it to memory, e.g. {1:G:set} -> {}",
+        add("set","set a variable to a value and save it to memory, e.g. {1:G:set} -> {}, equal to {1:@G}",
             [&](){const std::string str = mCallStack.pop();
                   mMemory.set(str, mCallStack.pop());
         });
@@ -448,7 +451,9 @@ public:
         add("switch","switch-statement, e.g. {2:switch(1:first?2:second?3:third)} -> {second}",[](){});
         add("quit","terminate evaluation, e.g. {1:2:+:quit:4:*} -> {3}",[](){});
     }
-    /// @brief performs syntax analysis on the specified str
+
+    /// @brief performs syntax analysis on the specified str. Implements control-flows like for- and each-loops, if- and switch-statements,
+    ///        and calls the lambda functions associated with the instructions.
     void operator()(std::string &str)
     {
         try {
@@ -575,7 +580,7 @@ struct BaseLoop
         memory.set("#"+name, pos);
     }
     void print(std::ostream& os = std::cerr) const {
-        os << "Processing: " << name << " = " << memory.get(name) << " counter = " << pos <<std::endl;
+        os << "Processing: " << name << " = " << memory.get(name) << ", counter #" << name << " = " << pos <<std::endl;
     }
 };// BaseLoop struct
 
@@ -749,7 +754,7 @@ void Action::setOption(const std::string &str)
         }
         throw std::invalid_argument(name + ": invalid option \"" + str + "\"");
     }
-}
+}// Action::setOption
 
 // ==============================================================================================================
 
@@ -820,7 +825,7 @@ Parser::Parser(std::vector<Option> &&def)
     // Lambda function used to skip loops by forwarding iterator to matching -end.
     // Note, this function assumes that -for,-each,-if all have a matching -end, which
     // was enforced during parsing by increasing and decreasing "counter" and checking
-    // that it never becomes negative and ends up being zero.
+    // that it never becomes negative and always ends up with a value of zero.
     auto skip2end = [](auto &it){
         for (int i = 1; i > 0;) {
             const std::string &name = (++it)->name;
@@ -887,9 +892,9 @@ Parser::Parser(std::vector<Option> &&def)
     );
 
     this->addAction(
-        "end", "", "marks the end scope of a for- or each-loop", {},
+        "end", "", "marks the end scope of \"-for,-each,and -if\" control actions", {},
         [&](){
-            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for or -each");
+            if (counter<=0) throw std::invalid_argument("Parser: -end must be preceeded by -for,-each, or -if");
             --counter;},
         [&](){
             assert(iter->name == "end");
@@ -901,7 +906,7 @@ Parser::Parser(std::vector<Option> &&def)
                 loops.pop_back();
             }}
     );
-}
+}// Parser::Parser
 
 // ==============================================================================================================
 
@@ -922,7 +927,6 @@ void Parser::finalize()
         hashMap.insert({it->name, it});
         if (it->alias!="") hashMap.insert({it->alias, it});
     }
-    //std::cerr << "buckets = " << hashMap.bucket_count() << ", size = " << hashMap.size() << std::endl;
 }
 
 // ==============================================================================================================
@@ -946,8 +950,8 @@ void Parser::parse(int argc, char *argv[])
             throw std::invalid_argument("Parser: unsupported action \""+str+"\"\n");
         }
     }// loop over all input arguments
-    if (counter!=0) throw std::invalid_argument("Parser: Unmatched pair of -for/-each and -end");
-}
+    if (counter!=0) throw std::invalid_argument("Parser: Unmatched pairing of {-for,-each,-if} and -end");
+}// Parser::parse
 
 // ==============================================================================================================
 
@@ -1010,18 +1014,18 @@ std::string Parser::usage(const Action &action, bool brief) const
         }
     }
     return ss.str();
-}
+}// Parser::usage
 
 // ==============================================================================================================
 
 void Parser::setDefaults()
 {
     for (auto &dst : iter->options) {
-        if (dst.value.empty()) {// is the existing value un-defined?
+        if (dst.value.empty()) {// only set default value if the existing value un-defined?
             for (auto &src : defaults) {
                 if (dst.name == src.name) {
                     dst.value = src.value;
-                    break;//only bread the inner loop
+                    break;//only breaks the innermost for-loop
                 }
             }
         }

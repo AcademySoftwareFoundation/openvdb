@@ -73,7 +73,7 @@ For support, bug-reports or ideas for improvements please contact ken.museth@gma
 
 # Terminology
 
-We introduce three terms: **actions**, **options** and **expressions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are low-level functions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
+We introduce terms: **actions**, **options**, **expressions**, and **instructions**. Actions are high-level openvdb tools, which each have unique options, e.g. -mesh2ls geo=1 voxel=0.1, where "-mesh2ls" is an action with two options "geo" and "voxel". Expressions are strings of code with one or more low-level instructions in our stack-based programming language (see below). These expressions start with "{" and ends with "}", and ":" is used to separate values and instructions. E.g. {1:2:+} is an expression with two values (1 and 2) and one instruction "+", and it reduces to the string value "3". See section on the "Stack-based string expressions" below for more details.
 
 Note that **actions** always start with one or more "-" and (except for file names) its associated **options** always contain a "=" and an optional number of leading characters used for identification, e.g. "-erode r=2" is identical to "-erode radius=2.0", but "-erode rr=2" will produce an error since "rr" does not match the first two characters of any option associated with the action "erode".
 
@@ -153,62 +153,110 @@ cmake --build . --config Release --parallel 2
 
 # Examples
 
-* Get help on actions and their options
+## Getting help on all actions and their options
 ```
 vdb_tool -help
+```
+
+## Getting help on specific actions and their options
+```
 vdb_tool -help read write
 ```
 
-* Get help on instructions
+## Getting help on all instructions
 ```
 vdb_tool -eval help="*"
+```
+
+## Getting help on specific instructions
+```
 vdb_tool -eval help=if,switch
 ```
 
-
-* "Hello-world" example: Create a level set sphere and save it to a file
+## Hello-world example
+Create a level set sphere and save it to a file
 ```
 vdb_tool -sphere -write sphere.vdb
 ```
-* Same example but with options to save the file in half-float precision
+## Hello-world example with option
+Same example but with options to save the file in half-float precision
 ```
 vdb_tool -sphere -write bits=16 sphere.vdb
 ```
 
-* Convert a polygon mesh file into a narrow-band level and save it to a file:
+## Converting a mesh into a level set
+Convert a polygon mesh file into a narrow-band level and save it to a file
 ```
 vdb_tool -read mesh.obj -mesh2ls -write level_set.vdb
 ```
 
-* Convert a polygon mesh file into a narrow-band level with a transform that matches another vdb:
+## Read multiple files
+Convert a polygon mesh file into a narrow-band level with a transform that matches a reference vdb
 ```
 vdb_tool -read mesh.obj,reference.vdb -mesh2ls vdb=0 -write level_set.vdb
 ```
 
-* Convert 5 polygon mesh files, "mesh_0{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb":
+## Convert a sequence of files
+Convert 5 polygon mesh files, "mesh_00{1,2,3,4,5}.obj", into separate narrow-band levels and save them to the files "level_set_0{1,2,3,4,5}.vdb". Note that the value of loop variables is accessible with a preceding "$" character and that the end of the for-loop (here 6) is exclusive.The instruction "pad0" add zero-padding and takes two arguments, the string to pad and the desired length after padding.
 ```
-vdb_tool -for f=1,6 -read mesh_'{$f:2:pad0}'.obj -mesh2ls -write level_set_'{$f:2:pad0}'.vdb -end
+vdb_tool -for n=1,6 -read mesh_'{$n:3:pad0}'.obj -mesh2ls -write level_set_'{$n:2:pad0}'.vdb -end
+```
+
+## Loop over specific files
+Convert 5 polygon mesh files, "bunny.obj,teapot.ply,car.stl", into the Alembic files "mesh_0{1,2,3,4,5}.vdb". Note that all loop variables have a matching counter defined with a preceding "#" character.
+```
+vdb_tool -each file=bunny.obj,teapot.ply,car.stl -read '{$file}' -write mesh_'{$#file:1:+:2:pad0}'.abc -end
 ```
  
-* Generate 5 sphere with different voxel sizes and save them all into a single vdb file:
+## Define voxel size from a loop-variable
+Generate 5 sphere with different voxel sizes and save them all into a single vdb file
 ```
 vdb_tool -for v=0.01,0.06,0.01 -sphere voxel='{$v}' name=sphere_%v -end -write vdb="*" spheres.vdb
 ```
 
-* Generate spheres that are rotating along a parametric circle
+## Specify which grids to write into a single file
+Generate 4 spheres named after their stack id, i.e. 3,2,1,0, and write only grid 0 and 2 to a file
+```
+vdb_tool -for i=0,5 -sphere name='{4:$i:-}' -end -write vdb=2,0 tmp.vdb
+```
+
+## Define options with simple math expression
+Read both a vdb and mesh file and convert the mesh to a vdb with twice the voxel size of the input vdb.
+```
+vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='{0:voxelSize:2:*}' -print
+```
+
+## Define options with complex math expressions
+Generate spheres that are rotating along a parametric circle
 ```
 vdb_tool -for degree=0,360,10 -eval '{$degree:d2r:@radian}' -sphere center='({$radian:cos},{$radian:sin},0)' name=sphere_'{$degree}' -end -write vdb="*" spheres.vdb
 ```
 
-* Converts input points in the file points.[obj|ply|abc|pts] to a level set, perform level set actions, and written to it the file surface.vdb:
+## Meshing of particles
+Converts input points in the file points.[obj|ply|abc|pts] to a level set, perform level set actions, and written to it the file surface.vdb:
 ```
 vdb_tool -read points.[obj|ply|abc|pts] -points2ls -dilate -gauss -erode -write surface.vdb
 ```
 
-* Example with many properties of scalar and vector fields
+## Changing global default options
+Example with many properties of scalar and vector fields
 ```
 vdb_tool -default keep=true -sphere -curvature -grad -curl -div -length v=1 -debug
 ```
+
+## If-statement to isolate level sets
+Read multiple grids, and render only level set grids
+
+```
+vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vdb='{$v}' -end -end
+```
+
+## Use shell-script to define list of files
+Find and render thumbnails of all level sets in an entire directory structure
+```
+vdb_tool -each file=`find ~/dev/data -name '*.vdb'` -read '{$file}' -for grid=0,'{gridCount}' -if '{$grid:isLS}' -render vdb='{$grid}' thumbnail_'{$grid:gridName}'.ppm image=256x256 keep=1 -end -end -clear -end
+```
+Most of the arguments should be self-explanatory, but at least two deserve an explanation: -render has the option keep=1 because otherwise rendered grids are removed from the stack which invalidates {gridCount}, and -clear is added to avoid accumulating all grids as multiple files are loaded.
 
 For more examples [click here](examples/EXAMPLES.md)
 
@@ -218,7 +266,7 @@ For more examples [click here](examples/EXAMPLES.md)
 vdb_tool supports unix-style pipelining, which is especially useful for interactive viewing. Specifically,
 vdb_tool can read VDB grids from stdin or write VDB grid to stdout. Here are some examples:
 
-* Redirection of stdout and stdin:
+## Redirection of stdout and stdin:
 ```
 vdb_tool -sphere -o stdout.vdb > sphere.vdb
 vdb_tool -i stdin.vdb -print < bunny.vdb
@@ -227,7 +275,7 @@ vdb_tool -sphere -o stdout.vdb | gzip > sphere.vdb.gz
 gzip -dc sphere.vdb.gz | vdb_tool -i stdin.vdb -print
 ```
 
-* Pipelining multiple instances of vdb_tool (see note below):
+## Pipelining multiple instances of vdb_tool
 ```
 vdb_tool -sphere -o stdout.vdb | vdb_tool -i stdin.vdb -dilate -o stdout.vdb > sphere.vdb
 ```
@@ -235,8 +283,7 @@ or with explicit semantics
 ```
 vdb_tool -sphere -o stdout.vdb | vdb_tool -i stdin.vdb -dilate -o stdout.vdb > sphere.vdb
 ```
-
-* Note that the example above is slow due to serialization of the VDB grid. A much faster alternative is:
+Note that the example above is slow due to serialization of the VDB grid.
 ```
 vdb_tool -sphere -dilate -o stdout.vdb > sphere.vdb
 ```
@@ -245,83 +292,30 @@ or with explicit semantics
 vdb_tool -sphere -dilate -o stdout.vdb > sphere.vdb
 ```
 
-* Pipelining vdb_tool with vdb_view for interactive viewing
+## Pipelining vdb_tool with vdb_view for interactive viewing
 ```
 vdb_tool -sphere -dilate -o stdout.vdb | vdb_view
 ```
 
-* View a sequence of animated level sets
+## View a sequence of scaling, rotating, and translated tetrahedra
+```
+vdb_tool -for t=0,6.28,0.2 -platonic f=4 -transform vdb=0 scale='{$t:sin:2:+}' rotate='(0,0,{$t})' translate='({$t:cos:5:*},{$t:sin:5:*},0)' -end -o stdout.vdb | vdb_view
+```
+
+## View a sequence of spheres deformed in an analytical fluid field
 ```
 vdb_tool -sphere d=80 r=0.15 c=0.35,0.35,0.35 -for i=1,20 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
+```
+
+## View a sequence of octahedrons deformed in an analytical fluid field
+```
 vdb_tool -platonic d=128 f=8 s=0.15 c=0.35,0.35,0.35 -for i=1,20 -enright dt=0.05 k=1 -end -o stdout.vdb | vdb_view
 ```
 
-# String evaluation:
-
-* Define, modify and access custom variables<br>
-Define the local variable G=0 and increment it inside a for-loop. Note that **string arguments of "-eval" should always start with "{" and end with "}**. Also, we use single-quotation marks to prevent the shell environment from interpreting special characters like "{","}", and "\$".
+## Production example of meshing of fluid particles
+Generate adaptive meshes from a sequence of points files, points_0[200,299].vdb, and use mesh_mask.obj to clip off boundaries. Points are first rasterized as level set spheres, then dilates, filtered and eroded and finally meshed using the mask.
 ```
-vdb_tool -quiet -eval '{0:@G}' -for i=10,15 -eval '{$G:++:@G}G = {$G}' -end
+vdb_tool -read mesh_mask.obj -mesh2ls voxel=0.1 width=3 -for n=200,300,1 -read points_{$n:4:pad0}.vdb -vdb2points -points2ls voxel=0.035 radius=2.142 width=3 -dilate radius=2.5 space=5 time=1 -gauss iter=2 space=5 time=1 size=1 -erode radius=2.5 space=5 time=1 -ls2mesh vdb=0 mask=1 adapt=0.005 -write mesh_{$n:4:pad0}.abc -end
 ```
-which prints the output:<br>
-G = 1<br>
-G = 2<br>
-G = 3<br>
-G = 4<br>
-G = 5<br>
-
-* Find real roots of a quadratic polynomial:<br>
-For convenience the computation is split in the following three steps:<br>
-a=1, b=-8, c=5<br>
-c=b^2-4ac, a=-2a<br>
-if (c==0) one solution: b/a, else if (c>0) two solutions: (b+-sqrt(c))/a
-```
-vdb_tool -eval '{1:@a:-8:@b:5:@c}' '{$b:pow2:4:$a:*:$c:*:-:@c:-2:$a:*:@a}' '{$c:0:==:if($b:$a:/):$c:0:>:if($c:sqrt:dup:$b:+:$a:/:$b:rot:-:$a:/):squash}'
-//vdb_tool -eval '(a=1;b=-8;c=5;c=b^2-4*a*c;a=-2*a;if(c==0){s1=b/a;}if(c>0){s1=(b+sqrt(c))/a;s2=b-sqrt(c))/a;}'
-```
-which prints the two real roots: 0.683375 7.316625. Changing b=c=4 prints the single real root -2.
-
-* Use scripting to access properties of grids and geometry
-
-Read both a vdb and mesh file and convert the mesh to a vdb with twice the voxel size of the input vdb.
-```
-vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='{0:voxelSize:2:*}' -print
-//vdb_tool -read bunny.vdb dragon.ply -mesh2ls voxel='(2*voxelSize(0);)' -print
-```
-
-* Loop skipping and expressions
-
-```
-vdb_tool -each i=1 -for j='{$i}',2 -end -end
-```
-
-which prints:<br>
-Processing: i = 1 counter = 0<br>
-Processing: j = 1 counter = 0
-
-```
-vdb_tool -each i=2 -for j='{$i}',2 -end -end
-```
-produces the output to:<br>
-Processing: i = 2 counter = 0
-
-```
-vdb_tool -each i= -for j='{$i}',2 -end -end
-```
-produces no output, since both loops are skipped
-
-* If-statement to level set grids
-
-Read multiple grids, and render all level set grids
-
-```
-vdb_tool -read boat_points.vdb -for v=0,'{gridCount}' -if '{$v:isLS}' -render vdb='{$v}' -end -end
-```
-
-* Find and render thumbnails of all level sets in an entire directory structure
-```
-vdb_tool -each file=`find ~/dev/data -name '*.vdb'` -read '{$file}' -for grid=0,'{gridCount}' -if '{$grid:isLS}' -render vdb='{$grid}' thumbnail_'{$grid:gridName}'.ppm image=256x256 keep=1 -end -end -clear -end
-```
-Most of the arguments should be self-explanatory, but at least two deserve an explanation: -render has the option keep=1 because otherwise rendered grids are removed from the stack which invalidates {gridCount}, and -clear is added to avoid accumulating all grids as multiple files are loaded.
 
 ---

@@ -89,7 +89,7 @@ namespace vdb_tool {
 class Tool
 {
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 4;// incremented for new functionality that is backwards-compatible.
+    static const int sMinor = 5;// incremented for new functionality that is backwards-compatible.
     static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
@@ -174,8 +174,8 @@ class Tool
 
     /// @brief Read one or more geometry or VDB files from disk or STDIN
     void read();
-    void readGeo( const std::string &fileName);
-    void readVDB( const std::string &fileName);
+    void readGeo(  const std::string &fileName);
+    void readVDB(  const std::string &fileName);
     void readNVDB( const std::string &fileName);
 
     /// @brief ray-tracing of level set surfaces and volume rendering of fog volumes
@@ -197,11 +197,11 @@ class Tool
     void vdbToPoints();
 
     /// @brief Write list of geometry, VDB or config files to disk or STDOUT
-    void write() const;
-    void writeGeo( const std::string &fileName) const;
-    void writeVDB( const std::string &fileName) const;
-    void writeNVDB(const std::string &fileName) const;
-    void writeConf(const std::string &fileName) const;
+    void write();
+    void writeGeo( const std::string &fileName);
+    void writeVDB( const std::string &fileName);
+    void writeNVDB(const std::string &fileName);
+    void writeConf(const std::string &fileName);
 
     /// @brief return the voxel-size of  a LS estimated from a desired grid dimension of a specific geometry
     float estimateVoxelSize(int maxDimension,  float halfWidth, int geo_age);
@@ -362,13 +362,14 @@ void Tool::init()
     {{"files", "", "{file|stdin}.{abc|obj|ply|stl|vdb}", "list of files or the input stream, e.g. file.vdb,stdin.vdb. Note that \"files=\" is optional since any argument without \"=\" is intrepreted as a file and appended to \"files\""},
      {"grids", "*", "*|grid_name,...", "list of VDB grids name to be imported (defaults to \"*\", i.e. import all available grids)"},
      {"delayed", "true", "1|0|true|false", "toggle delayed loading of VDB grids (enabled by default). This option is ignored by other file types"}},
-     [](){}, [&](){this->read();}, 0);// anonymous options are appended to "files"
+     [](){}, [&](){this->read();}, 0);//  anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
     {{"files", "", "{file|stdout}.{obj|ply|stl|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
      {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all availabe grids)."},
+     {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
      {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
      {"dither", "false", "1|0|true|false", "toggle dithering of quantized NanoVDB grids (disabled by default)"},
@@ -376,7 +377,7 @@ void Tool::init()
      {"tolerance", "-1", "1.0", "absolute or relative error tolerance used during quantization of NanoVDBs. Only used if bits=N."},// error tolerance for N bits in NVDB
      {"stats", "", "none|bbox|extrema|all", "specify the statistics to compute for NanoVDBs."},
      {"checksum", "", "none|partial|full", "specify the type of checksum to compute for NanoVDBs"}},
-     [](){}, [&](){this->write();}, 0);// anonymous options are appended to "files"
+     [&](){mParser.setDefaults();}, [&](){this->write();}, 0);// anonymous options are treated as to the first option,i.e. "files"
 
   mParser.addAction(
      "clear", "", "Deletes geometry, VDB grids and local variables",
@@ -413,7 +414,7 @@ void Tool::init()
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
      {"mask","-1", "1", "age (i.e. stack index) of the level set VDB grid used as a surface mask during meshing. Defaults to -1, i.e. it's disabled."},
      {"invert", "false", "1|0|true|false", "boolean toggle to mesh the complement of the mask. Defaults to false and ignored if no mask is specified."},
-     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing"},
+     {"keep", "", "1|0|true|false", "toggle wether the input VDB is preserved or deleted after the processing. The mask is never removed!"},
      {"name", "", "ls2mesh_input", "specify the name of the resulting vdb (by default it's derived from the input VDB)"}},
      [&](){mParser.setDefaults();}, [&](){this->levelSetToMesh();});
 
@@ -737,13 +738,11 @@ void Tool::init()
   // operations related to VDB grids
   proc.add("voxelSize", "voxel size of specified vdb grid, e.g. {0:voxelSize} -> {0.01}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
-            proc.set((*it)->voxelSize()[0]);}
-  );
+            proc.set((*it)->voxelSize()[0]);});
 
   proc.add("voxelCount", "number of active voxels of specified VDB grid, e.g. {0:voxelCount} -> {3269821}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
-            proc.set((*it)->activeVoxelCount());}
-  );
+            proc.set((*it)->activeVoxelCount());});
 
   proc.add("gridCount", "push the number of loaded VDB grids onto the stack, e.g. {gridCount} -> {1}",
       [&](){proc.push(mGrid.size());});
@@ -765,26 +764,22 @@ void Tool::init()
             switch ((*it)->getGridClass()) {
                 case GRID_LEVEL_SET: proc.set("ls"); break;
                 case GRID_FOG_VOLUME: proc.set("fog"); break;
-                default: proc.set("unknown");
-      }});
+                default: proc.set("unknown");}});
 
   proc.add("isLS", "test if a specified VDB grid is a level set or not, e.g. {0:isLS} -> {1}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
-            proc.set((*it)->getGridClass()==GRID_LEVEL_SET);
-      });
+            proc.set((*it)->getGridClass()==GRID_LEVEL_SET);});
 
   proc.add("isFOG", "test if a specified VDB grid is a fog volume or not, e.g. {0:isFOG} -> {0}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
-            proc.set((*it)->getGridClass()==GRID_FOG_VOLUME);
-      });
+            proc.set((*it)->getGridClass()==GRID_FOG_VOLUME);});
 
   proc.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0:gridDim} -> {[255,255,255]}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             std::stringstream ss;
             ss << bbox.dim();
-            proc.set(ss.str());
-      });
+            proc.set(ss.str());});
 
   proc.add("gridBBox", "world space bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
@@ -795,8 +790,7 @@ void Tool::init()
             std::stringstream ss;
             ss << "["<<min[0]<<","<<min[1]<<","<<min[2]<<"] "
                << "["<<max[0]<<","<<max[1]<<","<<max[2]<<"]";
-            proc.set(ss.str());
-      });
+            proc.set(ss.str());});
 
   proc.add("gridCenter", "world space center of bounding box of specified VDB grid, e.g. {0:gridCenter} -> {[0.0,0.0,0.0]}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
@@ -806,16 +800,14 @@ void Tool::init()
             const auto center = 0.5*(bboxWorld.max() + bboxWorld.min());
             std::stringstream ss;
             ss << "["<<center[0]<<","<<center[1]<<","<<center[2]<<"]";
-            proc.set(ss.str());
-      });
+            proc.set(ss.str());});
 
   proc.add("gridRadius", "world space radius of bounding box of specified VDB grid, e.g. {0:gridRadius} -> {1.73}",
       [&](){auto it = this->getGrid(str2int(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
-            proc.set(0.5*(bboxWorld.max() - bboxWorld.min()).length());
-      });
+            proc.set(0.5*(bboxWorld.max() - bboxWorld.min()).length());});
 
   // operations related to geometry
   proc.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
@@ -844,8 +836,7 @@ void Tool::init()
             } else if ((*it)->isMesh()) {
                 proc.set("mesh");
             } else {
-                proc.set("unknown");
-      }});
+                proc.set("unknown");}});
 
   proc.add("geomBBox", "world space bounding box of specified geometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
@@ -853,21 +844,18 @@ void Tool::init()
             std::stringstream ss;
             ss << "["<<min[0]<<","<<min[1]<<","<<min[2]<<"] "
                << "["<<max[0]<<","<<max[1]<<","<<max[2]<<"]";
-            proc.set(ss.str());
-      });
+            proc.set(ss.str());});
 
   proc.add("geomCenter", "world space center of bounding box of specified geometry, e.g. {0:geomCenter} -> {[0.0,0.0,0.0]}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
             const auto center = 0.5*((*it)->bbox().max() + (*it)->bbox().min());
             std::stringstream ss;
             ss << "["<<center[0]<<","<<center[1]<<","<<center[2]<<"]";
-            proc.set(ss.str());
-      });
+            proc.set(ss.str());});
 
   proc.add("geomRadius", "world space radius of bounding box of specified geometry, e.g. {0:geomRadius} -> {1.73}",
       [&](){auto it = this->getGeom(str2int(proc.get()));
-            proc.set(0.5*((*it)->bbox().max() - (*it)->bbox().min()).length());
-      });
+            proc.set(0.5*((*it)->bbox().max() - (*it)->bbox().min()).length());});
 
 }// Tool::init()
 
@@ -1123,7 +1111,7 @@ void Tool::config()
 
 // ==============================================================================================================
 
-void Tool::write() const
+void Tool::write()
 {
   assert(mParser.getAction().name == "write");
   for (std::string &fileName : mParser.getVec<std::string>("files")) {
@@ -1149,13 +1137,14 @@ void Tool::write() const
 
 // ==============================================================================================================
 
-void Tool::writeVDB(const std::string &fileName) const
+void Tool::writeVDB(const std::string &fileName)
 {
   const std::string &name = mParser.getAction().name;
   assert(name == "write");
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     const std::string codec = to_lower_case(mParser.get<std::string>("codec"));
     bool half;
     switch (mParser.get<int>("bits")) {
@@ -1166,16 +1155,17 @@ void Tool::writeVDB(const std::string &fileName) const
       default:
         throw std::invalid_argument("writeVDB: bits should either be 32 or 16, not "+mParser.get<std::string>("bits"));
     }
-    GridPtrVec grids;
+    GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+      if (!keep) mGrid.clear();
     } else {
-      for (int a : vectorize<int>(age, ",")) {
-        auto it = this->getGrid(a);
-        grids.push_back(*it);
-      }
+      for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
+      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
+
     if (grids.empty()) throw std::invalid_argument("writeVDB: no vdb grids to write");
+
     auto setCodec = [&](io::Archive &a) {
       if (codec=="zip") {
         a.setCompression(io::COMPRESS_ZIP | io::COMPRESS_ACTIVE_MASK);
@@ -1212,7 +1202,7 @@ void Tool::writeVDB(const std::string &fileName) const
 
 // ==============================================================================================================
 
-void Tool::writeNVDB(const std::string &fileName) const
+void Tool::writeNVDB(const std::string &fileName)
 {
 #ifdef VDB_TOOL_USE_NANO
   const std::string &name = mParser.getAction().name;
@@ -1220,6 +1210,7 @@ void Tool::writeNVDB(const std::string &fileName) const
   try {
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
+    const bool keep = mParser.get<bool>("keep");
     const std::string codec_str = to_lower_case(mParser.get<std::string>("codec"));
     const std::string bits = mParser.get<std::string>("bits");
     const bool dither = mParser.get<bool>("dither");
@@ -1274,15 +1265,15 @@ void Tool::writeNVDB(const std::string &fileName) const
       throw std::invalid_argument("writeNVDB: unsupported checksum \""+checksum+"\"");
     }
 
-    GridPtrVec grids;
+    GridPtrVec grids;// vector of grids to be written and possibly removed from mGrid
     if (age == "*") {
       for (auto it = mGrid.crbegin(); it != mGrid.crend(); ++it) grids.push_back(*it);
+      if (!keep) mGrid.clear();
     } else {
-      for (int a : vectorize<int>(age, ",")) {
-        auto it = this->getGrid(a);
-        grids.push_back(*it);
-      }
+      for (int a : vectorize<int>(age, ",")) grids.push_back(*this->getGrid(a));
+      if (!keep) for (auto &g : grids) mGrid.remove(g);
     }
+
     if (grids.empty()) throw std::invalid_argument("writeNVDB: no vdb grids to write");
 
     auto openToNano = [&](const GridBase::Ptr& base) {
@@ -1344,21 +1335,23 @@ void Tool::writeNVDB(const std::string &fileName) const
 
 // ==============================================================================================================
 
-void Tool::writeGeo(const std::string &fileName) const
+void Tool::writeGeo(const std::string &fileName)
 {
   assert(mParser.getAction().name == "write");
   const int age = mParser.get<int>("geo");
+  const bool keep = mParser.get<bool>("keep");
   if (mParser.verbose>1) std::cerr << "Writing geometry to \"" << fileName << "\"\n";
   auto it = this->getGeom(age);
   const Geometry &mesh = **it;
   if (mParser.verbose) mTimer.start("Write geometry");
   mesh.write(fileName);
+  if (!keep) mGeom.erase(std::next(it).base());
   if (mParser.verbose) mTimer.stop();
 }// Tool::writeGeo
 
 // ==============================================================================================================
 
-void Tool::writeConf(const std::string &fileName) const
+void Tool::writeConf(const std::string &fileName)
 {
   assert(mParser.getAction().name == "write");
   if (mParser.verbose>1) std::cerr << "Writing configuration to \"" << fileName << "\"\n";

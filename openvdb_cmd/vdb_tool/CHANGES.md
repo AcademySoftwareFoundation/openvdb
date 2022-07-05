@@ -93,7 +93,7 @@
 - [X] -for i=1,9  (third argument defaults to 1, i.e. i=1,9,1)
 - [X] -if 0|1|false|true  ... -end (if statement)
 - [X] -eval help="*" or -eval help=if,switch
-- [X] {data}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
+- [X] {date}, {uuid}, {1:a:set}, {a:get}, {a:is_set}, {sphere:sp:match}
 - [X] composite: -min, -max, -sum
 - [X] -transform vdb=0,3 geo=5 (scale -> rotate -> translate of VDB grids and geometry)
 - [X] -print mem=1 prints variables saved to memory, e.g. loop variables
@@ -101,6 +101,7 @@
 - [X] read NanoVDB voxel volumes (thanks to Greg Klar)
 - [X] -ls2mesh iso=0.1 mask=1 invert=true
 - [X] -write binary abc mesh files (thanks to Alexandre Sirois-Vigneux)
+- [x] -write keep=false (by default grids and geometries written are also removed)
 - [ ] -merge
 - [ ] -points2mask
 - [ ] -erodeTopology
