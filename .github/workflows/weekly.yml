@@ -512,6 +512,8 @@ jobs:
       github.event.inputs.type == 'abi'
     # abi-dumper version verified to work with 20.04/GCC9
     runs-on: ubuntu-20.04
+    env:
+      VDB_MAJOR_VERSION: 9
     steps:
     - uses: actions/checkout@v3
       with:
@@ -544,9 +546,9 @@ jobs:
         --target=openvdb_shared
         --components=\"core\"
         --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
-    - name: checkout_v9
-      run: git checkout v9.0.0
-    - name: build_9
+    - name: checkout_baseline
+      run: git checkout v${VDB_MAJOR_VERSION}.0.0
+    - name: build_baseline
       run: >
         CXXFLAGS=-Og ./ci/build.sh -v
         --build-type=Debug
@@ -557,6 +559,12 @@ jobs:
       run: |
         abi-dumper/abi-dumper.pl build_latest/openvdb/openvdb/libopenvdb.so -o ABI-1.dump -lver 1
         abi-dumper/abi-dumper.pl        build/openvdb/openvdb/libopenvdb.so -o ABI-2.dump -lver 2
+      # Replace the version namespace in the latest ABI dump with the baseline
+      # version we're comparing against. We should probably instead build the
+      # latest with the baseline version number but no CMake/defines allow us to
+      # do this.
+    - name: replace_symbols
+      run: sed -i -E 's/openvdb([^v]*)v'${VDB_MAJOR_VERSION}'_[0-9]/openvdb\1v'${VDB_MAJOR_VERSION}'_0/g' ABI-1.dump
     - name: abi_check
       # -strict treats warnings as errors
       # -extended checks all member data
