@@ -89,17 +89,16 @@ namespace vdb_tool {
 class Tool
 {
     static const int sMajor =10;// incremented for incompatible changes options or file.
-    static const int sMinor = 5;// incremented for new functionality that is backwards-compatible.
-    static const int sPatch = 0;// incremented for backwards-compatible bug fixes.
+    static const int sMinor = 6;// incremented for new functionality that is backwards-compatible.
+    static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
 
     using GridT = FloatGrid;
-    using FilterT = tools::LevelSetFilter<GridT>;
+    using FilterT = std::unique_ptr<tools::LevelSetFilter<GridT>>;
     struct Points;// defined below
     struct Header;// defined below
  
     mutable util::CpuTimer   mTimer;
     std::string              mCmdName;// name of this command-line tool
-    std::unique_ptr<FilterT> mFilter;
     std::list<Geometry::Ptr> mGeom;// list of geometries owned by this tool
     std::list<GridBase::Ptr> mGrid;// list of based grids owned by this tool
     Parser                   mParser;
@@ -206,7 +205,7 @@ class Tool
     /// @brief return the voxel-size of  a LS estimated from a desired grid dimension of a specific geometry
     float estimateVoxelSize(int maxDimension,  float halfWidth, int geo_age);
 
-    void updateFilter(GridT &grid,  int space, int time);
+    FilterT createFilter(GridT &grid,  int space, int time);
 
     /// @brief print examples to the terminal and terminate
     std::string examples() const;
@@ -703,7 +702,7 @@ void Tool::init()
      {"translate", "(0,0,0)", "(0,0,0)", "translation of the camera in world-space units, applied after rotation"},
      {"rotate", "(0,0,0)", "(0,0,0)", "rotation in degrees of the camera in world space (applied in x, y, z order)"},
      {"target", "(0,0,0)", "", "target point in world pace that the camera will point at (if undefined target is set to the center of the bbox of the grid)"},
-     {"up", "(0,1,0)", "(0,1,0", "vector that should point up after rotation with lookat"},
+     {"up", "(0,1,0)", "(0,1,0)", "vector that should point up after rotation with lookat"},
      {"lookat", "true", "true", "rotate the camera so it looks at the center of the shape uses up as the horizontal direction"},
      {"near", "0.001", "0.001", "depth of the near clipping plane in world-space units"},
      {"far",  "3.4e+38", "3.4e+38", "depth of the far clipping plane in world-space units"},
@@ -945,7 +944,6 @@ void Tool::clear()
   if (mParser.get<bool>("variables")) {
     mParser.processor.memory().clear();
   }
-  mFilter.reset();
 }// Tool::clear
 
 // ==============================================================================================================
@@ -1662,47 +1660,46 @@ void Tool::particlesToLevelSet()
 
 // ==============================================================================================================
 
-void Tool::updateFilter(GridT &grid, int space, int time)
+typename Tool::FilterT Tool::createFilter(GridT &grid, int space, int time)
 {
-  if (!mFilter || &(mFilter->grid()) != &grid ) {
-    mFilter.reset(new tools::LevelSetFilter<GridT>(grid) );
-  }
+  auto filter = std::make_unique<tools::LevelSetFilter<GridT>>(grid);
 
   switch (space) {
   case 1:
-    mFilter->setSpatialScheme(math::FIRST_BIAS);
+    filter->setSpatialScheme(math::FIRST_BIAS);
     break;
   case 2:
-    mFilter->setSpatialScheme(math::SECOND_BIAS);
+    filter->setSpatialScheme(math::SECOND_BIAS);
     break;
   case 3:
-    mFilter->setSpatialScheme(math::THIRD_BIAS);
+    filter->setSpatialScheme(math::THIRD_BIAS);
     break;
   case 5:
 #if 0
-    mFilter->setSpatialScheme(math::WENO5_BIAS);
+    filter->setSpatialScheme(math::WENO5_BIAS);
 #else
-    mFilter->setSpatialScheme(math::HJWENO5_BIAS);
+    filter->setSpatialScheme(math::HJWENO5_BIAS);
 #endif
     break;
   default:
-    throw std::invalid_argument("updateFilter: invalid space discretization scheme \""+std::to_string(space)+"\"");
+    throw std::invalid_argument("createFilter: invalid space discretization scheme \""+std::to_string(space)+"\"");
   }
 
   switch (time) {
   case 1:
-    mFilter->setTemporalScheme(math::TVD_RK1);
+    filter->setTemporalScheme(math::TVD_RK1);
     break;
   case 2:
-    mFilter->setTemporalScheme(math::TVD_RK2);
+    filter->setTemporalScheme(math::TVD_RK2);
     break;
   case 3:
-    mFilter->setTemporalScheme(math::TVD_RK3);
+    filter->setTemporalScheme(math::TVD_RK3);
     break;
   default:
-    throw std::invalid_argument("tracker: invalid time discretization scheme \""+std::to_string(time)+"\"");
+    throw std::invalid_argument("createFilter: invalid time discretization scheme \""+std::to_string(time)+"\"");
   }
-}// Tool::updateFilter
+  return filter;
+}// Tool::createFilter
 
 // ==============================================================================================================
 
@@ -1721,22 +1718,22 @@ void Tool::offsetLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("offsetLevelSet: no level set with age "+std::to_string(age));
-    this->updateFilter(*grid, space, time);
+    auto filter = this->createFilter(*grid, space, time);
     radius *= (*it)->voxelSize()[0];// voxel to world units
     if (name == "dilate") {
       if (mParser.verbose) mTimer.start("Dilate  SDF");
-      mFilter->offset(-radius);
+      filter->offset(-radius);
     } else if (name == "erode") {
       if (mParser.verbose) mTimer.start("Erode   SDF");
-      mFilter->offset( radius);
+      filter->offset( radius);
     } else if (name == "open") {
       if (mParser.verbose) mTimer.start("Open   SDF");
-      mFilter->offset( radius);
-      mFilter->offset(-radius);
+      filter->offset( radius);
+      filter->offset(-radius);
     } else if (name == "close") {
       if (mParser.verbose) mTimer.start("Close   SDF");
-      mFilter->offset(-radius);
-      mFilter->offset( radius);
+      filter->offset(-radius);
+      filter->offset( radius);
     } else {
       throw std::invalid_argument("offsetLevelSet: invalid operation type");
     }
@@ -1765,17 +1762,17 @@ void Tool::filterLevelSet()
     auto it = this->getGrid(age);
     GridT::Ptr grid = gridPtrCast<GridT>(*it);
     if (!grid || grid->getGridClass() != GRID_LEVEL_SET) throw std::invalid_argument("filterLevelSet: no level set with age "+std::to_string(age));
-    this->updateFilter(*grid, space, time);
+    auto filter = this->createFilter(*grid, space, time);
 
     if (name == "gauss") {
       if (mParser.verbose) mTimer.start("Gauss   SDF");
-      for (int i=0; i<nIter; ++i) mFilter->gaussian(size);
+      for (int i=0; i<nIter; ++i) filter->gaussian(size);
     } else if (name == "mean") {
       if (mParser.verbose) mTimer.start("Mean SDF ");
-      for (int i=0; i<nIter; ++i) mFilter->mean(size);
+      for (int i=0; i<nIter; ++i) filter->mean(size);
     } else if (name == "median") {
       if (mParser.verbose) mTimer.start("Median SDF");
-      for (int i=0; i<nIter; ++i) mFilter->median(size);
+      for (int i=0; i<nIter; ++i) filter->median(size);
     } else {
       throw std::invalid_argument("filterLevelSet: invalid filter type");
     }
