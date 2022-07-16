@@ -3,6 +3,10 @@ OpenVDB Version History
 
 Version 9.1.1 - In development
 
+    Bug Fixes:
+    - Fixed an issue with tools::topologyToLevelSet which would previously
+    ignore active tiles in the input topology. [Reported by Tobias Rittig]
+
 Version 9.1.0 - June 9, 2022
 
     Bug Fixes:
