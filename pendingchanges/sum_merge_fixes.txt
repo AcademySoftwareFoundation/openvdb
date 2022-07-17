@@ -1,0 +1,2 @@
+Bug Fixes:
+    Fix bugs in the sum merge that produced incorrect merged grids when deep-copying the input nodes or when non-zero background grids were being used.
