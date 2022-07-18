@@ -1,5 +1,0 @@
-Improvements:
- - Added a --thread [n] argument to the vdb_ax binary.
- - Added a --copy-file-metadata option to vdb_ax. This behaviour is now off by default.
- - Added support for multiple input files with the vdb_ax binary using -i. Positional arguments as input files are deprecated.
-

@@ -396,6 +396,17 @@ struct TypeCodeOp
     template<typename T> void operator()(const T&) { codes.push_back(typeCode<T>()); }
 };
 
+struct ListModifier
+{
+    template <typename T>
+    using Promote = typename PromoteType<T>::Next;
+
+    template <typename T>
+    using RemoveInt32 = typename std::conditional<std::is_same<int32_t, T>::value, TypeList<>, T>::type;
+
+    template <typename T>
+    using Duplicate = TypeList<T, T>;
+};
 
 template<typename TSet>
 inline std::string
@@ -406,6 +417,19 @@ typeSetAsString()
     return op.codes;
 }
 
+template <typename T1, typename T2>
+using ConvertIntegrals = typename std::conditional<std::is_integral<T1>::value, T2, T1>::type;
+
+template <typename T1>
+using ConvertIntegralsToFloats = ConvertIntegrals<T1, float>;
+
+template <typename T>
+struct Tester
+{
+    template <typename T1>
+    using ConvertIntegralsToFloats = ConvertIntegrals<T1, T>;
+};
+
 } // anonymous namespace
 
 /// @note  static_assert with no message requires C++17
@@ -413,6 +437,126 @@ typeSetAsString()
 
 TEST_F(TestTypes, testTypeList)
 {
+    /// Compile time tests of TypeList
+
+    using IntTypes = TypeList<Int16, Int32, Int64>;
+    using EmptyList = TypeList<>;
+
+    // Size
+    STATIC_ASSERT((IntTypes::Size == 3));
+    STATIC_ASSERT((EmptyList::Size == 0));
+
+    // Contains
+    STATIC_ASSERT((IntTypes::Contains<Int16>));
+    STATIC_ASSERT((IntTypes::Contains<Int32>));
+    STATIC_ASSERT((IntTypes::Contains<Int64>));
+    STATIC_ASSERT((!IntTypes::Contains<float>));
+
+    // Index
+    STATIC_ASSERT((IntTypes::Index<Int16> == 0));
+    STATIC_ASSERT((IntTypes::Index<Int32> == 1));
+    STATIC_ASSERT((IntTypes::Index<Int64> == 2));
+    STATIC_ASSERT((IntTypes::Index<float> == -1));
+
+    // Get
+    STATIC_ASSERT((std::is_same<IntTypes::Get<0>, Int16>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<1>, Int32>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<2>, Int64>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Get<3>,  typelist_internal::NullType>::value));
+    STATIC_ASSERT((!std::is_same<IntTypes::Get<3>, void>::value));
+
+    // Unique
+    STATIC_ASSERT((std::is_same<IntTypes::Unique<>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Unique<IntTypes>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Unique<>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int, int, int>::Unique<>, TypeList<int>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float, int, float>::Unique<>, TypeList<float, int>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<bool, int, float, int, float>::Unique<>, TypeList<bool, int, float>>::value));
+
+    // Front/Back
+    STATIC_ASSERT((std::is_same<IntTypes::Front, Int16>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::Back, Int64>::value));
+
+    // PopFront/PopBack
+    STATIC_ASSERT((std::is_same<IntTypes::PopFront, TypeList<Int32, Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::PopBack, TypeList<Int16, Int32>>::value));
+
+    // RemoveByIndex
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,0>, IntTypes::PopFront>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,2>, IntTypes::PopBack>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,2>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,10>, EmptyList>::value));
+
+    // invalid indices do nothing
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value));
+    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value));
+
+    //
+
+    // Test methods on an empty list
+    STATIC_ASSERT((!EmptyList::Contains<Int16>));
+    STATIC_ASSERT((EmptyList::Index<Int16> == -1));
+    STATIC_ASSERT((std::is_same<EmptyList::Get<0>, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Front, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::Back, typelist_internal::NullType>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::PopFront, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::PopBack, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value));
+
+    //
+
+    // Test some methods on lists with duplicate types
+    using DuplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
+    using DuplicateRealTypes = TypeList<float, float, float, float>;
+
+    STATIC_ASSERT((DuplicateIntTypes::Size == 4));
+    STATIC_ASSERT((DuplicateRealTypes::Size == 4));
+    STATIC_ASSERT((DuplicateIntTypes::Index<Int16> == 1));
+    STATIC_ASSERT((std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value));
+    STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value));
+    STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<DuplicateIntTypes>,
+        TypeList<float, Int32, Int16, Int64>>::value));
+
+    //
+
+    // Tests on VDB grid node chains - reverse node chains from leaf->root
+    using Tree4Float = openvdb::tree::Tree4<float, 5, 4, 3>::Type; // usually the same as FloatTree
+    using NodeChainT = Tree4Float::RootNodeType::NodeChainType;
+
+    // Expected types
+    using LeafT = openvdb::tree::LeafNode<float, 3>;
+    using IternalT1 = openvdb::tree::InternalNode<LeafT, 4>;
+    using IternalT2 = openvdb::tree::InternalNode<IternalT1, 5>;
+    using RootT = openvdb::tree::RootNode<IternalT2>;
+
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<0>, LeafT>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<1>, IternalT1>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<2>, IternalT2>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<3>, RootT>::value));
+    STATIC_ASSERT((std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value));
+
+    // Transform
+    STATIC_ASSERT((std::is_same<EmptyList::Transform<ListModifier::Promote>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int32_t>::Transform<ListModifier::Promote>, TypeList<int64_t>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float>::Transform<ListModifier::Promote>, TypeList<double>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<bool, uint32_t>::Transform<ListModifier::Promote>, TypeList<uint16_t, uint64_t>>::value));
+
+    STATIC_ASSERT((std::is_same<TypeList<float, uint32_t>::Transform<ConvertIntegralsToFloats>,
+        TypeList<float, float>>::value));
+    STATIC_ASSERT((std::is_same<TypeList<float, uint32_t>::Transform<Tester<float>::ConvertIntegralsToFloats>,
+        TypeList<float, float>>::value));
+
+    // @note  Transforming types to TypeList<>s causes the target type to expand.
+    //   This has some weird effects like being able to remove/extend types with
+    //   TypeList::Transform.
+    STATIC_ASSERT((std::is_same<TypeList<int32_t, int32_t>::Transform<ListModifier::RemoveInt32>, EmptyList>::value));
+    STATIC_ASSERT((std::is_same<TypeList<int32_t, float>::Transform<ListModifier::Duplicate>,
+        TypeList<int32_t, int32_t, float, float>>::value));
+
+    // Foreach
     using T0 = TypeList<>;
     EXPECT_EQ(std::string(), typeSetAsString<T0>());
 
@@ -456,99 +600,55 @@ TEST_F(TestTypes, testTypeList)
     using T13 = T8::Remove<TypeList<char, int>>;
     EXPECT_EQ(std::string("bdfl"), typeSetAsString<T13>());
 
-    /// Compile time tests of TypeList
+    // Apply
+    FloatGrid g1;
+    GridBase& base = g1;
+    bool applied = false;
+    EXPECT_TRUE((!TypeList<>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<Int32Grid>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<DoubleGrid>::apply([&](const auto&) {}, base)));
+    EXPECT_TRUE((!TypeList<DoubleGrid>::apply([&](auto&) {}, base)));
+    EXPECT_TRUE((TypeList<FloatGrid>::apply([&](const auto& typed) {
+        EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+        applied = true; }, base)));
+    EXPECT_TRUE((applied));
 
-    using IntTypes = TypeList<Int16, Int32, Int64>;
-    using EmptyList = TypeList<>;
+    // check arg is passed non-const
+    applied = false;
+    EXPECT_TRUE((TypeList<FloatGrid>::apply([&](auto& typed) {
+        EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+        applied = true; }, base)));
+    EXPECT_TRUE(applied);
 
-    // Size
-    STATIC_ASSERT((IntTypes::Size == 3));
-    STATIC_ASSERT((EmptyList::Size == 0));
+    applied = false;
+    EXPECT_TRUE((TypeList<Int32Grid, FloatGrid, DoubleGrid>::apply([&](const auto& typed) {
+            EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+            applied = true;
+        }, base)));
+    EXPECT_TRUE(applied);
 
-    // Contains
-    STATIC_ASSERT((IntTypes::Contains<Int16>));
-    STATIC_ASSERT((IntTypes::Contains<Int32>));
-    STATIC_ASSERT((IntTypes::Contains<Int64>));
-    STATIC_ASSERT((!IntTypes::Contains<float>));
+    // check const args
+    applied = false;
+    const GridBase& cbase = base;
+    EXPECT_TRUE((TypeList<Int32Grid, FloatGrid, DoubleGrid>::apply([&](const auto& typed) {
+            EXPECT_EQ(reinterpret_cast<const void*>(&g1), reinterpret_cast<const void*>(&typed));
+            applied = true;
+        }, cbase)));
+    EXPECT_TRUE(applied);
 
-    // Index
-    STATIC_ASSERT((IntTypes::Index<Int16> == 0));
-    STATIC_ASSERT((IntTypes::Index<Int32> == 1));
-    STATIC_ASSERT((IntTypes::Index<Int64> == 2));
-    STATIC_ASSERT((IntTypes::Index<float> == -1));
+    // check same functor is used and how many types are processed
+    struct Counter {
+        Counter() = default;
+        // delete copy constructor to check functor isn't being copied
+        Counter(const Counter&) = delete;
+        inline void operator()(const FloatGrid&) { ++mCounter; }
+        int32_t mCounter = 0;
+    } count;
 
-    // Get
-    STATIC_ASSERT((std::is_same<IntTypes::Get<0>, Int16>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::Get<1>, Int32>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::Get<2>, Int64>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::Get<3>,  typelist_internal::NullType>::value));
-    STATIC_ASSERT((!std::is_same<IntTypes::Get<3>, void>::value));
-
-    // Unique
-    STATIC_ASSERT((std::is_same<IntTypes::Unique<>, IntTypes>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::Unique<>, EmptyList>::value));
-
-    // Front/Back
-    STATIC_ASSERT((std::is_same<IntTypes::Front, Int16>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::Back, Int64>::value));
-
-    // PopFront/PopBack
-    STATIC_ASSERT((std::is_same<IntTypes::PopFront, TypeList<Int32, Int64>>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::PopBack, TypeList<Int16, Int32>>::value));
-
-    // RemoveByIndex
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,0>, IntTypes::PopFront>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,2>, IntTypes::PopBack>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,2>, EmptyList>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,2>, TypeList<Int16>>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<1,1>, TypeList<Int16, Int64>>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,1>, TypeList<Int64>>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<0,10>, EmptyList>::value));
-
-    // invalid indices do nothing
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<2,1>, IntTypes>::value));
-    STATIC_ASSERT((std::is_same<IntTypes::RemoveByIndex<3,3>, IntTypes>::value));
-
-    //
-
-    // Test methods on an empty list
-    STATIC_ASSERT((!EmptyList::Contains<Int16>));
-    STATIC_ASSERT((EmptyList::Index<Int16> == -1));
-    STATIC_ASSERT((std::is_same<EmptyList::Get<0>, typelist_internal::NullType>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::Front, typelist_internal::NullType>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::Back, typelist_internal::NullType>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::PopFront, EmptyList>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::PopBack, EmptyList>::value));
-    STATIC_ASSERT((std::is_same<EmptyList::RemoveByIndex<0,0>, EmptyList>::value));
-
-    //
-
-    // Test some methods on lists with duplicate types
-    using DuplicateIntTypes = TypeList<Int32, Int16, Int64, Int16>;
-    using DuplicateRealTypes = TypeList<float, float, float, float>;
-    STATIC_ASSERT((DuplicateIntTypes::Size == 4));
-    STATIC_ASSERT((DuplicateRealTypes::Size == 4));
-    STATIC_ASSERT((DuplicateIntTypes::Index<Int16> == 1));
-    STATIC_ASSERT((std::is_same<DuplicateIntTypes::Unique<>, TypeList<Int32, Int16, Int64>>::value));
-    STATIC_ASSERT((std::is_same<DuplicateRealTypes::Unique<>, TypeList<float>>::value));
-
-    //
-
-    // Tests on VDB grid node chains - reverse node chains from leaf->root
-    using Tree4Float = openvdb::tree::Tree4<float, 5, 4, 3>::Type; // usually the same as FloatTree
-    using NodeChainT = Tree4Float::RootNodeType::NodeChainType;
-
-    // Expected types
-    using LeafT = openvdb::tree::LeafNode<float, 3>;
-    using IternalT1 = openvdb::tree::InternalNode<LeafT, 4>;
-    using IternalT2 = openvdb::tree::InternalNode<IternalT1, 5>;
-    using RootT = openvdb::tree::RootNode<IternalT2>;
-
-    STATIC_ASSERT((std::is_same<NodeChainT::Get<0>, LeafT>::value));
-    STATIC_ASSERT((std::is_same<NodeChainT::Get<1>, IternalT1>::value));
-    STATIC_ASSERT((std::is_same<NodeChainT::Get<2>, IternalT2>::value));
-    STATIC_ASSERT((std::is_same<NodeChainT::Get<3>, RootT>::value));
-    STATIC_ASSERT((std::is_same<NodeChainT::Get<4>, typelist_internal::NullType>::value));
+    EXPECT_TRUE((TypeList<FloatGrid>::apply(std::ref(count), cbase)));
+    EXPECT_EQ(count.mCounter, 1);
+    EXPECT_TRUE((TypeList<FloatGrid, FloatGrid>::apply(std::ref(count), cbase)));
+    EXPECT_EQ(count.mCounter, 2);
 }
 
 TEST_F(TestTypes, testConvertElementType)
@@ -772,4 +872,80 @@ TEST_F(TestTypes, testPromoteType)
 
     CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat3)
     CHECK_PROMOTED_DOUBLE_MATH_TYPE(Mat4)
+}
+
+template <typename T> struct IsRegistered { inline void operator()() { EXPECT_TRUE(T::isRegistered()); } };
+template <typename T> struct IsRegisteredType { inline void operator()() { EXPECT_TRUE(T::isRegisteredType()); } };
+template <typename GridT> struct GridListContains { inline void operator()() { STATIC_ASSERT((GridTypes::Contains<GridT>)); } };
+template <typename GridT> struct AttrListContains { inline void operator()() { STATIC_ASSERT((AttributeTypes::Contains<GridT>)); } };
+
+TEST_F(TestTypes, testOpenVDBTypeLists)
+{
+    openvdb::initialize();
+
+#define CHECK_TYPE_LIST_IS_VALID(LIST_T) \
+    STATIC_ASSERT((LIST_T::Size > 0));   \
+    STATIC_ASSERT((std::is_same<LIST_T::Unique<>, LIST_T>::value));
+
+    CHECK_TYPE_LIST_IS_VALID(GridTypes)
+    CHECK_TYPE_LIST_IS_VALID(RealGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericGridTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3GridTypes)
+
+    CHECK_TYPE_LIST_IS_VALID(TreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(RealTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericTreeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3TreeTypes)
+
+    STATIC_ASSERT((GridTypes::Size == TreeTypes::Size));
+    STATIC_ASSERT((RealGridTypes::Size == RealTreeTypes::Size));
+    STATIC_ASSERT((IntegerGridTypes::Size == IntegerTreeTypes::Size));
+    STATIC_ASSERT((NumericGridTypes::Size == NumericTreeTypes::Size));
+    STATIC_ASSERT((Vec3GridTypes::Size == Vec3TreeTypes::Size));
+
+    GridTypes::foreach<IsRegistered>();
+
+    RealGridTypes::foreach<GridListContains>();
+    IntegerGridTypes::foreach<GridListContains>();
+    NumericGridTypes::foreach<GridListContains>();
+    Vec3GridTypes::foreach<GridListContains>();
+
+    CHECK_TYPE_LIST_IS_VALID(AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(IntegerAttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(NumericAttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Vec3AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Mat3AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(Mat4AttributeTypes)
+    CHECK_TYPE_LIST_IS_VALID(QuatAttributeTypes)
+
+    AttributeTypes::foreach<IsRegistered>();
+
+    RealAttributeTypes::foreach<AttrListContains>();
+    IntegerAttributeTypes::foreach<AttrListContains>();
+    NumericAttributeTypes::foreach<AttrListContains>();
+    Vec3AttributeTypes::foreach<AttrListContains>();
+    Mat3AttributeTypes::foreach<AttrListContains>();
+    Mat4AttributeTypes::foreach<AttrListContains>();
+    QuatAttributeTypes::foreach<AttrListContains>();
+
+    CHECK_TYPE_LIST_IS_VALID(MapTypes)
+
+    MapTypes::foreach<IsRegistered>();
+
+    CHECK_TYPE_LIST_IS_VALID(MetaTypes)
+
+    MetaTypes::foreach<IsRegisteredType>();
+
+    // Test apply methods
+    const FloatGrid grid;
+    const GridBase& gridBase = grid;
+    EXPECT_TRUE(GridTypes::apply([](const auto&) {}, gridBase));
+
+    const FloatTree tree;
+    const TreeBase& treeBase = tree;
+    EXPECT_TRUE(TreeTypes::apply([](const auto&) {}, treeBase));
+
+    openvdb::uninitialize();
 }

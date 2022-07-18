@@ -419,7 +419,7 @@ struct HalfWriter</*IsReal=*/true, T> {
         writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };
-#ifdef _MSC_VER
+#ifdef _WIN32
 /// Specialization to avoid double to float warnings in MSVC
 template<>
 struct HalfWriter</*IsReal=*/true, double> {
@@ -442,7 +442,7 @@ struct HalfWriter</*IsReal=*/true, double> {
         writeData<HalfT>(os, reinterpret_cast<const HalfT*>(&halfData[0]), count, compression);
     }
 };
-#endif // _MSC_VER
+#endif // _WIN32
 
 
 ////////////////////////////////////////

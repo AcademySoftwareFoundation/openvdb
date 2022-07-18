@@ -1,0 +1,3 @@
+Bug Fixes:
+    - Fixed an issue with tools::topologyToLevelSet which would previously
+    ignore active tiles in the input topology. [Reported by Tobias Rittig]

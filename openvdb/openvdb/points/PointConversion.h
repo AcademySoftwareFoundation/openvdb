@@ -237,14 +237,14 @@ template <typename T> struct ConversionTraits
     using WriteHandle = AttributeWriteHandle<T, UnknownCodec>;
     static T zero() { return zeroVal<T>(); }
     template <typename LeafT>
-    static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
+    static std::unique_ptr<Handle> handleFromLeaf(const LeafT& leaf, const Index index) {
         const AttributeArray& array = leaf.constAttributeArray(index);
-        return Handle::create(array);
+        return std::make_unique<Handle>(array);
     }
     template <typename LeafT>
-    static typename WriteHandle::Ptr writeHandleFromLeaf(LeafT& leaf, Index index) {
+    static std::unique_ptr<WriteHandle> writeHandleFromLeaf(LeafT& leaf, const Index index) {
         AttributeArray& array = leaf.attributeArray(index);
-        return WriteHandle::create(array);
+        return std::make_unique<WriteHandle>(array);
     }
 }; // ConversionTraits
 template <> struct ConversionTraits<openvdb::Name>
@@ -253,16 +253,16 @@ template <> struct ConversionTraits<openvdb::Name>
     using WriteHandle = StringAttributeWriteHandle;
     static openvdb::Name zero() { return ""; }
     template <typename LeafT>
-    static typename Handle::Ptr handleFromLeaf(LeafT& leaf, Index index) {
+    static std::unique_ptr<Handle> handleFromLeaf(const LeafT& leaf, const Index index) {
         const AttributeArray& array = leaf.constAttributeArray(index);
         const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
-        return Handle::create(array, descriptor.getMetadata());
+        return std::make_unique<Handle>(array, descriptor.getMetadata());
     }
     template <typename LeafT>
-    static typename WriteHandle::Ptr writeHandleFromLeaf(LeafT& leaf, Index index) {
+    static std::unique_ptr<WriteHandle> writeHandleFromLeaf(LeafT& leaf, const Index index) {
         AttributeArray& array = leaf.attributeArray(index);
         const AttributeSet::Descriptor& descriptor = leaf.attributeSet().descriptor();
-        return WriteHandle::create(array, descriptor.getMetadata());
+        return std::make_unique<WriteHandle>(array, descriptor.getMetadata());
     }
 }; // ConversionTraits<openvdb::Name>
 
@@ -298,7 +298,7 @@ struct PopulateAttributeOp {
 
             if (!pointIndexLeaf)    continue;
 
-            typename HandleT::Ptr attributeWriteHandle =
+            auto attributeWriteHandle =
                 ConversionTraits<ValueType>::writeHandleFromLeaf(*leaf, static_cast<Index>(mIndex));
 
             Index64 index = 0;
@@ -474,7 +474,7 @@ struct ConvertPointDataGridAttributeOp {
 
             if (leaf.pos() > 0) offset += mPointOffsets[leaf.pos() - 1];
 
-            typename SourceHandleT::Ptr handle = ConversionTraits<ValueType>::handleFromLeaf(
+            auto handle = ConversionTraits<ValueType>::handleFromLeaf(
                 *leaf, static_cast<Index>(mIndex));
 
             if (mFilter.state() == index::ALL) {

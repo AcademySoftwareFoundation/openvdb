@@ -128,7 +128,8 @@
 
 /// @brief Bracket code with OPENVDB_NO_DEPRECATION_WARNING_BEGIN/_END,
 /// to inhibit warnings about deprecated code.
-/// @note Use this sparingly.  Remove references to deprecated code if at all possible.
+/// @note Only intended to be used internally whilst parent code is being
+///   deprecated
 /// @details Example:
 /// @code
 /// OPENVDB_DEPRECATED void myDeprecatedFunction() {}
@@ -142,9 +143,7 @@
 #if defined __INTEL_COMPILER
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         _Pragma("warning (push)") \
-        _Pragma("warning (disable:1478)") \
-        PRAGMA(message("NOTE: ignoring deprecation warning at " __FILE__  \
-            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+        _Pragma("warning (disable:1478)")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("warning (pop)")
 #elif defined __clang__
@@ -157,16 +156,13 @@
 #elif defined __GNUC__
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         _Pragma("GCC diagnostic push") \
-        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"") \
-        _Pragma("message(\"NOTE: ignoring deprecation warning\")")
+        _Pragma("GCC diagnostic ignored \"-Wdeprecated-declarations\"")
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         _Pragma("GCC diagnostic pop")
 #elif defined _MSC_VER
     #define OPENVDB_NO_DEPRECATION_WARNING_BEGIN \
         __pragma(warning(push)) \
-        __pragma(warning(disable : 4996)) \
-        __pragma(message("NOTE: ignoring deprecation warning at " __FILE__ \
-            ":" OPENVDB_PREPROC_STRINGIFY(__LINE__)))
+        __pragma(warning(disable : 4996))
     #define OPENVDB_NO_DEPRECATION_WARNING_END \
         __pragma(warning(pop))
 #else
@@ -214,10 +210,6 @@
 #ifdef OPENVDB_IMPORT
 #undef OPENVDB_IMPORT
 #endif
-#ifdef __GNUC__
-    #define OPENVDB_EXPORT __attribute__((visibility("default")))
-    #define OPENVDB_IMPORT __attribute__((visibility("default")))
-#endif
 #ifdef _WIN32
     #ifdef OPENVDB_DLL
         #define OPENVDB_EXPORT __declspec(dllexport)
@@ -226,6 +218,9 @@
         #define OPENVDB_EXPORT
         #define OPENVDB_IMPORT
     #endif
+#elif defined(__GNUC__)
+    #define OPENVDB_EXPORT __attribute__((visibility("default")))
+    #define OPENVDB_IMPORT __attribute__((visibility("default")))
 #endif
 
 /// Helper macros for explicit template instantiation

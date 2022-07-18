@@ -149,7 +149,7 @@ Normalize (vector -> vector):\n\
             "A VDB from the second input used to define the iteration space"
             " (see [specifying volumes|/model/volumes#group])\n\n"
             "The selected __Operator__ will be applied only where the mask VDB has"
-            " [active|https://academysoftwarefoundation.github.io/openvdb/overview.html#subsecInactive]"
+            " [active|https://www.openvdb.org/documentation/doxygen/overview.html#subsecInactive]"
             " voxels or, if the mask VDB is a level set, only in the interior of the level set."));
 
     // Output name

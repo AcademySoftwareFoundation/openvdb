@@ -92,7 +92,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}\"
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
@@ -125,8 +125,9 @@ jobs:
           # Boost as both shared and static libs are installed.
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
+          # @note  Commented out the static debug build due to linker OOM LNK1102
           - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+          #- { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
           - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
@@ -146,8 +147,19 @@ jobs:
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,bin,test\"
-        --cargs=\'${{ matrix.config.cmake }} -DUSE_EXR=ON -DUSE_PNG=ON -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET} -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"\'
+        --components=\"core,bin,view,render,test\"
+        --cargs=\'
+        ${{ matrix.config.cmake }}
+        -DMSVC_COMPRESS_PDB=ON
+        -DUSE_EXR=ON
+        -DUSE_PNG=ON
+        -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
+        -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        \'
+    - name: size
+      shell: bash
+      # Print the build directy size (monitor if we're hitting runner limits)
+      run: du -h build
     - name: test
       shell: bash
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
@@ -182,7 +194,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
+        --components=\"core,python,bin,view,render,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash

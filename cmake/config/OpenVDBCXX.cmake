@@ -1,5 +1,79 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
+
+  CXX and CMAKE_CXX options and definitions for OpenVDB build types
+
+#]=======================================================================]
 
 cmake_minimum_required(VERSION 3.15)
+
+###############################################################################
+
+# General CMake and CXX settings
+
+if(FUTURE_MINIMUM_CMAKE_VERSION)
+  if(${CMAKE_VERSION} VERSION_LESS ${FUTURE_MINIMUM_CMAKE_VERSION})
+    message(DEPRECATION "Support for CMake versions < ${FUTURE_MINIMUM_CMAKE_VERSION} "
+      "is deprecated and will be removed.")
+  endif()
+endif()
+
+if(NOT CMAKE_CXX_STANDARD)
+  set(CMAKE_CXX_STANDARD ${MINIMUM_CXX_STANDARD} CACHE STRING
+    "The C++ standard whose features are requested to build OpenVDB components." FORCE)
+elseif(CMAKE_CXX_STANDARD LESS ${MINIMUM_CXX_STANDARD})
+  message(FATAL_ERROR "Provided C++ Standard is less than the supported minimum."
+    "Required is at least \"${MINIMUM_CXX_STANDARD}\" (found ${CMAKE_CXX_STANDARD})")
+endif()
+if(OPENVDB_FUTURE_DEPRECATION AND FUTURE_MINIMUM_CXX_STANDARD)
+  if(CMAKE_CXX_STANDARD LESS ${FUTURE_MINIMUM_CXX_STANDARD})
+    message(DEPRECATION "C++ < 17 is deprecated and will be removed.")
+  endif()
+endif()
+
+# Configure MS Runtime
+
+if(WIN32 AND CMAKE_MSVC_RUNTIME_LIBRARY)
+  message(STATUS "CMAKE_MSVC_RUNTIME_LIBRARY set to target ${CMAKE_MSVC_RUNTIME_LIBRARY}")
+
+  # Configure Boost library varient on Windows
+  if(NOT Boost_USE_STATIC_RUNTIME)
+    set(Boost_USE_STATIC_RUNTIME OFF)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreaded OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
+      set(Boost_USE_STATIC_RUNTIME ON)
+    endif()
+  endif()
+  if(NOT Boost_USE_DEBUG_RUNTIME)
+    set(Boost_USE_DEBUG_RUNTIME OFF)
+    if(CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebugDLL OR
+       CMAKE_MSVC_RUNTIME_LIBRARY STREQUAL MultiThreadedDebug)
+      set(Boost_USE_DEBUG_RUNTIME ON)
+    endif()
+  endif()
+endif()
+
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_CXX_EXTENSIONS OFF)
+
+set(CMAKE_DISABLE_SOURCE_CHANGES ON)
+set(CMAKE_DISABLE_IN_SOURCE_BUILD ON)
+
+if(OPENVDB_ENABLE_RPATH)
+  # Configure rpath for installation base on the following:
+  # https://gitlab.kitware.com/cmake/community/wikis/doc/cmake/RPATH-handling
+  set(CMAKE_SKIP_BUILD_RPATH FALSE)
+  set(CMAKE_BUILD_WITH_INSTALL_RPATH FALSE)
+  set(CMAKE_INSTALL_RPATH_USE_LINK_PATH TRUE)
+  # @todo make relocatable?
+  set(CMAKE_INSTALL_RPATH "${CMAKE_INSTALL_PREFIX}/${CMAKE_INSTALL_LIBDIR}")
+endif()
+
+# For CMake's find Threads module which brings in pthread - This flag
+# forces the compiler -pthread flag vs -lpthread
+set(THREADS_PREFER_PTHREAD_FLAG TRUE)
 
 ###############################################################################
 
@@ -65,9 +139,32 @@ add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_SECURE_NO_WARNINGS>")
 # https://docs.microsoft.com/en-us/cpp/error-messages/compiler-warnings/
 #     compiler-warning-level-3-c4996?view=vs-2019#posix-function-names
 add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:_CRT_NONSTDC_NO_WARNINGS>")
-# If a user has explicitly requested a parallel build, configure this during CMake
+
 if(MSVC_MP_THREAD_COUNT AND MSVC_MP_THREAD_COUNT GREATER 1)
+  # If a user has explicitly requested a parallel build, configure this during CMake
   add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/MP${MSVC_MP_THREAD_COUNT}>")
+
+  # If building with multiple threads with MSVC, delay generation of PDB files
+  # until the end of compilation to speed up their generation (invoke mspdbsrv once).
+  # This assumes /Zi is being used to generate PDBs (CMakes default)
+  add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Zf>")
+endif()
+
+if(MSVC_COMPRESS_PDB)
+  # /Zi enables PDBs - CMake seems to default to creating PDBs as the defacto way
+  # of handling debug symbols. As these PDBs can be very large, we attempt to compress
+  # them here with various settings. This disable incremental linking and can make
+  # stack traces more confusing.
+  # https://devblogs.microsoft.com/cppblog/shrink-my-program-database-pdb-file/
+
+  # First, generate comdats to allow the linker to remove unused data
+  add_compile_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/Gy>")
+  # Remove unreferenced packaged functions and data from comdats
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/OPT:REF>")
+  # Fold duplicate comdat data (1 iteration)
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/OPT:ICF>")
+  # Generally compress the generated pdbs as they are being created
+  add_link_options("$<$<AND:$<CONFIG:Debug>,$<COMPILE_LANG_AND_ID:CXX,MSVC>>:/PDBCOMPRESS>")
 endif()
 
 if(OPENVDB_CXX_STRICT)
@@ -116,11 +213,23 @@ endif()
 ###############################################################################
 
 # Build Types
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
 set(CMAKE_BUILD_TYPE ${CMAKE_BUILD_TYPE}
   CACHE STRING [=[Choose the type of build. CMake natively supports the following options: None Debug Release
     RelWithDebInfo MinSizeRel. OpenVDB additionally supports the following sanitizers and tools:
     coverage tsan asan lsan msan ubsan]=]
   FORCE)
+
+if(CMAKE_BUILD_TYPE EQUAL coverage)
+  # use .gcno extension instead of .cc.gcno
+  # @note This is an undocumented internal cmake var and does not work
+  # with multi config generators
+  set(CMAKE_CXX_OUTPUT_EXTENSION_REPLACE 1)
+endif()
 
 # Note that the thread, address and memory sanitizers are incompatible with each other
 set(EXTRA_BUILD_TYPES coverage tsan asan lsan msan ubsan)
@@ -170,3 +279,11 @@ add_link_options("$<$<AND:$<CONFIG:MSAN>,$<COMPILE_LANG_AND_ID:CXX,Clang,AppleCl
 # UndefinedBehaviour
 add_compile_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
 add_link_options("$<$<AND:$<CONFIG:UBSAN>,$<COMPILE_LANG_AND_ID:CXX,GNU,Clang,AppleClang>>:-fsanitize=undefined>")
+
+# CMAKE_BUILD_TYPE is ignored for multi config generators i.e. MSVS
+
+get_property(_isMultiConfig GLOBAL PROPERTY GENERATOR_IS_MULTI_CONFIG)
+if(NOT _isMultiConfig)
+  message(STATUS "CMake Build Type: ${CMAKE_BUILD_TYPE}")
+endif()
+

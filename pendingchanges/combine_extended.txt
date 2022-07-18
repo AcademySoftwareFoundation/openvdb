@@ -1,4 +1,0 @@
-Bug Fixes:
-    - Fixed a bug with Tree::combineExtended which wouldn't propagate the resulting active state when a destination tile overlapped a source child node.
-    [Reported by @frapit]
-

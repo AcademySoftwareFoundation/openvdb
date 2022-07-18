@@ -29,6 +29,8 @@ if(TARGET vdb_ax AND OPENVDB_AX_TEST_CMD)
       -DDOWNLOAD_VDBS=${OPENVDB_AX_TEST_CMD_DOWNLOADS}
       -DCMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
       -P ${CMAKE_CURRENT_LIST_DIR}/TestAXCmd.cmake)
+elseif(OPENVDB_BUILD_BINARIES)
+  message(WARNING "Unable to test the vdb_ax binary as the vdb_ax target was not found!")
 endif()
 
 if(NOT OPENVDB_BUILD_AX)
@@ -43,6 +45,7 @@ set(TEST_SOURCE_FILES
   ast/TestScanners.cc
   ast/TestPrinters.cc
   backend/TestAttributeBindings.cc
+  backend/TestCodecs.cc
   backend/TestComputeGeneratorFailures.cc
   backend/TestFunctionGroup.cc
   backend/TestFunctionRegistry.cc

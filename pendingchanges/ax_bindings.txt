@@ -1,5 +1,0 @@
-New features:
-    - Added bindings mechanism to AX to allow differing data and AX attribute names (@) in Point and Volume executables.
-
-Houdini:
-    - Added Attribute Bindings to AX SOP to allow differently named AX attributes (@) and target point attributes/volumes.

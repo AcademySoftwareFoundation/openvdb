@@ -187,7 +187,7 @@ endif()
 if(USE_BLOSC OR USE_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
+    if(MSVC)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
     else()
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")
@@ -449,10 +449,20 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeFrustum.h
+  points/PointRasterizeSDF.h
+  points/PointRasterizeTrilinear.h
   points/PointSample.h
   points/PointScatter.h
   points/PointStatistics.h
+  points/PointTransfer.h
   points/StreamCompression.h
+)
+
+set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointRasterizeFrustumImpl.h
+  points/impl/PointRasterizeSDFImpl.h
+  points/impl/PointRasterizeTrilinearImpl.h
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
@@ -613,6 +623,10 @@ endif()
 # Private defines (not inherited by dependent projects)
 list(APPEND OPENVDB_CORE_PRIVATE_DEFINES -DOPENVDB_PRIVATE)
 
+if(MINGW)
+  list(APPEND OPENVDB_CORE_PUBLIC_DEFINES -D_USE_MATH_DEFINES)
+endif()
+
 if(WIN32)
   if(USE_IMATH_HALF)
     # @note OPENVDB_OPENEXR_STATICLIB is old functionality and should be removed
@@ -721,6 +735,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${CMAKE_
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points)
+install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points/impl)
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tools)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)

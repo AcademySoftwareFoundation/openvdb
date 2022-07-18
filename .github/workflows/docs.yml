@@ -49,17 +49,39 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components="core,python,doc"
-        --cargs=\"-DUSE_BLOSC=OFF -DOPENVDB_CORE_STATIC=OFF -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\"
+        --cargs=\"
+        -DUSE_BLOSC=OFF
+        -DOPENVDB_CORE_STATIC=OFF
+        -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON
+        -DUSE_EXPLICIT_INSTANTIATION=OFF
+        -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON
+        \"
     - name: epydoc
       run: |
         epydoc --html -o /usr/local/share/doc/OpenVDB/html/python pyopenvdb
+    - name: pre_deploy
+      # Overwrite global SSH configuration
+      #  https://github.com/peaceiris/actions-gh-pages/issues/719
+      #  https://linuxhint.com/ssh-stricthostkeychecking/
+      run: >
+        echo "Host *
+          StrictHostKeyChecking no
+          UserKnownHostsFile=/dev/null
+        " > /etc/ssh/ssh_config
     - name: deploy
-      # only deploy documentation to gh-pages on a manual workflow dispatch
+      # only deploy documentation on a manual workflow dispatch
       if: |
         github.repository_owner == 'AcademySoftwareFoundation' &&
         github.event_name == 'workflow_dispatch' &&
         github.event.inputs.deploy == 'true'
       uses: peaceiris/actions-gh-pages@v3
       with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
         publish_dir: /usr/local/share/doc/OpenVDB/html
+        destination_dir: documentation/doxygen
+        external_repository: AcademySoftwareFoundation/openvdb-website
+        publish_branch: doxygen
+        full_commit_message: "Automatic doxygen documentation update
+          - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
+
+          Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"

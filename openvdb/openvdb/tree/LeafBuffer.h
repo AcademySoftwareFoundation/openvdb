@@ -87,6 +87,7 @@ public:
 
     /// Return the memory footprint of this buffer in bytes.
     inline Index memUsage() const;
+    inline Index memUsageIfLoaded() const;
     /// Return the number of values contained in this buffer.
     static Index size() { return SIZE; }
 
@@ -276,6 +277,16 @@ LeafBuffer<T, Log2Dim>::memUsage() const
 
 
 template<typename T, Index Log2Dim>
+inline Index
+LeafBuffer<T, Log2Dim>::memUsageIfLoaded() const
+{
+    size_t n = sizeof(*this);
+    n += SIZE * sizeof(ValueType);
+    return static_cast<Index>(n);
+}
+
+
+template<typename T, Index Log2Dim>
 inline const typename LeafBuffer<T, Log2Dim>::ValueType*
 LeafBuffer<T, Log2Dim>::data() const
 {
@@ -425,6 +436,7 @@ public:
     void swap(LeafBuffer& other) { if (&other != this) std::swap(mData, other.mData); }
 
     Index memUsage() const { return sizeof(*this); }
+    Index memUsageIfLoaded() const { return sizeof(*this); }
     static Index size() { return SIZE; }
 
     /// @brief Return a pointer to the C-style array of words encoding the bits.

@@ -9,7 +9,7 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
     * 2a. Create a new `v6.1.0` tag under the "Choose a tag" drop-down (Note that this tag will not be created until the release is published).
     * 2b. Select `v6.1.0_rc` under the "Target" drop-down.
     * 2c. Set "OpenVDB 6.1.0" as the title.
-    * 2d. As a minimum, the body should be "See the [release notes](https://academysoftwarefoundation.github.io/openvdb/changes.html#v6_1_0_changes) for more details.". Include the correct link to the documentation. (Note this link will be broken until the documentation is generated in step 8). It is optional to also include a few release highlights.
+    * 2d. As a minimum, the body should be "See the [release notes](https://www.openvdb.org/documentation/doxygen/changes.html#v6_1_0_changes) for more details.". Include the correct link to the documentation. (Note this link will be broken until the documentation is generated in step 8). It is optional to also include a few release highlights.
     * 2e. Click the "Save draft" button. DO NOT publish the release at this stage.
 3. Check out the `v6.1.0_rc` branch.
 4. Ensure the root `CMakeLists.txt` has the correct version number at the top.
@@ -17,8 +17,8 @@ The following assumes that the current OpenVDB library version number is 6.0.0 a
 6. Update the "Version 6.1.0 - In development" section in `CHANGES` and `doc/changes.txt` to replace "In development" with the planned release date.
 7. Merge these changes to `v6.1.0_rc` in a new pull request and verify that the build CI runs successfully.
 8. Manually dispatch the weekly CI workflow from the `v6.1.0_rc` branch and verify that the additional checks run successfully.
-9. Go to the [GitHub docs actions](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/docs.yml?query=workflow%3ADocs) for OpenVDB and manually dispatch the workflow for the `v6.1.0_rc` branch and set deploy to "true". This will deploy the documentation and typically takes around 15 mins. When the action completes, [check over the documentation](https://academysoftwarefoundation.github.io/openvdb/). Fix any errors through pull request and re-dispatch the workflow if necessary.
-10. Confirm that the release notes link in the draft release now points at the correct release notes.
+9. Go to the [GitHub docs actions](https://github.com/AcademySoftwareFoundation/openvdb/actions/workflows/docs.yml?query=workflow%3ADocs) for OpenVDB and manually dispatch the workflow for the `v6.1.0_rc` branch and set deploy to "true". This will generate and add the documentation to the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo and typically takes around 15 mins. When the action completes, check over the documentation on the `doxygen` branch in the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) repo. Fix any errors through pull request and re-dispatch the workflow if necessary.
+10. Merge the `doxygen` branch in the [OpenVDB website](https://github.com/AcademySoftwareFoundation/openvdb-website) into `master` via a new pull request so that the release notes link in the draft release now points to the correct release notes.
 12. Publish the GitHub draft release from the [GitHub releases](https://github.com/AcademySoftwareFoundation/openvdb/releases) page.
 13. Merge the `v6.1.0_rc` branch back into `master` in a new pull request to ensure edits to release notes or any other fixes go back to master.
 14. Delete the `v6.1.0_rc` branch.

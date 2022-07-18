@@ -74,9 +74,10 @@ public:
     /// @{
     /// Required interface methods
     bool                isDegenerate() const override;
-    int                 getBBox(UT_BoundingBox *bbox) const override;
+    bool                getBBox(UT_BoundingBox *bbox) const override;
     void                reverse() override;
     UT_Vector3          computeNormal() const override;
+    UT_Vector3D         computeNormalD() const override;
     void                copyPrimitive(const GEO_Primitive *src) override;
     void                copySubclassData(const GA_Primitive *source) override;
 
@@ -195,6 +196,14 @@ public:
     // Transform the matrix associated with this primitive. Translate is
     // ignored.
     void                transform(const UT_Matrix4 &mat) override;
+
+
+    /// True if the underlying grid has no voxels.
+    bool                 isEmpty() const { return getGridPtr()->empty(); }
+
+    /// Background value of the grid as a scalar or vector.
+    fpreal               backgroundF() const;
+    UT_Vector3D          backgroundV3() const;
 
     /// Accessors for the 4x4 matrix representing the affine transform that
     /// converts from index space voxel coordinates to world space. For frustum

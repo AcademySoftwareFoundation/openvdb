@@ -146,6 +146,9 @@ else()
     TestPointMask.cc
     TestPointMove.cc
     TestPointPartitioner.cc
+    TestPointRasterizeFrustum.cc
+    TestPointRasterizeSDF.cc
+    TestPointRasterizeTrilinear.cc
     TestPointSample.cc
     TestPointScatter.cc
     TestPointStatistics.cc
@@ -194,7 +197,7 @@ endif()
 if(USE_BLOSC OR OpenVDB_USES_BLOSC OR USE_ZLIB OR OpenVDB_USES_ZLIB)
   if(USE_STATIC_DEPENDENCIES)
     set(_ZLIB_ORIG_CMAKE_FIND_LIBRARY_SUFFIXES ${CMAKE_FIND_LIBRARY_SUFFIXES})
-    if(WIN32)
+    if(MSVC)
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".lib")
     else()
       set(CMAKE_FIND_LIBRARY_SUFFIXES ".a")

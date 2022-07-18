@@ -261,6 +261,7 @@ static const std::vector<StrWrapper> tests {
     "if + a;",
     "a + if(true) {};",
     "{} + {};",
+    "{} int",
     "~ + !;",
     "+ + -;",
     "; + ;",
@@ -567,7 +568,24 @@ static const std::vector<StrWrapper> tests {
     "|;",
     ",;",
     "!;",
-    "\\;"
+    "\\;",
+
+    // Test right associativity. These symbols are defined with %right in the
+    // parser which forces partial creation of ASTs. ::parse should ensure
+    // that these cases still produce invalid AST ptrs.
+    "{} ?",
+    "{} :",
+    "{} =",
+    "{} +=",
+    "{} -=",
+    "{} /=",
+    "{} *=",
+    "{} %=",
+    "{} |=",
+    "{} &=",
+    "{} ^=",
+    "{} <<=",
+    "{} >>="
 };
 
 }
@@ -587,7 +605,7 @@ CPPUNIT_TEST_SUITE_REGISTRATION(TestSyntaxFailures);
 
 void TestSyntaxFailures::testSyntax()
 {
-    // Quickly check the above doesn't have multiple occurance
+    // Quickly check the above doesn't have multiple occurrence
     // store multiple in a hash map
     const auto hash = [](const StrWrapper* s) {
         return std::hash<std::string>()(s->first);
@@ -611,5 +629,3 @@ void TestSyntaxFailures::testSyntax()
 
     TEST_SYNTAX_FAILS(tests);
 }
-
-

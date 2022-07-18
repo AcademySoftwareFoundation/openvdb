@@ -1,5 +1,0 @@
-New Features:
- - Added support for OpenVDB AX on Windows.
-
-Build:
- - Regenerated AX grammar with Flex 2.6.4 and Bison 3.8.2.

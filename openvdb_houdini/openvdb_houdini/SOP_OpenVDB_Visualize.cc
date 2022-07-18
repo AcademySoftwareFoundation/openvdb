@@ -150,7 +150,7 @@ newSopOperator(OP_OperatorTable* table)
             "Specify whether to draw the camera frustums\n"
             "of VDBs with frustum transforms.")
         .setDocumentation(
-            "For VDBs with [frustum transforms|https://academysoftwarefoundation.github.io/openvdb/"
+            "For VDBs with [frustum transforms|https://www.openvdb.org/documentation/doxygen/"
             "transformsAndMaps.html#sFrustumTransforms],"
             " generate geometry representing the frustum bounding box."));
 
@@ -228,7 +228,7 @@ newSopOperator(OP_OperatorTable* table)
         .setDocumentation(
             "For voxels, tiles, and leaf nodes rendered as points, add an attribute to"
             " the points that gives the coordinates of the points in the VDB's [index space|"
-            "https://academysoftwarefoundation.github.io/openvdb/overview.html#secSpaceAndTrans]."));
+            "https://www.openvdb.org/documentation/doxygen/overview.html#secSpaceAndTrans]."));
 
     parms.add(hutil::ParmFactory(PRM_TOGGLE, "addvalue", "Points with Values")
         .setTooltip("Add a voxel/tile value attribute to points.")
@@ -418,14 +418,14 @@ newSopOperator(OP_OperatorTable* table)
 #tags: vdb\n\
 \n\
 \"\"\"Generate geometry to visualize the internal\n\
-[tree structure|https://academysoftwarefoundation.github.io/openvdb/overview.html#secTree]\n\
+[tree structure|https://www.openvdb.org/documentation/doxygen/overview.html#secTree]\n\
 of a VDB volume.\"\"\"\n\
 \n\
 @overview\n\
 \n\
 This node can be a useful troubleshooting tool.\n\
 Among other things, it allows one to evaluate the\n\
-[sparseness|https://academysoftwarefoundation.github.io/openvdb/overview.html#secSparsity]\n\
+[sparseness|https://www.openvdb.org/documentation/doxygen/overview.html#secSparsity]\n\
 of VDB volumes as well as to examine their extents and the values of individual voxels.\n\
 \n\
 @related\n\
@@ -1844,15 +1844,7 @@ TreeVisualizer::allocateOffsetArrays(const GridType& grid)
 {
     // allocate offsets per node arrays - no zero value initialization
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 7
     const auto nodeCounts = grid.tree().nodeCount();
-#else
-    // Tree::nodeCount() was only added in ABI=7, so use a NodeIterator with an earlier ABI
-    std::vector<openvdb::Index32> nodeCounts(grid.tree().treeDepth());
-    for (auto it = grid.tree().cbeginNode(); it; ++it) {
-        ++(nodeCounts[it.getLevel()]);
-    }
-#endif
 
     for (const auto& count : nodeCounts) {
         mPointOffsets.emplace_back(new size_t[count]);

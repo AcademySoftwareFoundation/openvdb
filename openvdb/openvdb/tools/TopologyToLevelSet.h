@@ -14,7 +14,6 @@
 
 #include "LevelSetFilter.h"
 #include "Morphology.h" // for erodeActiveValues and dilateActiveValues
-#include "SignedFloodFill.h"
 
 #include <openvdb/Grid.h>
 #include <openvdb/Types.h>
@@ -22,7 +21,9 @@
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
+
 #include <tbb/task_group.h>
+
 #include <algorithm> // for std::min(), std::max()
 #include <vector>
 
@@ -47,7 +48,10 @@ namespace tools {
 /// @param smoothingSteps  Number of smoothing interations.
 template<typename GridT>
 typename GridT::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
+topologyToLevelSet(const GridT& grid,
+    int halfWidth = 3,
+    int closingSteps = 1,
+    int dilation = 0,
     int smoothingSteps = 0);
 
 
@@ -66,8 +70,12 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 /// @param interrupt       Optional object adhering to the util::NullInterrupter interface.
 template<typename GridT, typename InterrupterT>
 typename GridT::template ValueConverter<float>::Type::Ptr
-topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, int dilation = 0,
-    int smoothingSteps = 0, InterrupterT* interrupt = nullptr);
+topologyToLevelSet(const GridT& grid,
+    int halfWidth = 3,
+    int closingSteps = 1,
+    int dilation = 0,
+    int smoothingSteps = 0,
+    InterrupterT* interrupt = nullptr);
 
 
 ////////////////////////////////////////
@@ -77,31 +85,6 @@ topologyToLevelSet(const GridT& grid, int halfWidth = 3, int closingSteps = 1, i
 namespace ttls_internal {
 
 
-template<typename TreeT>
-struct DilateOp
-{
-    DilateOp(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const {
-        dilateActiveValues( *tree, size, tools::NN_FACE, tools::IGNORE_TILES);
-    }
-    TreeT* tree;
-    const int size;
-};
-
-
-template<typename TreeT>
-struct ErodeOp
-{
-    ErodeOp(TreeT& t, int n) : tree(&t), size(n) {}
-    void operator()() const {
-        tools::erodeActiveValues(*tree, /*iterations=*/size, tools::NN_FACE, tools::IGNORE_TILES);
-        tools::pruneInactive(*tree);
-    }
-    TreeT* tree;
-    const int size;
-};
-
-
 template<typename TreeType>
 struct OffsetAndMinComp
 {
@@ -109,35 +92,37 @@ struct OffsetAndMinComp
     using ValueType = typename TreeType::ValueType;
 
     OffsetAndMinComp(std::vector<LeafNodeType*>& lhsNodes,
-        const TreeType& rhsTree, ValueType offset)
-        : mLhsNodes(lhsNodes.empty() ? nullptr : &lhsNodes[0]), mRhsTree(&rhsTree), mOffset(offset)
-    {
-    }
+        const TreeType& rhsTree,
+        ValueType offset)
+        : mLhsNodes(lhsNodes)
+        , mRhsTree(rhsTree)
+        , mOffset(offset) {}
 
     void operator()(const tbb::blocked_range<size_t>& range) const
     {
         using Iterator = typename LeafNodeType::ValueOnIter;
 
-        tree::ValueAccessor<const TreeType> rhsAcc(*mRhsTree);
+        tree::ValueAccessor<const TreeType> rhsAcc(mRhsTree);
         const ValueType offset = mOffset;
 
         for (size_t n = range.begin(), N = range.end(); n < N; ++n) {
 
             LeafNodeType& lhsNode = *mLhsNodes[n];
-            const LeafNodeType * rhsNodePt = rhsAcc.probeConstLeaf(lhsNode.origin());
+            const LeafNodeType* rhsNodePt = rhsAcc.probeConstLeaf(lhsNode.origin());
             if (!rhsNodePt) continue;
 
+            auto* const data = lhsNode.buffer().data();
             for (Iterator it = lhsNode.beginValueOn(); it; ++it) {
-                ValueType& val = const_cast<ValueType&>(it.getValue());
+                ValueType& val = data[it.pos()];
                 val = std::min(val, offset + rhsNodePt->getValue(it.pos()));
             }
         }
     }
 
 private:
-    LeafNodeType    *       * const mLhsNodes;
-    TreeType          const * const mRhsTree;
-    ValueType                 const mOffset;
+    std::vector<LeafNodeType*>&  mLhsNodes;
+    const TreeType&  mRhsTree;
+    const ValueType  mOffset;
 }; // struct OffsetAndMinComp
 
 
@@ -184,7 +169,6 @@ smoothLevelSet(GridType& grid, int iterations, int halfBandWidthInVoxels,
     normalizeLevelSet(grid, halfBandWidthInVoxels, interrupt);
 }
 
-
 } // namespace ttls_internal
 
 /// @endcond
@@ -209,31 +193,39 @@ topologyToLevelSet(const GridT& grid, int halfWidth, int closingSteps, int dilat
     }
 
     // Copy the topology into a MaskGrid.
-    MaskTreeT maskTree( grid.tree(), false/*background*/, openvdb::TopologyCopy() );
+    MaskTreeT maskTree(grid.tree(), false/*background*/, openvdb::TopologyCopy());
 
     // Morphological closing operation.
-    tools::dilateActiveValues(maskTree, closingSteps + dilation, tools::NN_FACE, tools::IGNORE_TILES);
-    tools::erodeActiveValues(maskTree, /*iterations=*/closingSteps, tools::NN_FACE, tools::IGNORE_TILES);
+    tools::dilateActiveValues(maskTree, closingSteps + dilation, tools::NN_FACE, tools::PRESERVE_TILES);
+    tools::erodeActiveValues(maskTree, /*iterations=*/closingSteps, tools::NN_FACE, tools::PRESERVE_TILES);
     tools::pruneInactive(maskTree);
 
     // Generate a volume with an implicit zero crossing at the boundary
     // between active and inactive values in the input grid.
     const float background = float(grid.voxelSize()[0]) * float(halfWidth);
     typename FloatTreeT::Ptr lsTree(
-        new FloatTreeT( maskTree, /*out=*/background, /*in=*/-background, openvdb::TopologyCopy() ) );
+        new FloatTreeT(maskTree, /*out=*/background, /*in=*/-background, openvdb::TopologyCopy()));
 
     tbb::task_group pool;
-    pool.run( ttls_internal::ErodeOp< MaskTreeT >( maskTree, halfWidth ) );
-    pool.run( ttls_internal::DilateOp<FloatTreeT>( *lsTree , halfWidth ) );
+    pool.run([&]() {
+        tools::erodeActiveValues(maskTree, /*iterations=*/halfWidth, tools::NN_FACE, tools::PRESERVE_TILES);
+        tools::pruneInactive(maskTree);
+    });
+    pool.run([&]() {
+        tools::dilateActiveValues(*lsTree, /*iterations=*/halfWidth, tools::NN_FACE, tools::PRESERVE_TILES);
+    });
     pool.wait();// wait for both tasks to complete
 
-    lsTree->topologyDifference( maskTree );
-    tools::pruneLevelSet( *lsTree,  /*threading=*/true);
+    lsTree->topologyDifference(maskTree);
+    maskTree.clear();
+
+    lsTree->voxelizeActiveTiles(); // has to come before ::pruneLevelSet
+    tools::pruneLevelSet(*lsTree,  /*threading=*/true);
 
     // Create a level set grid from the tree
-    typename FloatGridT::Ptr lsGrid = FloatGridT::create( lsTree );
-    lsGrid->setTransform( grid.transform().copy() );
-    lsGrid->setGridClass( openvdb::GRID_LEVEL_SET );
+    typename FloatGridT::Ptr lsGrid = FloatGridT::create(lsTree);
+    lsGrid->setTransform(grid.transform().copy());
+    lsGrid->setGridClass(openvdb::GRID_LEVEL_SET);
 
     // Use a PDE based scheme to propagate distance values from the
     // implicit zero crossing.
