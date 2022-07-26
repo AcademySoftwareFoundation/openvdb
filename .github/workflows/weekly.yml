@@ -149,7 +149,7 @@ jobs:
     runs-on: ubuntu-latest
     name: linux-clang-sanitizer:${{ matrix.config.build }}
     container:
-      image: aswf/ci-openvdb:2021
+      image: aswf/ci-openvdb:2022-clang11
     env:
       CXX: clang++
     strategy:
@@ -197,11 +197,12 @@ jobs:
     strategy:
       matrix:
         config:
-          - { name: 'all',  cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
-          - { name: 'half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',  cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'all',   cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',  cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
+          - { name: 'half',  cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',   cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',   cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'numpy', cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
