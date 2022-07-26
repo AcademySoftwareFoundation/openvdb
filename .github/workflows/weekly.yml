@@ -160,7 +160,6 @@ jobs:
           #- { build: 'lsan', cmake: '' } # asan encompasses and includes lsan
           #- { build: 'tsan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
           #- { build: 'msan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
-          #- { build: 'coverage', cmake: '' } # todo
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
@@ -584,4 +583,3 @@ jobs:
         name: abi_report
         path: ./compat_reports/OPENVDB/2_to_1/compat_report.html
         retention-days: 5
-
