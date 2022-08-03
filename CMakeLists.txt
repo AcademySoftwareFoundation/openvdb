@@ -540,6 +540,7 @@ if(OPENVDB_BUILD_UNITTESTS)
   add_subdirectory(openvdb/openvdb/unittest)
 endif()
 
+# Tests the vdb_ax binary so needs to come after openvdb_cmd
 if(OPENVDB_BUILD_AX_UNITTESTS)
   add_subdirectory(openvdb_ax/openvdb_ax/test)
 endif()

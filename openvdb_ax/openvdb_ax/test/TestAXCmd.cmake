@@ -28,14 +28,17 @@ get_filename_component(BINARY_NAME ${VDB_AX_BINARY_PATH} NAME_WE)
 get_filename_component(PATH_TO_BIN ${VDB_AX_BINARY_PATH} DIRECTORY)
 set(VDB_AX_BINARY_PATH "${PATH_TO_BIN}/${BINARY_NAME}")
 
+set(SPHERE_POINTS_VDB ${CMAKE_BINARY_DIR}/sphere_points.vdb)
 set(SPHERE_VDB ${CMAKE_BINARY_DIR}/sphere.vdb)
 set(TORUS_VDB ${CMAKE_BINARY_DIR}/torus.vdb)
 
 if(DOWNLOAD_VDBS)
   find_package(Python COMPONENTS Interpreter REQUIRED)
-  if(NOT EXISTS ${SPHERE_VDB} OR NOT EXISTS ${TORUS_VDB})
+  if(NOT EXISTS ${SPHERE_VDB} OR
+     NOT EXISTS ${TORUS_VDB} OR
+     NOT EXISTS ${SPHERE_POINTS_VDB})
     set(DOWNLOAD_SCRIPT ${CMAKE_CURRENT_LIST_DIR}/../../../ci/download_vdb_caches.py)
-    execute_process(COMMAND ${Python_EXECUTABLE} ${DOWNLOAD_SCRIPT} -f sphere.vdb torus.vdb
+    execute_process(COMMAND ${Python_EXECUTABLE} ${DOWNLOAD_SCRIPT} -f sphere.vdb torus.vdb sphere_points.vdb
       OUTPUT_VARIABLE DOWNLOAD_OUTPUT
       ERROR_VARIABLE  DOWNLOAD_OUTPUT
       RESULT_VARIABLE RETURN_CODE)
@@ -46,7 +49,9 @@ if(DOWNLOAD_VDBS)
 endif()
 
 set(HAS_DOWNLOAD_VDBS FALSE)
-if(EXISTS ${SPHERE_VDB} AND EXISTS ${TORUS_VDB})
+if(EXISTS ${SPHERE_VDB} AND
+   EXISTS ${TORUS_VDB} AND
+   EXISTS ${SPHERE_POINTS_VDB})
   set(HAS_DOWNLOAD_VDBS TRUE)
 endif()
 
@@ -69,6 +74,8 @@ set(TEST_FAIL_NUM 0)
 ##   to with the AX keyword (otherwise semicolons are impossible to handle).
 ## KEYWORDS:
 ##   PASS, FAIL: Whether the test is expected to pass/fail
+##   FILE_SUFFIX: Suffix of the test file output. If not provided, it's set to
+##     either pass/fail and the test number.
 ##   GENERATES_OUTPUT: Whether the test is expected to generate output. If so,
 ##     the outputs are diffed. Note that line endings are NOT compared.
 ##   IGNORE_OUTPUT: Whether any output should be ignored. Overrides GENERATES_OUTPUT.
@@ -80,7 +87,7 @@ set(TEST_FAIL_NUM 0)
 ###############################################################################
 function(RUN_TEST)
   set(KEYWORD_OPTIONS PASS FAIL GENERATES_OUTPUT IGNORE_OUTPUT)
-  set(SINGLE_OPTIONS COMMAND)
+  set(SINGLE_OPTIONS COMMAND FILE_SUFFIX)
   set(MULTI_OPTIONS AX ARGS)
   cmake_parse_arguments(RUN_TEST "${KEYWORD_OPTIONS}" "${SINGLE_OPTIONS}" "${MULTI_OPTIONS}" ${ARGN})
 
@@ -91,12 +98,20 @@ function(RUN_TEST)
   set(TEST_FILE "vdb_ax_test")
   if(RUN_TEST_GENERATES_OUTPUT)
     if(RUN_TEST_PASS)
-      math(EXPR TEST_PASS_NUM ${TEST_PASS_NUM}+1)
-      set(TEST_FILE "${TEST_FILE}_pass_${TEST_PASS_NUM}")
+      if(NOT RUN_TEST_FILE_SUFFIX)
+        math(EXPR TEST_PASS_NUM ${TEST_PASS_NUM}+1)
+        set(RUN_TEST_FILE_SUFFIX "pass_${TEST_PASS_NUM}")
+      endif()
+
+      set(TEST_FILE "${TEST_FILE}_${RUN_TEST_FILE_SUFFIX}")
       set(TEST_PASS_NUM ${TEST_PASS_NUM} PARENT_SCOPE)
     elseif(RUN_TEST_FAIL)
-      math(EXPR TEST_FAIL_NUM ${TEST_FAIL_NUM}+1)
-      set(TEST_FILE "${TEST_FILE}_fail_${TEST_FAIL_NUM}")
+      if(NOT RUN_TEST_FILE_SUFFIX)
+        math(EXPR TEST_FAIL_NUM ${TEST_FAIL_NUM}+1)
+        set(RUN_TEST_FILE_SUFFIX "fail_${TEST_FAIL_NUM}")
+      endif()
+
+      set(TEST_FILE "${TEST_FILE}_${RUN_TEST_FILE_SUFFIX}")
       set(TEST_FAIL_NUM ${TEST_FAIL_NUM} PARENT_SCOPE)
     endif()
   endif()
@@ -157,7 +172,7 @@ function(RUN_TEST)
           ${OUTPUT_DIR}/${TEST_FILE}
           ${CMAKE_CURRENT_LIST_DIR}/cmd/${TEST_FILE}
         OUTPUT_VARIABLE DIFF_OUTPUT)
-      message(STATUS "Diff outputs failed:\n${DIFF_OUTPUT}")
+      message(STATUS "Diff outputs failed: (${TEST_FILE})\n${DIFF_OUTPUT}")
     endif()
     string(REPLACE ";" " " RUN_TEST_ARGS "${RUN_TEST_ARGS}")
     set(FAILED_TESTS "${FAILED_TESTS};${TEST_EXE_COMMAND} ${RUN_TEST_ARGS}" PARENT_SCOPE)
@@ -182,31 +197,7 @@ run_test(PASS GENERATES_OUTPUT ARGS analyze -f ${CMAKE_CURRENT_LIST_DIR}/snippet
 run_test(PASS GENERATES_OUTPUT ARGS functions -h)
 run_test(PASS GENERATES_OUTPUT ARGS functions --list log)
 run_test(PASS GENERATES_OUTPUT ARGS functions --list-names)
-
-if(HAS_DOWNLOAD_VDBS)
-  run_test(PASS GENERATES_OUTPUT ARGS ${SPHERE_VDB} --threads 1
-    AX "
-    vec3i c = getcoord();
-    if(c.y > 60)
-      if(c.x < 2 && c.x > -2)
-        if(c.z < 2 && c.z > -2)
-          print(@ls_sphere);
-    ")
-  run_test(PASS GENERATES_OUTPUT ARGS execute ${SPHERE_VDB} --threads 1
-    AX "
-    vec3i c = getcoord();
-    if(c.y > 60)
-      if(c.x < 2 && c.x > -2)
-        if(c.z < 2 && c.z > -2)
-          print(@ls_sphere);
-    ")
-  run_test(PASS GENERATES_OUTPUT ARGS execute ${TORUS_VDB} ${SPHERE_VDB} --threads 1
-    AX  "
-    @ls_sphere = max(@ls_torus, @ls_sphere);
-    if (abs(@ls_sphere) < 1e-4 && @ls_sphere != 0.0f) {
-      print(@ls_sphere);
-    }")
-endif()
+run_test(PASS GENERATES_OUTPUT ARGS execute -h)
 
 # These tests should pass and produce no output
 
@@ -236,16 +227,48 @@ run_test(FAIL GENERATES_OUTPUT ARGS functions)
 run_test(FAIL GENERATES_OUTPUT ARGS functions -i file.vdb)
 run_test(FAIL GENERATES_OUTPUT ARGS file.vdb -o tmp.vdb AX "@ls_sphere += 1;")
 run_test(FAIL GENERATES_OUTPUT ARGS execute file.vdb -o tmp.vdb AX "@ls_sphere += 1;")
-
-# These should come last so that, when enabled, any that GENERATES_OUTPUT don't impact order
+run_test(FAIL GENERATES_OUTPUT ARGS --points-grain nan)
+run_test(FAIL GENERATES_OUTPUT ARGS --volume-grain nan)
 
 if(HAS_DOWNLOAD_VDBS)
+  run_test(PASS GENERATES_OUTPUT FILE_SUFFIX ls_sphere_1 ARGS ${SPHERE_VDB} --threads 1
+    AX "
+    vec3i c = getcoord();
+    if(c.y > 60)
+      if(c.x < 2 && c.x > -2)
+        if(c.z < 2 && c.z > -2)
+          print(@ls_sphere);
+    ")
+  run_test(PASS GENERATES_OUTPUT FILE_SUFFIX ls_sphere_2 ARGS execute ${SPHERE_VDB} --threads 1
+    AX "
+    vec3i c = getcoord();
+    if(c.y > 60)
+      if(c.x < 2 && c.x > -2)
+        if(c.z < 2 && c.z > -2)
+          print(@ls_sphere);
+    ")
+  run_test(PASS GENERATES_OUTPUT FILE_SUFFIX ls_sphere_3 ARGS execute ${TORUS_VDB} ${SPHERE_VDB} --threads 1
+    AX "
+    @ls_sphere = max(@ls_torus, @ls_sphere);
+    if (abs(@ls_sphere) < 1e-4 && @ls_sphere != 0.0f) {
+      print(@ls_sphere);
+    }")
+  run_test(PASS GENERATES_OUTPUT FILE_SUFFIX vol_bind
+    ARGS ${TORUS_VDB} ${SPHERE_VDB} --bindings "a:ls_sphere,b:ls_torus" --create-missing "OFF"
+    AX "@a = 1; @b = 1;")
+
   # @todo  diff these once we have attribute bindings (can't diff the files)
   #   due to UUID changing
   run_test(PASS ARGS -i ${SPHERE_VDB} -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere += 1;")
   run_test(PASS ARGS -i ${SPHERE_VDB} -i ${CMAKE_BINARY_DIR}/tmp.vdb -o ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
-  run_test(PASS GENERATES_OUTPUT ARGS ${SPHERE_VDB} ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
+  run_test(PASS GENERATES_OUTPUT FILE_SUFFIX uuid ARGS ${SPHERE_VDB} ${CMAKE_BINARY_DIR}/tmp.vdb AX "@ls_sphere -= 1;")
   run_test(PASS COMMAND ${CMAKE_COMMAND} ARGS -E remove -f ${CMAKE_BINARY_DIR}/tmp.vdb)
+
+  # fail tests
+  run_test(FAIL GENERATES_OUTPUT
+      FILE_SUFFIX attr_create
+      ARGS ${SPHERE_POINTS_VDB} --create-missing "OFF"
+      AX "@nonexist = 1;")
 endif()
 
 # These test fail and output is not checked

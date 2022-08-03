@@ -71,6 +71,9 @@ class Compiler;
 ///       processing and active tile processing.
 ///       @sa setGrainSize
 ///       @sa setActiveTileStreamingGrainSize
+///   - AttributeBindings: None
+///       Whether to indriect any AX accesses to different grid names.
+///       @sa setAttributeBindings
 ///
 ///  For more in depth information, see the @ref vdbaxcompilerexe documentation.
 class OPENVDB_AX_API VolumeExecutable
@@ -239,13 +242,6 @@ public:
     size_t getActiveTileStreamingGrainSize() const;
     ///@}
 
-
-
-    ////////////////////////////////////////////////////////
-
-    /// @return  The tree execution level.
-    [[deprecated]] Index getTreeExecutionLevel() const;
-
     /// @brief  Set attribute bindings.
     /// @param bindings A map of attribute bindings to expected names on
     ///   the geometry to be executed over. By default the AX attributes will be
@@ -264,7 +260,36 @@ public:
     ////////////////////////////////////////////////////////
 
     // foward declaration of settings for this executable
-    struct Settings;
+    template <bool> struct Settings;
+
+    /// @brief Command Line Interface handling for the VolumeExecutable.
+    /// @details  This class wraps the logic for converting commands specific
+    ///   to the VolumeExecutable to the internal Settings. Subsequent
+    ///   executables can be initialized from the CLI object that gets created.
+    struct CLI
+    {
+        ~CLI();
+        CLI(CLI&&);
+        CLI& operator=(CLI&&);
+        static CLI create(size_t argc, const char* argv[], bool* used=nullptr);
+        static void usage(std::ostream& os, const bool verbose);
+    private:
+        friend class VolumeExecutable;
+        CLI();
+        std::unique_ptr<Settings<true>> mSettings;
+    };
+
+    /// @brief  Intialize the Settings of this executables from the CLI object
+    /// @param cli The CLI object
+    /// @{
+    void setSettingsFromCLI(const CLI& cli);
+    /// @}
+
+    ////////////////////////////////////////////////////////
+
+    /// @return  The tree execution level.
+    OPENVDB_DEPRECATED_MESSAGE("Use getTreeExecutionLevel(Index&, Index&)")
+    Index getTreeExecutionLevel() const;
 
 private:
     friend class Compiler;
@@ -299,7 +324,7 @@ private:
     const AttributeRegistry::ConstPtr mAttributeRegistry;
     const CustomData::ConstPtr mCustomData;
     const std::unordered_map<std::string, uint64_t> mFunctionAddresses;
-    std::unique_ptr<Settings> mSettings;
+    std::unique_ptr<Settings<false>> mSettings;
 };
 
 } // namespace ax

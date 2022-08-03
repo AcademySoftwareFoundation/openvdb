@@ -3,6 +3,8 @@
 
 /// @file compiler/VolumeExecutable.cc
 
+#include "cli.h" // from vdb_ax command line tool
+
 #include "VolumeExecutable.h"
 #include "Logger.h"
 
@@ -33,18 +35,181 @@ namespace OPENVDB_VERSION_NAME {
 
 namespace ax {
 
+std::ostream& operator<<(std::ostream& os, const VolumeExecutable::Streaming& v)
+{
+    if (v == VolumeExecutable::Streaming::ON)        os << "ON";
+    else if (v == VolumeExecutable::Streaming::OFF)  os << "OFF";
+    else if (v == VolumeExecutable::Streaming::AUTO) os << "AUTO";
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const VolumeExecutable::IterType& v)
+{
+    if (v == VolumeExecutable::IterType::ON)        os << "ON";
+    else if (v == VolumeExecutable::IterType::OFF)  os << "OFF";
+    else if (v == VolumeExecutable::IterType::ALL)  os << "ALL";
+    return os;
+}
+
 /// @brief Settings which are stored on the volume executer
 ///   and are configurable by the user.
+template <bool IsCLI>
 struct VolumeExecutable::Settings
 {
-    Index mTreeExecutionLevelMin = 0;
-    Index mTreeExecutionLevelMax = FloatTree::DEPTH-1;
-    bool mCreateMissing = true;
-    IterType mValueIterator = IterType::ON;
-    Streaming mActiveTileStreaming = Streaming::AUTO;
-    size_t mGrainSize = 1;
-    size_t mTileGrainSize = 32;
-    AttributeBindings mBindings;
+    template <typename T>
+    using ParamT = typename std::conditional<IsCLI,
+        cli::Param<T>,
+        cli::BasicParam<T>>::type;
+
+    template <typename T>
+    using ParamBuilderT = typename std::conditional<IsCLI,
+        cli::ParamBuilder<T>,
+        cli::BasicParamBuilder<T>>::type;
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    inline std::vector<cli::ParamBase*> optional()
+    {
+        assert(IsCLI);
+        std::vector<cli::ParamBase*> params {
+            &this->mCreateMissing,
+            &this->mTreeExecutionLevel,
+            &this->mValueIterator,
+            &this->mActiveTileStreaming,
+            &this->mGrainSizes,
+            &this->mBindings
+        };
+        return params;
+    }
+
+    inline void initialize(const VolumeExecutable::Settings<true>& S)
+    {
+        if (S.mCreateMissing.isInit())       mCreateMissing = S.mCreateMissing.get();
+        if (S.mTreeExecutionLevel.isInit())  mTreeExecutionLevel = S.mTreeExecutionLevel.get();
+        if (S.mValueIterator.isInit())       mValueIterator = S.mValueIterator.get();
+        if (S.mActiveTileStreaming.isInit()) mActiveTileStreaming = S.mActiveTileStreaming.get();
+        if (S.mGrainSizes.isInit())          mGrainSizes = S.mGrainSizes.get();
+        if (S.mBindings.isInit())            mBindings = S.mBindings.get();
+    }
+
+    ///////////////////////////////////////////////////////////////////////////
+
+    ParamT<bool> mCreateMissing =
+        ParamBuilderT<bool>()
+            .addOpt("--create-missing [ON|OFF]")
+            .setDoc("whether to implicitly create volumes (Default: ON). Volumes are created "
+                    "if they are referenced in the AX program but do not exist on the input "
+                    "geometry.")
+            .setDefault(true)
+            .setCB([](bool& v, const char* arg) {
+                if (std::strcmp(arg, "ON") == 0)       v = true;
+                else if (std::strcmp(arg, "OFF") == 0) v = false;
+                else OPENVDB_THROW(CLIError, "Invalid option passed to --create-missing: '" << arg << "'");
+            })
+            .get();
+
+    ParamT<std::pair<Index,Index>> mTreeExecutionLevel =
+        ParamBuilderT<std::pair<Index,Index>>()
+            .addOpt("--tree-level [l1|l1:l2]")
+            .setDoc("a node level or node range to process (Default: 0:4). If [l2] is not "
+                    "provided only a single level [l1] is processed. By default AX processes the "
+                    "entire VDB tree.")
+            .setDefault({0, FloatTree::DEPTH-1})
+            .setCB([](std::pair<Index,Index>& v, const char* arg) {
+                cli::DefaultCallback<Index>::get()(v.first, arg);
+                if (const char* sep = std::strchr(arg, ':')) {
+                    cli::DefaultCallback<Index>::get()(v.second, sep+1);
+                }
+            })
+            .get();
+
+    ParamT<IterType> mValueIterator =
+        ParamBuilderT<IterType>()
+            .addOpt("--node-iter [ON|OFF|ALL]")
+            .setDoc("the active state type of nodes to process (Default: ON). [ON] processes "
+                    "active values, [OFF] processes inactive values, ALL processes both. The default "
+                    "is [ALL].")
+            .setDefault(IterType::ON)
+            .setCB([](IterType& v, const char* arg) {
+                if (std::strcmp(arg, "ON") == 0)       v = IterType::ON;
+                else if (std::strcmp(arg, "OFF") == 0) v = IterType::OFF;
+                else if (std::strcmp(arg, "ALL") == 0) v = IterType::ALL;
+                else OPENVDB_THROW(CLIError, "Invalid option passed to --node-iter: '" << arg << "'");
+            })
+            .get();
+
+   ParamT<Streaming> mActiveTileStreaming =
+        ParamBuilderT<Streaming>()
+            .addOpt("--tile-stream [ON|OFF|AUTO]")
+            .setDoc("set the active tile streaming behaviour (Default: AUTO). Active tiles "
+                "are constant tree nodes that can potentially span a large area of the volume. By default "
+                "AX will 'stream' these tiles only when it detects that a given program may produce non-"
+                "constant values. This involves densifying tiles into potentially finer child topology. "
+                "You can explicitly set this behaviour to always be [ON], or disable it with [OFF]. The "
+                "latter ensures that each active tiles single value is only processed once.")
+            .setDefault(Streaming::AUTO)
+            .setCB([](Streaming& v, const char* arg) {
+                if (std::strcmp(arg, "ON") == 0)        v = Streaming::ON;
+                else if (std::strcmp(arg, "OFF") == 0)  v = Streaming::OFF;
+                else if (std::strcmp(arg, "AUTO") == 0) v = Streaming::AUTO;
+                else OPENVDB_THROW(CLIError, "Invalid option passed to --tile-stream: '" << arg << "'");
+            })
+            .get();
+
+   ParamT<std::pair<size_t,size_t>> mGrainSizes =
+        ParamBuilderT<std::pair<size_t,size_t>>()
+            .addOpt("--volume-grain [g1|g1:g2]")
+            .setDoc("threading grain size for processing nodes (Default: 1:32). [g1] controls the outer layer's "
+                    "grain size. The outer layer visits each individual node in a VDB. [g2] controls the inner "
+                    "layer's grain size. This is used for Volumes during task splitting of active tile streaming. "
+                    "A value of 0 disables threading for the respective layer.")
+            .setDefault({ 1, 32 })
+            .setCB([](std::pair<size_t,size_t>& v, const char* arg) {
+                cli::DefaultCallback<size_t>::get()(v.first, arg);
+                if (const char* sep = std::strchr(arg, ':')) {
+                    cli::DefaultCallback<size_t>::get()(v.second, sep+1);
+                }
+            })
+            .get();
+
+   ParamT<AttributeBindings> mBindings =
+        ParamBuilderT<AttributeBindings>()
+            .addOpt("--bindings [\"ax_name:volume_name,...\"]")
+            .setDoc("attribute bindings for volumes. The argument accepts a quoted string list of "
+                    "AX (source code) name to data (vdb attribute) name pairs joined by colons and "
+                    "seperated by commas. For example:\n"
+                    "  --bindings \"velocity:v,density:s\"\n"
+                    "binds velocity AX accesses to a 'v' attribute and density AX accesses to a 's' "
+                    "attribute. The following snippet would then alias these attributes:\n"
+                    "  v@velocity *= 5;   // actually accesses 'v' volume\n"
+                    "   @density += 1.0f; // actually accesses 's' volume")
+            .setDefault(AttributeBindings{})
+            .setCB([](AttributeBindings& bindings, const char* c) {
+                std::string source, target;
+                std::string* active = &source, *other = &target;
+                while (*c != '\0') {
+                    if (*c == ':') std::swap(active, other);
+                    else if (*c == ',') {
+                        std::swap(active, other);
+                        if (source.empty() || target.empty()) {
+                            OPENVDB_THROW(CLIError, "invalid string passed to --bindings: '" << c << "'");
+                        }
+                        bindings.set(source, target);
+                        source.clear();
+                        target.clear();
+                    }
+                    else {
+                        active->push_back(*c);
+                    }
+                    ++c;
+                }
+
+                if (source.empty() || target.empty()) {
+                    OPENVDB_THROW(CLIError, "invalid string passed to --bindings: '" << c << "'");
+                }
+                bindings.set(source, target);
+            })
+            .get();
 };
 
 namespace {
@@ -1014,7 +1179,7 @@ inline void run(GridCache& cache,
                 const std::unordered_map<std::string, uint64_t>& functions,
                 const AttributeRegistry& registry,
                 const CustomData* const custom,
-                const VolumeExecutable::Settings& S,
+                const VolumeExecutable::Settings<false>& S,
                 const VolumeExecutable& E,
                 Logger& logger)
 {
@@ -1032,13 +1197,13 @@ inline void run(GridCache& cache,
     data.mCustomData = custom;
     data.mAttributeRegistry = &registry;
     data.mGrids = cache.mRead.data();
-    data.mTreeLevelMin = S.mTreeExecutionLevelMin;
-    data.mTreeLevelMax = S.mTreeExecutionLevelMax;
+    data.mTreeLevelMin = S.mTreeExecutionLevel.get().first;
+    data.mTreeLevelMax = S.mTreeExecutionLevel.get().second;
     data.mIterMode =
         std::is_same<IterT, ValueOnIter>::value  ? 1 :
         std::is_same<IterT, ValueOffIter>::value ? 0 :
         std::is_same<IterT, ValueAllIter>::value ? 2 : 2;
-    data.mTileGrainSize = S.mTileGrainSize;
+    data.mTileGrainSize = S.mGrainSizes.get().second;
     // @note If Streaming::AUTO, this value can be temporarily
     // changed by the next invocation of run().
     data.mActiveTileStreaming = ((data.mIterMode == 1 || data.mIterMode == 2) &&
@@ -1083,7 +1248,7 @@ VolumeExecutable::VolumeExecutable(const std::shared_ptr<const llvm::LLVMContext
     , mAttributeRegistry(accessRegistry)
     , mCustomData(customData)
     , mFunctionAddresses(functionAddresses)
-    , mSettings(new Settings)
+    , mSettings(new Settings<false>)
 {
     assert(mContext);
     assert(mExecutionEngine);
@@ -1115,7 +1280,7 @@ VolumeExecutable::VolumeExecutable(const std::shared_ptr<const llvm::LLVMContext
 
     // Set up the default attribute bindings
      for (const auto& iter : mAttributeRegistry->data()) {
-        mSettings->mBindings.set(iter.name(), iter.name());
+        mSettings->mBindings.get().set(iter.name(), iter.name());
     }
 }
 
@@ -1125,7 +1290,7 @@ VolumeExecutable::VolumeExecutable(const VolumeExecutable& other)
     , mAttributeRegistry(other.mAttributeRegistry)
     , mCustomData(other.mCustomData)
     , mFunctionAddresses(other.mFunctionAddresses)
-    , mSettings(new Settings(*other.mSettings)) {}
+    , mSettings(new Settings<false>(*other.mSettings)) {}
 
 VolumeExecutable::~VolumeExecutable() {}
 
@@ -1143,7 +1308,7 @@ void VolumeExecutable::execute(openvdb::GridPtrVec& grids) const
     }
 
     std::unique_ptr<GridCache> cache =
-        registerVolumes(grids, *mAttributeRegistry, mSettings->mBindings, mSettings->mCreateMissing, *logger);
+        registerVolumes(grids, *mAttributeRegistry, mSettings->mBindings.get(), mSettings->mCreateMissing, *logger);
 
     if (logger->hasError()) return;
 
@@ -1198,19 +1363,13 @@ void VolumeExecutable::setTreeExecutionLevel(const Index min, const Index max)
         OPENVDB_THROW(RuntimeError,
             "Invalid tree execution level in VolumeExecutable.");
     }
-    mSettings->mTreeExecutionLevelMin = min;
-    mSettings->mTreeExecutionLevelMax = max;
-}
-
-Index VolumeExecutable::getTreeExecutionLevel() const
-{
-    return mSettings->mTreeExecutionLevelMin;
+    mSettings->mTreeExecutionLevel.set({ min, max});
 }
 
 void VolumeExecutable::getTreeExecutionLevel(Index& min, Index& max) const
 {
-    min = mSettings->mTreeExecutionLevelMin;
-    max = mSettings->mTreeExecutionLevelMax;
+    min = mSettings->mTreeExecutionLevel.get().first;
+    max = mSettings->mTreeExecutionLevel.get().second;
 }
 
 void VolumeExecutable::setActiveTileStreaming(const Streaming& s)
@@ -1261,32 +1420,37 @@ VolumeExecutable::IterType VolumeExecutable::getValueIterator() const
 
 void VolumeExecutable::setGrainSize(const size_t grain)
 {
-    mSettings->mGrainSize = grain;
+    mSettings->mGrainSizes.get().first = grain;
 }
 
 size_t VolumeExecutable::getGrainSize() const
 {
-    return mSettings->mGrainSize;
+    return mSettings->mGrainSizes.get().first;
 }
 
 void VolumeExecutable::setActiveTileStreamingGrainSize(const size_t grain)
 {
-    mSettings->mTileGrainSize = grain;
+    mSettings->mGrainSizes.get().second = grain;
 }
 
 size_t VolumeExecutable::getActiveTileStreamingGrainSize() const
 {
-    return mSettings->mTileGrainSize;
+    return mSettings->mGrainSizes.get().second;
+}
+
+Index VolumeExecutable::getTreeExecutionLevel() const
+{
+    return mSettings->mTreeExecutionLevel.get().first;
 }
 
 void VolumeExecutable::setAttributeBindings(const AttributeBindings& bindings)
 {
     for (const auto& binding : bindings.axToDataMap()) {
-        mSettings->mBindings.set(binding.first, binding.second);
+        mSettings->mBindings.get().set(binding.first, binding.second);
     }
     // check the registry to make sure everything is bound
     for (const auto& access : mAttributeRegistry->data()) {
-        if (!mSettings->mBindings.isBoundAXName(access.name())) {
+        if (!mSettings->mBindings.get().isBoundAXName(access.name())) {
             if (bindings.isBoundDataName(access.name())) {
                 OPENVDB_THROW(AXExecutionError, "AX attribute \"@"
                     + access.name() + "\" not bound to any volume."
@@ -1296,7 +1460,7 @@ void VolumeExecutable::setAttributeBindings(const AttributeBindings& bindings)
             else {
                 // rebind to itself as it may have been unbound
                 // by a previous set call
-                mSettings->mBindings.set(access.name(), access.name());
+                mSettings->mBindings.get().set(access.name(), access.name());
             }
         }
     }
@@ -1304,8 +1468,46 @@ void VolumeExecutable::setAttributeBindings(const AttributeBindings& bindings)
 
 const AttributeBindings& VolumeExecutable::getAttributeBindings() const
 {
-    return mSettings->mBindings;
+    return mSettings->mBindings.get();
 }
+
+
+////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////
+
+
+VolumeExecutable::CLI::CLI()
+    : mSettings(new VolumeExecutable::Settings<true>) {}
+VolumeExecutable::CLI::~CLI() {}
+VolumeExecutable::CLI::CLI(CLI&& other) {
+    mSettings = std::move(other.mSettings);
+}
+VolumeExecutable::CLI& VolumeExecutable::CLI::operator=(CLI&& other) {
+    mSettings = std::move(other.mSettings);
+    return *this;
+}
+
+VolumeExecutable::CLI
+VolumeExecutable::CLI::create(size_t argc, const char* argv[], bool* flags)
+{
+    CLI cli;
+    openvdb::ax::cli::init(argc, argv, {}, cli.mSettings->optional(), flags);
+    return cli;
+}
+
+void VolumeExecutable::CLI::usage(std::ostream& os, const bool verbose)
+{
+    VolumeExecutable::Settings<true> S;
+    for (const auto& P : S.optional()) {
+        ax::cli::usage(os, P->opts(), P->doc(), verbose);
+    }
+}
+
+void VolumeExecutable::setSettingsFromCLI(const VolumeExecutable::CLI& cli)
+{
+    mSettings->initialize(*cli.mSettings);
+}
+
 
 } // namespace ax
 } // namespace OPENVDB_VERSION_NAME
