@@ -2,6 +2,12 @@
 // SPDX-License-Identifier: MPL-2.0
 
 /// @file cmd/cli.h
+///
+/// @brief  This file is not intended to be part of the public API but is used
+///   internally by the vdb_ax command line too _and_ volume/point executables.
+/// @todo   Stabilize this API, consider making the parameter types public here
+///   and on the executables so that we can use it in the Houdini SOP/other
+///   components in the future.
 
 #ifndef OPENVDB_AX_VDB_AX_CLI_HAS_BEEN_INCLUDED
 #define OPENVDB_AX_VDB_AX_CLI_HAS_BEEN_INCLUDED
