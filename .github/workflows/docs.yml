@@ -23,9 +23,9 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: 'Deploy docs?'
+        description: 'Deploy to openvdb-website (docs/coverage)?'
         required: true
-        default: 'false'
+        default: 'none'
 
 jobs:
   doxygen:
@@ -73,15 +73,69 @@ jobs:
       if: |
         github.repository_owner == 'AcademySoftwareFoundation' &&
         github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.deploy == 'true'
+        github.event.inputs.deploy == 'docs'
       uses: peaceiris/actions-gh-pages@v3
       with:
         deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
         publish_dir: /usr/local/share/doc/OpenVDB/html
         destination_dir: documentation/doxygen
         external_repository: AcademySoftwareFoundation/openvdb-website
-        publish_branch: doxygen
+        publish_branch: master
         full_commit_message: "Automatic doxygen documentation update
           - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
 
           Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+
+  #############################################################################
+  ################################ Coverage ###################################
+  #############################################################################
+
+  linux-coverage:
+    if: |
+      github.repository_owner == 'AcademySoftwareFoundation' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.deploy == 'coverage'
+    runs-on: ubuntu-latest
+    container:
+      image: aswf/ci-openvdb:2021
+    env:
+      CXX: g++
+    steps:
+    - uses: actions/checkout@v2
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: install_gcovr
+      run: pip install gcovr
+    - name: build
+      run: >
+        ./ci/build.sh -v
+        --build-type=coverage
+        --components="core,axcore,test,axtest"
+        --cargs=\"-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF\"
+    - name: test_and_gcov
+      run: |
+        cd build
+        ctest -V
+        make gcov_html
+    - name: pre_deploy
+      # Overwrite global SSH configuration
+      #  https://github.com/peaceiris/actions-gh-pages/issues/719
+      #  https://linuxhint.com/ssh-stricthostkeychecking/
+      run: >
+        echo "Host *
+          StrictHostKeyChecking no
+          UserKnownHostsFile=/dev/null
+        " > /etc/ssh/ssh_config
+    - name: deploy
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+        publish_dir: ./build/gcov_html
+        destination_dir: documentation/code_coverage
+        external_repository: AcademySoftwareFoundation/openvdb-website
+        publish_branch: master
+        full_commit_message: "Automatic code coverage update
+          - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
+
+          Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+

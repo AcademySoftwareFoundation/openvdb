@@ -7,6 +7,11 @@
 <B>Version 9.1.1</B> - <I>In development</I>
 
 @par
+Bug Fixes:
+- Fixed an issue with tools::topologyToLevelSet which would previously
+ignore active tiles in the input topology. [Reported by Tobias Rittig]
+
+@par
 <B>Version 9.1.0</B> - <I>June 9, 2022</I>
 
 @par

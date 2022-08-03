@@ -78,6 +78,14 @@
     #endif
 #endif
 
+/// Macros to suppress undefined behaviour sanitizer warnings. Should be used
+/// sparingly, primarily to suppress issues in upstream dependencies.
+#if defined(__clang__)
+#define OPENVDB_UBSAN_SUPPRESS(X) __attribute__((no_sanitize(X)))
+#else
+#define OPENVDB_UBSAN_SUPPRESS(X)
+#endif
+
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
 /// as in the following example, to inhibit ICC remarks about unreachable code:
 /// @code
