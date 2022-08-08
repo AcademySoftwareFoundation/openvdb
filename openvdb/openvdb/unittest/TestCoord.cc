@@ -277,6 +277,7 @@ TEST_F(TestCoord, testCoordBBox)
         const size_t count = b.volume();
         size_t n = 0;
         openvdb::Coord::ValueType unused = 0;
+        (void)unused;
         for (const auto& ijk: b) {
             unused += ijk[0];
             EXPECT_TRUE(++n <= count);
