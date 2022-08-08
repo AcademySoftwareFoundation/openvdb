@@ -913,9 +913,7 @@ private:
     void resetTable(const MapType&) const {}
     //@}
 
-#if OPENVDB_ABI_VERSION_NUMBER < 8
     Index getChildCount() const;
-#endif
     Index getTileCount() const;
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
@@ -1502,13 +1500,11 @@ RootNode<ChildT>::evalActiveBoundingBox(CoordBBox& bbox, bool visitVoxels) const
 }
 
 
-#if OPENVDB_ABI_VERSION_NUMBER < 8
 template<typename ChildT>
 inline Index
 RootNode<ChildT>::getChildCount() const {
     return this->childCount();
 }
-#endif
 
 
 template<typename ChildT>

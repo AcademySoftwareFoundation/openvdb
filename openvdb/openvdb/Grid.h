@@ -173,10 +173,8 @@ public:
     /// shared with other grids.  The pointer is guaranteed to be non-null.
     virtual TreeBase::ConstPtr constBaseTreePtr() const = 0;
 
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     /// @brief Return true if tree is not shared with another grid.
     virtual bool isTreeUnique() const = 0;
-#endif
 
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
@@ -900,11 +898,8 @@ tools::minMax(grid->tree()). Use threaded = false for serial execution")
     //@}
     /// @brief Return true if tree is not shared with another grid.
     /// @note This is a virtual function with ABI=8
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
     bool isTreeUnique() const final;
-#else
-    bool isTreeUnique() const;
-#endif
+
     //@{
     /// @brief Return a reference to this grid's tree, which might be
     /// shared with other grids.
