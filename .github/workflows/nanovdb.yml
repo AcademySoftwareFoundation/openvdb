@@ -52,6 +52,8 @@ jobs:
     runs-on: ubuntu-latest
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
+    container:
+      image: aswf/ci-base:2022
     env:
       CXX: ${{ matrix.config.cxx }}
     strategy:
@@ -63,16 +65,15 @@ jobs:
           - { cxx: clang++, build: 'Debug' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
-      - name: update_apt
-        run: sudo apt-get update
-      - name: install_deps
-        run: >
-          sudo apt-get -q install -y
-          libboost-dev libboost-system-dev libboost-iostreams-dev
-          libtbb-dev libgtest-dev libblosc-dev
-      - name: install_cuda
-        run: sudo apt-get -q install -y nvidia-cuda-toolkit
+      - uses: actions/checkout@v3
+      - name: install_cuda_11
+        run: |
+          yum -y install yum-utils
+          yum-config-manager --add-repo http://developer.download.nvidia.com/compute/cuda/repos/rhel7/x86_64/cuda-rhel7.repo
+          echo "Installing cuda toolkit"
+          yum --enablerepo=epel -y install cuda-toolkit-11-0
+          echo '/usr/local/cuda-11.0/bin' >> $GITHUB_PATH
+          echo 'LD_LIBRARY_PATH=/usr/local/cuda-11.0/lib64:$LD_LIBRARY_PATH' >> $GITHUB_ENV
       - name: build
         run: >
           ./ci/build.sh -v
@@ -109,7 +110,7 @@ jobs:
           - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
@@ -157,12 +158,9 @@ jobs:
           - { runner: 'macos-11', cxx: 'clang++', build: 'Debug'   }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install_deps
         run: ./ci/install_macos.sh
-      - name: install
-        shell: bash
-        run: ./ci/install_blosc.sh 1.5.0
       - name: build
         run: >
           ./ci/build.sh -v
@@ -179,7 +177,7 @@ jobs:
       github.event.inputs.type == 'linux'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install_gtest
         run: |
           sudo apt-get update
