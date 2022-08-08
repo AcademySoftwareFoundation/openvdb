@@ -12,7 +12,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 option(UPDATE_BASELINES "Replace the expected outputs whilst running tests" OFF)
 option(DOWNLOAD_VDBS "Fetch .vdb files required for some tests" OFF)

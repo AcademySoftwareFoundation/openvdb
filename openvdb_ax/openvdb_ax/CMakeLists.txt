@@ -7,8 +7,12 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
-project(OpenVDBAXCore LANGUAGES CXX)
+cmake_minimum_required(VERSION 3.18)
+
+# There is a bug introduced with LLVM 14 config files which causes CMake to
+# complain if the project is not init-ted with LANGUAGES C
+# https://github.com/llvm/llvm-project/issues/53950
+project(OpenVDBAXCore LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 
@@ -265,6 +269,12 @@ if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   string(REPLACE "." "0" TBB_USE_GLIBCXX_VERSION ${CMAKE_CXX_COMPILER_VERSION})
   list(APPEND OPENVDB_AX_PUBLIC_DEFINES
     -DTBB_USE_GLIBCXX_VERSION=${TBB_USE_GLIBCXX_VERSION})
+endif()
+
+if(WIN32)
+  # Silence deprecation warnings coming from MSVC/LLVM about deriving from std::iterator
+  list(APPEND OPENVDB_AX_PUBLIC_DEFINES
+    -D_SILENCE_CXX17_ITERATOR_BASE_CLASS_DEPRECATION_WARNING)
 endif()
 
 list(APPEND OPENVDB_AX_PRIVATE_DEFINES "-DOPENVDB_AX_PRIVATE")
