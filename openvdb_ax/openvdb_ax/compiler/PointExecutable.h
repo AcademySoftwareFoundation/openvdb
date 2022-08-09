@@ -146,7 +146,7 @@ public:
     /// @details  This class wraps the logic for converting commands specific
     ///   to the PointExecutable to the internal Settings. Subsequent
     ///   executables can be initialized from the CLI object that gets created
-    struct CLI
+    struct OPENVDB_AX_API CLI
     {
         ~CLI();
         CLI(CLI&&);

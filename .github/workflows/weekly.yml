@@ -336,8 +336,8 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2020-clang7',  cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2020-clang7',  cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2020-clang7',  cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest,python' }
+          - { image: '2020-clang7',  cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest,python' }
           # Standalone
           - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core' }
@@ -366,7 +366,7 @@ jobs:
           ./ci/build.sh -v
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components="bin,axcore,axbin,axtest"
+          --components="bin,axcore,axbin,axtest,python"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -401,7 +401,7 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,bin,axcore,axbin,axtest"
+          --components="core,python,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -421,38 +421,38 @@ jobs:
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      # Export this with '' avoid bash treating \ as escape
+      VDB_INSTALL_PREFIX: '${{ github.workspace }}\\install'
     strategy:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', llvm_crt: 'MT',  build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', llvm_crt: 'MTd', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          # @todo  We don't currently run the axtests with shared builds of ax
+          # due to symbol issues using LLVM as a static lib (which is the only
+          # option on Windows).
+          - { vc: 'x64-windows',        crt: 'MD',  components: 'core,bin,axcore,axbin,python', build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
+          - { vc: 'x64-windows-static', crt: 'MT',  components: 'core,bin,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', crt: 'MTd', components: 'core,bin,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v2
-    - name: path
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: llvm
       shell: bash
-      # If building debug, build llvm with MTd
-      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm_crt }}
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
     - name: install
       shell: bash
       run: |
         vcpkg update
-        vcpkg install zlib tbb cppunit blosc \
-          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+        vcpkg install zlib tbb cppunit blosc python3 \
+          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm boost-python
     - name: build
       shell: bash
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,bin,axcore,axbin,axtest\"
+        --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 16 2019\"
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
@@ -460,9 +460,15 @@ jobs:
         -DMSVC_COMPRESS_PDB=ON
         -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
-        -DLLVM_DIR=${HOME}\llvm_install\lib\cmake\llvm
+        -DLLVM_DIR=\"${HOME}\\llvm_install\\lib\\cmake\\llvm\"
+        -DCMAKE_INSTALL_PREFIX=\"${VDB_INSTALL_PREFIX}\"
         ${{ matrix.config.cmake }}
         \'
+    - name: runtime_path
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "$Env:VDB_INSTALL_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: test
       shell: bash
       run: cd build && ctest -V -C ${{ matrix.config.build }}
