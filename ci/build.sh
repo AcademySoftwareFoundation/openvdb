@@ -2,6 +2,8 @@
 
 set -e
 
+CI_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)
+
 # print versions
 bash --version
 if [ ! -z "$CXX" ]; then $CXX -v; fi
@@ -129,6 +131,27 @@ for comp in "${!COMPONENTS[@]}"; do
     done
     CMAKE_EXTRA+=("-D${COMPONENTS[$comp]}=$setting")
 done
+
+################################################
+
+###### TEMPORARY CHANGE: check if we need to install blosc 1.17.0 as it's not available on the linux docker images yet
+if [ $(uname) == "Linux" ]; then
+    function get_ver_as_int { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+    BLOSC_VERSION="0.0.0"
+    if [ -f "/usr/local/include/blosc.h" ]; then
+        BLOSC_VERSION=$(cat /usr/local/include/blosc.h | grep BLOSC_VERSION_STRING | cut -d'"' -f 2)
+    fi
+
+    if [ $(get_ver_as_int $BLOSC_VERSION) -lt $(get_ver_as_int "1.17.0") ]; then
+        # Install
+        $CI_DIR/install_blosc.sh 1.17.0
+    elif [ $(get_ver_as_int $BLOSC_VERSION) -eq $(get_ver_as_int "1.17.0") ]; then
+        # Remind us to remove this code
+        echo "FAIL: Blosc has been updated to 1.17.0 - this logic in build.sh should be removed!!"
+        exit 1
+    fi
+fi
+###### TEMPORARY CHANGE: always install blosc 1.17.0 as it's not available on the docker images yet
 
 ################################################
 
