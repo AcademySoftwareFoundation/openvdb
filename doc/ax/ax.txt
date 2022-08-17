@@ -1165,10 +1165,11 @@ operations (if an operation is not listed, it is not supported):
 <tr style="text-align:center">
 <th>Left Operand Type</th><th>Binary Op(s)</th><th>Right Operand Type</th><th>Description</th>
 </tr>
-<tr style="text-align:center"><td rowspan="3">@ref axscalars "scalar"</td><td rowspan="3">`== != < > <= >=`</td><td>@ref axscalars "scalar"</td>
+<tr style="text-align:center"><td rowspan="3">@ref axscalars "scalar"</td><td rowspan="1">`== != < > <= >=`</td><td>@ref axscalars "scalar"</td>
 <td style="text-align:left">Returns the result of the scalar comparison.</td>
 </tr>
 <tr style="text-align:center">
+<td rowspan="2">`== !=`</td>
 <td>@ref axvecmats "vector"</td>
 <td style="text-align:left" rowspan="2">
 Performs per component comparisons (after
@@ -1195,11 +1196,12 @@ for (int i = 1; i < 3; ++i) c &= a[i] == b;
 </tr>
 <tr style="text-align:center">
 <td style="border-top-width: thick" rowspan="2">@ref axvecmats "vector"</td>
-<td style="border-top-width: thick; text-align:center" rowspan="2">`== != < > <= >=`</td>
+<td style="border-top-width: thick; text-align:center" rowspan="1">`== != < > <= >=`</td>
 <td style="border-top-width: thick">@ref axscalars "scalar"</td>
 <td style="border-top-width: thick;text-align:left">Same as `scalar op vector`</td>
 </tr>
 <tr style="text-align:center">
+<td rowspan="1">`== !=`</td>
 <td>@ref axvecmats "vector"</td>
 <td style="text-align:left">
 Performs binary comparison operations (after
@@ -1220,11 +1222,13 @@ for (int i = 1; i < 3; ++i) c &= a[i] == b[i];
 </tr>
 <tr style="text-align:center">
 <td style="border-top-width: thick" rowspan="2">@ref axvecmats "matrix"</td>
-<td style="border-top-width: thick; text-align:center" rowspan="2">`== != < > <= >=`</td>
+<td style="border-top-width: thick; text-align:center" rowspan="1">`== != < > <= >=`</td>
 <td style="border-top-width: thick">@ref axscalars "scalar"</td>
 <td style="border-top-width: thick;text-align:left">Same as `scalar op matrix`</td>
 </tr>
-<tr style="text-align:center"><td>@ref axvecmats "matrix"</td>
+<tr style="text-align:center">
+<td rowspan="1">`== !=`</td>
+<td>@ref axvecmats "matrix"</td>
 <td style="text-align:left">
 Performs binary comparison operations (after
 @ref axtypeprecedence "implicit conversion") on each pair corresponding
