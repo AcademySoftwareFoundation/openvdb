@@ -1,0 +1,3 @@
+Build:
+    - Fixed an issue where OPENVDB_AX_DLL was not being defined on shared library builds of AX, resulting in symbols not being exported.
+    - Fixed an issue where setting Tbb_INCLUDE_DIR could cause CMake failures.
