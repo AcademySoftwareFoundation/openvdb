@@ -56,9 +56,10 @@ jobs:
 
   linux-vfx-houdini:
     needs: [checksecret]
-    if: >
-      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-          github.repository_owner == 'AcademySoftwareFoundation' }}
+#    if: >
+#      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+#          github.repository_owner == 'AcademySoftwareFoundation' }}
+    if: ${{ false }}  # disable for now
     runs-on: ubuntu-latest
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
@@ -71,7 +72,7 @@ jobs:
         config:
           - { cxx: clang++, image: '2021', hou: '19_5', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
           # Houdini 19 is technically on VFX 2020, but we need 2021 dependencies for VDB 10
-          - { cxx: clang++, image: '2021', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2021', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'ON' }
           - { cxx: clang++, image: '2021', hou: '19_5', j: '2', build: 'Debug',   components: 'core,hou', disable_checks: 'OFF' }
           - { cxx: g++,     image: '2021', hou: '19_5', j: '1', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
       fail-fast: false

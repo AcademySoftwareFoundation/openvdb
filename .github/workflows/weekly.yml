@@ -48,12 +48,13 @@ jobs:
   # succeeds, put it into the GitHub Actions cache
   linux_houdini:
     needs: [checksecret]
-    if: |
-      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation') &&
-      (github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'houdini')
+#    if: |
+#      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+#      github.repository_owner == 'AcademySoftwareFoundation') &&
+#      (github.event_name != 'workflow_dispatch' ||
+#      github.event.inputs.type == 'all' ||
+#      github.event.inputs.type == 'houdini')
+    if: ${{ false }}  # disable for now
     runs-on: ubuntu-latest
     name: linux-houdini:${{ matrix.config.houdini_version }}
     env:
@@ -88,7 +89,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest"
-        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
+        --cargs=\"-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
     - name: write_houdini_cache
