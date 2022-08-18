@@ -115,13 +115,14 @@ class TestOpenVDB(unittest.TestCase):
 
         vec3_grid.fill((0, 0, 0), (7, 7, 7), (-1,-1,-1), active=True)
         openvdb.ax('v@vec_grid = @float_grid;', [vec3_grid, float_grid])
+        acc = vec3_grid.getAccessor()
 
         for i in range(0, 8):
             for j in range(0, 8):
                 for k in range(0, 8):
                     ijk = (i, j, k)
                     lsq = (i*i)+(j*j)+(k*k)
-                    self.assertEqual(acc.getValue(ijk), float(lsq))
+                    self.assertEqual(acc.getValue(ijk), (lsq,lsq,lsq))
 
 
     def testTransform(self):
