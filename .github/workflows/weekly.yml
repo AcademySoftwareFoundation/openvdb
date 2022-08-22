@@ -392,6 +392,7 @@ jobs:
           - { cxx: 'g++',     build: 'Release', llvm: '8'  }
           - { cxx: 'clang++', build: 'Debug',   llvm: '8'  }
           - { cxx: 'clang++', build: 'Release', llvm: '13' }
+          - { cxx: 'clang++', build: 'Release', llvm: '14' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2

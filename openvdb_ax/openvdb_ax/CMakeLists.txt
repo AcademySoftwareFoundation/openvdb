@@ -8,7 +8,10 @@
 #]=======================================================================]
 
 cmake_minimum_required(VERSION 3.15)
-project(OpenVDBAXCore LANGUAGES CXX)
+# There is a bug introduced with LLVM 14 config files which causes CMake to
+# complain if the project is not init-ted with LANGUAGES C
+# https://github.com/llvm/llvm-project/issues/53950
+project(OpenVDBAXCore LANGUAGES C CXX)
 
 include(GNUInstallDirs)
 

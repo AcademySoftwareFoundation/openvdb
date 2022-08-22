@@ -265,7 +265,12 @@ Function::flattenAttrs(llvm::LLVMContext& C) const
         return set;
     };
 
+#if LLVM_VERSION_MAJOR <= 13
     llvm::AttrBuilder ab;
+#else
+    llvm::AttrBuilder ab(C);
+#endif
+
     const llvm::AttributeSet fn = buildSetFromKinds(ab, mAttributes->mFnAttrs);
     const llvm::AttributeSet ret = buildSetFromKinds(ab, mAttributes->mRetAttrs);
 

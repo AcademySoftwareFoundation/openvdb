@@ -55,7 +55,11 @@ inline auto ir_load(llvm::IRBuilder<>& B, llvm::Value* ptr, const char* Name = "
 {
     assert(ptr);
     assert(ptr->getType()->isPointerTy());
+#if LLVM_VERSION_MAJOR <= 7
+    return B.CreateLoad(ptr, Name);
+#else
     return B.CreateLoad(ptr->getType()->getPointerElementType(), ptr, Name);
+#endif
 }
 
 /// @brief  Alias around IR gep inst.
@@ -65,8 +69,12 @@ inline auto ir_gep(llvm::IRBuilder<>& B,
     assert(ptr);
     assert(ptr->getType()->getScalarType());
     assert(ptr->getType()->getScalarType()->isPointerTy());
+#if LLVM_VERSION_MAJOR <= 7
+    return B.CreateGEP(ptr, IdxList, Name);
+#else
     return B.CreateGEP(ptr->getType()->getScalarType()->getPointerElementType(),
                  ptr, IdxList, Name);
+#endif
 }
 
 /// @brief  Alias around IR gep2_64 inst.
@@ -76,9 +84,13 @@ inline auto ir_constgep2_64(llvm::IRBuilder<>& B,
     assert(ptr);
     assert(ptr->getType()->getScalarType());
     assert(ptr->getType()->getScalarType()->isPointerTy());
+#if LLVM_VERSION_MAJOR <= 7
+    return B.CreateConstGEP2_64(ptr, Idx0, Idx1, Name);
+#else
     return B.CreateConstGEP2_64(
         ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
         Idx1, Name);
+#endif
 }
 
 /// @brief  Alias around IR in bounds gep2_64 inst.
@@ -88,9 +100,13 @@ inline auto ir_constinboundsgep2_64(llvm::IRBuilder<>& B,
     assert(ptr);
     assert(ptr->getType()->getScalarType());
     assert(ptr->getType()->getScalarType()->isPointerTy());
+#if LLVM_VERSION_MAJOR <= 7
+    return B.CreateConstInBoundsGEP2_64(ptr, Idx0, Idx1, Name);
+#else
     return B.CreateConstInBoundsGEP2_64(
         ptr->getType()->getScalarType()->getPointerElementType(), ptr, Idx0,
         Idx1, Name);
+#endif
 }
 
 /// @brief  Populate a vector of llvm Types from a vector of llvm values
