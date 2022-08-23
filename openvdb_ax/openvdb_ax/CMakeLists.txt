@@ -306,7 +306,7 @@ endif()
 # Configure shared build
 
 if(OPENVDB_AX_SHARED)
-  target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES})
+  target_compile_definitions(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_DEFINES} -DOPENVDB_AX_DLL)
   target_compile_definitions(openvdb_ax_shared PRIVATE ${OPENVDB_AX_PRIVATE_DEFINES})
   target_compile_options(openvdb_ax_shared PUBLIC ${OPENVDB_AX_PUBLIC_OPTIONS})
   target_include_directories(openvdb_ax_shared PUBLIC ../)

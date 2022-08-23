@@ -169,6 +169,8 @@ if(NOT Tbb_INCLUDE_DIR)
     PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
     PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
   )
+else()
+  set(Tbb_LEGACY_INCLUDE_DIR ${Tbb_INCLUDE_DIR})
 endif()
 
 # Look for a new tbb header installation

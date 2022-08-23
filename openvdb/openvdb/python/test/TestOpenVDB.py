@@ -12,6 +12,17 @@ C++-to-Python bindings, not the OpenVDB library itself.
 import os, os.path
 import sys
 import unittest
+import inspect
+
+# If on Windows, add required dll directories from our binary build tree
+if 'add_dll_directory' in dir(os):
+    # Should be something like Release, Debug, etc
+    config = os.path.basename(os.getcwd())
+    os.add_dll_directory(os.getcwd() + '\\..\\..\\' + config)
+    if os.getenv('OPENVDB_TEST_PYTHON_AX'):
+        os.add_dll_directory(os.getcwd() +
+            '\\..\\..\\..\\..\\openvdb_ax\\openvdb_ax\\' + config)
+
 import pyopenvdb as openvdb
 
 
@@ -31,6 +42,19 @@ def valueFactory(zeroValue, elemValue):
         # Return a scalar value of the appropriate type.
         val = typ(elemValue)
     return val
+
+
+def ax_is_enabled():
+    '''
+    Return true if we should be testing pyopenvdb.ax(). This environment
+    variable is set by the CMake test command if we expect AX to be tested.
+    '''
+    ax_hook_exists = 'ax' in dir(openvdb) and inspect.isbuiltin(openvdb.ax)
+    ax_is_enabled = os.getenv('OPENVDB_TEST_PYTHON_AX')
+    if ax_is_enabled and not ax_hook_exists:
+        raise RuntimeError('Expected to test the AX python hooks but '
+            'pyopenvdb.ax() has not been located.')
+    return ax_is_enabled
 
 
 class TestOpenVDB(unittest.TestCase):
@@ -58,6 +82,47 @@ class TestOpenVDB(unittest.TestCase):
             acc = grid.getAccessor()
             acc.setValueOn((-1, -2, 3))
             self.assertEqual(grid.activeVoxelCount(), 1)
+
+
+    def testAX(self):
+        if not ax_is_enabled():
+            return
+
+        float_grid = openvdb.FloatGrid()
+        float_grid.name = 'float_grid'
+        ijk = (1, 1, 1)
+
+        acc = float_grid.getAccessor()
+        acc.setValueOn((ijk))
+        self.assertEqual(acc.getValue(ijk), 0)
+
+        openvdb.ax('@float_grid = 2;', float_grid)
+        self.assertEqual(acc.getValue(ijk), 2)
+        acc.setValueOn((ijk))
+
+        float_grid.fill((0, 0, 0), (7, 7, 7), -1, active=True)
+        openvdb.ax('@float_grid = lengthsq(getcoord());', float_grid)
+
+        for i in range(0, 8):
+            for j in range(0, 8):
+                for k in range(0, 8):
+                    ijk = (i, j, k)
+                    lsq = (i*i)+(j*j)+(k*k)
+                    self.assertEqual(acc.getValue(ijk), lsq)
+
+        vec3_grid = openvdb.Vec3SGrid()
+        vec3_grid.name = 'vec_grid'
+
+        vec3_grid.fill((0, 0, 0), (7, 7, 7), (-1,-1,-1), active=True)
+        openvdb.ax('v@vec_grid = @float_grid;', [vec3_grid, float_grid])
+        acc = vec3_grid.getAccessor()
+
+        for i in range(0, 8):
+            for j in range(0, 8):
+                for k in range(0, 8):
+                    ijk = (i, j, k)
+                    lsq = (i*i)+(j*j)+(k*k)
+                    self.assertEqual(acc.getValue(ijk), (lsq,lsq,lsq))
 
 
     def testTransform(self):

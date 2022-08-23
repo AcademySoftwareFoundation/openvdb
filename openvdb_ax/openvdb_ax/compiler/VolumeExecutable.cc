@@ -1207,7 +1207,7 @@ inline void run(GridCache& cache,
     // @note If Streaming::AUTO, this value can be temporarily
     // changed by the next invocation of run().
     data.mActiveTileStreaming = ((data.mIterMode == 1 || data.mIterMode == 2) &&
-        (S.mActiveTileStreaming != VolumeExecutable::Streaming::OFF));
+        (S.mActiveTileStreaming.get() != VolumeExecutable::Streaming::OFF));
 
     openvdb::GridBase** read = cache.mRead.data();
     data.mVoidTransforms.reserve(cache.mRead.size());
@@ -1312,13 +1312,13 @@ void VolumeExecutable::execute(openvdb::GridPtrVec& grids) const
 
     if (logger->hasError()) return;
 
-    if (mSettings->mValueIterator == IterType::ON) {
+    if (mSettings->mValueIterator.get() == IterType::ON) {
         run<ValueOnIter>(*cache, mFunctionAddresses, *mAttributeRegistry, mCustomData.get(), *mSettings, *this, *logger);
     }
-    else if (mSettings->mValueIterator == IterType::OFF) {
+    else if (mSettings->mValueIterator.get() == IterType::OFF) {
         run<ValueOffIter>(*cache, mFunctionAddresses, *mAttributeRegistry, mCustomData.get(), *mSettings, *this, *logger);
     }
-    else if (mSettings->mValueIterator == IterType::ALL) {
+    else if (mSettings->mValueIterator.get() == IterType::ALL) {
         run<ValueAllIter>(*cache, mFunctionAddresses, *mAttributeRegistry, mCustomData.get(), *mSettings, *this, *logger);
     }
     else {
@@ -1387,7 +1387,7 @@ VolumeExecutable::getActiveTileStreaming(const std::string& name,
                      const ast::tokens::CoreType& type) const
 {
     assert(mAttributeRegistry);
-    if (mSettings->mActiveTileStreaming == VolumeExecutable::Streaming::AUTO) {
+    if (mSettings->mActiveTileStreaming.get() == VolumeExecutable::Streaming::AUTO) {
         const ax::AttributeRegistry::AccessData* accessData =
             mAttributeRegistry->get(name, type);
         if (!accessData) return this->getActiveTileStreaming();
