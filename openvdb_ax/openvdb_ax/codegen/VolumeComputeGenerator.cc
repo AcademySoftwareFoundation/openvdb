@@ -115,13 +115,13 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
 
         // increment
         B.SetInsertPoint(iterBlock);
-        llvm::Value* new_incr = B.CreateAdd(B.CreateLoad(incr), B.getInt64(1));
+        llvm::Value* new_incr = B.CreateAdd(ir_load(B, incr), B.getInt64(1));
         B.CreateStore(new_incr, incr);
         B.CreateBr(conditionBlock);
 
         // generate loop body
         B.SetInsertPoint(bodyBlock);
-        llvm::Value* lincr = B.CreateLoad(incr);
+        llvm::Value* lincr = ir_load(B, incr);
 
         // Extract mask bit from array of words
         // NodeMask::isOn() = (0 != (mWords[n >> 6] & (Word(1) << (n & 63))));
@@ -129,8 +129,8 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
             binaryOperator(lincr, B.getInt64(63), ast::tokens::BITAND, B),
                 ast::tokens::SHIFTLEFT, B);
         llvm::Value* word_idx = binaryOperator(lincr, B.getInt64(6), ast::tokens::SHIFTRIGHT, B);
-        llvm::Value* word = B.CreateGEP(abuff, word_idx);
-        word = B.CreateLoad(word);
+        llvm::Value* word = ir_gep(B, abuff, word_idx);
+        word = ir_load(B, word);
         word = binaryOperator(word, mask, ast::tokens::BITAND, B);
         llvm::Value* ison = B.CreateICmpNE(word, B.getInt64(0));
 
@@ -152,7 +152,7 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
                 args[1],            // index space coordinate
                 vbuff,              // value buffer
                 ison,               // active/inactive
-                B.CreateLoad(incr), // offset in the value buffer
+                ir_load(B, incr), // offset in the value buffer
                 args[6],            // read accessors
                 args[7],            // transforms
                 args[8]             // write index
@@ -162,7 +162,7 @@ inline void VolumeComputeGenerator::computek2(llvm::Function* compute, const Att
         }
 
         B.SetInsertPoint(conditionBlock);
-        llvm::Value* endCondition = B.CreateICmpULT(B.CreateLoad(incr), buffSize);
+        llvm::Value* endCondition = B.CreateICmpULT(ir_load(B, incr), buffSize);
 
         llvm::BasicBlock* postBlock = llvm::BasicBlock::Create(C, "k2.end", base);
         B.CreateCondBr(endCondition, bodyBlock, postBlock);
@@ -220,7 +220,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
 
             llvm::Value* registeredIndex = this->mModule.getGlobalVariable(token);
             assert(registeredIndex);
-            registeredIndex = B.CreateLoad(registeredIndex);
+            registeredIndex = ir_load(B, registeredIndex);
             llvm::Value* result = B.CreateICmpEQ(wi, registeredIndex);
 
             llvm::BasicBlock* thenBlock = llvm::BasicBlock::Create(C, "k3.invoke_k1_" + token, base);
@@ -234,7 +234,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
 
             const FunctionGroup* const F = this->getFunction("probevalue", true);
             F->execute({wa, isc, ison, location}, B);
-            ison = B.CreateLoad(ison);
+            ison = ir_load(B, ison);
 
             llvm::Value* vptr = B.CreatePointerCast(location, LLVMType<void*>::get(C));
 
@@ -252,7 +252,7 @@ inline void VolumeComputeGenerator::computek3(llvm::Function* compute, const Att
 
             // set the voxel - load the result (if its a scalar)
             if (type->isIntegerTy() || type->isFloatingPointTy()) {
-                location = B.CreateLoad(location);
+                location = ir_load(B, location);
             }
 
             const FunctionGroup* const function = this->getFunction("setvoxel", true);
@@ -381,7 +381,7 @@ bool VolumeComputeGenerator::visit(const ast::Attribute* node)
     const std::string globalName = node->tokenname();
     llvm::Value* value;
     value = localTable->get(globalName + "_vptr");
-    value = mBuilder.CreateLoad(value);
+    value = ir_load(mBuilder, value);
     assert(value);
     mValues.push(value);
     return true;
@@ -400,7 +400,7 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
     llvm::Value* registeredIndex = llvm::cast<llvm::GlobalVariable>
         (mModule.getOrInsertGlobal(globalName, LLVMType<int64_t>::get(mContext)));
     this->globals().insert(globalName, registeredIndex);
-    registeredIndex = mBuilder.CreateLoad(registeredIndex);
+    registeredIndex = ir_load(mBuilder, registeredIndex);
 
     // first see if pre cached node exists.
 
@@ -422,7 +422,7 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
 
         llvm::Type* type = location->getType(); // ValueType*
         valueptr = mBuilder.CreatePointerCast(valueptr, type);
-        llvm::Value* value = mBuilder.CreateGEP(valueptr, offset);
+        llvm::Value* value = ir_gep(mBuilder, valueptr, offset);
         mBuilder.CreateStore(value, this->mSymbolTables.get(1)->get(globalName + "_vptr"));
         mBuilder.CreateBr(post);
     }
@@ -441,13 +441,13 @@ void VolumeComputeGenerator::getAccessorValue(const std::string& globalName, llv
         assert(origin);
         assert(offset);
 
-        accessorPtr = mBuilder.CreateGEP(accessorPtr, registeredIndex);
-        llvm::Value* targetTransform = mBuilder.CreateGEP(transformPtr, registeredIndex);
-        llvm::Value* sourceTransform = mBuilder.CreateGEP(transformPtr, accessIndex);
+        accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
+        llvm::Value* targetTransform = ir_gep(mBuilder, transformPtr, registeredIndex);
+        llvm::Value* sourceTransform = ir_gep(mBuilder, transformPtr, accessIndex);
 
-        llvm::Value* accessor = mBuilder.CreateLoad(accessorPtr);
-        targetTransform = mBuilder.CreateLoad(targetTransform);
-        sourceTransform = mBuilder.CreateLoad(sourceTransform);
+        llvm::Value* accessor = ir_load(mBuilder, accessorPtr);
+        targetTransform = ir_load(mBuilder, targetTransform);
+        sourceTransform = ir_load(mBuilder, sourceTransform);
 
         const FunctionGroup* const F = this->getFunction("getvoxel", true);
         F->execute({accessor, sourceTransform, targetTransform, origin, offset, location}, mBuilder);
@@ -467,17 +467,17 @@ llvm::Value* VolumeComputeGenerator::accessorHandleFromToken(const std::string& 
         (mModule.getOrInsertGlobal(globalName, LLVMType<int64_t>::get(mContext)));
     this->globals().insert(globalName, registeredIndex);
 
-    registeredIndex = mBuilder.CreateLoad(registeredIndex);
+    registeredIndex = ir_load(mBuilder, registeredIndex);
 
     // index into the void* array of handles and load the value.
     // The result is a loaded void* value
 
     llvm::Value* accessorPtr = extractArgument(mFunction, "accessors");
     assert(accessorPtr);
-    accessorPtr = mBuilder.CreateGEP(accessorPtr, registeredIndex);
+    accessorPtr = ir_gep(mBuilder, accessorPtr, registeredIndex);
 
     // return loaded void** = void*
-    return mBuilder.CreateLoad(accessorPtr);
+    return ir_load(mBuilder, accessorPtr);
 }
 
 ///////////////////////////////////////////////////////////////////////////

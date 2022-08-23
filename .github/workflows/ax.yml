@@ -61,11 +61,11 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,python,bin,axcore,axbin,axtest' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -143,7 +143,7 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,bin,axcore,axbin,axtest"
+          --components="core,python,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF

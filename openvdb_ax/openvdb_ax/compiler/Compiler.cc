@@ -35,7 +35,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/SourceMgr.h> // SMDiagnostic
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
 

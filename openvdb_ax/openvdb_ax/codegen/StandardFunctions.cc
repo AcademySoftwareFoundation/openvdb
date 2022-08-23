@@ -1817,7 +1817,7 @@ inline FunctionGroup::UniquePtr axpostscale(const FunctionOptions& op)
             for (size_t col = 0; col < 3; ++col) {
                 const size_t idx = (row*4) + col;
                 assert(idx <= 14);
-                llvm::Value* m1v = B.CreateLoad(m1[idx]);
+                llvm::Value* m1v = ir_load(B, m1[idx]);
                 m1v = binaryOperator(m1v, v1[col], ast::tokens::MULTIPLY, B);
                 B.CreateStore(m1v, m1[idx]);
             }
@@ -1933,7 +1933,7 @@ inline FunctionGroup::UniquePtr axprescale(const FunctionOptions& op)
             for (size_t col = 0; col < 4; ++col) {
                 const size_t idx = (row*4) + col;
                 assert(idx <= 11);
-                llvm::Value* m1v = B.CreateLoad(m1[idx]);
+                llvm::Value* m1v = ir_load(B, m1[idx]);
                 m1v = binaryOperator(m1v, v1[row], ast::tokens::MULTIPLY, B);
                 B.CreateStore(m1v, m1[idx]);
             }
@@ -2261,9 +2261,9 @@ inline FunctionGroup::UniquePtr axinverse(const FunctionOptions& op)
         assert(madj.size() == 9 && m1.size() == 9);
 
         // compute determinant of the input mat by reusing the adjoint's 0, 3 and 6 terms
-        llvm::Value* m20 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 0));
-        llvm::Value* m23 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 3));
-        llvm::Value* m26 = B.CreateLoad(B.CreateConstGEP2_64(args[1], 0, 6));
+        llvm::Value* m20 = ir_load(B, ir_constgep2_64(B, args[1], 0, 0));
+        llvm::Value* m23 = ir_load(B, ir_constgep2_64(B, args[1], 0, 3));
+        llvm::Value* m26 = ir_load(B, ir_constgep2_64(B, args[1], 0, 6));
 
         // compute det and store in c0
         llvm::Value* c0 = binaryOperator(madj[0], m20, ast::tokens::MULTIPLY, B);
@@ -2778,7 +2778,7 @@ inline FunctionGroup::UniquePtr axhsvtorgb(const FunctionOptions& op)
 
         B.SetInsertPoint(post);
 
-        h = B.CreateLoad(h);
+        h = ir_load(B, h);
         llvm::Value* sat = hsv[1];
         llvm::Value* val = hsv[2];
 
@@ -2936,7 +2936,7 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
 
         B.SetInsertPoint(post);
 
-        llvm::Value* sat = B.CreateLoad(hsv[1]);
+        llvm::Value* sat = ir_load(B, hsv[1]);
 
         then = llvm::BasicBlock::Create(C, "then", base);
         post = llvm::BasicBlock::Create(C, "post", base);
@@ -3011,7 +3011,7 @@ inline FunctionGroup::UniquePtr axrgbtohsv(const FunctionOptions& op)
 
             llvm::Value* six = llvm::ConstantFP::get(precision, 6.0);
 
-            llvm::Value* h = B.CreateLoad(hsv[0]);
+            llvm::Value* h = ir_load(B, hsv[0]);
             h = binaryOperator(h, six, ast::tokens::DIVIDE, B);
             B.CreateStore(h, hsv[0]);
 
@@ -3107,7 +3107,7 @@ inline FunctionGroup::UniquePtr axexternal(const FunctionOptions& op)
         inputs.emplace_back(arg);
         inputs.insert(inputs.end(), args.begin(), args.end());
         ax_external(op)->execute(inputs, B);
-        return B.CreateLoad(inputs.front());
+        return ir_load(B, inputs.front());
     };
 
     return FunctionBuilder("external")

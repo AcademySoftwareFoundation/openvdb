@@ -274,6 +274,32 @@ if(USE_AX)
   target_compile_definitions(pyopenvdb PUBLIC "-DPY_OPENVDB_USE_AX")
 endif()
 
+# Configure static boost linkage
+# @note  This is usually undesirable. pyopenvdb should ideally be built
+#   against dynamic libs/runtime
+# @note  For some reason vcpkg decides to turn Boost_USE_STATIC_LIBS off
+#   when calling find_package(Boost), so we have to manually query the
+#   triplet to see if we're using boost static libs.
+set(_BUILDING_STATIC_TRIPLET OFF)
+if(VCPKG_TARGET_TRIPLET)
+  string(FIND ${VCPKG_TARGET_TRIPLET} "static" _BUILDING_STATIC_TRIPLET)
+  if(NOT (_BUILDING_STATIC_TRIPLET EQUAL -1))
+    set(_BUILDING_STATIC_TRIPLET ON)
+  else()
+    set(_BUILDING_STATIC_TRIPLET OFF)
+  endif()
+endif()
+
+if(Boost_USE_STATIC_LIBS OR _BUILDING_STATIC_TRIPLET)
+  message(WARNING "Building pyopenvdb against static variants of python/boost.python is not recommended.")
+  # Boost CMake should define these but doesn't...
+  target_compile_definitions(pyopenvdb PUBLIC "-DBOOST_PYTHON_STATIC_LIB")
+  if(USE_NUMPY)
+    target_compile_definitions(pyopenvdb PUBLIC "-DBOOST_NUMPY_STATIC_LIB")
+  endif()
+endif()
+unset(_BUILDING_STATIC_TRIPLET)
+
 set(PYTHON_PUBLIC_INCLUDE_NAMES
   pyopenvdb.h
 )
@@ -288,15 +314,29 @@ install(FILES ${PYTHON_PUBLIC_INCLUDE_NAMES} DESTINATION ${CMAKE_INSTALL_INCLUDE
 
 # pytest
 if(OPENVDB_BUILD_PYTHON_UNITTESTS)
-  add_test(pytest ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py -v)
+
+  set(PYVDB_WORKING_DIR "${CMAKE_CURRENT_BINARY_DIR}")
   if(WIN32)
-    set(PYTHONPATH "$ENV{PYTHONPATH};${CMAKE_CURRENT_BINARY_DIR}")
+    set(PYVDB_WORKING_DIR "${PYVDB_WORKING_DIR}/$<CONFIG>")
+  endif()
+
+  add_test(NAME pytest
+    COMMAND ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test/TestOpenVDB.py -v
+    WORKING_DIRECTORY "${PYVDB_WORKING_DIR}")
+
+  set(PYOPENVDB_TEST_ENV "")
+  if(USE_AX)
+    list(APPEND PYOPENVDB_TEST_ENV "OPENVDB_TEST_PYTHON_AX=1")
+  endif()
+
+  if(WIN32)
+    set(PYTHONPATH "$ENV{PYTHONPATH};${PYVDB_WORKING_DIR}")
     string(REPLACE "\\;" ";" PYTHONPATH "${PYTHONPATH}")
     string(REPLACE ";" "\\;" PYTHONPATH "${PYTHONPATH}")
     set_tests_properties(pytest PROPERTIES
-      ENVIRONMENT "PYTHONPATH=${PYTHONPATH}")
+      ENVIRONMENT "PYTHONPATH=${PYTHONPATH};${PYOPENVDB_TEST_ENV}")
   else()
     set_tests_properties(pytest PROPERTIES
-      ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${CMAKE_CURRENT_BINARY_DIR}")
+      ENVIRONMENT "PYTHONPATH=$ENV{PYTHONPATH}:${PYVDB_WORKING_DIR};${PYOPENVDB_TEST_ENV}")
   endif()
 endif()
