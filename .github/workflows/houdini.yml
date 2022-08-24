@@ -56,10 +56,9 @@ jobs:
 
   linux-vfx-houdini:
     needs: [checksecret]
-#    if: >
-#      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-#          github.repository_owner == 'AcademySoftwareFoundation' }}
-    if: ${{ false }}  # disable for now
+    if: >
+      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+          github.repository_owner == 'AcademySoftwareFoundation' }}
     runs-on: ubuntu-20.04-8c-32g-300h
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
