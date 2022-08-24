@@ -23,6 +23,11 @@ tar -xzf houdini.tar.gz
 
 # copy required files into hou dir
 cp houdini_setup* ../hou/.
+
+# report library names
+ls -al dsolib/
+
+# copy required libraries
 cp -r toolkit/cmake ../hou/toolkit/.
 cp -r toolkit/include ../hou/toolkit/.
 cp -r dsolib/libHoudini* ../hou/dsolib/.
@@ -32,19 +37,15 @@ cp -r dsolib/libhboost* ../hou/dsolib/.
 cp -r dsolib/libz* ../hou/dsolib/.
 cp -r dsolib/libbz2* ../hou/dsolib/.
 cp -r dsolib/libtbb* ../hou/dsolib/.
-cp -r dsolib/libHalf* ../hou/dsolib/.
 cp -r dsolib/libjemalloc* ../hou/dsolib/.
 cp -r dsolib/liblzma* ../hou/dsolib/.
 cp -r dsolib/libIex* ../hou/dsolib/.
 cp -r dsolib/libImath* ../hou/dsolib/.
 cp -r dsolib/libIlmThread* ../hou/dsolib/.
-cp -r dsolib/libIlmImf* ../hou/dsolib/.
 
-# needed for < H18.0 (due to sesitag)
-if [ "$HOUDINI_MAJOR" == "17.0" ] || [ "$HOUDINI_MAJOR" == "17.5" ]; then
-    cp -r bin/app_init* ../hou/bin/.
-    cp -r bin/sesitag* ../hou/bin/.
-    cp -r dsolib/lib* ../hou/dsolib/.
+if [ "$HOUDINI_MAJOR" == "19.0" ]; then
+    cp -r dsolib/libHalf* ../hou/dsolib/.
+    cp -r dsolib/libIlmImf* ../hou/dsolib/.
 fi
 
 # write hou into hou.tar.gz and cleanup

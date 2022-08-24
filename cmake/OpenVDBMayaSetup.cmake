@@ -51,7 +51,7 @@ variables may be provided to tell this module where to look.
 # Find the Maya installation and use Maya's CMake to initialize
 # the Maya lib
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 
 set(_FIND_MAYA_ADDITIONAL_OPTIONS "")

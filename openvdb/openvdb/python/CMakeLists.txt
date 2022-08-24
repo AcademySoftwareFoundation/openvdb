@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBPython LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -87,24 +87,15 @@ function(OPENVDB_CHECK_PYTHON_VERSION)
   endif()
 endfunction()
 
-# Configure Python and Numpy. Note that:
-#  - find_package(Python Development) target Python::Module requires CMake >= 3.15
-#  - find_package(Python Development.Module) requires CMake >= 3.18
+# Configure Python and Numpy.
 # To ensure consistent versions between components Interpreter, Compiler,
 # Development and NumPy, specify all components at the same time when using
 # FindPython.
-# @note  the Python::Module target should be used over the Python::Python
-#   target but this was only added in CMake 3.15. See:
-#      https://github.com/AcademySoftwareFoundation/openvdb/issues/886
 set(OPENVDB_PYTHON_DEPS)
 
 # @note  explicitly only search for Development.Module from 3.18 as searching
 #   Development.Embed can cause issues on linux systems where it doesn't exist
-if(${CMAKE_VERSION} VERSION_LESS 3.18)
-  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development)
-else()
-  set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development.Module)
-endif()
+set(OPENVDB_PYTHON_REQUIRED_COMPONENTS Development.Module)
 
 if(NOT DEFINED PYOPENVDB_INSTALL_DIRECTORY)
   list(APPEND OPENVDB_PYTHON_REQUIRED_COMPONENTS Interpreter)

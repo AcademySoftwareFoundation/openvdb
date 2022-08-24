@@ -42,7 +42,7 @@
 
 # note: cmake_minimum_required must be called before project commands to
 #  ensure policy scope is set up correctly
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 
 # CMP0091 allows for MSVC ABI targetting via CMAKE_MSVC_RUNTIME_LIBRARY
 # from CMake 3.15 and above. Must come before project().
@@ -52,9 +52,9 @@ endif()
 
 ###### Version
 
-set(OpenVDB_MAJOR_VERSION 9)
-set(OpenVDB_MINOR_VERSION 1)
-set(OpenVDB_PATCH_VERSION 1)
+set(OpenVDB_MAJOR_VERSION 10)
+set(OpenVDB_MINOR_VERSION 0)
+set(OpenVDB_PATCH_VERSION 0)
 set(OpenVDB_VERSION "${OpenVDB_MAJOR_VERSION}.${OpenVDB_MINOR_VERSION}.${OpenVDB_PATCH_VERSION}")
 
 project(OpenVDB LANGUAGES CXX VERSION ${OpenVDB_VERSION})
