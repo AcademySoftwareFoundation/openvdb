@@ -48,13 +48,12 @@ jobs:
   # succeeds, put it into the GitHub Actions cache
   linux_houdini:
     needs: [checksecret]
-#    if: |
-#      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-#      github.repository_owner == 'AcademySoftwareFoundation') &&
-#      (github.event_name != 'workflow_dispatch' ||
-#      github.event.inputs.type == 'all' ||
-#      github.event.inputs.type == 'houdini')
-    if: ${{ false }}  # disable for now
+    if: |
+      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+      github.repository_owner == 'AcademySoftwareFoundation') &&
+      (github.event_name != 'workflow_dispatch' ||
+      github.event.inputs.type == 'all' ||
+      github.event.inputs.type == 'houdini')
     runs-on: ubuntu-latest
     name: linux-houdini:${{ matrix.config.houdini_version }}
     env:
