@@ -122,6 +122,29 @@ public:
         ScopedRegistryLock();
     }; // class ScopedRegistryLock
 
+    // Class to store private AttributeArray internals for optimization purposes
+    class OPENVDB_API BufferAccessor
+    {
+    public:
+        using CopyPtr = void (*)(AttributeArray& target, Index targetIndex, const AttributeArray& source, Index sourceIndex);
+
+        const char* buffer = nullptr;
+        size_t bytes = 0;
+        bool uniform = true;
+        const AttributeArray* array = nullptr;
+        CopyPtr copy = nullptr;
+    public:
+        BufferAccessor() = default;
+        BufferAccessor(const AttributeArray& array);
+
+        void reset();
+        void reset(const AttributeArray& array);
+
+        inline bool valid() const { return bool(buffer); }
+
+        friend class AttributeArray;
+    }; // class BufferAccessor
+
     using Ptr           = std::shared_ptr<AttributeArray>;
     using ConstPtr      = std::shared_ptr<const AttributeArray>;
 
@@ -245,8 +268,6 @@ public:
     ///     MyIterator& operator++();
     ///     // returns the source index that the iterator is referencing for copying
     ///     Index sourceIndex() const;
-    ///     // returns the target index that the iterator is referencing for copying
-    ///     Index targetIndex() const;
     /// };
     /// @endcode
     /// @note It is assumed that the strided storage sizes match, the arrays are both in-core,
@@ -257,6 +278,38 @@ public:
     /// concurrently modified by another thread and that the source array is also not modified.
     template<typename IterT>
     void copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter);
+    /// @brief Copy values into this array from an array of source buffers to a target array
+    /// as referenced by an iterator.
+    /// @details Iterators must adhere to the ForwardIterator interface described
+    /// in the example below:
+    /// @code
+    /// struct MyIterator
+    /// {
+    ///     // returns true if the iterator is referencing valid copying indices
+    ///     operator bool() const;
+    ///     // increments the iterator
+    ///     MyIterator& operator++();
+    ///     // returns the source buffer index that the iterator is referencing for copying
+    ///     Index sourceBufferIndex() const;
+    ///     // returns the source index that the iterator is referencing for copying
+    ///     Index sourceIndex() const;
+    /// };
+    /// @endcode
+    /// @note It is assumed that the strided storage sizes match, the arrays are all in-core,
+    /// and all value types are floating-point or all integer.
+    /// @note It is possible to use this method to write to a uniform target array
+    /// if the iterator does not have non-zero target indices.
+    /// @note This method is not thread-safe, it must be guaranteed that this array is not
+    /// concurrently modified by another thread and that the source array is also not modified.
+    template<bool AllowConversion, typename IterT>
+    void copyValuesUnsafe(const std::vector<AttributeArray::BufferAccessor>& sourceBuffers,
+        const IterT& iter);
+
+    template<bool AllowConversion, bool IsUniform, typename IterT>
+    void doCopyValuesUnsafe(const std::vector<AttributeArray::BufferAccessor>& sourceBuffers,
+        IterT& iter, const size_t bytes, Index targetIndex = 0);
+
+
     /// @brief Like copyValuesUnsafe(), but if @a compact is true, attempt to collapse this array.
     /// @note This method is not thread-safe, it must be guaranteed that this array is not
     /// concurrently modified by another thread and that the source array is also not modified.
@@ -817,6 +870,8 @@ template <typename ValueType, typename CodecType = UnknownCodec>
 class AttributeHandle
 {
 public:
+    using ValueT = ValueType;
+    using CodecT = CodecType;
     using Handle    = AttributeHandle<ValueType, CodecType>;
     using Ptr       = std::shared_ptr<Handle>;
     using UniquePtr = std::unique_ptr<Handle>;
@@ -1039,9 +1094,10 @@ void AttributeArray::doCopyValues(const AttributeArray& sourceArray, const IterT
     const Index sourceDataSize = rangeChecking ? sourceArray.dataSize() : 0;
     const Index targetDataSize = rangeChecking ? this->dataSize() : 0;
 
-    for (IterT it(iter); it; ++it) {
+    Index targetIndex(0);
+
+    for (IterT it(iter); it; ++it, ++targetIndex) {
         const Index sourceIndex = sourceIsUniform ? 0 : it.sourceIndex();
-        const Index targetIndex = it.targetIndex();
 
         if (rangeChecking) {
             if (sourceIndex >= sourceDataSize) {
@@ -1070,6 +1126,100 @@ template <typename IterT>
 void AttributeArray::copyValuesUnsafe(const AttributeArray& sourceArray, const IterT& iter)
 {
     this->doCopyValues(sourceArray, iter, /*range-checking=*/false);
+}
+
+template <bool AllowConversion, bool IsUniform, typename IterT>
+void AttributeArray::doCopyValuesUnsafe(const std::vector<AttributeArray::BufferAccessor>& sourceBuffers,
+    IterT& it, const size_t bytes, Index targetIndex)
+{
+    assert(this->isUniform() == IsUniform);
+    assert(this->storageTypeSize()*this->stride() == bytes);
+    assert(this->isDataLoaded());
+
+    char* targetBuffer = this->dataAsByteArray();
+    assert(targetBuffer);
+
+    Index lastSourceBufferIndex = std::numeric_limits<Index>::max();
+
+    for (; it; ++it, ++targetIndex) {
+        const Index sourceBufferIndex = it.sourceBufferIndex();
+        const auto& sourceBuffer = sourceBuffers[sourceBufferIndex];
+
+        if (!sourceBuffer.valid())  continue;
+
+        // ensure both arrays have float-float or integer-integer value types
+        assert(sourceBuffer.array->valueTypeIsFloatingPoint() ==
+            this->valueTypeIsFloatingPoint());
+        // ensure source arrays has been loaded from disk (if delay-loaded)
+        assert(sourceBuffer.array->isDataLoaded());
+
+        const bool customCopy = AllowConversion && sourceBuffer.copy;
+
+        if (IsUniform) {
+            if (customCopy) {
+                // always expand the array for custom copy and conversion
+                this->expand();
+                doCopyValuesUnsafe<AllowConversion, /*IsUniform=*/false>(sourceBuffers, it, bytes, targetIndex);
+                break;
+            } else {
+                // ensure storage sizes match
+                assert(sourceBuffer.bytes == bytes);
+
+                // skip memory check if the source buffer is uniform and has already been checked
+                if (lastSourceBufferIndex == sourceBufferIndex)    continue;
+
+                // perform memory comparison, compute source offsets
+                const Index sourceIndex = sourceBuffer.uniform ? 0 : it.sourceIndex();
+                assert(sourceIndex < sourceBuffer.array->dataSize());
+                const size_t sourceOffset(sourceIndex * bytes);
+                if (std::memcmp(targetBuffer, sourceBuffer.buffer + sourceOffset, bytes) != 0) {
+                    this->expand();
+                    // call this method without any uniform logic
+                    doCopyValuesUnsafe<AllowConversion, /*IsUniform=*/false>(sourceBuffers, it, bytes, targetIndex);
+                    break;
+                } else {
+                    // if source buffer is uniform avoid performing a memory check next time
+                    if (sourceBuffer.uniform)   lastSourceBufferIndex = sourceBufferIndex;
+                    // memory to be copied is equal to the background value, don't expand the array
+                    continue;
+                }
+            }
+        }
+
+        // this copying logic expects that the array has been expanded
+        assert(!this->isUniform());
+
+        // compute source and target indices
+        const Index sourceIndex = sourceBuffer.uniform ? 0 : it.sourceIndex();
+        assert(sourceIndex < sourceBuffer.array->dataSize());
+        assert(targetIndex < this->dataSize());
+
+        if (customCopy) {
+            sourceBuffer.copy(*this, targetIndex, *sourceBuffer.array, sourceIndex);
+        } else {
+            // ensure storage sizes match
+            assert(sourceBuffer.bytes == bytes);
+
+            // perform memory copy, compute source and target offsets
+            const size_t sourceOffset(sourceIndex * bytes);
+            const size_t targetOffset(targetIndex * bytes);
+            std::memcpy(targetBuffer + targetOffset, sourceBuffer.buffer + sourceOffset, bytes);
+        }
+    }
+}
+
+template <bool AllowConversion, typename IterT>
+void AttributeArray::copyValuesUnsafe(const std::vector<AttributeArray::BufferAccessor>& sourceBuffers,
+    const IterT& iter)
+{
+    IterT it(iter);
+    const size_t bytes(this->storageTypeSize()*this->stride());
+
+    if (this->isUniform()) {
+        doCopyValuesUnsafe<AllowConversion, true>(sourceBuffers, it, bytes);
+    } else {
+        doCopyValuesUnsafe<AllowConversion, false>(sourceBuffers, it, bytes);
+    }
 }
 
 template <typename IterT>

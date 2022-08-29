@@ -5,6 +5,7 @@
 
 #include "AttributeSet.h"
 #include "AttributeGroup.h"
+#include "AttributeArrayString.h"
 
 #include <algorithm> // std::equal
 #include <string>
@@ -57,16 +58,10 @@ namespace {
 // AttributeSet implementation
 
 
-AttributeSet::AttributeSet()
-    : mDescr(new Descriptor())
-{
-}
-
-
-AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
-    const AttributeArray::ScopedRegistryLock* lock)
-    : mDescr(attrSet.descriptorPtr())
-    , mAttrs(attrSet.descriptor().size(), AttributeArray::Ptr())
+AttributeSet::AttributeSet(const Info& info, AttributeSet* existingAttributeSet,
+    Index arrayLength, const AttributeArray::ScopedRegistryLock* lock)
+    : mDescr(info.descriptorPtr())
+    , mAttrs(info.size())
 {
     std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
     if (!lock) {
@@ -79,45 +74,46 @@ AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
 
     for (const auto& namePos : mDescr->map()) {
         const size_t& pos = namePos.second;
+        const Info::Array& arrayInfo = info.arrayInfo(pos);
         Metadata::ConstPtr metadata;
         if (hasMetadata)    metadata = meta["default:" + namePos.first];
-        const AttributeArray* existingArray = attrSet.getConst(pos);
-        const bool constantStride = existingArray->hasConstantStride();
-        const Index stride = constantStride ? existingArray->stride() : existingArray->dataSize();
+        bool constantStride = arrayInfo.constantStride;
+        const Index stride = arrayInfo.stride;
 
-        AttributeArray::Ptr array = AttributeArray::create(mDescr->type(pos), arrayLength,
-            stride, constantStride, metadata.get(), lock);
+        // attempt to steal array from the existingAttributeSet
+
+        size_t existingPos = existingAttributeSet ?
+            existingAttributeSet->find(namePos.first) : INVALID_POS;
+
+        AttributeArray::Ptr array;
+        if (existingPos != INVALID_POS) {
+            array = existingAttributeSet->stealAttribute(existingPos,
+                /*updateDescriptor=*/false);
+        } else {
+            array = AttributeArray::create(mDescr->type(pos), arrayLength,
+                stride, constantStride, metadata.get(), lock);
+        }
 
         // transfer hidden and transient flags
-        if (existingArray->isHidden())      array->setHidden(true);
-        if (existingArray->isTransient())   array->setTransient(true);
+        if (arrayInfo.hidden)       array->setHidden(true);
+        if (arrayInfo.transient)    array->setTransient(true);
 
         mAttrs[pos] = array;
     }
 }
 
 
+AttributeSet::AttributeSet(const AttributeSet& attrSet, Index arrayLength,
+    const AttributeArray::ScopedRegistryLock* lock)
+    : AttributeSet(Info(attrSet), nullptr, arrayLength, lock)
+{
+}
+
+
 AttributeSet::AttributeSet(const DescriptorPtr& descr, Index arrayLength,
     const AttributeArray::ScopedRegistryLock* lock)
-    : mDescr(descr)
-    , mAttrs(descr->size(), AttributeArray::Ptr())
+    : AttributeSet(Info(descr), nullptr, arrayLength, lock)
 {
-    std::unique_ptr<AttributeArray::ScopedRegistryLock> localLock;
-    if (!lock) {
-        localLock.reset(new AttributeArray::ScopedRegistryLock);
-        lock = localLock.get();
-    }
-
-    const MetaMap& meta = mDescr->getMetadata();
-    bool hasMetadata = meta.metaCount();
-
-    for (const auto& namePos : mDescr->map()) {
-        const size_t& pos = namePos.second;
-        Metadata::ConstPtr metadata;
-        if (hasMetadata)    metadata = meta["default:" + namePos.first];
-        mAttrs[pos] = AttributeArray::create(mDescr->type(pos), arrayLength,
-            /*stride=*/1, /*constantStride=*/true, metadata.get(), lock);
-    }
 }
 
 
@@ -388,6 +384,24 @@ AttributeSet::removeAttributeUnsafe(const size_t pos)
     assert(mAttrs[pos]);
     AttributeArray::Ptr array;
     std::swap(array, mAttrs[pos]);
+
+    return array;
+}
+
+
+AttributeArray::Ptr
+AttributeSet::stealAttribute(const size_t pos, bool updateDescriptor)
+{
+    if (pos >= mAttrs.size())     return AttributeArray::Ptr();
+
+    AttributeArray::Ptr array = mAttrs[pos];
+    assert(array);
+    mAttrs[pos].reset();
+
+    if (updateDescriptor) {
+        std::vector<size_t> toDrop{pos};
+        this->dropAttributes(toDrop);
+    }
 
     return array;
 }
@@ -1182,7 +1196,7 @@ AttributeSet::Descriptor::canCompactGroups() const
 }
 
 size_t
-AttributeSet::Descriptor::unusedGroupOffset(size_t hint) const
+AttributeSet::Descriptor::nextUnusedGroupOffset(size_t hint) const
 {
     // all group offsets are in use
 
@@ -1223,7 +1237,7 @@ bool
 AttributeSet::Descriptor::requiresGroupMove(Name& sourceName,
     size_t& sourceOffset, size_t& targetOffset) const
 {
-    targetOffset = this->unusedGroupOffset();
+    targetOffset = this->nextUnusedGroupOffset();
 
     for (const auto& namePos : mGroupMap) {
 
@@ -1383,6 +1397,181 @@ AttributeSet::Descriptor::read(std::istream& is)
     mMetadata.readMeta(is);
 }
 
+
+////////////////////////////////////////
+
+// AttributeSet::Info implementation
+
+
+AttributeSet::Info::Info(const AttributeSet::Descriptor::Ptr& descriptor)
+    : mDescriptor(descriptor)
+    , mArrayInfo(descriptor->size(), Array())
+{
+}
+
+
+AttributeSet::Info::Info(const AttributeSet& attributeSet)
+    : AttributeSet::Info(attributeSet.descriptorPtr())
+{
+    for (const auto& namePos : mDescriptor->map()) {
+        size_t idx = namePos.second;
+        const AttributeArray* existingArray = attributeSet.getConst(idx);
+
+        Array& info = mArrayInfo[idx];
+        info.constantStride = existingArray->hasConstantStride();
+        info.stride = info.constantStride ? existingArray->stride() : existingArray->dataSize();
+        info.hidden = existingArray->isHidden();
+        info.transient = existingArray->isTransient();
+        info.group = isGroup(*existingArray);
+        info.string = isString(*existingArray);
+    }
+}
+
+
+AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(const Name& name)
+{
+    size_t idx = mDescriptor->find(name);
+    if (idx == INVALID_POS || idx >= mArrayInfo.size()) {
+        OPENVDB_THROW(LookupError, "ArrayInfo index out-of-range.")
+    }
+    return mArrayInfo[idx];
+}
+
+const AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(const Name& name) const
+{
+    size_t idx = mDescriptor->find(name);
+    if (idx == INVALID_POS || idx >= mArrayInfo.size()) {
+        OPENVDB_THROW(LookupError, "ArrayInfo index out-of-range.")
+    }
+    return mArrayInfo[idx];
+}
+
+AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(size_t idx)
+{
+    assert(idx != INVALID_POS);
+    assert(idx < mArrayInfo.size());
+    return mArrayInfo[idx];
+}
+
+const AttributeSet::Info::Array&
+AttributeSet::Info::arrayInfo(size_t idx) const
+{
+    assert(idx != INVALID_POS);
+    assert(idx < mArrayInfo.size());
+    return mArrayInfo[idx];
+}
+
+void
+AttributeSet::Info::merge(const Info& attributeInfo)
+{
+    const auto& otherDescriptor = attributeInfo.descriptor();
+
+    // ensure descriptor is unique when merging
+
+    if (mDescriptor.use_count() > 1) {
+        mDescriptor.reset(new Descriptor(*mDescriptor));
+    }
+
+    // merge attributes
+
+    for (const auto& namePos : otherDescriptor.map()) {
+        const Name& name = namePos.first;
+        size_t pos = mDescriptor->find(name);
+        if (pos == AttributeSet::INVALID_POS) {
+            pos = namePos.second;
+            mDescriptor = mDescriptor->duplicateAppend(name, otherDescriptor.type(pos));
+            assert(mDescriptor->find(name) == mArrayInfo.size());
+            mArrayInfo.emplace_back(attributeInfo.arrayInfo(namePos.second));
+        } else {
+            // TODO: implement merge policies
+        }
+    }
+
+    // find number of groups that need to be added
+
+    size_t groupsToAdd = 0;
+
+    for (const auto& namePos : otherDescriptor.groupMap()) {
+        const Name& group = namePos.first;
+
+        // do nothing if the group name already exists
+
+        if (mDescriptor->hasGroup(group))  continue;
+
+        groupsToAdd++;
+    }
+
+    // add required group attributes
+
+    while (groupsToAdd > mDescriptor->unusedGroups()) {
+
+        // add a new group attribute
+
+        mDescriptor = mDescriptor->duplicateAppend(
+            mDescriptor->uniqueName("__group"), GroupAttributeArray::attributeType());
+
+        // append new group array info element
+
+        mArrayInfo.emplace_back();
+        mArrayInfo.back().group = true;
+    }
+
+    // merge groups
+
+    for (const auto& namePos : otherDescriptor.groupMap()) {
+        const Name& group = namePos.first;
+
+        // do nothing if the group name has zero length or already exists
+
+        if (mDescriptor->hasGroup(group))  continue;
+
+        assert(mDescriptor->unusedGroups() > 0);
+
+        // use the next unused offset for this new group, provide current index as hint
+
+        mDescriptor->setGroup(group, mDescriptor->nextUnusedGroupOffset(namePos.second));
+    }
+
+    // merge string metamaps
+
+    const auto& otherMetadata = otherDescriptor.getMetadata();
+
+    StringMetaCache metaCache(otherMetadata);
+    StringMetaInserter metaInserter(mDescriptor->getMetadata());
+
+    for (auto metaElement : metaCache.map()) {
+        metaInserter.insert(metaElement.first, metaElement.second);
+    }
+}
+
+void
+AttributeSet::Info::print(std::ostream& os) const
+{
+    os << "AttributeSet::Info:" << std::endl;
+    os << "\tAttributes: " << this->size() << " attribute(s)" << std::endl;
+    for (const auto& namePos : mDescriptor->map()) {
+        const Name& name = namePos.first;
+        size_t pos = namePos.second;
+        std::cerr << "\t\t[" << pos << "] \"" << name << "\" " << std::endl;
+        std::cerr << "\t\t\tType: " << mDescriptor->type(pos).first << " " << mDescriptor->type(pos).second << std::endl;
+        std::cerr << "\t\t\tDefaultValue: " << (mDescriptor->hasDefaultValue(name) ? "yes" : "no") << std::endl;
+        const auto& arrayInfo = this->arrayInfo(pos);
+        std::cerr << "\t\t\tConstantStride: " << (arrayInfo.constantStride ? "yes" : "no") << std::endl;
+        std::cerr << "\t\t\tStride: " << arrayInfo.stride << std::endl;
+        std::cerr << "\t\t\tGroup: " << (arrayInfo.group ? "yes" : "no") << std::endl;
+        std::cerr << "\t\t\tString: " << (arrayInfo.string ? "yes" : "no") << std::endl;
+        std::cerr << "\t\t\tHidden: " << (arrayInfo.hidden ? "yes" : "no") << std::endl;
+        std::cerr << "\t\t\tTransient: " << (arrayInfo.transient ? "yes" : "no") << std::endl;
+    }
+    os << "\tGroups: " << mDescriptor->groupMap().size() << " group(s)" << std::endl;
+    for (const auto& namePos : mDescriptor->groupMap()) {
+        std::cerr << "\t\t[" << namePos.second << "] " << namePos.first << std::endl;
+    }
+    os << "\tMetadata: " << mDescriptor->getMetadata().metaCount() << " metadata element(s)" << std::endl;
+}
 
 
 ////////////////////////////////////////

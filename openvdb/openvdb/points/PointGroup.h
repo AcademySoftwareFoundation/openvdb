@@ -369,7 +369,7 @@ inline void appendGroup(PointDataTreeT& tree, const Name& group)
 
     // find next unused offset
 
-    const size_t offset = descriptor->unusedGroupOffset();
+    const size_t offset = descriptor->nextUnusedGroupOffset();
 
     // add the group mapping to the descriptor
 

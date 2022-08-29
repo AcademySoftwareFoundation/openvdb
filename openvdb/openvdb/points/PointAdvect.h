@@ -36,15 +36,12 @@ namespace points {
 /// @param timeSteps            number of advection steps to perform.
 /// @param advectFilter         an optional advection index filter (moves a subset of the points)
 /// @param filter               an optional index filter (deletes a subset of the points)
-/// @param cached               caches velocity interpolation for faster performance, disable to use
-///                             less memory (default is on).
 template <typename PointDataGridT, typename VelGridT,
     typename AdvectFilterT = NullFilter, typename FilterT = NullFilter>
 inline void advectPoints(PointDataGridT& points, const VelGridT& velocity,
                          const Index integrationOrder, const double dt, const Index timeSteps,
                          const AdvectFilterT& advectFilter = NullFilter(),
-                         const FilterT& filter = NullFilter(),
-                         const bool cached = true);
+                         const FilterT& filter = NullFilter());
 
 
 ////////////////////////////////////////
@@ -101,8 +98,6 @@ private:
 template <typename PointDataGridT, typename VelGridT, typename AdvectFilterT, typename FilterT>
 struct AdvectionOp
 {
-    using CachedDeformerT = CachedDeformer<double>;
-
     AdvectionOp(PointDataGridT& points, const VelGridT& velocity,
                 const Index integrationOrder, const double timeStep, const Index steps,
                 const AdvectFilterT& advectFilter,
@@ -115,84 +110,51 @@ struct AdvectionOp
         , mAdvectFilter(advectFilter)
         , mFilter(filter) { }
 
-    void cache()
-    {
-        mCachedDeformer.reset(new CachedDeformerT(mCache));
-        (*this)(true);
-    }
-
     void advect()
-    {
-        (*this)(false);
-    }
-
-private:
-    template <int IntegrationOrder, bool Staggered>
-    void resolveIntegrationOrder(bool buildCache)
-    {
-        const auto leaf = mPoints.constTree().cbeginLeaf();
-        if (!leaf)  return;
-
-        // move points according to the pre-computed cache
-        if (!buildCache && mCachedDeformer) {
-            movePoints(mPoints, *mCachedDeformer, mFilter);
-            return;
-        }
-
-        NullFilter nullFilter;
-
-        if (buildCache) {
-            // disable group filtering from the advection deformer and perform group filtering
-            // in the cache deformer instead, this restricts the cache to just containing
-            // positions from points which are both deforming *and* are not being deleted
-            AdvectionDeformer<VelGridT, IntegrationOrder, Staggered, NullFilter> deformer(
-                mVelocity, mTimeStep, mSteps, nullFilter);
-            if (mFilter.state() == index::ALL && mAdvectFilter.state() == index::ALL) {
-                mCachedDeformer->evaluate(mPoints, deformer, nullFilter);
-            } else {
-                BinaryFilter<AdvectFilterT, FilterT, /*And=*/true> binaryFilter(
-                    mAdvectFilter, mFilter);
-                mCachedDeformer->evaluate(mPoints, deformer, binaryFilter);
-            }
-        }
-        else {
-            // revert to NullFilter if all points are being evaluated
-            if (mAdvectFilter.state() == index::ALL) {
-                AdvectionDeformer<VelGridT, IntegrationOrder, Staggered, NullFilter> deformer(
-                    mVelocity, mTimeStep, mSteps, nullFilter);
-                movePoints(mPoints, deformer, mFilter);
-            }
-            else {
-                AdvectionDeformer<VelGridT, IntegrationOrder, Staggered, AdvectFilterT> deformer(
-                    mVelocity, mTimeStep, mSteps, mAdvectFilter);
-                movePoints(mPoints, deformer, mFilter);
-            }
-        }
-    }
-
-    template <bool Staggered>
-    void resolveStaggered(bool buildCache)
-    {
-        if (mIntegrationOrder == INTEGRATION_ORDER_FWD_EULER) {
-            resolveIntegrationOrder<1, Staggered>(buildCache);
-        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_2ND) {
-            resolveIntegrationOrder<2, Staggered>(buildCache);
-        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_3RD) {
-            resolveIntegrationOrder<3, Staggered>(buildCache);
-        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_4TH) {
-            resolveIntegrationOrder<4, Staggered>(buildCache);
-        }
-    }
-
-    void operator()(bool buildCache)
     {
         // early-exit if no leafs
         if (mPoints.constTree().leafCount() == 0)            return;
 
         if (mVelocity.getGridClass() == openvdb::GRID_STAGGERED) {
-            resolveStaggered<true>(buildCache);
+            resolveStaggered<true>();
         } else {
-            resolveStaggered<false>(buildCache);
+            resolveStaggered<false>();
+        }
+    }
+
+private:
+    template <int IntegrationOrder, bool Staggered>
+    void resolveIntegrationOrder()
+    {
+        const auto leaf = mPoints.constTree().cbeginLeaf();
+        if (!leaf)  return;
+
+        NullFilter nullFilter;
+
+        // revert to NullFilter if all points are being evaluated
+        if (mAdvectFilter.state() == index::ALL) {
+            AdvectionDeformer<VelGridT, IntegrationOrder, Staggered, NullFilter> deformer(
+                mVelocity, mTimeStep, mSteps, nullFilter);
+            movePoints(mPoints, deformer, mFilter);
+        }
+        else {
+            AdvectionDeformer<VelGridT, IntegrationOrder, Staggered, AdvectFilterT> deformer(
+                mVelocity, mTimeStep, mSteps, mAdvectFilter);
+            movePoints(mPoints, deformer, mFilter);
+        }
+    }
+
+    template <bool Staggered>
+    void resolveStaggered()
+    {
+        if (mIntegrationOrder == INTEGRATION_ORDER_FWD_EULER) {
+            resolveIntegrationOrder<1, Staggered>();
+        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_2ND) {
+            resolveIntegrationOrder<2, Staggered>();
+        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_3RD) {
+            resolveIntegrationOrder<3, Staggered>();
+        } else if (mIntegrationOrder == INTEGRATION_ORDER_RK_4TH) {
+            resolveIntegrationOrder<4, Staggered>();
         }
     }
 
@@ -203,8 +165,6 @@ private:
     const Index mSteps;
     const AdvectFilterT& mAdvectFilter;
     const FilterT& mFilter;
-    CachedDeformerT::Cache mCache;
-    std::unique_ptr<CachedDeformerT> mCachedDeformer;
 }; // struct AdvectionOp
 
 } // namespace point_advect_internal
@@ -218,8 +178,7 @@ template <typename PointDataGridT, typename VelGridT, typename AdvectFilterT, ty
 inline void advectPoints(PointDataGridT& points, const VelGridT& velocity,
                          const Index integrationOrder, const double timeStep, const Index steps,
                          const AdvectFilterT& advectFilter,
-                         const FilterT& filter,
-                         const bool cached)
+                         const FilterT& filter)
 {
     using namespace point_advect_internal;
 
@@ -232,11 +191,6 @@ inline void advectPoints(PointDataGridT& points, const VelGridT& velocity,
     AdvectionOp<PointDataGridT, VelGridT, AdvectFilterT, FilterT> op(
         points, velocity, integrationOrder, timeStep, steps,
         advectFilter, filter);
-
-    // if caching is enabled, sample the velocity field using a CachedDeformer to store the
-    // intermediate positions before moving the points, this uses more memory but typically
-    // results in faster overall performance
-    if (cached)     op.cache();
 
     // advect the points
     op.advect();

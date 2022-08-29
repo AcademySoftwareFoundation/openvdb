@@ -882,13 +882,12 @@ TEST_F(TestAttributeArray, testAttributeArray)
 
 struct VectorWrapper
 {
-    using T = std::vector<std::pair<Index, Index>>;
+    using T = std::vector<Index>;
 
     VectorWrapper(const T& _data) : data(_data) { }
     operator bool() const { return index < data.size(); }
     VectorWrapper& operator++() { index++; return *this; }
-    Index sourceIndex() const { assert(*this); return data[index].first; }
-    Index targetIndex() const { assert(*this); return data[index].second; }
+    Index sourceIndex() const { assert(*this); return data[index]; }
 
 private:
     const T& data;
@@ -914,21 +913,22 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
 
     // initialize source -> target pairs that reverse the order
 
-    std::vector<std::pair<Index, Index>> indexPairs;
+    std::vector<Index> indices;
     for (Index i = 0; i < size; i++) {
-        indexPairs.push_back(std::make_pair(i, size-i-1));
+        indices.push_back(size-i-1);
     }
 
     // create a new index pair wrapper
 
-    VectorWrapper wrapper(indexPairs);
+    VectorWrapper wrapper(indices);
 
     // build a target attribute array
 
     AttributeArrayD targetTypedAttr(size);
     AttributeArray& targetAttr(targetTypedAttr);
-    for (const auto& pair : indexPairs) {
-        targetTypedAttr.set(pair.second, sourceTypedAttr.get(pair.first));
+    Index targetIndex(0);
+    for (const auto& index : indices) {
+        targetTypedAttr.set(targetIndex++, sourceTypedAttr.get(index));
     }
 
     using AttributeArrayF = TypedAttributeArray<float>;
@@ -984,19 +984,19 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
         AttributeArrayD typedAttr(size);
         AttributeArray& attr(typedAttr);
 
-        decltype(indexPairs) rangeIndexPairs(indexPairs);
+        decltype(indices) rangeIndices(indices);
 
-        rangeIndexPairs[10].first = size+1;
+        rangeIndices[10] = size+1;
 
-        VectorWrapper rangeWrapper(rangeIndexPairs);
+        VectorWrapper rangeWrapper(rangeIndices);
 
         EXPECT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
 
-        rangeIndexPairs[10].first = 0;
+        rangeIndices[10] = 0;
 
         EXPECT_NO_THROW(attr.copyValues(sourceAttr, rangeWrapper));
 
-        rangeIndexPairs[10].second = size+1;
+        rangeIndices[10] = size+1;
 
         EXPECT_THROW(attr.copyValues(sourceAttr, rangeWrapper), IndexError);
     }
@@ -1028,10 +1028,10 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
 
         // resize the vector to be smaller than the size of the array
 
-        decltype(indexPairs) subsetIndexPairs(indexPairs);
-        subsetIndexPairs.resize(size-1);
+        decltype(indices) subsetIndices(indices);
+        subsetIndices.resize(size-1);
 
-        decltype(wrapper) subsetWrapper(subsetIndexPairs);
+        decltype(wrapper) subsetWrapper(subsetIndices);
 
         // now copy the values attempting to preserve uniformity
 
@@ -1058,17 +1058,18 @@ TEST_F(TestAttributeArray, testAttributeArrayCopy)
 
         EXPECT_TRUE(!attr.isUniform());
 
-        std::vector<std::pair<Index, Index>> uniformIndexPairs;
-        uniformIndexPairs.push_back(std::make_pair(10, 0));
-        uniformIndexPairs.push_back(std::make_pair(5, 0));
-        VectorWrapper uniformWrapper(uniformIndexPairs);
+        std::vector<Index> uniformIndices;
+        uniformIndices.push_back(10);
+        uniformIndices.push_back(5);
+        VectorWrapper uniformWrapper(uniformIndices);
 
         // note that calling copyValues() will implicitly expand the uniform target
 
         EXPECT_NO_THROW(uniformAttr.copyValuesUnsafe(attr, uniformWrapper));
 
         EXPECT_TRUE(uniformAttr.isUniform());
-        EXPECT_TRUE(uniformTypedAttr.get(0) == typedAttr.get(5));
+
+        EXPECT_TRUE(uniformTypedAttr.get(0) == typedAttr.get(10));
     }
 }
 

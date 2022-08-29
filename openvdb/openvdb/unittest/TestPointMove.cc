@@ -27,8 +27,6 @@ class TestPointMove: public ::testing::Test
 public:
     void SetUp() override { openvdb::initialize(); }
     void TearDown() override { openvdb::uninitialize(); }
-
-    void testCachedDeformer();
 }; // class TestPointMove
 
 
@@ -209,148 +207,6 @@ struct OddIndexFilter
 };
 
 } // namespace
-
-
-void TestPointMove::testCachedDeformer()
-{
-    NullObject nullObject;
-
-    // create an empty cache and CachedDeformer
-    CachedDeformer<double>::Cache cache;
-    EXPECT_TRUE(cache.leafs.empty());
-
-    CachedDeformer<double> cachedDeformer(cache);
-
-    // check initialization is as expected
-    EXPECT_TRUE(cachedDeformer.mLeafVec == nullptr);
-    EXPECT_TRUE(cachedDeformer.mLeafMap == nullptr);
-
-    // throw when resetting cachedDeformer with an empty cache
-    EXPECT_THROW(cachedDeformer.reset(nullObject, size_t(0)), openvdb::IndexError);
-
-    // manually create one leaf in the cache
-    cache.leafs.resize(1);
-    auto& leaf = cache.leafs[0];
-    EXPECT_TRUE(leaf.vecData.empty());
-    EXPECT_TRUE(leaf.mapData.empty());
-    EXPECT_EQ(Index(0), leaf.totalSize);
-
-    // reset should no longer throw and leaf vec pointer should now be non-null
-    EXPECT_NO_THROW(cachedDeformer.reset(nullObject, size_t(0)));
-    EXPECT_TRUE(cachedDeformer.mLeafMap == nullptr);
-    EXPECT_TRUE(cachedDeformer.mLeafVec != nullptr);
-    EXPECT_TRUE(cachedDeformer.mLeafVec->empty());
-
-    // nothing stored in the cache so position is unchanged
-    DummyIter indexIter(0);
-    Vec3d position(0,0,0);
-    Vec3d newPosition(position);
-    cachedDeformer.apply(newPosition, indexIter);
-    EXPECT_TRUE(math::isApproxEqual(position, newPosition));
-
-    // insert a new value into the leaf vector and verify tbe position is deformed
-    Vec3d deformedPosition(5,10,15);
-    leaf.vecData.push_back(deformedPosition);
-    cachedDeformer.apply(newPosition, indexIter);
-    EXPECT_TRUE(math::isApproxEqual(deformedPosition, newPosition));
-
-    // insert a new value into the leaf map and verify the position is deformed as before
-    Vec3d newDeformedPosition(2,3,4);
-    leaf.mapData.insert({0, newDeformedPosition});
-    newPosition.setZero();
-    cachedDeformer.apply(newPosition, indexIter);
-    EXPECT_TRUE(math::isApproxEqual(deformedPosition, newPosition));
-
-    // now reset the cached deformer and verify the value is updated
-    // (map has precedence over vector)
-    cachedDeformer.reset(nullObject, size_t(0));
-    EXPECT_TRUE(cachedDeformer.mLeafMap != nullptr);
-    EXPECT_TRUE(cachedDeformer.mLeafVec == nullptr);
-    newPosition.setZero();
-    cachedDeformer.apply(newPosition, indexIter);
-    EXPECT_TRUE(math::isApproxEqual(newDeformedPosition, newPosition));
-
-    // four points, some same leaf, some different
-    const float voxelSize = 1.0f;
-    std::vector<Vec3s> positions =  {
-                                        {5, 2, 3},
-                                        {2, 4, 1},
-                                        {50, 5, 1},
-                                        {3, 20, 1},
-                                    };
-
-    PointDataGrid::Ptr points = positionsToGrid(positions, voxelSize);
-
-    // evaluate with null deformer and no filter
-
-    NullDeformer nullDeformer;
-    NullFilter nullFilter;
-    cachedDeformer.evaluate(*points, nullDeformer, nullFilter);
-
-    EXPECT_EQ(size_t(points->tree().leafCount()), cache.leafs.size());
-
-    int leafIndex = 0;
-    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
-        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
-            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s());
-            Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
-        }
-        leafIndex++;
-    }
-
-    // evaluate with Offset deformer and no filter
-
-    Vec3d yOffset(1,2,3);
-    OffsetDeformer yOffsetDeformer(yOffset);
-
-    cachedDeformer.evaluate(*points, yOffsetDeformer, nullFilter);
-
-    EXPECT_EQ(size_t(points->tree().leafCount()), cache.leafs.size());
-
-    leafIndex = 0;
-    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
-        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
-            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
-            Vec3f cachePosition = cache.leafs[leafIndex].vecData[*iter];
-            EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
-        }
-        leafIndex++;
-    }
-
-    // evaluate with Offset deformer and OddIndex filter
-
-    OddIndexFilter oddFilter;
-    cachedDeformer.evaluate(*points, yOffsetDeformer, oddFilter);
-
-    EXPECT_EQ(size_t(points->tree().leafCount()), cache.leafs.size());
-
-    leafIndex = 0;
-    for (auto leafIter = points->tree().cbeginLeaf(); leafIter; ++leafIter) {
-        // odd filter writes to mapData, not vecData
-        EXPECT_TRUE(cache.leafs[leafIndex].vecData.empty());
-        const auto& data = cache.leafs[leafIndex].mapData;
-
-        for (auto iter = leafIter->beginIndexOn(); iter; ++iter) {
-            AttributeHandle<Vec3f> handle(leafIter->constAttributeArray("P"));
-            Vec3f pos(handle.get(*iter) + iter.getCoord().asVec3s() + yOffset);
-
-            const auto miter = data.find(*iter);
-            if (!oddFilter.valid(iter)) {
-                EXPECT_TRUE(miter == data.cend());
-            }
-            else {
-                EXPECT_TRUE(miter != data.cend());
-                const Vec3f& cachePosition = miter->second;
-                EXPECT_TRUE(math::isApproxEqual(pos, cachePosition));
-            }
-        }
-        leafIndex++;
-    }
-}
-TEST_F(TestPointMove, testCachedDeformer) { testCachedDeformer(); }
 
 
 TEST_F(TestPointMove, testMoveLocal)
@@ -757,8 +613,8 @@ TEST_F(TestPointMove, testCustomDeformer)
         std::vector<Vec3s> positions =          {
                                                     {5, 2, 3},
                                                     {2, 4, 1},
-                                                    {50, 5, 1},
-                                                    {3, 20, 1},
+                                                    // {50, 5, 1},
+                                                    // {3, 20, 1},
                                                 };
 
         std::vector<Vec3s> desiredPositions = applyOffset(positions, offset);
@@ -779,24 +635,17 @@ TEST_F(TestPointMove, testCustomDeformer)
 
         movePoints(*points, deformer);
 
-        EXPECT_TRUE(2*leafCount == resetCalls);
-        EXPECT_TRUE(2*pointCount == applyCalls);
+        EXPECT_TRUE(leafCount == resetCalls);
+        EXPECT_TRUE(pointCount == applyCalls);
 
         std::vector<Vec3s> actualPositions = gridToPositions(points);
 
         ASSERT_APPROX_EQUAL(desiredPositions, actualPositions, __LINE__);
 
-        // use CachedDeformer
-
         resetCalls = 0;
         applyCalls = 0;
 
-        CachedDeformer<double>::Cache cache;
-        CachedDeformer<double> cachedDeformer(cache);
-        NullFilter filter;
-        cachedDeformer.evaluate(*cachedPoints, deformer, filter);
-
-        movePoints(*cachedPoints, cachedDeformer);
+        movePoints(*cachedPoints, deformer);
 
         EXPECT_TRUE(leafCount == resetCalls);
         EXPECT_TRUE(pointCount == applyCalls);
@@ -890,6 +739,20 @@ TEST_F(TestPointMove, testPointData)
 
         movePoints(*points, deformer);
 
+        auto leaf = points->tree().cbeginLeaf();
+        const auto& descriptor = leaf->attributeSet().descriptor();
+
+        // ensure that the test group and it's values have been preserved as expected
+        EXPECT_TRUE(descriptor.hasGroup("test"));
+        size_t groupCount = 0;
+        for (; leaf; ++leaf) {
+            GroupHandle handle = leaf->groupHandle("test");
+            for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
+                groupCount += handle.get(*iter) ? size_t(1) : size_t(0);
+            }
+        }
+        EXPECT_EQ(size_t(1), groupCount);
+
         std::vector<Vec3s> finalPositions1 = gridToPositions(points, /*sort=*/false);
 
         ASSERT_APPROX_EQUAL(initialPositions, finalPositions1, __LINE__);
@@ -898,7 +761,7 @@ TEST_F(TestPointMove, testPointData)
 
         excludeGroups.push_back("test");
 
-        auto leaf = points->tree().cbeginLeaf();
+        leaf = points->tree().cbeginLeaf();
         MultiGroupFilter filter(includeGroups, excludeGroups, leaf->attributeSet());
         movePoints(*points, deformer, filter);
 
@@ -1077,29 +940,24 @@ TEST_F(TestPointMove, testPointData)
         MultiGroupFilter advectFilter(includeGroups, excludeGroups, leaf->attributeSet());
         OffsetDeformer offsetDeformer(Vec3d(0, 1, 0));
 
-        CachedDeformer<double>::Cache cache;
-        CachedDeformer<double> cachedDeformer(cache);
-
-        cachedDeformer.evaluate(*points, offsetDeformer, advectFilter);
-
         double ySumBefore = 0.0;
         double ySumAfter = 0.0;
 
         for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
             AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3d();
                 position = transform->indexToWorld(position);
                 ySumBefore += position.y();
             }
         }
 
-        movePoints(*points, cachedDeformer);
+        movePoints(*points, offsetDeformer, advectFilter);
 
         for (auto leaf = points->tree().cbeginLeaf(); leaf; ++leaf) {
             AttributeHandle<Vec3f> handle(leaf->constAttributeArray("P"));
             for (auto iter = leaf->beginIndexOn(); iter; ++iter) {
-                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3s();
+                Vec3d position = handle.get(*iter) + iter.getCoord().asVec3d();
                 position = transform->indexToWorld(position);
                 ySumAfter += position.y();
             }
@@ -1109,8 +967,8 @@ TEST_F(TestPointMove, testPointData)
         // (only odd points are being moved 1.0 in Y)
         double increaseInY = ySumAfter - ySumBefore;
 
-        EXPECT_NEAR(increaseInY, static_cast<double>(count) / 2.0,
-            /*tolerance=*/double(0.01));
+        EXPECT_NEAR(static_cast<double>(count) / 2.0, increaseInY,
+            /*tolerance=*/double(1.0));
     }
 }
 
