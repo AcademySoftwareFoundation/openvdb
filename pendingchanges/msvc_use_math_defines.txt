@@ -1,0 +1,7 @@
+Build:
+    - On Windows (MSVC), the _USE_MATH_DEFINES macro is no longer defined when
+    including <openvdb/Platform.h> (or any dependent headers). If you were
+    relying on this in your own project for M_PI, M_PI_2, etc. you can add
+    -D_USE_MATH_DEFINES to your own project compiler options. See
+    https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
+    for more info.
