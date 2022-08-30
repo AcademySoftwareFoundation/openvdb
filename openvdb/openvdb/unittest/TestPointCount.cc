@@ -4,6 +4,7 @@
 #include <openvdb/points/PointDataGrid.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/io/TempFile.h>
+#include <openvdb/math/Math.h>
 
 #include <openvdb/points/PointGroup.h>
 #include <openvdb/points/PointCount.h>
@@ -595,8 +596,8 @@ genPoints(std::vector<Vec3R>& positions, const int numPoints, const double scale
     // init
     math::Random01 randNumber(0);
     const int n = int(std::sqrt(double(numPoints)));
-    const double xScale = (2.0 * M_PI) / double(n);
-    const double yScale = M_PI / double(n);
+    const double xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double yScale = openvdb::math::pi<double>() / double(n);
 
     double x, y, theta, phi;
     Vec3R pos;

@@ -921,7 +921,7 @@ openvdb::Vec3SGrid::Ptr grid = ...;
 
 // Construct the rotation matrix.
 openvdb::math::Mat3s rot45 =
-    openvdb::math::rotation<openvdb::math::Mat3s>(openvdb::math::Y_AXIS, M_PI_4);
+    openvdb::math::rotation<openvdb::math::Mat3s>(openvdb::math::Y_AXIS, openvdb::math::pi<double>()/4.0);
 
 // Apply the functor to all active values.
 openvdb::tools::foreach(grid->beginValueOn(), MatMul(rot45));

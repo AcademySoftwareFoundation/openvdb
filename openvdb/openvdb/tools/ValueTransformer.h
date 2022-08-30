@@ -78,7 +78,7 @@ namespace tools {
 /// {
 ///     VectorGrid grid = ...;
 ///     tools::foreach(grid.beginValueOn(),
-///         MatMul(math::rotation<math::Mat3s>(math::Y, M_PI_4)));
+///         MatMul(math::rotation<math::Mat3s>(math::Y, openvdb::math::pi<double>()/4.0)));
 /// }
 /// @endcode
 ///

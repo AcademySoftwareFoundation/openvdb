@@ -6,6 +6,7 @@
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/DDA.h>
 #include <openvdb/math/BBox.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/Types.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/tools/LevelSetSphere.h>
@@ -84,7 +85,7 @@ TEST_F(TestRay, testRay)
     {// test transformation
         math::Transform::Ptr xform = math::Transform::createLinearTransform();
 
-        xform->preRotate(M_PI, math::Y_AXIS );
+        xform->preRotate(openvdb::math::pi<double>(), math::Y_AXIS );
         xform->postTranslate(math::Vec3d(1, 2, 3));
         xform->preScale(Vec3R(0.1, 0.2, 0.4));
 
@@ -124,7 +125,7 @@ TEST_F(TestRay, testRay)
 
         // This is the index to world transform
         math::Transform::Ptr xform = math::Transform::createLinearTransform();
-        xform->postRotate(M_PI, math::Y_AXIS );
+        xform->postRotate(openvdb::math::pi<double>(), math::Y_AXIS );
         xform->postTranslate(math::Vec3d(1, 2, 3));
         xform->postScale(Vec3R(0.1, 0.1, 0.1));//voxel size
 
