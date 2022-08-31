@@ -13,7 +13,9 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if !defined (__WIN32__)
 #include <unistd.h>
+#endif
 #include <stdio.h>
 
 
