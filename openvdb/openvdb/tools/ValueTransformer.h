@@ -139,12 +139,10 @@ inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
 
-#ifndef _WIN32
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void transformValues(const InIterT& inIter, OutGridT& outGrid,
     const XformOp& op, bool threaded = true, bool shareOp = true,
     MergePolicy merge = MERGE_ACTIVE_STATES);
-#endif
 
 
 /// Iterate over a grid and at each step call @c op(iter).  If threading is enabled,
@@ -602,7 +600,6 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, XformOp& op,
     }
 }
 
-#ifndef _WIN32
 template<typename InIterT, typename OutGridT, typename XformOp>
 inline void
 transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
@@ -615,7 +612,6 @@ transformValues(const InIterT& inIter, OutGridT& outGrid, const XformOp& op,
     Processor proc(inIter, Adapter::tree(outGrid), op, merge);
     proc.process(threaded);
 }
-#endif
 
 
 ////////////////////////////////////////
