@@ -13,7 +13,7 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
-#if !defined (__WIN32__)
+#if !defined(_WIN32) && !defined(__WIN32__) && !defined(WIN32)
 #include <unistd.h>
 #endif
 #include <stdio.h>
