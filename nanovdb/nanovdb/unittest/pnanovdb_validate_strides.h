@@ -63,48 +63,61 @@ static void compute_tile_strides(pnanovdb_uint32_t grid_type, pnanovdb_uint32_t*
 }
 
 static void compute_node_strides(
-    pnanovdb_uint32_t grid_type,
-    pnanovdb_uint32_t nodeLevel,
-    pnanovdb_uint32_t* min_off, pnanovdb_uint32_t* max_off,
-    pnanovdb_uint32_t* ave_off, pnanovdb_uint32_t* stddev_off,
-    pnanovdb_uint32_t* table_off,
-    pnanovdb_uint32_t* total_size)
+	pnanovdb_uint32_t grid_type,
+	pnanovdb_uint32_t nodeLevel,
+	pnanovdb_uint32_t* min_off, pnanovdb_uint32_t* max_off,
+	pnanovdb_uint32_t* ave_off, pnanovdb_uint32_t* stddev_off,
+	pnanovdb_uint32_t* table_off,
+	pnanovdb_uint32_t* total_size)
 {
-    static const pnanovdb_uint32_t node_size[3] = { PNANOVDB_LEAF_BASE_SIZE, PNANOVDB_LOWER_BASE_SIZE, PNANOVDB_UPPER_BASE_SIZE };
-    static const pnanovdb_uint32_t node_elements[3] = { PNANOVDB_LEAF_TABLE_COUNT, PNANOVDB_LOWER_TABLE_COUNT, PNANOVDB_UPPER_TABLE_COUNT };
-    pnanovdb_uint32_t offset = 0u;
-    allocate(&offset, node_size[nodeLevel], 32u);
+	static const pnanovdb_uint32_t node_size[3] = { PNANOVDB_LEAF_BASE_SIZE, PNANOVDB_LOWER_BASE_SIZE, PNANOVDB_UPPER_BASE_SIZE };
+	static const pnanovdb_uint32_t node_elements[3] = { PNANOVDB_LEAF_TABLE_COUNT, PNANOVDB_LOWER_TABLE_COUNT, PNANOVDB_UPPER_TABLE_COUNT };
+	pnanovdb_uint32_t offset = 0u;
+	allocate(&offset, node_size[nodeLevel], 32u);
 
-    pnanovdb_uint32_t valueStrideBits = pnanovdb_grid_type_value_strides_bits[grid_type];
-    pnanovdb_uint32_t tableStrideBits = nodeLevel == 0u ? valueStrideBits : pnanovdb_grid_type_table_strides_bits[grid_type];
-    pnanovdb_uint32_t tableAlign = 32u;
-    pnanovdb_uint32_t tableFullStride = (tableStrideBits * node_elements[nodeLevel]) / 8u;
+	pnanovdb_uint32_t valueStrideBits = pnanovdb_grid_type_value_strides_bits[grid_type];
+	pnanovdb_uint32_t tableStrideBits = nodeLevel == 0u ? valueStrideBits : pnanovdb_grid_type_table_strides_bits[grid_type];
+	pnanovdb_uint32_t tableAlign = 32u;
+	pnanovdb_uint32_t tableFullStride = (tableStrideBits * node_elements[nodeLevel]) / 8u;
 
-    pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
-    pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
-    pnanovdb_uint32_t statStride = pnanovdb_grid_type_stat_strides_bits[grid_type] / 8u;
-    if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
-    {
-        minmaxStride = 0u;
-        minmaxAlign = 0u;
-        statStride = 0u;
-    }
-
-    if (nodeLevel == 0u && pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_FP)
-    {
-        minmaxStride = 2u;
-        minmaxAlign = 2u;
-        statStride = 2u;
-        // allocate minimum and quantum
-        allocate(&offset, 4u, 4u);
-        allocate(&offset, 4u, 4u);
-    }
-    *min_off = allocate(&offset, minmaxStride, minmaxAlign);
-    *max_off = allocate(&offset, minmaxStride, minmaxAlign);
-    *ave_off = allocate(&offset, statStride, statStride);
-    *stddev_off = allocate(&offset, statStride, statStride);
-    *table_off = allocate(&offset, tableFullStride, tableAlign);
-    *total_size = allocate(&offset, 0u, 32u);
+	pnanovdb_uint32_t minmaxStride = pnanovdb_grid_type_minmax_strides_bits[grid_type] / 8u;
+	pnanovdb_uint32_t minmaxAlign = pnanovdb_grid_type_minmax_aligns_bits[grid_type] / 8u;
+	pnanovdb_uint32_t statStride = pnanovdb_grid_type_stat_strides_bits[grid_type] / 8u;
+	pnanovdb_uint32_t postStatStride = 0u;
+	if (nodeLevel == 0u)
+	{
+		if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_LITE)
+		{
+			minmaxStride = 0u;
+			minmaxAlign = 0u;
+			statStride = 0u;
+		}
+		else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_FP)
+		{
+			minmaxStride = 2u;
+			minmaxAlign = 2u;
+			statStride = 2u;
+			// allocate minimum and quantum
+			allocate(&offset, 4u, 4u);
+			allocate(&offset, 4u, 4u);
+		}
+		else if (pnanovdb_grid_type_leaf_type[grid_type] == PNANOVDB_LEAF_TYPE_INDEX)
+		{
+			minmaxStride = 0u;
+			minmaxAlign = 0u;
+			statStride = 0u;
+			postStatStride = 8u;
+			tableAlign = 8u;
+			tableFullStride = 8u;
+		}
+	}
+	*min_off = allocate(&offset, minmaxStride, minmaxAlign);
+	*max_off = allocate(&offset, minmaxStride, minmaxAlign);
+	*ave_off = allocate(&offset, statStride, statStride);
+	*stddev_off = allocate(&offset, statStride, statStride);
+	allocate(&offset, postStatStride, postStatStride);
+	*table_off = allocate(&offset, tableFullStride, tableAlign);
+	*total_size = allocate(&offset, 0u, 32u);
 }
 
 static bool validate_strides(int(*local_printf)(const char* format, ...))

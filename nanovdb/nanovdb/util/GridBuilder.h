@@ -113,7 +113,7 @@ class GridBuilder
 
     ValueT                   mDelta; // skip node if: node.max < -mDelta || node.min > mDelta
     uint8_t*                 mBufferPtr;// pointer to the beginning of the buffer
-    uint64_t                 mBufferOffsets[9];//grid, tree, root, upper. lower, leafs, meta data, blind data, buffer size
+    uint64_t                 mBufferOffsets[9];//grid, tree, root, upper, lower, leafs, meta data, blind data, buffer size
     int                      mVerbose;
     uint64_t                 mBlindDataSize;
     SrcRootT                 mRoot;// this root supports random write
@@ -371,15 +371,15 @@ initHandle(const OracleT &oracle, const BufferT& buffer)
                 offset[1] += DstNode1::memUsage();
                 for (auto it0 = lower->mChildMask.beginOn(); it0; ++it0) {
                     SrcNode0 *leaf = lower->mTable[*it0].child;
-                    leaf->mDstOffset = offset[0];
+                    leaf->mDstOffset = offset[0];// dummy if BuildT = FpN
                     mArray0.emplace_back(leaf);
-                    offset[0] += DstNode0::memUsage();
+                    offset[0] += sizeof(DstNode0);// dummy if BuildT = FpN
                 }// loop over leaf nodes
             }// loop over lower internal nodes
         }// is child node of the root
     }// loop over root table
 
-    this->template compression<BuildT, OracleT>(offset[0], oracle);
+    this->template compression<BuildT, OracleT>(offset[0], oracle);// no-op unless BuildT = FpN
 
     mBufferOffsets[0] = 0;// grid is always stored at the start of the buffer!
     mBufferOffsets[1] = DstGridT::memUsage(); // tree
@@ -702,12 +702,18 @@ GridBuilder<ValueT, BuildT, StatsT>::
             auto *srcLeaf = srcLeafs[i];
             auto *dstLeaf = PtrAdd<DstNode0>(ptr, srcLeaf->mDstOffset);
             auto *data = dstLeaf->data();
+            if (DstNode0::DataType::padding()>0u) {
+                std::memset(data, 0, DstNode0::DataType::memUsage());
+            } else {
+                data->mBBoxDif[0] = 0u;
+                data->mBBoxDif[1] = 0u;
+                data->mBBoxDif[2] = 0u;
+                data->mFlags = 0u;
+                data->mMinimum = data->mMaximum = ValueT();
+                data->mAverage = data->mStdDevi = 0;
+            }
             srcLeaf->mDstNode = dstLeaf;
             data->mBBoxMin = srcLeaf->mOrigin; // copy origin of node
-            data->mBBoxDif[0] = 0u;
-            data->mBBoxDif[1] = 0u;
-            data->mBBoxDif[2] = 0u;
-            data->mFlags = 0u;
             data->mValueMask = srcLeaf->mValueMask; // copy value mask
             const ValueT* src = srcLeaf->mValues;
             for (ValueT *dst = data->mValues, *end = dst + SrcNode0::SIZE; dst != end; dst += 4, src += 4) {
@@ -744,11 +750,13 @@ GridBuilder<ValueT, BuildT, StatsT>::
             auto *dstLeaf = PtrAdd<DstNode0>(ptr, srcLeaf->mDstOffset);
             srcLeaf->mDstNode = dstLeaf;
             auto *data = dstLeaf->data();
+            if (DstNode0::DataType::padding()>0u) {
+                std::memset(data, 0, DstNode0::DataType::memUsage());
+            } else {
+                data->mFlags = data->mBBoxDif[2] = data->mBBoxDif[1] = data->mBBoxDif[0] = 0u;
+                data->mDev = data->mAvg = data->mMax = data->mMin = 0u;
+            }
             data->mBBoxMin = srcLeaf->mOrigin; // copy origin of node
-            data->mBBoxDif[0] = 0u;
-            data->mBBoxDif[1] = 0u;
-            data->mBBoxDif[2] = 0u;
-            data->mFlags = 0u;
             data->mValueMask = srcLeaf->mValueMask; // copy value mask
             const float* src = srcLeaf->mValues;
             // compute extrema values
@@ -890,6 +898,7 @@ void GridBuilder<ValueT, BuildT, StatsT>::
             SrcNodeT *srcNode = srcNodes[i];
             DstNodeT *dstNode = PtrAdd<DstNodeT>(ptr, srcNode->mDstOffset);
             auto     *data = dstNode->data();
+            if (DstNodeT::DataType::padding()>0u) std::memset(data, 0, DstNodeT::memUsage());
             srcNode->mDstNode = dstNode;
             data->mBBox[0]   = srcNode->mOrigin; // copy origin of node
             data->mValueMask = srcNode->mValueMask; // copy value mask
@@ -912,6 +921,7 @@ NanoRoot<BuildT>* GridBuilder<ValueT, BuildT, StatsT>::processRoot()
 {
     auto *dstRoot = reinterpret_cast<DstRootT*>(mBufferPtr + mBufferOffsets[2]);
     auto *data = dstRoot->data();
+    if (data->padding()>0) std::memset(data, 0, DstRootT::memUsage(uint32_t(mRoot.mTable.size())));
     data->mTableSize = uint32_t(mRoot.mTable.size());
     data->mMinimum = data->mMaximum = data->mBackground = mRoot.mBackground;
     data->mBBox = CoordBBox(); // // set to an empty bounding box
@@ -1001,6 +1011,9 @@ processGrid(const Map&         map,
     data->mBlindMetadataCount = 0;
     data->mGridClass = mGridClass;
     data->mGridType = mapToGridType<BuildT>();
+    data->mData0 = 0u;
+    data->mData1 = 0u;
+    data->mData2 = 0u;
 
     if (!isValid(data->mGridType, data->mGridClass)) {
         std::stringstream ss;
@@ -1009,8 +1022,9 @@ processGrid(const Map&         map,
         throw std::runtime_error(ss.str());
     }
 
+    std::memset(data->mGridName, '\0', GridData::MaxNameSize);//overwrite mGridName
     strncpy(data->mGridName, name.c_str(), GridData::MaxNameSize-1);
-    if (name.length() >= GridData::MaxNameSize) {//  currenlty we don't support long grid names
+    if (name.length() >= GridData::MaxNameSize) {//  currently we don't support long grid names
         std::stringstream ss;
         ss << "Grid name \"" << name << "\" is more then " << GridData::MaxNameSize << " characters";
         throw std::runtime_error(ss.str());

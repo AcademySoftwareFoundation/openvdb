@@ -50,8 +50,10 @@
    MUST outlive @c handles since the pool does not own its memory in this example.
    @code
         const size_t poolSize = 1 << 30;// 1 GB
-        uint8_t *data = static_cast<uint8_t*>(std::malloc(size));// 1 GB buffer
-        auto pool = nanovdb::HostBuffer::createPool(poolSize, data);
+        uint8_t *data = static_cast<uint8_t*>(std::malloc(size)+NANOVDB_DATA_ALIGNMENT);// 1 GB pool
+        uint8_t *buffer = nanovdb::alignPtr(data);// 32B aligned buffer
+        //uint8_t *buffer = std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, poolSize);// in C++17
+        auto pool = nanovdb::HostBuffer::createPool(poolSize, buffer);
         auto handles1 = nanovdb::io::readGrids("file1.nvdb", 0, pool);
         auto handles2 = nanovdb::io::readGrids("file2.nvdb", 0, pool);
         ....
@@ -64,8 +66,10 @@
    MUST outlive @c handles since the pool does not own its memory in this example.
    @code
         const size_t poolSize = 1 << 30;// 1 GB
-        std::unique_ptr<uint8_t[]> array(new uint8_t[size]);// scoped buffer of 1 GB
-        auto pool = nanovdb::HostBuffer::createPool(poolSize, array.get());
+        std::unique_ptr<uint8_t[]> array(new uint8_t[size+NANOVDB_DATA_ALIGNMENT]);// scoped pool of 1 GB
+        //std::unique_ptr<uint8_t[]> array(std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, size));// in C++17
+        uint8_t *buffer = nanovdb::alignPtr(array.get());// 32B aligned buffer
+        auto pool = nanovdb::HostBuffer::createPool(poolSize, buffer);
         auto handles = nanovdb::io::readGrids("file.nvdb", 0, pool);
    @endcode
 */
@@ -73,9 +77,10 @@
 #ifndef NANOVDB_HOSTBUFFER_H_HAS_BEEN_INCLUDED
 #define NANOVDB_HOSTBUFFER_H_HAS_BEEN_INCLUDED
 
+#include "../NanoVDB.h"// for NANOVDB_DATA_ALIGNMENT;
 #include <stdint.h> //    for types like int32_t etc
 #include <cstdio> //      for fprintf
-#include <cstdlib> //     for std::malloc/std::reallow/std::free
+#include <cstdlib> //     for std::malloc/std::realloc/std::free
 #include <memory>//       for std::make_shared
 #include <mutex>//        for std::mutex
 #include <unordered_set>//for std::unordered_set
@@ -118,6 +123,11 @@ class HostBuffer
     {
         if (ptr == nullptr) {
             fprintf(stderr, "NULL pointer error: %s %s %d\n", msg, file, line);
+            if (abort)
+                exit(1);
+        }
+        if (uint64_t(ptr) % NANOVDB_DATA_ALIGNMENT) {
+            fprintf(stderr, "Alignment pointer error: %s %s %d\n", msg, file, line);
             if (abort)
                 exit(1);
         }
@@ -244,22 +254,35 @@ public:
 struct HostBuffer::Pool
 {
     using HashTableT = std::unordered_set<HostBuffer*>;
-    std::mutex mMutex;// mutex for updating mRegister and mFree
+    std::mutex mMutex; // mutex for updating mRegister and mFree
     HashTableT mRegister;
     uint8_t*   mData;
     uint8_t*   mFree;
     uint64_t   mSize;
+    uint64_t   mPadding;
     bool       mManaged;
 
     /// @brief External memory ctor
-    Pool(uint64_t size = 0, void *data = nullptr) : mData((uint8_t*)data), mFree(mData), mSize(size), mManaged(data==nullptr)
+    Pool(uint64_t size = 0, void* data = nullptr)
+        : mData((uint8_t*)data)
+        , mFree(mData)
+        , mSize(size)
+        , mPadding(0)
+        , mManaged(data == nullptr)
     {
         if (mManaged) {
-            mData = mFree = static_cast<uint8_t*>(std::malloc(size));
+            mData = static_cast<uint8_t*>(Pool::alloc(mSize));
             if (mData == nullptr) {
                 throw std::runtime_error("Pool::Pool malloc failed");
             }
         }
+        mPadding = alignmentPadding(mData);
+        if (!mManaged && mPadding != 0) {
+            throw std::runtime_error("Pool::Pool: external memory buffer is not aligned to " +
+                                     std::to_string(NANOVDB_DATA_ALIGNMENT) +
+                                     " bytes.\nHint: use nanovdb::alignPtr or std::aligned_alloc (C++17 only)");
+        }
+        mFree = mData + mPadding;
     }
 
     /// @brief Custom destructor
@@ -284,16 +307,19 @@ struct HostBuffer::Pool
     Pool& operator=(const Pool&&) = delete;
 
     /// @brief Return the total number of bytes used from this Pool by buffers
-    uint64_t usage() const { return static_cast<uint64_t>(mFree - mData); }
+    uint64_t usage() const { return static_cast<uint64_t>(mFree - mData) - mPadding; }
 
     /// @brief Allocate a buffer of the specified size and add it to the register
-    void add(HostBuffer *buffer, uint64_t size)
+    void add(HostBuffer* buffer, uint64_t size)
     {
-        if (mFree + size > mData + mSize) {
+        auto* alignedFree = mFree + alignmentPadding(mFree);
+
+        if (alignedFree + size > mData + mPadding + mSize) {
             std::stringstream ss;
             ss << "HostBuffer::Pool: insufficient memory\n"
-               << "\tA buffer requested " << size << " bytes from a pool with "
-               << mSize <<" bytes of which\n\t" << (mFree-mData)
+               << "\tA buffer requested " << size << " bytes with " << NANOVDB_DATA_ALIGNMENT
+               << "-bytes alignment from a pool with "
+               << mSize << " bytes of which\n\t" << (alignedFree - mData - mPadding)
                << " bytes are used by " << mRegister.size() << " other buffer(s). "
                << "Pool is " << (mManaged ? "internally" : "externally") << " managed.\n";
             //std::cerr << ss.str();
@@ -302,8 +328,8 @@ struct HostBuffer::Pool
         buffer->mSize = size;
         const std::lock_guard<std::mutex> lock(mMutex);
         mRegister.insert(buffer);
-        buffer->mData = mFree;
-        mFree += size;
+        buffer->mData = alignedFree;
+        mFree = alignedFree + size;
     }
 
     /// @brief Remove the specified buffer from the register
@@ -330,7 +356,7 @@ struct HostBuffer::Pool
             buffer->mData = nullptr;
         }
         mRegister.clear();
-        mFree = mData;
+        mFree = mData + mPadding;
     }
 
     /// @brief Resize this Pool and update registered buffers as needed. If data is no NULL
@@ -338,29 +364,46 @@ struct HostBuffer::Pool
     void resize(uint64_t size, void *data = nullptr)
     {
         const uint64_t memUsage = this->usage();
+
+        const bool managed = (data == nullptr);
+
+        if (!managed && alignmentPadding(data) != 0) {
+            throw std::runtime_error("Pool::resize: external memory buffer is not aligned to " +
+                                     std::to_string(NANOVDB_DATA_ALIGNMENT) + " bytes");
+        }
+
         if (memUsage > size) {
             throw std::runtime_error("Pool::resize: insufficient memory");
         }
-        const bool managed = (data == nullptr);
-        if (mManaged && managed && size != mSize) {// managed -> manged
-            data = std::realloc(mData, size);// performs both copy and free of mData
-        } else if (!mManaged && managed) {// un-managed -> managed
-            data = std::malloc(size);
+
+        uint64_t padding = 0;
+        if (mManaged && managed && size != mSize) { // managed -> managed
+            padding = mPadding;
+            data = Pool::realloc(mData, memUsage, size, padding); // performs both copy and free of mData
+        } else if (!mManaged && managed) { // un-managed -> managed
+            data = Pool::alloc(size);
+            padding = alignmentPadding(data);
         }
+
         if (data == nullptr) {
             throw std::runtime_error("Pool::resize: allocation failed");
         } else if (data != mData) {
-            if (!(mManaged && managed)) {// no need to copy if managed -> managed
-                memcpy(data, mData, memUsage);
+            auto* paddedData = static_cast<uint8_t*>(data) + padding;
+
+            if (!(mManaged && managed)) { // no need to copy if managed -> managed
+                memcpy(paddedData, mData + mPadding, memUsage);
             }
-            for (HostBuffer *buffer : mRegister) {// update registered buffers
-                buffer->mData = static_cast<uint8_t*>(data) + ptrdiff_t(buffer->mData - mData);
+
+            for (HostBuffer* buffer : mRegister) { // update registered buffers
+                buffer->mData = paddedData + ptrdiff_t(buffer->mData - (mData + mPadding));
             }
-            mFree = static_cast<uint8_t*>(data) + memUsage;// update the free pointer
+            mFree = paddedData + memUsage; // update the free pointer
             if (mManaged && !managed) {// only free if managed -> un-managed
                 std::free(mData);
             }
+
             mData = static_cast<uint8_t*>(data);
+            mPadding = padding;
         }
         mSize    = size;
         mManaged = managed;
@@ -368,9 +411,45 @@ struct HostBuffer::Pool
     /// @brief Return true is all the memory in this pool is in use.
     bool isFull() const
     {
-        assert(mFree <= mData + mSize);
-        return mSize > 0 ? mFree == mData + mSize : false;
+        assert(mFree <= mData + mPadding + mSize);
+        return mSize > 0 ? mFree == mData + mPadding + mSize : false;
     }
+
+private:
+
+    static void* alloc(uint64_t size)
+    {
+#if (__cplusplus >= 201703L)
+    return std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, size);//C++17 or newer
+#else
+    // make sure we alloc enough space to align the result
+    return std::malloc(size + NANOVDB_DATA_ALIGNMENT);
+#endif
+    }
+
+    static void* realloc(void* const origData,
+                         uint64_t    origSize,
+                         uint64_t    desiredSize,
+                         uint64_t&   padding)
+    {
+        // make sure we alloc enough space to align the result
+        void* data = std::realloc(origData, desiredSize + NANOVDB_DATA_ALIGNMENT);
+
+        if (data != nullptr && data != origData) {
+            uint64_t newPadding = alignmentPadding(data);
+            // Number of padding bytes may have changed -- move data if that's the case
+            if (newPadding != padding) {
+                // Realloc should not happen when shrinking down buffer, but let's be safe
+                std::memmove(static_cast<uint8_t*>(data) + newPadding,
+                             static_cast<uint8_t*>(data) + padding,
+                             Min(origSize, desiredSize));
+                padding = newPadding;
+            }
+        }
+
+        return data;
+    }
+
 };// struct HostBuffer::Pool
 
 // --------------------------> Implementation of HostBuffer <------------------------------------

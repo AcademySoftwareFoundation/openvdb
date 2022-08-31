@@ -113,6 +113,9 @@ public:
         const ByteT *begin = static_cast<const ByteT*>(data);
         this->operator()<const ByteT*>(begin, begin + byteSize);
     }
+
+    template <typename T>
+    void operator()(const T &data) {(*this)(&data, sizeof(T));}
 };// CRC32
 
 inline std::uint_fast32_t crc32(const void *data, size_t byteSize)
@@ -203,7 +206,9 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
 
     if (mode == ChecksumMode::Partial || tree.isEmpty()) return;
 
-    auto mgr = createNodeMgr(grid);
+    auto mgrHandle = createNodeManager(grid);
+    auto *mgr = mgrHandle.template mgr<ValueT>();
+    assert(isValid(mgr));
     const auto nodeCount = tree.nodeCount(0) + tree.nodeCount(1) + tree.nodeCount(2);
     std::vector<std::uint_fast32_t> checksums(nodeCount, 0);
 
@@ -212,8 +217,8 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin();
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = mgr.upper(static_cast<uint32_t>(i));
-            local(node, sizeof(*node) );
+            const auto &node = mgr->upper(static_cast<uint32_t>(i));
+            local(node);
             *p++ = local.checksum();
             local.reset();
         }
@@ -224,8 +229,8 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *node = mgr.lower(static_cast<uint32_t>(i));
-            local(node, sizeof(*node) );
+            const auto &node = mgr->lower(static_cast<uint32_t>(i));
+            local(node);
             *p++ = local.checksum();
             local.reset();
         }
@@ -236,8 +241,8 @@ void GridChecksum::operator()(const NanoGrid<ValueT> &grid, ChecksumMode mode)
         CRC32 local;
         std::uint_fast32_t *p = checksums.data() + r.begin() + tree.nodeCount(1) + tree.nodeCount(2);
         for (auto i = r.begin(); i != r.end(); ++i) {
-            const auto *leaf = mgr.leaf(static_cast<uint32_t>(i));
-            local(leaf, sizeof(*leaf) );
+            const auto &leaf = mgr->leaf(static_cast<uint32_t>(i));
+            local(leaf);
             *p++ = local.checksum();
             local.reset();
         }
