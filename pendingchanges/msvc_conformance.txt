@@ -1,0 +1,3 @@
+Build:
+    - On Windows (MSVC), OpenVDB is now built with extra compiler options to
+    ensure stricter C++ conformance: /permissive- /Zc:throwingNew /Zc:inline
