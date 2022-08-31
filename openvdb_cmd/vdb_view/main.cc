@@ -93,8 +93,11 @@ main(int argc, char *argv[])
                 usage(progName, EXIT_FAILURE);
             }
         }
-
-        const bool hasInput  = !isatty(fileno(stdin));
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+        const bool hasInput = false;
+#else
+        const bool hasInput = !isatty(fileno(stdin));
+#endif
         const size_t numFiles = filenames.size();
 
         if (printVersionInfo) {
