@@ -129,6 +129,10 @@ endif()
 
 # Increase the number of sections that an object file can contain
 add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/bigobj>")
+# Enable MSVC options that make it behave like other compilers
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/permissive->")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/Zc:throwingNew>")
+add_compile_options("$<$<CXX_COMPILER_ID:MSVC>:/Zc:inline>")
 # Excludes APIs such as Cryptography, DDE, RPC, Shell, and Windows Sockets
 add_compile_definitions("$<$<CXX_COMPILER_ID:MSVC>:WIN32_LEAN_AND_MEAN>")
 # Disable non-secure CRT library function warnings
