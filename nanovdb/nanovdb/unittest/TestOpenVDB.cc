@@ -23,6 +23,7 @@
 #endif
 
 #include <openvdb/openvdb.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/LevelSetPlatonic.h>
 #include <openvdb/tools/Interpolation.h>
@@ -1020,8 +1021,8 @@ inline void genPoints(const int numPoints, std::vector<openvdb::Vec3R>& points)
 {
     openvdb::math::Random01 randNumber(0);
     const int               n = int(std::sqrt(double(numPoints)));
-    const double            xScale = (2.0 * M_PI) / double(n);
-    const double            yScale = M_PI / double(n);
+    const double            xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double            yScale = openvdb::math::pi<double>() / double(n);
 
     double         x, y, theta, phi;
     openvdb::Vec3R pos;

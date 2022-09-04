@@ -357,9 +357,9 @@ public:
         , mScaleHeight(frameWidth * double(film.height()) / double(film.width()))
     {
         assert(nearPlane > 0 && farPlane > nearPlane);
-        mScreenToWorld.accumPostRotation(math::X_AXIS, rotation[0] * M_PI / 180.0);
-        mScreenToWorld.accumPostRotation(math::Y_AXIS, rotation[1] * M_PI / 180.0);
-        mScreenToWorld.accumPostRotation(math::Z_AXIS, rotation[2] * M_PI / 180.0);
+        mScreenToWorld.accumPostRotation(math::X_AXIS, rotation[0] * math::pi<double>() / 180.0);
+        mScreenToWorld.accumPostRotation(math::Y_AXIS, rotation[1] * math::pi<double>() / 180.0);
+        mScreenToWorld.accumPostRotation(math::Z_AXIS, rotation[2] * math::pi<double>() / 180.0);
         mScreenToWorld.accumPostTranslation(translation);
         this->initRay(nearPlane, farPlane);
     }
@@ -464,13 +464,13 @@ class PerspectiveCamera: public BaseCamera
     /// focal lenth in mm and the specified aperture in mm.
     static double focalLengthToFieldOfView(double length, double aperture)
     {
-        return 360.0 / M_PI * atan(aperture/(2.0*length));
+        return 360.0 / math::pi<double>() * atan(aperture/(2.0*length));
     }
     /// @brief Return the focal length in mm given a horizontal field of
     /// view in degrees and the specified aperture in mm.
     static double fieldOfViewToFocalLength(double fov, double aperture)
     {
-        return aperture/(2.0*(tan(fov * M_PI / 360.0)));
+        return aperture/(2.0*(tan(fov * math::pi<double>() / 360.0)));
     }
 };// PerspectiveCamera
 

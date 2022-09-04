@@ -9,6 +9,7 @@
 #include <openvdb/tools/LevelSetSphere.h>
 #include <openvdb/tools/Composite.h> // csgDifference
 #include <openvdb/tools/MeshToVolume.h> // createLevelSetBox
+#include <openvdb/math/Math.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/Types.h>
 
@@ -389,7 +390,7 @@ TEST_F(TestPointAdvect, testZalesaksDisk)
     for (auto leaf = velocity->tree().beginLeaf(); leaf; ++leaf) {
         for (auto iter = leaf->beginValueOn(); iter; ++iter) {
             Vec3s position = xform->indexToWorld(iter.getCoord().asVec3d());
-            Vec3s vel = (position.cross(Vec3s(0, 0, 1)) * 2.0f * M_PI) / 10.0f;
+            Vec3s vel = (position.cross(Vec3s(0, 0, 1)) * 2.0f * openvdb::math::pi<float>()) / 10.0f;
             iter.setValue(vel);
         }
     }

@@ -3,6 +3,8 @@
 
 #include "Camera.h"
 
+#include <openvdb/math/Math.h>
+
 #include <cmath>
 
 #define GLFW_INCLUDE_GLU
@@ -10,7 +12,7 @@
 
 namespace openvdb_viewer {
 
-const double Camera::sDeg2rad = M_PI / 180.0;
+const double Camera::sDeg2rad = openvdb::math::pi<double>() / 180.0;
 
 
 Camera::Camera()

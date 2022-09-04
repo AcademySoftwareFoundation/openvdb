@@ -93,8 +93,8 @@ TEST_F(TestQuantizedUnitVec, testQuantization)
     // init
     srand(0);
     const int n = int(std::sqrt(double(numNormals)));
-    const double xScale = (2.0 * M_PI) / double(n);
-    const double yScale = M_PI / double(n);
+    const double xScale = (2.0 * openvdb::math::pi<double>()) / double(n);
+    const double yScale = openvdb::math::pi<double>() / double(n);
 
     double x, y, theta, phi;
     Vec3s n0, n1;
