@@ -30,7 +30,7 @@ jobs:
   # download Houdini and cache it. The secrets are used in download_houdini.py
   checksecret:
     name: Verify Houdini Secrets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     outputs:
       HOUDINI_SECRETS: ${{ steps.check.outputs.HOUDINI_SECRETS }}
     steps:
@@ -55,7 +55,7 @@ jobs:
 #      github.event.inputs.type == 'all' ||
 #      github.event.inputs.type == 'houdini')
     if: ${{ false }}  # disable for now
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: linux-houdini:${{ matrix.config.houdini_version }}
     env:
       CXX: clang++
@@ -109,7 +109,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'extra'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: linux-extra:${{ matrix.config.name }}
     container:
       # Can bump clang when AX is compatible with LLVM14
@@ -177,7 +177,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: >
       linux-ax:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -188,15 +188,15 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', j: '8', components: 'core,bin,axcore,axbin,axtest' }
           # Standalone
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '8', components: 'core' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '8', components: 'core' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '8', components: 'core' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '8', components: 'core' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v3
@@ -270,7 +270,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'ax'
-    runs-on: windows-2019
+    runs-on: windows-2022-8c-32g-300h
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
@@ -307,7 +307,7 @@ jobs:
         --config=${{ matrix.config.build }}
         --components="${{ matrix.config.components }}"
         --cargs=\'
-        -A x64 -G \"Visual Studio 16 2019\"
+        -A x64 -G \"Visual Studio 17 2022\"
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
         -DMSVC_COMPRESS_PDB=ON
@@ -335,7 +335,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'blosc'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: linux-blosc:${{ matrix.blosc }}
     container:
       image: aswf/ci-base:2021

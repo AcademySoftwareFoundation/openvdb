@@ -49,7 +49,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: >
       linux-nanovdb:cxx:${{ matrix.config.cxx }}-${{ matrix.config.build }}
     container:
@@ -93,7 +93,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'win'
-    runs-on: windows-2019
+    runs-on: windows-2022-8c-32g-300h
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
       visual_studio: "Visual Studio 16 2019"
@@ -175,7 +175,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     steps:
       - uses: actions/checkout@v3
       - name: install_gtest
@@ -188,5 +188,5 @@ jobs:
           sudo mkdir .build
           cd .build
           sudo cmake -DUSE_EXPLICIT_INSTANTIATION=OFF -DNANOVDB_BUILD_UNITTESTS=ON ../
-          sudo make -j2 install
+          sudo make -j8 install
           sudo ctest -V
