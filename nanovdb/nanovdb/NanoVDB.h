@@ -1986,33 +1986,39 @@ public:
         return sum;
     }
 
+    template <bool On>
     class Iterator
     {
     public:
-        __hostdev__ Iterator()
-            : mPos(Mask::SIZE)
-            , mParent(nullptr)
-        {
-        }
-        __hostdev__ Iterator(uint32_t pos, const Mask* parent)
-            : mPos(pos)
-            , mParent(parent)
-        {
-        }
-        Iterator&            operator=(const Iterator&) = default;
+        __hostdev__ Iterator() : mPos(Mask::SIZE), mParent(nullptr){}
+        __hostdev__ Iterator(uint32_t pos, const Mask* parent) : mPos(pos), mParent(parent){}
+        Iterator&          operator=(const Iterator&) = default;
         __hostdev__ uint32_t operator*() const { return mPos; }
         __hostdev__ uint32_t pos() const { return mPos; }
         __hostdev__          operator bool() const { return mPos != Mask::SIZE; }
         __hostdev__ Iterator& operator++()
         {
-            mPos = mParent->findNextOn(mPos + 1);
+            mPos = mParent->findNext<On>(mPos + 1);
             return *this;
+        }
+        __hostdev__ Iterator operator++(int)
+        {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
         }
 
     private:
         uint32_t    mPos;
         const Mask* mParent;
-    }; // Member class MaskIterator
+    }; // Member class Iterator
+
+    using OnIterator = Iterator<true>;
+    using OffIterator = Iterator<false>;
+
+    __hostdev__ OnIterator beginOn() const { return OnIterator(this->findFirst<true>(), this); }
+
+    __hostdev__ OffIterator beginOff() const { return OffIterator(this->findFirst<false>(), this); }
 
     /// @brief Initialize all bits to zero.
     __hostdev__ Mask()
@@ -2034,12 +2040,20 @@ public:
             mWords[i] = other.mWords[i];
     }
 
-    /// @brief Return the <i>n</i>th word of the bit mask, for a word of arbitrary size.
+    /// @brief Return a const reference to the <i>n</i>th word of the bit mask, for a word of arbitrary size.
     template<typename WordT>
-    __hostdev__ WordT getWord(int n) const
+    __hostdev__ const WordT& getWord(int n) const
     {
         NANOVDB_ASSERT(n * 8 * sizeof(WordT) < SIZE);
         return reinterpret_cast<const WordT*>(mWords)[n];
+    }
+
+    /// @brief Return a reference to the <i>n</i>th word of the bit mask, for a word of arbitrary size.
+    template<typename WordT>
+    __hostdev__ WordT& getWord(int n)
+    {
+        NANOVDB_ASSERT(n * 8 * sizeof(WordT) < SIZE);
+        return reinterpret_cast<WordT*>(mWords)[n];
     }
 
     /// @brief Assignment operator that works with openvdb::util::NodeMask
@@ -2066,8 +2080,6 @@ public:
     }
 
     __hostdev__ bool operator!=(const Mask& other) const { return !((*this) == other); }
-
-    __hostdev__ Iterator beginOn() const { return Iterator(this->findFirstOn(), this); }
 
     /// @brief Return true if the given bit is set.
     __hostdev__ bool isOn(uint32_t n) const { return 0 != (mWords[n >> 6] & (uint64_t(1) << (n & 63))); }
@@ -2142,31 +2154,65 @@ public:
     }
     __hostdev__ void toggle(uint32_t n) { mWords[n >> 6] ^= uint64_t(1) << (n & 63); }
 
+    /// @brief Bitwise intersection
+    __hostdev__  Mask& operator&=(const Mask& other)
+    {
+        uint64_t *w1 = mWords;
+        const uint64_t *w2 = other.mWords;
+        for (uint32_t n = WORD_COUNT; n--;  ++w1, ++w2) *w1 &= *w2;
+        return *this;
+    }
+    /// @brief Bitwise union
+    __hostdev__ Mask& operator|=(const Mask& other)
+    {
+        uint64_t *w1 = mWords;
+        const uint64_t *w2 = other.mWords;
+        for (uint32_t n = WORD_COUNT; n--;  ++w1, ++w2) *w1 |= *w2;
+        return *this;
+    }
+    /// @brief Bitwise difference
+    __hostdev__ Mask& operator-=(const Mask& other)
+    {
+        uint64_t *w1 = mWords;
+        const uint64_t *w2 = other.mWords;
+        for (uint32_t n = WORD_COUNT; n--;  ++w1, ++w2) *w1 &= ~*w2;
+        return *this;
+    }
+    /// @brief Bitwise XOR
+    __hostdev__ Mask& operator^=(const Mask& other)
+    {
+        uint64_t *w1 = mWords;
+        const uint64_t *w2 = other.mWords;
+        for (uint32_t n = WORD_COUNT; n--;  ++w1, ++w2) *w1 ^= *w2;
+        return *this;
+    }
+
 private:
 
     NANOVDB_HOSTDEV_DISABLE_WARNING
-    __hostdev__ uint32_t findFirstOn() const
+    template <bool On>
+    __hostdev__ uint32_t findFirst() const
     {
-        uint32_t        n = 0;
+        uint32_t n = 0;
         const uint64_t* w = mWords;
-        for (; n < WORD_COUNT && !*w; ++w, ++n)
-            ;
-        return n == WORD_COUNT ? SIZE : (n << 6) + FindLowestOn(*w);
+        for (; n<WORD_COUNT && !(On ? *w : ~*w); ++w, ++n);
+        return n==WORD_COUNT ? SIZE : (n << 6) + FindLowestOn(On ? *w : ~*w);
     }
 
     NANOVDB_HOSTDEV_DISABLE_WARNING
-    __hostdev__ uint32_t findNextOn(uint32_t start) const
+    template <bool On>
+    __hostdev__ uint32_t findNext(uint32_t start) const
     {
         uint32_t n = start >> 6; // initiate
         if (n >= WORD_COUNT)
             return SIZE; // check for out of bounds
         uint32_t m = start & 63;
-        uint64_t b = mWords[n];
+        uint64_t b = On ? mWords[n] : ~mWords[n];
         if (b & (uint64_t(1) << m))
             return start; // simple case: start is on
         b &= ~uint64_t(0) << m; // mask out lower bits
         while (!b && ++n < WORD_COUNT)
-            b = mWords[n]; // find next non-zero word
+            b = On ? mWords[n] : ~mWords[n]; // find next non-zero word
         return (!b ? SIZE : (n << 6) + FindLowestOn(b)); // catch last word=0
     }
 }; // Mask class
@@ -2380,7 +2426,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) GridData
     int64_t          mBlindMetadataOffset; // 8B (640). offset of GridBlindMetaData structures that follow this grid.
     uint32_t         mBlindMetadataCount; // 4B (648). count of GridBlindMetaData structures that follow this grid.
     uint32_t         mData0;// 4B (652)
-    uint64_t         mData1, mData2;// 2x8B (656) padding to 32 B alignment
+    uint64_t         mData1, mData2;// 2x8B (656) padding to 32 B alignment. mData1 is use for the total number of values indexed by an IndexGrid
 
     // Set and unset various bit flags
     __hostdev__ void setFlagsOff() { mFlags = uint32_t(0); }
@@ -2520,6 +2566,12 @@ public:
 
     /// @brief Return total number of grids in the buffer
     __hostdev__ uint32_t gridCount() const { return DataType::mGridCount; }
+
+    /// @brief  @brief Return the total number of values indexed by this IndexGrid
+    ///
+    /// @note This method is only defined for IndexGrid = NanoGrid<ValueIndex>
+    template <typename T = BuildType>
+    __hostdev__ typename enable_if<is_same<T, ValueIndex>::value, uint64_t>::type valueCount() const {return DataType::mData1;}
 
     /// @brief Return a const reference to the tree
     __hostdev__ const TreeT& tree() const { return *reinterpret_cast<const TreeT*>(this->treePtr()); }
@@ -3019,21 +3071,30 @@ public:
 
     class ChildIterator
     {
-        const DataType &mParent;
-        uint32_t        mPos;
-        const uint32_t  mSize;
+        const DataType *mParent;
+        uint32_t        mPos, mSize;
     public:
-        __hostdev__ ChildIterator(const RootNode *parent) : mParent(*parent->data()), mPos(0), mSize(parent->tileCount()) {
-            while (mPos<mSize && !mParent.tile(mPos)->isChild()) ++mPos;
+        __hostdev__ ChildIterator() : mParent(nullptr), mPos(0), mSize(0) {}
+        __hostdev__ ChildIterator(const RootNode *parent) : mParent(parent->data()), mPos(0), mSize(parent->tileCount()) {
+            NANOVDB_ASSERT(mParent);
+            while (mPos<mSize && !mParent->tile(mPos)->isChild()) ++mPos;
         }
-        __hostdev__ const ChildT& operator*() const {NANOVDB_ASSERT(*this); return *mParent.getChild(mParent.tile(mPos));}
-        __hostdev__ const ChildT* operator->() const {NANOVDB_ASSERT(*this); return mParent.getChild(mParent.tile(mPos));}
+        ChildIterator& operator=(const ChildIterator&) = default;
+        __hostdev__ const ChildT& operator*() const {NANOVDB_ASSERT(*this); return *mParent->getChild(mParent->tile(mPos));}
+        __hostdev__ const ChildT* operator->() const {NANOVDB_ASSERT(*this); return mParent->getChild(mParent->tile(mPos));}
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); mParent->tile(mPos)->origin();}
         __hostdev__ operator bool() const {return mPos < mSize;}
         __hostdev__ uint32_t pos() const {return mPos;}
-        __hostdev__ ChildIterator& operator++(){
+        __hostdev__ ChildIterator& operator++() {
+            NANOVDB_ASSERT(mParent);
             ++mPos;
-            while (mPos < mSize && mParent.tile(mPos)->isValue()) ++mPos;
+            while (mPos < mSize && mParent->tile(mPos)->isValue()) ++mPos;
             return *this;
+        }
+        __hostdev__ ChildIterator operator++(int) {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
         }
     }; // Member class ChildIterator
 
@@ -3041,21 +3102,30 @@ public:
 
     class ValueIterator
     {
-        const DataType &mParent;
-        uint32_t        mPos;
-        const uint32_t  mSize;
+        const DataType *mParent;
+        uint32_t        mPos, mSize;
     public:
-        __hostdev__ ValueIterator(const RootNode *parent) : mParent(*parent->data()), mPos(0), mSize(parent->tileCount()){
-            while (mPos < mSize && mParent.tile(mPos)->isChild()) ++mPos;
+        __hostdev__ ValueIterator() : mParent(nullptr), mPos(0), mSize(0) {}
+        __hostdev__ ValueIterator(const RootNode *parent) : mParent(parent->data()), mPos(0), mSize(parent->tileCount()){
+            NANOVDB_ASSERT(mParent);
+            while (mPos < mSize && mParent->tile(mPos)->isChild()) ++mPos;
         }
-        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent.tile(mPos)->value;}
-        __hostdev__ bool isActive() const {NANOVDB_ASSERT(*this); return mParent.tile(mPos)->state;}
+        ValueIterator& operator=(const ValueIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->tile(mPos)->value;}
+        __hostdev__ bool isActive() const {NANOVDB_ASSERT(*this); return mParent->tile(mPos)->state;}
         __hostdev__ operator bool() const {return mPos < mSize;}
         __hostdev__ uint32_t pos() const {return mPos;}
-        __hostdev__ ValueIterator& operator++(){
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); mParent->tile(mPos)->origin();}
+        __hostdev__ ValueIterator& operator++() {
+            NANOVDB_ASSERT(mParent);
             ++mPos;
-            while (mPos < mSize && mParent.tile(mPos)->isChild()) ++mPos;
+            while (mPos < mSize && mParent->tile(mPos)->isChild()) ++mPos;
             return *this;
+        }
+        __hostdev__ ValueIterator operator++(int) {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
         }
     }; // Member class ValueIterator
 
@@ -3063,20 +3133,29 @@ public:
 
     class ValueOnIterator
     {
-        const DataType &mParent;
-        uint32_t        mPos;
-        const uint32_t  mSize;
+        const DataType *mParent;
+        uint32_t        mPos, mSize;
     public:
-        __hostdev__ ValueOnIterator(const RootNode *parent) : mParent(*parent->data()), mPos(0), mSize(parent->tileCount()){
-            while (mPos < mSize && !mParent.tile(mPos)->isActive()) ++mPos;
+        __hostdev__ ValueOnIterator() : mParent(nullptr), mPos(0), mSize(0) {}
+        __hostdev__ ValueOnIterator(const RootNode *parent) : mParent(parent->data()), mPos(0), mSize(parent->tileCount()){
+            NANOVDB_ASSERT(mParent);
+            while (mPos < mSize && !mParent->tile(mPos)->isActive()) ++mPos;
         }
-        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent.tile(mPos)->value;}
+        ValueOnIterator& operator=(const ValueOnIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->tile(mPos)->value;}
         __hostdev__ operator bool() const {return mPos < mSize;}
         __hostdev__ uint32_t pos() const {return mPos;}
-        __hostdev__ ValueOnIterator& operator++(){
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); mParent->tile(mPos)->origin();}
+        __hostdev__ ValueOnIterator& operator++() {
+            NANOVDB_ASSERT(mParent);
             ++mPos;
-            while (mPos < mSize && !mParent.tile(mPos)->isActive()) ++mPos;
+            while (mPos < mSize && !mParent->tile(mPos)->isActive()) ++mPos;
             return *this;
+        }
+        __hostdev__ ValueOnIterator operator++(int) {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
         }
     }; // Member class ValueOnIterator
 
@@ -3130,7 +3209,7 @@ public:
     /// @brief Return the value of the given voxel
     __hostdev__ ValueType getValue(const CoordType& ijk) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             return tile->isChild() ? this->getChild(tile)->getValue(ijk) : tile->value;
         }
         return DataType::mBackground;
@@ -3138,7 +3217,7 @@ public:
 
     __hostdev__ bool isActive(const CoordType& ijk) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             return tile->isChild() ? this->getChild(tile)->isActive(ijk) : tile->state;
         }
         return false;
@@ -3149,7 +3228,7 @@ public:
 
     __hostdev__ bool probeValue(const CoordType& ijk, ValueType& v) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             if (tile->isChild()) {
                 const auto *child = this->getChild(tile);
                 return child->probeValue(ijk, v);
@@ -3163,7 +3242,7 @@ public:
 
     __hostdev__ const LeafNodeType* probeLeaf(const CoordType& ijk) const
     {
-        const Tile* tile = this->findTile(ijk);
+        const Tile* tile = this->probeTile(ijk);
         if (tile && tile->isChild()) {
             const auto *child = this->getChild(tile);
             return child->probeLeaf(ijk);
@@ -3171,21 +3250,17 @@ public:
         return nullptr;
     }
 
-private:
-    static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData) is misaligned");
-    static_assert(sizeof(typename DataType::Tile) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData::Tile) is misaligned");
+    __hostdev__ const ChildNodeType* probeChild(const CoordType& ijk) const
+    {
+        const Tile* tile = this->probeTile(ijk);
+        if (tile && tile->isChild()) {
+            return this->getChild(tile);
+        }
+        return nullptr;
+    }
 
-    template<typename, int, int, int>
-    friend class ReadAccessor;
-
-    template<typename>
-    friend class Tree;
-
-    /// @brief Private method to find a Tile of this root node by means of binary-search. This is obviously
-    ///        much slower then direct lookup into a linear array (as in the other nodes) which is exactly
-    ///        why it is important to use the ReadAccessor which amortizes this overhead by node caching and
-    ///        inverse tree traversal!
-    __hostdev__ const Tile* findTile(const CoordType& ijk) const
+    /// @brief Find and return a Tile of this root node
+    __hostdev__ const Tile* probeTile(const CoordType& ijk) const
     {
         const Tile* tiles = reinterpret_cast<const Tile*>(this + 1);
         const auto  key = DataType::CoordToKey(ijk);
@@ -3211,12 +3286,22 @@ private:
         return nullptr;
     }
 
+private:
+    static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData) is misaligned");
+    static_assert(sizeof(typename DataType::Tile) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(RootData::Tile) is misaligned");
+
+    template<typename, int, int, int>
+    friend class ReadAccessor;
+
+    template<typename>
+    friend class Tree;
+
     /// @brief Private method to return node information and update a ReadAccessor
     template<typename AccT>
     __hostdev__ typename AccT::NodeInfo getNodeInfoAndCache(const CoordType& ijk, const AccT& acc) const
     {
         using NodeInfoT = typename AccT::NodeInfo;
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             if (tile->isChild()) {
                 const auto *child = this->getChild(tile);
                 acc.insert(ijk, child);
@@ -3233,7 +3318,7 @@ private:
     template<typename AccT>
     __hostdev__ ValueType getValueAndCache(const CoordType& ijk, const AccT& acc) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             if (tile->isChild()) {
                 const auto *child = this->getChild(tile);
                 acc.insert(ijk, child);
@@ -3247,7 +3332,7 @@ private:
     template<typename AccT>
     __hostdev__ bool isActiveAndCache(const CoordType& ijk, const AccT& acc) const
     {
-        const Tile* tile = this->findTile(ijk);
+        const Tile* tile = this->probeTile(ijk);
         if (tile && tile->isChild()) {
             const auto *child = this->getChild(tile);
             acc.insert(ijk, child);
@@ -3259,7 +3344,7 @@ private:
     template<typename AccT>
     __hostdev__ bool probeValueAndCache(const CoordType& ijk, ValueType& v, const AccT& acc) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             if (tile->isChild()) {
                 const auto *child = this->getChild(tile);
                 acc.insert(ijk, child);
@@ -3275,7 +3360,7 @@ private:
     template<typename AccT>
     __hostdev__ const LeafNodeType* probeLeafAndCache(const CoordType& ijk, const AccT& acc) const
     {
-        const Tile* tile = this->findTile(ijk);
+        const Tile* tile = this->probeTile(ijk);
         if (tile && tile->isChild()) {
             const auto *child = this->getChild(tile);
             acc.insert(ijk, child);
@@ -3287,7 +3372,7 @@ private:
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
     {
-        if (const Tile* tile = this->findTile(ijk)) {
+        if (const Tile* tile = this->probeTile(ijk)) {
             if (tile->isChild()) {
                 const auto *child = this->getChild(tile);
                 acc.insert(ijk, child);
@@ -3424,7 +3509,8 @@ public:
     static constexpr bool FIXED_SIZE = DataType::FIXED_SIZE;
     template<uint32_t LOG2>
     using MaskType = typename ChildT::template MaskType<LOG2>;
-    using MaskIterT = typename Mask<Log2Dim>::Iterator;
+    template<bool On>
+    using MaskIterT = typename Mask<Log2Dim>::template Iterator<On>;
 
     static constexpr uint32_t LOG2DIM = Log2Dim;
     static constexpr uint32_t TOTAL = LOG2DIM + ChildT::TOTAL; // dimension in index space
@@ -3434,23 +3520,49 @@ public:
     static constexpr uint32_t LEVEL = 1 + ChildT::LEVEL; // level 0 = leaf
     static constexpr uint64_t NUM_VALUES = uint64_t(1) << (3 * TOTAL); // total voxel count represented by this node
 
-    class ChildIterator : public MaskIterT
+    /// @brief Visits child nodes of this node only
+    class ChildIterator : public MaskIterT<true>
     {
-        const DataType &mParent;
+        using BaseT = MaskIterT<true>;
+        const DataType *mParent;
     public:
-        __hostdev__ ChildIterator(const InternalNode* parent) : MaskIterT(parent->data()->mChildMask.beginOn()), mParent(*parent->data()) {}
-        __hostdev__ const ChildT& operator*() const {NANOVDB_ASSERT(*this); return *mParent.getChild(MaskIterT::pos());}
-        __hostdev__ const ChildT* operator->() const {NANOVDB_ASSERT(*this); return mParent.getChild(MaskIterT::pos());}
+        __hostdev__ ChildIterator() : BaseT(), mParent(nullptr) {}
+        __hostdev__ ChildIterator(const InternalNode* parent) : BaseT(parent->data()->mChildMask.beginOn()), mParent(parent->data()) {}
+        ChildIterator& operator=(const ChildIterator&) = default;
+        __hostdev__ const ChildT& operator*() const {NANOVDB_ASSERT(*this); return *mParent->getChild(BaseT::pos());}
+        __hostdev__ const ChildT* operator->() const {NANOVDB_ASSERT(*this); return mParent->getChild(BaseT::pos());}
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); return (*this)->origin();}
     }; // Member class ChildIterator
 
     ChildIterator beginChild() const {return ChildIterator(this);}
 
-    class ValueOnIterator : public MaskIterT
+    /// @brief Visits all tile values in this node, i.e. both inactive and active tiles
+    class ValueIterator : public MaskIterT<false>
     {
-         const DataType &mParent;
+        using BaseT = MaskIterT<false>;
+        const InternalNode *mParent;
     public:
-        __hostdev__ ValueOnIterator(const InternalNode* parent) :  MaskIterT(parent->data()->mValueMask.beginOn()), mParent(*parent->data()) {}
-        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent.getValue(MaskIterT::pos());}
+        __hostdev__ ValueIterator() : BaseT(), mParent(nullptr) {}
+        __hostdev__ ValueIterator(const InternalNode* parent) :  BaseT(parent->data()->mChildMask.beginOff()), mParent(parent) {}
+        ValueIterator& operator=(const ValueIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->data()->getValue(BaseT::pos());}
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); return mParent->localToGlobalCoord(BaseT::pos());}
+        __hostdev__ bool isActive() const { NANOVDB_ASSERT(*this); return mParent->data()->isActive(BaseT::mPos);}
+    }; // Member class ValueIterator
+
+    ValueIterator beginValue() const {return ValueIterator(this);}
+
+    /// @brief Visits active tile values of this node only
+    class ValueOnIterator : public MaskIterT<true>
+    {
+        using BaseT = MaskIterT<true>;
+        const InternalNode *mParent;
+    public:
+        __hostdev__ ValueOnIterator() : BaseT(), mParent(nullptr) {}
+        __hostdev__ ValueOnIterator(const InternalNode* parent) :  BaseT(parent->data()->mValueMask.beginOn()), mParent(parent) {}
+        ValueOnIterator& operator=(const ValueOnIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->data()->getValue(BaseT::pos());}
+        __hostdev__ CoordType getOrigin() const { NANOVDB_ASSERT(*this); return mParent->localToGlobalCoord(BaseT::pos());}
     }; // Member class ValueOnIterator
 
     ValueOnIterator beginValueOn() const {return ValueOnIterator(this);}
@@ -3527,6 +3639,12 @@ public:
         if (DataType::mChildMask.isOn(n))
             return this->getChild(n)->probeLeaf(ijk);
         return nullptr;
+    }
+
+    __hostdev__ const ChildNodeType* probeChild(const CoordType& ijk) const
+    {
+        const uint32_t n = CoordToOffset(ijk);
+        return DataType::mChildMask.isOn(n) ? this->getChild(n) : nullptr;
     }
 
     /// @brief Return the linear offset corresponding to the given coordinate
@@ -3647,8 +3765,8 @@ private:
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
     {
-        if (DataType::mFlags & uint32_t(1))
-            this->dim(); //ship this node if first bit is set
+        // if (DataType::mFlags & uint32_t(1))
+        //     this->dim(); //ship this node if first bit is set
         //if (!ray.intersects( this->bbox() )) return 1<<TOTAL;
 
         const uint32_t n = CoordToOffset(ijk);
@@ -4125,30 +4243,58 @@ public:
     static constexpr bool FIXED_SIZE = DataType::FIXED_SIZE;
     template<uint32_t LOG2>
     using MaskType = MaskT<LOG2>;
-    using MaskIterT = typename Mask<Log2Dim>::Iterator;
+    template<bool ON>
+    using MaskIterT = typename Mask<Log2Dim>::template Iterator<ON>;
 
-    class ValueOnIterator : public MaskIterT
+    /// @brief Visits all active values in a leaf node
+    class ValueOnIterator : public MaskIterT<true>
     {
-        const LeafNode &mParent;
+        using BaseT = MaskIterT<true>;
+        const LeafNode *mParent;
     public:
-        __hostdev__ ValueOnIterator(const LeafNode* parent) :  MaskIterT(parent->data()->mValueMask.beginOn()), mParent(*parent) {}
-        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent.getValue(MaskIterT::pos());}
-        __hostdev__ CoordT getCoord() const { NANOVDB_ASSERT(*this); return mParent.offsetToGlobalCoord(MaskIterT::pos());}
+        __hostdev__ ValueOnIterator() : BaseT(), mParent(nullptr) {}
+        __hostdev__ ValueOnIterator(const LeafNode* parent) :  BaseT(parent->data()->mValueMask.beginOn()), mParent(parent) {}
+        ValueOnIterator& operator=(const ValueOnIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->getValue(BaseT::pos());}
+        __hostdev__ CoordT getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(BaseT::pos());}
     }; // Member class ValueOnIterator
 
     ValueOnIterator beginValueOn() const {return ValueOnIterator(this);}
 
+    /// @brief Visits all inactive values in a leaf node
+    class ValueOffIterator : public MaskIterT<false>
+    {
+        using BaseT = MaskIterT<false>;
+        const LeafNode *mParent;
+    public:
+        __hostdev__ ValueOffIterator() : BaseT(), mParent(nullptr) {}
+        __hostdev__ ValueOffIterator(const LeafNode* parent) :  BaseT(parent->data()->mValueMask.beginOff()), mParent(parent) {}
+        ValueOffIterator& operator=(const ValueOffIterator&) = default;
+        __hostdev__ ValueType operator*() const {NANOVDB_ASSERT(*this); return mParent->getValue(BaseT::pos());}
+        __hostdev__ CoordT getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(BaseT::pos());}
+    }; // Member class ValueOffIterator
+
+    ValueOffIterator beginValueOff() const {return ValueOffIterator(this);}
+
+    /// @brief Visits all values in a leaf node, i.e. both active and inactive values
     class ValueIterator
     {
-        const LeafNode &mParent;
+        const LeafNode *mParent;
         uint32_t mPos;
     public:
-        __hostdev__ ValueIterator(const LeafNode* parent) :  mParent(*parent), mPos(0) {}
-        __hostdev__ ValueType operator*() const { NANOVDB_ASSERT(*this); return mParent.getValue(mPos);}
-        __hostdev__ CoordT getCoord() const { NANOVDB_ASSERT(*this); return mParent.offsetToGlobalCoord(mPos);}
-        __hostdev__ bool isActive() const { NANOVDB_ASSERT(*this); return mParent.isActive(mPos);}
+        __hostdev__ ValueIterator() : mParent(nullptr), mPos(1u << 3 * Log2Dim) {}
+        __hostdev__ ValueIterator(const LeafNode* parent) :  mParent(parent), mPos(0) {NANOVDB_ASSERT(parent);}
+        ValueIterator& operator=(const ValueIterator&) = default;
+        __hostdev__ ValueType operator*() const { NANOVDB_ASSERT(*this); return mParent->getValue(mPos);}
+        __hostdev__ CoordT getCoord() const { NANOVDB_ASSERT(*this); return mParent->offsetToGlobalCoord(mPos);}
+        __hostdev__ bool isActive() const { NANOVDB_ASSERT(*this); return mParent->isActive(mPos);}
         __hostdev__ operator bool() const {return mPos < (1u << 3 * Log2Dim);}
-        __hostdev__ ValueIterator& operator++(){++mPos; return *this;}
+        __hostdev__ ValueIterator& operator++() {++mPos; return *this;}
+        __hostdev__ ValueIterator operator++(int) {
+            auto tmp = *this;
+            ++(*this);
+            return tmp;
+        }
     }; // Member class ValueIterator
 
     ValueIterator beginValue() const {return ValueIterator(this);}
@@ -4329,8 +4475,9 @@ private:
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordT&, const RayT& /*ray*/, const AccT&) const
     {
-        if (DataType::mFlags & uint8_t(1))
-            return this->dim(); // skip this node if first bit is set
+        //if (DataType::mFlags & uint8_t(1))
+        //    return this->dim(); // skip this node if first bit is set
+
         //if (!ray.intersects( this->bbox() )) return 1 << LOG2DIM;
         return ChildNodeType::dim();
     }
@@ -5388,7 +5535,7 @@ public:
     __hostdev__ const Vec3R& voxelSize() const { return mGrid.voxelSize(); }
 
     /// @brief Return total number of values indexed by the IndexGrid
-    __hostdev__ const uint64_t& valueCount() const { return mGrid.data()->mData1; }
+    __hostdev__ const uint64_t& valueCount() const { return mGrid.valueCount(); }
 
     /// @brief Change to an external channel
     __hostdev__ void setChannel(ChannelT *channelPtr)

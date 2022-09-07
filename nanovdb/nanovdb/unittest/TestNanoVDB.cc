@@ -1347,6 +1347,27 @@ TEST_F(TestNanoVDB, Mask)
     mask.setOn();
     EXPECT_EQ(512u, mask.countOn());
     for (uint32_t i=0; i<512; ++i) EXPECT_EQ(i, mask.countOn(i));
+
+    mask.setOff();
+    EXPECT_TRUE(mask.isOff());
+    mask.setOn(7);
+    mask.setOn(123);
+    EXPECT_FALSE(mask.isOn());
+
+    auto it1 = mask.beginOff();
+    EXPECT_TRUE(it1);
+    EXPECT_EQ(0, *it1);
+    EXPECT_TRUE(++it1);
+    EXPECT_EQ(1, *it1);
+    EXPECT_TRUE(++it1);
+    EXPECT_EQ(2, *it1);
+
+    auto it2 = mask.beginOn();
+    EXPECT_TRUE(it2);
+    EXPECT_EQ(7, *it2);
+    EXPECT_TRUE(++it2);
+    EXPECT_EQ(123, *it2);
+    EXPECT_FALSE(++it2);
 }
 
 TEST_F(TestNanoVDB, LeafNode)
@@ -1376,12 +1397,13 @@ TEST_F(TestNanoVDB, LeafNode)
               sizeof(LeafT));
 
     // allocate buffer
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[LeafT::DataType::memUsage()]);
-    std::memset(buffer.get(), 0, LeafT::DataType::memUsage());
-    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[LeafT::DataType::memUsage()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    std::memset(buffer, 0, LeafT::DataType::memUsage());
+    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer);
 
     { // set members of the leaf node
-        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer);
         data.mValueMask.setOff();
         auto* values = data.mValues;
         for (int i = 0; i < 256; ++i)
@@ -1398,7 +1420,7 @@ TEST_F(TestNanoVDB, LeafNode)
     EXPECT_TRUE( leaf->isActive() );
 
     { // compute BBox
-        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer);
         EXPECT_EQ(8u, data.mValueMask.wordCount());
 
         nanovdb::CoordBBox bbox(nanovdb::Coord(-1), nanovdb::Coord(-1));
@@ -1428,7 +1450,7 @@ TEST_F(TestNanoVDB, LeafNode)
     EXPECT_TRUE( leaf->isActive() );
 
     // check values
-    auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer.get())->mValues;
+    auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer)->mValues;
     for (uint32_t i = 0; i < LeafT::voxelCount(); ++i) {
         if (i < 256) {
             EXPECT_FALSE(leaf->valueMask().isOn(i));
@@ -1509,11 +1531,12 @@ TEST_F(TestNanoVDB, LeafNodeBool)
               sizeof(LeafT));
 
     // allocate buffer
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[LeafT::DataType::memUsage()]);
-    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[LeafT::DataType::memUsage()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer);
 
     { // set members of the leaf node
-        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer);
         data.mValueMask.setOff();
         data.mValues.setOn();
 
@@ -1551,11 +1574,12 @@ TEST_F(TestNanoVDB, LeafNodeValueMask)
     //std::cerr << "Byte padding = " << (sizeof(LeafT)-64-12-4) << std::endl;
 
     // allocate buffer
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[LeafT::DataType::memUsage()]);
-    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[LeafT::DataType::memUsage()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    LeafT*                     leaf = reinterpret_cast<LeafT*>(buffer);
 
     { // set members of the leaf node
-        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<LeafT::DataType*>(buffer);
         data.mValueMask.setOff();
 
         for (uint32_t i = 256; i < LeafT::voxelCount(); ++i) {
@@ -1586,11 +1610,12 @@ TEST_F(TestNanoVDB, InternalNode)
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(size_t(2 * (16 * 16 * 16 / 64) * 8 + 16 * 16 * 16 * 8 + 2 * 4 + 4 + 2 * 3 * 4 + 4)), NodeT::memUsage());
 
     // an empty InternalNode
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[NodeT::DataType::memUsage()]);
-    NodeT*                     node = reinterpret_cast<NodeT*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[NodeT::DataType::memUsage()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    NodeT*                     node = reinterpret_cast<NodeT*>(buffer);
 
     { // set members of the node
-        auto& data = *reinterpret_cast<NodeT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<NodeT::DataType*>(buffer);
         data.mValueMask.setOff();
         data.mChildMask.setOff();
         auto* tiles = data.mTable;
@@ -1605,7 +1630,7 @@ TEST_F(TestNanoVDB, InternalNode)
     }
 
     // check values
-    auto* ptr = reinterpret_cast<NodeT::DataType*>(buffer.get())->mTable;
+    auto* ptr = reinterpret_cast<NodeT::DataType*>(buffer)->mTable;
     for (uint32_t i = 0; i < NodeT::SIZE; ++i, ++ptr) {
         EXPECT_FALSE(node->childMask().isOn(i));
         if (i < NodeT::SIZE / 2) {
@@ -1641,11 +1666,13 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(size_t(24 + 4 + 4 + 512 + 512 + 4 + 4 + (16 * 16 * 16) * 8)), NodeT::memUsage());
 
     // an empty InternalNode
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[NodeT::DataType::memUsage()]);
-    NodeT*                     node = reinterpret_cast<NodeT*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[NodeT::DataType::memUsage()+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+
+    NodeT*                     node = reinterpret_cast<NodeT*>(buffer);
 
     { // set members of the node
-        auto& data = *reinterpret_cast<NodeT::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<NodeT::DataType*>(buffer);
         data.mValueMask.setOff();
         data.mChildMask.setOff();
         auto* tiles = data.mTable;
@@ -1660,7 +1687,7 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
     }
 
     // check values
-    auto* ptr = reinterpret_cast<NodeT::DataType*>(buffer.get())->mTable;
+    auto* ptr = reinterpret_cast<NodeT::DataType*>(buffer)->mTable;
     for (uint32_t i = 0; i < NodeT::SIZE; ++i, ++ptr) {
         EXPECT_FALSE(node->childMask().isOn(i));
         if (i < NodeT::SIZE / 2) {
@@ -1684,8 +1711,9 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
                                                          16*16*16*8), // mTable
                                                          sizeof(LowerT));
       //std::cerr << "Size = " << sizeof(LowerT) << std::endl;
-      std::unique_ptr<uint8_t[]> buffer(new uint8_t[sizeof(LowerT)]);
-      auto *data = reinterpret_cast<LowerT*>(buffer.get())->data();
+      std::unique_ptr<uint8_t[]> pool(new uint8_t[sizeof(LowerT)+NANOVDB_DATA_ALIGNMENT]);
+      uint8_t *buffer = nanovdb::alignPtr(pool.get());
+      auto *data = reinterpret_cast<LowerT*>(buffer)->data();
       // since InternalData::mTable is 32 Byte aligned and the previous entry, InternalData::mStdDevi, is not on
       // a 32 Byte boundary we expect padding of a certain size which will check below
       uint8_t *start = reinterpret_cast<uint8_t*>(&(data->mStdDevi)+1);
@@ -1711,8 +1739,9 @@ TEST_F(TestNanoVDB, InternalNodeValueMask)
                                                          32*32*32*8), // mTable
                                                          sizeof(UpperT));
       //std::cerr << "Size = " << sizeof(UpperT) << std::endl;
-      std::unique_ptr<uint8_t[]> buffer(new uint8_t[sizeof(UpperT)]);
-      auto *data = reinterpret_cast<UpperT*>(buffer.get())->data();
+      std::unique_ptr<uint8_t[]> pool(new uint8_t[sizeof(UpperT)+NANOVDB_DATA_ALIGNMENT]);
+      uint8_t *buffer = nanovdb::alignPtr(pool.get());
+      auto *data = reinterpret_cast<UpperT*>(buffer)->data();
       // since InternalData::mTable is 32 Byte aligned and the previous entry, InternalData::mStdDevi, is not on
       // a 32 Byte boundary we expect padding of a certain size which will check below
       uint8_t *start = reinterpret_cast<uint8_t*>(&(data->mStdDevi)+1);
@@ -1744,11 +1773,12 @@ TEST_F(TestNanoVDB, RootNode)
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint32_t) + (5 * sizeof(float))), NodeT3::memUsage(0));
 
     // an empty RootNode
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[NodeT3::memUsage(0)]);
-    NodeT3*                    root = reinterpret_cast<NodeT3*>(buffer.get());
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[NodeT3::memUsage(0)+NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
+    NodeT3*                    root = reinterpret_cast<NodeT3*>(buffer);
 
     { // set members of the node
-        auto& data = *reinterpret_cast<NodeT3::DataType*>(buffer.get());
+        auto& data = *reinterpret_cast<NodeT3::DataType*>(buffer);
         data.mBackground = data.mMinimum = data.mMaximum = 1.234f;
         data.mTableSize = 0;
     }
@@ -2246,10 +2276,11 @@ TEST_F(TestNanoVDB, BasicGrid)
     size_t bytes[6] = {GridT::memUsage(), TreeT::memUsage(), RootT::memUsage(1), NodeT2::memUsage(), NodeT1::memUsage(), LeafT::DataType::memUsage()};
     for (int i = 1; i < 6; ++i)
         bytes[i] += bytes[i - 1]; // Byte offsets to: tree, root, internal nodes, leafs, total
-    std::unique_ptr<uint8_t[]> buffer(new uint8_t[bytes[5]]);
+    std::unique_ptr<uint8_t[]> pool(new uint8_t[bytes[5] + NANOVDB_DATA_ALIGNMENT]);
+    uint8_t *buffer = nanovdb::alignPtr(pool.get());
 
     // init leaf
-    LeafT* leaf = reinterpret_cast<LeafT*>(buffer.get() + bytes[4]);
+    LeafT* leaf = reinterpret_cast<LeafT*>(buffer + bytes[4]);
     { // set members of the leaf node
         auto* data = leaf->data();
         data->mValueMask.setOff();
@@ -2265,7 +2296,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     // lower internal node
-    NodeT1* node1 = reinterpret_cast<NodeT1*>(buffer.get() + bytes[3]);
+    NodeT1* node1 = reinterpret_cast<NodeT1*>(buffer + bytes[3]);
     { // set members of the  internal node
         auto *data = node1->data();
         data->mValueMask.setOff();
@@ -2284,7 +2315,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     // upper internal node
-    NodeT2* node2 = reinterpret_cast<NodeT2*>(buffer.get() + bytes[2]);
+    NodeT2* node2 = reinterpret_cast<NodeT2*>(buffer + bytes[2]);
     { // set members of the  internal node
         auto *data = node2->data();
         data->mValueMask.setOff();
@@ -2303,7 +2334,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     // init root
-    RootT* root = reinterpret_cast<RootT*>(buffer.get() + bytes[1]);
+    RootT* root = reinterpret_cast<RootT*>(buffer + bytes[1]);
     { // set members of the root node
         auto* data = root->data();
         data->mBackground = 0.0f;
@@ -2314,7 +2345,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     // init tree
-    TreeT* tree = reinterpret_cast<TreeT*>(buffer.get() + bytes[0]);
+    TreeT* tree = reinterpret_cast<TreeT*>(buffer + bytes[0]);
     {
         auto* data = tree->data();
         data->setRoot(root);
@@ -2324,7 +2355,7 @@ TEST_F(TestNanoVDB, BasicGrid)
         data->mNodeCount[0] = data->mNodeCount[1] = data->mNodeCount[2] = 1;
     }
 
-    GridT* grid = reinterpret_cast<GridT*>(buffer.get());
+    GridT* grid = reinterpret_cast<GridT*>(buffer);
     { // init Grid
         auto* data = grid->data();
         {
@@ -2390,7 +2421,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     { // check leaf node
-        auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer.get() + bytes[4])->mValues;
+        auto* ptr = reinterpret_cast<LeafT::DataType*>(buffer + bytes[4])->mValues;
         for (uint32_t i = 0; i < LeafT::voxelCount(); ++i) {
             if (i < 256) {
                 EXPECT_FALSE(leaf->valueMask().isOn(i));
@@ -2407,7 +2438,7 @@ TEST_F(TestNanoVDB, BasicGrid)
     }
 
     { // check lower internal node
-        auto& data = *reinterpret_cast<NodeT1::DataType*>(buffer.get() + bytes[3]);
+        auto& data = *reinterpret_cast<NodeT1::DataType*>(buffer + bytes[3]);
         EXPECT_TRUE(node1->childMask().isOn(0));
         for (uint32_t i = 1; i < NodeT1::SIZE; ++i) {
             EXPECT_FALSE(node1->childMask().isOn(i));
@@ -2426,7 +2457,7 @@ TEST_F(TestNanoVDB, BasicGrid)
         EXPECT_EQ(2.0f, node1->getValue(CoordT(8*16-1)));
     }
     { // check upper internal node
-        auto& data = *reinterpret_cast<NodeT2::DataType*>(buffer.get() + bytes[2]);
+        auto& data = *reinterpret_cast<NodeT2::DataType*>(buffer + bytes[2]);
         EXPECT_TRUE(node2->childMask().isOn(0));
         for (uint32_t i = 1; i < NodeT2::SIZE; ++i) {
             EXPECT_FALSE(node2->childMask().isOn(i));
@@ -5777,6 +5808,107 @@ TEST_F(TestNanoVDB, HostBuffer)
     }
 }// HostBuffer
 
+TEST_F(TestNanoVDB, NodeIterators)
+{
+    // create a FloatGrid with a level set sphere
+    const double voxelSize = 0.1;
+    const float radius = 10.0f;
+    const float halfWidth = 3.0f;
+    const nanovdb::Vec3f center(0);
+    //mTimer.start("Create level set sphere");
+    auto handle1 = nanovdb::createLevelSetSphere<float>(radius, center, voxelSize, halfWidth);
+    //mTimer.stop();
+    auto *fltGrid = handle1.grid<float>();
+    EXPECT_TRUE(fltGrid);
+    auto &fltTree = fltGrid->tree();
+    auto &fltRoot = fltTree.root();
+    //std::cerr << "FloatGrid footprint: " << (fltGrid->gridSize()>>20) << "MB" << std::endl;
+
+    {// check LeafNode::ValueOnInterator
+        nanovdb::NanoLeaf<float>::ValueOnIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLeaf();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginValueOn();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+
+    {// check LeafNode::ValueOffInterator
+        nanovdb::NanoLeaf<float>::ValueOffIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLeaf();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginValueOff();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+
+    {// check LeafNode::ValueInterator
+        nanovdb::NanoLeaf<float>::ValueIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLeaf();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginValue();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+
+    {// check InternalNode::ChildInterator
+        nanovdb::NanoLower<float>::ChildIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLower();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginChild();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+
+    {// check InternalNode::ValueOnInterator
+        nanovdb::NanoLower<float>::ValueOnIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLower();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginValueOn();
+        EXPECT_FALSE(it);// no active tiles
+        auto it2 = it;
+        EXPECT_FALSE(it2);
+    }
+
+    {// check InternalNode::ValueInterator
+        nanovdb::NanoLower<float>::ValueIterator it;
+        EXPECT_FALSE(it);
+        auto *leaf = fltTree.getFirstLower();
+        EXPECT_TRUE(leaf);
+        it = leaf->beginValue();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+
+    {// check RootNode::ValueOnInterator
+        nanovdb::NanoRoot<float>::ValueOnIterator it;
+        EXPECT_FALSE(it);
+        it = fltTree.root().beginValueOn();
+        EXPECT_FALSE(it);// no active tiles
+        auto it2 = it;
+        EXPECT_FALSE(it2);
+    }
+
+    {// check RootNode::ValueOnInterator
+        nanovdb::NanoRoot<float>::ChildIterator it;
+        EXPECT_FALSE(it);
+        it = fltTree.root().beginChild();
+        EXPECT_TRUE(it);
+        auto it2 = it;
+        EXPECT_TRUE(it2);
+    }
+}
+
 // make testNanoVDB && ./unittest/testNanoVDB --gtest_filter="*IndexGridBuilder*" --gtest_break_on_failure --gtest_repeat=5
 TEST_F(TestNanoVDB, IndexGridBuilder1)
 {
@@ -5815,13 +5947,13 @@ TEST_F(TestNanoVDB, IndexGridBuilder1)
     EXPECT_EQ(nanovdb::Vec3d(1.0,1.0,1.0), idxGrid->voxelSize());
     EXPECT_EQ(1u, idxGrid->tree().root().tileCount());
     EXPECT_EQ(1u, idxGrid->activeVoxelCount());
-    EXPECT_EQ(5u+4u+32*32*32u-1 + 4u+16*16*16u-1 + 4u+8*8*8u, idxGrid->data()->mData1);
+    EXPECT_EQ(5u+4u+32*32*32u-1 + 4u+16*16*16u-1 + 4u+8*8*8u, idxGrid->valueCount());
     EXPECT_EQ(0u, idxGrid->tree().root().background());
     EXPECT_EQ(1u, idxGrid->tree().root().minimum());
     EXPECT_EQ(2u, idxGrid->tree().root().maximum());
     EXPECT_EQ(3u, idxGrid->tree().root().average());
     EXPECT_EQ(4u, idxGrid->tree().root().stdDeviation());
-    EXPECT_EQ(idxGrid->data()->mData1, builder2.getValueCount());
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
 
     EXPECT_FALSE(idxGrid->tree().isActive(nanovdb::Coord(0,0,0)));
     EXPECT_TRUE(idxGrid->tree().isActive(ijk));
@@ -5902,7 +6034,7 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder1)
     EXPECT_EQ(2u, idxGrid->tree().root().maximum());
     EXPECT_EQ(3u, idxGrid->tree().root().average());
     EXPECT_EQ(4u, idxGrid->tree().root().stdDeviation());
-    EXPECT_EQ(idxGrid->data()->mData1, builder2.getValueCount());
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
 
     EXPECT_FALSE(idxGrid->tree().isActive(nanovdb::Coord(0,0,0)));
     EXPECT_TRUE(idxGrid->tree().isActive(ijk));
@@ -5985,9 +6117,11 @@ TEST_F(TestNanoVDB, IndexGridBuilder2)
     EXPECT_EQ(2u, idxGrid->tree().root().maximum());
     EXPECT_EQ(3u, idxGrid->tree().root().average());
     EXPECT_EQ(4u, idxGrid->tree().root().stdDeviation());
-    EXPECT_EQ(idxGrid->data()->mData1, builder2.getValueCount());
+
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
     //EXPECT_EQ(idxAcc.valueCount(), builder2.getValueCount());
-    EXPECT_TRUE(idxGrid->data()->mData1>0);// this is the number of values pointed to by the indexGrid
+    EXPECT_TRUE(idxGrid->valueCount()>0);// this is the number of values pointed to by the indexGrid
 
     for (auto iter = fltGrid->indexBBox().begin(); iter; ++iter) {
         EXPECT_EQ(fltTree.isActive(*iter), idxTree.isActive(*iter));
@@ -6016,7 +6150,7 @@ TEST_F(TestNanoVDB, IndexGridBuilder2)
     {// allocate an external buffer and populate it with the floatGrid values
         float *buffer = new float[builder2.getValueCount()];// this is the number of values pointed to by the indexGrid
         EXPECT_TRUE(buffer);
-        //std::cerr << "Buffer footprint: " << ((4*idxGrid->data()->mData1)>>20) << "MB" << std::endl;
+        //std::cerr << "Buffer footprint: " << ((4*idxGrid->valueCount())>>20) << "MB" << std::endl;
         EXPECT_TRUE(builder2.copyValues(buffer, builder2.getValueCount()));
 
         EXPECT_EQ(buffer[idxRoot.minimum()], fltRoot.minimum());
@@ -6133,9 +6267,9 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
     EXPECT_EQ(2u, idxRoot.maximum());
     EXPECT_EQ(3u, idxRoot.average());
     EXPECT_EQ(4u, idxRoot.stdDeviation());
-    EXPECT_EQ(idxGrid->data()->mData1, builder2.getValueCount());
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
     //(idxAcc.valueCount(), builder2.getValueCount());
-    EXPECT_TRUE(idxGrid->data()->mData1>0);// this is the number of values pointed to by the indexGrid
+    EXPECT_TRUE(idxGrid->valueCount()>0);// this is the number of values pointed to by the indexGrid
 
     for (auto it = fltGrid->indexBBox().begin(); it; ++it) EXPECT_EQ(fltTree.isActive(*it), idxTree.isActive(*it));
 
@@ -6156,10 +6290,10 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
     }
 
     {// allocate an external buffer and populate it with the floatGrid values
-        float *buffer = new float[idxGrid->data()->mData1];// this is the number of values pointed to by the indexGrid
+        float *buffer = new float[idxGrid->valueCount()];// this is the number of values pointed to by the indexGrid
         EXPECT_TRUE(buffer);
-        //std::cerr << "Buffer footprint: " << ((4*idxGrid->data()->mData1)>>20) << "MB" << std::endl;
-        EXPECT_TRUE(builder2.copyValues(buffer, idxGrid->data()->mData1));
+        //std::cerr << "Buffer footprint: " << ((4*idxGrid->valueCount())>>20) << "MB" << std::endl;
+        EXPECT_TRUE(builder2.copyValues(buffer, idxGrid->valueCount()));
 
         // compare the values of the functor with the original fltGrid
         for (auto it = idxGrid->indexBBox().begin(); it; ++it) {
@@ -6266,13 +6400,13 @@ TEST_F(TestNanoVDB, ChannelIndexGridBuilder)
     EXPECT_EQ(fltGrid->activeVoxelCount(), idxGrid->activeVoxelCount());
     EXPECT_EQ(fltGrid->worldBBox(), idxGrid->worldBBox());
     EXPECT_EQ(fltGrid->indexBBox(), idxGrid->indexBBox());
-    EXPECT_EQ(idxGrid->data()->mData1, builder2.getValueCount());
+    EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
     EXPECT_EQ(channels, idxGrid->blindDataCount());
-    EXPECT_TRUE(idxGrid->data()->mData1>0);// this is the number of values pointed to by the indexGrid
+    EXPECT_TRUE(idxGrid->valueCount()>0);// this is the number of values pointed to by the indexGrid
 
     auto *leaf = idxTree.getFirstNode<0>();
     for (uint32_t i=0; i<channels; ++i) {
-        EXPECT_EQ(idxGrid->data()->mData1, idxGrid->blindMetaData(i).mElementCount);
+        EXPECT_EQ(idxGrid->valueCount(), idxGrid->blindMetaData(i).mElementCount);
         EXPECT_EQ(nanovdb::GridType::Float, idxGrid->blindMetaData(i).mDataType);
         EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, idxGrid->blindMetaData(i).mDataClass);
         EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, idxGrid->blindMetaData(i).mSemantic);
@@ -6292,7 +6426,7 @@ TEST_F(TestNanoVDB, ChannelIndexGridBuilder)
     };
 
     for (uint32_t i=0; i<channels; ++i) {
-        EXPECT_EQ(idxGrid->data()->mData1, idxGrid->blindMetaData(i).mElementCount);
+        EXPECT_EQ(idxGrid->valueCount(), idxGrid->blindMetaData(i).mElementCount);
         EXPECT_EQ(nanovdb::GridType::Float, idxGrid->blindMetaData(i).mDataType);
         EXPECT_EQ(nanovdb::GridBlindDataClass::ChannelArray, idxGrid->blindMetaData(i).mDataClass);
         EXPECT_EQ(nanovdb::GridBlindDataSemantic::Unknown, idxGrid->blindMetaData(i).mSemantic);
