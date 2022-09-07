@@ -117,12 +117,12 @@ public:
     ///       points to.
     uint64_t getValueCount() const { return mValueCount; }
 
-   /// @brief return a buffer with all the values in the source grid
-   template<typename BufferT = HostBuffer>
-   BufferT getValues(uint32_t channels = 1u, const BufferT &buffer = BufferT());
+    /// @brief return a buffer with all the values in the source grid
+    template<typename BufferT = HostBuffer>
+    BufferT getValues(uint32_t channels = 1u, const BufferT &buffer = BufferT());
 
-   /// @brief copy values from the source grid into the provided array and returns number of values copied
-   uint64_t copyValues(SrcValueT *buffer, size_t maxValueCount = -1);
+    /// @brief copy values from the source grid into the provided array and returns number of values copied
+    uint64_t copyValues(SrcValueT *buffer, size_t maxValueCount = -1);
 }; // IndexGridBuilder
 
 //================================================================================================
@@ -210,7 +210,6 @@ void IndexGridBuilder<SrcValueT>::countValues()
     valueCount = mValIdx1.back();
 
     // voxel values in leaf nodes
-
     mValIdx0.clear();
     mValIdx0.resize(mSrcMgr->nodeCount(0) + 1, 512u + stats);
     if (mIsSparse) {

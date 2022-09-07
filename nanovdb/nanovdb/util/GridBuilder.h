@@ -86,7 +86,7 @@ inline std::ostream& operator<<(std::ostream& os, const RelDiff& diff)
     return os;
 }
 
-/// @brief Allows for the construction of NanoVDB grids without any dependecy
+/// @brief Allows for the construction of NanoVDB grids without any dependency
 template<typename ValueT, typename BuildT = ValueT, typename StatsT = Stats<ValueT>>
 class GridBuilder
 {
@@ -95,7 +95,6 @@ class GridBuilder
     struct BuildNode;
     template<typename ChildT>
     struct BuildRoot;
-    struct ValueAccessor;
 
     struct Codec {float min, max; uint16_t log2, size;};// used for adaptive bit-rate quantization
 
@@ -173,18 +172,20 @@ class GridBuilder
     setFlag(const T& min, const T& max, FlagT& flag) const;
 
 public:
+    struct ValueAccessor;
+
     GridBuilder(ValueT background = ValueT(),
                 GridClass gClass = GridClass::Unknown,
                 uint64_t blindDataSize = 0);
 
     ValueAccessor getAccessor() { return ValueAccessor(mRoot); }
 
-    /// @brief Performs multi-threaded bottum-up signed-distance flood-filling and changes GridClass to LevelSet
+    /// @brief Performs multi-threaded bottom-up signed-distance flood-filling and changes GridClass to LevelSet
     ///
     /// @warning Only call this method once this GridBuilder contains a valid signed distance field
     void sdfToLevelSet();
 
-    /// @brief Performs multi-threaded bottum-up signed-distance flood-filling followed by level-set -> FOG volume
+    /// @brief Performs multi-threaded bottom-up signed-distance flood-filling followed by level-set -> FOG volume
     ///        conversion. It also changes the GridClass to FogVolume
     ///
     /// @warning Only call this method once this GridBuilder contains a valid signed distance field
@@ -218,7 +219,7 @@ public:
     /// @brief Sets grids values in domain of the @a bbox to those returned by the specified @a func with the
     ///        expected signature [](const Coord&)->ValueT.
     ///
-    /// @note If @a func returns a value equal to the brackground value (specified in the constructor) at a
+    /// @note If @a func returns a value equal to the background value (specified in the constructor) at a
     ///       specific voxel coordinate, then the active state of that coordinate is left off! Else the value
     ///       value is set and the active state is on. This is done to allow for sparse grids to be generated.
     ///
@@ -509,7 +510,7 @@ void GridBuilder<ValueT, BuildT, StatsT>::
         }// is child node of the root
     }// loop over root table
 
-    // Note that the bottum-up flood filling is essential
+    // Note that the bottom-up flood filling is essential
     const ValueT outside = mRoot.mBackground;
     forEach(mArray0, 8, [&](const Range1D& r) {
         for (auto i = r.begin(); i != r.end(); ++i)
@@ -819,7 +820,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
             const float* src = srcLeaf->mValues;
             const float min = mCodec[i].min, max = mCodec[i].max;
             data->init(min, max, uint8_t(1) << logBitWidth);
-            // perform quantization relative to the values in the curret leaf node
+            // perform quantization relative to the values in the current leaf node
             int offset = 0;
             switch (logBitWidth) {
                 case 0u: {// 1 bit

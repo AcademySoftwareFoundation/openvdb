@@ -419,12 +419,12 @@ private:
 
     static void* alloc(uint64_t size)
     {
-#if (__cplusplus >= 201703L)
-    return std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, size);//C++17 or newer
-#else
+//#if (__cplusplus >= 201703L)
+//    return std::aligned_alloc(NANOVDB_DATA_ALIGNMENT, size);//C++17 or newer
+//#else
     // make sure we alloc enough space to align the result
     return std::malloc(size + NANOVDB_DATA_ALIGNMENT);
-#endif
+//#endif
     }
 
     static void* realloc(void* const origData,
