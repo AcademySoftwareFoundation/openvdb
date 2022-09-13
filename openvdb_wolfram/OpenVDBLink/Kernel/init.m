@@ -6,6 +6,12 @@ If[$CloudEvaluation,
 ];
 
 
+If[$VersionNumber < 11.0,
+	Print["OpenVDBLink requires Mathematica 11.0 or later.  Aborting."];
+	Abort[]
+]
+
+
 Unprotect["OpenVDBLink`*"];
 
 
