@@ -5,7 +5,8 @@ BeginTestSection["Generic"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 1 *)
-	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount",     "BackgroundValue","BoundingGridVoxelCount","Empty","GridClass","GridType",    "HalfWidth","IndexBoundingBox","IndexDimensions","MinMaxValues","UniformVoxels",    "VoxelSize","WorldBoundingBox","WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];BoundaryMeshRegionQ[bmr]
+	$propertyList = {"ActiveLeafVoxelCount",  "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox", "IndexDimensions", "MinMaxValues", "UniformVoxels", "VoxelSize", "WorldBoundingBox", "WorldDimensions"}; OpenVDBLink`$OpenVDBSpacing = 0.1; OpenVDBLink`$OpenVDBHalfWidth = 3.; 
+  bmr = ExampleData[{"Geometry3D",  "Triceratops"},  "BoundaryMeshRegion"]; BoundaryMeshRegionQ[bmr]
 	,
 	True	
 ]
@@ -23,7 +24,7 @@ VerificationTest[(* 2 *)
 VerificationTest[(* 3 *)
 	Attributes[OpenVDBLink`OpenVDBGrid]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -32,22 +33,18 @@ VerificationTest[(* 4 *)
 	Options[OpenVDBLink`OpenVDBGrid]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 5 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBGrid]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 6 *)
-	{OpenVDBLink`OpenVDBGrid[], OpenVDBLink`OpenVDBGrid[1.3], OpenVDBLink`OpenVDBGrid[1], OpenVDBLink`OpenVDBGrid[2, "error"], OpenVDBLink`OpenVDBGrid[3, "Vector", "error"]}
+	{OpenVDBLink`OpenVDBGrid[],  OpenVDBLink`OpenVDBGrid[1.3], OpenVDBLink`OpenVDBGrid[1], OpenVDBLink`OpenVDBGrid[2,  "error"], OpenVDBLink`OpenVDBGrid[3,  "Vector", "error"]}
 	,
-	{OpenVDBLink`OpenVDBGrid[], OpenVDBLink`OpenVDBGrid[1.3], OpenVDBLink`OpenVDBGrid[1], OpenVDBLink`OpenVDBGrid[2, "error"], OpenVDBLink`OpenVDBGrid[3, "Vector", "error"]}	
+	{OpenVDBLink`OpenVDBGrid[],  OpenVDBLink`OpenVDBGrid[1.3], OpenVDBLink`OpenVDBGrid[1], OpenVDBLink`OpenVDBGrid[2,  "error"], OpenVDBLink`OpenVDBGrid[3,  "Vector", "error"]}	
 ]
 
 EndTestSection[]
@@ -63,7 +60,7 @@ VerificationTest[(* 7 *)
 VerificationTest[(* 8 *)
 	Attributes[OpenVDBLink`OpenVDBGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -72,20 +69,18 @@ VerificationTest[(* 9 *)
 	Options[OpenVDBLink`OpenVDBGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 10 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 11 *)
-	{OpenVDBLink`OpenVDBGridQ[], OpenVDBLink`OpenVDBGridQ["error"], OpenVDBLink`OpenVDBGridQ[OpenVDBLink`OpenVDBLevelSet[bmr], "error"]}
+	{OpenVDBLink`OpenVDBGridQ[],  OpenVDBLink`OpenVDBGridQ["error"], OpenVDBLink`OpenVDBGridQ[OpenVDBLink`OpenVDBLevelSet[bmr],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -101,7 +96,7 @@ VerificationTest[(* 12 *)
 VerificationTest[(* 13 *)
 	Attributes[OpenVDBLink`OpenVDBGrids]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -110,20 +105,18 @@ VerificationTest[(* 14 *)
 	Options[OpenVDBLink`OpenVDBGrids]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 15 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBGrids]
 	,
-	{"ArgumentsPattern"->{_.}}	
+	{"ArgumentsPattern" -> {_.}}	
 ]
 
 VerificationTest[(* 16 *)
-	{OpenVDBLink`OpenVDBGrids["error"], OpenVDBLink`OpenVDBGrids["Scalar", "error"]}
+	{OpenVDBLink`OpenVDBGrids["error"],  OpenVDBLink`OpenVDBGrids["Scalar",  "error"]}
 	,
-	{$Failed, $Failed}
+	{$Failed,  $Failed}
 	,
 	{OpenVDBGrids::type, OpenVDBGrids::argt}
 ]
@@ -135,21 +128,21 @@ VerificationTest[(* 17 *)
 ]
 
 VerificationTest[(* 18 *)
-	VectorQ[OpenVDBLink`OpenVDBGrids/@{Automatic, All, {"Float", "Vector"}}, AssociationQ]
+	VectorQ[OpenVDBLink`OpenVDBGrids /@ {Automatic,  All, {"Float",  "Vector"}},  AssociationQ]
 	,
 	True	
 ]
 
 VerificationTest[(* 19 *)
-	VectorQ[OpenVDBLink`OpenVDBGrids/@{"Int32", "Vector"}, ListQ]
+	VectorQ[OpenVDBLink`OpenVDBGrids /@ {"Int32",  "Vector"},  ListQ]
 	,
 	True	
 ]
 
 VerificationTest[(* 20 *)
-	vdbball=OpenVDBLink`OpenVDBLevelSet[Ball[], 0.1, 3.];{OpenVDBLink`OpenVDBScalarGridQ[vdbball], ListQ[OpenVDBLink`OpenVDBGrids["Float"]],    MemberQ[OpenVDBLink`OpenVDBGrids["Float"], vdbball]}
+	vdbball = OpenVDBLink`OpenVDBLevelSet[Ball[],  0.1, 3.]; {OpenVDBLink`OpenVDBScalarGridQ[vdbball],  ListQ[OpenVDBLink`OpenVDBGrids["Float"]], MemberQ[OpenVDBLink`OpenVDBGrids["Float"],  vdbball]}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -165,7 +158,7 @@ VerificationTest[(* 21 *)
 VerificationTest[(* 22 *)
 	Attributes[OpenVDBLink`OpenVDBGridTypes]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -174,20 +167,18 @@ VerificationTest[(* 23 *)
 	Options[OpenVDBLink`OpenVDBGridTypes]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 24 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBGridTypes]
 	,
-	{"ArgumentsPattern"->{_.}}	
+	{"ArgumentsPattern" -> {_.}}	
 ]
 
 VerificationTest[(* 25 *)
-	{OpenVDBLink`OpenVDBGridTypes["error"], OpenVDBLink`OpenVDBGridTypes["Scalar", "error"]}
+	{OpenVDBLink`OpenVDBGridTypes["error"],  OpenVDBLink`OpenVDBGridTypes["Scalar",  "error"]}
 	,
-	{$Failed, $Failed}
+	{$Failed,  $Failed}
 	,
 	{OpenVDBGridTypes::type, OpenVDBGridTypes::argt}
 ]
@@ -195,25 +186,25 @@ VerificationTest[(* 25 *)
 VerificationTest[(* 26 *)
 	OpenVDBLink`OpenVDBGridTypes[]
 	,
-	{"Scalar", "Vector", "Double", "Float", "Byte", "Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}	
+	{"Scalar",  "Vector", "Double", "Float", "Byte", "Int32", "Int64", "UInt32", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S", "Boolean", "Mask"}	
 ]
 
 VerificationTest[(* 27 *)
 	OpenVDBLink`OpenVDBGridTypes["Scalar"]
 	,
-	{"Scalar", "Double", "Float"}	
+	{"Scalar",  "Double", "Float"}	
 ]
 
 VerificationTest[(* 28 *)
 	OpenVDBLink`OpenVDBGridTypes["Integer"]
 	,
-	{"Byte", "Int32", "Int64", "UInt32"}	
+	{"Byte",  "Int32", "Int64", "UInt32"}	
 ]
 
 VerificationTest[(* 29 *)
 	OpenVDBLink`OpenVDBGridTypes["Vector"]
 	,
-	{"Vector", "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S"}	
+	{"Vector",  "Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S"}	
 ]
 
 VerificationTest[(* 30 *)
@@ -241,7 +232,7 @@ VerificationTest[(* 32 *)
 VerificationTest[(* 33 *)
 	Attributes[OpenVDBLink`OpenVDBScalarGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -250,20 +241,18 @@ VerificationTest[(* 34 *)
 	Options[OpenVDBLink`OpenVDBScalarGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 35 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBScalarGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 36 *)
-	{OpenVDBLink`OpenVDBScalarGridQ[], OpenVDBLink`OpenVDBScalarGridQ["error"], OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Int32"], "error"]}
+	{OpenVDBLink`OpenVDBScalarGridQ[],  OpenVDBLink`OpenVDBScalarGridQ["error"], OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Int32"],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -279,7 +268,7 @@ VerificationTest[(* 37 *)
 VerificationTest[(* 38 *)
 	Attributes[OpenVDBLink`OpenVDBIntegerGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -288,20 +277,18 @@ VerificationTest[(* 39 *)
 	Options[OpenVDBLink`OpenVDBIntegerGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 40 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBIntegerGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 41 *)
-	{OpenVDBLink`OpenVDBIntegerGridQ[], OpenVDBLink`OpenVDBIntegerGridQ["error"], OpenVDBLink`OpenVDBIntegerGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Int32"], "error"]}
+	{OpenVDBLink`OpenVDBIntegerGridQ[],  OpenVDBLink`OpenVDBIntegerGridQ["error"], OpenVDBLink`OpenVDBIntegerGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Int32"],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -317,7 +304,7 @@ VerificationTest[(* 42 *)
 VerificationTest[(* 43 *)
 	Attributes[OpenVDBLink`OpenVDBVectorGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -326,20 +313,18 @@ VerificationTest[(* 44 *)
 	Options[OpenVDBLink`OpenVDBVectorGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 45 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBVectorGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 46 *)
-	{OpenVDBLink`OpenVDBVectorGridQ[], OpenVDBLink`OpenVDBVectorGridQ["error"], OpenVDBLink`OpenVDBVectorGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Vector"], "error"]}
+	{OpenVDBLink`OpenVDBVectorGridQ[],  OpenVDBLink`OpenVDBVectorGridQ["error"], OpenVDBLink`OpenVDBVectorGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Vector"],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -355,7 +340,7 @@ VerificationTest[(* 47 *)
 VerificationTest[(* 48 *)
 	Attributes[OpenVDBLink`OpenVDBBooleanGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -364,20 +349,18 @@ VerificationTest[(* 49 *)
 	Options[OpenVDBLink`OpenVDBBooleanGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 50 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBBooleanGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 51 *)
-	{OpenVDBLink`OpenVDBBooleanGridQ[], OpenVDBLink`OpenVDBBooleanGridQ["error"], OpenVDBLink`OpenVDBBooleanGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Boolean"], "error"]}
+	{OpenVDBLink`OpenVDBBooleanGridQ[],  OpenVDBLink`OpenVDBBooleanGridQ["error"], OpenVDBLink`OpenVDBBooleanGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Boolean"],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -393,7 +376,7 @@ VerificationTest[(* 52 *)
 VerificationTest[(* 53 *)
 	Attributes[OpenVDBLink`OpenVDBMaskGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -402,20 +385,18 @@ VerificationTest[(* 54 *)
 	Options[OpenVDBLink`OpenVDBMaskGridQ]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 55 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBMaskGridQ]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 56 *)
-	{OpenVDBLink`OpenVDBMaskGridQ[], OpenVDBLink`OpenVDBMaskGridQ["error"], OpenVDBLink`OpenVDBMaskGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Mask"], "error"]}
+	{OpenVDBLink`OpenVDBMaskGridQ[],  OpenVDBLink`OpenVDBMaskGridQ["error"], OpenVDBLink`OpenVDBMaskGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Mask"],  "error"]}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -431,7 +412,7 @@ VerificationTest[(* 57 *)
 VerificationTest[(* 58 *)
 	Attributes[OpenVDBLink`OpenVDBScalarGridQ]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -439,19 +420,19 @@ VerificationTest[(* 58 *)
 VerificationTest[(* 59 *)
 	Options[OpenVDBLink`OpenVDBCreateGrid]
 	,
-	{"BackgroundValue"->Automatic, "Creator":>OpenVDBLink`$OpenVDBCreator, "GridClass"->None, "Name"->None}	
+	{"BackgroundValue" -> Automatic,  "Creator" :> OpenVDBLink`$OpenVDBCreator, "GridClass" -> None, "Name" -> None}	
 ]
 
 VerificationTest[(* 60 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBCreateGrid]
 	,
-	{"ArgumentsPattern"->{_., _., OptionsPattern[]}}	
+	{"ArgumentsPattern" -> {_.,  _., OptionsPattern[]}}	
 ]
 
 VerificationTest[(* 61 *)
-	{OpenVDBLink`OpenVDBCreateGrid["error"], OpenVDBLink`OpenVDBCreateGrid[1., "error"], OpenVDBLink`OpenVDBCreateGrid[1., "Scalar", "error"]}
+	{OpenVDBLink`OpenVDBCreateGrid["error"],  OpenVDBLink`OpenVDBCreateGrid[1.,  "error"], OpenVDBLink`OpenVDBCreateGrid[1.,  "Scalar", "error"]}
 	,
-	{$Failed, $Failed, $Failed}
+	{$Failed,  $Failed, $Failed}
 	,
 	{OpenVDBCreateGrid::nonpos, OpenVDBCreateGrid::type, OpenVDBCreateGrid::nonopt}
 ]
@@ -469,27 +450,25 @@ VerificationTest[(* 62 *)
 VerificationTest[(* 63 *)
 	Attributes[OpenVDBLink`OpenVDBDeleteGrid]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 ]
 
 VerificationTest[(* 64 *)
 	Options[OpenVDBLink`OpenVDBDeleteGrid]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 65 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBDeleteGrid]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 66 *)
-	{OpenVDBLink`OpenVDBDeleteGrid[], OpenVDBLink`OpenVDBDeleteGrid["error"], OpenVDBLink`OpenVDBCreateGrid[OpenVDBLink`OpenVDBCreateGrid[1.], "error"]}
+	{OpenVDBLink`OpenVDBDeleteGrid[],  OpenVDBLink`OpenVDBDeleteGrid["error"], OpenVDBLink`OpenVDBCreateGrid[OpenVDBLink`OpenVDBCreateGrid[1.],  "error"]}
 	,
-	{$Failed, $Failed, $Failed}
+	{$Failed,  $Failed, $Failed}
 	,
 	{OpenVDBDeleteGrid::argx, OpenVDBDeleteGrid::grids, OpenVDBCreateGrid::nonpos}
 ]
@@ -507,7 +486,7 @@ VerificationTest[(* 67 *)
 VerificationTest[(* 68 *)
 	Attributes[OpenVDBLink`OpenVDBCopyGrid]
 	,
-	{Protected, ReadProtected}	
+	{Protected,  ReadProtected}	
 	,
 	{}
 ]
@@ -515,19 +494,19 @@ VerificationTest[(* 68 *)
 VerificationTest[(* 69 *)
 	Options[OpenVDBLink`OpenVDBCopyGrid]
 	,
-	{"Creator"->Inherited, "Name"->Inherited}	
+	{"Creator" -> Inherited,  "Name" -> Inherited}	
 ]
 
 VerificationTest[(* 70 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBCopyGrid]
 	,
-	{"ArgumentsPattern"->{_, OptionsPattern[]}}	
+	{"ArgumentsPattern" -> {_,  OptionsPattern[]}}	
 ]
 
 VerificationTest[(* 71 *)
-	{OpenVDBLink`OpenVDBCopyGrid[], OpenVDBLink`OpenVDBCopyGrid["error"], OpenVDBLink`OpenVDBCopyGrid[OpenVDBLink`OpenVDBCreateGrid[1.], "error"]}
+	{OpenVDBLink`OpenVDBCopyGrid[],  OpenVDBLink`OpenVDBCopyGrid["error"], OpenVDBLink`OpenVDBCopyGrid[OpenVDBLink`OpenVDBCreateGrid[1.],  "error"]}
 	,
-	{$Failed, $Failed, $Failed}
+	{$Failed,  $Failed, $Failed}
 	,
 	{OpenVDBCopyGrid::argx, OpenVDBCopyGrid::grid, OpenVDBCopyGrid::nonopt}
 ]
@@ -546,66 +525,60 @@ VerificationTest[(* 73 *)
 	Attributes[OpenVDBLink`$OpenVDBSpacing]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 74 *)
 	Options[OpenVDBLink`$OpenVDBSpacing]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 75 *)
 	SyntaxInformation[OpenVDBLink`$OpenVDBSpacing]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 76 *)
-	{OpenVDBLink`$OpenVDBSpacing=0.3, OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing = 0.3,  OpenVDBLink`$OpenVDBSpacing}
 	,
-	{0.3, 0.3}	
+	{0.3,  0.3}	
 ]
 
 VerificationTest[(* 77 *)
-	{OpenVDBLink`$OpenVDBSpacing=., OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing =. , OpenVDBLink`$OpenVDBSpacing}
 	,
-	{Null, OpenVDBLink`$OpenVDBSpacing}	
+	{Null,  OpenVDBLink`$OpenVDBSpacing}	
 ]
 
 VerificationTest[(* 78 *)
-	{OpenVDBLink`$OpenVDBSpacing=.;OpenVDBLink`$OpenVDBSpacing=x, OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing =. ; OpenVDBLink`$OpenVDBSpacing = x,  OpenVDBLink`$OpenVDBSpacing}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBSpacing}
+	{$Failed,  OpenVDBLink`$OpenVDBSpacing}
 	,
 	{OpenVDBLink`$OpenVDBSpacing::setpos}
 ]
 
 VerificationTest[(* 79 *)
-	{OpenVDBLink`$OpenVDBSpacing=.;OpenVDBLink`$OpenVDBSpacing=0, OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing =. ; OpenVDBLink`$OpenVDBSpacing = 0,  OpenVDBLink`$OpenVDBSpacing}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBSpacing}
+	{$Failed,  OpenVDBLink`$OpenVDBSpacing}
 	,
 	{OpenVDBLink`$OpenVDBSpacing::setpos}
 ]
 
 VerificationTest[(* 80 *)
-	{OpenVDBLink`$OpenVDBSpacing=.;OpenVDBLink`$OpenVDBSpacing=-1., OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing =. ; OpenVDBLink`$OpenVDBSpacing = -1.,  OpenVDBLink`$OpenVDBSpacing}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBSpacing}
+	{$Failed,  OpenVDBLink`$OpenVDBSpacing}
 	,
 	{OpenVDBLink`$OpenVDBSpacing::setpos}
 ]
 
 VerificationTest[(* 81 *)
-	{OpenVDBLink`$OpenVDBSpacing=.;OpenVDBLink`$OpenVDBSpacing=I, OpenVDBLink`$OpenVDBSpacing}
+	{OpenVDBLink`$OpenVDBSpacing =. ; OpenVDBLink`$OpenVDBSpacing = I,  OpenVDBLink`$OpenVDBSpacing}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBSpacing}
+	{$Failed,  OpenVDBLink`$OpenVDBSpacing}
 	,
 	{OpenVDBLink`$OpenVDBSpacing::setpos}
 ]
@@ -624,72 +597,66 @@ VerificationTest[(* 83 *)
 	Attributes[OpenVDBLink`$OpenVDBHalfWidth]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 84 *)
 	Options[OpenVDBLink`$OpenVDBHalfWidth]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 85 *)
 	SyntaxInformation[OpenVDBLink`$OpenVDBHalfWidth]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 86 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=3.5, OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth = 3.5,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{3.5, 3.5}	
+	{3.5,  3.5}	
 ]
 
 VerificationTest[(* 87 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=., OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth =. , OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{Null, OpenVDBLink`$OpenVDBHalfWidth}	
+	{Null,  OpenVDBLink`$OpenVDBHalfWidth}	
 ]
 
 VerificationTest[(* 88 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=.;OpenVDBLink`$OpenVDBHalfWidth=x, OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth =. ; OpenVDBLink`$OpenVDBHalfWidth = x,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBHalfWidth}
+	{$Failed,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
 	{OpenVDBLink`$OpenVDBHalfWidth::setpos}
 ]
 
 VerificationTest[(* 89 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=.;OpenVDBLink`$OpenVDBHalfWidth=0.5, OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth =. ; OpenVDBLink`$OpenVDBHalfWidth = 0.5,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{0.5, 0.5}	
+	{0.5,  0.5}	
 ]
 
 VerificationTest[(* 90 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=.;OpenVDBLink`$OpenVDBHalfWidth=-1., OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth =. ; OpenVDBLink`$OpenVDBHalfWidth = -1.,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBHalfWidth}
+	{$Failed,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
 	{OpenVDBLink`$OpenVDBHalfWidth::setpos}
 ]
 
 VerificationTest[(* 91 *)
-	{OpenVDBLink`$OpenVDBHalfWidth=.;OpenVDBLink`$OpenVDBHalfWidth=I, OpenVDBLink`$OpenVDBHalfWidth}
+	{OpenVDBLink`$OpenVDBHalfWidth =. ; OpenVDBLink`$OpenVDBHalfWidth = I,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBHalfWidth}
+	{$Failed,  OpenVDBLink`$OpenVDBHalfWidth}
 	,
 	{Greater::nord, $OpenVDBHalfWidth::setpos}
 ]
 
 VerificationTest[(* 92 *)
-	{OpenVDBLink`$OpenVDBSpacing=0.1, OpenVDBLink`$OpenVDBHalfWidth=3.}
+	{OpenVDBLink`$OpenVDBSpacing = 0.1,  OpenVDBLink`$OpenVDBHalfWidth = 3.}
 	,
-	{0.1, 3.}	
+	{0.1,  3.}	
 ]
 
 EndTestSection[]
@@ -706,58 +673,52 @@ VerificationTest[(* 94 *)
 	Attributes[OpenVDBLink`$OpenVDBCreator]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 95 *)
 	Options[OpenVDBLink`$OpenVDBCreator]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 96 *)
 	SyntaxInformation[OpenVDBLink`$OpenVDBCreator]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 97 *)
-	{OpenVDBLink`$OpenVDBCreator="Gauss", OpenVDBLink`$OpenVDBCreator}
+	{OpenVDBLink`$OpenVDBCreator = "Gauss",  OpenVDBLink`$OpenVDBCreator}
 	,
-	{"Gauss", "Gauss"}	
+	{"Gauss",  "Gauss"}	
 ]
 
 VerificationTest[(* 98 *)
-	{OpenVDBLink`$OpenVDBCreator=., OpenVDBLink`$OpenVDBCreator}
+	{OpenVDBLink`$OpenVDBCreator =. , OpenVDBLink`$OpenVDBCreator}
 	,
-	{Null, OpenVDBLink`$OpenVDBCreator}	
+	{Null,  OpenVDBLink`$OpenVDBCreator}	
 ]
 
 VerificationTest[(* 99 *)
-	{OpenVDBLink`$OpenVDBCreator=x, OpenVDBLink`$OpenVDBCreator}
+	{OpenVDBLink`$OpenVDBCreator = x,  OpenVDBLink`$OpenVDBCreator}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBCreator}
+	{$Failed,  OpenVDBLink`$OpenVDBCreator}
 	,
 	{OpenVDBLink`$OpenVDBCreator::badset}
 ]
 
 VerificationTest[(* 100 *)
-	{OpenVDBLink`$OpenVDBCreator=.;OpenVDBLink`$OpenVDBCreator=2, OpenVDBLink`$OpenVDBCreator}
+	{OpenVDBLink`$OpenVDBCreator =. ; OpenVDBLink`$OpenVDBCreator = 2,  OpenVDBLink`$OpenVDBCreator}
 	,
-	{$Failed, OpenVDBLink`$OpenVDBCreator}
+	{$Failed,  OpenVDBLink`$OpenVDBCreator}
 	,
 	{OpenVDBLink`$OpenVDBCreator::badset}
 ]
 
 VerificationTest[(* 101 *)
-	{OpenVDBLink`$OpenVDBCreator="", OpenVDBLink`$OpenVDBCreator}
+	{OpenVDBLink`$OpenVDBCreator = "",  OpenVDBLink`$OpenVDBCreator}
 	,
-	{"", ""}	
+	{"",  ""}	
 ]
 
 EndTestSection[]
@@ -773,29 +734,25 @@ VerificationTest[(* 102 *)
 VerificationTest[(* 103 *)
 	Attributes[OpenVDBLink`OpenVDBDefaultSpace]
 	,
-	{}	
-	,
-	{}
+	{Protected,  ReadProtected}	
 ]
 
 VerificationTest[(* 104 *)
 	Options[OpenVDBLink`OpenVDBDefaultSpace]
 	,
 	{}	
-	,
-	{}
 ]
 
 VerificationTest[(* 105 *)
 	SyntaxInformation[OpenVDBLink`OpenVDBDefaultSpace]
 	,
-	{"ArgumentsPattern"->{_}}	
+	{"ArgumentsPattern" -> {_}}	
 ]
 
 VerificationTest[(* 106 *)
-	{OpenVDBLink`OpenVDBDefaultSpace[], OpenVDBLink`OpenVDBDefaultSpace["error", "error"]}
+	{OpenVDBLink`OpenVDBDefaultSpace[],  OpenVDBLink`OpenVDBDefaultSpace["error",  "error"]}
 	,
-	{$Failed, $Failed}	
+	{$Failed,  $Failed}	
 ]
 
 EndTestSection[]
@@ -807,9 +764,10 @@ BeginTestSection["Float"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 107 *)
-	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount",     "BackgroundValue","BoundingGridVoxelCount","Empty","GridClass","GridType",    "HalfWidth","IndexBoundingBox","IndexDimensions","MinMaxValues","UniformVoxels",    "VoxelSize","WorldBoundingBox","WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr], OpenVDBLink`OpenVDBScalarGridQ[vdbempty],    OpenVDBLink`OpenVDBScalarGridQ[vdb],OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	$propertyList = {"ActiveLeafVoxelCount",  "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox", "IndexDimensions", "MinMaxValues", "UniformVoxels", "VoxelSize", "WorldBoundingBox", "WorldDimensions"}; OpenVDBLink`$OpenVDBSpacing = 0.1; OpenVDBLink`$OpenVDBHalfWidth = 3.; 
+  bmr = ExampleData[{"Geometry3D",  "Triceratops"},  "BoundaryMeshRegion"]; vdbempty = OpenVDBLink`OpenVDBCreateGrid[1.,  "Scalar"]; vdb = OpenVDBLink`OpenVDBLevelSet[bmr]; fog = OpenVDBLink`OpenVDBFogVolume[vdb]; {BoundaryMeshRegionQ[bmr],  OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
-	{True, True, True, True}	
+	{True,  True, True, True}	
 ]
 
 EndTestSection[]
@@ -817,15 +775,15 @@ EndTestSection[]
 BeginTestSection["OpenVDBGrid"]
 
 VerificationTest[(* 108 *)
-	Head/@{vdbempty, vdb, fog}
+	Head /@ {vdbempty,  vdb, fog}
 	,
-	{OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid}	
+	{OpenVDBLink`OpenVDBGrid,  OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid}	
 ]
 
 VerificationTest[(* 109 *)
-	(MatchQ[#1, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Float"]]&)/@{vdbempty, vdb, fog}
+	(MatchQ[#1,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Float"]] & ) /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -833,9 +791,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBGridQ"]
 
 VerificationTest[(* 110 *)
-	OpenVDBLink`OpenVDBGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -843,9 +801,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBScalarGridQ"]
 
 VerificationTest[(* 111 *)
-	OpenVDBLink`OpenVDBScalarGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBScalarGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -853,9 +811,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBIntegerGridQ"]
 
 VerificationTest[(* 112 *)
-	OpenVDBLink`OpenVDBIntegerGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBIntegerGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -863,9 +821,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBVectorGridQ"]
 
 VerificationTest[(* 113 *)
-	OpenVDBLink`OpenVDBVectorGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBVectorGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -873,9 +831,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBBooleanGridQ"]
 
 VerificationTest[(* 114 *)
-	OpenVDBLink`OpenVDBBooleanGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBBooleanGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -883,9 +841,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBMaskGridQ"]
 
 VerificationTest[(* 115 *)
-	OpenVDBLink`OpenVDBMaskGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBMaskGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -893,13 +851,13 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 116 *)
-	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"]]
+	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Scalar"]]
 	,
 	True	
 ]
 
 VerificationTest[(* 117 *)
-	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[0.4, "Float"]]
+	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[0.4,  "Float"]]
 	,
 	True	
 ]
@@ -909,9 +867,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 118 *)
-	vdb2=OpenVDBLink`OpenVDBLevelSet[Ball[]];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBLevelSet[Ball[]]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{7674, 0}	
+	{7674,  0}	
 ]
 
 EndTestSection[]
@@ -919,7 +877,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 119 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]
@@ -933,9 +891,11 @@ BeginTestSection["Double"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 120 *)
-	$propertyList={"ActiveLeafVoxelCount", "ActiveTileCount", "ActiveVoxelCount",     "BackgroundValue","BoundingGridVoxelCount","Empty","GridClass","GridType",    "HalfWidth","IndexBoundingBox","IndexDimensions","MinMaxValues","UniformVoxels",    "VoxelSize","WorldBoundingBox","WorldDimensions"};OpenVDBLink`$OpenVDBSpacing=0.1;OpenVDBLink`$OpenVDBHalfWidth=3.;bmr=ExampleData[{"Geometry3D", "Triceratops"}, "BoundaryMeshRegion"];vdbempty=OpenVDBLink`OpenVDBCreateGrid[1., "Double"];vdb=OpenVDBLink`OpenVDBLevelSet[bmr, "ScalarType"->"Double"];fog=OpenVDBLink`OpenVDBFogVolume[vdb];{BoundaryMeshRegionQ[bmr],    OpenVDBLink`OpenVDBScalarGridQ[vdbempty],OpenVDBLink`OpenVDBScalarGridQ[vdb],   OpenVDBLink`OpenVDBScalarGridQ[fog]}
+	$propertyList = {"ActiveLeafVoxelCount",  "ActiveTileCount", "ActiveVoxelCount", "BackgroundValue", "BoundingGridVoxelCount", "Empty", "GridClass", "GridType", "HalfWidth", "IndexBoundingBox", "IndexDimensions", "MinMaxValues", "UniformVoxels", "VoxelSize", "WorldBoundingBox", "WorldDimensions"}; OpenVDBLink`$OpenVDBSpacing = 0.1; OpenVDBLink`$OpenVDBHalfWidth = 3.; 
+  bmr = ExampleData[{"Geometry3D",  "Triceratops"},  "BoundaryMeshRegion"]; vdbempty = OpenVDBLink`OpenVDBCreateGrid[1.,  "Double"]; vdb = OpenVDBLink`OpenVDBLevelSet[bmr,  "ScalarType" -> "Double"]; fog = OpenVDBLink`OpenVDBFogVolume[vdb]; 
+  {BoundaryMeshRegionQ[bmr],  OpenVDBLink`OpenVDBScalarGridQ[vdbempty], OpenVDBLink`OpenVDBScalarGridQ[vdb], OpenVDBLink`OpenVDBScalarGridQ[fog]}
 	,
-	{True, True, True, True}	
+	{True,  True, True, True}	
 ]
 
 EndTestSection[]
@@ -943,15 +903,15 @@ EndTestSection[]
 BeginTestSection["OpenVDBGrid"]
 
 VerificationTest[(* 121 *)
-	Head/@{vdbempty, vdb, fog}
+	Head /@ {vdbempty,  vdb, fog}
 	,
-	{OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid}	
+	{OpenVDBLink`OpenVDBGrid,  OpenVDBLink`OpenVDBGrid, OpenVDBLink`OpenVDBGrid}	
 ]
 
 VerificationTest[(* 122 *)
-	(MatchQ[#1, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Double"]]&)/@{vdbempty, vdb, fog}
+	(MatchQ[#1,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Double"]] & ) /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -959,9 +919,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBGridQ"]
 
 VerificationTest[(* 123 *)
-	OpenVDBLink`OpenVDBGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -969,9 +929,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBScalarGridQ"]
 
 VerificationTest[(* 124 *)
-	OpenVDBLink`OpenVDBScalarGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBScalarGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -979,9 +939,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBIntegerGridQ"]
 
 VerificationTest[(* 125 *)
-	OpenVDBLink`OpenVDBIntegerGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBIntegerGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -989,9 +949,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBVectorGridQ"]
 
 VerificationTest[(* 126 *)
-	OpenVDBLink`OpenVDBVectorGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBVectorGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -999,9 +959,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBBooleanGridQ"]
 
 VerificationTest[(* 127 *)
-	OpenVDBLink`OpenVDBBooleanGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBBooleanGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -1009,9 +969,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBMaskGridQ"]
 
 VerificationTest[(* 128 *)
-	OpenVDBLink`OpenVDBMaskGridQ/@{vdbempty, vdb, fog}
+	OpenVDBLink`OpenVDBMaskGridQ /@ {vdbempty,  vdb, fog}
 	,
-	{False, False, False}	
+	{False,  False, False}	
 ]
 
 EndTestSection[]
@@ -1019,13 +979,13 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 129 *)
-	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Scalar"]]
+	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Scalar"]]
 	,
 	True	
 ]
 
 VerificationTest[(* 130 *)
-	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[0.4, "Float"]]
+	OpenVDBLink`OpenVDBScalarGridQ[OpenVDBLink`OpenVDBCreateGrid[0.4,  "Float"]]
 	,
 	True	
 ]
@@ -1035,9 +995,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 131 *)
-	vdb2=OpenVDBLink`OpenVDBLevelSet[Ball[]];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBLevelSet[Ball[]]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{7674, 0}	
+	{7674,  0}	
 ]
 
 EndTestSection[]
@@ -1045,7 +1005,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 132 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]
@@ -1059,7 +1019,7 @@ BeginTestSection["Integer"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 133 *)
-	vdb=OpenVDBLink`OpenVDBCreateGrid[1., "Int64"];OpenVDBLink`OpenVDBSetValues[vdb,    Table[{i, i, i}, {i, 10}],Range[10]];OpenVDBLink`OpenVDBSetValues[vdb,    Table[{11 - i, 11 - i, i}, {i, 10}],Range[10]];OpenVDBLink`OpenVDBIntegerGridQ[vdb]
+	vdb = OpenVDBLink`OpenVDBCreateGrid[1.,  "Int64"]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{i,  i, i},  {i,  10}], Range[10]]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{11 - i,  11 - i, i},  {i,  10}], Range[10]]; OpenVDBLink`OpenVDBIntegerGridQ[vdb]
 	,
 	True	
 ]
@@ -1075,7 +1035,7 @@ VerificationTest[(* 134 *)
 ]
 
 VerificationTest[(* 135 *)
-	MatchQ[vdb, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Int64"]]
+	MatchQ[vdb,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Int64"]]
 	,
 	True	
 ]
@@ -1145,9 +1105,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 142 *)
-	(OpenVDBLink`OpenVDBIntegerGridQ[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Int32", "Int64", "UInt32"}
+	(OpenVDBLink`OpenVDBIntegerGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  #1]] & ) /@ {"Int32",  "Int64", "UInt32"}
 	,
-	{True, True, True}	
+	{True,  True, True}	
 ]
 
 EndTestSection[]
@@ -1155,9 +1115,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 143 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{20, 0}	
+	{20,  0}	
 ]
 
 EndTestSection[]
@@ -1165,7 +1125,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 144 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]
@@ -1179,7 +1139,7 @@ BeginTestSection["Vector"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 145 *)
-	vdb=OpenVDBLink`OpenVDBCreateGrid[1., "Vec2D"];OpenVDBLink`OpenVDBSetValues[vdb,    Table[{i, i, i}, {i, 10}],Table[{12 - i, 13 - i}, {i, 10}]];OpenVDBLink`OpenVDBSetValues[vdb, Table[{11 - i, 11 - i, i}, {i, 10}],    Table[{12 - i, 13 - i}, {i, 10}]];OpenVDBLink`OpenVDBVectorGridQ[vdb]
+	vdb = OpenVDBLink`OpenVDBCreateGrid[1.,  "Vec2D"]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{i,  i, i},  {i,  10}], Table[{12 - i,  13 - i},  {i,  10}]]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{11 - i,  11 - i, i},  {i,  10}], Table[{12 - i,  13 - i},  {i,  10}]]; OpenVDBLink`OpenVDBVectorGridQ[vdb]
 	,
 	True	
 ]
@@ -1195,7 +1155,7 @@ VerificationTest[(* 146 *)
 ]
 
 VerificationTest[(* 147 *)
-	MatchQ[vdb, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Vec2D"]]
+	MatchQ[vdb,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Vec2D"]]
 	,
 	True	
 ]
@@ -1265,9 +1225,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 154 *)
-	(OpenVDBLink`OpenVDBVectorGridQ[OpenVDBLink`OpenVDBCreateGrid[1., #1]]&)/@{"Vec2D", "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S"}
+	(OpenVDBLink`OpenVDBVectorGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  #1]] & ) /@ {"Vec2D",  "Vec2I", "Vec2S", "Vec3D", "Vec3I", "Vec3S"}
 	,
-	{True, True, True, True, True, True}	
+	{True,  True, True, True, True, True}	
 ]
 
 EndTestSection[]
@@ -1275,9 +1235,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 155 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{20, 0}	
+	{20,  0}	
 ]
 
 EndTestSection[]
@@ -1285,7 +1245,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 156 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]
@@ -1299,7 +1259,7 @@ BeginTestSection["Boolean"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 157 *)
-	vdb=OpenVDBLink`OpenVDBCreateGrid[1., "Boolean"];OpenVDBLink`OpenVDBSetValues[vdb,    Table[{i, i, i}, {i, 10}],Table[Mod[i, 3], {i, 10}]];OpenVDBLink`OpenVDBSetValues[vdb, Table[{11 - i, 11 - i, i}, {i, 10}],    Table[EvenQ[i], {i, 10}]];OpenVDBLink`OpenVDBBooleanGridQ[vdb]
+	vdb = OpenVDBLink`OpenVDBCreateGrid[1.,  "Boolean"]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{i,  i, i},  {i,  10}], Table[Mod[i,  3],  {i,  10}]]; OpenVDBLink`OpenVDBSetValues[vdb,  Table[{11 - i,  11 - i, i},  {i,  10}], Table[EvenQ[i],  {i,  10}]]; OpenVDBLink`OpenVDBBooleanGridQ[vdb]
 	,
 	True	
 ]
@@ -1315,7 +1275,7 @@ VerificationTest[(* 158 *)
 ]
 
 VerificationTest[(* 159 *)
-	MatchQ[vdb, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Boolean"]]
+	MatchQ[vdb,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Boolean"]]
 	,
 	True	
 ]
@@ -1385,7 +1345,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 166 *)
-	OpenVDBLink`OpenVDBBooleanGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Boolean"]]
+	OpenVDBLink`OpenVDBBooleanGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Boolean"]]
 	,
 	True	
 ]
@@ -1395,9 +1355,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 167 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{20, 0}	
+	{20,  0}	
 ]
 
 EndTestSection[]
@@ -1405,7 +1365,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 168 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]
@@ -1419,7 +1379,7 @@ BeginTestSection["Mask"]
 BeginTestSection["Initialization"]
 
 VerificationTest[(* 169 *)
-	vdb=OpenVDBLink`OpenVDBCreateGrid[1., "Mask"];OpenVDBLink`OpenVDBSetStates[vdb,    Table[{i, i, i}, {i, 10}],Table[Mod[i, 3], {i, 10}]];OpenVDBLink`OpenVDBSetStates[vdb, Table[{11 - i, 11 - i, i}, {i, 10}],    Table[Mod[i, 2], {i, 10}]];OpenVDBLink`OpenVDBMaskGridQ[vdb]
+	vdb = OpenVDBLink`OpenVDBCreateGrid[1.,  "Mask"]; OpenVDBLink`OpenVDBSetStates[vdb,  Table[{i,  i, i},  {i,  10}], Table[Mod[i,  3],  {i,  10}]]; OpenVDBLink`OpenVDBSetStates[vdb,  Table[{11 - i,  11 - i, i},  {i,  10}], Table[Mod[i,  2],  {i,  10}]]; OpenVDBLink`OpenVDBMaskGridQ[vdb]
 	,
 	True	
 ]
@@ -1435,7 +1395,7 @@ VerificationTest[(* 170 *)
 ]
 
 VerificationTest[(* 171 *)
-	MatchQ[vdb, OpenVDBLink`OpenVDBGrid[_Integer?Positive, "Mask"]]
+	MatchQ[vdb,  OpenVDBLink`OpenVDBGrid[_Integer?Positive,  "Mask"]]
 	,
 	True	
 ]
@@ -1505,7 +1465,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCreateGrid"]
 
 VerificationTest[(* 178 *)
-	OpenVDBLink`OpenVDBMaskGridQ[OpenVDBLink`OpenVDBCreateGrid[1., "Mask"]]
+	OpenVDBLink`OpenVDBMaskGridQ[OpenVDBLink`OpenVDBCreateGrid[1.,  "Mask"]]
 	,
 	True	
 ]
@@ -1515,9 +1475,9 @@ EndTestSection[]
 BeginTestSection["OpenVDBDeleteGrid"]
 
 VerificationTest[(* 179 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];{vdb2["ActiveVoxelCount"],    OpenVDBLink`OpenVDBDeleteGrid[vdb2];vdb2["ActiveVoxelCount"]}
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; {vdb2["ActiveVoxelCount"],  OpenVDBLink`OpenVDBDeleteGrid[vdb2]; vdb2["ActiveVoxelCount"]}
 	,
-	{12, 0}	
+	{12,  0}	
 ]
 
 EndTestSection[]
@@ -1525,7 +1485,7 @@ EndTestSection[]
 BeginTestSection["OpenVDBCopyGrid"]
 
 VerificationTest[(* 180 *)
-	vdb2=OpenVDBLink`OpenVDBCopyGrid[vdb];vdb[$propertyList]===vdb2[$propertyList]&&   ListQ[vdb[$propertyList]]
+	vdb2 = OpenVDBLink`OpenVDBCopyGrid[vdb]; vdb[$propertyList] === vdb2[$propertyList] && ListQ[vdb[$propertyList]]
 	,
 	True	
 ]

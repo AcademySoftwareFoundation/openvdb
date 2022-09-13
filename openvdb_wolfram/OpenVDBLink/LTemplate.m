@@ -8,7 +8,7 @@
 BeginPackage["OpenVDBLink`"]
 
 
-Get["LTemplate`LTemplatePrivate`"];
+Get["OpenVDBLink`LTemplate`LTemplatePrivate`"];
 ConfigureLTemplate["MessageSymbol" -> OpenVDBLink, "LazyLoading" -> False]
 
 
