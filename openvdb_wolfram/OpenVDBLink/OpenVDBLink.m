@@ -966,7 +966,7 @@ PackageScope["CheckArgs"]
 SetAttributes[{CheckArgs, catchMessages}, HoldFirst]
 
 
-CheckArgs[expr_, spec_] := !FailureQ[catchMessages[System`Private`Arguments[expr, spec, HoldComplete, {}, ""]]]
+CheckArgs[expr_, spec_] := !FailureQ[catchMessages[System`Private`Arguments[expr, spec, HoldComplete, {}]]]
 
 
 catchMessages[expr_] := Catch[Internal`HandlerBlock[{"Message", Throw[$Failed, "iArgumentsMessage"]&}, expr], "iArgumentsMessage"];
