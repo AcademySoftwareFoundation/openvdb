@@ -1431,11 +1431,19 @@ PNANOVDB_FORCE_INLINE pnanovdb_uint64_t pnanovdb_leaf_index_get_value_index(pnan
 {
     pnanovdb_uint32_t n = pnanovdb_leaf_coord_to_offset(ijk);
     pnanovdb_uint32_t bbox_dif_and_flags = pnanovdb_leaf_get_bbox_dif_and_flags(buf, leaf);
-    if ((bbox_dif_and_flags & 0xFF000000) != 0u)
-    {
-        n = pnanovdb_leaf_count_on_range(buf, leaf, n);
-    }
     pnanovdb_address_t value_address = pnanovdb_leaf_get_table_address(grid_type, buf, leaf, 0u);
+    if ((bbox_dif_and_flags & 0x10000000) != 0u)
+    {
+        if (pnanovdb_leaf_get_value_mask(buf, leaf, n))
+        {
+            n = pnanovdb_leaf_count_on_range(buf, leaf, n);
+        }
+        else
+        {
+            value_address = pnanovdb_address_null();
+            n = 0;
+        }
+    }
     return pnanovdb_uint64_offset(pnanovdb_read_uint64(buf, value_address), n);
 }
 

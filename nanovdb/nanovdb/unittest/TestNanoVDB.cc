@@ -385,7 +385,7 @@ TEST_F(TestNanoVDB, Magic)
 
     ss2 >> magic;
     EXPECT_EQ(magic, nanovdb::io::reverseEndianness(NANOVDB_MAGIC_NUMBER));
-}
+}// Magic
 
 TEST_F(TestNanoVDB, FindBits)
 {
@@ -1790,6 +1790,16 @@ TEST_F(TestNanoVDB, RootNode)
     EXPECT_EQ(nanovdb::AlignUp<NANOVDB_DATA_ALIGNMENT>(sizeof(nanovdb::CoordBBox) + sizeof(uint32_t) + (5 * sizeof(float))), root->memUsage()); // background, min, max, tileCount + bbox
     EXPECT_EQ(1.234f, root->getValue(CoordT(1, 2, 3)));
 
+    {// examine padding of RootNode
+        //std::cerr << "sizeof(Coord) = " << sizeof(nanovdb::Coord) << " bytes\n";
+        size_t size = sizeof(nanovdb::CoordBBox) + sizeof(uint32_t) + 5*sizeof(float);
+        //std::cerr << "NanoRoot<float> padding:" << (sizeof(nanovdb::NanoRoot<float>) - size) << " bytes\n";
+        EXPECT_GE(sizeof(nanovdb::NanoRoot<float>) - size, sizeof(nanovdb::Coord));
+        size = sizeof(nanovdb::CoordBBox) + sizeof(uint32_t) + 3*sizeof(nanovdb::Vec3f) + 2*sizeof(float);
+        //std::cerr << "NanoRoot<Vec3f> padding:" << (sizeof(nanovdb::NanoRoot<nanovdb::Vec3f>) - size) << "bytes\n";
+        EXPECT_GE(sizeof(nanovdb::NanoRoot<nanovdb::Vec3f>) - size, sizeof(nanovdb::Coord));
+    }
+
     { // test RootData::CoordToKey and RotData::KetToCoord
         const int dim = NodeT2::DIM;// dimension of the root's child nodes
         EXPECT_EQ(4096, dim);
@@ -2370,8 +2380,17 @@ TEST_F(TestNanoVDB, BasicGrid)
                 {1 / dx, 0.0, 0.0, 0.0}, // row 0
                 {0.0, 1 / dx, 0.0, 0.0}, // row 1
                 {0.0, 0.0, 1 / dx, 0.0}, // row 2
-                {-Tx, -Ty, -Tz, 1.0}, // row 3
+                {-Tx/dx, -Ty/dx, -Tz/dx, 1.0}, // row 3
             };
+            // row 3 of invMat is actually ignored by map::set (below), but we'll unit-test it anyway
+            for (int i=0; i<4; ++i) {
+                for (int j=0; j<4; ++j) {
+                    double sum = 0.0, expected = i==j ? 1.0 : 0.0;
+                    for (int k=0; k<4; ++k) sum += mat[i][k] * invMat[k][j];
+                    EXPECT_DOUBLE_EQ(expected, sum);
+                }
+            }
+
             data->setFlagsOff();
             data->setMinMaxOn();
             data->mGridIndex = 0;
@@ -2402,11 +2421,19 @@ TEST_F(TestNanoVDB, BasicGrid)
                 {Tx, Ty, Tz, 1.0}, // row 3
             };
             const double invMat[4][4] = {
-                {1 / dx, 0.0, 0.0, 0.0}, // row 0
-                {0.0, 1 / dx, 0.0, 0.0}, // row 1
-                {0.0, 0.0, 1 / dx, 0.0}, // row 2
-                {-1 / Tx, -1 / Ty, -1 / Tz, 1.0}, // row 3
+                {1/dx, 0.0, 0.0, 0.0}, // row 0
+                {0.0, 1/dx, 0.0, 0.0}, // row 1
+                {0.0, 0.0, 1/dx, 0.0}, // row 2
+                {-Tx/dx, -Ty/dx, -Tz/dx, 1.0}, // row 3
             };
+            // row 3 of invMat is actually ignored by map::set (below), but we'll unit-test it anyway
+            for (int i=0; i<4; ++i) {
+                for (int j=0; j<4; ++j) {
+                    double sum = 0.0, expected = i==j ? 1.0 : 0.0;
+                    for (int k=0; k<4; ++k) sum += mat[i][k] * invMat[k][j];
+                    EXPECT_DOUBLE_EQ(expected, sum);
+                }
+            }
             data->mVoxelSize = nanovdb::Vec3R(dx);
             data->mMap.set(mat, invMat, 1.0);
         }
@@ -6187,7 +6214,7 @@ TEST_F(TestNanoVDB, IndexGridBuilder2)
             for (auto it = bbox.begin(); it; ++it) EXPECT_EQ(values[idxAcc.getValue(*it)], fltAcc.getValue(*it));
         });
         auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
-        //mTimer.restart("Sequential node iterator test of active voxels");
+        //mTimer.start("Dense IndexGrid: Sequential node iterator test of active voxels");
         for (auto it2 = idxRoot.beginChild(); it2; ++it2) {
             for (auto it1 = it2->beginChild(); it1; ++it1) {
                 for (auto it0 = it1->beginChild(); it0; ++it0) {
@@ -6215,6 +6242,17 @@ TEST_F(TestNanoVDB, IndexGridBuilder2)
                 EXPECT_TRUE(srcLeaf);
                 EXPECT_EQ(values[idxLeaf->minimum()], srcLeaf->minimum());
                 for (auto vox = idxLeaf->beginValueOn(); vox; ++vox) {
+                    EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
+                }
+            }
+        });
+        //mTimer.stop();
+        //mTimer.start("Dense IndexGrid: Parallel leaf iterator test of active voxels");
+        auto *leaf = idxTree.getFirstNode<0>();
+        nanovdb::forEach(nanovdb::Range1D(0,idxTree.nodeCount(0)),[&](const nanovdb::Range1D &r){
+            auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
+            for (auto i=r.begin(); i!=r.end(); ++i){
+                for (auto vox = leaf[i].beginValueOn(); vox; ++vox) {
                     EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
                 }
             }
@@ -6329,7 +6367,7 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
             }
         });
         auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
-        //mTimer.restart("Sequential node iterator test of active voxels");
+        //mTimer.start("Sparse IndexGrid: Sequential node iterator test of active voxels");
         for (auto it2 = idxRoot.beginChild(); it2; ++it2) {
             for (auto it1 = it2->beginChild(); it1; ++it1) {
                 for (auto it0 = it1->beginChild(); it0; ++it0) {
@@ -6347,12 +6385,12 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
                 EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
             }
         }// loop over leaf nodes
-        //mTimer.restart("Parallel leaf iterator test of active voxels");
+        //mTimer.start("Sparse IndexGrid: Parallel leaf iterator test of active voxels");
         auto *leaf = idxTree.getFirstNode<0>();
         nanovdb::forEach(nanovdb::Range1D(0,idxTree.nodeCount(0)),[&](const nanovdb::Range1D &r){
             auto fltAcc = fltTree.getAccessor();// NOT thread-safe!
             for (auto i=r.begin(); i!=r.end(); ++i){
-                for (auto vox = (leaf+i)->beginValueOn(); vox; ++vox) {
+                for (auto vox = leaf[i].beginValueOn(); vox; ++vox) {
                     EXPECT_EQ(values[*vox], fltAcc.getValue(vox.getCoord()));
                 }
             }

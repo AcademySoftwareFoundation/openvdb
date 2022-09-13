@@ -2231,9 +2231,17 @@ struct Map
     double mVecD[3]; // 3*8B <- translation
     double mTaperD; // 8B, placeholder for taper value
 
-    // This method can only be called on the host to initialize the member data
+    /// @brief Initialize the member data
+    template<typename Mat3T, typename Vec3T>
+    __hostdev__ void set(const Mat3T& mat, const Mat3T& invMat, const Vec3T& translate, double taper);
+
+    /// @brief Initialize the member data
+    /// @note  The last (4th) row of invMat is actually ignored.
     template<typename Mat4T>
-    __hostdev__ void set(const Mat4T& mat, const Mat4T& invMat, double taper);
+    __hostdev__ void set(const Mat4T& mat, const Mat4T& invMat, double taper) {this->set(mat, invMat, mat[3], taper);}
+
+    template<typename Vec3T>
+    __hostdev__ void set(double scale, const Vec3T &translation, double taper);
 
     template<typename Vec3T>
     __hostdev__ Vec3T applyMap(const Vec3T& xyz) const { return matMult(mMatD, mVecD, xyz); }
@@ -2267,18 +2275,16 @@ struct Map
     __hostdev__ Vec3T applyIJTF(const Vec3T& xyz) const { return matMultT(mInvMatF, xyz); }
 }; // Map
 
-template<typename Mat4T>
-__hostdev__ void Map::set(const Mat4T& mat, const Mat4T& invMat, double taper)
+template<typename Mat3T, typename Vec3T>
+__hostdev__ inline void Map::set(const Mat3T& mat, const Mat3T& invMat, const Vec3T& translate, double taper)
 {
-    float * mf = mMatF, *vf = mVecF;
-    float*  mif = mInvMatF;
-    double *md = mMatD, *vd = mVecD;
-    double* mid = mInvMatD;
+    float *mf = mMatF, *vf = mVecF, *mif = mInvMatF;
+    double *md = mMatD, *vd = mVecD, *mid = mInvMatD;
     mTaperF = static_cast<float>(taper);
     mTaperD = taper;
     for (int i = 0; i < 3; ++i) {
-        *vd++ = mat[3][i]; //translation
-        *vf++ = static_cast<float>(mat[3][i]);
+        *vd++ = translate[i]; //translation
+        *vf++ = static_cast<float>(translate[i]);
         for (int j = 0; j < 3; ++j) {
             *md++ = mat[j][i]; //transposed
             *mid++ = invMat[j][i];
@@ -2286,6 +2292,21 @@ __hostdev__ void Map::set(const Mat4T& mat, const Mat4T& invMat, double taper)
             *mif++ = static_cast<float>(invMat[j][i]);
         }
     }
+}
+
+template<typename Vec3T>
+__hostdev__ inline void Map::set(double dx, const Vec3T &trans, double taper)
+{
+    const double mat[3][3] = {
+        {dx, 0.0, 0.0}, // row 0
+        {0.0, dx, 0.0}, // row 1
+        {0.0, 0.0, dx}, // row 2
+    }, idx = 1.0/dx, invMat[3][3] = {
+        {idx, 0.0, 0.0}, // row 0
+        {0.0, idx, 0.0}, // row 1
+        {0.0, 0.0, idx}, // row 2
+    };
+    this->set(mat, invMat, trans, taper);
 }
 
 // ----------------------------> GridBlindMetaData <--------------------------------------
@@ -2960,7 +2981,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) RootData
     __hostdev__ static KeyT   CoordToKey(const CoordT& ijk) { return ijk & ~ChildT::MASK; }
     __hostdev__ static CoordT KeyToCoord(const KeyT& key) { return key; }
 #endif
-    BBox<CoordT> mBBox; // 24B. AABB if active values in index space.
+    BBox<CoordT> mBBox; // 24B. AABB of active values in index space.
     uint32_t     mTableSize; // 4B. number of tiles and child pointers in the root node
 
     ValueT mBackground; // background value, i.e. value of any unset voxel
@@ -3765,8 +3786,7 @@ private:
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordType& ijk, const RayT& ray, const AccT& acc) const
     {
-        // if (DataType::mFlags & uint32_t(1))
-        //     this->dim(); //ship this node if first bit is set
+        if (DataType::mFlags & uint32_t(1u)) return this->dim(); // skip this node if the 1st bit is set
         //if (!ray.intersects( this->bbox() )) return 1<<TOTAL;
 
         const uint32_t n = CoordToOffset(ijk);
@@ -3798,7 +3818,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
-    uint8_t        mFlags; // 1B.
+    uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: is sparse ValueIndex, bits5,6,7: bit-width for FpN
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
 
     ValueType mMinimum; // typically 4B
@@ -3857,7 +3877,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafFnBase
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
-    uint8_t        mFlags; // 1B.
+    uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: is sparse ValueIndex, bits5,6,7: bit-width for FpN
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
 
     float mMinimum; //  4B - minimum of ALL values in this node
@@ -4076,7 +4096,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<bool, CoordT, MaskT, LOG2D
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
-    uint8_t        mFlags; // 1B.
+    uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: is sparse ValueIndex, bits5,6,7: bit-width for FpN
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
     MaskT<LOG2DIM> mValues; // LOG2DIM(3): 64B.
     uint64_t       mPadding[2];// 16B padding to 32B alignment
@@ -4125,7 +4145,7 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueMask, CoordT, MaskT, 
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
-    uint8_t        mFlags; // 1B.
+    uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: is sparse ValueIndex, bits5,6,7: bit-width for FpN
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
     uint64_t       mPadding[2];// 16B padding to 32B alignment
 
@@ -4175,7 +4195,8 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndex, CoordT, MaskT,
 
     CoordT         mBBoxMin; // 12B.
     uint8_t        mBBoxDif[3]; // 3B.
-    uint8_t        mFlags; // 1B.
+    uint8_t        mFlags; // 1B. bit0: skip render?, bit1: has bbox?, bit3: unused, bit4: is sparse ValueIndex, bits5,6,7: bit-width for FpN
+
     MaskT<LOG2DIM> mValueMask; // LOG2DIM(3): 64B.
     uint64_t       mStatsOff;// 8B offset to min/max/avg/sdv
     uint64_t       mValueOff;// 8B offset to values
@@ -4198,8 +4219,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndex, CoordT, MaskT,
 
     __hostdev__ uint64_t getValue(uint32_t i) const
     {
-        if (mFlags==0) return mValueOff + i;// dense array of active and inactive voxels
-        return mValueMask.isOn(i) ? mValueOff + mValueMask.countOn(i) : 0;// sparse array of active voxels only! 0 is background
+        if (mFlags & uint8_t(16u)) {// if 4th bit is set only active voxels are indexed
+            return mValueMask.isOn(i) ? mValueOff + mValueMask.countOn(i) : 0;// 0 is background
+        }
+        return mValueOff + i;// dense array of active and inactive voxels
     }
 
     template <typename T>
@@ -4357,7 +4380,7 @@ public:
     __hostdev__ BBox<CoordT> bbox() const
     {
         BBox<CoordT> bbox(DataType::mBBoxMin, DataType::mBBoxMin);
-        if ( this->isActive() ) {
+        if ( this->hasBBox() ) {
             bbox.max()[0] += DataType::mBBoxDif[0];
             bbox.max()[1] += DataType::mBBoxDif[1];
             bbox.max()[2] += DataType::mBBoxDif[2];
@@ -4405,10 +4428,12 @@ public:
     /// @brief Return @c true if any of the voxel value are active in this leaf node.
     __hostdev__ bool isActive() const
     {
-        NANOVDB_ASSERT( bool(DataType::mFlags & uint8_t(2)) != DataType::mValueMask.isOff() );
-        return DataType::mFlags & uint8_t(2);
+        //NANOVDB_ASSERT( bool(DataType::mFlags & uint8_t(2)) != DataType::mValueMask.isOff() );
+        //return DataType::mFlags & uint8_t(2);
+        return !DataType::mValueMask.isOff();
     }
 
+    __hostdev__ bool hasBBox() const {return DataType::mFlags & uint8_t(2);}
 
     /// @brief Return @c true if the voxel value at the given coordinate is active and updates @c v with the value.
     __hostdev__ bool probeValue(const CoordT& ijk, ValueType& v) const
@@ -4430,14 +4455,14 @@ public:
     #endif
     }
 
-    /// @brief Updates the local bounding box of active voxels in this node.
+    /// @brief Updates the local bounding box of active voxels in this node. Return true if bbox was updated.
     ///
     /// @warning It assumes that the origin and value mask have already been set.
     ///
     /// @details This method is based on few (intrinsic) bit operations and hence is relatively fast.
     ///          However, it should only only be called of either the value mask has changed or if the
     ///          active bounding box is still undefined. e.g. during construction of this node.
-    __hostdev__ void updateBBox();
+    __hostdev__ bool updateBBox();
 
 private:
     static_assert(sizeof(DataType) % NANOVDB_DATA_ALIGNMENT == 0, "sizeof(LeafData) is misaligned");
@@ -4475,8 +4500,7 @@ private:
     template<typename RayT, typename AccT>
     __hostdev__ uint32_t getDimAndCache(const CoordT&, const RayT& /*ray*/, const AccT&) const
     {
-        //if (DataType::mFlags & uint8_t(1))
-        //    return this->dim(); // skip this node if first bit is set
+        if (DataType::mFlags & uint8_t(1u)) return this->dim(); // skip this node if the 1st bit is set
 
         //if (!ray.intersects( this->bbox() )) return 1 << LOG2DIM;
         return ChildNodeType::dim();
@@ -4485,10 +4509,13 @@ private:
 }; // LeafNode class
 
 template<typename ValueT, typename CoordT, template<uint32_t> class MaskT, uint32_t LOG2DIM>
-__hostdev__ inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
+__hostdev__ inline bool LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
 {
     static_assert(LOG2DIM == 3, "LeafNode::updateBBox: only supports LOGDIM = 3!");
-    if (!this->isActive()) return;
+    if (DataType::mValueMask.isOff()) {
+        DataType::mFlags &= ~uint8_t(2);// set 2nd bit off, which indicates that this nodes has no bbox
+        return false;
+    }
     auto update = [&](uint32_t min, uint32_t max, int axis) {
         NANOVDB_ASSERT(min <= max && max < 8);
         DataType::mBBoxMin[axis] = (DataType::mBBoxMin[axis] & ~MASK) + int(min);
@@ -4514,6 +4541,8 @@ __hostdev__ inline void LeafNode<ValueT, CoordT, MaskT, LOG2DIM>::updateBBox()
     const uint8_t  *b = reinterpret_cast<const uint8_t* >(&word16), byte   = b[0] | b[1];
     NANOVDB_ASSERT(byte);
     update(FindLowestOn(static_cast<uint32_t>(byte)), FindHighestOn(static_cast<uint32_t>(byte)), 2);
+    DataType::mFlags |= uint8_t(2);// set 2nd bit on, which indicates that this nodes has a bbox
+    return true;
 } // LeafNode::updateBBox
 
 // --------------------------> Template specializations and traits <------------------------------------

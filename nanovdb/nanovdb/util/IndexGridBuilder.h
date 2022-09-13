@@ -18,6 +18,7 @@
 
 #include "GridHandle.h"
 #include "NodeManager.h"
+//#include "GridStats.h"
 #include "Range.h"
 #include "ForEach.h"
 
@@ -149,6 +150,8 @@ getHandle(const std::string &name, uint32_t channels, const BufferT &buffer)
     this->processGrid(name, channels);
 
     this->processChannels(channels);
+
+    //gridStats(*this->getGrid(), StatsMode::BBox);
 
     return handle;
 } // IndexGridBuilder::getHandle
@@ -581,6 +584,7 @@ void IndexGridBuilder<SrcValueT>::processLeafs()
 
     auto kernel = [&](const Range1D& r) {
         DstData0 *dstData0 = this->getLeaf(r.begin())->data();// fixed size
+        const uint8_t flags = mIsSparse ? 16u : 0u;// 4th bit indicates sparseness
         for (auto i = r.begin(); i != r.end(); ++i, ++dstData0) {
             SrcData0 *srcData0 = mSrcMgr->leaf(i).data();// might vary in size due to compression
             dstData0->mBBoxMin = srcData0->mBBoxMin;
@@ -588,8 +592,9 @@ void IndexGridBuilder<SrcValueT>::processLeafs()
             dstData0->mBBoxDif[0] = srcData0->mBBoxDif[0];
             dstData0->mBBoxDif[1] = srcData0->mBBoxDif[1];
             dstData0->mBBoxDif[2] = srcData0->mBBoxDif[2];
-            dstData0->mFlags = mIsSparse;
+            dstData0->mFlags = flags | (srcData0->mFlags & 2u);// 2nd bit indicates a bbox
             dstData0->mValueMask = srcData0->mValueMask;
+
             if (mIncludeStats) {
                 dstData0->mStatsOff = mValIdx0[i];// first 4 entries are leaf stats
                 dstData0->mValueOff = mValIdx0[i] + 4u;

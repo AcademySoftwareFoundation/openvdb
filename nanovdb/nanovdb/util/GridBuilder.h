@@ -542,21 +542,8 @@ GridHandle<BufferT> GridBuilder<ValueT, BuildT, StatsT>::
     if (dx <= 0) {
         throw std::runtime_error("GridBuilder: voxel size is zero or negative");
     }
-    Map          map; // affine map
-    const double Tx = p0[0], Ty = p0[1], Tz = p0[2];
-    const double mat[4][4] = {
-        {dx, 0.0, 0.0, 0.0}, // row 0
-        {0.0, dx, 0.0, 0.0}, // row 1
-        {0.0, 0.0, dx, 0.0}, // row 2
-        {Tx, Ty, Tz, 1.0}, // row 3
-    };
-    const double invMat[4][4] = {
-        {1 / dx, 0.0, 0.0, 0.0}, // row 0
-        {0.0, 1 / dx, 0.0, 0.0}, // row 1
-        {0.0, 0.0, 1 / dx, 0.0}, // row 2
-        {-Tx, -Ty, -Tz, 1.0}, // row 3
-    };
-    map.set(mat, invMat, 1.0);
+    Map map; // affine map
+    map.set(dx, p0, 1.0);
     return this->getHandle(map, name, oracle, buffer);
 } // GridBuilder::getHandle
 
@@ -709,7 +696,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
                 data->mBBoxDif[0] = 0u;
                 data->mBBoxDif[1] = 0u;
                 data->mBBoxDif[2] = 0u;
-                data->mFlags = 0u;
+                data->mFlags = 0u;// enable rendering, no bbox
                 data->mMinimum = data->mMaximum = ValueT();
                 data->mAverage = data->mStdDevi = 0;
             }
@@ -768,7 +755,7 @@ GridBuilder<ValueT, BuildT, StatsT>::
                 if (v > max) max = v;
             }
             data->init(min, max, DstNode0::DataType::bitWidth());
-            // perform quantization relative to the values in the curret leaf node
+            // perform quantization relative to the values in the current leaf node
             const FloatT encode = UNITS/(max-min);
             auto *code = reinterpret_cast<ArrayT*>(data->mCode);
             int offset = 0;
@@ -1149,10 +1136,9 @@ struct GridBuilder<ValueT, BuildT, StatsT>::BuildRoot
             child = new ChildT(ijk, iter->second.value, iter->second.state);
             iter->second.child = child;
         }
-        if (child) {
-            acc.insert(ijk, child);
-            child->setValueAndCache(ijk, value, acc);
-        }
+        NANOVDB_ASSERT(child);
+        acc.insert(ijk, child);
+        child->setValueAndCache(ijk, value, acc);
     }
 
     template<typename NodeT>
@@ -1564,8 +1550,9 @@ struct GridBuilder<ValueT, BuildT, StatsT>::
     {
         ValueT*  target = mValues;
         uint32_t n = SIZE;
-        while (n--)
+        while (n--) {
             *target++ = value;
+        }
     }
     BuildLeaf(const BuildLeaf&) = delete; // disallow copy-construction
     BuildLeaf(BuildLeaf&&) = delete; // disallow move construction
