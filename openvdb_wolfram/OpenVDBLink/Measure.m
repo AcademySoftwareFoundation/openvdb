@@ -35,7 +35,7 @@ OpenVDBVolume::usage = "OpenVDBVolume[expr] finds the volume of an OpenVDB level
 (*Main*)
 
 
-OpenVDBArea[args___] /; !CheckArguments[OpenVDBArea[args], {1, 2}] = $Failed;
+OpenVDBArea[args___] /; !CheckArgs[OpenVDBArea[args], {1, 2}] = $Failed;
 
 
 OpenVDBArea[args___] :=
@@ -122,7 +122,7 @@ mOpenVDBArea[___] = $Failed;
 (*Main*)
 
 
-OpenVDBEulerCharacteristic[args___] /; !CheckArguments[OpenVDBEulerCharacteristic[args], 1] = $Failed;
+OpenVDBEulerCharacteristic[args___] /; !CheckArgs[OpenVDBEulerCharacteristic[args], 1] = $Failed;
 
 
 OpenVDBEulerCharacteristic[args___] :=
@@ -181,7 +181,7 @@ mOpenVDBEulerCharacteristic[___] = $Failed;
 (*Main*)
 
 
-OpenVDBGenus[args___] /; !CheckArguments[OpenVDBGenus[args], 1] = $Failed;
+OpenVDBGenus[args___] /; !CheckArgs[OpenVDBGenus[args], 1] = $Failed;
 
 
 OpenVDBGenus[args___] :=
@@ -240,7 +240,7 @@ mOpenVDBGenus[___] = $Failed;
 (*Main*)
 
 
-OpenVDBVolume[args___] /; !CheckArguments[OpenVDBVolume[args], {1, 2}] = $Failed;
+OpenVDBVolume[args___] /; !CheckArgs[OpenVDBVolume[args], {1, 2}] = $Failed;
 
 
 OpenVDBVolume[args___] :=

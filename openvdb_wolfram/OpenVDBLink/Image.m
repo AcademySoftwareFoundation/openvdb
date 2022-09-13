@@ -44,7 +44,7 @@ OpenVDBDynamicSliceImage::usage = "OpenVDBDynamicSliceImage[expr] returns a Dyna
 Options[OpenVDBImage3D] = {Resampling -> Automatic, "ScalingFactor" -> 1.0};
 
 
-OpenVDBImage3D[args___] /; !CheckArguments[OpenVDBImage3D[args], {1, 2}] = $Failed;
+OpenVDBImage3D[args___] /; !CheckArgs[OpenVDBImage3D[args], {1, 2}] = $Failed;
 
 
 OpenVDBImage3D[args___] :=
@@ -192,7 +192,7 @@ OpenVDBImage3D::scale = "The setting for \"ScalingFactor\" should either be a po
 (*Main*)
 
 
-OpenVDBDepthImage[args___] /; !CheckArguments[OpenVDBDepthImage[args], {1, 4}] = $Failed;
+OpenVDBDepthImage[args___] /; !CheckArgs[OpenVDBDepthImage[args], {1, 4}] = $Failed;
 
 
 OpenVDBDepthImage[args___] :=
@@ -303,7 +303,7 @@ OpenVDBDepthImage::range = "`1` at position `2` should be a list of two increasi
 (*Main*)
 
 
-OpenVDBProjectionImage[args___] /; !CheckArguments[OpenVDBProjectionImage[args], {1, 2}] = $Failed;
+OpenVDBProjectionImage[args___] /; !CheckArgs[OpenVDBProjectionImage[args], {1, 2}] = $Failed;
 
 
 OpenVDBProjectionImage[args___] :=
@@ -399,7 +399,7 @@ mOpenVDBProjectionImage[___] = $Failed;
 Options[OpenVDBSliceImage] = {"MirrorSlice" -> False};
 
 
-OpenVDBSliceImage[args___] /; !CheckArguments[OpenVDBSliceImage[args], {1, 3}] = $Failed;
+OpenVDBSliceImage[args___] /; !CheckArgs[OpenVDBSliceImage[args], {1, 3}] = $Failed;
 
 
 OpenVDBSliceImage[args___] :=
@@ -494,7 +494,7 @@ mOpenVDBSliceImage[___] = $Failed;
 Options[OpenVDBDynamicSliceImage] = {DisplayFunction -> Identity, ImageSize -> Automatic};
 
 
-OpenVDBDynamicSliceImage[args___] /; !CheckArguments[OpenVDBDynamicSliceImage[args], 1] = $Failed;
+OpenVDBDynamicSliceImage[args___] /; !CheckArgs[OpenVDBDynamicSliceImage[args], 1] = $Failed;
 
 
 OpenVDBDynamicSliceImage[args___] :=

@@ -45,7 +45,7 @@ OpenVDBActiveVoxels::usage = "OpenVDBActiveVoxels[expr] returns all active voxel
 (*Main*)
 
 
-OpenVDBActiveVoxelSliceTotals[args___] /; !CheckArguments[OpenVDBActiveVoxelSliceTotals[args], {1, 3}] = $Failed;
+OpenVDBActiveVoxelSliceTotals[args___] /; !CheckArgs[OpenVDBActiveVoxelSliceTotals[args], {1, 3}] = $Failed;
 
 
 OpenVDBActiveVoxelSliceTotals[args___] :=
@@ -151,7 +151,7 @@ OpenVDBActiveVoxelSliceTotals::cntr = "`1` at position `2` is not one of \"Value
 Options[OpenVDBSlice] = {"MirrorSlice" -> False};
 
 
-OpenVDBSlice[args___] /; !CheckArguments[OpenVDBSlice[args], {1, 3}] = $Failed;
+OpenVDBSlice[args___] /; !CheckArgs[OpenVDBSlice[args], {1, 3}] = $Failed;
 
 
 OpenVDBSlice[args___] :=
@@ -240,7 +240,7 @@ mOpenVDBSlice[___] = $Failed;
 (*Main*)
 
 
-OpenVDBData[args___] /; !CheckArguments[OpenVDBData[args], {1, 2}] = $Failed;
+OpenVDBData[args___] /; !CheckArgs[OpenVDBData[args], {1, 2}] = $Failed;
 
 
 OpenVDBData[args___] :=
@@ -329,7 +329,7 @@ mOpenVDBData[___] = $Failed;
 Options[OpenVDBActiveTiles] = {"PartialOverlap" -> True};
 
 
-OpenVDBActiveTiles[args___] /; !CheckArguments[OpenVDBActiveTiles[args], {1, 2}] = $Failed;
+OpenVDBActiveTiles[args___] /; !CheckArgs[OpenVDBActiveTiles[args], {1, 2}] = $Failed;
 
 
 OpenVDBActiveTiles[args___] :=
@@ -405,7 +405,7 @@ mOpenVDBActiveTiles[___] = $Failed;
 (*Main*)
 
 
-OpenVDBActiveVoxels[args___] /; !CheckArguments[OpenVDBActiveVoxels[args], {1, 3}] = $Failed;
+OpenVDBActiveVoxels[args___] /; !CheckArgs[OpenVDBActiveVoxels[args], {1, 3}] = $Failed;
 
 
 OpenVDBActiveVoxels[args___] :=

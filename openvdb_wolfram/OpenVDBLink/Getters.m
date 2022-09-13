@@ -151,7 +151,7 @@ validReturnFormatQ[___] = False;
 (*Main*)
 
 
-OpenVDBProperty[args___] /; !CheckArguments[OpenVDBProperty[args], {2, 3}] = $Failed;
+OpenVDBProperty[args___] /; !CheckArgs[OpenVDBProperty[args], {2, 3}] = $Failed;
 
 
 OpenVDBProperty[args___] :=

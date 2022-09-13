@@ -41,7 +41,7 @@ OpenVDBValues::usage = "OpenVDBValues[expr, coords] returns the values at coordi
 (*Main*)
 
 
-OpenVDBSetStates[args___] /; !CheckArguments[OpenVDBSetStates[args], 3] = $Failed;
+OpenVDBSetStates[args___] /; !CheckArgs[OpenVDBSetStates[args], 3] = $Failed;
 
 
 OpenVDBSetStates[args___] :=
@@ -117,7 +117,7 @@ mOpenVDBSetStates[___] = $Failed;
 (*Main*)
 
 
-OpenVDBStates[args___] /; !CheckArguments[OpenVDBStates[args], 2] = $Failed;
+OpenVDBStates[args___] /; !CheckArgs[OpenVDBStates[args], 2] = $Failed;
 
 
 OpenVDBStates[args___] :=
@@ -186,7 +186,7 @@ mOpenVDBStates[___] = $Failed;
 (*Main*)
 
 
-OpenVDBSetValues[args___] /; !CheckArguments[OpenVDBSetValues[args], 3] = $Failed;
+OpenVDBSetValues[args___] /; !CheckArgs[OpenVDBSetValues[args], 3] = $Failed;
 
 
 OpenVDBSetValues[args___] :=
@@ -284,7 +284,7 @@ mOpenVDBSetValues[___] = $Failed;
 (*Main*)
 
 
-OpenVDBValues[args___] /; !CheckArguments[OpenVDBValues[args], 2] = $Failed;
+OpenVDBValues[args___] /; !CheckArgs[OpenVDBValues[args], 2] = $Failed;
 
 
 OpenVDBValues[args___] :=

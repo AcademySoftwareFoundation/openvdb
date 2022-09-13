@@ -33,7 +33,7 @@ OpenVDBFilter::usage = "OpenVDBFilter[expr, f] applies a filter on level set Ope
 (*Main*)
 
 
-OpenVDBFilter[args___] /; !CheckArguments[OpenVDBFilter[args], {2, 3}] = $Failed;
+OpenVDBFilter[args___] /; !CheckArgs[OpenVDBFilter[args], {2, 3}] = $Failed;
 
 
 OpenVDBFilter[args___] :=

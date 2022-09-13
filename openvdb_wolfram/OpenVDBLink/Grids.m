@@ -175,7 +175,7 @@ SyntaxInformation[OpenVDBGridQ] = {"ArgumentsPattern" -> {_}};
 (*Main*)
 
 
-OpenVDBGrids[args___] /; !CheckArguments[OpenVDBGrids[args], {0, 1}] = $Failed;
+OpenVDBGrids[args___] /; !CheckArgs[OpenVDBGrids[args], {0, 1}] = $Failed;
 
 
 OpenVDBGrids[args___] :=
@@ -272,7 +272,7 @@ OpenVDBGrids::type2 = "`1` is not a list of supported grid types. Evaluate OpenV
 (*Main*)
 
 
-OpenVDBGridTypes[args___] /; !CheckArguments[OpenVDBGridTypes[args], {0, 1}] = $Failed;
+OpenVDBGridTypes[args___] /; !CheckArgs[OpenVDBGridTypes[args], {0, 1}] = $Failed;
 
 
 OpenVDBGridTypes[args___] :=
@@ -454,7 +454,7 @@ SyntaxInformation[OpenVDBMaskGridQ] = {"ArgumentsPattern" -> {_}};
 Options[OpenVDBCreateGrid] = {"BackgroundValue" -> Automatic, "Creator" :> $OpenVDBCreator, "GridClass" -> None, "Name" -> None};
 
 
-OpenVDBCreateGrid[args___] /; !CheckArguments[OpenVDBCreateGrid[args], {0, 2}] = $Failed;
+OpenVDBCreateGrid[args___] /; !CheckArgs[OpenVDBCreateGrid[args], {0, 2}] = $Failed;
 
 
 OpenVDBCreateGrid[args___] :=
@@ -599,7 +599,7 @@ OpenVDBCreateGrid::type = "`1` is not a supported grid type. Evaluate OpenVDBGri
 (*Main*)
 
 
-OpenVDBDeleteGrid[args___] /; !CheckArguments[OpenVDBDeleteGrid[args], 1] = $Failed;
+OpenVDBDeleteGrid[args___] /; !CheckArgs[OpenVDBDeleteGrid[args], 1] = $Failed;
 
 
 OpenVDBDeleteGrid[args___] :=
@@ -663,7 +663,7 @@ OpenVDBDeleteGrid::grids = "`1` is not a grid or list of grids.";
 Options[OpenVDBCopyGrid] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBCopyGrid[args___] /; !CheckArguments[OpenVDBCopyGrid[args], 1] = $Failed;
+OpenVDBCopyGrid[args___] /; !CheckArgs[OpenVDBCopyGrid[args], 1] = $Failed;
 
 
 OpenVDBCopyGrid[args___] :=

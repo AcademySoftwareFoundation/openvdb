@@ -72,7 +72,7 @@ Options[OpenVDBLevelSetRender] = Join[
 ];
 
 
-OpenVDBLevelSetRender[args___] /; !CheckArguments[OpenVDBLevelSetRender[args], {1, 2}] = $Failed;
+OpenVDBLevelSetRender[args___] /; !CheckArgs[OpenVDBLevelSetRender[args], {1, 2}] = $Failed;
 
 
 OpenVDBLevelSetRender[args___] :=
@@ -183,7 +183,7 @@ mLevelSetRender[args___] := messageRenderFunction[OpenVDBLevelSetRender, args]
 Options[OpenVDBLevelSetViewer] = Options[OpenVDBLevelSetRender];
 
 
-OpenVDBLevelSetViewer[args___] /; !CheckArguments[OpenVDBLevelSetViewer[args], {1, 2}] = $Failed;
+OpenVDBLevelSetViewer[args___] /; !CheckArgs[OpenVDBLevelSetViewer[args], {1, 2}] = $Failed;
 
 
 OpenVDBLevelSetViewer[args___] :=

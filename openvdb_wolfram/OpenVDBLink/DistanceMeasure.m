@@ -44,7 +44,7 @@ OpenVDBFillWithBalls::usage = "OpenVDBFillWithBalls[expr, n, {rmin, rmax}] fills
 Options[OpenVDBMember] = {"IsoValue" -> Automatic};
 
 
-OpenVDBMember[args___] /; !CheckArguments[OpenVDBMember[args], 2] = $Failed;
+OpenVDBMember[args___] /; !CheckArgs[OpenVDBMember[args], 2] = $Failed;
 
 
 OpenVDBMember[args___] :=
@@ -123,7 +123,7 @@ OpenVDBDefaultSpace[OpenVDBMember] = $worldregime;
 Options[OpenVDBNearest] = {"IsoValue" -> Automatic};
 
 
-OpenVDBNearest[args___] /; !CheckArguments[OpenVDBNearest[args], 2] = $Failed;
+OpenVDBNearest[args___] /; !CheckArgs[OpenVDBNearest[args], 2] = $Failed;
 
 
 OpenVDBNearest[args___] :=
@@ -202,7 +202,7 @@ OpenVDBDefaultSpace[OpenVDBNearest] = $worldregime;
 Options[OpenVDBDistance] = {"IsoValue" -> Automatic};
 
 
-OpenVDBDistance[args___] /; !CheckArguments[OpenVDBDistance[args], 2] = $Failed;
+OpenVDBDistance[args___] /; !CheckArgs[OpenVDBDistance[args], 2] = $Failed;
 
 
 OpenVDBDistance[args___] :=
@@ -277,7 +277,7 @@ OpenVDBDefaultSpace[OpenVDBDistance] = $worldregime;
 Options[OpenVDBSignedDistance] = {"IsoValue" -> Automatic};
 
 
-OpenVDBSignedDistance[args___] /; !CheckArguments[OpenVDBSignedDistance[args], 2] = $Failed;
+OpenVDBSignedDistance[args___] /; !CheckArgs[OpenVDBSignedDistance[args], 2] = $Failed;
 
 
 OpenVDBSignedDistance[args___] :=
@@ -356,7 +356,7 @@ OpenVDBDefaultSpace[OpenVDBSignedDistance] = $worldregime;
 Options[OpenVDBFillWithBalls] = {"IsoValue" -> Automatic, "Overlapping" -> False, "ReturnType" -> Automatic, "SeedCount" -> Automatic};
 
 
-OpenVDBFillWithBalls[args___] /; !CheckArguments[OpenVDBFillWithBalls[args], {2, 3}] = $Failed;
+OpenVDBFillWithBalls[args___] /; !CheckArgs[OpenVDBFillWithBalls[args], {2, 3}] = $Failed;
 
 
 OpenVDBFillWithBalls[args___] :=

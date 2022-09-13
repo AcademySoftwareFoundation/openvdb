@@ -35,7 +35,7 @@ OpenVDBExport::usage = "OpenVDBExport[\"file.vdb\", expr] exports data from an O
 (*Main*)
 
 
-OpenVDBImport[args___] /; !CheckArguments[OpenVDBImport[args], {1, 3}] = $Failed;
+OpenVDBImport[args___] /; !CheckArgs[OpenVDBImport[args], {1, 3}] = $Failed;
 
 
 OpenVDBImport[args___] :=
@@ -147,7 +147,7 @@ OpenVDBImport::type = "`1` is not a supported grid type. Evaluate OpenVDBGridTyp
 Options[OpenVDBExport] = {OverwriteTarget -> False};
 
 
-OpenVDBExport[args___] /; !CheckArguments[OpenVDBExport[args], {1, 2}] = $Failed;
+OpenVDBExport[args___] /; !CheckArgs[OpenVDBExport[args], {1, 2}] = $Failed;
 
 
 OpenVDBExport[args___] :=

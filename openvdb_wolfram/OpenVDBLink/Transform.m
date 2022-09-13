@@ -42,7 +42,7 @@ OpenVDBGammaAdjust::usage = "OpenVDBGammaAdjust[expr, \[Gamma]] applies gamma ad
 Options[OpenVDBTransform] = {Resampling -> Automatic};
 
 
-OpenVDBTransform[args___] /; !CheckArguments[OpenVDBTransform[args], 2] = $Failed;
+OpenVDBTransform[args___] /; !CheckArgs[OpenVDBTransform[args], 2] = $Failed;
 
 
 OpenVDBTransform[args___] :=
@@ -182,7 +182,7 @@ OpenVDBTransform::resamp = "The setting for Resampling should be one of \"Neares
 (*Main*)
 
 
-OpenVDBMultiply[args___] /; !CheckArguments[OpenVDBMultiply[args], 2] = $Failed;
+OpenVDBMultiply[args___] /; !CheckArgs[OpenVDBMultiply[args], 2] = $Failed;
 
 
 OpenVDBMultiply[args___] :=
@@ -248,7 +248,7 @@ OpenVDBMultiply::real = "`1` at position `2` is not real number.";
 (*Main*)
 
 
-OpenVDBGammaAdjust[args___] /; !CheckArguments[OpenVDBGammaAdjust[args], 2] = $Failed;
+OpenVDBGammaAdjust[args___] /; !CheckArgs[OpenVDBGammaAdjust[args], 2] = $Failed;
 
 
 OpenVDBGammaAdjust[args___] :=

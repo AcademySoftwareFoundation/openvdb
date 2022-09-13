@@ -747,25 +747,25 @@ testToCellGroup[
 testToCellGroup[
 	HoldComplete[test : VerificationTest[fst_, {}, args___]],
 	cellids_
-] /; Quiet @ CheckArguments[test, 1] := testToCellGroup[VerificationTest[fst, {}, {}], cellids];
+] /; Quiet @ CheckArgs[test, 1] := testToCellGroup[VerificationTest[fst, {}, {}], cellids];
 
 (* Handle 1-arg tests *)
 testToCellGroup[
 	HoldComplete[test : VerificationTest[fst_, args___]],
 	cellids_
-] /; Quiet @ CheckArguments[test, 1] := testToCellGroup[VerificationTest[fst, True, {}, args], cellids];
+] /; Quiet @ CheckArgs[test, 1] := testToCellGroup[VerificationTest[fst, True, {}, args], cellids];
 
 (* Handle 2-arg tests *)
 testToCellGroup[
 	HoldComplete[test : VerificationTest[fst_, snd_, args___]],
 	cellids_
-] /; Quiet @ CheckArguments[test, 2] := testToCellGroup[VerificationTest[fst, snd, {}, args], cellids];
+] /; Quiet @ CheckArgs[test, 2] := testToCellGroup[VerificationTest[fst, snd, {}, args], cellids];
 
 (* Handle 3-arg tests *)
 testToCellGroup[
 	HoldComplete[test_VerificationTest],
 	cellids_
-] /; Quiet @ CheckArguments[test, 3] := testToCellGroup[test, cellids]
+] /; Quiet @ CheckArgs[test, 3] := testToCellGroup[test, cellids]
 
 (* Convert test to Cells *)
 testToCellGroup[
@@ -954,6 +954,22 @@ validTryToLevelSetQ[] := TrueQ[!$inToLevelSet] && TrueQ[Positive[$OpenVDBSpacing
 
 validScalarGridCollectionQ[levelsets_List] := Length[levelsets] > 0 && VectorQ[levelsets, validScalarGridCollectionQ]
 validScalarGridCollectionQ[expr_] := OpenVDBScalarGridQ[expr] || OptionQ[expr]
+
+
+(* ::Subsection::Closed:: *)
+(*Argument checking*)
+
+
+PackageScope["CheckArgs"]
+
+
+SetAttributes[{CheckArgs, catchMessages}, HoldFirst]
+
+
+CheckArgs[expr_, spec_] := !FailureQ[catchMessages[System`Private`Arguments[expr, spec, HoldComplete, {}, ""]]]
+
+
+catchMessages[expr_] := Catch[Internal`HandlerBlock[{"Message", Throw[$Failed, "iArgumentsMessage"]&}, expr], "iArgumentsMessage"];
 
 
 (* ::Subsection::Closed:: *)

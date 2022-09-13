@@ -41,7 +41,7 @@ OpenVDBOpening::usage = "OpenVDBOpening[expr, r] gives the morphological opening
 (*Main*)
 
 
-OpenVDBResizeBandwidth[args___] /; !CheckArguments[OpenVDBResizeBandwidth[args], {1, 2}] = $Failed;
+OpenVDBResizeBandwidth[args___] /; !CheckArgs[OpenVDBResizeBandwidth[args], {1, 2}] = $Failed;
 
 
 OpenVDBResizeBandwidth[args___] :=
@@ -105,7 +105,7 @@ mOpenVDBResizeBandwidth[args___] := messageMorphologyFunction[OpenVDBResizeBandw
 (*Main*)
 
 
-OpenVDBDilation[args___] /; !CheckArguments[OpenVDBDilation[args], {1, 2}] = $Failed;
+OpenVDBDilation[args___] /; !CheckArgs[OpenVDBDilation[args], {1, 2}] = $Failed;
 
 
 OpenVDBDilation[args___] :=
@@ -165,7 +165,7 @@ mOpenVDBDilation[args___] := messageMorphologyFunction[OpenVDBDilation, args]
 (*Main*)
 
 
-OpenVDBErosion[args___] /; !CheckArguments[OpenVDBErosion[args], {1, 2}] = $Failed;
+OpenVDBErosion[args___] /; !CheckArgs[OpenVDBErosion[args], {1, 2}] = $Failed;
 
 
 OpenVDBErosion[args___] :=
@@ -225,7 +225,7 @@ mOpenVDBErosion[args___] := messageMorphologyFunction[OpenVDBErosion, args]
 (*Main*)
 
 
-OpenVDBClosing[args___] /; !CheckArguments[OpenVDBClosing[args], {1, 2}] = $Failed;
+OpenVDBClosing[args___] /; !CheckArgs[OpenVDBClosing[args], {1, 2}] = $Failed;
 
 
 OpenVDBClosing[args___] :=
@@ -279,7 +279,7 @@ mOpenVDBClosing[args___] := messageMorphologyFunction[OpenVDBClosing, args]
 (*Main*)
 
 
-OpenVDBOpening[args___] /; !CheckArguments[OpenVDBOpening[args], {1, 2}] = $Failed;
+OpenVDBOpening[args___] /; !CheckArgs[OpenVDBOpening[args], {1, 2}] = $Failed;
 
 
 OpenVDBOpening[args___] :=

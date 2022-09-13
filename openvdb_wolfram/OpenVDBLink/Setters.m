@@ -29,7 +29,7 @@ OpenVDBSetProperty::usage = "OpenVDBSetProperty[expr, \"prop\", val] sets the va
 (*Main*)
 
 
-OpenVDBSetProperty[args___] /; !CheckArguments[OpenVDBSetProperty[args], {2, 3}] = $Failed;
+OpenVDBSetProperty[args___] /; !CheckArgs[OpenVDBSetProperty[args], {2, 3}] = $Failed;
 
 
 OpenVDBSetProperty[args___] :=

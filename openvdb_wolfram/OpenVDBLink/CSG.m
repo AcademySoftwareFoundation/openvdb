@@ -52,7 +52,7 @@ OpenVDBClip::usage = "OpenVDBClip[expr, bds] clips an OpenVDB grid over bounds b
 Options[OpenVDBUnion] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBUnion[args___] /; !CheckArguments[OpenVDBUnion[args], {0, \[Infinity]}] = $Failed;
+OpenVDBUnion[args___] /; !CheckArgs[OpenVDBUnion[args], {0, \[Infinity]}] = $Failed;
 
 
 OpenVDBUnion[args___] :=
@@ -125,7 +125,7 @@ mOpenVDBUnion[args___] := messageBooleanFunction[OpenVDBUnion, args]
 Options[OpenVDBIntersection] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBIntersection[args___] /; !CheckArguments[OpenVDBIntersection[args], {0, \[Infinity]}] = $Failed;
+OpenVDBIntersection[args___] /; !CheckArgs[OpenVDBIntersection[args], {0, \[Infinity]}] = $Failed;
 
 
 OpenVDBIntersection[args___] :=
@@ -198,7 +198,7 @@ mOpenVDBIntersection[args___] := messageBooleanFunction[OpenVDBIntersection, arg
 Options[OpenVDBDifference] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBDifference[args___] /; !CheckArguments[OpenVDBDifference[args], {0, \[Infinity]}] = $Failed;
+OpenVDBDifference[args___] /; !CheckArgs[OpenVDBDifference[args], {0, \[Infinity]}] = $Failed;
 
 
 OpenVDBDifference[args___] :=
@@ -295,7 +295,7 @@ mOpenVDBDifference[args___] := messageBooleanFunction[OpenVDBDifference, args]
 Options[OpenVDBUnionTo] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBUnionTo[args___] /; !CheckArguments[OpenVDBUnionTo[args], {1, \[Infinity]}] = $Failed;
+OpenVDBUnionTo[args___] /; !CheckArgs[OpenVDBUnionTo[args], {1, \[Infinity]}] = $Failed;
 
 
 OpenVDBUnionTo[args___] :=
@@ -363,7 +363,7 @@ mOpenVDBUnionTo[args___] := messageBooleanFunction[OpenVDBUnionTo, args]
 Options[OpenVDBIntersectWith] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBIntersectWith[args___] /; !CheckArguments[OpenVDBIntersectWith[args], {1, \[Infinity]}] = $Failed;
+OpenVDBIntersectWith[args___] /; !CheckArgs[OpenVDBIntersectWith[args], {1, \[Infinity]}] = $Failed;
 
 
 OpenVDBIntersectWith[args___] :=
@@ -431,7 +431,7 @@ mOpenVDBIntersectWith[args___] := messageBooleanFunction[OpenVDBIntersectWith, a
 Options[OpenVDBDifferenceFrom] = {"Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBDifferenceFrom[args___] /; !CheckArguments[OpenVDBDifferenceFrom[args], {1, \[Infinity]}] = $Failed;
+OpenVDBDifferenceFrom[args___] /; !CheckArgs[OpenVDBDifferenceFrom[args], {1, \[Infinity]}] = $Failed;
 
 
 OpenVDBDifferenceFrom[args___] :=
@@ -506,7 +506,7 @@ mOpenVDBDifferenceFrom[args___] := messageBooleanFunction[OpenVDBUnion, args]
 Options[OpenVDBClip] = {"CloseBoundary" -> True, "Creator" -> Inherited, "Name" -> Inherited};
 
 
-OpenVDBClip[args___] /; !CheckArguments[OpenVDBClip[args], 2] = $Failed;
+OpenVDBClip[args___] /; !CheckArgs[OpenVDBClip[args], 2] = $Failed;
 
 
 OpenVDBClip[args___] :=
