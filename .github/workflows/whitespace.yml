@@ -10,7 +10,7 @@ on:
       - 'tsc/meetings/**'
 
 jobs:
-  # Search the git repository for any trailing spaces excluding meeting notes
+  # Search the git repository for any trailing spaces excluding meeting notes and auto-generated wlt files
   trailingspaces:
     runs-on: ubuntu-latest
     steps:
@@ -18,7 +18,7 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*'
+          git grep -n -I -E '^.+[ ]+$' -- ':!tsc/meetings/*' ':!*.wlt'
           test $? -eq 1
 
   # Search for any tabs excluding meeting notes, image files and a few others
@@ -29,5 +29,5 @@ jobs:
     - name: test
       run: |
           set +e
-          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png'
+          git grep -n "	" -- ':!*/whitespace.yml' ':!tsc/meetings/*' ':!*.svg' ':!*.cmd' ':!*.png' ':!*.wlt'
           test $? -eq 1
