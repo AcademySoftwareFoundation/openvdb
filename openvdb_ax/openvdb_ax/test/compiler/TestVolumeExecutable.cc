@@ -20,6 +20,7 @@ public:
     CPPUNIT_TEST(testActiveTileStreaming);
     CPPUNIT_TEST(testCompilerCases);
     CPPUNIT_TEST(testExecuteBindings);
+    CPPUNIT_TEST(testCLI);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
@@ -28,6 +29,7 @@ public:
     void testActiveTileStreaming();
     void testCompilerCases();
     void testExecuteBindings();
+    void testCLI();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestVolumeExecutable);
@@ -768,7 +770,7 @@ TestVolumeExecutable::testCompilerCases()
         // with string only
         CPPUNIT_ASSERT(static_cast<bool>(compiler->compile<openvdb::ax::VolumeExecutable>("int i;")));
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i;"), openvdb::AXCompilerError);
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i"), openvdb::AXCompilerError);
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>("i"), openvdb::AXSyntaxError);
         // with AST only
         auto ast = openvdb::ax::ast::parse("i;");
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::VolumeExecutable>(*ast), openvdb::AXCompilerError);
@@ -1000,5 +1002,284 @@ TestVolumeExecutable::testExecuteBindings()
         const openvdb::ax::AttributeBindings& bindingsOnExecutable = executable->getAttributeBindings();
         CPPUNIT_ASSERT(bindingsOnExecutable.isBoundAXName("c"));
         CPPUNIT_ASSERT_EQUAL(*bindingsOnExecutable.dataNameBoundTo("c"), std::string("c"));
+    }
+}
+
+void
+TestVolumeExecutable::testCLI()
+{
+    using namespace openvdb;
+    using CLI = openvdb::ax::VolumeExecutable::CLI;
+
+    struct UnusedCLIParam : public openvdb::Exception {
+        UnusedCLIParam() noexcept: Exception( "UnusedCLIParam" ) {} \
+        explicit UnusedCLIParam(const std::string& msg) noexcept: Exception( "UnusedCLIParam" , &msg) {}
+    };
+
+    auto CreateCLI = [](const char* c, bool throwIfUnused = true)
+    {
+        std::vector<std::string> strs;
+        const char* s = c;
+        while (*c != '\0') {
+            if (*c == ' ') {
+                strs.emplace_back(std::string(s, c-s));
+                ++c;
+                s = c;
+            }
+            else {
+                ++c;
+            }
+        }
+        if (*s != '\0') strs.emplace_back(std::string(s, c-s));
+
+        std::vector<const char*> args;
+        for (auto& str : strs) args.emplace_back(str.c_str());
+
+        std::unique_ptr<bool[]> flags(new bool[args.size()]);
+        std::fill(flags.get(), flags.get()+args.size(), false);
+
+        auto cli = CLI::create(args.size(), args.data(), flags.get());
+        if (throwIfUnused) {
+            for (size_t i = 0; i < args.size(); ++i) {
+                if (!flags[i]) OPENVDB_THROW(UnusedCLIParam, "unused param");
+            }
+        }
+        return cli;
+    };
+
+    ax::Compiler::UniquePtr compiler = ax::Compiler::create();
+
+    auto defaultExe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+    Index defaultMinLevel, defaultMaxLevel;
+    defaultExe->getTreeExecutionLevel(defaultMinLevel, defaultMaxLevel);
+    const auto defaultCreateMissing = defaultExe->getCreateMissing();
+    const auto defaultTileStream = defaultExe->getActiveTileStreaming();
+    const auto defaultValueIter = defaultExe->getValueIterator();
+    const auto defaultGrain = defaultExe->getGrainSize();
+    const auto defaultTileGrain = defaultExe->getActiveTileStreamingGrainSize();
+    const auto defaultBindings = defaultExe->getAttributeBindings();
+
+    CPPUNIT_ASSERT_THROW(CreateCLI("--unknown"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-unknown"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("--"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-- "), UnusedCLIParam);
+
+    {
+        CLI cli = CreateCLI("");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --create-missing
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--create-missing ON");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --tile-stream
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tile-stream"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tile-stream invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tile-stream --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--tile-stream ON");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --node-iter
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--node-iter"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--node-iter invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--node-iter --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--node-iter ALL");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::IterType::ALL, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --tree-level
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tree-level"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tree-level invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--tree-level --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--tree-level 0");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(min, Index(0));
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+
+        cli = CreateCLI("--tree-level 1:2");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(min, Index(1));
+        CPPUNIT_ASSERT_EQUAL(max, Index(2));
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --tree-level
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--volume-grain"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--volume-grain invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--volume-grain --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--volume-grain 0");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+
+        cli = CreateCLI("--volume-grain 1:2");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(size_t(1), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(size_t(2), exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --bindings
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a:"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a,b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,a:b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings --create-missing ON"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--bindings a:b,c:d,12:13");
+        ax::AttributeBindings bindings;
+        bindings.set("a", "b");
+        bindings.set("c", "d");
+        bindings.set("12", "13");
+
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultTileGrain, exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
+    }
+
+    // multiple
+    {
+        CLI cli = CreateCLI("--volume-grain 5:10 --create-missing OFF");
+        auto exe = compiler->compile<openvdb::ax::VolumeExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+
+        Index min,max;
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(defaultMinLevel, min);
+        CPPUNIT_ASSERT_EQUAL(defaultMaxLevel, max);
+        CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultTileStream, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(defaultValueIter, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(size_t(5), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(size_t(10), exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+
+        cli = CreateCLI("--tile-stream ON --node-iter OFF --tree-level 2:3 --volume-grain 10:20 --create-missing ON --bindings a:b");
+        ax::AttributeBindings bindings;
+        bindings.set("a", "b");
+
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        exe->getTreeExecutionLevel(min, max);
+        CPPUNIT_ASSERT_EQUAL(Index(2), min);
+        CPPUNIT_ASSERT_EQUAL(Index(3), max);
+        CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::Streaming::ON, exe->getActiveTileStreaming());
+        CPPUNIT_ASSERT_EQUAL(openvdb::ax::VolumeExecutable::IterType::OFF, exe->getValueIterator());
+        CPPUNIT_ASSERT_EQUAL(size_t(10), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(size_t(20), exe->getActiveTileStreamingGrainSize());
+        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
     }
 }

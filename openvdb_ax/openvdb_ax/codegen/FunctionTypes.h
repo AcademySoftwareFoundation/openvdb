@@ -81,7 +81,7 @@
 #include <memory>
 #include <stack>
 #include <type_traits>
-#include <unordered_map>
+#include <map>
 #include <vector>
 
 namespace openvdb {

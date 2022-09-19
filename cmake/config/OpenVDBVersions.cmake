@@ -1,0 +1,77 @@
+# Copyright Contributors to the OpenVDB Project
+# SPDX-License-Identifier: MPL-2.0
+#
+#[=======================================================================[
+
+  Current and future version requirements for all OpenVDB dependencies,
+  including compilers, language features and OpenVDB's ABI.
+
+#]=======================================================================]
+
+cmake_minimum_required(VERSION 3.18)
+
+###############################################################################
+
+# Configure minimum version requirements - some are treated specially and fall
+# outside of the DISABLE_DEPENDENCY_VERSION_CHECKS catch
+set(MINIMUM_CXX_STANDARD 17)
+
+# @note  ABI always enforced so the correct deprecation messages are available.
+# OPENVDB_USE_DEPRECATED_ABI_<VERSION> should be used to circumvent this
+set(MINIMUM_OPENVDB_ABI_VERSION 8)
+set(FUTURE_MINIMUM_OPENVDB_ABI_VERSION 10)
+set(FUTURE_OPENVDB_ABI_VERSION 11)
+
+if(NOT DISABLE_DEPENDENCY_VERSION_CHECKS)
+  # @note  Currently tracking CY2021 of the VFX platform where available
+
+  # @Note  Compiler versions are not really a hard and fast rule, you just need
+  # a compiler with complete support for our MINIMUM_CXX_STANDARD (currently 17).
+  # What's usually important is that the version of libstdc++ and glibc in use
+  # matches. Compilers other than GCC should provide options to ensure this
+  # targetting e.g. --gcc-toolchain and -fgnuc-version with Clang.
+  set(MINIMUM_GCC_VERSION 9.3.1)
+  set(MINIMUM_CLANG_VERSION 5.0)
+  set(MINIMUM_ICC_VERSION 19)
+  set(MINIMUM_MSVC_VERSION 19.10) # 1910 (Visual Studio 2017 15.0)
+
+  set(MINIMUM_BOOST_VERSION 1.73)
+  set(MINIMUM_ILMBASE_VERSION 2.4)
+  set(MINIMUM_OPENEXR_VERSION 2.4)
+  set(MINIMUM_ZLIB_VERSION 1.2.7)
+  set(MINIMUM_TBB_VERSION 2020.2)
+  set(MINIMUM_LLVM_VERSION 10.0.0)
+  set(MINIMUM_BLOSC_VERSION 1.17.0)
+
+  set(MINIMUM_PYTHON_VERSION 3.7)
+  set(MINIMUM_NUMPY_VERSION 1.19.0)
+
+  set(MINIMUM_GOOGLETEST_VERSION 1.10)
+  set(MINIMUM_GLFW_VERSION 3.1)
+  set(MINIMUM_LOG4CPLUS_VERSION 1.1.2)
+  set(MINIMUM_HOUDINI_VERSION 19.0)
+
+  # These always promote warnings rather than errors
+  set(MINIMUM_MAYA_VERSION 2017)
+  set(MINIMUM_DOXYGEN_VERSION 1.8.8)
+endif()
+
+# VFX 22 deprecations to transition to MINIMUM_* variables in OpenVDB 11.0.0
+# @note  At the time of writing, any variables that are commented out don't
+#   have target transitional versions.
+
+set(FUTURE_MINIMUM_GCC_VERSION 11.2.1)
+set(FUTURE_MINIMUM_MSVC_VERSION 19.28) # 1928 (Visual Studio 2019 Version 16.8 + 16.9)
+# set(FUTURE_MINIMUM_ICC_VERSION 19)
+
+# set(FUTURE_MINIMUM_CXX_STANDARD 17)
+# set(FUTURE_MINIMUM_CMAKE_VERSION 3.18)
+set(FUTURE_MINIMUM_ILMBASE_VERSION 3.1)
+set(FUTURE_MINIMUM_OPENEXR_VERSION 3.1)
+set(FUTURE_MINIMUM_BOOST_VERSION 1.76)
+# set(FUTURE_MINIMUM_BLOSC_VERSION 1.17.0)
+set(FUTURE_MINIMUM_TBB_VERSION 2020.3)
+set(FUTURE_MINIMUM_PYTHON_VERSION 3.9.1)
+set(FUTURE_MINIMUM_NUMPY_VERSION 1.20.0)
+set(FUTURE_MINIMUM_HOUDINI_VERSION 19.5)
+# set(FUTURE_MINIMUM_LLVM_VERSION 10.0.0)

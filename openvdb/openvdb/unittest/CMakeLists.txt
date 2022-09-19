@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBUnitTests LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -146,6 +146,7 @@ else()
     TestPointMask.cc
     TestPointMove.cc
     TestPointPartitioner.cc
+    TestPointRasterizeFrustum.cc
     TestPointRasterizeSDF.cc
     TestPointRasterizeTrilinear.cc
     TestPointSample.cc

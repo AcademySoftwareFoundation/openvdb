@@ -655,7 +655,7 @@ void Morphology<TreeType>::dilateVoxels(const size_t iter,
             // For each node, dilate the mask into itself and neighboring leaf nodes.
             // If the node was originally dense (all active), steal/replace it so
             // subsequent iterations are faster
-            manager.foreach([&](LeafT& leaf, const size_t idx) {
+            manager.foreach([&](auto& leaf, const size_t idx) {
                 // original bit-mask of current leaf node
                 const MaskType& oldMask = nodeMasks[idx];
                 const bool dense = oldMask.isOn();

@@ -1,4 +1,5 @@
 WARNING: position arguments [input.vdb <output.vdb>] are deprecated. use -i and -o
+WARNING: no output VDB File specified - nothing will be written to disk
 9.61348e-05
 1.11423e-05
 7.19763e-05

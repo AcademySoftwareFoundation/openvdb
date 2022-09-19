@@ -39,7 +39,7 @@ inline FunctionGroup::UniquePtr axtrncdecode()
 
         if (type->isIntegerTy() || type->isFloatingPointTy())
         {
-            in = B.CreateLoad(in);
+            in = ir_load(B, in);
             const bool intconversion = type->isIntegerTy();
             assert(intconversion || type->isHalfTy());
             llvm::Value* result = intconversion ?
@@ -91,7 +91,7 @@ inline FunctionGroup::UniquePtr axtrncencode()
 
         if (type->isIntegerTy() || type->isFloatingPointTy())
         {
-            in = B.CreateLoad(in);
+            in = ir_load(B, in);
             const bool intconversion = in->getType()->isIntegerTy();
             assert(intconversion || in->getType()->isFloatTy());
             llvm::Value* result = intconversion ?
@@ -145,7 +145,7 @@ inline FunctionGroup::UniquePtr axfxptdecode(const bool OneByte, const bool IsPo
 
         if (type->isIntegerTy())
         {
-            in = B.CreateLoad(in);
+            in = ir_load(B, in);
             assert(type->isIntegerTy(8) || type->isIntegerTy(16));
             llvm::Value* s = B.CreateUIToFP(in, B.getFloatTy());
             llvm::Value* d = type->isIntegerTy(8) ?
@@ -202,7 +202,7 @@ inline FunctionGroup::UniquePtr axfxptencode(const bool OneByte, const bool IsPo
         llvm::Function* base = B.GetInsertBlock()->getParent();
         llvm::Value* u = args[0]; // out
         llvm::Value* s = args[1]; // in
-        s = B.CreateLoad(s);
+        s = ir_load(B, s);
 
         llvm::Value* offset = LLVMType<float>::get(B.getContext(), 0.5f);
         if (IsPositionRange) s = B.CreateFAdd(s, offset);

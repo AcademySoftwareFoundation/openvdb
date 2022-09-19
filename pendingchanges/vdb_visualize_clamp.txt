@@ -1,0 +1,2 @@
+Houdini:
+    Fix bug in VDB Visualize SOP where color values that exceed the range wrap around instead of being clamped.

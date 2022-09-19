@@ -294,14 +294,8 @@ private:
 
 
 /// @note Macro to use a final specifier from ABI=8 onwards.
-#if OPENVDB_ABI_VERSION_NUMBER >= 8
 #define OPENVDB_MAP_CLASS_SPECIFIER final
 #define OPENVDB_MAP_FUNC_SPECIFIER final
-#else
-#define OPENVDB_MAP_CLASS_SPECIFIER
-#define OPENVDB_MAP_FUNC_SPECIFIER override
-#endif
-
 
 /// @brief A general linear transform using homogeneous coordinates to perform
 /// rotation, scaling, shear and translation

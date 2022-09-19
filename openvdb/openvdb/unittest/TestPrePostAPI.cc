@@ -4,6 +4,7 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Mat4.h>
 #include <openvdb/math/Maps.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
 #include <openvdb/util/MapsUtil.h>
 
@@ -72,9 +73,9 @@ TEST_F(TestPrePostAPI, testMat4Rotate)
     double TOL = 1e-7;
 
     Mat4d rx, ry, rz;
-    const double angle1 = 20. * M_PI / 180.;
-    const double angle2 = 64. * M_PI / 180.;
-    const double angle3 = 125. *M_PI / 180.;
+    const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
+    const double angle2 = 64. * openvdb::math::pi<double>() / 180.;
+    const double angle3 = 125. *openvdb::math::pi<double>() / 180.;
     rx.setToRotation(Vec3d(1,0,0), angle1);
     ry.setToRotation(Vec3d(0,1,0), angle2);
     rz.setToRotation(Vec3d(0,0,1), angle3);
@@ -352,7 +353,7 @@ TEST_F(TestPrePostAPI, testMaps)
         }
     }
     { // pre rotate
-        const double angle1 = 20. * M_PI / 180.;
+        const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
         UniformScaleMap usm;
         UniformScaleTranslateMap ustm;
         ScaleMap sm;
@@ -383,7 +384,7 @@ TEST_F(TestPrePostAPI, testMaps)
         }
     }
     { // post rotate
-        const double angle1 = 20. * M_PI / 180.;
+        const double angle1 = 20. * openvdb::math::pi<double>() / 180.;
         UniformScaleMap usm;
         UniformScaleTranslateMap ustm;
         ScaleMap sm;

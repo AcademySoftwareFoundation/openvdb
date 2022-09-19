@@ -35,7 +35,6 @@
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/raw_os_ostream.h>
 #include <llvm/Support/SourceMgr.h> // SMDiagnostic
-#include <llvm/Support/TargetRegistry.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/Target/TargetOptions.h>
 
@@ -463,13 +462,15 @@ bool initializeGlobalFunctions(const codegen::FunctionRegistry& registry,
     return count == logger.errors();
 }
 
-void verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
+bool verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
 {
     // verify the attributes and external variables requested in the syntax tree
     // only have a single type. Note that the executer will also throw a runtime
     // error if the same attribute is accessed with different types, but as that's
     // currently not a valid state on a PointDataGrid, error in compilation as well
     // @todo - introduce a framework for supporting custom preprocessors
+
+    const size_t errs = logger.errors();
 
     std::unordered_map<std::string, std::string> nameType;
 
@@ -504,6 +505,8 @@ void verifyTypedAccesses(const ast::Tree& tree, openvdb::ax::Logger& logger)
         };
 
     ast::visitNodeType<ast::ExternalVariable>(tree, externalOp);
+
+    return logger.errors() == errs;
 }
 
 inline void
@@ -682,6 +685,12 @@ Compiler::compile(const ast::Tree& tree,
         CustomData::Ptr data,
         Logger& logger)
 {
+    // @todo  Not technically necessary for volumes but does the
+    //   executer/bindings handle this?
+    if (!verifyTypedAccesses(tree, logger)) {
+        return nullptr;
+    }
+
     // initialize the module and execution engine - the latter isn't needed
     // for IR generation but we leave the creation of the TM to the EE.
 
@@ -768,8 +777,6 @@ Compiler::compile<PointExecutable>(const ast::Tree& syntaxTree,
     PointDefaultModifier modifier;
     modifier.traverse(tree.get());
 
-    verifyTypedAccesses(*tree, logger);
-
     const std::vector<std::string> functionNames {
         codegen::PointKernelBufferRange::getDefaultName(),
         codegen::PointKernelAttributeArray::getDefaultName()
@@ -786,8 +793,6 @@ Compiler::compile<VolumeExecutable>(const ast::Tree& syntaxTree,
                                     const CustomData::Ptr customData)
 {
     using GenT = codegen::codegen_internal::VolumeComputeGenerator;
-
-    verifyTypedAccesses(syntaxTree, logger);
 
     const std::vector<std::string> functionNames {
         // codegen::VolumeKernelValue::getDefaultName(), // currently unused directly

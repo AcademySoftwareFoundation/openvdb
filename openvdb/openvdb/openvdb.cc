@@ -3,9 +3,7 @@
 
 #include "openvdb.h"
 #include "io/DelayedLoadMetadata.h"
-//#ifdef OPENVDB_ENABLE_POINTS
 #include "points/PointDataGrid.h"
-//#endif
 #include "tools/PointIndexGrid.h"
 #include "util/logging.h"
 
@@ -16,31 +14,31 @@
 #include <blosc.h>
 #endif
 
-#if OPENVDB_ABI_VERSION_NUMBER < 6
-    #error ABI <= 5 is no longer supported
+#if OPENVDB_ABI_VERSION_NUMBER <= 7
+    #error ABI <= 7 is no longer supported
 #endif
 
 // If using an OPENVDB_ABI_VERSION_NUMBER that has been deprecated, issue an
 // error directive. This can be optionally suppressed by defining:
 //   OPENVDB_USE_DEPRECATED_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_DEPRECATED_ABI_6
-    #if OPENVDB_ABI_VERSION_NUMBER == 6
-        #error ABI = 6 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_6 suppresses this error
+#ifndef OPENVDB_USE_DEPRECATED_ABI_8
+    #if OPENVDB_ABI_VERSION_NUMBER == 8
+        #error ABI = 8 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_8 suppresses this error
     #endif
 #endif
-#ifndef OPENVDB_USE_DEPRECATED_ABI_7
-    #if OPENVDB_ABI_VERSION_NUMBER == 7
-        #error ABI = 7 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_7 suppresses this error
+#ifndef OPENVDB_USE_DEPRECATED_ABI_9
+    #if OPENVDB_ABI_VERSION_NUMBER == 9
+        #error ABI = 9 is deprecated, CMake option OPENVDB_USE_DEPRECATED_ABI_9 suppresses this error
     #endif
 #endif
 
 // If using a future OPENVDB_ABI_VERSION_NUMBER, issue an error directive.
 // This can be optionally suppressed by defining:
 //   OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
-#ifndef OPENVDB_USE_FUTURE_ABI_10
-    #if OPENVDB_ABI_VERSION_NUMBER == 10
-        #error ABI = 10 is still in active development and has not been finalized, \
-CMake option OPENVDB_USE_FUTURE_ABI_10 suppresses this error
+#ifndef OPENVDB_USE_FUTURE_ABI_11
+    #if OPENVDB_ABI_VERSION_NUMBER == 11
+        #error ABI = 11 is still in active development and has not been finalized, \
+CMake option OPENVDB_USE_FUTURE_ABI_11 suppresses this error
     #endif
 #endif
 
@@ -54,6 +52,11 @@ std::mutex sInitMutex;
 std::atomic<bool> sIsInitialized{false};
 }
 
+/// @todo  Change registerX() methods to simply be register()...
+template <typename GridT> struct RegisterGrid { inline void operator()() { GridT::registerGrid(); } };
+template <typename MetaT> struct RegisterMeta { inline void operator()() { MetaT::registerType(); } };
+template <typename MapT>  struct RegisterMap  { inline void operator()() { MapT::registerMap(); } };
+
 void
 initialize()
 {
@@ -65,65 +68,29 @@ initialize()
 
     // Register metadata.
     Metadata::clearRegistry();
-    BoolMetadata::registerType();
-    DoubleMetadata::registerType();
-    FloatMetadata::registerType();
-    Int32Metadata::registerType();
-    Int64Metadata::registerType();
-    StringMetadata::registerType();
-    Vec2IMetadata::registerType();
-    Vec2SMetadata::registerType();
-    Vec2DMetadata::registerType();
-    Vec3IMetadata::registerType();
-    Vec3SMetadata::registerType();
-    Vec3DMetadata::registerType();
-    Vec4IMetadata::registerType();
-    Vec4SMetadata::registerType();
-    Vec4DMetadata::registerType();
-    Mat4SMetadata::registerType();
-    Mat4DMetadata::registerType();
+    MetaTypes::foreach<RegisterMeta>();
 
     // Register maps
     math::MapRegistry::clear();
-    math::AffineMap::registerMap();
-    math::UnitaryMap::registerMap();
-    math::ScaleMap::registerMap();
-    math::UniformScaleMap::registerMap();
-    math::TranslationMap::registerMap();
-    math::ScaleTranslateMap::registerMap();
-    math::UniformScaleTranslateMap::registerMap();
-    math::NonlinearFrustumMap::registerMap();
+    MapTypes::foreach<RegisterMap>();
 
     // Register common grid types.
     GridBase::clearRegistry();
-    BoolGrid::registerGrid();
-    MaskGrid::registerGrid();
-    FloatGrid::registerGrid();
-    DoubleGrid::registerGrid();
-    Int32Grid::registerGrid();
-    Int64Grid::registerGrid();
+    GridTypes::foreach<RegisterGrid>();
+
     // @note String grids types are deprecated but we still register them
     //   as supported serializable types for backward compatibility. This
     //   will likely be removed in a future major version
 OPENVDB_NO_DEPRECATION_WARNING_BEGIN
     StringGrid::registerGrid();
 OPENVDB_NO_DEPRECATION_WARNING_END
-    Vec3IGrid::registerGrid();
-    Vec3SGrid::registerGrid();
-    Vec3DGrid::registerGrid();
 
     // Register types associated with point index grids.
     Metadata::registerType(typeNameAsString<PointIndex32>(), Int32Metadata::createMetadata);
     Metadata::registerType(typeNameAsString<PointIndex64>(), Int64Metadata::createMetadata);
-    tools::PointIndexGrid::registerGrid();
 
     // Register types associated with point data grids.
-//#ifdef OPENVDB_ENABLE_POINTS
     points::internal::initialize();
-//#endif
-
-    // Register delay load metadata
-    io::DelayedLoadMetadata::registerType();
 
 #ifdef OPENVDB_USE_BLOSC
     blosc_init();
@@ -166,10 +133,7 @@ __pragma(warning(default:1711))
     Metadata::clearRegistry();
     GridBase::clearRegistry();
     math::MapRegistry::clear();
-
-//#ifdef OPENVDB_ENABLE_POINTS
     points::internal::uninitialize();
-//#endif
 
 #ifdef OPENVDB_USE_BLOSC
     // We don't want to destroy Blosc, because it might have been

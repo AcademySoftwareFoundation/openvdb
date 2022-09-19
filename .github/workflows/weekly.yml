@@ -12,9 +12,14 @@ on:
   workflow_dispatch:
     inputs:
       type:
-        description: 'The type of CI to run (all, houdini, sanitize, mac, extra, ax, blosc)'
+        description: 'The type of CI to run (all, houdini, mac, extra, ax, blosc, abi)'
         required: true
         default: 'all'
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   #############################################################################
@@ -38,152 +43,67 @@ jobs:
         if: steps.check.outputs.HOUDINI_SECRETS != 'true'
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
-  # download the latest production version of Houdini 18.5, strip out headers,
+  # download the latest production version of Houdini X, strip out headers,
   # libraries and binaries required for building OpenVDB and if the build
   # succeeds, put it into the GitHub Actions cache
-  linux_houdini18_5:
+  linux_houdini:
     needs: [checksecret]
-    if: |
-      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation') &&
-      (github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'houdini')
+#    if: |
+#      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
+#      github.repository_owner == 'AcademySoftwareFoundation') &&
+#      (github.event_name != 'workflow_dispatch' ||
+#      github.event.inputs.type == 'all' ||
+#      github.event.inputs.type == 'houdini')
+    if: ${{ false }}  # disable for now
     runs-on: ubuntu-latest
+    name: linux-houdini:${{ matrix.config.houdini_version }}
     env:
       CXX: clang++
       HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
       HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
-    container:
-      image: aswf/ci-base:2020
-    steps:
-    - uses: actions/checkout@v2
-    - name: timestamp
-      id: timestamp
-      shell: bash
-      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
-    - name: download_houdini
-      run: ./ci/download_houdini.sh 18.5 ON
-    - name: install_houdini
-      run: |
-        mkdir $HOME/houdini_install
-        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
-        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
-    - name: build
-      shell: bash
-      run: >
-        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
-        ./ci/build.sh -v
-        --build-type=Release
-        --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
-    - name: test
-      run: cd build && ctest -V
-    - name: write_houdini_cache
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb-v5-houdini18_5-${{ steps.timestamp.outputs.timestamp }}
-
-  # download the latest production version of Houdini 19.0, strip out headers,
-  # libraries and binaries required for building OpenVDB and if the build
-  # succeeds, put it into the GitHub Actions cache
-  linux_houdini19_0:
-    needs: [checksecret]
-    if: |
-      (needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
-      github.repository_owner == 'AcademySoftwareFoundation') &&
-      (github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'houdini')
-    runs-on: ubuntu-latest
-    env:
-      CXX: clang++
-      HOUDINI_CLIENT_ID: ${{ secrets.HOUDINI_CLIENT_ID }}
-      HOUDINI_SECRET_KEY: ${{ secrets.HOUDINI_SECRET_KEY }}
-    container:
-      image: aswf/ci-base:2020
-    steps:
-    - uses: actions/checkout@v2
-    - name: timestamp
-      id: timestamp
-      shell: bash
-      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
-    - name: download_houdini
-      run: ./ci/download_houdini.sh 19.0 ON
-    - name: install_houdini
-      run: |
-        mkdir $HOME/houdini_install
-        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
-        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
-    - name: build
-      shell: bash
-      run: >
-        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
-        ./ci/build.sh -v
-        --build-type=Release
-        --components="core,hou,bin,python,test,axcore,axbin,axtest"
-        --cargs=\"-DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
-    - name: test
-      run: cd build && ctest -V
-    - name: write_houdini_cache
-      uses: actions/cache@v2
-      with:
-        path: hou
-        key: vdb-v5-houdini19_0-${{ steps.timestamp.outputs.timestamp }}
-
-  #############################################################################
-  ################################ Sanitizers #################################
-  #############################################################################
-
-  # This workflow is for running various sanitizers on OpenVDB. We currently
-  # only use clang over gcc (for no particular reason). Note that some of the
-  # errors produces by these sanitizers may be fairly obscure as the
-  # llvm-symbolizer is not installed on the openvdb image. The address
-  # sanitizer should never fail.
-  linux-sanitizers:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'sanitize'
-    runs-on: ubuntu-latest
-    name: linux-clang-sanitizer:${{ matrix.config.build }}
-    container:
-      image: aswf/ci-openvdb:2021
-    env:
-      CXX: clang++
     strategy:
       matrix:
         config:
-          - { build: 'asan',  components: 'core,test,nano,nanotest,axcore,axtest', cmake: '-DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
-          - { build: 'ubsan', components: 'core,test,axcore,axtest', cmake: '' } # Doesn't currently test NanoVDB
-          #- { build: 'lsan', cmake: '' } # asan encompasses and includes lsan
-          #- { build: 'tsan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
-          #- { build: 'msan', cmake: '' } # requires full stack rebuild for valid results (including libc++)
-          #- { build: 'coverage', cmake: '' } # todo
+          - { houdini_version: '19.0', houdini_version_str: '19_0' }
+          - { houdini_version: '19.5', houdini_version_str: '19_5' }
       fail-fast: false
+    container:
+      image: aswf/ci-base:2021
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
+    - name: timestamp
+      id: timestamp
+      shell: bash
+      run: echo "::set-output name=timestamp::`date -u +'%Y-%m-%dT%H:%M:%SZ'`"
+    - name: download_houdini
+      run: ./ci/download_houdini.sh ${{ matrix.config.houdini_version }} ON
+    - name: install_houdini
+      run: |
+        mkdir $HOME/houdini_install
+        cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
+        cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
     - name: build
+      shell: bash
       run: >
+        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
         ./ci/build.sh -v
-        --build-type=${{ matrix.config.build }}
-        --components="${{ matrix.config.components }}"
-        --cargs=\"
-        -DOPENVDB_CORE_STATIC=OFF
-        -DOPENVDB_AX_STATIC=OFF
-        -DNANOVDB_USE_OPENVDB=ON
-        -DCMAKE_INSTALL_PREFIX=`pwd`
-        ${{ matrix.config.cmake }}
-        \"
+        --build-type=Release
+        --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest"
+        --cargs=\"-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
     - name: test
       run: cd build && ctest -V
+    - name: write_houdini_cache
+      uses: actions/cache@v2
+      with:
+        path: hou
+        key: vdb-v5-houdini${{ matrix.config.houdini_version_str }}-${{ steps.timestamp.outputs.timestamp }}
 
   #############################################################################
   ########################### Core Library Extras #############################
   #############################################################################
 
-  # Extra configuration tests for the OpenVDB Core library
+  # Extra configuration tests for the OpenVDB Core library. These test a
+  # variety of options with newer compilers.
   linux-extra:
     if: |
       github.event_name != 'workflow_dispatch' ||
@@ -192,126 +112,58 @@ jobs:
     runs-on: ubuntu-latest
     name: linux-extra:${{ matrix.config.name }}
     container:
-      image: aswf/ci-openvdb:2022-clang11
+      # Can bump clang when AX is compatible with LLVM14
+      image: aswf/ci-openvdb:2022-clang12
     env:
       CXX: clang++
     strategy:
       matrix:
         config:
-          - { name: 'all',  cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
-          - { name: 'lite', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
-          - { name: 'half', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
-          - { name: 'sse',  cmake: '-DOPENVDB_SIMD=SSE42' }
-          - { name: 'avx',  cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'all',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=ON  -DUSE_ZLIB=ON  -DUSE_EXR=ON  -DUSE_PNG=ON'  }
+          - { name: 'lite',  build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_ZLIB=OFF -DUSE_EXR=OFF -DUSE_PNG=OFF' }
+          - { name: 'half',  build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_BLOSC=OFF -DUSE_IMATH_HALF=ON' }
+          - { name: 'sse',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=SSE42' }
+          - { name: 'avx',   build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DOPENVDB_SIMD=AVX' }
+          - { name: 'numpy', build: 'Release', components: 'core,python,bin,view,render,test', cmake: '-DUSE_NUMPY=ON -DOPENVDB_PYTHON_WRAP_ALL_GRID_TYPES=ON' }
+          - { name: 'asan',  build: 'asan',    components: 'core,test,axcore,axtest',          cmake: '-DNANOVDB_USE_OPENVDB=ON -DOPENVDB_AX_STATIC=OFF -DOPENVDB_CORE_STATIC=OFF -DUSE_BLOSC=OFF' } # We never called blosc_destroy(), so disable blosc to silence these errors
+          - { name: 'ubsan', build: 'ubsan',   components: 'core,test,axcore,axtest',          cmake: '' }
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: build
       run: >
         ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=9 ${{ matrix.config.cmake }}\"
-    - name: test
-      run: cd build && ctest -V
-
-  # Extra compiler tests
-  linux-cxx17:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'extra'
-    runs-on: ubuntu-20.04
-    name: linux-cxx17:${{ matrix.config.cxx }}
-    env:
-      CXX: ${{ matrix.config.cxx }}
-    strategy:
-      matrix:
-        config:
-          - { cxx: 'g++-10',     j: '1' }
-          - { cxx: 'clang++-10', j: '2' }
-      fail-fast: false
-    steps:
-    - uses: actions/checkout@v2
-    - name: update_apt
-      run: sudo apt-get update
-    - name: install
-      run: >
-        sudo apt-get -q install -y
-        libboost-dev libboost-system-dev libboost-iostreams-dev libboost-python-dev
-        libglfw3-dev libtbb-dev libgtest-dev libcppunit-dev libglu1-mesa-dev
-    - name: build
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        -j ${{ matrix.config.j }}
-        --components=\"core,python,test,bin,axcore,axbin,axtest\"
-        --cargs=\"
-        -DUSE_BLOSC=OFF
-        -DCMAKE_CXX_STANDARD=17
-        -DOPENVDB_ABI_VERSION_NUMBER=9
-        -DCMAKE_INSTALL_PREFIX=`pwd`
-        \"
+        --build-type=${{ matrix.config.build }}
+        --components="${{ matrix.config.components }}"
+        --cargs=\"-DOPENVDB_CXX_STRICT=ON ${{ matrix.config.cmake }}\"
     - name: test
       run: cd build && ctest -V
 
   # Test EXR 3 and TBB 2021 on MacOS
-  test-macos-11:
+  macos-latest:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'mac'
-    runs-on: macos-11
+    runs-on: macos-12
     env:
       CXX: clang++
     steps:
-    - uses: actions/checkout@v2
-    - name: install
-      shell: bash
-      run: |
-        brew update
-        brew install bash gnu-getopt cmake imath openexr boost tbb glfw googletest
-        echo "/usr/local/opt/gnu-getopt/bin" >> $GITHUB_PATH
-    - name: build
-      shell: bash
-      run: >
-        ./ci/build.sh -v
-        --build-type=Release
-        --components=\"core,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DUSE_BLOSC=OFF -DUSE_ZLIB=OFF\"
-    - name: test
-      shell: bash
-      run: cd build && ctest -V
-
-  test-macos-1015:
-    if: |
-      github.event_name != 'workflow_dispatch' ||
-      github.event.inputs.type == 'all' ||
-      github.event.inputs.type == 'mac'
-    runs-on: macos-10.15
-    env:
-      CXX: clang++
-    steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: install
       shell: bash
       # brew boost-python3 installs a "Keg-only" version of python which is
       # not installed to PATH. We must manually provide the location of the
       # required python installation to CMake through a hint variable which
       # is exported in install_macos.sh
-      run: ./ci/install_macos.sh
-    - name: install
-      shell: bash
-      run: ./ci/install_blosc.sh 1.5.0
+      run: ./ci/install_macos.sh latest
     - name: build
       shell: bash
-      # Also need to disable compiler warnings for ABI 6 and above due to
-      # the version of clang installed
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
+        --components=\"core,python,bin,view,render,test\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF\"
     - name: test
       shell: bash
       run: cd build && ctest -V
@@ -336,8 +188,10 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2020-clang7',  cxx: 'clang++', build: 'Release', j: '2', components: 'core,axcore,axbin,axtest' }
-          - { image: '2020-clang7',  cxx: 'g++',     build: 'Release', j: '1', components: 'core,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang14', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang13', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
           # Standalone
           - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core' }
           - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core' }
@@ -345,7 +199,7 @@ jobs:
           - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: build
         run: >
           ./ci/build.sh -v
@@ -366,7 +220,7 @@ jobs:
           ./ci/build.sh -v
           -j ${{ matrix.config.j }}
           --build-type=${{ matrix.config.build }}
-          --components="axcore,axbin,axtest"
+          --components="bin,axcore,axbin,axtest,python"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -389,9 +243,8 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: 'g++',     build: 'Release', llvm: '8'  }
-          - { cxx: 'clang++', build: 'Debug',   llvm: '8'  }
-          - { cxx: 'clang++', build: 'Release', llvm: '13' }
+          - { cxx: 'clang++', build: 'Release', llvm: '14', dir: '@14' }
+          - { cxx: 'clang++', build: 'Release', llvm: 'latest', dir: '' }
       fail-fast: false
     steps:
       - uses: actions/checkout@v2
@@ -401,11 +254,11 @@ jobs:
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,axcore,axbin,axtest"
+          --components="core,python,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
-          -DLLVM_DIR=/usr/local/opt/llvm@${{ matrix.config.llvm }}/lib/cmake/llvm
+          -DLLVM_DIR=/usr/local/opt/llvm${{ matrix.config.dir }}/lib/cmake/llvm
           \"
       - name: test
         run: cd build && ctest -V
@@ -421,47 +274,54 @@ jobs:
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
+      # Export this with '' avoid bash treating \ as escape
+      VDB_INSTALL_PREFIX: '${{ github.workspace }}\\install'
     strategy:
       matrix:
         config:
           # static build of blosc from vcpkg does not build internal sources.
           # USE_STATIC_DEPENDENCIES is required for IlmBase/OpenEXR defines and
           # Boost as both shared and static libs are installed.
-          - { vc: 'x64-windows-static', llvm_crt: 'MT',  build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', llvm_crt: 'MTd', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          # @todo  We don't currently run the axtests with shared builds of ax
+          # due to symbol issues using LLVM as a static lib (which is the only
+          # option on Windows).
+          - { vc: 'x64-windows',        crt: 'MD',  components: 'core,bin,axcore,axbin,python', build: 'Release', cmake: '-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF' }
+          - { vc: 'x64-windows-static', crt: 'MT',  components: 'core,bin,axcore,axbin,axtest', build: 'Release', cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          - { vc: 'x64-windows-static', crt: 'MTd', components: 'core,bin,axcore,axbin,axtest', build: 'Debug',   cmake: '-DOPENVDB_CORE_SHARED=OFF -DOPENVDB_AX_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
-    - name: path
-      run: |
-        # note: system path must be modified in a previous step to it's use
-        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
-        echo "${{github.workspace}}\build\openvdb\openvdb\${{ matrix.config.build }}" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+    - uses: actions/checkout@v3
     - name: llvm
       shell: bash
-      # If building debug, build llvm with MTd
-      run: ./ci/install_llvm_windows.sh ${{ matrix.config.llvm_crt }}
+      run: ./ci/install_llvm_windows.sh ${{ matrix.config.crt }}
     - name: install
       shell: bash
       run: |
         vcpkg update
-        vcpkg install zlib tbb cppunit blosc \
-          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm
+        vcpkg install zlib tbb cppunit blosc python3 \
+          boost-iostreams boost-system boost-any boost-uuid boost-interprocess boost-algorithm boost-python
     - name: build
       shell: bash
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,axcore,axbin,axtest\"
+        --components="${{ matrix.config.components }}"
         --cargs=\'
         -A x64 -G \"Visual Studio 16 2019\"
         -DVCPKG_TARGET_TRIPLET=${VCPKG_DEFAULT_TRIPLET}
         -DCMAKE_TOOLCHAIN_FILE=\"${VCPKG_INSTALLATION_ROOT}\\scripts\\buildsystems\\vcpkg.cmake\"
+        -DMSVC_COMPRESS_PDB=ON
         -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
         -DUSE_EXPLICIT_INSTANTIATION=OFF
-        -DLLVM_DIR=${HOME}\llvm_install\lib\cmake\llvm
+        -DLLVM_DIR=\"${HOME}\\llvm_install\\lib\\cmake\\llvm\"
+        -DCMAKE_INSTALL_PREFIX=\"${VDB_INSTALL_PREFIX}\"
         ${{ matrix.config.cmake }}
         \'
+    - name: runtime_path
+      run: |
+        # note: system path must be modified in a previous step to it's use
+        echo "$Env:VCPKG_INSTALLATION_ROOT\installed\${{ matrix.config.vc }}\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+        echo "$Env:VDB_INSTALL_PREFIX\bin" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
     - name: test
       shell: bash
       run: cd build && ctest -V -C ${{ matrix.config.build }}
@@ -477,18 +337,14 @@ jobs:
       github.event.inputs.type == 'blosc'
     runs-on: ubuntu-latest
     name: linux-blosc:${{ matrix.blosc }}
+    container:
+      image: aswf/ci-base:2021
     strategy:
       matrix:
-        blosc: ['1.17.0','1.18.0'] # Need to fix unit tests for '1.19.0','1.20.0','1.21.0'
+        blosc: ['1.18.0','1.19.0','1.20.0','1.21.0']
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
-    - name: install_boost
-      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev libboost-python-dev
-    - name: install_tbb
-      run: sudo apt-get -q install -y libtbb-dev
-    - name: install_gtest
-      run: sudo apt-get -q install -y libgtest-dev
+    - uses: actions/checkout@v3
     - name: install_blosc
       shell: bash
       run: sudo ./ci/install_blosc.sh ${{ matrix.blosc }}
@@ -500,3 +356,87 @@ jobs:
     - name: test
       run: cd build && sudo ctest -V
 
+  #############################################################################
+  ################################## ABI ######################################
+  #############################################################################
+
+  linux-abi-checker:
+    # v10.0.0 doesn't exist yet, so can't run this automatically.
+    if: |
+      github.event_name == 'workflow_dispatch' &&
+      (github.event.inputs.type == 'all' ||
+       github.event.inputs.type == 'abi')
+    # abi-dumper version verified to work with 20.04/GCC9
+    runs-on: ubuntu-20.04
+    env:
+      VDB_MAJOR_VERSION: 10
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - name: install_deps
+      run: sudo apt-get -q install -y libboost-dev libboost-system-dev libboost-iostreams-dev libtbb-dev libblosc-dev elfutils
+    # abi-compliance-checker and abi-dumper
+    #
+    # @note that abi-dumper is available through apt but at the time of writing this
+    # the version there (1.1) doesn't work correctly and maniftest by creating an
+    # invalid ABI report with missing headers. This then always reports 100% success
+    # rate when used with abi-compliance-checker.
+    # To fix, install both from source and checkout specific commits for both
+    # which have been verified to work on ubuntu 20.04.
+    #
+    # @warning  If you update these, test that they fail when expected!
+    #
+    # Also note that these are far superior to abigail/abidiff tools from redhat
+    - name: install_abi_checker
+      run: |
+        git clone https://github.com/lvc/abi-dumper.git abi-dumper
+        cd abi-dumper && git checkout 16bb467cd7d343dd3a16782b151b56cf15509594 && cd -
+        git clone https://github.com/lvc/abi-compliance-checker abi-compliance-checker
+        cd abi-compliance-checker && git checkout 7c175c45a8ba9ac41b8e47d8ebbab557b623b18e && cd -
+    - name: build_latest
+      run: >
+        CXXFLAGS=-Og ./ci/build.sh -v
+        --build-dir=build_latest
+        --build-type=Debug
+        --target=openvdb_shared
+        --components=\"core\"
+        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+    - name: checkout_baseline
+      run: git checkout v${VDB_MAJOR_VERSION}.0.0
+    - name: build_baseline
+      run: >
+        CXXFLAGS=-Og ./ci/build.sh -v
+        --build-type=Debug
+        --target=openvdb_shared
+        --components=\"core\"
+        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+    - name: abi_dump
+      run: |
+        abi-dumper/abi-dumper.pl build_latest/openvdb/openvdb/libopenvdb.so -o ABI-1.dump -lver 1
+        abi-dumper/abi-dumper.pl        build/openvdb/openvdb/libopenvdb.so -o ABI-2.dump -lver 2
+      # Replace the version namespace in the latest ABI dump with the baseline
+      # version we're comparing against. We should probably instead build the
+      # latest with the baseline version number but no CMake/defines allow us to
+      # do this.
+    - name: replace_symbols
+      run: sed -i -E 's/openvdb([^v]*)v'${VDB_MAJOR_VERSION}'_[0-9]/openvdb\1v'${VDB_MAJOR_VERSION}'_0/g' ABI-1.dump
+    - name: abi_check
+      # -strict treats warnings as errors
+      # -extended checks all member data
+      # we check everything _not_ in openvdb::**::internal namespace
+      run: >
+        abi-compliance-checker/abi-compliance-checker.pl -l OPENVDB
+        -old ABI-2.dump
+        -new ABI-1.dump
+        -skip-internal-symbols "\d(openvdb.*internal)"
+        -skip-internal-types "(openvdb.*internal)::"
+        -strict
+        -extended
+    - name: upload_report
+      uses: actions/upload-artifact@v3
+      if: always()
+      with:
+        name: abi_report
+        path: ./compat_reports/OPENVDB/2_to_1/compat_report.html
+        retention-days: 5

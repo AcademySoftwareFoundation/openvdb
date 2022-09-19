@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBAXUnitTests LANGUAGES CXX)
 
 option(OPENVDB_AX_TEST_PROFILE "Switch on profiling for some of the unit tests." OFF)
@@ -29,6 +29,8 @@ if(TARGET vdb_ax AND OPENVDB_AX_TEST_CMD)
       -DDOWNLOAD_VDBS=${OPENVDB_AX_TEST_CMD_DOWNLOADS}
       -DCMAKE_BINARY_DIR=${CMAKE_BINARY_DIR}
       -P ${CMAKE_CURRENT_LIST_DIR}/TestAXCmd.cmake)
+elseif(OPENVDB_BUILD_BINARIES)
+  message(WARNING "Unable to test the vdb_ax binary as the vdb_ax target was not found!")
 endif()
 
 if(NOT OPENVDB_BUILD_AX)

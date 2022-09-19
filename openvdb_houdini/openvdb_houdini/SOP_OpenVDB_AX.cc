@@ -422,7 +422,7 @@ vector@v2 = { 5.0f, 5.0f, 10.3f }; // Create a new float vector attribute using 
 vec3i@vid = { 3, -1, 10 }; // Create a new integer vector attribute
 }}}
 
-See the [ASWF OpenVDB AX documentation|https://academysoftwarefoundation.github.io/openvdb/openvdbax.html] for source code
+See the [ASWF OpenVDB AX documentation|https://www.openvdb.org/documentation/openvdbax.html] for source code
 and usage examples.
 
 @vexsyntax VEX Hooks

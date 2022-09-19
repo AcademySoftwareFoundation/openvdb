@@ -26,6 +26,7 @@ public:
     CPPUNIT_TEST(testCompilerCases);
     CPPUNIT_TEST(testExecuteBindings);
     CPPUNIT_TEST(testAttributeCodecs);
+    CPPUNIT_TEST(testCLI);
     CPPUNIT_TEST_SUITE_END();
 
     void testConstructionDestruction();
@@ -34,6 +35,7 @@ public:
     void testCompilerCases();
     void testExecuteBindings();
     void testAttributeCodecs();
+    void testCLI();
 };
 
 CPPUNIT_TEST_SUITE_REGISTRATION(TestPointExecutable);
@@ -200,7 +202,7 @@ TestPointExecutable::testCompilerCases()
         // with string only
         CPPUNIT_ASSERT(static_cast<bool>(compiler->compile<openvdb::ax::PointExecutable>("int i;")));
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i;"), openvdb::AXCompilerError);
-        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i"), openvdb::AXCompilerError);
+        CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>("i"), openvdb::AXSyntaxError);
         // with AST only
         auto ast = openvdb::ax::ast::parse("i;");
         CPPUNIT_ASSERT_THROW(compiler->compile<openvdb::ax::PointExecutable>(*ast), openvdb::AXCompilerError);
@@ -748,5 +750,165 @@ TestPointExecutable::testAttributeCodecs()
 
         CPPUNIT_ASSERT_EQUAL(float(math::half(8908410.12384910f)), handle1.get(0));
         CPPUNIT_ASSERT_EQUAL(Vec3f(compress(points::FixedPointCodec<false, points::PositionRange>(), 245e-9f)), handle2.get(0));
+    }
+}
+
+void
+TestPointExecutable::testCLI()
+{
+    using CLI = openvdb::ax::PointExecutable::CLI;
+
+    struct UnusedCLIParam : public openvdb::Exception {
+        UnusedCLIParam() noexcept: Exception( "UnusedCLIParam" ) {} \
+        explicit UnusedCLIParam(const std::string& msg) noexcept: Exception( "UnusedCLIParam" , &msg) {}
+    };
+
+    auto CreateCLI = [](const char* c, bool throwIfUnused = true)
+    {
+        std::vector<std::string> strs;
+        const char* s = c;
+        while (*c != '\0') {
+            if (*c == ' ') {
+                strs.emplace_back(std::string(s, c-s));
+                ++c;
+                s = c;
+            }
+            else {
+                ++c;
+            }
+        }
+        if (*s != '\0') strs.emplace_back(std::string(s, c-s));
+
+        std::vector<const char*> args;
+        for (auto& str : strs) args.emplace_back(str.c_str());
+
+        std::unique_ptr<bool[]> flags(new bool[args.size()]);
+        std::fill(flags.get(), flags.get()+args.size(), false);
+
+        auto cli = CLI::create(args.size(), args.data(), flags.get());
+        if (throwIfUnused) {
+            for (size_t i = 0; i < args.size(); ++i) {
+                if (!flags[i]) OPENVDB_THROW(UnusedCLIParam, "unused param");
+            }
+        }
+        return cli;
+    };
+
+    ax::Compiler::UniquePtr compiler = ax::Compiler::create();
+
+    auto defaultExe = compiler->compile<openvdb::ax::PointExecutable>("");
+    const auto defaultGroup = defaultExe->getGroupExecution();
+    const auto defaultCreateMissing = defaultExe->getCreateMissing();
+    const auto defaultGrain = defaultExe->getGrainSize();
+    const auto defaultBindings = defaultExe->getAttributeBindings();
+
+    CPPUNIT_ASSERT_THROW(CreateCLI("--unknown"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-unknown"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("--"), UnusedCLIParam);
+    CPPUNIT_ASSERT_THROW(CreateCLI("-- "), UnusedCLIParam);
+
+    {
+        CLI cli = CreateCLI("");
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --create-missing
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing invalid"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--create-missing --group test"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--create-missing ON");
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(true, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --group
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--group"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--group --create-missing ON"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--group test");
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(std::string("test"), exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --grain
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain nan"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain -1"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--points-grain --create-missing ON"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--points-grain 0");
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(size_t(0), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    // --bindings
+    {
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a:"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings a,b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings :b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings ,a:b"), openvdb::CLIError);
+        CPPUNIT_ASSERT_THROW(CreateCLI("--bindings --create-missing ON"), openvdb::CLIError);
+
+        CLI cli = CreateCLI("--bindings a:b,c:d,12:13");
+        ax::AttributeBindings bindings;
+        bindings.set("a", "b");
+        bindings.set("c", "d");
+        bindings.set("12", "13");
+
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(defaultCreateMissing, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(defaultGrain, exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
+    }
+
+    // multiple
+    {
+        CLI cli = CreateCLI("--points-grain 5 --create-missing OFF");
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(defaultGroup, exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(size_t(5), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(defaultBindings, exe->getAttributeBindings());
+    }
+
+    {
+        CLI cli = CreateCLI("--group 123 --points-grain 128 --create-missing OFF --bindings a:b");
+        ax::AttributeBindings bindings;
+        bindings.set("a", "b");
+
+        auto exe = compiler->compile<openvdb::ax::PointExecutable>("");
+        CPPUNIT_ASSERT_NO_THROW(exe->setSettingsFromCLI(cli));
+        CPPUNIT_ASSERT_EQUAL(false, exe->getCreateMissing());
+        CPPUNIT_ASSERT_EQUAL(std::string("123"), exe->getGroupExecution());
+        CPPUNIT_ASSERT_EQUAL(size_t(128), exe->getGrainSize());
+        CPPUNIT_ASSERT_EQUAL(bindings, exe->getAttributeBindings());
     }
 }

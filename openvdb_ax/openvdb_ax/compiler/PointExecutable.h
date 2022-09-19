@@ -123,7 +123,7 @@ public:
     size_t getGrainSize() const;
 
     /// @brief  Set attribute bindings.
-    /// @param attributeBindings A map of attribute bindings to expected names on
+    /// @param bindings A map of attribute bindings to expected names on
     ///   the geometry to be executed over. By default the AX attributes will be
     ///   bound to point attributes of the same name. Supplying bindings
     ///   for a subset of the attributes will leave the others unchanged.
@@ -140,7 +140,30 @@ public:
     ////////////////////////////////////////////////////////
 
     // foward declaration of settings for this executable
-    struct Settings;
+    template <bool> struct Settings;
+
+    /// @brief Command Line Interface handling for the PointExecutable.
+    /// @details  This class wraps the logic for converting commands specific
+    ///   to the PointExecutable to the internal Settings. Subsequent
+    ///   executables can be initialized from the CLI object that gets created
+    struct OPENVDB_AX_API CLI
+    {
+        ~CLI();
+        CLI(CLI&&);
+        CLI& operator=(CLI&&);
+        static CLI create(size_t argc, const char* argv[], bool* used=nullptr);
+        static void usage(std::ostream& os, const bool verbose);
+    private:
+        friend class PointExecutable;
+        CLI();
+        std::unique_ptr<Settings<true>> mSettings;
+    };
+
+    /// @brief  Intialize the Settings of this executables from the CLI object
+    /// @param cli The CLI object
+    void setSettingsFromCLI(const CLI& cli);
+
+    ////////////////////////////////////////////////////////
 
 private:
     friend class Compiler;
@@ -178,7 +201,7 @@ private:
     const AttributeRegistry::ConstPtr mAttributeRegistry;
     const CustomData::ConstPtr mCustomData;
     const std::unordered_map<std::string, uint64_t> mFunctionAddresses;
-    std::unique_ptr<Settings> mSettings;
+    std::unique_ptr<Settings<false>> mSettings;
 };
 
 } // namespace ax

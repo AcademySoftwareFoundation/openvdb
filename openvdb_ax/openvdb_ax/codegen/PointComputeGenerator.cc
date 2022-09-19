@@ -169,7 +169,7 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
         // increment
         B.SetInsertPoint(iterBlock);
         {
-            llvm::Value* new_incr = B.CreateAdd(B.CreateLoad(incr), B.getInt64(1));
+            llvm::Value* new_incr = B.CreateAdd(ir_load(B, incr), B.getInt64(1));
             B.CreateStore(new_incr, incr);
             B.CreateBr(conditionBlock);
         }
@@ -177,7 +177,7 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
         // generate loop body
         B.SetInsertPoint(bodyBlock);
         {
-            llvm::Value* lincr = B.CreateLoad(incr);
+            llvm::Value* lincr = ir_load(B, incr);
 
             // Extract mask bit from array of words
             // NodeMask::isOn() = (0 != (mWords[n >> 6] & (Word(1) << (n & 63))));
@@ -185,8 +185,8 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
                 binaryOperator(lincr, B.getInt64(63), ast::tokens::BITAND, B),
                     ast::tokens::SHIFTLEFT, B);
             llvm::Value* word_idx = binaryOperator(lincr, B.getInt64(6), ast::tokens::SHIFTRIGHT, B);
-            llvm::Value* word = B.CreateGEP(abuff, word_idx);
-            word = B.CreateLoad(word);
+            llvm::Value* word = ir_gep(B, abuff, word_idx);
+            word = ir_load(B, word);
             word = binaryOperator(word, mask, ast::tokens::BITAND, B);
             llvm::Value* ison = B.CreateICmpNE(word, B.getInt64(0));
 
@@ -213,8 +213,8 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
 
                 // loops from pindex->pindexend (point grids have 32bit buffers)
                 llvm::Value* pindex = insertStaticAlloca(B, B.getInt32Ty());
-                llvm::Value* pindexend = B.CreateGEP(vbuff, lincr);
-                pindexend = B.CreateLoad(pindexend);
+                llvm::Value* pindexend = ir_gep(B, vbuff, lincr);
+                pindexend = ir_load(B, pindexend);
 
                 llvm::Value* firstvoxel = binaryOperator(lincr, B.getInt64(0), ast::tokens::EQUALSEQUALS, B);
                 B.CreateCondBr(firstvoxel, pthen, pelse);
@@ -227,20 +227,20 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
                 B.SetInsertPoint(pelse);
                 {
                     llvm::Value* prevv = binaryOperator(lincr, B.getInt64(1), ast::tokens::MINUS, B);
-                    llvm::Value* pindexcount = B.CreateGEP(vbuff, prevv);
-                    B.CreateStore(B.CreateLoad(pindexcount), pindex);
+                    llvm::Value* pindexcount = ir_gep(B, vbuff, prevv);
+                    B.CreateStore(ir_load(B, pindexcount), pindex);
                     B.CreateBr(pcondition);
                 }
 
                 B.SetInsertPoint(pcondition);
                 {
-                    llvm::Value* end = B.CreateICmpULT(B.CreateLoad(pindex), pindexend);
+                    llvm::Value* end = B.CreateICmpULT(ir_load(B, pindex), pindexend);
                     B.CreateCondBr(end, pbody, iterBlock);
                 }
 
                 B.SetInsertPoint(piter);
                 {
-                    llvm::Value* pnext = B.CreateAdd(B.CreateLoad(pindex), B.getInt32(1));
+                    llvm::Value* pnext = B.CreateAdd(ir_load(B, pindex), B.getInt32(1));
                     B.CreateStore(pnext, pindex);
                     B.CreateBr(pcondition);
                 }
@@ -253,7 +253,7 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
                         args[1],  // index space coordinate
                         vbuff,    // value buffer
                         ison,     // active/inactive
-                        arithmeticConversion(B.CreateLoad(pindex), B.getInt64Ty(), B),  // offset in the point array
+                        arithmeticConversion(ir_load(B, pindex), B.getInt64Ty(), B),  // offset in the point array
                         args[6],  // transforms
                         args[7],  // buffers
                         args[8],  // flags
@@ -269,7 +269,7 @@ inline void PointComputeGenerator::computePKBR(const AttributeRegistry&)
         }
 
         B.SetInsertPoint(conditionBlock);
-        llvm::Value* endCondition = B.CreateICmpULT(B.CreateLoad(incr), buffSize);
+        llvm::Value* endCondition = B.CreateICmpULT(ir_load(B, incr), buffSize);
 
         llvm::BasicBlock* postBlock = llvm::BasicBlock::Create(C, "k2.end", base);
         B.CreateCondBr(endCondition, bodyBlock, postBlock);
@@ -325,7 +325,7 @@ decode(llvm::Value* buffer,
     if (!codecs) {
         // Value can't be encoded so the buffer is guaranteed to be the decoded type
         buffer = B.CreatePointerCast(buffer, type->getPointerTo());
-        return B.CreateGEP(buffer, pid);
+        return ir_gep(B, buffer, pid);
     }
     assert(!codecs->empty());
     assert(store);
@@ -356,7 +356,7 @@ decode(llvm::Value* buffer,
 
             // guranteed to be castable
             llvm::Value* typedBuffer = B.CreatePointerCast(buffer, encodedType);
-            llvm::Value* encoded = B.CreateGEP(typedBuffer, pid);
+            llvm::Value* encoded = ir_gep(B, typedBuffer, pid);
             assert(F->match({store->getType(), encoded->getType()}, C));
             F->execute({store, encoded}, B);
             B.CreateBr(post);
@@ -369,8 +369,8 @@ decode(llvm::Value* buffer,
     // @todo  We could instead register all vaid nullcodecs which would give
     //   guarantees should a codec not exist
     llvm::Value* typedBuffer = B.CreatePointerCast(buffer, type->getPointerTo());
-    llvm::Value* value = B.CreateGEP(typedBuffer, pid);
-    B.CreateStore(B.CreateLoad(value), store);
+    llvm::Value* value = ir_gep(B, typedBuffer, pid);
+    B.CreateStore(ir_load(B, value), store);
     B.CreateBr(post);
 
     B.SetInsertPoint(post);
@@ -400,7 +400,7 @@ encode(llvm::Value* in,
     if (!codecs) {
         // Value can't be encoded so the buffer is guaranteed to be the decoded type
         buffer = B.CreatePointerCast(buffer, type->getPointerTo());
-        B.CreateStore(B.CreateLoad(in), B.CreateGEP(buffer, pid));
+        B.CreateStore(ir_load(B, in), ir_gep(B, buffer, pid));
         return;
     }
     assert(!codecs->empty());
@@ -427,7 +427,7 @@ encode(llvm::Value* in,
             assert(encodedType);
             encodedType = encodedType->getPointerTo();
             llvm::Value* typedBuffer = B.CreatePointerCast(buffer, encodedType);
-            llvm::Value* loc = B.CreateGEP(typedBuffer, pid);
+            llvm::Value* loc = ir_gep(B, typedBuffer, pid);
             assert(F->match({loc->getType(),in->getType()}, C));
             F->execute({loc, in}, B);
             B.CreateBr(post);
@@ -440,8 +440,8 @@ encode(llvm::Value* in,
     // @todo  We could instead register all vaid nullcodecs which would give
     //   guarantees should a codec not exist
     llvm::Value* typedBuffer = B.CreatePointerCast(buffer, type->getPointerTo());
-    llvm::Value* loc = B.CreateGEP(typedBuffer, pid);
-    B.CreateStore(B.CreateLoad(in), loc);
+    llvm::Value* loc = ir_gep(B, typedBuffer, pid);
+    B.CreateStore(ir_load(B, in), loc);
     B.CreateBr(post);
 
     B.SetInsertPoint(post);
@@ -475,19 +475,19 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             const std::string token = data.tokenname();
             llvm::Type* type = llvmTypeFromToken(data.type(), C);
 
-            llvm::Value* decodedPtrs = B.CreateConstInBoundsGEP2_64(loc, 0, i++); // void**, location to hold the typed ptr
+            llvm::Value* decodedPtrs = ir_constinboundsgep2_64(B, loc, 0, i++); // void**, location to hold the typed ptr
             decodedPtrs = B.CreatePointerCast(decodedPtrs, type->getPointerTo()->getPointerTo()); // ValueType**
 
             llvm::Value* index = mModule.getGlobalVariable(token);
             assert(index);
-            index = B.CreateLoad(index);
-            llvm::Value* buffer = B.CreateGEP(buffers, index);
-            buffer = B.CreateLoad(buffer); // void** = void*
+            index = ir_load(B, index);
+            llvm::Value* buffer = ir_gep(B, buffers, index);
+            buffer = ir_load(B, buffer); // void** = void*
 
-            llvm::Value* flag = B.CreateLoad(B.CreateGEP(flags, index));
+            llvm::Value* flag = ir_load(B, ir_gep(B, flags, index));
 
             // @todo  write handles shouldn't need to do this check
-            llvm::Value* isuniform = B.CreateAnd(flag, LLVMType<uint64_t>::get(C, uint64_t(1UL << 63)));
+            llvm::Value* isuniform = B.CreateAnd(flag, LLVMType<uint64_t>::get(C, (uint64_t(1) << 63)));
             isuniform = boolComparison(isuniform, B);
 
             // If the value type has supported codecs we have to allocate the
@@ -527,7 +527,7 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
         // invoke the point kernel for this value
         std::array<llvm::Value*, 11> input;
         std::copy_n(args.begin(), 11, input.begin());
-        input[6] = B.CreateConstInBoundsGEP2_64(loc, 0, 0); // void**, replace the buffers with the extracted values
+        input[6] = ir_constinboundsgep2_64(B, loc, 0, 0); // void**, replace the buffers with the extracted values
 
         B.CreateCall(compute, input);
 
@@ -543,17 +543,17 @@ inline void PointComputeGenerator::computePKB(const AttributeRegistry& registry)
             const std::string token = data.tokenname();
             llvm::Type* type = llvmTypeFromToken(data.type(), C);
 
-            llvm::Value* store = B.CreateConstInBoundsGEP2_64(loc, 0, i++); // void**, location to hold the typed ptr
-            store = B.CreateLoad(store); // void*
+            llvm::Value* store = ir_constinboundsgep2_64(B, loc, 0, i++); // void**, location to hold the typed ptr
+            store = ir_load(B, store); // void*
             store = B.CreatePointerCast(store, type->getPointerTo()); // ValueType*
 
             llvm::Value* index = mModule.getGlobalVariable(token);
             assert(index);
-            index = B.CreateLoad(index);
-            llvm::Value* flag = B.CreateLoad(B.CreateGEP(flags, index));
+            index = ir_load(B, index);
+            llvm::Value* flag = ir_load(B, ir_gep(B, flags, index));
 
-            llvm::Value* buffer = B.CreateGEP(buffers, index);
-            buffer = B.CreateLoad(buffer); // void** = void*
+            llvm::Value* buffer = ir_gep(B, buffers, index);
+            buffer = ir_load(B, buffer); // void** = void*
 
             // The buffer should not be uniform if we're writing to it, so no
             // need to branch for this case (this should be guaranteed by the
@@ -614,12 +614,12 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         // the location which will hold the attribute handle offset.
         llvm::Value* index = M->getGlobalVariable(token);
         assert(index);
-        index = B.CreateLoad(index);
+        index = ir_load(B, index);
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
         assert(arrays);
-        llvm::Value* array = B.CreateGEP(arrays, index);
-        array = B.CreateLoad(array); // void** = void*
+        llvm::Value* array = ir_gep(B, arrays, index);
+        array = ir_load(B, array); // void** = void*
 
         // invoke C binding
         const bool usingString =
@@ -655,16 +655,16 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         // the location which will hold the attribute handle offset.
         llvm::Value* index = M->getGlobalVariable(token);
         assert(index);
-        index = B.CreateLoad(index);
+        index = ir_load(B, index);
 
         llvm::Value* arrays = extractArgument(self, "attribute_arrays");
         assert(arrays);
-        llvm::Value* array = B.CreateGEP(arrays, index);
-        array = B.CreateLoad(array); // void** = void*
+        llvm::Value* array = ir_gep(B, arrays, index);
+        array = ir_load(B, array); // void** = void*
 
         // load the result (if its a scalar)
         if (type->isIntegerTy() || type->isFloatingPointTy()) {
-            load = B.CreateLoad(load);
+            load = ir_load(B, load);
         }
         //llvm::errs() << "storing: " <<  *(load->getType()) << '\n';
 
@@ -713,7 +713,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
             table.insert(access.tokenname(), value);
 
             // store the allocated ptr in the array of void*
-            llvm::Value* store = B.CreateConstInBoundsGEP2_64(loc, 0, i); // void**, location to hold the typed ptr
+            llvm::Value* store = ir_constinboundsgep2_64(B, loc, 0, i); // void**, location to hold the typed ptr
             value = B.CreatePointerCast(value, LLVMType<void*>::get(C));
             B.CreateStore(value, store);
 
@@ -730,7 +730,7 @@ inline void PointComputeGenerator::computePKAA(const AttributeRegistry& registry
         // invoke the point kernel for this value
         std::array<llvm::Value*, 11> input;
         std::copy_n(args.begin(), 11, input.begin());
-        input[6] = B.CreateConstInBoundsGEP2_64(loc, 0, 0); // void**, replace the buffers with the extracted values
+        input[6] = ir_constinboundsgep2_64(B, loc, 0, 0); // void**, replace the buffers with the extracted values
         B.CreateCall(compute, input);
 
         // insert set code and deallocations
@@ -840,7 +840,8 @@ AttributeRegistry::Ptr PointComputeGenerator::generate(const ast::Tree& tree)
     // full code generation
     // errors can stop traversal, but dont always, so check the log
 
-    if (!this->traverse(&tree) || mLog.hasError()) return nullptr;
+    const size_t err = mLog.errors();
+    if (!this->traverse(&tree) || (mLog.errors() > err)) return nullptr;
 
     // insert free calls for any strings
 
@@ -863,10 +864,10 @@ bool PointComputeGenerator::visit(const ast::Attribute* node)
 
     assert(index);
     // index into the void* array of handles and load the value.
-    index = mBuilder.CreateLoad(index);
+    index = ir_load(mBuilder, index);
     llvm::Value* value = extractArgument(mFunction, "values"); // void**
-    value = mBuilder.CreateGEP(value, index); // void**
-    value = mBuilder.CreateLoad(value); // void*
+    value = ir_gep(mBuilder, value, index); // void**
+    value = ir_load(mBuilder, value); // void*
     value = mBuilder.CreatePointerCast(value, type->getPointerTo()); // void* = ValueType*
 
     mValues.push(value);

@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(OpenVDBCore LANGUAGES CXX)
 
 include(GNUInstallDirs)
@@ -449,6 +449,7 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointGroup.h
   points/PointMask.h
   points/PointMove.h
+  points/PointRasterizeFrustum.h
   points/PointRasterizeSDF.h
   points/PointRasterizeTrilinear.h
   points/PointSample.h
@@ -456,6 +457,12 @@ set(OPENVDB_LIBRARY_POINTS_INCLUDE_FILES
   points/PointStatistics.h
   points/PointTransfer.h
   points/StreamCompression.h
+)
+
+set(OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES
+  points/impl/PointRasterizeFrustumImpl.h
+  points/impl/PointRasterizeSDFImpl.h
+  points/impl/PointRasterizeTrilinearImpl.h
 )
 
 set(OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES
@@ -728,6 +735,7 @@ install(FILES ${CMAKE_CURRENT_BINARY_DIR}/openvdb/version.h DESTINATION ${CMAKE_
 install(FILES ${OPENVDB_LIBRARY_IO_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/io)
 install(FILES ${OPENVDB_LIBRARY_MATH_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/math)
 install(FILES ${OPENVDB_LIBRARY_POINTS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points)
+install(FILES ${OPENVDB_LIBRARY_POINTS_IMPL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/points/impl)
 install(FILES ${OPENVDB_LIBRARY_TOOLS_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tools)
 install(FILES ${OPENVDB_LIBRARY_TREE_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/tree)
 install(FILES ${OPENVDB_LIBRARY_UTIL_INCLUDE_FILES} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/openvdb/util)
