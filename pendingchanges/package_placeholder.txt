@@ -1,0 +1,4 @@
+Build:
+    - Add a placeholder to inject the specific revision and URL used
+      to build OpenVDB, useful for 3rd party build scripts to publish
+      their exact versions.
