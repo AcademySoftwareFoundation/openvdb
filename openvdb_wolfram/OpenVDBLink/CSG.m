@@ -56,9 +56,9 @@ OpenVDBUnion[args___] /; !CheckArgs[OpenVDBUnion[args], {0, \[Infinity]}] = $Fai
 
 
 OpenVDBUnion[args___] :=
-	With[{res = iOpenVDBUnion[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBUnion[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBUnion[args___] := mOpenVDBUnion[args]
@@ -72,26 +72,26 @@ Options[iOpenVDBUnion] = Options[OpenVDBUnion];
 
 
 iOpenVDBUnion[OptionsPattern[]] :=
-	Block[{vdb},
-		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
-		(
-			OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-			
-			vdb	
-			
-		) /; OpenVDBGridQ[vdb]
-	]
+    Block[{vdb},
+        vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
+        (
+            OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+            
+            vdb	
+            
+        ) /; OpenVDBGridQ[vdb]
+    ]
 
 
 iOpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	Block[{ivdb},
-		ivdb = OpenVDBCreateGrid[vdb];
-		ivdb["gridUnionCopy"[{vdb, vdbs}[[All, 1]]]];
-		
-		OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		ivdb
-	]
+    Block[{ivdb},
+        ivdb = OpenVDBCreateGrid[vdb];
+        ivdb["gridUnionCopy"[{vdb, vdbs}[[All, 1]]]];
+        
+        OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        ivdb
+    ]
 
 
 iOpenVDBUnion[___] = $Failed;
@@ -129,9 +129,9 @@ OpenVDBIntersection[args___] /; !CheckArgs[OpenVDBIntersection[args], {0, \[Infi
 
 
 OpenVDBIntersection[args___] :=
-	With[{res = iOpenVDBIntersection[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBIntersection[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBIntersection[args___] := mOpenVDBIntersection[args]
@@ -145,26 +145,26 @@ Options[iOpenVDBIntersection] = Options[OpenVDBIntersection];
 
 
 iOpenVDBIntersection[OptionsPattern[]] :=
-	Block[{vdb},
-		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
-		(
-			OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-			
-			vdb	
-			
-		) /; OpenVDBGridQ[vdb]
-	]
+    Block[{vdb},
+        vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
+        (
+            OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+            
+            vdb	
+            
+        ) /; OpenVDBGridQ[vdb]
+    ]
 
 
 iOpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	Block[{ivdb},
-		ivdb = OpenVDBCreateGrid[{vdb}[[1]]];
-		ivdb["gridIntersectionCopy"[{vdb, vdbs}[[All, 1]]]];
-		
-		OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		ivdb
-	]
+    Block[{ivdb},
+        ivdb = OpenVDBCreateGrid[{vdb}[[1]]];
+        ivdb["gridIntersectionCopy"[{vdb, vdbs}[[All, 1]]]];
+        
+        OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        ivdb
+    ]
 
 
 iOpenVDBIntersection[___] = $Failed;
@@ -202,9 +202,9 @@ OpenVDBDifference[args___] /; !CheckArgs[OpenVDBDifference[args], {0, \[Infinity
 
 
 OpenVDBDifference[args___] :=
-	With[{res = iOpenVDBDifference[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDifference[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDifference[args___] := mOpenVDBDifference[args]
@@ -218,38 +218,38 @@ Options[iOpenVDBDifference] = Options[OpenVDBDifference];
 
 
 iOpenVDBDifference[OptionsPattern[]] :=
-	Block[{vdb},
-		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
-		(
-			OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-			
-			vdb
-				
-		) /; OpenVDBGridQ[vdb]
-	]
+    Block[{vdb},
+        vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
+        (
+            OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+            
+            vdb
+                
+        ) /; OpenVDBGridQ[vdb]
+    ]
 
 
 iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
-	(
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	Block[{union, vdbdiff},
-		union = vdbUnion[vdbs];
-		(
-			vdbdiff = OpenVDBCreateGrid[vdb];
-			vdbdiff["gridDifferenceCopy"[vdb[[1]], union[[1]]]];
-		
-			OpenVDBSetProperty[vdbdiff, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-			
-			vdbdiff
-			
-		) /; OpenVDBGridQ[union]
-	]
+    Block[{union, vdbdiff},
+        union = vdbUnion[vdbs];
+        (
+            vdbdiff = OpenVDBCreateGrid[vdb];
+            vdbdiff["gridDifferenceCopy"[vdb[[1]], union[[1]]]];
+        
+            OpenVDBSetProperty[vdbdiff, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+            
+            vdbdiff
+            
+        ) /; OpenVDBGridQ[union]
+    ]
 
 
 iOpenVDBDifference[___] = $Failed;
@@ -299,9 +299,9 @@ OpenVDBUnionTo[args___] /; !CheckArgs[OpenVDBUnionTo[args], {1, \[Infinity]}] = 
 
 
 OpenVDBUnionTo[args___] :=
-	With[{res = iOpenVDBUnionTo[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBUnionTo[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBUnionTo[args___] := mOpenVDBUnionTo[args]
@@ -315,21 +315,21 @@ Options[iOpenVDBUnionTo] = Options[OpenVDBUnionTo];
 
 
 iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
-	(
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	(
-		Scan[vdb["gridUnion"[#]]&, {vdbs}[[All, 1]]];
-		
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        Scan[vdb["gridUnion"[#]]&, {vdbs}[[All, 1]]];
+        
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBUnionTo[___] = $Failed;
@@ -367,9 +367,9 @@ OpenVDBIntersectWith[args___] /; !CheckArgs[OpenVDBIntersectWith[args], {1, \[In
 
 
 OpenVDBIntersectWith[args___] :=
-	With[{res = iOpenVDBIntersectWith[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBIntersectWith[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBIntersectWith[args___] := mOpenVDBIntersectWith[args]
@@ -383,21 +383,21 @@ Options[iOpenVDBIntersectWith] = Options[OpenVDBIntersectWith];
 
 
 iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
-	(
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	(
-		Scan[vdb["gridIntersection"[#]]&, {vdbs}[[All, 1]]];
-		
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        Scan[vdb["gridIntersection"[#]]&, {vdbs}[[All, 1]]];
+        
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBIntersectWith[___] = $Failed;
@@ -435,9 +435,9 @@ OpenVDBDifferenceFrom[args___] /; !CheckArgs[OpenVDBDifferenceFrom[args], {1, \[
 
 
 OpenVDBDifferenceFrom[args___] :=
-	With[{res = iOpenVDBDifferenceFrom[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDifferenceFrom[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDifferenceFrom[args___] := mOpenVDBDifferenceFrom[args]
@@ -451,24 +451,24 @@ Options[iOpenVDBDifferenceFrom] = Options[OpenVDBDifferenceFrom];
 
 
 iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
-	(
-		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-		
-		vdb
-	)
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+        
+        vdb
+    )
 
 
 iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
-	Block[{vdbunion},
-		vdbunion = OpenVDBUnionTo[vdbs];
-		(
-			vdb["gridDifference"[vdbunion[[1]]]];
-			
-			OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-			
-			vdb
-		) /; OpenVDBGridQ[vdbunion]
-	]
+    Block[{vdbunion},
+        vdbunion = OpenVDBUnionTo[vdbs];
+        (
+            vdb["gridDifference"[vdbunion[[1]]]];
+            
+            OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+            
+            vdb
+        ) /; OpenVDBGridQ[vdbunion]
+    ]
 
 
 iOpenVDBDifferenceFrom[___] = $Failed;
@@ -510,9 +510,9 @@ OpenVDBClip[args___] /; !CheckArgs[OpenVDBClip[args], 2] = $Failed;
 
 
 OpenVDBClip[args___] :=
-	With[{res = pOpenVDBClip[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = pOpenVDBClip[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBClip[args___] := mOpenVDBClip[args]
@@ -526,20 +526,20 @@ Options[pOpenVDBClip] = Options[OpenVDBClip];
 
 
 pOpenVDBClip[vdb_?OpenVDBScalarGridQ, bspec_List -> regime_?regimeQ, opts:OptionsPattern[]] :=
-	Block[{bds, closeQ, clip},
-		bds = parseClipBounds[vdb, bspec, regime];
-		closeQ = TrueQ[OptionValue["CloseBoundary"]];
-		(
-			clip = iOpenVDBClip[vdb, bds, closeQ];
-			(
-				OpenVDBSetProperty[clip, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-				
-				clip
-				
-			) /; OpenVDBGridQ[clip]
-			
-		) /; bds =!= $Failed
-	]
+    Block[{bds, closeQ, clip},
+        bds = parseClipBounds[vdb, bspec, regime];
+        closeQ = TrueQ[OptionValue["CloseBoundary"]];
+        (
+            clip = iOpenVDBClip[vdb, bds, closeQ];
+            (
+                OpenVDBSetProperty[clip, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+                
+                clip
+                
+            ) /; OpenVDBGridQ[clip]
+            
+        ) /; bds =!= $Failed
+    ]
 
 
 pOpenVDBClip[vdb_, bds_List, opts:OptionsPattern[]] := pOpenVDBClip[vdb, bds -> $worldregime, opts]
@@ -569,27 +569,27 @@ iOpenVDBClip[vdb_?emptyVDBQ, __] := vdb
 
 
 iOpenVDBClip[vdb_?levelSetQ, bds_, True] :=
-	Block[{voxsize, halfwidth, cube, clipvdb},
-		voxsize = voxelSize[vdb];
-		halfwidth = halfWidth[vdb];
-		(
-			cube = OpenVDBLevelSet[Cuboid @@ Transpose[bds], voxsize, halfwidth, "ScalarType" -> vdb[[2]]];
-			clipvdb = OpenVDBIntersection[vdb, cube];
-			
-			clipvdb /; OpenVDBGridQ[clipvdb]
-			
-		) /; voxsize > 0 && halfwidth > 0
-	]
+    Block[{voxsize, halfwidth, cube, clipvdb},
+        voxsize = voxelSize[vdb];
+        halfwidth = halfWidth[vdb];
+        (
+            cube = OpenVDBLevelSet[Cuboid @@ Transpose[bds], voxsize, halfwidth, "ScalarType" -> vdb[[2]]];
+            clipvdb = OpenVDBIntersection[vdb, cube];
+            
+            clipvdb /; OpenVDBGridQ[clipvdb]
+            
+        ) /; voxsize > 0 && halfwidth > 0
+    ]
 
 
 iOpenVDBClip[vdb_, bds_, closeQ_] /; closeQ =!= True || !levelSetQ[vdb] :=
-	Block[{inst, bdata, clipvdb},
-		clipvdb = OpenVDBCreateGrid[vdb];
-		
-		clipvdb["clipGrid"[vdb[[1]], bds]];
-		
-		clipvdb
-	]
+    Block[{inst, bdata, clipvdb},
+        clipvdb = OpenVDBCreateGrid[vdb];
+        
+        clipvdb["clipGrid"[vdb[[1]], bds]];
+        
+        clipvdb
+    ]
 
 
 iOpenVDBClip[___] = $Failed;
@@ -600,18 +600,18 @@ iOpenVDBClip[___] = $Failed;
 
 
 parseClipBounds[vdb_, bspec_, regime_] :=
-	Block[{bds, voxsize, vdbbbox},
-		bds = iParseClipBounds[bspec];
-		voxsize = voxelSize[vdb];
-		(
-			bds = regimeConvert[vdb, bds, regime -> $worldregime];
-			
-			vdbbbox = voxsize*(vdb["getGridBoundingBox"[]] + {{-2, 2}, {-2, 2}, {-2, 2}});
-			
-			boundingBoxIntersection[{vdbbbox, bds}]
-			
-		) /; MatrixQ[bds] && voxsize > 0
-	]
+    Block[{bds, voxsize, vdbbbox},
+        bds = iParseClipBounds[bspec];
+        voxsize = voxelSize[vdb];
+        (
+            bds = regimeConvert[vdb, bds, regime -> $worldregime];
+            
+            vdbbbox = voxsize*(vdb["getGridBoundingBox"[]] + {{-2, 2}, {-2, 2}, {-2, 2}});
+            
+            boundingBoxIntersection[{vdbbbox, bds}]
+            
+        ) /; MatrixQ[bds] && voxsize > 0
+    ]
 
 parseClipBounds[___] = $Failed;
 
@@ -620,19 +620,19 @@ iParseClipBounds[bds_?bounds3DQ] := bds
 
 
 iParseClipBounds[l_List] :=
-	With[{res = iParseClipBounds /@ l},
-		boundingBoxIntersection[res] /; FreeQ[res, $Failed, {1}]
-	]
+    With[{res = iParseClipBounds /@ l},
+        boundingBoxIntersection[res] /; FreeQ[res, $Failed, {1}]
+    ]
 
 
 iParseClipBounds[(dir_Integer) -> {v1_, v2_}] /; 1 <= dir <= 3 && -\[Infinity] <= v1 < v2 <= \[Infinity] := Insert[{{-\[Infinity], \[Infinity]}, {-\[Infinity], \[Infinity]}}, {v1, v2}, dir]
 
 
 iParseClipBounds[(dir_Integer) -> v_?NumericQ] /; 1 <= Abs[dir] <= 3 :=
-	If[dir < 0,
-		iParseClipBounds[Minus[dir] -> {v, \[Infinity]}],
-		iParseClipBounds[dir -> {-\[Infinity], v}]
-	]
+    If[dir < 0,
+        iParseClipBounds[Minus[dir] -> {v, \[Infinity]}],
+        iParseClipBounds[dir -> {-\[Infinity], v}]
+    ]
 
 
 iParseClipBounds[Cuboid[lo_]?ConstantRegionQ] := Transpose[{lo, lo+1}]
@@ -645,11 +645,11 @@ iParseClipBounds[___] = $Failed;
 
 
 boundingBoxIntersection[bds_] :=
-	Developer`ToPackedArray @ {
-		{Max[bds[[All, 1, 1]]], Min[bds[[All, 1, 2]]]},
-		{Max[bds[[All, 2, 1]]], Min[bds[[All, 2, 2]]]},
-		{Max[bds[[All, 3, 1]]], Min[bds[[All, 3, 2]]]}
-	}
+    Developer`ToPackedArray @ {
+        {Max[bds[[All, 1, 1]]], Min[bds[[All, 1, 2]]]},
+        {Max[bds[[All, 2, 1]]], Min[bds[[All, 2, 2]]]},
+        {Max[bds[[All, 3, 1]]], Min[bds[[All, 3, 2]]]}
+    }
 
 
 (* ::Subsubsection::Closed:: *)
@@ -677,16 +677,16 @@ Options[messageBooleanFunction] = Options[OpenVDBUnion];
 
 
 messageBooleanFunction[head_, vdbs___, OptionsPattern[]] :=
-	Catch[
-		Do[
-			If[messageScalarGridQ[vdb, head], Throw[$Failed]],
-			{vdb, {vdbs}}
-		];
-		
-		messageSameGridTypeQ[vdbs, head];
-		
-		$Failed
-	]
+    Catch[
+        Do[
+            If[messageScalarGridQ[vdb, head], Throw[$Failed]],
+            {vdb, {vdbs}}
+        ];
+        
+        messageSameGridTypeQ[vdbs, head];
+        
+        $Failed
+    ]
 
 
 messageBooleanFunction[___] = $Failed;

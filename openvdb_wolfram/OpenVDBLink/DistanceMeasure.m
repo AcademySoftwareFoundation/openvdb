@@ -48,9 +48,9 @@ OpenVDBMember[args___] /; !CheckArgs[OpenVDBMember[args], 2] = $Failed;
 
 
 OpenVDBMember[args___] :=
-	With[{res = iOpenVDBMember[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBMember[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBMember[args___] := messageCPTFunction[OpenVDBMember, args]
@@ -68,25 +68,25 @@ Options[iOpenVDBMember] = Options[OpenVDBMember];
 
 
 iOpenVDBMember[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $indexregime, OptionsPattern[]] :=
-	Block[{isovalue, mems},
-		isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
-		(
-			mems = vdb["gridMember"[pts, isovalue]];
-			
-			If[fogVolumeQ[vdb], Subtract[1, mems], mems] /; VectorQ[mems, IntegerQ]
-			
-		) /; realQ[isovalue]
-	]
+    Block[{isovalue, mems},
+        isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
+        (
+            mems = vdb["gridMember"[pts, isovalue]];
+            
+            If[fogVolumeQ[vdb], Subtract[1, mems], mems] /; VectorQ[mems, IntegerQ]
+            
+        ) /; realQ[isovalue]
+    ]
 
 
 iOpenVDBMember[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, opts___] :=
-	iOpenVDBMember[vdb, regimeConvert[vdb, pts, $worldregime -> $indexregime] -> $indexregime, opts]
+    iOpenVDBMember[vdb, regimeConvert[vdb, pts, $worldregime -> $indexregime] -> $indexregime, opts]
 
 
 iOpenVDBMember[vdb_, pts_?coordinateQ -> regime_, opts___] :=
-	With[{res = iOpenVDBMember[vdb, {pts} -> regime, opts]},
-		res[[1]] /; VectorQ[res, IntegerQ] && Length[res] === 1
-	]
+    With[{res = iOpenVDBMember[vdb, {pts} -> regime, opts]},
+        res[[1]] /; VectorQ[res, IntegerQ] && Length[res] === 1
+    ]
 
 
 iOpenVDBMember[vdb_, pts_List, opts___] := iOpenVDBMember[vdb, pts -> $worldregime, opts]
@@ -127,9 +127,9 @@ OpenVDBNearest[args___] /; !CheckArgs[OpenVDBNearest[args], 2] = $Failed;
 
 
 OpenVDBNearest[args___] :=
-	With[{res = iOpenVDBNearest[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBNearest[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBNearest[args___] := messageCPTFunction[OpenVDBNearest, args]
@@ -147,25 +147,25 @@ Options[iOpenVDBNearest] = Options[OpenVDBNearest];
 
 
 iOpenVDBNearest[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, OptionsPattern[]] :=
-	Block[{isovalue, nearest},
-		isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
-		(
-			nearest = vdb["gridNearest"[pts, isovalue]];
-			
-			nearest /; MatrixQ[nearest, NumericQ]
-			
-		) /; realQ[isovalue]
-	]
+    Block[{isovalue, nearest},
+        isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
+        (
+            nearest = vdb["gridNearest"[pts, isovalue]];
+            
+            nearest /; MatrixQ[nearest, NumericQ]
+            
+        ) /; realQ[isovalue]
+    ]
 
 
 iOpenVDBNearest[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $indexregime, opts___] :=
-	iOpenVDBNearest[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
+    iOpenVDBNearest[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
 
 
 iOpenVDBNearest[vdb_, pts_?coordinateQ -> regime_, opts___] :=
-	With[{res = iOpenVDBNearest[vdb, {pts} -> regime, opts]},
-		res[[1]] /; MatrixQ[res] && Dimensions[res] === {1, 3}
-	]
+    With[{res = iOpenVDBNearest[vdb, {pts} -> regime, opts]},
+        res[[1]] /; MatrixQ[res] && Dimensions[res] === {1, 3}
+    ]
 
 
 iOpenVDBNearest[vdb_, pts_List, opts___] := iOpenVDBNearest[vdb, pts -> $worldregime, opts]
@@ -206,9 +206,9 @@ OpenVDBDistance[args___] /; !CheckArgs[OpenVDBDistance[args], 2] = $Failed;
 
 
 OpenVDBDistance[args___] :=
-	With[{res = iOpenVDBDistance[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDistance[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDistance[args___] := messageCPTFunction[OpenVDBDistance, args]
@@ -226,25 +226,25 @@ Options[iOpenVDBDistance] = Options[OpenVDBDistance];
 
 
 iOpenVDBDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, OptionsPattern[]] :=
-	Block[{isovalue, dists},
-		isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
-		(
-			dists = vdb["gridDistance"[pts, isovalue]];
-			
-			dists /; VectorQ[dists, NumericQ]
-			
-		) /; realQ[isovalue]
-	]
+    Block[{isovalue, dists},
+        isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
+        (
+            dists = vdb["gridDistance"[pts, isovalue]];
+            
+            dists /; VectorQ[dists, NumericQ]
+            
+        ) /; realQ[isovalue]
+    ]
 
 
 iOpenVDBDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $indexregime, opts___] :=
-	iOpenVDBDistance[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
+    iOpenVDBDistance[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
 
 
 iOpenVDBDistance[vdb_, pts_?coordinateQ -> regime_, opts___] :=
-	With[{res = iOpenVDBDistance[vdb, {pts} -> regime, opts]},
-		res[[1]] /; VectorQ[res, NumericQ] && Length[res] === 1
-	]
+    With[{res = iOpenVDBDistance[vdb, {pts} -> regime, opts]},
+        res[[1]] /; VectorQ[res, NumericQ] && Length[res] === 1
+    ]
 
 
 iOpenVDBDistance[vdb_, pts_List, opts___] := iOpenVDBDistance[vdb, pts -> $worldregime, opts]
@@ -281,9 +281,9 @@ OpenVDBSignedDistance[args___] /; !CheckArgs[OpenVDBSignedDistance[args], 2] = $
 
 
 OpenVDBSignedDistance[args___] :=
-	With[{res = iOpenVDBSignedDistance[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSignedDistance[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSignedDistance[args___] := messageCPTFunction[OpenVDBSignedDistance, args]
@@ -301,25 +301,25 @@ Options[iOpenVDBSignedDistance] = Options[OpenVDBSignedDistance];
 
 
 iOpenVDBSignedDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, OptionsPattern[]] :=
-	Block[{isovalue, dists},
-		isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
-		(
-			dists = vdb["gridSignedDistance"[pts, isovalue]];
-			
-			If[fogVolumeQ[vdb], Minus[dists], dists] /; VectorQ[dists, NumericQ]
-			
-		) /; realQ[isovalue]
-	]
+    Block[{isovalue, dists},
+        isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
+        (
+            dists = vdb["gridSignedDistance"[pts, isovalue]];
+            
+            If[fogVolumeQ[vdb], Minus[dists], dists] /; VectorQ[dists, NumericQ]
+            
+        ) /; realQ[isovalue]
+    ]
 
 
 iOpenVDBSignedDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $indexregime, opts___] :=
-	iOpenVDBSignedDistance[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
+    iOpenVDBSignedDistance[vdb, regimeConvert[vdb, pts, $indexregime -> $worldregime] -> $worldregime, opts]
 
 
 iOpenVDBSignedDistance[vdb_, pts_?coordinateQ -> regime_, opts___] :=
-	With[{res = iOpenVDBSignedDistance[vdb, {pts} -> regime, opts]},
-		res[[1]] /; VectorQ[res, NumericQ] && Length[res] === 1
-	]
+    With[{res = iOpenVDBSignedDistance[vdb, {pts} -> regime, opts]},
+        res[[1]] /; VectorQ[res, NumericQ] && Length[res] === 1
+    ]
 
 
 iOpenVDBSignedDistance[vdb_, pts_List, opts___] := iOpenVDBSignedDistance[vdb, pts -> $worldregime, opts]
@@ -360,9 +360,9 @@ OpenVDBFillWithBalls[args___] /; !CheckArgs[OpenVDBFillWithBalls[args], {2, 3}] 
 
 
 OpenVDBFillWithBalls[args___] :=
-	With[{res = iOpenVDBFillWithBalls[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBFillWithBalls[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBFillWithBalls[args___] := mOpenVDBFillWithBalls[args]
@@ -376,25 +376,25 @@ Options[iOpenVDBFillWithBalls] = Options[OpenVDBFillWithBalls];
 
 
 iOpenVDBFillWithBalls[vdb_?OpenVDBScalarGridQ, n_Integer?Positive, rspec_, OptionsPattern[]] :=
-	Block[{parsedrspec, isovalue, overlappingQ, rettype, seedcnt, rmin, rmax, res},
-		parsedrspec = parseRadiiSpec[vdb, rspec];
-		isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
-		overlappingQ = TrueQ[OptionValue["Overlapping"]];
-		rettype = parseBallReturnType[OptionValue["ReturnType"]];
-		seedcnt = parseBallSeedCount[OptionValue["SeedCount"]];
-		(
-			{rmin, rmax} = parsedrspec;
+    Block[{parsedrspec, isovalue, overlappingQ, rettype, seedcnt, rmin, rmax, res},
+        parsedrspec = parseRadiiSpec[vdb, rspec];
+        isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
+        overlappingQ = TrueQ[OptionValue["Overlapping"]];
+        rettype = parseBallReturnType[OptionValue["ReturnType"]];
+        seedcnt = parseBallSeedCount[OptionValue["SeedCount"]];
+        (
+            {rmin, rmax} = parsedrspec;
 
-			res = vdb["fillWithBalls"[1, n, overlappingQ, rmin, rmax, isovalue, seedcnt]];
+            res = vdb["fillWithBalls"[1, n, overlappingQ, rmin, rmax, isovalue, seedcnt]];
 
-			returnBalls[res, rettype] /; MatrixQ[res]
+            returnBalls[res, rettype] /; MatrixQ[res]
 
-		) /; parsedrspec =!= $Failed && realQ[isovalue] && rettype =!= $Failed && seedcnt > 0
-	]
+        ) /; parsedrspec =!= $Failed && realQ[isovalue] && rettype =!= $Failed && seedcnt > 0
+    ]
 
 
 iOpenVDBFillWithBalls[vdb_?OpenVDBScalarGridQ, n_, opts:OptionsPattern[]] :=
-	iOpenVDBFillWithBalls[vdb, n, {0.5vdb["VoxelSize"], \[Infinity]} -> $worldregime, opts]
+    iOpenVDBFillWithBalls[vdb, n, {0.5vdb["VoxelSize"], \[Infinity]} -> $worldregime, opts]
 
 
 iOpenVDBFillWithBalls[___] = $Failed;
@@ -424,15 +424,15 @@ parseRadiiSpec[vdb_, (r_?NumericQ) -> regime_] := parseRadiiSpec[vdb, {0.5vdb["V
 
 
 parseRadiiSpec[vdb_, {rmin_, rmax_} -> regime_?regimeQ] /; rmin <= rmax :=
-	Block[{bds, \[Delta], rcap},
-		bds = vdb["IndexDimensions"];
-		\[Delta] = vdb["VoxelSize"];
-		(
-			rcap = Round[0.5*Last[bds] + 3];
-			Clip[regimeConvert[vdb, {rmin, rmax}, regime -> $indexregime], {0.0, rcap}]
+    Block[{bds, \[Delta], rcap},
+        bds = vdb["IndexDimensions"];
+        \[Delta] = vdb["VoxelSize"];
+        (
+            rcap = Round[0.5*Last[bds] + 3];
+            Clip[regimeConvert[vdb, {rmin, rmax}, regime -> $indexregime], {0.0, rcap}]
 
-		) /; ListQ[bds] && Positive[\[Delta]]
-	]
+        ) /; ListQ[bds] && Positive[\[Delta]]
+    ]
 
 
 parseRadiiSpec[___] = $Failed;
@@ -451,20 +451,20 @@ parseBallReturnType[___] = $Failed
 
 
 returnBalls[balls_, ret_] :=
-	Block[{balls2},
-		balls2 = If[balls[[-1, 4]] == 0.0,
-			DeleteDuplicates[balls],
-			balls
-		];
+    Block[{balls2},
+        balls2 = If[balls[[-1, 4]] == 0.0,
+            DeleteDuplicates[balls],
+            balls
+        ];
 
-		If[ret === "PackedArray",
-			balls2,
-			If[#4 == 0.0,
-				Point[{#1, #2, #3}],
-				Ball[{#1, #2, #3}, #4]
-			]& @@@ balls2
-		]
-	]
+        If[ret === "PackedArray",
+            balls2,
+            If[#4 == 0.0,
+                Point[{#1, #2, #3}],
+                Ball[{#1, #2, #3}, #4]
+            ]& @@@ balls2
+        ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -478,40 +478,40 @@ mOpenVDBFillWithBalls[expr_, ___] /; messageScalarGridQ[expr, OpenVDBFillWithBal
 
 
 mOpenVDBFillWithBalls[vdb_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] :=
-	(
-		Message[OpenVDBFillWithBalls::intpm, HoldForm[OpenVDBFillWithBalls[vdb, expr, rest]], 2];
-		$Failed
-	)
+    (
+        Message[OpenVDBFillWithBalls::intpm, HoldForm[OpenVDBFillWithBalls[vdb, expr, rest]], 2];
+        $Failed
+    )
 
 
 mOpenVDBFillWithBalls[vdb_, n_, rspec_List -> regime_, args___] := messageRegimeSpecQ[regime, OpenVDBFillWithBalls] || mOpenVDBFillWithBalls[vdb, n, rspec, args]
 
 
 mOpenVDBFillWithBalls[vdb_, n_, rspec_, rest___] /; !MatchQ[rspec, {a_, b_} /; 0 <= a <= b] :=
-	(
-		Message[OpenVDBFillWithBalls::rspec, 3, HoldForm[OpenVDBFillWithBalls[vdb, n, rspec, rest]]];
-		$Failed
-	)
+    (
+        Message[OpenVDBFillWithBalls::rspec, 3, HoldForm[OpenVDBFillWithBalls[vdb, n, rspec, rest]]];
+        $Failed
+    )
 
 
 mOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
-	(
-		If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBFillWithBalls],
-			Return[$Failed]
-		];
-		
-		If[parseBallReturnType[OptionValue["ReturnType"]] === $Failed,
-			Message[OpenVDBFillWithBalls::rettype];
-			Return[$Failed]
-		];
-		
-		If[parseBallSeedCount[OptionValue["SeedCount"]] === $Failed,
-			Message[OpenVDBFillWithBalls::seedcnt];
-			Return[$Failed]
-		];
-		
-		$Failed
-	)
+    (
+        If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBFillWithBalls],
+            Return[$Failed]
+        ];
+        
+        If[parseBallReturnType[OptionValue["ReturnType"]] === $Failed,
+            Message[OpenVDBFillWithBalls::rettype];
+            Return[$Failed]
+        ];
+        
+        If[parseBallSeedCount[OptionValue["SeedCount"]] === $Failed,
+            Message[OpenVDBFillWithBalls::seedcnt];
+            Return[$Failed]
+        ];
+        
+        $Failed
+    )
 
 
 mOpenVDBFillWithBalls[___] = $Failed;
@@ -540,13 +540,13 @@ messageCPTFunction[head_, _, expr_, ___] /; messageCoordinateSpecQ[expr, head] =
 
 
 messageCPTFunction[head_, args__, Longest[OptionsPattern[]]] :=
-	(
-		If[messageIsoValueQ[OptionValue["IsoValue"], head],
-			Return[$Failed]
-		];
-		
-		$Failed
-	)
+    (
+        If[messageIsoValueQ[OptionValue["IsoValue"], head],
+            Return[$Failed]
+        ];
+        
+        $Failed
+    )
 
 
 messageCPTFunction[___] = $Failed;

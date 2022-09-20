@@ -39,9 +39,9 @@ OpenVDBArea[args___] /; !CheckArgs[OpenVDBArea[args], {1, 2}] = $Failed;
 
 
 OpenVDBArea[args___] :=
-	With[{res = iOpenVDBArea[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBArea[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBArea[args___] := mOpenVDBArea[args]
@@ -52,15 +52,15 @@ OpenVDBArea[args___] := mOpenVDBArea[args]
 
 
 iOpenVDBArea[vdb_?OpenVDBScalarGridQ, regime_?regimeQ] :=
-	Block[{area, scale},
-		area = scalarArea[vdb];
-		(
-			area = regimeConvert[vdb, area, $worldregime -> regime, 2];
-			
-			area
-			
-		) /; area =!= $Failed
-	]
+    Block[{area, scale},
+        area = scalarArea[vdb];
+        (
+            area = regimeConvert[vdb, area, $worldregime -> regime, 2];
+            
+            area
+            
+        ) /; area =!= $Failed
+    ]
 
 
 iOpenVDBArea[vdb_] := iOpenVDBArea[vdb, $worldregime]
@@ -90,9 +90,9 @@ scalarArea[vdb_?emptyVDBQ] = 0.
 
 
 scalarArea[vdb_?levelSetQ] :=
-	With[{vol = vdb["levelSetGridArea"[]]},
-		vol /; NumericQ[vol]
-	]
+    With[{vol = vdb["levelSetGridArea"[]]},
+        vol /; NumericQ[vol]
+    ]
 
 
 scalarArea[vdb_] /; !levelSetQ[vdb] = Indeterminate;
@@ -126,9 +126,9 @@ OpenVDBEulerCharacteristic[args___] /; !CheckArgs[OpenVDBEulerCharacteristic[arg
 
 
 OpenVDBEulerCharacteristic[args___] :=
-	With[{res = iOpenVDBEulerCharacteristic[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBEulerCharacteristic[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBEulerCharacteristic[args___] := mOpenVDBEulerCharacteristic[args]
@@ -139,15 +139,15 @@ OpenVDBEulerCharacteristic[args___] := mOpenVDBEulerCharacteristic[args]
 
 
 iOpenVDBEulerCharacteristic[vdb_?OpenVDBScalarGridQ] :=
-	Block[{char},
-		char = Which[
-			!levelSetQ[vdb], Indeterminate,
-			emptyVDBQ[vdb], Undefined,
-			True, Replace[vdb["levelSetGridEulerCharacteristic"[]], Except[_Integer] -> $Failed, {0}]
-		];
-		
-		char /; char =!= $Failed
-	]
+    Block[{char},
+        char = Which[
+            !levelSetQ[vdb], Indeterminate,
+            emptyVDBQ[vdb], Undefined,
+            True, Replace[vdb["levelSetGridEulerCharacteristic"[]], Except[_Integer] -> $Failed, {0}]
+        ];
+        
+        char /; char =!= $Failed
+    ]
 
 
 iOpenVDBEulerCharacteristic[___] = $Failed;
@@ -185,9 +185,9 @@ OpenVDBGenus[args___] /; !CheckArgs[OpenVDBGenus[args], 1] = $Failed;
 
 
 OpenVDBGenus[args___] :=
-	With[{res = iOpenVDBGenus[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBGenus[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBGenus[args___] := mOpenVDBGenus[args]
@@ -198,15 +198,15 @@ OpenVDBGenus[args___] := mOpenVDBGenus[args]
 
 
 iOpenVDBGenus[vdb_?OpenVDBScalarGridQ] :=
-	Block[{genus},
-		genus = Which[
-			!levelSetQ[vdb], Indeterminate,
-			emptyVDBQ[vdb], Undefined,
-			True, Replace[vdb["levelSetGridGenus"[]], Except[_Integer] -> $Failed, {0}]
-		];
-		
-		genus /; genus =!= $Failed
-	]
+    Block[{genus},
+        genus = Which[
+            !levelSetQ[vdb], Indeterminate,
+            emptyVDBQ[vdb], Undefined,
+            True, Replace[vdb["levelSetGridGenus"[]], Except[_Integer] -> $Failed, {0}]
+        ];
+        
+        genus /; genus =!= $Failed
+    ]
 
 
 iOpenVDBGenus[___] = $Failed;
@@ -244,9 +244,9 @@ OpenVDBVolume[args___] /; !CheckArgs[OpenVDBVolume[args], {1, 2}] = $Failed;
 
 
 OpenVDBVolume[args___] :=
-	With[{res = iOpenVDBVolume[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBVolume[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBVolume[args___] := mOpenVDBVolume[args]
@@ -257,15 +257,15 @@ OpenVDBVolume[args___] := mOpenVDBVolume[args]
 
 
 iOpenVDBVolume[vdb_?OpenVDBScalarGridQ, regime_?regimeQ] :=
-	Block[{volume, scale},
-		volume = scalarVolume[vdb];
-		(
-			volume = regimeConvert[vdb, volume, $worldregime -> regime, 3];
-			
-			volume
-			
-		) /; volume =!= $Failed
-	]
+    Block[{volume, scale},
+        volume = scalarVolume[vdb];
+        (
+            volume = regimeConvert[vdb, volume, $worldregime -> regime, 3];
+            
+            volume
+            
+        ) /; volume =!= $Failed
+    ]
 
 
 iOpenVDBVolume[vdb_] := iOpenVDBVolume[vdb, $worldregime]
@@ -295,18 +295,18 @@ scalarVolume[vdb_?emptyVDBQ] := If[TrueQ[Negative[vdb["getBackgroundValue"[]]]],
 
 
 scalarVolume[vdb_?levelSetQ] :=
-	With[{vol = vdb["levelSetGridVolume"[]]},
-		vol /; NumericQ[vol]
-	]
+    With[{vol = vdb["levelSetGridVolume"[]]},
+        vol /; NumericQ[vol]
+    ]
 
 
 scalarVolume[vdb_?fogVolumeQ] :=
-	With[{tots = OpenVDBActiveVoxelSliceTotals[vdb]},
-		(
-			Total[tots] * vdb["VoxelSize"]^3
-			
-		) /; VectorQ[tots, NumericQ]
-	]
+    With[{tots = OpenVDBActiveVoxelSliceTotals[vdb]},
+        (
+            Total[tots] * vdb["VoxelSize"]^3
+            
+        ) /; VectorQ[tots, NumericQ]
+    ]
 
 
 scalarVolume[vdb_] /; !levelSetQ[vdb] && !fogVolumeQ[vdb] = Indeterminate;

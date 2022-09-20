@@ -45,9 +45,9 @@ OpenVDBSetStates[args___] /; !CheckArgs[OpenVDBSetStates[args], 3] = $Failed;
 
 
 OpenVDBSetStates[args___] :=
-	With[{res = iOpenVDBSetStates[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetStates[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSetStates[args___] := mOpenVDBSetStates[args]
@@ -58,26 +58,26 @@ OpenVDBSetStates[args___] := mOpenVDBSetStates[args]
 
 
 iOpenVDBSetStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ, states_] /; VectorQ[states, realQ] && Length[coords] === Length[states] :=
-	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
-		vdb["setActiveStates"[indexcoordinates, states]];
-		
-		Unitize[states]
-	]
+    With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
+        vdb["setActiveStates"[indexcoordinates, states]];
+        
+        Unitize[states]
+    ]
 
 
 iOpenVDBSetStates[expr_, coord_?coordinateQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
-	With[{res = iOpenVDBSetStates[expr, {coord} -> regime, {state}]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetStates[expr, {coord} -> regime, {state}]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetStates[expr_, coords_ -> regime_, states_List, args___] /; VectorQ[states, BooleanQ] := iOpenVDBSetStates[expr, coords -> regime, Boole[states], args]
 
 
 iOpenVDBSetStates[expr_, coords_?MatrixQ -> regime_, state_] /; realQ[state] || BooleanQ[state] :=
-	With[{res = iOpenVDBSetStates[expr, coords -> regime, ConstantArray[state, Length[coords]]]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetStates[expr, coords -> regime, ConstantArray[state, Length[coords]]]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetStates[expr_, coords_List, args___] := iOpenVDBSetStates[expr, coords -> $indexregime, args]
@@ -121,9 +121,9 @@ OpenVDBStates[args___] /; !CheckArgs[OpenVDBStates[args], 2] = $Failed;
 
 
 OpenVDBStates[args___] :=
-	With[{res = iOpenVDBStates[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBStates[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBStates[args___] := mOpenVDBStates[args]
@@ -134,15 +134,15 @@ OpenVDBStates[args___] := mOpenVDBStates[args]
 
 
 iOpenVDBStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
-	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
-		vdb["getActiveStates"[indexcoordinates]]
-	]
+    With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
+        vdb["getActiveStates"[indexcoordinates]]
+    ]
 
 
 iOpenVDBStates[expr_, coord_?coordinateQ -> regime_] :=
-	With[{vals = iOpenVDBStates[expr, {coord} -> regime]},
-		vals[[1]] /; vals =!= $Failed
-	]
+    With[{vals = iOpenVDBStates[expr, {coord} -> regime]},
+        vals[[1]] /; vals =!= $Failed
+    ]
 
 
 iOpenVDBStates[expr_, coords_List] := iOpenVDBStates[expr, coords -> $indexregime]
@@ -190,9 +190,9 @@ OpenVDBSetValues[args___] /; !CheckArgs[OpenVDBSetValues[args], 3] = $Failed;
 
 
 OpenVDBSetValues[args___] :=
-	With[{res = iOpenVDBSetValues[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetValues[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSetValues[args___] := mOpenVDBSetValues[args]
@@ -203,51 +203,51 @@ OpenVDBSetValues[args___] := mOpenVDBSetValues[args]
 
 
 iOpenVDBSetValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ, values_] /; ArrayQ[values, _, realQ] && Length[coords] === Length[values] :=
-	Block[{indexcoordinates, res},
-		indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime];
-		
-		res = Quiet[vdb["setValues"[indexcoordinates, values]]];
-		
-		Which[
-			OpenVDBBooleanGridQ[vdb],
-				Unitize[values],
-			Precision[vdb["getBackgroundValue"[]]] =!= \[Infinity],
-				N[values],
-			True,
-				values
-		] /; res === Null
-	]
+    Block[{indexcoordinates, res},
+        indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime];
+        
+        res = Quiet[vdb["setValues"[indexcoordinates, values]]];
+        
+        Which[
+            OpenVDBBooleanGridQ[vdb],
+                Unitize[values],
+            Precision[vdb["getBackgroundValue"[]]] =!= \[Infinity],
+                N[values],
+            True,
+                values
+        ] /; res === Null
+    ]
 
 
 iOpenVDBSetValues[expr_?OpenVDBVectorGridQ, coord_?coordinateQ -> regime_, value_?VectorQ] :=
-	With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetValues[expr_?OpenVDBVectorGridQ, coords_?MatrixQ -> regime_, value_?VectorQ] :=
-	With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetValues[expr_, coord_?coordinateQ -> regime_, value_?realQ] :=
-	With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetValues[expr, {coord} -> regime, {value}]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetValues[expr_, coords_?MatrixQ -> regime_, value_?realQ] :=
-	With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
-		res[[1]] /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetValues[expr, coords -> regime, ConstantArray[value, Length[coords]]]},
+        res[[1]] /; res =!= $Failed
+    ]
 
 
 iOpenVDBSetValues[expr_, coords_List, args___] := iOpenVDBSetValues[expr, coords -> $indexregime, args]
 
 
 iOpenVDBSetValues[vdb_?OpenVDBBooleanGridQ, coords_?coordinatesQ -> regime_?regimeQ, values:{(True|False)..}] :=
-	iOpenVDBSetValues[vdb, coords -> regime, Boole[values]]
+    iOpenVDBSetValues[vdb, coords -> regime, Boole[values]]
 
 
 iOpenVDBSetValues[___] = $Failed;
@@ -288,9 +288,9 @@ OpenVDBValues[args___] /; !CheckArgs[OpenVDBValues[args], 2] = $Failed;
 
 
 OpenVDBValues[args___] :=
-	With[{res = iOpenVDBValues[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBValues[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBValues[args___] := mOpenVDBValues[args]
@@ -301,15 +301,15 @@ OpenVDBValues[args___] := mOpenVDBValues[args]
 
 
 iOpenVDBValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ] :=
-	With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
-		vdb["getValues"[indexcoordinates]]
-	]
+    With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
+        vdb["getValues"[indexcoordinates]]
+    ]
 
 
 iOpenVDBValues[expr_, coord_?coordinateQ -> regime_] :=
-	With[{vals = iOpenVDBValues[expr, {coord} -> regime]},
-		vals[[1]] /; vals =!= $Failed
-	]
+    With[{vals = iOpenVDBValues[expr, {coord} -> regime]},
+        vals[[1]] /; vals =!= $Failed
+    ]
 
 
 iOpenVDBValues[expr_, coords_List] := iOpenVDBValues[expr, coords -> $indexregime]

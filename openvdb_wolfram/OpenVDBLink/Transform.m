@@ -46,9 +46,9 @@ OpenVDBTransform[args___] /; !CheckArgs[OpenVDBTransform[args], 2] = $Failed;
 
 
 OpenVDBTransform[args___] :=
-	With[{res = iOpenVDBTransform[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBTransform[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBTransform[args___] := mOpenVDBTransform[args]
@@ -62,26 +62,26 @@ Options[iOpenVDBTransform] = Options[OpenVDBTransform];
 
 
 iOpenVDBTransform[vdb_?OpenVDBGridQ, tf_, OptionsPattern[]] :=
-	Block[{ptf, mat, regime, vx, tvdb, resampling, tfunc},
-		ptf = ParseTransformationMatrix[tf];
-		resampling = resamplingMethod[OptionValue[Resampling]];
-		(
-			{mat, regime} = ptf;
-			vx = voxelSize[vdb];
-			tvdb = OpenVDBCreateGrid[vdb];
-			
-			tfunc = Transpose[mat];
-			If[worldRegimeQ[regime],
-				tfunc[[1 ;; 3, 4]] *= vx;
-				tfunc[[4, 1 ;; 3]] /= vx;
-			];
-			
-			tvdb["transformGrid"[vdb[[1]], tfunc, resampling]];
-			
-			tvdb
-			
-		) /; ListQ[ptf] && Length[ptf] === 2 && resampling =!= $Failed
-	]
+    Block[{ptf, mat, regime, vx, tvdb, resampling, tfunc},
+        ptf = ParseTransformationMatrix[tf];
+        resampling = resamplingMethod[OptionValue[Resampling]];
+        (
+            {mat, regime} = ptf;
+            vx = voxelSize[vdb];
+            tvdb = OpenVDBCreateGrid[vdb];
+            
+            tfunc = Transpose[mat];
+            If[worldRegimeQ[regime],
+                tfunc[[1 ;; 3, 4]] *= vx;
+                tfunc[[4, 1 ;; 3]] /= vx;
+            ];
+            
+            tvdb["transformGrid"[vdb[[1]], tfunc, resampling]];
+            
+            tvdb
+            
+        ) /; ListQ[ptf] && Length[ptf] === 2 && resampling =!= $Failed
+    ]
 
 
 iOpenVDBTransform[___] = $Failed;
@@ -105,12 +105,12 @@ OpenVDBDefaultSpace[OpenVDBTransform] = $worldregime;
 
 
 ParseTransformationMatrix[tf_] :=
-	Catch[
-		iParseTransformationMatrix @ If[Head[tf] === Rule,
-			tf,
-			tf -> $worldregime
-		]
-	]
+    Catch[
+        iParseTransformationMatrix @ If[Head[tf] === Rule,
+            tf,
+            tf -> $worldregime
+        ]
+    ]
 
 
 iParseTransformationMatrix[tf_ -> regime_?regimeQ] := {iParseTransformationMatrix[tf], regime}
@@ -145,20 +145,20 @@ mOpenVDBTransform[expr_, ___] /; messageGridQ[expr, OpenVDBTransform] = $Failed;
 
 
 mOpenVDBTransform[_, tf_, ___] /; ParseTransformationMatrix[tf] === $Failed :=
-	(
-		Message[OpenVDBTransform::trans, tf, 2];
-		$Failed
-	)
+    (
+        Message[OpenVDBTransform::trans, tf, 2];
+        $Failed
+    )
 
 
 mOpenVDBTransform[__, OptionsPattern[]] :=
-	Block[{resampling},
-		resampling = resamplingMethod[OptionValue[Resampling]];
-		(
-			Message[OpenVDBTransform::resamp];
-			$Failed
-		) /; resampling === $Failed
-	]
+    Block[{resampling},
+        resampling = resamplingMethod[OptionValue[Resampling]];
+        (
+            Message[OpenVDBTransform::resamp];
+            $Failed
+        ) /; resampling === $Failed
+    ]
 
 
 mOpenVDBTransform[___] = $Failed;
@@ -186,9 +186,9 @@ OpenVDBMultiply[args___] /; !CheckArgs[OpenVDBMultiply[args], 2] = $Failed;
 
 
 OpenVDBMultiply[args___] :=
-	With[{res = iOpenVDBMultiply[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBMultiply[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBMultiply[args___] := mOpenVDBMultiply[args]
@@ -199,12 +199,12 @@ OpenVDBMultiply[args___] := mOpenVDBMultiply[args]
 
 
 iOpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] :=
-	(
-		If[s != 1.0,
-			vdb["scalarMultiply"[s]]
-		];
-		vdb
-	)
+    (
+        If[s != 1.0,
+            vdb["scalarMultiply"[s]]
+        ];
+        vdb
+    )
 
 
 iOpenVDBMultiply[___] = $Failed;
@@ -228,10 +228,10 @@ mOpenVDBMultiply[expr_, ___] /; messageScalarGridQ[expr, OpenVDBMultiply] = $Fai
 
 
 mOpenVDBMultiply[_, s_] /; !realQ[s] :=
-	(
-		Message[OpenVDBMultiply::real, s, 2];
-		$Failed
-	)
+    (
+        Message[OpenVDBMultiply::real, s, 2];
+        $Failed
+    )
 
 
 mOpenVDBMultiply[___] = $Failed;
@@ -252,9 +252,9 @@ OpenVDBGammaAdjust[args___] /; !CheckArgs[OpenVDBGammaAdjust[args], 2] = $Failed
 
 
 OpenVDBGammaAdjust[args___] :=
-	With[{res = iOpenVDBGammaAdjust[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBGammaAdjust[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBGammaAdjust[args___] := mOpenVDBGammaAdjust[args]
@@ -265,19 +265,19 @@ OpenVDBGammaAdjust[args___] := mOpenVDBGammaAdjust[args]
 
 
 iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vdb] :=
-	(
-		If[\[Gamma] != 1.0,
-			vdb["gammaAdjustment"[\[Gamma]]]
-		];
-		vdb
-	)
+    (
+        If[\[Gamma] != 1.0,
+            vdb["gammaAdjustment"[\[Gamma]]]
+        ];
+        vdb
+    )
 
 
 iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, args___] /; levelSetQ[vdb] :=
-	(
-		OpenVDBToFogVolume[vdb];
-		iOpenVDBGammaAdjust[vdb, args]
-	)
+    (
+        OpenVDBToFogVolume[vdb];
+        iOpenVDBGammaAdjust[vdb, args]
+    )
 
 
 iOpenVDBGammaAdjust[___] = $Failed;
@@ -301,10 +301,10 @@ mOpenVDBGammaAdjust[expr_, ___] /; messageScalarGridQ[expr, OpenVDBGammaAdjust] 
 
 
 mOpenVDBGammaAdjust[_, \[Gamma]_] /; !TrueQ[\[Gamma] > 0] :=
-	(
-		Message[OpenVDBGammaAdjust::pos, \[Gamma], 2];
-		$Failed
-	)
+    (
+        Message[OpenVDBGammaAdjust::pos, \[Gamma], 2];
+        $Failed
+    )
 
 
 mOpenVDBGammaAdjust[___] = $Failed;

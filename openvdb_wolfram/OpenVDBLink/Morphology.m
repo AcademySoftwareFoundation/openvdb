@@ -45,9 +45,9 @@ OpenVDBResizeBandwidth[args___] /; !CheckArgs[OpenVDBResizeBandwidth[args], {1, 
 
 
 OpenVDBResizeBandwidth[args___] :=
-	With[{res = iOpenVDBResizeBandwidth[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBResizeBandwidth[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBResizeBandwidth[args___] := mOpenVDBResizeBandwidth[args]
@@ -58,13 +58,13 @@ OpenVDBResizeBandwidth[args___] := mOpenVDBResizeBandwidth[args]
 
 
 iOpenVDBResizeBandwidth[vdb_?OpenVDBScalarGridQ, width_?Positive -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	Block[{w},
-		w = regimeConvert[vdb, width, regime -> $indexregime];
-		(
-			vdb["resizeBandwidth"[w]];
-			vdb
-		) /; w > 0
-	]
+    Block[{w},
+        w = regimeConvert[vdb, width, regime -> $indexregime];
+        (
+            vdb["resizeBandwidth"[w]];
+            vdb
+        ) /; w > 0
+    ]
 
 
 iOpenVDBResizeBandwidth[vdb_, width_?Positive] := iOpenVDBResizeBandwidth[vdb, width -> $indexregime]
@@ -109,9 +109,9 @@ OpenVDBDilation[args___] /; !CheckArgs[OpenVDBDilation[args], {1, 2}] = $Failed;
 
 
 OpenVDBDilation[args___] :=
-	With[{res = iOpenVDBDilation[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDilation[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDilation[args___] := mOpenVDBDilation[args]
@@ -122,13 +122,13 @@ OpenVDBDilation[args___] := mOpenVDBDilation[args]
 
 
 iOpenVDBDilation[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	Block[{offset},
-		offset = regimeConvert[vdb, -r, regime -> $worldregime];
-		
-		vdb["offsetLevelSet"[offset]];
-		
-		vdb
-	]
+    Block[{offset},
+        offset = regimeConvert[vdb, -r, regime -> $worldregime];
+        
+        vdb["offsetLevelSet"[offset]];
+        
+        vdb
+    ]
 
 
 iOpenVDBDilation[vdb_, r_?realQ] := iOpenVDBDilation[vdb, r -> $worldregime]
@@ -169,9 +169,9 @@ OpenVDBErosion[args___] /; !CheckArgs[OpenVDBErosion[args], {1, 2}] = $Failed;
 
 
 OpenVDBErosion[args___] :=
-	With[{res = iOpenVDBErosion[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBErosion[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBErosion[args___] := mOpenVDBErosion[args]
@@ -182,13 +182,13 @@ OpenVDBErosion[args___] := mOpenVDBErosion[args]
 
 
 iOpenVDBErosion[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	Block[{offset},
-		offset = regimeConvert[vdb, r, regime -> $worldregime];
-		
-		vdb["offsetLevelSet"[offset]];
-		
-		vdb
-	]
+    Block[{offset},
+        offset = regimeConvert[vdb, r, regime -> $worldregime];
+        
+        vdb["offsetLevelSet"[offset]];
+        
+        vdb
+    ]
 
 
 iOpenVDBErosion[vdb_, r_?realQ] := iOpenVDBErosion[vdb, r -> $worldregime]
@@ -229,9 +229,9 @@ OpenVDBClosing[args___] /; !CheckArgs[OpenVDBClosing[args], {1, 2}] = $Failed;
 
 
 OpenVDBClosing[args___] :=
-	With[{res = iOpenVDBClosing[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBClosing[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBClosing[args___] := mOpenVDBClosing[args]
@@ -242,7 +242,7 @@ OpenVDBClosing[args___] := mOpenVDBClosing[args]
 
 
 iOpenVDBClosing[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	iOpenVDBErosion[iOpenVDBDilation[vdb, r -> regime], r -> regime]
+    iOpenVDBErosion[iOpenVDBDilation[vdb, r -> regime], r -> regime]
 
 
 iOpenVDBClosing[vdb_, r_?NonNegative] := iOpenVDBClosing[vdb, r -> $worldregime]
@@ -283,9 +283,9 @@ OpenVDBOpening[args___] /; !CheckArgs[OpenVDBOpening[args], {1, 2}] = $Failed;
 
 
 OpenVDBOpening[args___] :=
-	With[{res = iOpenVDBOpening[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBOpening[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBOpening[args___] := mOpenVDBOpening[args]
@@ -296,7 +296,7 @@ OpenVDBOpening[args___] := mOpenVDBOpening[args]
 
 
 iOpenVDBOpening[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	iOpenVDBDilation[iOpenVDBErosion[vdb, r -> regime], r -> regime]
+    iOpenVDBDilation[iOpenVDBErosion[vdb, r -> regime], r -> regime]
 
 
 iOpenVDBOpening[vdb_, r_?NonNegative] := iOpenVDBOpening[vdb, r -> $worldregime]
@@ -349,10 +349,10 @@ messagePositiveDistanceQ[w_ -> regime_, pos_, head_] := messageRegimeSpecQ[regim
 
 
 messagePositiveDistanceQ[w_, pos_, head_] /; !TrueQ[NonNegative[w]] :=
-	(
-		Message[head::nonneg, w, pos];
-		True
-	)
+    (
+        Message[head::nonneg, w, pos];
+        True
+    )
 
 
 messagePositiveDistanceQ[___] = False;

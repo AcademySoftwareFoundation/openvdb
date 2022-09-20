@@ -33,9 +33,9 @@ OpenVDBSetProperty[args___] /; !CheckArgs[OpenVDBSetProperty[args], {2, 3}] = $F
 
 
 OpenVDBSetProperty[args___] :=
-	With[{res = iOpenVDBSetProperty[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSetProperty[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSetProperty[args___] := mOpenVDBSetProperty[args]
@@ -46,18 +46,18 @@ OpenVDBSetProperty[args___] := mOpenVDBSetProperty[args]
 
 
 iOpenVDBSetProperty[vdb_?OpenVDBGridQ, args__] :=
-	Block[{parsedargs, res},
-		parsedargs = setterArguments[args];
-		(
-			res = MapThread[setVDBProperty[vdb, ##]&, parsedargs];
-			
-			If[MatchQ[{args}, {_String, _} | {_String -> _}],
-				res[[1]],
-				res
-			]
-			
-		) /; parsedargs =!= $Failed
-	]
+    Block[{parsedargs, res},
+        parsedargs = setterArguments[args];
+        (
+            res = MapThread[setVDBProperty[vdb, ##]&, parsedargs];
+            
+            If[MatchQ[{args}, {_String, _} | {_String -> _}],
+                res[[1]],
+                res
+            ]
+            
+        ) /; parsedargs =!= $Failed
+    ]
 
 
 iOpenVDBSetProperty[___] = $Failed;
@@ -78,21 +78,21 @@ mOpenVDBSetProperty[expr_, ___] /; messageGridQ[expr, OpenVDBSetProperty, False]
 
 
 mOpenVDBSetProperty[_, args__] /; setterArguments[args] === $Failed :=
-	(
-		Message[OpenVDBSetProperty::spec];
-		$Failed
-	)
+    (
+        Message[OpenVDBSetProperty::spec];
+        $Failed
+    )
 
 
 mOpenVDBSetProperty[_, args__] :=
-	Block[{parsed, props},
-		parsed = setterArguments[args][[1]];
-		props = Pick[parsed, Lookup[$setterPropertyAssoc, parsed, $Failed], $Failed];
-		(
-			Message[OpenVDBSetProperty::prop, First[props]];
-			$Failed
-		) /; Length[props] > 0
-	]
+    Block[{parsed, props},
+        parsed = setterArguments[args][[1]];
+        props = Pick[parsed, Lookup[$setterPropertyAssoc, parsed, $Failed], $Failed];
+        (
+            Message[OpenVDBSetProperty::prop, First[props]];
+            $Failed
+        ) /; Length[props] > 0
+    ]
 
 
 mOpenVDBSetProperty[___] = $Failed;
@@ -116,16 +116,16 @@ openVDBSetBackgroundValue[vdb_?OpenVDBBooleanGridQ, bool_?BooleanQ] := openVDBSe
 
 
 openVDBSetBackgroundValue[vdb_?nonMaskGridQ, bg_] :=
-	With[{res = Quiet[Check[vdb["setBackgroundValue"[bg]];True, False]]},
-		Which[
-			OpenVDBBooleanGridQ[vdb],
-				Unitize[bg],
-			Precision[vdb["getBackgroundValue"[]]] =!= \[Infinity],
-				N[bg],
-			True,
-				bg
-		] /; res
-	]
+    With[{res = Quiet[Check[vdb["setBackgroundValue"[bg]];True, False]]},
+        Which[
+            OpenVDBBooleanGridQ[vdb],
+                Unitize[bg],
+            Precision[vdb["getBackgroundValue"[]]] =!= \[Infinity],
+                N[bg],
+            True,
+                bg
+        ] /; res
+    ]
 
 
 openVDBSetBackgroundValue[___] = $Failed;
@@ -136,10 +136,10 @@ openVDBSetBackgroundValue[___] = $Failed;
 
 
 openVDBSetCreator[vdb_, creator_String] :=
-	(
-		vdb["setCreator"[creator]];
-		creator
-	)
+    (
+        vdb["setCreator"[creator]];
+        creator
+    )
 
 
 openVDBSetCreator[vdb_, None] := openVDBSetCreator[vdb, ""]
@@ -153,10 +153,10 @@ openVDBSetCreator[___] = $Failed;
 
 
 openVDBSetDescription[vdb_, description_String] :=
-	(
-		vdb["setStringMetadata"["description", description]];
-		description
-	)
+    (
+        vdb["setStringMetadata"["description", description]];
+        description
+    )
 
 
 openVDBSetDescription[vdb_, None] := openVDBSetDescription[vdb, ""]
@@ -170,10 +170,10 @@ openVDBSetDescription[___] = $Failed;
 
 
 openVDBSetGridClass[vdb_?OpenVDBScalarGridQ, gc_] :=
-	With[{gcid = gridClassID[gc]},
-		vdb["setGridClass"[gcid]];
-		gridClassName[gcid]
-	]
+    With[{gcid = gridClassID[gc]},
+        vdb["setGridClass"[gcid]];
+        gridClassName[gcid]
+    ]
 
 
 openVDBSetGridClass[___] = $Failed;
@@ -184,10 +184,10 @@ openVDBSetGridClass[___] = $Failed;
 
 
 openVDBSetName[vdb_, name_String] :=
-	(
-		vdb["setName"[name]];
-		name
-	)
+    (
+        vdb["setName"[name]];
+        name
+    )
 
 
 openVDBSetName[vdb_, None] := openVDBSetName[vdb, ""]
@@ -201,10 +201,10 @@ openVDBSetName[___] = $Failed;
 
 
 openVDBSetVoxelSize[vdb_, spacing_?Positive] :=
-	(
-		vdb["setVoxelSize"[spacing]];
-		N[spacing]	
-	)
+    (
+        vdb["setVoxelSize"[spacing]];
+        N[spacing]	
+    )
 
 
 openVDBSetVoxelSize[___] = $Failed;
@@ -231,19 +231,19 @@ setterArguments[___] = $Failed;
 
 
 $setterPropertyAssoc = <|
-	"BackgroundValue" -> openVDBSetBackgroundValue,
-	"Creator" -> openVDBSetCreator,
-	"Description" -> openVDBSetDescription,
-	"GridClass" -> openVDBSetGridClass,
-	"Name" -> openVDBSetName,
-	"VoxelSize" -> openVDBSetVoxelSize
+    "BackgroundValue" -> openVDBSetBackgroundValue,
+    "Creator" -> openVDBSetCreator,
+    "Description" -> openVDBSetDescription,
+    "GridClass" -> openVDBSetGridClass,
+    "Name" -> openVDBSetName,
+    "VoxelSize" -> openVDBSetVoxelSize
 |>;
 
 
 setVDBProperty[id_, prop_, val_] :=
-	With[{setter = Lookup[$setterPropertyAssoc, prop, $Failed]},
-		setter[id, val] /; setter =!= $Failed
-	]
+    With[{setter = Lookup[$setterPropertyAssoc, prop, $Failed]},
+        setter[id, val] /; setter =!= $Failed
+    ]
 
 
 setVDBProperty[__] = $Failed;

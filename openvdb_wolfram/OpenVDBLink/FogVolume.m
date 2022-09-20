@@ -39,9 +39,9 @@ OpenVDBToFogVolume[args___] /; !CheckArgs[OpenVDBToFogVolume[args], {1, 2}] = $F
 
 
 OpenVDBToFogVolume[args___] :=
-	With[{res = iOpenVDBToFogVolume[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBToFogVolume[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBToFogVolume[args___] := mOpenVDBToFogVolume[args]
@@ -52,18 +52,18 @@ OpenVDBToFogVolume[args___] := mOpenVDBToFogVolume[args]
 
 
 iOpenVDBToFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	Block[{wcutoff},
-		wcutoff = If[TrueQ[Positive[cutoff]],
-			cutoff,
-			halfWidth[vdb]
-		];
-		
-		wcutoff = regimeConvert[vdb, wcutoff, regime -> $worldregime];
-		
-		vdb["levelSetToFogVolume"[wcutoff]];
-		
-		vdb
-	]
+    Block[{wcutoff},
+        wcutoff = If[TrueQ[Positive[cutoff]],
+            cutoff,
+            halfWidth[vdb]
+        ];
+        
+        wcutoff = regimeConvert[vdb, wcutoff, regime -> $worldregime];
+        
+        vdb["levelSetToFogVolume"[wcutoff]];
+        
+        vdb
+    ]
 
 
 iOpenVDBToFogVolume[vdb_] := iOpenVDBToFogVolume[vdb, Automatic -> $indexregime]
@@ -113,9 +113,9 @@ OpenVDBFogVolume[args___] /; !CheckArgs[OpenVDBFogVolume[args], {1, 2}] = $Faile
 
 
 OpenVDBFogVolume[args___] :=
-	With[{res = iOpenVDBFogVolume[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBFogVolume[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBFogVolume[args___] := mOpenVDBFogVolume[args]
@@ -126,13 +126,13 @@ OpenVDBFogVolume[args___] := mOpenVDBFogVolume[args]
 
 
 iOpenVDBFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] :=
-	Block[{vdbcopy},
-		vdbcopy = OpenVDBCopyGrid[vdb];
-		
-		iOpenVDBToFogVolume[vdbcopy, cutoff -> regime];
-		
-		vdbcopy
-	]
+    Block[{vdbcopy},
+        vdbcopy = OpenVDBCopyGrid[vdb];
+        
+        iOpenVDBToFogVolume[vdbcopy, cutoff -> regime];
+        
+        vdbcopy
+    ]
 
 
 iOpenVDBFogVolume[vdb_] := iOpenVDBFogVolume[vdb, Automatic -> $indexregime]

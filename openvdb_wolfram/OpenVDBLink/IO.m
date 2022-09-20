@@ -39,9 +39,9 @@ OpenVDBImport[args___] /; !CheckArgs[OpenVDBImport[args], {1, 3}] = $Failed;
 
 
 OpenVDBImport[args___] :=
-	With[{res = iOpenVDBImport[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBImport[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBImport[args___] := mOpenVDBImport[args]
@@ -58,20 +58,20 @@ iOpenVDBImport[file_String] := iOpenVDBImport[file, Automatic]
 
 
 iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
-	Block[{name, type, vdb, id, successQ},
-		name = If[StringQ[iname], iname, ""];
-		type = If[itype === Automatic, detectVDBType[file, name], itype];
-		(
-			vdb = OpenVDBCreateGrid[1.0, type];
-			(	
-				successQ = vdb["importVDB"[file, name]];
-				
-				vdb /; successQ
-				
-			) /; OpenVDBGridQ[vdb]
-			
-		) /; type =!= $Failed
-	]
+    Block[{name, type, vdb, id, successQ},
+        name = If[StringQ[iname], iname, ""];
+        type = If[itype === Automatic, detectVDBType[file, name], itype];
+        (
+            vdb = OpenVDBCreateGrid[1.0, type];
+            (	
+                successQ = vdb["importVDB"[file, name]];
+                
+                vdb /; successQ
+                
+            ) /; OpenVDBGridQ[vdb]
+            
+        ) /; type =!= $Failed
+    ]
 
 
 iOpenVDBImport[___] = $Failed;
@@ -92,18 +92,18 @@ addCodeCompletion[OpenVDBImport][None, None, $gridTypeList];
 
 
 detectVDBType[file_, name_] :=
-	Block[{vdb, type, wltype},
-		(* create a grid of any type since it has the base methods *)
-		vdb = OpenVDBCreateGrid[1.0, "Scalar"];
-		
-		type = vdb["importVDBType"[file, name]];
-		(
-			wltype = fromInternalType[type];
-			
-			wltype /; StringQ[wltype]
-		
-		) /; StringQ[type]
-	]
+    Block[{vdb, type, wltype},
+        (* create a grid of any type since it has the base methods *)
+        vdb = OpenVDBCreateGrid[1.0, "Scalar"];
+        
+        type = vdb["importVDBType"[file, name]];
+        (
+            wltype = fromInternalType[type];
+            
+            wltype /; StringQ[wltype]
+        
+        ) /; StringQ[type]
+    ]
 
 
 detectVDBType[___] = $Failed;
@@ -114,17 +114,17 @@ detectVDBType[___] = $Failed;
 
 
 mOpenVDBImport[expr_, ___] /; !FileExistsQ[expr] :=
-	(
-		Message[OpenVDBImport::nffil, expr, Import];
-		$Failed
-	)
+    (
+        Message[OpenVDBImport::nffil, expr, Import];
+        $Failed
+    )
 
 
 mOpenVDBImport[expr_, _, type_, ___] /; type =!= Automatic && !MemberQ[$gridTypeList, type] :=
-	(
-		Message[OpenVDBImport::type, type];
-		$Failed
-	)
+    (
+        Message[OpenVDBImport::type, type];
+        $Failed
+    )
 
 
 mOpenVDBImport[___] = $Failed;
@@ -151,9 +151,9 @@ OpenVDBExport[args___] /; !CheckArgs[OpenVDBExport[args], {1, 2}] = $Failed;
 
 
 OpenVDBExport[args___] :=
-	With[{res = iOpenVDBExport[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBExport[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBExport[args___] := mOpenVDBExport[args]
@@ -170,11 +170,11 @@ iOpenVDBExport[File[file_String], args___] := iOpenVDBExport[file, args]
 
 
 iOpenVDBExport[file_String, vdb_?OpenVDBGridQ, OptionsPattern[]] :=
-	If[fileExportQ[file, OptionValue[OverwriteTarget]],		
-		vdb["exportVDB"[file]];
-		file,
-		$Failed
-	]
+    If[fileExportQ[file, OptionValue[OverwriteTarget]],		
+        vdb["exportVDB"[file]];
+        file,
+        $Failed
+    ]
 
 
 iOpenVDBExport[___] = $Failed;
@@ -195,14 +195,14 @@ SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
 
 
 fileExportQ[filename_, overwriteQ_] :=
-	If[!FileExistsQ[filename],
-		True,
-		If[TrueQ[overwriteQ],
-			True,
-			Message[OpenVDBExport::filex, filename];
-			False
-		]
-	 ];
+    If[!FileExistsQ[filename],
+        True,
+        If[TrueQ[overwriteQ],
+            True,
+            Message[OpenVDBExport::filex, filename];
+            False
+        ]
+     ];
 
 
 OpenVDBExport::filex = "Cannot overwrite existing file `1`.";
@@ -213,10 +213,10 @@ OpenVDBExport::filex = "Cannot overwrite existing file `1`.";
 
 
 mOpenVDBExport[expr_, ___] /; !MatchQ[expr, File[_String]|_String] :=
-	(
-		Message[OpenVDBExport::chtype, expr];
-		$Failed
-	)
+    (
+        Message[OpenVDBExport::chtype, expr];
+        $Failed
+    )
 
 
 mOpenVDBExport[_, expr_, ___] /; messageGridQ[expr, OpenVDBExport] = $Failed;

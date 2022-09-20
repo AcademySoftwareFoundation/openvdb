@@ -49,9 +49,9 @@ OpenVDBActiveVoxelSliceTotals[args___] /; !CheckArgs[OpenVDBActiveVoxelSliceTota
 
 
 OpenVDBActiveVoxelSliceTotals[args___] :=
-	With[{res = iOpenVDBActiveVoxelSliceTotals[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBActiveVoxelSliceTotals[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBActiveVoxelSliceTotals[args___] := mOpenVDBActiveVoxelSliceTotals[args]
@@ -62,16 +62,16 @@ OpenVDBActiveVoxelSliceTotals[args___] := mOpenVDBActiveVoxelSliceTotals[args]
 
 
 iOpenVDBActiveVoxelSliceTotals[vdb_?carefulNonMaskGridQ, {z1_, z2_} -> regime_?regimeQ, cntfunc_] /; z1 <= z2 :=
-	Block[{zindex, counter, counts},
-		zindex = regimeConvert[vdb, {z1, z2}, regime -> $indexregime];
-		counter = parseSliceTotalCounter[cntfunc];
-		(
-			counts = vdb[counter[##]]& @@ zindex;
-			
-			counts /; ArrayQ[counts, _, NumericQ]
-			
-		) /; StringQ[counter] && (cntfunc === "Count" || !OpenVDBBooleanGridQ[vdb])
-	]
+    Block[{zindex, counter, counts},
+        zindex = regimeConvert[vdb, {z1, z2}, regime -> $indexregime];
+        counter = parseSliceTotalCounter[cntfunc];
+        (
+            counts = vdb[counter[##]]& @@ zindex;
+            
+            counts /; ArrayQ[counts, _, NumericQ]
+            
+        ) /; StringQ[counter] && (cntfunc === "Count" || !OpenVDBBooleanGridQ[vdb])
+    ]
 
 
 iOpenVDBActiveVoxelSliceTotals[vdb_, {z1_?NumericQ, z2_?NumericQ}, args___] := iOpenVDBActiveVoxelSliceTotals[vdb, {z1, z2} -> $indexregime, args]
@@ -122,12 +122,12 @@ mOpenVDBActiveVoxelSliceTotals[_, zspec_, ___] /; messageZSpecQ[zspec, OpenVDBAc
 
 
 mOpenVDBActiveVoxelSliceTotals[_, _, cntfunc_] :=
-	(
-		If[parseSliceTotalCounter[cntfunc] === $Failed,
-			Message[OpenVDBActiveVoxelSliceTotals::cntr, cntfunc, 3]
-		];
-		$Failed
-	);
+    (
+        If[parseSliceTotalCounter[cntfunc] === $Failed,
+            Message[OpenVDBActiveVoxelSliceTotals::cntr, cntfunc, 3]
+        ];
+        $Failed
+    );
 
 
 mOpenVDBActiveVoxelSliceTotals[___] = $Failed;
@@ -155,9 +155,9 @@ OpenVDBSlice[args___] /; !CheckArgs[OpenVDBSlice[args], {1, 3}] = $Failed;
 
 
 OpenVDBSlice[args___] :=
-	With[{res = iOpenVDBSlice[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSlice[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSlice[args___] := mOpenVDBSlice[args]
@@ -171,17 +171,17 @@ Options[iOpenVDBSlice] = Options[OpenVDBSlice];
 
 
 iOpenVDBSlice[vdb_?carefulNonMaskGridQ, z_?NumericQ -> regime_?regimeQ, bds_?bounds2DQ, OptionsPattern[]] :=
-	Block[{mirrorQ, threadedQ, zindex, bdsindex, data},
-		mirrorQ = TrueQ[OptionValue["MirrorSlice"]];
-		threadedQ = True;
-		
-		zindex = regimeConvert[vdb, z, regime -> $indexregime];
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		
-		data = vdb["gridSlice"[zindex, bdsindex, mirrorQ, threadedQ]];
-		
-		data /; ArrayQ[data]
-	]
+    Block[{mirrorQ, threadedQ, zindex, bdsindex, data},
+        mirrorQ = TrueQ[OptionValue["MirrorSlice"]];
+        threadedQ = True;
+        
+        zindex = regimeConvert[vdb, z, regime -> $indexregime];
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        
+        data = vdb["gridSlice"[zindex, bdsindex, mirrorQ, threadedQ]];
+        
+        data /; ArrayQ[data]
+    ]
 
 
 iOpenVDBSlice[vdb_, z_?NumericQ, args___] := iOpenVDBSlice[vdb, z -> $indexregime, args]
@@ -244,9 +244,9 @@ OpenVDBData[args___] /; !CheckArgs[OpenVDBData[args], {1, 2}] = $Failed;
 
 
 OpenVDBData[args___] :=
-	With[{res = iOpenVDBData[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBData[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBData[args___] := mOpenVDBData[args]
@@ -257,12 +257,12 @@ OpenVDBData[args___] := mOpenVDBData[args]
 
 
 iOpenVDBData[vdb_?carefulNonMaskGridQ, bds_?bounds3DQ -> regime_?regimeQ] :=
-	Block[{bdsindex, data},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		data = vdb["gridData"[bdsindex]];
-			
-		data /; ArrayQ[data]
-	]
+    Block[{bdsindex, data},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        data = vdb["gridData"[bdsindex]];
+            
+        data /; ArrayQ[data]
+    ]
 
 
 iOpenVDBData[vdb_?carefulNonMaskGridQ] := iOpenVDBData[vdb, vdb["IndexBoundingBox"] -> $indexregime]
@@ -275,11 +275,11 @@ iOpenVDBData[vdb_, bspec_List] /; bounds3DQ[bspec] || intervalQ[bspec] := iOpenV
 
 
 iOpenVDBData[vdb_?carefulNonMaskGridQ, int_?intervalQ -> regime_?regimeQ] :=
-	Block[{bds2d},
-		bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-		
-		iOpenVDBData[vdb, Append[bds2d, int] -> regime] /; bounds2DQ[bds2d]
-	]
+    Block[{bds2d},
+        bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
+        
+        iOpenVDBData[vdb, Append[bds2d, int] -> regime] /; bounds2DQ[bds2d]
+    ]
 
 
 iOpenVDBData[___] = $Failed;
@@ -333,9 +333,9 @@ OpenVDBActiveTiles[args___] /; !CheckArgs[OpenVDBActiveTiles[args], {1, 2}] = $F
 
 
 OpenVDBActiveTiles[args___] :=
-	With[{res = iOpenVDBActiveTiles[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBActiveTiles[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBActiveTiles[args___] := mOpenVDBActiveTiles[args]
@@ -349,14 +349,14 @@ Options[iOpenVDBActiveTiles] = Options[OpenVDBActiveTiles];
 
 
 iOpenVDBActiveTiles[vdb_?OpenVDBGridQ, bds_?bounds3DQ -> regime_?regimeQ, OptionsPattern[]] :=
-	Block[{bdsindex, partialoverlap, tiles},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		partialoverlap = TrueQ[OptionValue["PartialOverlap"]];
-		
-		tiles = vdb["activeTiles"[bdsindex, partialoverlap]];
-		
-		tiles /; ListQ[tiles]
-	]
+    Block[{bdsindex, partialoverlap, tiles},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        partialoverlap = TrueQ[OptionValue["PartialOverlap"]];
+        
+        tiles = vdb["activeTiles"[bdsindex, partialoverlap]];
+        
+        tiles /; ListQ[tiles]
+    ]
 
 
 iOpenVDBActiveTiles[vdb_?OpenVDBGridQ, opts:OptionsPattern[]] := iOpenVDBActiveTiles[vdb, vdb["IndexBoundingBox"] -> $indexregime, opts]
@@ -409,9 +409,9 @@ OpenVDBActiveVoxels[args___] /; !CheckArgs[OpenVDBActiveVoxels[args], {1, 3}] = 
 
 
 OpenVDBActiveVoxels[args___] :=
-	With[{res = pOpenVDBActiveVoxels[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = pOpenVDBActiveVoxels[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBActiveVoxels[args___] := mOpenVDBActiveVoxels[args]
@@ -422,13 +422,13 @@ OpenVDBActiveVoxels[args___] := mOpenVDBActiveVoxels[args]
 
 
 pOpenVDBActiveVoxels[vdb_?OpenVDBGridQ, bds_?bounds3DQ -> regime_?regimeQ, ret_] :=
-	Block[{bdsindex, res},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		
-		res = iOpenVDBActiveVoxels[vdb, bdsindex, ret];
-		
-		res /; res =!= $Failed
-	]
+    Block[{bdsindex, res},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        
+        res = iOpenVDBActiveVoxels[vdb, bdsindex, ret];
+        
+        res /; res =!= $Failed
+    ]
 
 
 pOpenVDBActiveVoxels[vdb_?OpenVDBGridQ] := pOpenVDBActiveVoxels[vdb, vdb["IndexBoundingBox"] -> $indexregime]
@@ -467,62 +467,62 @@ addCodeCompletion[OpenVDBActiveVoxels][None, None, {"SparseArray", "Positions", 
 
 
 iOpenVDBActiveVoxels[vdb_, bds_, "SparseArray"|Automatic] /; AnyTrue[{OpenVDBScalarGridQ, OpenVDBIntegerGridQ, OpenVDBBooleanGridQ}, #[vdb]&] :=
-	Block[{res},
-		res = vdb["activeVoxels"[bds]];
-		
-		res /; ArrayQ[res, 3]
-	]
+    Block[{res},
+        res = vdb["activeVoxels"[bds]];
+        
+        res /; ArrayQ[res, 3]
+    ]
 
 
 iOpenVDBActiveVoxels[vdb_?OpenVDBVectorGridQ, bds_, "SparseArray"|Automatic] :=
-	Block[{pos, vals, dims, offset, res},
-		pos = iOpenVDBActiveVoxels[vdb, bds, "Positions"];
-		vals = iOpenVDBActiveVoxels[vdb, bds, "Values"];
-		(
-			dims = Abs[Subtract @@@ bds] + 1;
-			offset = 1 - bds[[All, 1]];
-			
-			Statistics`Library`MatrixRowTranslate[pos, offset];
-			
-			res = SparseArray[pos -> #, dims]& /@ Transpose[vals];
-			
-			res /; VectorQ[res, ArrayQ[#, 3]&]
-			
-		) /; pos =!= $Failed && vals =!= $Failed
-	]
+    Block[{pos, vals, dims, offset, res},
+        pos = iOpenVDBActiveVoxels[vdb, bds, "Positions"];
+        vals = iOpenVDBActiveVoxels[vdb, bds, "Values"];
+        (
+            dims = Abs[Subtract @@@ bds] + 1;
+            offset = 1 - bds[[All, 1]];
+            
+            Statistics`Library`MatrixRowTranslate[pos, offset];
+            
+            res = SparseArray[pos -> #, dims]& /@ Transpose[vals];
+            
+            res /; VectorQ[res, ArrayQ[#, 3]&]
+            
+        ) /; pos =!= $Failed && vals =!= $Failed
+    ]
 
 
 iOpenVDBActiveVoxels[vdb_?OpenVDBMaskGridQ, bds_, "SparseArray"|Automatic] :=
-	Block[{pos, dims, offset},
-		pos = vdb["activeVoxelPositions"[bds]];
-		(
-			dims = 1 + Abs[Subtract @@@ bds];
-			offset = 1 - bds[[All, 1]];
-			
-			Statistics`Library`MatrixRowTranslate[pos, offset];
-			(
-				SparseArray[pos -> _, dims]
-				
-			) /; Min[dims] > 0
-			
-		) /; MatrixQ[pos, IntegerQ]
-	]
+    Block[{pos, dims, offset},
+        pos = vdb["activeVoxelPositions"[bds]];
+        (
+            dims = 1 + Abs[Subtract @@@ bds];
+            offset = 1 - bds[[All, 1]];
+            
+            Statistics`Library`MatrixRowTranslate[pos, offset];
+            (
+                SparseArray[pos -> _, dims]
+                
+            ) /; Min[dims] > 0
+            
+        ) /; MatrixQ[pos, IntegerQ]
+    ]
 
 
 iOpenVDBActiveVoxels[vdb_, bds_, "Positions"] :=
-	Block[{res},
-		res = vdb["activeVoxelPositions"[bds]];
-		
-		res /; MatrixQ[res, IntegerQ]
-	]
+    Block[{res},
+        res = vdb["activeVoxelPositions"[bds]];
+        
+        res /; MatrixQ[res, IntegerQ]
+    ]
 
 
 iOpenVDBActiveVoxels[vdb_?nonMaskGridQ, bds_, "Values"] :=
-	Block[{res},
-		res = vdb["activeVoxelValues"[bds]];
-		
-		res /; ArrayQ[res, _, NumericQ]
-	]
+    Block[{res},
+        res = vdb["activeVoxelValues"[bds]];
+        
+        res /; ArrayQ[res, _, NumericQ]
+    ]
 
 
 iOpenVDBActiveVoxels[___] = $Failed;
@@ -539,17 +539,17 @@ mOpenVDBActiveVoxels[_, bbox_, ___] /; message3DBBoxQ[bbox, OpenVDBActiveVoxels]
 
 
 mOpenVDBActiveVoxels[_, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Positions"|"Values"|Automatic] :=
-	(
-		Message[OpenVDBActiveVoxels::rettype, 3];
-		$Failed
-	)
+    (
+        Message[OpenVDBActiveVoxels::rettype, 3];
+        $Failed
+    )
 
 
 mOpenVDBActiveVoxels[_?OpenVDBMaskGridQ, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Values"] :=
-	(
-		Message[OpenVDBActiveVoxels::mask];
-		$Failed
-	)
+    (
+        Message[OpenVDBActiveVoxels::mask];
+        $Failed
+    )
 
 
 mOpenVDBActiveVoxels[___] = $Failed;

@@ -98,34 +98,34 @@ $classTypeList = {$scalarType, $vectorType, $integerType, $booleanType, $maskTyp
 
 
 $GridClassData = <|
-	$scalarType  -> <|
-		"Double" -> <|"ClassName" -> "OpenVDBDoubleGrid", "TreeName" -> "Tree_double_5_4_3", "WLBaseType" -> Real, "PixelClass" -> True|>,
-		"Float"  -> <|"ClassName" -> "OpenVDBFloatGrid",  "TreeName" -> "Tree_float_5_4_3",  "WLBaseType" -> Real, "PixelClass" -> True, "Alias" -> "Scalar"|>
-	|>,
-	
-	$integerType -> <|
-		"Byte"   -> <|"ClassName" -> "OpenVDBByteGrid",   "TreeName" -> "Tree_uint8_5_4_3",  "WLBaseType" -> Integer, "PixelClass" -> True|>,
-		"Int32"  -> <|"ClassName" -> "OpenVDBInt32Grid",  "TreeName" -> "Tree_int32_5_4_3",  "WLBaseType" -> Integer|>,
-		"Int64"  -> <|"ClassName" -> "OpenVDBInt64Grid",  "TreeName" -> "Tree_int64_5_4_3",  "WLBaseType" -> Integer|>,
-		"UInt32" -> <|"ClassName" -> "OpenVDBUInt32Grid", "TreeName" -> "Tree_uint32_5_4_3", "WLBaseType" -> Integer|>
-	|>,
-	
-	$vectorType -> <|
-		"Vec2D" -> <|"ClassName" -> "OpenVDBVec2DGrid", "TreeName" -> "Tree_vec2d_5_4_3", "WLBaseType" -> Real|>,
-		"Vec2I" -> <|"ClassName" -> "OpenVDBVec2IGrid", "TreeName" -> "Tree_vec2i_5_4_3", "WLBaseType" -> Integer|>,
-		"Vec2S" -> <|"ClassName" -> "OpenVDBVec2SGrid", "TreeName" -> "Tree_vec2s_5_4_3", "WLBaseType" -> Real|>,
-		"Vec3D" -> <|"ClassName" -> "OpenVDBVec3DGrid", "TreeName" -> "Tree_vec3d_5_4_3", "WLBaseType" -> Real|>,
-		"Vec3I" -> <|"ClassName" -> "OpenVDBVec3IGrid", "TreeName" -> "Tree_vec3i_5_4_3", "WLBaseType" -> Integer|>,
-		"Vec3S" -> <|"ClassName" -> "OpenVDBVec3SGrid", "TreeName" -> "Tree_vec3s_5_4_3", "WLBaseType" -> Real, "Alias" -> "Vector"|>
-	|>,
-	
-	$booleanType -> <|
-		$booleanType -> <|"ClassName" -> "OpenVDBBoolGrid", "TreeName" -> "Tree_bool_5_4_3", "WLBaseType" -> Integer, "PixelClass" -> True|>
-	|>,
-	
-	$maskType -> <|
-		$maskType -> <|"ClassName" -> "OpenVDBMaskGrid", "TreeName" -> "Tree_mask_5_4_3", "PixelClass" -> True|>
-	|>
+    $scalarType  -> <|
+        "Double" -> <|"ClassName" -> "OpenVDBDoubleGrid", "TreeName" -> "Tree_double_5_4_3", "WLBaseType" -> Real, "PixelClass" -> True|>,
+        "Float"  -> <|"ClassName" -> "OpenVDBFloatGrid",  "TreeName" -> "Tree_float_5_4_3",  "WLBaseType" -> Real, "PixelClass" -> True, "Alias" -> "Scalar"|>
+    |>,
+    
+    $integerType -> <|
+        "Byte"   -> <|"ClassName" -> "OpenVDBByteGrid",   "TreeName" -> "Tree_uint8_5_4_3",  "WLBaseType" -> Integer, "PixelClass" -> True|>,
+        "Int32"  -> <|"ClassName" -> "OpenVDBInt32Grid",  "TreeName" -> "Tree_int32_5_4_3",  "WLBaseType" -> Integer|>,
+        "Int64"  -> <|"ClassName" -> "OpenVDBInt64Grid",  "TreeName" -> "Tree_int64_5_4_3",  "WLBaseType" -> Integer|>,
+        "UInt32" -> <|"ClassName" -> "OpenVDBUInt32Grid", "TreeName" -> "Tree_uint32_5_4_3", "WLBaseType" -> Integer|>
+    |>,
+    
+    $vectorType -> <|
+        "Vec2D" -> <|"ClassName" -> "OpenVDBVec2DGrid", "TreeName" -> "Tree_vec2d_5_4_3", "WLBaseType" -> Real|>,
+        "Vec2I" -> <|"ClassName" -> "OpenVDBVec2IGrid", "TreeName" -> "Tree_vec2i_5_4_3", "WLBaseType" -> Integer|>,
+        "Vec2S" -> <|"ClassName" -> "OpenVDBVec2SGrid", "TreeName" -> "Tree_vec2s_5_4_3", "WLBaseType" -> Real|>,
+        "Vec3D" -> <|"ClassName" -> "OpenVDBVec3DGrid", "TreeName" -> "Tree_vec3d_5_4_3", "WLBaseType" -> Real|>,
+        "Vec3I" -> <|"ClassName" -> "OpenVDBVec3IGrid", "TreeName" -> "Tree_vec3i_5_4_3", "WLBaseType" -> Integer|>,
+        "Vec3S" -> <|"ClassName" -> "OpenVDBVec3SGrid", "TreeName" -> "Tree_vec3s_5_4_3", "WLBaseType" -> Real, "Alias" -> "Vector"|>
+    |>,
+    
+    $booleanType -> <|
+        $booleanType -> <|"ClassName" -> "OpenVDBBoolGrid", "TreeName" -> "Tree_bool_5_4_3", "WLBaseType" -> Integer, "PixelClass" -> True|>
+    |>,
+    
+    $maskType -> <|
+        $maskType -> <|"ClassName" -> "OpenVDBMaskGrid", "TreeName" -> "Tree_mask_5_4_3", "PixelClass" -> True|>
+    |>
 |>;
 
 
@@ -156,31 +156,31 @@ PackageScope["resolveAliasType"]
 
 
 Block[{alltypes, typetreegroups},
-	alltypes = Join @@ Values[$GridClassData];
-	
-	typetreegroups = Join[
-		{#["Alias"], #["TreeName"], #["ClassName"]}& /@ Values[alltypes],
-		KeyValueMap[{#1, #2["TreeName"], #2["ClassName"]}&, alltypes]
-	];
-	
-	typetreegroups = Transpose[DeleteMissing[typetreegroups, 1, 2]];
-	
-	$gridTypeList = typetreegroups[[1]];
-	$internalTypeList = typetreegroups[[2]];
-	
-	Clear[typeClass];
-	Block[{$Context = "OpenVDBLink`LTemplate`Classes`"},
-		MapThread[(typeClass[#1] = Symbol[#3])&, typetreegroups];
-	];
-	
-	KeyValueMap[Function[{k, v},
-		If[!MissingQ[v["Alias"]],
-			aliasTypeQ[v["Alias"]] = True;
-			resolveAliasType[v["Alias"]] = k;
-		]
-	], alltypes];
-	
-	aliasTypeQ[_] = False;
+    alltypes = Join @@ Values[$GridClassData];
+    
+    typetreegroups = Join[
+        {#["Alias"], #["TreeName"], #["ClassName"]}& /@ Values[alltypes],
+        KeyValueMap[{#1, #2["TreeName"], #2["ClassName"]}&, alltypes]
+    ];
+    
+    typetreegroups = Transpose[DeleteMissing[typetreegroups, 1, 2]];
+    
+    $gridTypeList = typetreegroups[[1]];
+    $internalTypeList = typetreegroups[[2]];
+    
+    Clear[typeClass];
+    Block[{$Context = "OpenVDBLink`LTemplate`Classes`"},
+        MapThread[(typeClass[#1] = Symbol[#3])&, typetreegroups];
+    ];
+    
+    KeyValueMap[Function[{k, v},
+        If[!MissingQ[v["Alias"]],
+            aliasTypeQ[v["Alias"]] = True;
+            resolveAliasType[v["Alias"]] = k;
+        ]
+    ], alltypes];
+    
+    aliasTypeQ[_] = False;
 ]
 
 
@@ -226,65 +226,65 @@ LVDBBaseGridClass[class_String, members_List] := LClass[class, Join[vdbBaseGridM
 
 
 vdbBaseGridMembers[class_] :=
-	{
-		(* ------------ creation, deletion ------------ *)
-		LFun["createEmptyGrid", {}, "Void"],
-		LFun["deleteGrid", {}, "Void"],
-		LFun["copyGrid", {LExpressionID[class]}, "Void"],
-		
-		(* ------------ IO ------------ *)
-		LFun["importVDBType", {"UTF8String", "UTF8String"}, "UTF8String"],
-		LFun["importVDB", {"UTF8String", "UTF8String"}, "Boolean"],
-		LFun["exportVDB", {"UTF8String"}, "Void"],
-		
-		(* ------------ setters ------------ *)
-		LFun["setActiveStates", {{Integer, 2, "Constant"}, {Integer, 1, "Constant"}}, "Void"],
-		LFun["setGridClass", {Integer}, "Void"],
-		LFun["setCreator", {"UTF8String"}, "Void"],
-		LFun["setName", {"UTF8String"}, "Void"],
-		LFun["setVoxelSize", {Real}, "Void"],
-				
-		(* ------------ getters ------------ *)
-		LFun["getActiveStates", {{Integer, 2, "Constant"}}, {Integer, 1}],
-		LFun["getActiveLeafVoxelCount", {}, Integer],
-		LFun["getActiveTileCount", {}, Integer],
-		LFun["getActiveVoxelCount", {}, Integer],
-		LFun["getGridClass", {}, Integer],
-		LFun["getCreator", {}, "UTF8String"],
-		LFun["getGridBoundingBox", {}, {Integer, 2}],
-		LFun["getGridDimensions", {}, {Integer, 1}],
-		LFun["getGridType", {}, "UTF8String"],
-		LFun["getHasUniformVoxels", {}, "Boolean"],
-		LFun["getIsEmpty", {}, "Boolean"],
-		LFun["getMemoryUsage", {}, Integer],
-		LFun["getName", {}, "UTF8String"],
-		LFun["getVoxelSize", {}, Real],
-				
-		(* ------------ Metadata ------------ *)
-		LFun["getBooleanMetadata", {"UTF8String"}, "Boolean"],
-		LFun["getIntegerMetadata", {"UTF8String"}, Integer],
-		LFun["getRealMetadata", {"UTF8String"}, Real],
-		LFun["getStringMetadata", {"UTF8String"}, "UTF8String"],
-		LFun["setBooleanMetadata", {"UTF8String", "Boolean"}, "Void"],
-		LFun["setStringMetadata", {"UTF8String", "UTF8String"}, "Void"],
-		LFun["setDescription", {"UTF8String"}, "Void"],
-		
-		(* ------------ grid transformation ------------ *)
-		LFun["transformGrid", {LExpressionID[class], {Real, 2, "Constant"}, Integer}, "Void"],
-		
-		(* ------------ aggregate data ------------ *)
-		LFun["sliceVoxelCounts", {Integer, Integer}, {Integer, 1}],
-		LFun["activeTiles", {{Integer, 2, "Constant"}, "Boolean"}, {Integer, 3}],
-		LFun["activeVoxelPositions", {{Integer, 2, "Constant"}}, {Integer, 2}]
-	};
+    {
+        (* ------------ creation, deletion ------------ *)
+        LFun["createEmptyGrid", {}, "Void"],
+        LFun["deleteGrid", {}, "Void"],
+        LFun["copyGrid", {LExpressionID[class]}, "Void"],
+        
+        (* ------------ IO ------------ *)
+        LFun["importVDBType", {"UTF8String", "UTF8String"}, "UTF8String"],
+        LFun["importVDB", {"UTF8String", "UTF8String"}, "Boolean"],
+        LFun["exportVDB", {"UTF8String"}, "Void"],
+        
+        (* ------------ setters ------------ *)
+        LFun["setActiveStates", {{Integer, 2, "Constant"}, {Integer, 1, "Constant"}}, "Void"],
+        LFun["setGridClass", {Integer}, "Void"],
+        LFun["setCreator", {"UTF8String"}, "Void"],
+        LFun["setName", {"UTF8String"}, "Void"],
+        LFun["setVoxelSize", {Real}, "Void"],
+                
+        (* ------------ getters ------------ *)
+        LFun["getActiveStates", {{Integer, 2, "Constant"}}, {Integer, 1}],
+        LFun["getActiveLeafVoxelCount", {}, Integer],
+        LFun["getActiveTileCount", {}, Integer],
+        LFun["getActiveVoxelCount", {}, Integer],
+        LFun["getGridClass", {}, Integer],
+        LFun["getCreator", {}, "UTF8String"],
+        LFun["getGridBoundingBox", {}, {Integer, 2}],
+        LFun["getGridDimensions", {}, {Integer, 1}],
+        LFun["getGridType", {}, "UTF8String"],
+        LFun["getHasUniformVoxels", {}, "Boolean"],
+        LFun["getIsEmpty", {}, "Boolean"],
+        LFun["getMemoryUsage", {}, Integer],
+        LFun["getName", {}, "UTF8String"],
+        LFun["getVoxelSize", {}, Real],
+                
+        (* ------------ Metadata ------------ *)
+        LFun["getBooleanMetadata", {"UTF8String"}, "Boolean"],
+        LFun["getIntegerMetadata", {"UTF8String"}, Integer],
+        LFun["getRealMetadata", {"UTF8String"}, Real],
+        LFun["getStringMetadata", {"UTF8String"}, "UTF8String"],
+        LFun["setBooleanMetadata", {"UTF8String", "Boolean"}, "Void"],
+        LFun["setStringMetadata", {"UTF8String", "UTF8String"}, "Void"],
+        LFun["setDescription", {"UTF8String"}, "Void"],
+        
+        (* ------------ grid transformation ------------ *)
+        LFun["transformGrid", {LExpressionID[class], {Real, 2, "Constant"}, Integer}, "Void"],
+        
+        (* ------------ aggregate data ------------ *)
+        LFun["sliceVoxelCounts", {Integer, Integer}, {Integer, 1}],
+        LFun["activeTiles", {{Integer, 2, "Constant"}, "Boolean"}, {Integer, 3}],
+        LFun["activeVoxelPositions", {{Integer, 2, "Constant"}}, {Integer, 2}]
+    };
 
 
 vdbBaseGridPixelMembers[class_?pixelClassQ] :=
 {	
-	(* ------------ Image ------------ *)
-	LFun["depthMap", {{Integer, 2, "Constant"}, Real, Real, Real}, LType["Image", "Real32"]],
-	LFun["gridSliceImage", {Integer, {Integer, 2, "Constant"}, "Boolean", "Boolean"}, LType["Image"]],
-	LFun["gridImage3D", {{Integer, 2, "Constant"}}, LType["Image3D"]]
+    (* ------------ Image ------------ *)
+    LFun["depthMap", {{Integer, 2, "Constant"}, Real, Real, Real}, LType["Image", "Real32"]],
+    LFun["gridSliceImage", {Integer, {Integer, 2, "Constant"}, "Boolean", "Boolean"}, LType["Image"]],
+    LFun["gridImage3D", {{Integer, 2, "Constant"}}, LType["Image3D"]]
 }
 
 
@@ -296,40 +296,40 @@ vdbBaseGridPixelMembers[___] = {};
 
 
 LVDBBaseNumericGrid[class_String, type_, rank_, members_List] :=
-	LClass[
-		class,
-		Join[
-			vdbBaseGridMembers[class],
-			vdbBaseGridPixelMembers[class],
-			vdbBaseNumericGridMembers[class, type, rank],
-			members
-		]
-	]
+    LClass[
+        class,
+        Join[
+            vdbBaseGridMembers[class],
+            vdbBaseGridPixelMembers[class],
+            vdbBaseNumericGridMembers[class, type, rank],
+            members
+        ]
+    ]
 
 
 vdbBaseNumericGridMembers[class_, type_, rank_] :=
 With[{
-	$scalarinput = scalarInput[type, rank], $scalaroutput = scalarOutput[type, rank],
-	$vectorinput = vectorInput[type, rank], $vectoroutput = vectorOutput[type, rank],
-	$matrixinput = matrixInput[type, rank], $matrixoutput = matrixOutput[type, rank],
-	$cubeinput   = cubeInput[type, rank],   $cubeoutput   = cubeOutput[type, rank]
+    $scalarinput = scalarInput[type, rank], $scalaroutput = scalarOutput[type, rank],
+    $vectorinput = vectorInput[type, rank], $vectoroutput = vectorOutput[type, rank],
+    $matrixinput = matrixInput[type, rank], $matrixoutput = matrixOutput[type, rank],
+    $cubeinput   = cubeInput[type, rank],   $cubeoutput   = cubeOutput[type, rank]
 },
-	{	
-		(* ------------ setters ------------ *)
-		LFun["setBackgroundValue", {$scalarinput}, "Void"],
-		LFun["setValues", {{Integer, 2, "Constant"}, $vectorinput}, "Void"],
-				
-		(* ------------ getters ------------ *)
-		LFun["getBackgroundValue", {}, $scalaroutput],
-		LFun["getMinMaxValues", {}, $vectoroutput],
-		LFun["getValues", {{Integer, 2, "Constant"}}, $vectoroutput],
-		
-		(* ------------ aggregate data ------------ *)
-		LFun["sliceVoxelValueTotals", {Integer, Integer}, $vectoroutput],
-		LFun["activeVoxelValues", {{Integer, 2, "Constant"}}, $vectoroutput],
-		LFun["gridSlice", {Integer, {Integer, 2, "Constant"}, "Boolean", "Boolean"}, $matrixoutput],
-		LFun["gridData", {{Integer, 2, "Constant"}}, $cubeoutput]
-	}
+    {	
+        (* ------------ setters ------------ *)
+        LFun["setBackgroundValue", {$scalarinput}, "Void"],
+        LFun["setValues", {{Integer, 2, "Constant"}, $vectorinput}, "Void"],
+                
+        (* ------------ getters ------------ *)
+        LFun["getBackgroundValue", {}, $scalaroutput],
+        LFun["getMinMaxValues", {}, $vectoroutput],
+        LFun["getValues", {{Integer, 2, "Constant"}}, $vectoroutput],
+        
+        (* ------------ aggregate data ------------ *)
+        LFun["sliceVoxelValueTotals", {Integer, Integer}, $vectoroutput],
+        LFun["activeVoxelValues", {{Integer, 2, "Constant"}}, $vectoroutput],
+        LFun["gridSlice", {Integer, {Integer, 2, "Constant"}, "Boolean", "Boolean"}, $matrixoutput],
+        LFun["gridData", {{Integer, 2, "Constant"}}, $cubeoutput]
+    }
 ];
 
 
@@ -352,78 +352,78 @@ cubeOutput[type_, rank_]   := {type, rank+3}
 
 
 LVDBScalarGridClass[class_, type_] :=
-	LVDBBaseNumericGrid[class, type, 0,
-		{
-			(* ------------ getters ------------ *)
-			LFun["getHalfwidth", {}, Real],
-			
-			(* ------------ CSG ------------ *)
-			LFun["gridUnion", {LExpressionID[class]}, "Void"],
-			LFun["gridIntersection", {LExpressionID[class]}, "Void"],
-			LFun["gridDifference", {LExpressionID[class]}, "Void"],
-			LFun["gridUnionCopy", {{Integer, 1, "Constant"}}, "Void"],
-			LFun["gridIntersectionCopy", {{Integer, 1, "Constant"}}, "Void"],
-			LFun["gridDifferenceCopy", {LExpressionID[class], LExpressionID[class]}, "Void"],
-			LFun["clipGrid", {LExpressionID[class], {Real, 2, "Constant"}}, "Void"],
-			
-			(* ------------ level set creation ------------ *)
-			LFun["ballLevelSet", {{Real, 1, "Constant"}, Real, Real, Real, "Boolean"}, "Void"],
-			LFun["cuboidLevelSet", {{Real, 2, "Constant"}, Real, Real, "Boolean"}, "Void"],
-			LFun["meshLevelSet", {{Real, 2, "Constant"}, {Integer, 2, "Constant"}, Real, Real, "Boolean"}, "Void"],
-			LFun["offsetSurfaceLevelSet", {{Real, 2, "Constant"}, {Integer, 2, "Constant"}, Real, Real, Real, "Boolean"}, "Void"],
-			
-			(* ------------ level set measure ------------ *)
-			LFun["levelSetGridArea", {}, Real],
-			LFun["levelSetGridEulerCharacteristic", {}, Integer],
-			LFun["levelSetGridGenus", {}, Integer],
-			LFun["levelSetGridVolume", {}, Real],
-			
-			(* ------------ distance measure ------------ *)
-			LFun["gridMember", {{Integer, 2, "Constant"}, Real}, {Integer, 1}],
-			LFun["gridNearest", {{Real, 2, "Constant"}, Real}, {Real, 2}],
-			LFun["gridDistance", {{Real, 2, "Constant"}, Real}, {Real, 1}],
-			LFun["gridSignedDistance", {{Real, 2, "Constant"}, Real}, {Real, 1}],
-			LFun["fillWithBalls", {Integer, Integer, "Boolean", Real, Real, Real, Integer}, {Real, 2}],
-			
-			(* ------------ filters ------------ *)
-			LFun["filterGrid", {Integer, Integer, Integer}, "Void"],
-			
-			(* ------------ mesh creation ------------ *)
-			LFun["meshCellCount", {Real, Real, "Boolean"}, {Integer, 1}],
-			LFun["meshData", {Real, Real, "Boolean"}, {Real, 1}],
-			
-			(* ------------ fog volume ------------ *)
-			LFun["levelSetToFogVolume", {Real}, "Void"],
-			
-			(* ------------ grid transformation ------------ *)
-			LFun["scalarMultiply", {Real}, "Void"],
-			LFun["gammaAdjustment", {Real}, "Void"],
-			
-			(* ------------ morphology ------------ *)
-			LFun["resizeBandwidth", {Real}, "Void"],
-			LFun["offsetLevelSet", {Real}, "Void"],
-			
-			(* ------------ render ------------ *)
-			LFun["renderGrid", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer, {Integer, 1, "Constant"}, Real,
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],
-			
-			LFun["renderGridPBR", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, {Integer, 1, "Constant"}, Real, "Boolean",
-				{Real, 1}, {Real, 1}, {Real, 1},
-				Real, Real, Real, Real,
-				{Real, 1}, Real, Real, Real,
-				Real, Real, Real
-			}, LType["Image", "Byte"]],
-			
-			(*LFun["renderGridVectorColor", {Real, LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], {Real, 1, "Constant"},
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer,
-				{Integer, 1, "Constant"}, Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],*)
-			
-			(* ------------ aggregate data ------------ *)
-			LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Real, 3]]
-		}
-	]
+    LVDBBaseNumericGrid[class, type, 0,
+        {
+            (* ------------ getters ------------ *)
+            LFun["getHalfwidth", {}, Real],
+            
+            (* ------------ CSG ------------ *)
+            LFun["gridUnion", {LExpressionID[class]}, "Void"],
+            LFun["gridIntersection", {LExpressionID[class]}, "Void"],
+            LFun["gridDifference", {LExpressionID[class]}, "Void"],
+            LFun["gridUnionCopy", {{Integer, 1, "Constant"}}, "Void"],
+            LFun["gridIntersectionCopy", {{Integer, 1, "Constant"}}, "Void"],
+            LFun["gridDifferenceCopy", {LExpressionID[class], LExpressionID[class]}, "Void"],
+            LFun["clipGrid", {LExpressionID[class], {Real, 2, "Constant"}}, "Void"],
+            
+            (* ------------ level set creation ------------ *)
+            LFun["ballLevelSet", {{Real, 1, "Constant"}, Real, Real, Real, "Boolean"}, "Void"],
+            LFun["cuboidLevelSet", {{Real, 2, "Constant"}, Real, Real, "Boolean"}, "Void"],
+            LFun["meshLevelSet", {{Real, 2, "Constant"}, {Integer, 2, "Constant"}, Real, Real, "Boolean"}, "Void"],
+            LFun["offsetSurfaceLevelSet", {{Real, 2, "Constant"}, {Integer, 2, "Constant"}, Real, Real, Real, "Boolean"}, "Void"],
+            
+            (* ------------ level set measure ------------ *)
+            LFun["levelSetGridArea", {}, Real],
+            LFun["levelSetGridEulerCharacteristic", {}, Integer],
+            LFun["levelSetGridGenus", {}, Integer],
+            LFun["levelSetGridVolume", {}, Real],
+            
+            (* ------------ distance measure ------------ *)
+            LFun["gridMember", {{Integer, 2, "Constant"}, Real}, {Integer, 1}],
+            LFun["gridNearest", {{Real, 2, "Constant"}, Real}, {Real, 2}],
+            LFun["gridDistance", {{Real, 2, "Constant"}, Real}, {Real, 1}],
+            LFun["gridSignedDistance", {{Real, 2, "Constant"}, Real}, {Real, 1}],
+            LFun["fillWithBalls", {Integer, Integer, "Boolean", Real, Real, Real, Integer}, {Real, 2}],
+            
+            (* ------------ filters ------------ *)
+            LFun["filterGrid", {Integer, Integer, Integer}, "Void"],
+            
+            (* ------------ mesh creation ------------ *)
+            LFun["meshCellCount", {Real, Real, "Boolean"}, {Integer, 1}],
+            LFun["meshData", {Real, Real, "Boolean"}, {Real, 1}],
+            
+            (* ------------ fog volume ------------ *)
+            LFun["levelSetToFogVolume", {Real}, "Void"],
+            
+            (* ------------ grid transformation ------------ *)
+            LFun["scalarMultiply", {Real}, "Void"],
+            LFun["gammaAdjustment", {Real}, "Void"],
+            
+            (* ------------ morphology ------------ *)
+            LFun["resizeBandwidth", {Real}, "Void"],
+            LFun["offsetLevelSet", {Real}, "Void"],
+            
+            (* ------------ render ------------ *)
+            LFun["renderGrid", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
+                {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer, {Integer, 1, "Constant"}, Real,
+                {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],
+            
+            LFun["renderGridPBR", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
+                {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, {Integer, 1, "Constant"}, Real, "Boolean",
+                {Real, 1}, {Real, 1}, {Real, 1},
+                Real, Real, Real, Real,
+                {Real, 1}, Real, Real, Real,
+                Real, Real, Real
+            }, LType["Image", "Byte"]],
+            
+            (*LFun["renderGridVectorColor", {Real, LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], {Real, 1, "Constant"},
+                {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer,
+                {Integer, 1, "Constant"}, Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],*)
+            
+            (* ------------ aggregate data ------------ *)
+            LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Real, 3]]
+        }
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -431,12 +431,12 @@ LVDBScalarGridClass[class_, type_] :=
 
 
 LVDBIntegerGridClass[class_, type_] :=
-	LVDBBaseNumericGrid[class, type, 0,
-		{
-			(* ------------ aggregate data ------------ *)
-			LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Integer, 3]]
-		}
-	]
+    LVDBBaseNumericGrid[class, type, 0,
+        {
+            (* ------------ aggregate data ------------ *)
+            LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Integer, 3]]
+        }
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -444,11 +444,11 @@ LVDBIntegerGridClass[class_, type_] :=
 
 
 LVDBVectorGridClass[class_, type_] :=
-	LVDBBaseNumericGrid[class, type, 1,
-		{
-		
-		}
-	]
+    LVDBBaseNumericGrid[class, type, 1,
+        {
+        
+        }
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -463,15 +463,15 @@ deleteNonBooleanFuncs[class_] := class /. {LFun[Alternatives @@ $booleanBlackLis
 
 LVDBBoolGridClass =
 With[{
-	class = $GridClassData[$booleanType, $booleanType, "ClassName"],
-	type = $GridClassData[$booleanType, $booleanType, "WLBaseType"]
+    class = $GridClassData[$booleanType, $booleanType, "ClassName"],
+    type = $GridClassData[$booleanType, $booleanType, "WLBaseType"]
 },
-	deleteNonBooleanFuncs @ LVDBBaseNumericGrid[class, type, 0,
-		{
-			(* ------------ aggregate data ------------ *)
-			LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Integer, 3]]
-		}
-	]
+    deleteNonBooleanFuncs @ LVDBBaseNumericGrid[class, type, 0,
+        {
+            (* ------------ aggregate data ------------ *)
+            LFun["activeVoxels", {{Integer, 2, "Constant"}}, LType[SparseArray, Integer, 3]]
+        }
+    ]
 ];
 
 
@@ -480,9 +480,9 @@ With[{
 
 
 LVDBMaskGridClass = LVDBBaseGridClass[$GridClassData[$maskType, $maskType, "ClassName"],
-	{
-	
-	}
+    {
+    
+    }
 ];
 
 
@@ -491,15 +491,15 @@ LVDBMaskGridClass = LVDBBaseGridClass[$GridClassData[$maskType, $maskType, "Clas
 
 
 $OpenVDBTemplate = LTemplate["OpenVDBLink",
-	Join[
-		LVDBScalarGridClass [#ClassName, #WLBaseType]& /@ Values[$GridClassData[$scalarType]],
-		LVDBIntegerGridClass[#ClassName, #WLBaseType]& /@ Values[$GridClassData[$integerType]],
-		LVDBVectorGridClass [#ClassName, #WLBaseType]& /@ Values[$GridClassData[$vectorType]],
-		{
-			LVDBBoolGridClass,
-			LVDBMaskGridClass
-		}
-	]
+    Join[
+        LVDBScalarGridClass [#ClassName, #WLBaseType]& /@ Values[$GridClassData[$scalarType]],
+        LVDBIntegerGridClass[#ClassName, #WLBaseType]& /@ Values[$GridClassData[$integerType]],
+        LVDBVectorGridClass [#ClassName, #WLBaseType]& /@ Values[$GridClassData[$vectorType]],
+        {
+            LVDBBoolGridClass,
+            LVDBMaskGridClass
+        }
+    ]
 ];
 
 
@@ -515,31 +515,31 @@ OpenVDBLink`Developer`Recompile::build = "No build settings found. Please check 
 
 
 OpenVDBLink`Developer`Recompile[printQ_:False] :=
-	(
-		If[$buildSettings === None,
-			Message[OpenVDBLink`Developer`Recompile::build];
-			Return[$Failed]
-		];
-		
-		If[!DirectoryQ[$libraryDirectory],
-			CreateDirectory[$libraryDirectory]
-		];
-		
-		SetDirectory[$sourceDirectory];
-		CompileTemplate[
-			$OpenVDBTemplate,
-			{},
-			Sequence @@ If[TrueQ[printQ],
-				{"ShellCommandFunction" -> Print, "ShellOutputFunction" -> Print},
-				{}
-			],
-			"CleanIntermediate" -> True,
-			"TargetDirectory" -> $libraryDirectory,
-			Sequence @@ $buildSettings
-		];
-		ResetDirectory[];
-		
-		LoadOpenVDBLink[]
+    (
+        If[$buildSettings === None,
+            Message[OpenVDBLink`Developer`Recompile::build];
+            Return[$Failed]
+        ];
+        
+        If[!DirectoryQ[$libraryDirectory],
+            CreateDirectory[$libraryDirectory]
+        ];
+        
+        SetDirectory[$sourceDirectory];
+        CompileTemplate[
+            $OpenVDBTemplate,
+            {},
+            Sequence @@ If[TrueQ[printQ],
+                {"ShellCommandFunction" -> Print, "ShellOutputFunction" -> Print},
+                {}
+            ],
+            "CleanIntermediate" -> True,
+            "TargetDirectory" -> $libraryDirectory,
+            Sequence @@ $buildSettings
+        ];
+        ResetDirectory[];
+        
+        LoadOpenVDBLink[]
     )
 
 
@@ -548,17 +548,17 @@ OpenVDBLink`Developer`Recompile[printQ_:False] :=
 
 
 LoadOpenVDBLink[] :=
-	Module[{deps},
-		deps = FileNameJoin[{$libraryDirectory, "dependencies.m"}];
-		Check[
-			If[FileExistsQ[deps], Get[deps]],
-			Return[$Failed]
-		];
-		
-		If[Quiet @ LoadTemplate[$OpenVDBTemplate] === $Failed,
-			Return[$Failed]
-		];
-	]
+    Module[{deps},
+        deps = FileNameJoin[{$libraryDirectory, "dependencies.m"}];
+        Check[
+            If[FileExistsQ[deps], Get[deps]],
+            Return[$Failed]
+        ];
+        
+        If[Quiet @ LoadTemplate[$OpenVDBTemplate] === $Failed,
+            Return[$Failed]
+        ];
+    ]
 
 
 (* ::Subsection::Closed:: *)
@@ -566,10 +566,10 @@ LoadOpenVDBLink[] :=
 
 
 If[!TrueQ[$templateLoaded],
-	If[LoadOpenVDBLink[] === $Failed,
-		OpenVDBLink`Developer`Recompile[]
-	];
-	$templateLoaded = True;
+    If[LoadOpenVDBLink[] === $Failed,
+        OpenVDBLink`Developer`Recompile[]
+    ];
+    $templateLoaded = True;
 ]
 
 
@@ -586,39 +586,39 @@ If[!TrueQ[$templateLoaded],
 
 
 OpenVDBLink`Developer`TestOpenVDBLink[iareas_:All] :=
-	Block[{wlts, areas, filepattern, torun, results, final, passcnt, failcnt, percentage, totaltime, stats},
-		wlts = FileNames[$wltFilePattern];
-		areas = gridAreas[iareas];
-		(
-			filepattern = Alternatives @@ areas;
-			torun = Select[wlts, StringMatchQ[FileBaseName[#], filepattern]&];
-			
-			results = Map[
-				(PrintTemporary[FileBaseName[#]];
-				TestReport[#, SameTest -> sameExpression])&,
-				torun
-			];
-			(
-				final = AssociationThread[FileBaseName /@ torun, results];
-				
-				passcnt = Total[#["TestsSucceededCount"]& /@ results];
-				failcnt = Total[#["TestsFailedCount"]& /@ results];
-				percentage = N[Quiet[Divide[passcnt, passcnt + failcnt]]];
-				totaltime = Total[#["TimeElapsed"]& /@ results];
-				
-				stats = Association[{
-					"TestsSucceededCount" -> passcnt,
-					"TestsFailedCount" -> failcnt,
-					"SuccessRate" -> percentage,
-					"TimeElapsed" -> totaltime
-				}];
-				
-				Association[{"TestResults" -> final, "GlobalStatistics" -> stats}]
-			
-			) /; MatchQ[results, {__TestReportObject}]
-			
-		) /; VectorQ[areas, StringQ]
-	]
+    Block[{wlts, areas, filepattern, torun, results, final, passcnt, failcnt, percentage, totaltime, stats},
+        wlts = FileNames[$wltFilePattern];
+        areas = gridAreas[iareas];
+        (
+            filepattern = Alternatives @@ areas;
+            torun = Select[wlts, StringMatchQ[FileBaseName[#], filepattern]&];
+            
+            results = Map[
+                (PrintTemporary[FileBaseName[#]];
+                TestReport[#, SameTest -> sameExpression])&,
+                torun
+            ];
+            (
+                final = AssociationThread[FileBaseName /@ torun, results];
+                
+                passcnt = Total[#["TestsSucceededCount"]& /@ results];
+                failcnt = Total[#["TestsFailedCount"]& /@ results];
+                percentage = N[Quiet[Divide[passcnt, passcnt + failcnt]]];
+                totaltime = Total[#["TimeElapsed"]& /@ results];
+                
+                stats = Association[{
+                    "TestsSucceededCount" -> passcnt,
+                    "TestsFailedCount" -> failcnt,
+                    "SuccessRate" -> percentage,
+                    "TimeElapsed" -> totaltime
+                }];
+                
+                Association[{"TestResults" -> final, "GlobalStatistics" -> stats}]
+            
+            ) /; MatchQ[results, {__TestReportObject}]
+            
+        ) /; VectorQ[areas, StringQ]
+    ]
 
 
 OpenVDBLink`Developer`TestOpenVDBLink[___] = $Failed;
@@ -648,9 +648,9 @@ iGridAreas[___] = $Failed;
 
 
 sameExpression[expr1_, expr2_] :=
-	Block[{Internal`$EqualTolerance = 11, Internal`$SameQTolerance = 11},
-		expr1 === expr2
-	]
+    Block[{Internal`$EqualTolerance = 11, Internal`$SameQTolerance = 11},
+        expr1 === expr2
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -676,40 +676,40 @@ addCodeCompletion["OpenVDBLink`Developer`TestOpenVDBLink"][iGridAreas[All]];
 
 
 OpenVDBLink`Developer`WLTToNotebook[unitTestName_] := Enclose @ Module[{
-	file,
-	heldContents,
-	cellids,
-	cells
+    file,
+    heldContents,
+    cellids,
+    cells
 },
-	file = FileNameJoin[{
-		$OpenVDBInstallationDirectory,
-		"UnitTests", "wlt",
-		FileBaseName[unitTestName] <> ".wlt"
-	}];
-	ConfirmBy[file, FileExistsQ, "File does not exist"];
-	ConfirmBy[ToLowerCase @ FileExtension[file], MatchQ["wlt" | "mt"], "File extension is not .wlt or .mt"];
-	
-	Block[{$Context, $ContextPath, noTitleYetQ = True},
-		Needs["MUnit`"];
-		heldContents = Confirm[Import[file, {"WL", "HeldExpressions"}], "Import error"];
-		cellids = CreateDataStructure["HashSet"];
-		heldContents = testToCellGroup[#, cellids]& /@ heldContents;
-	];
-		
-	cells = Cases[Flatten @ heldContents, _Cell];
-	
-	cells = createCellGroup[cells, "Section"];
-	cells = Replace[cells, CellGroupData[l:{_[_, "Section"], __}, c___] :> CellGroupData[createCellGroup[l, "Subsection"], c], {1}];
-		
-	NotebookPut @ Notebook[
-		cells,
-		ShowGroupOpener -> True,
-		TaggingRules -> Association["$testsRun" -> False],
-		StyleDefinitions -> FrontEnd`FileName[
-			{"MUnit"}, "MUnit.nb",
-			CharacterEncoding -> "UTF-8"
-		]
-	]
+    file = FileNameJoin[{
+        $OpenVDBInstallationDirectory,
+        "UnitTests", "wlt",
+        FileBaseName[unitTestName] <> ".wlt"
+    }];
+    ConfirmBy[file, FileExistsQ, "File does not exist"];
+    ConfirmBy[ToLowerCase @ FileExtension[file], MatchQ["wlt" | "mt"], "File extension is not .wlt or .mt"];
+    
+    Block[{$Context, $ContextPath, noTitleYetQ = True},
+        Needs["MUnit`"];
+        heldContents = Confirm[Import[file, {"WL", "HeldExpressions"}], "Import error"];
+        cellids = CreateDataStructure["HashSet"];
+        heldContents = testToCellGroup[#, cellids]& /@ heldContents;
+    ];
+        
+    cells = Cases[Flatten @ heldContents, _Cell];
+    
+    cells = createCellGroup[cells, "Section"];
+    cells = Replace[cells, CellGroupData[l:{_[_, "Section"], __}, c___] :> CellGroupData[createCellGroup[l, "Subsection"], c], {1}];
+        
+    NotebookPut @ Notebook[
+        cells,
+        ShowGroupOpener -> True,
+        TaggingRules -> Association["$testsRun" -> False],
+        StyleDefinitions -> FrontEnd`FileName[
+            {"MUnit"}, "MUnit.nb",
+            CharacterEncoding -> "UTF-8"
+        ]
+    ]
 ];
 
 
@@ -718,16 +718,16 @@ OpenVDBLink`Developer`WLTToNotebook[unitTestName_] := Enclose @ Module[{
 
 
 generateUniqueID[max_, hashTable_] := Module[{i = 0},
-	TimeConstrained[
-		While[True,
-			i = RandomInteger[max];
-			If[ TrueQ @ hashTable["Insert", i],
-				Break[]
-			]
-		],
-		2
-	];
-	i
+    TimeConstrained[
+        While[True,
+            i = RandomInteger[max];
+            If[ TrueQ @ hashTable["Insert", i],
+                Break[]
+            ]
+        ],
+        2
+    ];
+    i
 ];
 
 
@@ -736,74 +736,74 @@ SetAttributes[testToCellGroup, HoldAllComplete];
 
 (* Handle verification tests terminated by a ; *)
 testToCellGroup[
-	HoldComplete[CompoundExpression[expressions__]],
-	rest___
+    HoldComplete[CompoundExpression[expressions__]],
+    rest___
 ] := Map[
-	testToCellGroup[#, rest]&,
-	Thread @ HoldComplete[{expressions}]
+    testToCellGroup[#, rest]&,
+    Thread @ HoldComplete[{expressions}]
 ];
 
 (* Handle 1-arg tests *)
 testToCellGroup[
-	HoldComplete[test : VerificationTest[fst_, {}, args___]],
-	cellids_
+    HoldComplete[test : VerificationTest[fst_, {}, args___]],
+    cellids_
 ] /; Quiet @ CheckArgs[test, 1] := testToCellGroup[VerificationTest[fst, {}, {}], cellids];
 
 (* Handle 1-arg tests *)
 testToCellGroup[
-	HoldComplete[test : VerificationTest[fst_, args___]],
-	cellids_
+    HoldComplete[test : VerificationTest[fst_, args___]],
+    cellids_
 ] /; Quiet @ CheckArgs[test, 1] := testToCellGroup[VerificationTest[fst, True, {}, args], cellids];
 
 (* Handle 2-arg tests *)
 testToCellGroup[
-	HoldComplete[test : VerificationTest[fst_, snd_, args___]],
-	cellids_
+    HoldComplete[test : VerificationTest[fst_, snd_, args___]],
+    cellids_
 ] /; Quiet @ CheckArgs[test, 2] := testToCellGroup[VerificationTest[fst, snd, {}, args], cellids];
 
 (* Handle 3-arg tests *)
 testToCellGroup[
-	HoldComplete[test_VerificationTest],
-	cellids_
+    HoldComplete[test_VerificationTest],
+    cellids_
 ] /; Quiet @ CheckArgs[test, 3] := testToCellGroup[test, cellids]
 
 (* Convert test to Cells *)
 testToCellGroup[
-	test : VerificationTest[in_, out_, msgs_, opts___],
-	cellids_
+    test : VerificationTest[in_, out_, msgs_, opts___],
+    cellids_
 ] := With[{
-	imax = 10^9
+    imax = 10^9
 },
-	Cell @ CellGroupData[
-		{
-			Cell[
-				BoxData @ MakeBoxes[in, StandardForm],
-				"VerificationTest",
-				CellID -> generateUniqueID[imax, cellids]
-			],
-			Cell[
-				BoxData @ MakeBoxes[out, StandardForm],
-				"ExpectedOutput",
-				CellID -> generateUniqueID[imax, cellids]
-			],
-			Cell[
-				BoxData @ MakeBoxes[msgs, StandardForm],
-				"ExpectedMessage",
-				CellID -> generateUniqueID[imax, cellids]
-			],
-			Cell[
-				BoxData @ MakeBoxes[{opts}, StandardForm],
-				"TestOptions",
-				CellID -> generateUniqueID[imax, cellids]
-			],
-			Cell[
-				BoxData @ ToBoxes @ MUnit`bottomCell[],
-				"BottomCell",
-				CellID -> generateUniqueID[imax, cellids]
-			]
-		},
-		Open
-	]
+    Cell @ CellGroupData[
+        {
+            Cell[
+                BoxData @ MakeBoxes[in, StandardForm],
+                "VerificationTest",
+                CellID -> generateUniqueID[imax, cellids]
+            ],
+            Cell[
+                BoxData @ MakeBoxes[out, StandardForm],
+                "ExpectedOutput",
+                CellID -> generateUniqueID[imax, cellids]
+            ],
+            Cell[
+                BoxData @ MakeBoxes[msgs, StandardForm],
+                "ExpectedMessage",
+                CellID -> generateUniqueID[imax, cellids]
+            ],
+            Cell[
+                BoxData @ MakeBoxes[{opts}, StandardForm],
+                "TestOptions",
+                CellID -> generateUniqueID[imax, cellids]
+            ],
+            Cell[
+                BoxData @ ToBoxes @ MUnit`bottomCell[],
+                "BottomCell",
+                CellID -> generateUniqueID[imax, cellids]
+            ]
+        },
+        Open
+    ]
 ];
 
 testToCellGroup[HoldComplete[MUnit`BeginTestSection[section_String]], _] := Cell[section, sectionType[section]];
@@ -817,16 +817,16 @@ sectionType[_] = "Section";
 
 
 createCellGroup[cells_, section_] :=
-	Block[{splitcells},
-		splitcells = SplitBy[cells, #[[-1]] === section&];
-		(
-			Prepend[
-				CellGroupData[Join[##], Closed]& @@@ Partition[Rest[splitcells], 2],
-				splitcells[[1, 1]]
-			]
-		
-		) /; OddQ[Length[splitcells]] && MatchQ[splitcells, {{_}, _, _, ___}]
-	];
+    Block[{splitcells},
+        splitcells = SplitBy[cells, #[[-1]] === section&];
+        (
+            Prepend[
+                CellGroupData[Join[##], Closed]& @@@ Partition[Rest[splitcells], 2],
+                splitcells[[1, 1]]
+            ]
+        
+        ) /; OddQ[Length[splitcells]] && MatchQ[splitcells, {{_}, _, _, ___}]
+    ];
 
 
 createCellGroup[args___] := $Failed
@@ -861,13 +861,13 @@ addCodeCompletion[sym_Symbol][args___] := addCodeCompletion[SymbolName[sym]][arg
 
 
 addCodeCompletion[function_String][args___] :=
-	With[{processed = {args} /. {
-			None -> 0, "AbsoluteFileName" -> 2, "RelativeFileName" -> 3,
-			"Color" -> 4, "PackageName" -> 7, "DirectoryName" -> 8,
-			"InterpreterType" -> 9}
-		},
-		FE`Evaluate[FEPrivate`AddSpecialArgCompletion[function -> processed]];
-	]
+    With[{processed = {args} /. {
+            None -> 0, "AbsoluteFileName" -> 2, "RelativeFileName" -> 3,
+            "Color" -> 4, "PackageName" -> 7, "DirectoryName" -> 8,
+            "InterpreterType" -> 9}
+        },
+        FE`Evaluate[FEPrivate`AddSpecialArgCompletion[function -> processed]];
+    ]
 
 
 (* ::Subsection::Closed:: *)
@@ -882,12 +882,12 @@ PackageScope["registerForLevelSet"]
 
 
 registerForLevelSet[func_Symbol, pos_:{{}}] :=
-	Block[{},
-		func[args__] :=
-			With[{res = tryToLevelSet[pos, func, args]},
-				res /; res =!= $Failed
-			]
-	]
+    Block[{},
+        func[args__] :=
+            With[{res = tryToLevelSet[pos, func, args]},
+                res /; res =!= $Failed
+            ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -895,24 +895,24 @@ registerForLevelSet[func_Symbol, pos_:{{}}] :=
 
 
 tryToLevelSet[pos_, func_, args__] /; validTryToLevelSetQ[] :=
-	Block[{levelsets, reps, res, $inToLevelSet = True},
-		levelsets = If[pos === {{}},
-			tryOpenVDBLevelSet /@ {args},
-			Quiet @ Extract[{args}, pos, tryOpenVDBLevelSet]
-		];
-		(
-			reps = Which[
-				pos === {{}}, pos -> levelsets,
-				ListQ[levelsets], Thread[pos -> levelsets],
-				True, pos -> levelsets
-			];
-			
-			res = func @@ ReplacePart[{args}, reps];
-			
-			res /; res =!= $Failed
-		
-		) /; validScalarGridCollectionQ[levelsets]
-	]
+    Block[{levelsets, reps, res, $inToLevelSet = True},
+        levelsets = If[pos === {{}},
+            tryOpenVDBLevelSet /@ {args},
+            Quiet @ Extract[{args}, pos, tryOpenVDBLevelSet]
+        ];
+        (
+            reps = Which[
+                pos === {{}}, pos -> levelsets,
+                ListQ[levelsets], Thread[pos -> levelsets],
+                True, pos -> levelsets
+            ];
+            
+            res = func @@ ReplacePart[{args}, reps];
+            
+            res /; res =!= $Failed
+        
+        ) /; validScalarGridCollectionQ[levelsets]
+    ]
 
 tryToLevelSet[___] := $Failed
 
@@ -924,21 +924,21 @@ tryToLevelSet[___] := $Failed
 tryOpenVDBLevelSet[vdb_?OpenVDBScalarGridQ] := vdb
 tryOpenVDBLevelSet[_?OpenVDBGridQ] = $Failed;
 tryOpenVDBLevelSet[{file_String?FileExistsQ, name_}] :=
-	Block[{vdb},
-		vdb = OpenVDBImport[file, name];
-		If[OpenVDBScalarGridQ[vdb],
-			vdb,
-			$Failed
-		]
-	]
+    Block[{vdb},
+        vdb = OpenVDBImport[file, name];
+        If[OpenVDBScalarGridQ[vdb],
+            vdb,
+            $Failed
+        ]
+    ]
 tryOpenVDBLevelSet[file_String] := tryOpenVDBLevelSet[{file, Automatic}]
 tryOpenVDBLevelSet[{File[file_], name_}] := tryOpenVDBLevelSet[{file, name}]
 tryOpenVDBLevelSet[File[file_]] := tryOpenVDBLevelSet[{file, Automatic}]
 tryOpenVDBLevelSet[opt_?OptionQ] := opt
 tryOpenVDBLevelSet[expr_] :=
-	With[{res = Quiet @ OpenVDBLevelSet[expr]},
-		res /; OpenVDBScalarGridQ[res]
-	]
+    With[{res = Quiet @ OpenVDBLevelSet[expr]},
+        res /; OpenVDBScalarGridQ[res]
+    ]
 tryOpenVDBLevelSet[___] = $Failed;
 
 
@@ -1082,16 +1082,16 @@ PackageScope["regimeConvert"]
 
 
 regimeConvert[vdb_, vals_, fromregime_ -> toregime_, dim_:1] :=
-	Which[
-		indexRegimeQ[fromregime] && fromregime === toregime,
-			Round[vals],
-		fromregime === toregime,
-			vals,
-		indexRegimeQ[fromregime], (* convert index space values to world space values *)
-			vals * voxelSize[vdb]^dim,
-		True,                     (* convert world space values to index space values *)
-			Round[Divide[vals, voxelSize[vdb]^dim]]
-	]
+    Which[
+        indexRegimeQ[fromregime] && fromregime === toregime,
+            Round[vals],
+        fromregime === toregime,
+            vals,
+        indexRegimeQ[fromregime], (* convert index space values to world space values *)
+            vals * voxelSize[vdb]^dim,
+        True,                     (* convert world space values to index space values *)
+            Round[Divide[vals, voxelSize[vdb]^dim]]
+    ]
 
 
 (* ::Subsection::Closed:: *)
@@ -1189,9 +1189,9 @@ PackageScope["carefulPixelGridQ"]
 
 
 With[{lid = gridClassID[$gridLevelSet], fid = gridClassID[$gridFogVolume]},
-	levelSetQ[vdb_] := vdb["getGridClass"[]] === lid;
-	fogVolumeQ[vdb_] := vdb["getGridClass"[]] === fid;
-	unknownClassQ[vdb_] := vdb["getGridClass"[]] =!= lid && vdb["getGridClass"[]] =!= fid;
+    levelSetQ[vdb_] := vdb["getGridClass"[]] === lid;
+    fogVolumeQ[vdb_] := vdb["getGridClass"[]] === fid;
+    unknownClassQ[vdb_] := vdb["getGridClass"[]] =!= lid && vdb["getGridClass"[]] =!= fid;
 ]
 
 

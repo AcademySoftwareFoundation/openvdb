@@ -44,16 +44,16 @@ $depthList = {"Depth"};
 
 
 $renderColorThemes = <|
-				 (*     front face             back face           closed face              background *)
-	"Default"    -> {RGBColor["#4D94FF"], RGBColor["#FFA24E"], RGBColor["#4D94FF"], White},
-	"Monochrome" -> {White,               White,               White,               Black},
-	"Bold"       -> {ColorData[106, 2],   ColorData[106, 1],   ColorData[106, 2],   Lighter[ColorData[106, 4], 0.5]},
-	"Cool"       -> {ColorData[107, 1],   ColorData[107, 4],   ColorData[107, 1],   RGBColor["#E6EBFF"]},
-	"Neon"       -> {ColorData[109, 8],   ColorData[109, 2],   ColorData[109, 8],   ColorData[109, 3]},
-	"Pastel"     -> {RGBColor["#D5B0F6"], RGBColor["#F5AE6F"], RGBColor["#D5B0F6"], RGBColor["#B9FFDB"]},
-	"Soft"       -> {RGBColor["#CFCFE1"], RGBColor["#EBBBAC"], RGBColor["#CFCFE1"], RGBColor["#3C3C78"]},
-	"Vibrant"    -> {ColorData[112, 2],   ColorData[112, 1],   ColorData[112, 2],   RGBColor["#FFDC80"]},
-	"Warm"       -> {ColorData[113, 1],   ColorData[113, 2],   ColorData[113, 1],   RGBColor["#FFE7B7"]}
+                 (*     front face             back face           closed face              background *)
+    "Default"    -> {RGBColor["#4D94FF"], RGBColor["#FFA24E"], RGBColor["#4D94FF"], White},
+    "Monochrome" -> {White,               White,               White,               Black},
+    "Bold"       -> {ColorData[106, 2],   ColorData[106, 1],   ColorData[106, 2],   Lighter[ColorData[106, 4], 0.5]},
+    "Cool"       -> {ColorData[107, 1],   ColorData[107, 4],   ColorData[107, 1],   RGBColor["#E6EBFF"]},
+    "Neon"       -> {ColorData[109, 8],   ColorData[109, 2],   ColorData[109, 8],   ColorData[109, 3]},
+    "Pastel"     -> {RGBColor["#D5B0F6"], RGBColor["#F5AE6F"], RGBColor["#D5B0F6"], RGBColor["#B9FFDB"]},
+    "Soft"       -> {RGBColor["#CFCFE1"], RGBColor["#EBBBAC"], RGBColor["#CFCFE1"], RGBColor["#3C3C78"]},
+    "Vibrant"    -> {ColorData[112, 2],   ColorData[112, 1],   ColorData[112, 2],   RGBColor["#FFDC80"]},
+    "Warm"       -> {ColorData[113, 1],   ColorData[113, 2],   ColorData[113, 1],   RGBColor["#FFE7B7"]}
 |>;
 
 
@@ -66,9 +66,9 @@ $renderColorThemes = <|
 
 
 Options[OpenVDBLevelSetRender] = Join[
-	{Background -> Automatic, "ClosedClipping" -> False, "FrameTranslation" -> Automatic, ImageResolution -> Automatic,
-		"IsoValue" -> 0.0, "OrthographicFrame" -> Automatic, PerformanceGoal :> $PerformanceGoal},
-	Options[Graphics3D, {ImageSize, ViewAngle, ViewCenter, ViewPoint, ViewProjection, ViewRange, ViewVertical}]
+    {Background -> Automatic, "ClosedClipping" -> False, "FrameTranslation" -> Automatic, ImageResolution -> Automatic,
+        "IsoValue" -> 0.0, "OrthographicFrame" -> Automatic, PerformanceGoal :> $PerformanceGoal},
+    Options[Graphics3D, {ImageSize, ViewAngle, ViewCenter, ViewPoint, ViewProjection, ViewRange, ViewVertical}]
 ];
 
 
@@ -76,9 +76,9 @@ OpenVDBLevelSetRender[args___] /; !CheckArgs[OpenVDBLevelSetRender[args], {1, 2}
 
 
 OpenVDBLevelSetRender[args___] :=
-	With[{res = iLevelSetRender[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iLevelSetRender[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBLevelSetRender[args___] := mLevelSetRender[args]
@@ -92,15 +92,15 @@ Options[iLevelSetRender] = Options[OpenVDBLevelSetRender];
 
 
 iLevelSetRender[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
-	Block[{ropts, res},
-		ropts = parseRenderOptions[vdb, shading, opts];
-		(
-			res = oLevelSetRender[vdb, ropts];
-			
-			res /; res =!= $Failed
-			
-		) /; AssociationQ[ropts]
-	]
+    Block[{ropts, res},
+        ropts = parseRenderOptions[vdb, shading, opts];
+        (
+            res = oLevelSetRender[vdb, ropts];
+            
+            res /; res =!= $Failed
+            
+        ) /; AssociationQ[ropts]
+    ]
 
 
 iLevelSetRender[vdb_, opts:OptionsPattern[]] := iLevelSetRender[vdb, Automatic, opts]
@@ -130,36 +130,36 @@ Options[oLevelSetRender] = Options[iLevelSetRender];
 
 
 oLevelSetRender[vdb_, ropts_] /; emptyVDBQ[vdb] || (!fogVolume[vdb] && vdb["BackgroundValue"] <= ropts["IsoValue"]) :=
-	Block[{bg, res, ires},
-		bg = RGBColor @@ ropts["Background"];
-		res = ropts["Resolution"];
-		ires = ropts["ImageResolution"];
-		
-		ConstantImage[bg, res, "Byte", ImageResolution -> ires]
-	]
+    Block[{bg, res, ires},
+        bg = RGBColor @@ ropts["Background"];
+        res = ropts["Resolution"];
+        ires = ropts["ImageResolution"];
+        
+        ConstantImage[bg, res, "Byte", ImageResolution -> ires]
+    ]
 
 
 oLevelSetRender[vdb_, ropts_] /; KeyExistsQ[materialParameters, ropts["Shader"]] :=
-	Block[{ires, pbrparams, args, im},
-		ires = ropts["ImageResolution"];
-		args = Lookup[ropts, $PBRrenderLevelSetArgumentKeys];
-		pbrparams = materialParameters[ropts["Shader"]];
-		(
-			im = vdb["renderGridPBR"[##]]& @@ Join[args, Values[pbrparams][[4 ;; -1]]];
-			
-			Image[im, ImageResolution -> ires] /; ImageQ[im]
-		) /; AssociationQ[pbrparams]
-	]
+    Block[{ires, pbrparams, args, im},
+        ires = ropts["ImageResolution"];
+        args = Lookup[ropts, $PBRrenderLevelSetArgumentKeys];
+        pbrparams = materialParameters[ropts["Shader"]];
+        (
+            im = vdb["renderGridPBR"[##]]& @@ Join[args, Values[pbrparams][[4 ;; -1]]];
+            
+            Image[im, ImageResolution -> ires] /; ImageQ[im]
+        ) /; AssociationQ[pbrparams]
+    ]
 
 
 oLevelSetRender[vdb_, ropts_] :=
-	Block[{ires, args, im},
-		ires = ropts["ImageResolution"];
-		args = Lookup[ropts, $renderLevelSetArgumentKeys];
-		im = vdb["renderGrid"[##]]& @@ args;
-		
-		Image[im, ImageResolution -> ires] /; ImageQ[im]
-	]
+    Block[{ires, args, im},
+        ires = ropts["ImageResolution"];
+        args = Lookup[ropts, $renderLevelSetArgumentKeys];
+        im = vdb["renderGrid"[##]]& @@ args;
+        
+        Image[im, ImageResolution -> ires] /; ImageQ[im]
+    ]
 
 
 oLevelSetRender[___] = $Failed;
@@ -187,9 +187,9 @@ OpenVDBLevelSetViewer[args___] /; !CheckArgs[OpenVDBLevelSetViewer[args], {1, 2}
 
 
 OpenVDBLevelSetViewer[args___] :=
-	With[{res = iLevelSetViewer[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iLevelSetViewer[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBLevelSetViewer[args___] := mLevelSetViewer[args]
@@ -203,13 +203,13 @@ Options[iLevelSetViewer] = Options[OpenVDBLevelSetViewer];
 
 
 iLevelSetViewer[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; levelSetQ[vdb] :=
-	Block[{ropts, args, im},
-		ropts = parseRenderOptions[vdb, shading, opts];
-		(
-			iDynamicRender[vdb, shading, ropts, opts]
-			
-		) /; AssociationQ[ropts]
-	]
+    Block[{ropts, args, im},
+        ropts = parseRenderOptions[vdb, shading, opts];
+        (
+            iDynamicRender[vdb, shading, ropts, opts]
+            
+        ) /; AssociationQ[ropts]
+    ]
 
 
 iLevelSetViewer[vdb_, opts:OptionsPattern[]] := iLevelSetViewer[vdb, Automatic, opts]
@@ -239,173 +239,173 @@ Options[iDynamicRender] = Options[OpenVDBLevelSetViewer];
 
 
 iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
-	DynamicModule[{t, l, b, vp, ovp, vv, ovv, va, ova, vc, vr, sz, dx = 0.0, dy = 0.0, dz = 0.0, origva, origvc, origvr, origvp, origvv, mem, iso, oiso, mniso, mxiso, ir,
-		td\[Delta], \[Delta], shader, oshader, vrng, ovrng, volQ, ivolQ, projection, oprojection, origprojection, oframe, ooframe, c1, oc1, c2, oc2, c3, oc3, bg, obg, clp, im, antialq, oantialq},
-		{t, l, b} = Lookup[iropts, {"Translate", "LookAt", "Bounds"}];
-		td\[Delta] = {0.005, 0.005, 0.1}*Max[Abs[Subtract @@@ b]];
-		
-		{vp, vv} = OptionValue[{ViewPoint, ViewVertical}];
-		va = constructViewAngle[OptionValue[ViewAngle], t, l, b];
-		vc = parseRenderViewCenter[OptionValue[ViewCenter], t, l, {{0, 1}, {0, 1}, {0, 1}}];
-		
-		origvc = vc;
-		origvp = ovp = vp;
-		origvv = ovv = vv;
-		origva = ova = va;
-		
-		origvr = ovrng = initialViewRange[OptionValue[ViewRange], vp, vc, vv, va, b];
-		volQ = ivolQ = TrueQ[OptionValue["ClosedClipping"]];
-		
-		ir = OptionValue[ImageResolution];
-		sz = initialImageSize[iropts["ImageSize"], OptionValue[ImageSize]];
-		oshader = canonicalizeShader[shading][[1]];
-		
-		projection = Replace[OptionValue[ViewProjection], Automatic -> "Perspective", {0}];
-		origprojection = oprojection = projection;
-		oframe = orthographicSphericalFrame[b];
-		ooframe = oframe;
-		
-		{c1, c2, c3, bg} = If[TrueQ[customColorQ[oshader]],
-			RGBColor @@@ Lookup[iropts, {"BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background"}],
-			$renderColorThemes["Default"]
-		];
-		{oc1, oc2, oc3, obg} = {c1, c2, c3, bg};
-		
-		oiso = iropts["IsoValue"];
-		{mniso, mxiso} = {-1, 1}Ramp[vdb["BackgroundValue"] - 1.5voxelSize[vdb]];
-		mem = Quotient[vdb["MemoryUsage"], Replace[$ProcessorCount, Except[_Integer?Positive] -> 1, {0}]];
-		
-		oantialq = OptionValue[PerformanceGoal] =!= "Speed";
-				
-		Manipulate[
-			Which[
-				dz != 0,
-				vp = zoomViewPoint[vp, vc, td\[Delta][[3]]dz, vv, va, b],
-				dx != 0 || dy != 0,
-				vc = translateViewCenter[vc, {td\[Delta][[1]]dx, td\[Delta][[2]]dy}]
-			];
-			Overlay[
-				{
-					Dynamic @ Image[im = iRender[
-						vdb, makeShader[shader, c1, c2, c3], "BoundingBox" -> b, ViewPoint -> vp, ViewVertical -> vv, ViewAngle -> va, ViewCenter -> vc,
-						ViewRange -> Scaled[vrng], ViewProjection -> projection, "OrthographicFrame" -> oframe, Background -> bg,
-						ImageSize -> dRenderImageSize[sz, \[Delta], OptionValue[PerformanceGoal], mem], "IsoValue" -> Clip[iso, .999{mniso, mxiso}],
-						PerformanceGoal -> If[antialq && !$ControlActiveSetting, "Quality", "Speed"], ImageResolution -> ir,
-						"ClosedClipping" -> volQ, opts
-					], ImageSize -> sz],
-					Graphics3D[{},
-						Boxed -> False, Method -> {}, ImageSize -> Dynamic[sz],
-						ViewPoint -> Dynamic[vp], ViewVertical -> Dynamic[vv], ViewAngle -> Dynamic[va], ViewCenter -> Dynamic[vc]
-					]
-				},
-				{1, 2},
-				2
-			],
-			OpenerView[{
-			Style["Appearance", Medium],
-				Column[{
-					Control[{{shader, oshader, "shading"},
-						KeyValueMap[#1 -> Row[{If[#2 === Automatic, Dynamic[c1], #2], ToLowerCase[#1]}, Spacer[2]]&, $dynamicRenderShaders],
-						ControlType -> PopupMenu
-					}],
-					Row[{
-						Control[{{antialq, oantialq, "anti aliasing"}, {True, False}}],
-						Control[{{volQ, ivolQ, "closed clipping"}, {True, False}}]
-					}, Spacer[2]],
-					Control[{{\[Delta], 1, "resolution"}, 0, 1}],
-					If[mxiso > 0, Control[{{iso, oiso, "iso\[Hyphen]value"}, mniso, mxiso}], Nothing],
-					Row[{
-						"themes",
-						Row[KeyValueMap[themeButton[ToLowerCase[#1], {c1, c2, c3, bg} = #2, Enabled -> Dynamic[customColorQ[shader]]]&, $renderColorThemes]]
-					}, Spacer[2]],
-					Dynamic @ Which[
-						!customColorQ[shader],
-						Row[{
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}]
-						}, Spacer[10]],
-						!volQ,
-						Row[{
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
-							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
-							If[c1 =!= c2, themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], Nothing]
-						}, Spacer[1]],
-						c1 === c2 === c3,
-						Row[{
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
-							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}],
-							Control[{{c3, oc3, "closed face"}, oc3, ControlType -> ColorSetter}]
-						}, Spacer[1]],
-						True,
-						Grid[{{
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
-							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
-							If[c1 =!= c2, Row[{themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], ""}], Nothing]
-						}, {
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
-							Control[{{c3, oc3, "closed face"}, oc3, ControlType -> ColorSetter}], Spacer[3],
-							If[c1 =!= c3, Row[{themeButton["set closed as front", c3 = c1], ""}], Nothing]
-						}},
-						Alignment -> {{Right, Right, Left, Left}, Automatic},
-						Spacings -> {1, Automatic}]
-					]
-				},
-				Spacings -> {Automatic, {Automatic, Automatic, Automatic, 1, 1}}]
-			}, Method -> "Active"],
-			OpenerView[{
-			Style["Orientation", Medium],
-				Column[{
-					Control[{{vv, ovv, "view vertical"}, {{0,0,1} -> "(0,0,1)", {0,0,-1} -> "(0,0,\[Hyphen]1)", {1,0,0} -> "(1,0,0)", {-1,0,0} -> "(\[Hyphen]1,0,0)", {0,1,0} -> "(0,1,0)", {0,-1,0} -> "(0,\[Hyphen]1,0)"}, ControlType -> Setter}],
-					Control[{{vp, ovp, "view point"}, {{1.3,-2.4,2} -> "default", {-3,0,0} -> "left", {3,0,0} -> "right", {0,-3,0} -> "front", {0,3,0} -> "back", {0,0,-3} -> "below", {0,0,3} -> "above"}, ControlType -> Setter}],
-					Row[{
-						"view point\[ThinSpace]&\[ThinSpace]center",
-						Framed[
-							Grid[{{
-									EventHandler[panSlider[Dynamic[dz, (dz = If[Abs[#] < .05, 0., #])&], Enabled -> Dynamic[projection =!= "Orthographic"]], {"MouseUp" :> (dz = 0)}, PassEventsDown -> True],
-									EventHandler[panSlider[Dynamic[dx, (dx = If[Abs[#] < .05, 0., #])&]], {"MouseUp" :> (dx = 0)}, PassEventsDown -> True],
-									EventHandler[panSlider[Dynamic[dy, (dy = If[Abs[#] < .05, 0., #])&]], {"MouseUp" :> (dy = 0)}, PassEventsDown -> True]
-								},
-								{"out\[ThinSpace]\[TwoWayRule]\[ThinSpace]in", "left\[ThinSpace]\[TwoWayRule]\[ThinSpace]right", "down\[ThinSpace]\[TwoWayRule]\[ThinSpace]up"}},
-								Spacings -> {1, 0.5}
-							],
-							ContentPadding -> True,
-							FrameStyle -> None,
-							ImageMargins -> {{0,0},{2,0}}
-						]
-					}, Spacer[2]]
-				}]
-			}, Method -> "Active"],
-			OpenerView[{
-			Style["Field of View", Medium],
-				Column[{
-					Row[{
-						Control[{{vrng, ovrng, "clipping"}, 0, 1, ControlType -> IntervalSlider, MinIntervalSize -> 0.01, Method -> "Stop"}],
-						Control[{{volQ, ivolQ, "closed"}, {True, False}}]
-					}, Spacer[3]],
-					Dynamic @ If[projection =!= "Orthographic",
-						Control[{{va, ova, "FOV (rad)"}, 0, 75*\[Pi]/180}],
-						Control[{{oframe, ooframe, "frame width"}, 0, ooframe}]
-					],
-					Control[{{projection, oprojection, "projection"}, {"Perspective" -> "perspective", "Orthographic" -> "orthographic"}}]
-				}]
-			}, Method -> "Active"],
-			OpenerView[{
-			Style["General", Medium],
-				Row[{
-					Button["Copy image",
-						CopyToClipboard[im]],
-					Button["Copy view settings",
-						CopyToClipboard[copyString @ {If[projection =!= "Orthographic", ViewAngle -> va, "OrthographicFrame" -> oframe], ViewCenter -> vc,
-							ViewRange -> unscaledViewRange[vrng, vp, vc, vv, va, b], ViewPoint -> vp, ViewProjection -> projection, ViewVertical -> vv}]],
-					Button["Reset view settings",
-						va = origva; vc = origvc; vrng = origvr; vp = origvp; vv = origvv; projection = origprojection; oframe = ooframe;]
-				}]
-			}, Method -> "Active"]
-		],
-		Initialization -> With[{args = Sequence @@ Append[vdb, $SessionID]}, iDynamicRenderTrack[args] = vdb],
-		Deinitialization :> With[{args = Sequence @@ Append[vdb, $SessionID]}, If[Head[iDynamicRenderTrack[args]] =!= iDynamicRenderTrack, iDynamicRenderTrack[args]=.]]
-	]
+    DynamicModule[{t, l, b, vp, ovp, vv, ovv, va, ova, vc, vr, sz, dx = 0.0, dy = 0.0, dz = 0.0, origva, origvc, origvr, origvp, origvv, mem, iso, oiso, mniso, mxiso, ir,
+        td\[Delta], \[Delta], shader, oshader, vrng, ovrng, volQ, ivolQ, projection, oprojection, origprojection, oframe, ooframe, c1, oc1, c2, oc2, c3, oc3, bg, obg, clp, im, antialq, oantialq},
+        {t, l, b} = Lookup[iropts, {"Translate", "LookAt", "Bounds"}];
+        td\[Delta] = {0.005, 0.005, 0.1}*Max[Abs[Subtract @@@ b]];
+        
+        {vp, vv} = OptionValue[{ViewPoint, ViewVertical}];
+        va = constructViewAngle[OptionValue[ViewAngle], t, l, b];
+        vc = parseRenderViewCenter[OptionValue[ViewCenter], t, l, {{0, 1}, {0, 1}, {0, 1}}];
+        
+        origvc = vc;
+        origvp = ovp = vp;
+        origvv = ovv = vv;
+        origva = ova = va;
+        
+        origvr = ovrng = initialViewRange[OptionValue[ViewRange], vp, vc, vv, va, b];
+        volQ = ivolQ = TrueQ[OptionValue["ClosedClipping"]];
+        
+        ir = OptionValue[ImageResolution];
+        sz = initialImageSize[iropts["ImageSize"], OptionValue[ImageSize]];
+        oshader = canonicalizeShader[shading][[1]];
+        
+        projection = Replace[OptionValue[ViewProjection], Automatic -> "Perspective", {0}];
+        origprojection = oprojection = projection;
+        oframe = orthographicSphericalFrame[b];
+        ooframe = oframe;
+        
+        {c1, c2, c3, bg} = If[TrueQ[customColorQ[oshader]],
+            RGBColor @@@ Lookup[iropts, {"BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background"}],
+            $renderColorThemes["Default"]
+        ];
+        {oc1, oc2, oc3, obg} = {c1, c2, c3, bg};
+        
+        oiso = iropts["IsoValue"];
+        {mniso, mxiso} = {-1, 1}Ramp[vdb["BackgroundValue"] - 1.5voxelSize[vdb]];
+        mem = Quotient[vdb["MemoryUsage"], Replace[$ProcessorCount, Except[_Integer?Positive] -> 1, {0}]];
+        
+        oantialq = OptionValue[PerformanceGoal] =!= "Speed";
+                
+        Manipulate[
+            Which[
+                dz != 0,
+                vp = zoomViewPoint[vp, vc, td\[Delta][[3]]dz, vv, va, b],
+                dx != 0 || dy != 0,
+                vc = translateViewCenter[vc, {td\[Delta][[1]]dx, td\[Delta][[2]]dy}]
+            ];
+            Overlay[
+                {
+                    Dynamic @ Image[im = iRender[
+                        vdb, makeShader[shader, c1, c2, c3], "BoundingBox" -> b, ViewPoint -> vp, ViewVertical -> vv, ViewAngle -> va, ViewCenter -> vc,
+                        ViewRange -> Scaled[vrng], ViewProjection -> projection, "OrthographicFrame" -> oframe, Background -> bg,
+                        ImageSize -> dRenderImageSize[sz, \[Delta], OptionValue[PerformanceGoal], mem], "IsoValue" -> Clip[iso, .999{mniso, mxiso}],
+                        PerformanceGoal -> If[antialq && !$ControlActiveSetting, "Quality", "Speed"], ImageResolution -> ir,
+                        "ClosedClipping" -> volQ, opts
+                    ], ImageSize -> sz],
+                    Graphics3D[{},
+                        Boxed -> False, Method -> {}, ImageSize -> Dynamic[sz],
+                        ViewPoint -> Dynamic[vp], ViewVertical -> Dynamic[vv], ViewAngle -> Dynamic[va], ViewCenter -> Dynamic[vc]
+                    ]
+                },
+                {1, 2},
+                2
+            ],
+            OpenerView[{
+            Style["Appearance", Medium],
+                Column[{
+                    Control[{{shader, oshader, "shading"},
+                        KeyValueMap[#1 -> Row[{If[#2 === Automatic, Dynamic[c1], #2], ToLowerCase[#1]}, Spacer[2]]&, $dynamicRenderShaders],
+                        ControlType -> PopupMenu
+                    }],
+                    Row[{
+                        Control[{{antialq, oantialq, "anti aliasing"}, {True, False}}],
+                        Control[{{volQ, ivolQ, "closed clipping"}, {True, False}}]
+                    }, Spacer[2]],
+                    Control[{{\[Delta], 1, "resolution"}, 0, 1}],
+                    If[mxiso > 0, Control[{{iso, oiso, "iso\[Hyphen]value"}, mniso, mxiso}], Nothing],
+                    Row[{
+                        "themes",
+                        Row[KeyValueMap[themeButton[ToLowerCase[#1], {c1, c2, c3, bg} = #2, Enabled -> Dynamic[customColorQ[shader]]]&, $renderColorThemes]]
+                    }, Spacer[2]],
+                    Dynamic @ Which[
+                        !customColorQ[shader],
+                        Row[{
+                            Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}]
+                        }, Spacer[10]],
+                        !volQ,
+                        Row[{
+                            Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
+                            Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
+                            Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
+                            If[c1 =!= c2, themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], Nothing]
+                        }, Spacer[1]],
+                        c1 === c2 === c3,
+                        Row[{
+                            Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
+                            Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
+                            Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}],
+                            Control[{{c3, oc3, "closed face"}, oc3, ControlType -> ColorSetter}]
+                        }, Spacer[1]],
+                        True,
+                        Grid[{{
+                            Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
+                            Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
+                            If[c1 =!= c2, Row[{themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], ""}], Nothing]
+                        }, {
+                            Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
+                            Control[{{c3, oc3, "closed face"}, oc3, ControlType -> ColorSetter}], Spacer[3],
+                            If[c1 =!= c3, Row[{themeButton["set closed as front", c3 = c1], ""}], Nothing]
+                        }},
+                        Alignment -> {{Right, Right, Left, Left}, Automatic},
+                        Spacings -> {1, Automatic}]
+                    ]
+                },
+                Spacings -> {Automatic, {Automatic, Automatic, Automatic, 1, 1}}]
+            }, Method -> "Active"],
+            OpenerView[{
+            Style["Orientation", Medium],
+                Column[{
+                    Control[{{vv, ovv, "view vertical"}, {{0,0,1} -> "(0,0,1)", {0,0,-1} -> "(0,0,\[Hyphen]1)", {1,0,0} -> "(1,0,0)", {-1,0,0} -> "(\[Hyphen]1,0,0)", {0,1,0} -> "(0,1,0)", {0,-1,0} -> "(0,\[Hyphen]1,0)"}, ControlType -> Setter}],
+                    Control[{{vp, ovp, "view point"}, {{1.3,-2.4,2} -> "default", {-3,0,0} -> "left", {3,0,0} -> "right", {0,-3,0} -> "front", {0,3,0} -> "back", {0,0,-3} -> "below", {0,0,3} -> "above"}, ControlType -> Setter}],
+                    Row[{
+                        "view point\[ThinSpace]&\[ThinSpace]center",
+                        Framed[
+                            Grid[{{
+                                    EventHandler[panSlider[Dynamic[dz, (dz = If[Abs[#] < .05, 0., #])&], Enabled -> Dynamic[projection =!= "Orthographic"]], {"MouseUp" :> (dz = 0)}, PassEventsDown -> True],
+                                    EventHandler[panSlider[Dynamic[dx, (dx = If[Abs[#] < .05, 0., #])&]], {"MouseUp" :> (dx = 0)}, PassEventsDown -> True],
+                                    EventHandler[panSlider[Dynamic[dy, (dy = If[Abs[#] < .05, 0., #])&]], {"MouseUp" :> (dy = 0)}, PassEventsDown -> True]
+                                },
+                                {"out\[ThinSpace]\[TwoWayRule]\[ThinSpace]in", "left\[ThinSpace]\[TwoWayRule]\[ThinSpace]right", "down\[ThinSpace]\[TwoWayRule]\[ThinSpace]up"}},
+                                Spacings -> {1, 0.5}
+                            ],
+                            ContentPadding -> True,
+                            FrameStyle -> None,
+                            ImageMargins -> {{0,0},{2,0}}
+                        ]
+                    }, Spacer[2]]
+                }]
+            }, Method -> "Active"],
+            OpenerView[{
+            Style["Field of View", Medium],
+                Column[{
+                    Row[{
+                        Control[{{vrng, ovrng, "clipping"}, 0, 1, ControlType -> IntervalSlider, MinIntervalSize -> 0.01, Method -> "Stop"}],
+                        Control[{{volQ, ivolQ, "closed"}, {True, False}}]
+                    }, Spacer[3]],
+                    Dynamic @ If[projection =!= "Orthographic",
+                        Control[{{va, ova, "FOV (rad)"}, 0, 75*\[Pi]/180}],
+                        Control[{{oframe, ooframe, "frame width"}, 0, ooframe}]
+                    ],
+                    Control[{{projection, oprojection, "projection"}, {"Perspective" -> "perspective", "Orthographic" -> "orthographic"}}]
+                }]
+            }, Method -> "Active"],
+            OpenerView[{
+            Style["General", Medium],
+                Row[{
+                    Button["Copy image",
+                        CopyToClipboard[im]],
+                    Button["Copy view settings",
+                        CopyToClipboard[copyString @ {If[projection =!= "Orthographic", ViewAngle -> va, "OrthographicFrame" -> oframe], ViewCenter -> vc,
+                            ViewRange -> unscaledViewRange[vrng, vp, vc, vv, va, b], ViewPoint -> vp, ViewProjection -> projection, ViewVertical -> vv}]],
+                    Button["Reset view settings",
+                        va = origva; vc = origvc; vrng = origvr; vp = origvp; vv = origvv; projection = origprojection; oframe = ooframe;]
+                }]
+            }, Method -> "Active"]
+        ],
+        Initialization -> With[{args = Sequence @@ Append[vdb, $SessionID]}, iDynamicRenderTrack[args] = vdb],
+        Deinitialization :> With[{args = Sequence @@ Append[vdb, $SessionID]}, If[Head[iDynamicRenderTrack[args]] =!= iDynamicRenderTrack, iDynamicRenderTrack[args]=.]]
+    ]
 
 
 (* ::Subsection::Closed:: *)
@@ -416,9 +416,9 @@ Options[iRender] = Options[iLevelSetRender];
 
 
 iRender[args__] :=
-	With[{res = Quiet[iLevelSetRender[args]]},
-		res /; ImageQ[res]
-	]
+    With[{res = Quiet[iLevelSetRender[args]]},
+        res /; ImageQ[res]
+    ]
 
 
 iRender[___] = Image[{{1}}];
@@ -435,10 +435,10 @@ Scan[(customColorQ[#] = True)&, $depthList];
 
 
 $dynamicRenderShaders := $dynamicRenderShaders = Association @ Join[
-	# -> Automatic& /@ $dielectricList,
-	# -> materialParameters[#]["BaseColorFront"]& /@ $metalList,
-	# -> $rainbowSwatch& /@ $rainbowList,
-	# -> $depthSwatch& /@ $depthList
+    # -> Automatic& /@ $dielectricList,
+    # -> materialParameters[#]["BaseColorFront"]& /@ $metalList,
+    # -> $rainbowSwatch& /@ $rainbowList,
+    # -> $depthSwatch& /@ $depthList
 ]
 
 
@@ -452,28 +452,28 @@ $depthSwatch = Image[ImagePad[Image[Table[With[{r = Sqrt[x^2 + y^2], \[Theta] = 
 
 
 makeShader[shader_, colors__] :=
-	If[TrueQ[customColorQ[shader]] || !KeyExistsQ[materialParameters, shader],
-		{shader, colors},
-		Prepend[Lookup[materialParameters[shader], {"BaseColorFront", "BaseColorBack", "BaseColorClosed"}], shader]
-	]
+    If[TrueQ[customColorQ[shader]] || !KeyExistsQ[materialParameters, shader],
+        {shader, colors},
+        Prepend[Lookup[materialParameters[shader], {"BaseColorFront", "BaseColorBack", "BaseColorClosed"}], shader]
+    ]
 
 
 initialViewRange[{min_?NumericQ, max_?NumericQ}, vp_, vc_, vv_, va_, bds_] /; min <= max :=
-	Block[{t, l, vr},
-		t = parseRenderViewPoint[vp, bds];
-		l = parseRenderViewCenter[vc, t, vv, va, bds];
-		vr = parseRenderViewRange[Scaled[{0, 1}], t, l, bds];
-		Clip[Rescale[{min, max}, vr], {0, 1}]
-	]
+    Block[{t, l, vr},
+        t = parseRenderViewPoint[vp, bds];
+        l = parseRenderViewCenter[vc, t, vv, va, bds];
+        vr = parseRenderViewRange[Scaled[{0, 1}], t, l, bds];
+        Clip[Rescale[{min, max}, vr], {0, 1}]
+    ]
 initialViewRange[___] = {0, 1};
 
 
 unscaledViewRange[vrng_, vp_, vc_, vv_, va_, bds_] :=
-	Block[{t, l},
-		t = parseRenderViewPoint[vp, bds];
-		l = parseRenderViewCenter[vc, t, vv, va, bds];
-		parseRenderViewRange[Scaled[vrng], t, l, bds]
-	]
+    Block[{t, l},
+        t = parseRenderViewPoint[vp, bds];
+        l = parseRenderViewCenter[vc, t, vv, va, bds];
+        parseRenderViewRange[Scaled[vrng], t, l, bds]
+    ]
 
 
 copyString[expr_List] := StringTake[ToString[expr, InputForm], {2, -2}]
@@ -487,9 +487,9 @@ initialImageSize[sz_, _] := sz
 
 
 dRenderImageSize[sz_, \[Delta]_, pgoal_, mem_] :=
-	With[{s = sz*\[Delta]},
-		Clip[Round[dPGoalFactor[pgoal, s, mem]*s], {1, \[Infinity]}]
-	]
+    With[{s = sz*\[Delta]},
+        Clip[Round[dPGoalFactor[pgoal, s, mem]*s], {1, \[Infinity]}]
+    ]
 
 
 (* ::Text:: *)
@@ -497,10 +497,10 @@ dRenderImageSize[sz_, \[Delta]_, pgoal_, mem_] :=
 
 
 dPGoalFactor["Speed", sz_, mem_] :=
-	If[TrueQ[(Times @@ sz) > Min[450^2, Divide[500000000.*720^2, mem]] && $ControlActiveSetting],
-		0.5,
-		1.0
-	]
+    If[TrueQ[(Times @@ sz) > Min[450^2, Divide[500000000.*720^2, mem]] && $ControlActiveSetting],
+        0.5,
+        1.0
+    ]
 dPGoalFactor[__] = 1.0;
 
 
@@ -508,9 +508,9 @@ panSlider[var_, opts___] := Slider[var, {-1, 1}, opts, Appearance -> "UpArrow", 
 
 
 orthographicSphericalFrame[bds_] :=
-	With[{reg = BoundingRegion[Tuples[bds], "MinBall"]},
-		2reg[[2]] /; MatchQ[reg, Ball[_, _Real]]
-	]
+    With[{reg = BoundingRegion[Tuples[bds], "MinBall"]},
+        2reg[[2]] /; MatchQ[reg, Ball[_, _Real]]
+    ]
 
 
 orthographicSphericalFrame[___] = $Failed;
@@ -530,19 +530,19 @@ translateViewCenter[vc_, {dx_, dy_}] := {vc, {0.5+dx, 0.5+dy}}
 
 
 zoomViewPoint[vp_, vc_, dz_, vv_, va_, bds_] :=
-	Block[{translate, lookat, dir, center, mx},
-		translate = parseRenderViewPoint[vp, bds];
-		lookat = parseRenderViewCenter[vc, translate, vv, va, bds];
-		dir = Min[.1dz*Power[Norm[Subtract[lookat, translate]], 1.25], 1.5]Normalize[Subtract[lookat, translate]];
-		
-		translate += dir;
-		lookat    += dir;
-		
-		center = Mean /@ bds;
-		mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
-		
-		Divide[Subtract[translate, center], mx]
-	]
+    Block[{translate, lookat, dir, center, mx},
+        translate = parseRenderViewPoint[vp, bds];
+        lookat = parseRenderViewCenter[vc, translate, vv, va, bds];
+        dir = Min[.1dz*Power[Norm[Subtract[lookat, translate]], 1.25], 1.5]Normalize[Subtract[lookat, translate]];
+        
+        translate += dir;
+        lookat    += dir;
+        
+        center = Mean /@ bds;
+        mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
+        
+        Divide[Subtract[translate, center], mx]
+    ]
 
 
 (* ::Subsection::Closed:: *)
@@ -561,11 +561,11 @@ mLevelSetViewer[args___] := messageRenderFunction[OpenVDBLevelSetViewer, args]
 
 
 $renderLevelSetArgumentKeys = {"IsoValue", "BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background", "Translate", "LookAt", "Up",
-	"Range", "FOV", "Shader", "Camera", "Samples", "Resolution", "Frame", "DepthParameters", "Lighting", "Step", "IsClosed"};
+    "Range", "FOV", "Shader", "Camera", "Samples", "Resolution", "Frame", "DepthParameters", "Lighting", "Step", "IsClosed"};
 
 
 $PBRrenderLevelSetArgumentKeys = {"IsoValue", "Background", "Translate", "LookAt", "Up",
-	"Range", "FOV", "Camera", "Samples", "Resolution", "Frame", "IsClosed", "BaseColorFront", "BaseColorBack", "BaseColorClosed"};
+    "Range", "FOV", "Camera", "Samples", "Resolution", "Frame", "IsClosed", "BaseColorFront", "BaseColorBack", "BaseColorClosed"};
 
 
 (* ::Subsection::Closed:: *)
@@ -580,11 +580,11 @@ Options[parseRenderOptions] = Join[Options[iLevelSetRender], {"BoundingBox" -> A
 
 
 parseRenderOptions[vdb_, shading_, opts:OptionsPattern[]] :=
-	Block[{res},
-		res = iparseRenderOptions[vdb, shading, opts];
-		
-		res /; AssociationQ[res] && NoneTrue[res, FailureQ]
-	]
+    Block[{res},
+        res = iparseRenderOptions[vdb, shading, opts];
+        
+        res /; AssociationQ[res] && NoneTrue[res, FailureQ]
+    ]
 
 
 parseRenderOptions[___] = $Failed;
@@ -598,46 +598,46 @@ Options[iparseRenderOptions] = Options[parseRenderOptions];
 
 
 iparseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
-	Block[{bds, translate, lookat1, \[Alpha], lookat, up, transdist, depthdata, imgresolution, shader, ropts},
-		bds = parseBoundingBox[vdb, OptionValue["BoundingBox"]];
-		
-		translate = parseRenderViewPoint[OptionValue[ViewPoint], bds];
-		up = parseRenderViewVertical[OptionValue[ViewVertical], OptionValue[ViewPoint]];
-		
-		lookat1 = parseRenderViewCenterNoOffset[OptionValue[ViewCenter], bds];
-		\[Alpha] = constructViewAngle[OptionValue[ViewAngle], translate, lookat1, bds];
-		lookat = parseRenderViewCenter[OptionValue[ViewCenter], translate, up, \[Alpha], bds];
-		
-		shader = canonicalizeShader[shading];
-		
-		depthdata = parseDepthParameters[shader];
-		imgresolution = parseRenderImageResolution[OptionValue[ImageResolution]];
-		
-		<|
-			"Bounds" -> bds,
-			"IsoValue" -> parseIsoValue[OptionValue["IsoValue"]],
-			"Background" -> parseRenderBackgroundColor[OptionValue[Background], shader],
-			"Translate" -> translate,
-			"LookAt" -> lookat,
-			"Up" -> up,
-			"Range" -> parseRenderViewRange[OptionValue[ViewRange], translate, lookat, bds],
-			"FOV" -> parseRenderViewAngle[OptionValue[ViewAngle], translate, lookat, bds],
-			"Shader" -> parseRenderShader[First[shader, $Failed]],
-			"Camera" -> parseRenderViewProjection[OptionValue[ViewProjection], OptionValue[ViewPoint]],
-			"Samples" -> parseRenderPerformance[OptionValue[PerformanceGoal]],
-			"Resolution" -> parseRenderImageSize[OptionValue[ImageSize], imgresolution, translate, up, bds],
-			"ImageSize" -> parseRenderUnscaledImageSize[OptionValue[ImageSize], translate, up, bds],
-			"ImageResolution" -> imgresolution,
-			"Frame" -> parseOrthographicFrame[OptionValue[ViewProjection], OptionValue["OrthographicFrame"], translate, lookat, up, bds],
-			"DepthParameters" -> depthdata,
-			"Lighting" -> RotationTransform[0.25, {-1, 1, 1}][translate - lookat],
-			"Step" -> {1.0, 2.0},
-			"BaseColorFront" -> parseRenderColor[shader],
-			"BaseColorBack" -> parseRenderColor2[shader],
-			"BaseColorClosed" -> parseRenderColor3[shader],
-			"IsClosed" -> TrueQ[OptionValue["ClosedClipping"]]
-		|>
-	]
+    Block[{bds, translate, lookat1, \[Alpha], lookat, up, transdist, depthdata, imgresolution, shader, ropts},
+        bds = parseBoundingBox[vdb, OptionValue["BoundingBox"]];
+        
+        translate = parseRenderViewPoint[OptionValue[ViewPoint], bds];
+        up = parseRenderViewVertical[OptionValue[ViewVertical], OptionValue[ViewPoint]];
+        
+        lookat1 = parseRenderViewCenterNoOffset[OptionValue[ViewCenter], bds];
+        \[Alpha] = constructViewAngle[OptionValue[ViewAngle], translate, lookat1, bds];
+        lookat = parseRenderViewCenter[OptionValue[ViewCenter], translate, up, \[Alpha], bds];
+        
+        shader = canonicalizeShader[shading];
+        
+        depthdata = parseDepthParameters[shader];
+        imgresolution = parseRenderImageResolution[OptionValue[ImageResolution]];
+        
+        <|
+            "Bounds" -> bds,
+            "IsoValue" -> parseIsoValue[OptionValue["IsoValue"]],
+            "Background" -> parseRenderBackgroundColor[OptionValue[Background], shader],
+            "Translate" -> translate,
+            "LookAt" -> lookat,
+            "Up" -> up,
+            "Range" -> parseRenderViewRange[OptionValue[ViewRange], translate, lookat, bds],
+            "FOV" -> parseRenderViewAngle[OptionValue[ViewAngle], translate, lookat, bds],
+            "Shader" -> parseRenderShader[First[shader, $Failed]],
+            "Camera" -> parseRenderViewProjection[OptionValue[ViewProjection], OptionValue[ViewPoint]],
+            "Samples" -> parseRenderPerformance[OptionValue[PerformanceGoal]],
+            "Resolution" -> parseRenderImageSize[OptionValue[ImageSize], imgresolution, translate, up, bds],
+            "ImageSize" -> parseRenderUnscaledImageSize[OptionValue[ImageSize], translate, up, bds],
+            "ImageResolution" -> imgresolution,
+            "Frame" -> parseOrthographicFrame[OptionValue[ViewProjection], OptionValue["OrthographicFrame"], translate, lookat, up, bds],
+            "DepthParameters" -> depthdata,
+            "Lighting" -> RotationTransform[0.25, {-1, 1, 1}][translate - lookat],
+            "Step" -> {1.0, 2.0},
+            "BaseColorFront" -> parseRenderColor[shader],
+            "BaseColorBack" -> parseRenderColor2[shader],
+            "BaseColorClosed" -> parseRenderColor3[shader],
+            "IsClosed" -> TrueQ[OptionValue["ClosedClipping"]]
+        |>
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -645,26 +645,26 @@ iparseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
 
 
 renderFailureOption[assoc_] :=
-	(
-		If[FailureQ[assoc["Bounds"]], Return["BoundingBox"]];
-		If[FailureQ[assoc["IsoValue"]], Return["IsoValue"]];
-		
-		If[FailureQ[assoc["Shader"]], Return["Shader"]];
-		If[FailureQ[assoc["Background"]], Return[Background]];
-		
-		If[FailureQ[assoc["Translate"]], Return[ViewPoint]];
-		If[FailureQ[assoc["Up"]], Return[ViewVertical]];
-		If[FailureQ[assoc["FOV"]], Return[ViewAngle]];
-		If[FailureQ[assoc["LookAt"]], Return[ViewCenter]];
-		If[FailureQ[assoc["Range"]], Return[ViewRange]];
-		
-		If[FailureQ[assoc["Camera"]], Return[ViewProjection]];
-		If[FailureQ[assoc["Samples"]], Return[PerformanceGoal]];
-		If[FailureQ[assoc["ImageResolution"]], Return[ImageResolution]];
-		If[FailureQ[assoc["ImageSize"]], Return[ImageSize]];
-		
-		$Failed
-	)
+    (
+        If[FailureQ[assoc["Bounds"]], Return["BoundingBox"]];
+        If[FailureQ[assoc["IsoValue"]], Return["IsoValue"]];
+        
+        If[FailureQ[assoc["Shader"]], Return["Shader"]];
+        If[FailureQ[assoc["Background"]], Return[Background]];
+        
+        If[FailureQ[assoc["Translate"]], Return[ViewPoint]];
+        If[FailureQ[assoc["Up"]], Return[ViewVertical]];
+        If[FailureQ[assoc["FOV"]], Return[ViewAngle]];
+        If[FailureQ[assoc["LookAt"]], Return[ViewCenter]];
+        If[FailureQ[assoc["Range"]], Return[ViewRange]];
+        
+        If[FailureQ[assoc["Camera"]], Return[ViewProjection]];
+        If[FailureQ[assoc["Samples"]], Return[PerformanceGoal]];
+        If[FailureQ[assoc["ImageResolution"]], Return[ImageResolution]];
+        If[FailureQ[assoc["ImageSize"]], Return[ImageSize]];
+        
+        $Failed
+    )
 
 
 (* ::Subsubsection::Closed:: *)
@@ -688,22 +688,22 @@ canonicalizeShader[{shader_, theme_String}] := {shader, theme}
 
 
 canonicalizeShader[{shader_, icolor_?ColorQ}] :=
-	With[{color = ColorConvert[icolor, "RGB"][[1 ;; 3]]},
-		{shader, color, color, color}
-	]
+    With[{color = ColorConvert[icolor, "RGB"][[1 ;; 3]]},
+        {shader, color, color, color}
+    ]
 
 
 canonicalizeShader[{shader_, icolorf_?ColorQ, icolorb_?ColorQ}] :=
-	With[{
-			colorf = ColorConvert[icolorf, "RGB"][[1 ;; 3]],
-			colorb = ColorConvert[icolorb, "RGB"][[1 ;; 3]]
-		},
-		{shader, colorf, colorb, colorf}
-	]
+    With[{
+            colorf = ColorConvert[icolorf, "RGB"][[1 ;; 3]],
+            colorb = ColorConvert[icolorb, "RGB"][[1 ;; 3]]
+        },
+        {shader, colorf, colorb, colorf}
+    ]
 
 
 canonicalizeShader[{shader_, colorf_?ColorQ, colorb_?ColorQ, colorc_?ColorQ}] :=
-	{shader, ColorConvert[colorf, "RGB"][[1 ;; 3]], ColorConvert[colorb, "RGB"][[1 ;; 3]], ColorConvert[colorc, "RGB"][[1 ;; 3]]}
+    {shader, ColorConvert[colorf, "RGB"][[1 ;; 3]], ColorConvert[colorb, "RGB"][[1 ;; 3]], ColorConvert[colorc, "RGB"][[1 ;; 3]]}
 
 
 canonicalizeShader[Automatic] = {$defaultShaderSpec, $defaultColorSpec};
@@ -743,27 +743,27 @@ parseIsoValue[___] = $Failed;
 
 parseRenderColor[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
 parseRenderColor[{_, theme_String}] :=
-	With[{color = $renderColorThemes[theme][[1]]},
-		List @@ color /; ColorQ[color]
-	]
+    With[{color = $renderColorThemes[theme][[1]]},
+        List @@ color /; ColorQ[color]
+    ]
 parseRenderColor[{_, color_?ColorQ, _, _}] := List @@ color
 parseRenderColor[___] = $Failed;
 
 
 parseRenderColor2[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
 parseRenderColor2[{_, theme_String}] :=
-	With[{color = $renderColorThemes[theme][[2]]},
-		List @@ color /; ColorQ[color]
-	]
+    With[{color = $renderColorThemes[theme][[2]]},
+        List @@ color /; ColorQ[color]
+    ]
 parseRenderColor2[{_, _, color_?ColorQ, _}] := List @@ color
 parseRenderColor2[___] = $Failed;
 
 
 parseRenderColor3[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
 parseRenderColor3[{_, theme_String}] :=
-	With[{color = $renderColorThemes[theme][[3]]},
-		List @@ color /; ColorQ[color]
-	]
+    With[{color = $renderColorThemes[theme][[3]]},
+        List @@ color /; ColorQ[color]
+    ]
 parseRenderColor3[{_, _, _, color_?ColorQ}] := List @@ color
 parseRenderColor3[___] = $Failed;
 
@@ -794,27 +794,27 @@ canonicalizeViewPoint[vp_] := vp
 
 
 parseRenderViewPoint[vp_List, bds_?bounds3DQ] /; VectorQ[vp, NumericQ] && Length[vp] === 3 :=
-	Block[{vpfinite, mx},
-		vpfinite = vp /. inf_DirectedInfinity :> Sign[inf]*1000;
-		mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
-		
-		mx * vpfinite + (Mean /@ bds)
-	]
+    Block[{vpfinite, mx},
+        vpfinite = vp /. inf_DirectedInfinity :> Sign[inf]*1000;
+        mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
+        
+        mx * vpfinite + (Mean /@ bds)
+    ]
 
 
 parseRenderViewPoint[dir:(Left|Right|Front|Back|Below|Above),  bds_] := parseRenderViewPoint[canonicalizeViewPoint[dir], bds]
 
 
 parseRenderViewPoint[dirs:{(Left|Right|Front|Back|Below|Above)..}, bds_] :=
-	Block[{canons, vps},
-		canons = canonicalizeViewPoint /@ dirs;
-		(
-			vps = GatherBy[canons, Unitize][[All, -1]];
-			
-			Total[parseRenderViewPoint[canonicalizeViewPoint[#], bds]& /@ vps]
-			
-		) /; MatrixQ[canons]
-	]
+    Block[{canons, vps},
+        canons = canonicalizeViewPoint /@ dirs;
+        (
+            vps = GatherBy[canons, Unitize][[All, -1]];
+            
+            Total[parseRenderViewPoint[canonicalizeViewPoint[#], bds]& /@ vps]
+            
+        ) /; MatrixQ[canons]
+    ]
 
 
 parseRenderViewPoint[___] = $Failed;
@@ -825,17 +825,17 @@ parseRenderViewPoint[___] = $Failed;
 
 
 parseRenderViewCenter[{vc_List, {ox_?NumericQ, oy_?NumericQ}}, translate_, up_, \[Alpha]_, bds_?bounds3DQ] :=
-	Block[{lookat = parseRenderViewCenterNoOffset[vc, bds], v, cross, rot},
-		(
-			v = translate-lookat;
-			cross = Cross[v, up];
-			
-			rot = RotationTransform[(oy-0.5)*\[Alpha], cross, translate] @* RotationTransform[(ox-0.5)*\[Alpha], up, translate];
-			
-			rot[lookat]
-			
-		) /; lookat =!= $Failed
-	]
+    Block[{lookat = parseRenderViewCenterNoOffset[vc, bds], v, cross, rot},
+        (
+            v = translate-lookat;
+            cross = Cross[v, up];
+            
+            rot = RotationTransform[(oy-0.5)*\[Alpha], cross, translate] @* RotationTransform[(ox-0.5)*\[Alpha], up, translate];
+            
+            rot[lookat]
+            
+        ) /; lookat =!= $Failed
+    ]
 parseRenderViewCenter[vc_, __, bds_] := parseRenderViewCenterNoOffset[vc, bds];
 
 
@@ -850,10 +850,10 @@ parseRenderViewCenterNoOffset[___] = $Failed;
 
 
 parseRenderViewVertical[vv_List, vp_] /; VectorQ[vp, NumericQ] && Length[vp] === 3 :=
-	If[degenerateViewVerticalQ[vv, vp],
-		fixDegenerateViewVertical[vp],
-		vv
-	]
+    If[degenerateViewVerticalQ[vv, vp],
+        fixDegenerateViewVertical[vp],
+        vv
+    ]
 parseRenderViewVertical[___] = $Failed;
 
 
@@ -862,35 +862,35 @@ parseRenderViewVertical[___] = $Failed;
 
 
 parseRenderViewRange[Automatic|All, vp_, vc_, bds_] :=
-	Block[{corners, inview, far},
-		corners = Tuples[bds];
-		inview = Pick[corners, RegionMember[HalfSpace[vp-vc, vp], corners]];
-		If[Length[inview] == 0,
-			parseRenderViewRange[{0.0, 0.0}, vp, vc, bds],
-			far = Sqrt[Max[Total[(Transpose[inview] - vp)^2]]];
-			parseRenderViewRange[{0.0, far}, vp, vc, bds]
-		]
-	]
+    Block[{corners, inview, far},
+        corners = Tuples[bds];
+        inview = Pick[corners, RegionMember[HalfSpace[vp-vc, vp], corners]];
+        If[Length[inview] == 0,
+            parseRenderViewRange[{0.0, 0.0}, vp, vc, bds],
+            far = Sqrt[Max[Total[(Transpose[inview] - vp)^2]]];
+            parseRenderViewRange[{0.0, far}, vp, vc, bds]
+        ]
+    ]
 
 
 parseRenderViewRange[{min_?NumericQ, max_?NumericQ}, ___] /; min <= max :=
-	Block[{clip},
-		clip = Clip[{min, max}, {.001, \[Infinity]}];
-		If[Equal @@ clip,
-			clip + {0, 0.001},
-			clip
-		]
-	]
+    Block[{clip},
+        clip = Clip[{min, max}, {.001, \[Infinity]}];
+        If[Equal @@ clip,
+            clip + {0, 0.001},
+            clip
+        ]
+    ]
 
 
 parseRenderViewRange[Scaled[vrng:{min_?NumericQ, max_?NumericQ}], vp_, vc_, bds_] /; min <= max :=
-	Block[{padding, vrmin, vrmax},
-		padding = 0.02*Max[Abs[Subtract @@@ bds]];
-		vrmin = Clip[SignedRegionDistance[Cuboid @@ Transpose[bds], vp] - padding, {0.1, \[Infinity]}];
-		vrmax = Ramp[Sqrt[Max[Total[Subtract[Transpose[Tuples[bds]], vp]^2, {1}]]] + .11];
-		
-		vrng*(vrmax-vrmin) + vrmin
-	]
+    Block[{padding, vrmin, vrmax},
+        padding = 0.02*Max[Abs[Subtract @@@ bds]];
+        vrmin = Clip[SignedRegionDistance[Cuboid @@ Transpose[bds], vp] - padding, {0.1, \[Infinity]}];
+        vrmax = Ramp[Sqrt[Max[Total[Subtract[Transpose[Tuples[bds]], vp]^2, {1}]]] + .11];
+        
+        vrng*(vrmax-vrmin) + vrmin
+    ]
 
 
 parseRenderViewRange[___] = $Failed;
@@ -904,27 +904,27 @@ $renderFocalLength = 50.0;
 
 
 parseRenderViewAngle[args__] :=
-	With[{aperture = viewAngleAperture[args]},
-		{aperture, $renderFocalLength} /; aperture =!= $Failed && NumericQ[$renderFocalLength]
-	]
+    With[{aperture = viewAngleAperture[args]},
+        {aperture, $renderFocalLength} /; aperture =!= $Failed && NumericQ[$renderFocalLength]
+    ]
 parseRenderViewAngle[___] = $Failed;
 
 
 viewAngleAperture[args__] :=
-	With[{\[Alpha] = constructViewAngle[args]},
-		2$renderFocalLength*Tan[Clip[\[Alpha], {.001, 3.14059}]/2] /; \[Alpha] =!= $Failed
-	];
+    With[{\[Alpha] = constructViewAngle[args]},
+        2$renderFocalLength*Tan[Clip[\[Alpha], {.001, 3.14059}]/2] /; \[Alpha] =!= $Failed
+    ];
 viewAngleAperture[___] = $Failed;
 
 
 constructViewAngle[All, translate_, lookat_, bds_] :=
-	With[{v = lookat - translate},
-		2.0*Max[VectorAngle[v, # - translate]& /@ Tuples[bds]]
-	];
+    With[{v = lookat - translate},
+        2.0*Max[VectorAngle[v, # - translate]& /@ Tuples[bds]]
+    ];
 constructViewAngle[Automatic, args__] :=
-	With[{\[Alpha] = constructViewAngle[All, args]},
-		Min[35.0*Degree, \[Alpha]] /; \[Alpha] =!= $Failed
-	];
+    With[{\[Alpha] = constructViewAngle[All, args]},
+        Min[35.0*Degree, \[Alpha]] /; \[Alpha] =!= $Failed
+    ];
 constructViewAngle[\[Alpha]_?NumericQ, args__] /; 0 <= \[Alpha] <= \[Pi] := \[Alpha]
 constructViewAngle[___] = $Failed;
 
@@ -990,9 +990,9 @@ iParseDepthParameters[___] = $Failed;
 parseRenderViewProjection["Perspective", _]  = 0;
 parseRenderViewProjection["Orthographic", _] = 1;
 parseRenderViewProjection[Automatic, vp_] :=
-	With[{p = If[FreeQ[vp, _DirectedInfinity], "Perspective", "Orthographic"]},
-		parseRenderViewProjection[p, vp]
-	]
+    With[{p = If[FreeQ[vp, _DirectedInfinity], "Perspective", "Orthographic"]},
+        parseRenderViewProjection[p, vp]
+    ]
 parseRenderViewProjection[___] = $Failed;
 
 
@@ -1015,25 +1015,25 @@ imageResolution[] := Replace[Max[Quiet[CurrentValue[{"ConnectedDisplays", "Resol
 parseRenderImageSize[x:(_Integer|Automatic), args__] := parseRenderImageSize[{x, Automatic}, args]
 parseRenderImageSize[{x_Integer?Positive, y_Integer?Positive}, res_, __] := res/72*{x, y}
 parseRenderImageSize[{x_, y_}, res_, vp_List, vv_List, bds_?bounds3DQ] :=
-	Block[{aspectratio, w, h},
-		aspectratio = 1.0;(*viewPointAspectRatio[bds, vp, vv];*)
-		w = Round[Replace[x, Automatic -> 360*res/72, {0}]];
-		h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
-		
-		{w, h}
-	]
+    Block[{aspectratio, w, h},
+        aspectratio = 1.0;(*viewPointAspectRatio[bds, vp, vv];*)
+        w = Round[Replace[x, Automatic -> 360*res/72, {0}]];
+        h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
+        
+        {w, h}
+    ]
 parseRenderImageSize[___] = $Failed
 
 
 viewPointAspectRatio[bds_, vp_, vv_] :=
-	Block[{rot, proj1, up2d, proj2},
-		rot = RotationTransform[{vp-(Mean /@ bds), {0,0,1}}];
-		proj1 = rot[Tuples[bds]][[All, 1;;2]];
-		up2d = rot[vv][[1 ;; 2]];
-		
-		proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
-		Divide @@ Clip[Reverse[Abs[Subtract @@@ CoordinateBounds[proj2]]], {0.001, \[Infinity]}]
-	]
+    Block[{rot, proj1, up2d, proj2},
+        rot = RotationTransform[{vp-(Mean /@ bds), {0,0,1}}];
+        proj1 = rot[Tuples[bds]][[All, 1;;2]];
+        up2d = rot[vv][[1 ;; 2]];
+        
+        proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
+        Divide @@ Clip[Reverse[Abs[Subtract @@@ CoordinateBounds[proj2]]], {0.001, \[Infinity]}]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -1043,13 +1043,13 @@ viewPointAspectRatio[bds_, vp_, vv_] :=
 parseRenderUnscaledImageSize[x:(_Integer|Automatic), args__] := parseRenderUnscaledImageSize[{x, Automatic}, args]
 parseRenderUnscaledImageSize[{x_Integer?Positive, y_Integer?Positive}, __] := {x, y}
 parseRenderUnscaledImageSize[{x_, y_}, vp_List, vv_List, bds_?bounds3DQ] :=
-	Block[{aspectratio, w, h},
-		aspectratio = viewPointAspectRatio[bds, vp, vv];
-		w = Round[Replace[x, Automatic -> 360, {0}]];
-		h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
-		
-		{w, h}
-	]
+    Block[{aspectratio, w, h},
+        aspectratio = viewPointAspectRatio[bds, vp, vv];
+        w = Round[Replace[x, Automatic -> 360, {0}]];
+        h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
+        
+        {w, h}
+    ]
 parseRenderUnscaledImageSize[___] = $Failed
 
 
@@ -1062,14 +1062,14 @@ viewPointAspectRatio[___] = 1.0;
 
 parseOrthographicFrame["Orthographic", x_?NumericQ, __] := Clip[x, {0.001, \[Infinity]}]
 parseOrthographicFrame["Orthographic", Automatic, vp_, vc_, vv_, bds_] :=
-	Block[{rot, proj1, up2d, proj2},
-		rot = RotationTransform[{vp-vc, {0,0,1}}];
-		proj1 = rot[Tuples[bds]][[All, 1;;2]];
-		up2d = rot[vv][[1 ;; 2]];
-		
-		proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
-		Clip[Abs[Subtract @@@ CoordinateBounds[proj2]][[1]], {0.001, \[Infinity]}]
-	]
+    Block[{rot, proj1, up2d, proj2},
+        rot = RotationTransform[{vp-vc, {0,0,1}}];
+        proj1 = rot[Tuples[bds]][[All, 1;;2]];
+        up2d = rot[vv][[1 ;; 2]];
+        
+        proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
+        Clip[Abs[Subtract @@@ CoordinateBounds[proj2]][[1]], {0.001, \[Infinity]}]
+    ]
 parseOrthographicFrame["Perspective"|Automatic, __] = 1.0;
 parseOrthographicFrame[___] = $Failed;
 
@@ -1100,20 +1100,20 @@ materialParameters = <||>;
 
 
 materialParameters["Aluminum"] = <|
-	"BaseColorFront" -> RGBColor[0.95, 0.95, 0.95],
-	"BaseColorBack" -> RGBColor[0.95, 0.95, 0.95],
-	"BaseColorClosed" -> RGBColor[0.95, 0.95, 0.95],
-	"MetallicCoefficient" -> 0.8,
-	"RoughnessCoefficient" -> 0.75,
-	"SpecularAnisotropyCoefficient" -> 0.6,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.95, 0.95, 0.95],
+    "BaseColorBack" -> RGBColor[0.95, 0.95, 0.95],
+    "BaseColorClosed" -> RGBColor[0.95, 0.95, 0.95],
+    "MetallicCoefficient" -> 0.8,
+    "RoughnessCoefficient" -> 0.75,
+    "SpecularAnisotropyCoefficient" -> 0.6,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1122,20 +1122,20 @@ materialParameters["Aluminum"] = <|
 
 
 materialParameters["Brass"] = <|
-	"BaseColorFront" -> RGBColor[0.9, 0.855, 0.45],
-	"BaseColorBack" -> RGBColor[0.9, 0.855, 0.45],
-	"BaseColorClosed" -> RGBColor[0.9, 0.855, 0.45],
-	"MetallicCoefficient" -> 0.8,
-	"RoughnessCoefficient" -> 0.65,
-	"SpecularAnisotropyCoefficient" -> 0.4,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.9, 0.855, 0.45],
+    "BaseColorBack" -> RGBColor[0.9, 0.855, 0.45],
+    "BaseColorClosed" -> RGBColor[0.9, 0.855, 0.45],
+    "MetallicCoefficient" -> 0.8,
+    "RoughnessCoefficient" -> 0.65,
+    "SpecularAnisotropyCoefficient" -> 0.4,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1144,20 +1144,20 @@ materialParameters["Brass"] = <|
 
 
 materialParameters["Bronze"] = <|
-	"BaseColorFront" -> RGBColor[0.9, 0.68625, 0.45],
-	"BaseColorBack" -> RGBColor[0.9, 0.68625, 0.45],
-	"BaseColorClosed" -> RGBColor[0.9, 0.68625, 0.45],
-	"MetallicCoefficient" -> 0.8,
-	"RoughnessCoefficient" -> 0.65,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.9, 0.68625, 0.45],
+    "BaseColorBack" -> RGBColor[0.9, 0.68625, 0.45],
+    "BaseColorClosed" -> RGBColor[0.9, 0.68625, 0.45],
+    "MetallicCoefficient" -> 0.8,
+    "RoughnessCoefficient" -> 0.65,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1166,20 +1166,20 @@ materialParameters["Bronze"] = <|
 
 
 materialParameters["Copper"] = <|
-	"BaseColorFront" -> RGBColor[1.0, 0.65, 0.5],
-	"BaseColorBack" -> RGBColor[1.0, 0.65, 0.5],
-	"BaseColorClosed" -> RGBColor[1.0, 0.65, 0.5],
-	"MetallicCoefficient" -> 0.8,
-	"RoughnessCoefficient" -> 0.65,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[1.0, 0.65, 0.5],
+    "BaseColorBack" -> RGBColor[1.0, 0.65, 0.5],
+    "BaseColorClosed" -> RGBColor[1.0, 0.65, 0.5],
+    "MetallicCoefficient" -> 0.8,
+    "RoughnessCoefficient" -> 0.65,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1188,20 +1188,20 @@ materialParameters["Copper"] = <|
 
 
 materialParameters["Electrum"] = <|
-	"BaseColorFront" -> RGBColor[0.9, 0.774, 0.45],
-	"BaseColorBack" -> RGBColor[0.9, 0.774, 0.45],
-	"BaseColorClosed" -> RGBColor[0.9, 0.774, 0.45],
-	"MetallicCoefficient" -> 0.7,
-	"RoughnessCoefficient" -> 0.7,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.9, 0.774, 0.45],
+    "BaseColorBack" -> RGBColor[0.9, 0.774, 0.45],
+    "BaseColorClosed" -> RGBColor[0.9, 0.774, 0.45],
+    "MetallicCoefficient" -> 0.7,
+    "RoughnessCoefficient" -> 0.7,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1210,20 +1210,20 @@ materialParameters["Electrum"] = <|
 
 
 materialParameters["Gold"] = <|
-	"BaseColorFront" -> RGBColor[1.0, 0.75, 0.0],
-	"BaseColorBack" -> RGBColor[1.0, 0.75, 0.0],
-	"BaseColorClosed" -> RGBColor[1.0, 0.75, 0.0],
-	"MetallicCoefficient" -> 0.8,
-	"RoughnessCoefficient" -> 0.65,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[1.0, 0.75, 0.0],
+    "BaseColorBack" -> RGBColor[1.0, 0.75, 0.0],
+    "BaseColorClosed" -> RGBColor[1.0, 0.75, 0.0],
+    "MetallicCoefficient" -> 0.8,
+    "RoughnessCoefficient" -> 0.65,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1232,20 +1232,20 @@ materialParameters["Gold"] = <|
 
 
 materialParameters["Iron"] = <|
-	"BaseColorFront" -> RGBColor[0.6, 0.576, 0.54],
-	"BaseColorBack" -> RGBColor[0.6, 0.576, 0.54],
-	"BaseColorClosed" -> RGBColor[0.6, 0.576, 0.54],
-	"MetallicCoefficient" -> 0.7,
-	"RoughnessCoefficient" -> 0.6,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.6, 0.576, 0.54],
+    "BaseColorBack" -> RGBColor[0.6, 0.576, 0.54],
+    "BaseColorClosed" -> RGBColor[0.6, 0.576, 0.54],
+    "MetallicCoefficient" -> 0.7,
+    "RoughnessCoefficient" -> 0.6,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1254,20 +1254,20 @@ materialParameters["Iron"] = <|
 
 
 materialParameters["Pewter"] = <|
-	"BaseColorFront" -> RGBColor[0.9, 0.864, 0.81],
-	"BaseColorBack" -> RGBColor[0.9, 0.864, 0.81],
-	"BaseColorClosed" -> RGBColor[0.9, 0.864, 0.81],
-	"MetallicCoefficient" -> 1,
-	"RoughnessCoefficient" -> 0.75,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.9, 0.864, 0.81],
+    "BaseColorBack" -> RGBColor[0.9, 0.864, 0.81],
+    "BaseColorClosed" -> RGBColor[0.9, 0.864, 0.81],
+    "MetallicCoefficient" -> 1,
+    "RoughnessCoefficient" -> 0.75,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1276,20 +1276,20 @@ materialParameters["Pewter"] = <|
 
 
 materialParameters["Silver"] = <|
-	"BaseColorFront" -> RGBColor[1.0, 1.0, 1.0],
-	"BaseColorBack" -> RGBColor[1.0, 1.0, 1.0],
-	"BaseColorClosed" -> RGBColor[1.0, 1.0, 1.0],
-	"MetallicCoefficient" -> 1,
-	"RoughnessCoefficient" -> 0.75,
-	"SpecularAnisotropyCoefficient" -> 0.3,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[1.0, 1.0, 1.0],
+    "BaseColorBack" -> RGBColor[1.0, 1.0, 1.0],
+    "BaseColorClosed" -> RGBColor[1.0, 1.0, 1.0],
+    "MetallicCoefficient" -> 1,
+    "RoughnessCoefficient" -> 0.75,
+    "SpecularAnisotropyCoefficient" -> 0.3,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1298,20 +1298,20 @@ materialParameters["Silver"] = <|
 
 
 materialParameters["Clay"] = <|
-	"BaseColorFront" -> RGBColor[0.8, 0.352, 0.16],
-	"BaseColorBack" -> RGBColor[0.8, 0.352, 0.16],
-	"BaseColorClosed" -> RGBColor[0.8, 0.352, 0.16],
-	"MetallicCoefficient" -> 0,
-	"RoughnessCoefficient" -> 0,
-	"SpecularAnisotropyCoefficient" -> 0.0,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 0.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.8, 0.352, 0.16],
+    "BaseColorBack" -> RGBColor[0.8, 0.352, 0.16],
+    "BaseColorClosed" -> RGBColor[0.8, 0.352, 0.16],
+    "MetallicCoefficient" -> 0,
+    "RoughnessCoefficient" -> 0,
+    "SpecularAnisotropyCoefficient" -> 0.0,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 0.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1320,20 +1320,20 @@ materialParameters["Clay"] = <|
 
 
 materialParameters["Foil"] = <|
-	"BaseColorFront" -> RGBColor[0.5, 1.0, 0.0],
-	"BaseColorBack" -> RGBColor[0.5, 1.0, 0.0],
-	"BaseColorClosed" -> RGBColor[0.5, 1.0, 0.0],
-	"MetallicCoefficient" -> 0.5,
-	"RoughnessCoefficient" -> 0.6,
-	"SpecularAnisotropyCoefficient" -> 0.0,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.6,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.75
+    "BaseColorFront" -> RGBColor[0.5, 1.0, 0.0],
+    "BaseColorBack" -> RGBColor[0.5, 1.0, 0.0],
+    "BaseColorClosed" -> RGBColor[0.5, 1.0, 0.0],
+    "MetallicCoefficient" -> 0.5,
+    "RoughnessCoefficient" -> 0.6,
+    "SpecularAnisotropyCoefficient" -> 0.0,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.6,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.75
 |>;
 
 
@@ -1342,20 +1342,20 @@ materialParameters["Foil"] = <|
 
 
 materialParameters["Glazed"] = <|
-	"BaseColorFront" -> RGBColor[1.0, 0.24, 0.0],
-	"BaseColorBack" -> RGBColor[1.0, 0.24, 0.0],
-	"BaseColorClosed" -> RGBColor[1.0, 0.24, 0.0],
-	"MetallicCoefficient" -> 0.5,
-	"RoughnessCoefficient" -> 0.6,
-	"SpecularAnisotropyCoefficient" -> 0.6,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.2,
-	"CoatAnisotropyCoefficient" -> 0.6,
-	"CoatReflectance" -> 0.6,
-	"SpecularColorMultiplier" -> 1.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.75
+    "BaseColorFront" -> RGBColor[1.0, 0.24, 0.0],
+    "BaseColorBack" -> RGBColor[1.0, 0.24, 0.0],
+    "BaseColorClosed" -> RGBColor[1.0, 0.24, 0.0],
+    "MetallicCoefficient" -> 0.5,
+    "RoughnessCoefficient" -> 0.6,
+    "SpecularAnisotropyCoefficient" -> 0.6,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.2,
+    "CoatAnisotropyCoefficient" -> 0.6,
+    "CoatReflectance" -> 0.6,
+    "SpecularColorMultiplier" -> 1.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.75
 |>;
 
 
@@ -1364,20 +1364,20 @@ materialParameters["Glazed"] = <|
 
 
 materialParameters["Plastic"] = <|
-	"BaseColorFront" -> RGBColor[0.3, 0.58, 1.0],
-	"BaseColorBack" -> RGBColor[0.3, 0.58, 1.0],
-	"BaseColorClosed" -> RGBColor[0.3, 0.58, 1.0],
-	"MetallicCoefficient" -> 0.0,
-	"RoughnessCoefficient" -> 1.0,
-	"SpecularAnisotropyCoefficient" -> 0.0,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.3,
-	"CoatAnisotropyCoefficient" -> 0.5,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.75
+    "BaseColorFront" -> RGBColor[0.3, 0.58, 1.0],
+    "BaseColorBack" -> RGBColor[0.3, 0.58, 1.0],
+    "BaseColorClosed" -> RGBColor[0.3, 0.58, 1.0],
+    "MetallicCoefficient" -> 0.0,
+    "RoughnessCoefficient" -> 1.0,
+    "SpecularAnisotropyCoefficient" -> 0.0,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.3,
+    "CoatAnisotropyCoefficient" -> 0.5,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.75
 |>;
 
 
@@ -1386,20 +1386,20 @@ materialParameters["Plastic"] = <|
 
 
 materialParameters["Rubber"] = <|
-	"BaseColorFront" -> RGBColor[0.5, 0.5, 0.5],
-	"BaseColorBack" -> RGBColor[0.5, 0.5, 0.5],
-	"BaseColorClosed" -> RGBColor[0.5, 0.5, 0.5],
-	"MetallicCoefficient" -> 0.2,
-	"RoughnessCoefficient" -> 0.6,
-	"SpecularAnisotropyCoefficient" -> 0.0,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.5, 0.5, 0.5],
+    "BaseColorBack" -> RGBColor[0.5, 0.5, 0.5],
+    "BaseColorClosed" -> RGBColor[0.5, 0.5, 0.5],
+    "MetallicCoefficient" -> 0.2,
+    "RoughnessCoefficient" -> 0.6,
+    "SpecularAnisotropyCoefficient" -> 0.0,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1408,20 +1408,20 @@ materialParameters["Rubber"] = <|
 
 
 materialParameters["Satin"] = <|
-	"BaseColorFront" -> RGBColor[0.75, 0.5, 1.0],
-	"BaseColorBack" -> RGBColor[0.75, 0.5, 1.0],
-	"BaseColorClosed" -> RGBColor[0.75, 0.5, 1.0],
-	"MetallicCoefficient" -> 0.5,
-	"RoughnessCoefficient" -> 0.66,
-	"SpecularAnisotropyCoefficient" -> 0.8,
-	"Reflectance" -> 0.5,
-	"CoatColor" -> {1.0, 1.0, 1.0},
-	"CoatRoughnessCoefficient" -> 0.0,
-	"CoatAnisotropyCoefficient" -> 0.0,
-	"CoatReflectance" -> 0.5,
-	"SpecularColorMultiplier" -> 1.0,
-	"DiffuseColorMultiplier" -> 1.0,
-	"CoatColorMultiplier" -> 0.0
+    "BaseColorFront" -> RGBColor[0.75, 0.5, 1.0],
+    "BaseColorBack" -> RGBColor[0.75, 0.5, 1.0],
+    "BaseColorClosed" -> RGBColor[0.75, 0.5, 1.0],
+    "MetallicCoefficient" -> 0.5,
+    "RoughnessCoefficient" -> 0.66,
+    "SpecularAnisotropyCoefficient" -> 0.8,
+    "Reflectance" -> 0.5,
+    "CoatColor" -> {1.0, 1.0, 1.0},
+    "CoatRoughnessCoefficient" -> 0.0,
+    "CoatAnisotropyCoefficient" -> 0.0,
+    "CoatReflectance" -> 0.5,
+    "SpecularColorMultiplier" -> 1.0,
+    "DiffuseColorMultiplier" -> 1.0,
+    "CoatColorMultiplier" -> 0.0
 |>;
 
 
@@ -1449,21 +1449,21 @@ messageRenderFunction[head_, vdb_, opts:OptionsPattern[]] := messageRenderFuncti
 
 
 messageRenderFunction[head_, vdb_, shading_, opts:OptionsPattern[]] /; !OptionQ[shading] :=
-	Block[{assoc, opt},
-		assoc = iparseRenderOptions[vdb, shading, opts];
-		(
-			opt = renderFailureOption[assoc];
-			(	
-				If[opt === "Shader",
-					Message[head::shaderval, shading],
-					Message[head::renderval, opt -> OptionValue[opt]]
-				];
-				$Failed
-				
-			) /; opt =!= $Failed
-			
-		) /; AssociationQ[assoc]
-	]
+    Block[{assoc, opt},
+        assoc = iparseRenderOptions[vdb, shading, opts];
+        (
+            opt = renderFailureOption[assoc];
+            (	
+                If[opt === "Shader",
+                    Message[head::shaderval, shading],
+                    Message[head::renderval, opt -> OptionValue[opt]]
+                ];
+                $Failed
+                
+            ) /; opt =!= $Failed
+            
+        ) /; AssociationQ[assoc]
+    ]
 
 
 messageRenderFunction[___] = $Failed

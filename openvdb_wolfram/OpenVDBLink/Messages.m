@@ -53,19 +53,19 @@ messageGridQ[_?OpenVDBGridQ, __] = False;
 
 
 messageGridQ[expr_, head_, tryToLevelSetQ_:True] :=
-	Block[{regionQ},
-		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
-		Which[
-			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
-				Message[head::grid, expr];
-				True,
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False,
-			True,
-				Message[head::grid2, expr];
-				True
-		]
-	]
+    Block[{regionQ},
+        regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+        Which[
+            !tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
+                Message[head::grid, expr];
+                True,
+            TrueQ[$OpenVDBSpacing > 0] && regionQ,
+                False,
+            True,
+                Message[head::grid2, expr];
+                True
+        ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -88,19 +88,19 @@ messageScalarGridQ[_?OpenVDBScalarGridQ, __] = False;
 
 
 messageScalarGridQ[expr_, head_, tryToLevelSetQ_:True] :=
-	Block[{regionQ},
-		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
-		Which[
-			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
-				Message[head::scalargrid, expr];
-				True,
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False,
-			True,
-				Message[head::scalargrid2, expr];
-				True
-		]
-	]
+    Block[{regionQ},
+        regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+        Which[
+            !tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
+                Message[head::scalargrid, expr];
+                True,
+            TrueQ[$OpenVDBSpacing > 0] && regionQ,
+                False,
+            True,
+                Message[head::scalargrid2, expr];
+                True
+        ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -123,19 +123,19 @@ messageLevelSetGridQ[vdb_?OpenVDBScalarGridQ, __] /; levelSetQ[vdb] = False;
 
 
 messageLevelSetGridQ[expr_, head_, tryToLevelSetQ_:True] :=
-	Block[{regionQ},
-		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
-		Which[
-			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
-				Message[head::lvlsetgrid, expr];
-				True,
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False,
-			True,
-				Message[head::lvlsetgrid2, expr];
-				True
-		]
-	]
+    Block[{regionQ},
+        regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+        Which[
+            !tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
+                Message[head::lvlsetgrid, expr];
+                True,
+            TrueQ[$OpenVDBSpacing > 0] && regionQ,
+                False,
+            True,
+                Message[head::lvlsetgrid2, expr];
+                True
+        ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -155,11 +155,11 @@ General::lvlsetgrid2 = "`1` is not a level set grid or constant 3D region.";
 
 
 messageNonMaskGridQ[expr_?OpenVDBGridQ, head_] :=
-	If[!carefulNonMaskGridQ[expr],
-		Message[head::nmsksupp, head];
-		True,
-		False
-	]
+    If[!carefulNonMaskGridQ[expr],
+        Message[head::nmsksupp, head];
+        True,
+        False
+    ]
 
 
 messageNonMaskGridQ[___] = False;
@@ -184,19 +184,19 @@ messagePixelGridQ[_?carefulPixelGridQ, __] = False;
 
 
 messagePixelGridQ[expr_, head_, tryToLevelSetQ_:True] :=
-	Block[{regionQ},
-		regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
-		Which[
-			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
-				Message[head::npxl, expr];
-				True,
-			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False,
-			True,
-				Message[head::npxl2, expr];
-				True
-		]
-	]
+    Block[{regionQ},
+        regionQ = ConstantRegionQ[expr] && RegionEmbeddingDimension[expr] === 3;
+        Which[
+            !tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
+                Message[head::npxl, expr];
+                True,
+            TrueQ[$OpenVDBSpacing > 0] && regionQ,
+                False,
+            True,
+                Message[head::npxl2, expr];
+                True
+        ]
+    ]
 
 
 messagePixelGridQ[___] = False;
@@ -219,11 +219,11 @@ General::npxl2 = "`1` is not a scalar, integer, Boolean, mask grid, or constant 
 
 
 messageNonEmptyGridQ[expr_?OpenVDBGridQ, head_] :=
-	If[emptyVDBQ[expr],
-		Message[head::empty, head];
-		True,
-		False
-	]
+    If[emptyVDBQ[expr],
+        Message[head::empty, head];
+        True,
+        False
+    ]
 
 
 messageNonEmptyGridQ[___] = False;
@@ -245,18 +245,18 @@ General::empty = "`1` does not support empty grids.";
 
 
 messageSameGridTypeQ[args___, head_] :=
-	Block[{grids},
-		grids = Select[{args}, OpenVDBGridQ];
-		If[TrueQ[$OpenVDBSpacing > 0] && Length[grids] =!= Length[{args}],
-			AppendTo[grids, OpenVDBCreateGrid[1.0, "Float"]]
-		];
-		
-		If[Not[sameGridTypeQ @@ grids],
-			Message[head::types];
-			True,
-			False
-		]
-	]
+    Block[{grids},
+        grids = Select[{args}, OpenVDBGridQ];
+        If[TrueQ[$OpenVDBSpacing > 0] && Length[grids] =!= Length[{args}],
+            AppendTo[grids, OpenVDBCreateGrid[1.0, "Float"]]
+        ];
+        
+        If[Not[sameGridTypeQ @@ grids],
+            Message[head::types];
+            True,
+            False
+        ]
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -282,11 +282,11 @@ messageCoordinateSpecQ[expr_ -> regime_, head_] := messageRegimeSpecQ[regime, he
 
 
 messageCoordinateSpecQ[expr_, head_] :=
-	If[coordinateQ[expr] || coordinatesQ[expr],
-		False,
-		Message[head::coord, expr];
-		True
-	]
+    If[coordinateQ[expr] || coordinatesQ[expr],
+        False,
+        Message[head::coord, expr];
+        True
+    ]
 
 
 (* ::Subsubsection::Closed:: *)
@@ -333,11 +333,11 @@ messageZSpecQ[zspec_List -> regime_, head_] := messageRegimeSpecQ[regime, head] 
 
 
 messageZSpecQ[zspec_, head_] :=
-	If[!MatchQ[zspec, Automatic|({z1_, z2_} /; z1 <= z2)],
-		Message[head::zspec, zspec];
-		True,
-		False
-	]
+    If[!MatchQ[zspec, Automatic|({z1_, z2_} /; z1 <= z2)],
+        Message[head::zspec, zspec];
+        True,
+        False
+    ]
 
 
 messageZSpecQ[___] = False;
@@ -362,11 +362,11 @@ messageZSliceQ[z_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || 
 
 
 messageZSliceQ[z_, head_] :=
-	If[!realQ[z],
-		Message[head::zslice, z];
-		True,
-		False
-	]
+    If[!realQ[z],
+        Message[head::zslice, z];
+        True,
+        False
+    ]
 
 
 messageZSliceQ[___] = False;
@@ -391,11 +391,11 @@ message2DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] 
 
 
 message2DBBoxQ[bbox_, head_] :=
-	If[!bounds2DQ[bbox] && bbox =!= Automatic,
-		Message[head::bbox2d, bbox];
-		True,
-		False
-	]
+    If[!bounds2DQ[bbox] && bbox =!= Automatic,
+        Message[head::bbox2d, bbox];
+        True,
+        False
+    ]
 
 
 message2DBBoxQ[___] = False;
@@ -420,11 +420,11 @@ message3DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] 
 
 
 message3DBBoxQ[bbox_, head_] :=
-	If[!bounds3DQ[bbox] && bbox =!= Automatic,
-		Message[head::bbox3d, bbox];
-		True,
-		False
-	]
+    If[!bounds3DQ[bbox] && bbox =!= Automatic,
+        Message[head::bbox3d, bbox];
+        True,
+        False
+    ]
 
 
 message3DBBoxQ[___] = False;
@@ -450,11 +450,11 @@ General::bbox3d = "`1` does not represent valid 3D bunding box.";
 
 
 messageIsoValueQ[iso_, head_] :=
-	If[!realQ[iso] && iso =!= Automatic,
-		Message[head::isoval];
-		True,
-		False
-	]
+    If[!realQ[iso] && iso =!= Automatic,
+        Message[head::isoval];
+        True,
+        False
+    ]
 
 
 messageIsoValueQ[___] = False;

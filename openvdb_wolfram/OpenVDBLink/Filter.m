@@ -37,9 +37,9 @@ OpenVDBFilter[args___] /; !CheckArgs[OpenVDBFilter[args], {2, 3}] = $Failed;
 
 
 OpenVDBFilter[args___] :=
-	With[{res = iOpenVDBFilter[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBFilter[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBFilter[args___] := mOpenVDBFilter[args]
@@ -50,17 +50,17 @@ OpenVDBFilter[args___] := mOpenVDBFilter[args]
 
 
 iOpenVDBFilter[vdb_?OpenVDBScalarGridQ, filter_, iter_:1] /; levelSetQ[vdb] && IntegerQ[iter] && iter > 0 :=
-	Block[{fdata, method, width},
-		fdata = filteringMethod[filter];
-		(
-			{method, width} = fdata;
-			
-			vdb["filterGrid"[method, width, iter]];
-			
-			vdb
-			
-		) /; fdata =!= $Failed
-	]
+    Block[{fdata, method, width},
+        fdata = filteringMethod[filter];
+        (
+            {method, width} = fdata;
+            
+            vdb["filterGrid"[method, width, iter]];
+            
+            vdb
+            
+        ) /; fdata =!= $Failed
+    ]
 
 
 iOpenVDBFilter[___] = $Failed;
@@ -105,17 +105,17 @@ mOpenVDBFilter[expr_, ___] /; messageLevelSetGridQ[expr, OpenVDBFilter] = $Faile
 
 
 mOpenVDBFilter[_, filter_, ___] /; filteringMethod[filter] === $Failed :=
-	(
-		Message[OpenVDBFilter::filter, filter];
-		$Failed
-	)
+    (
+        Message[OpenVDBFilter::filter, filter];
+        $Failed
+    )
 
 
 mOpenVDBFilter[vdb_, filter_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] :=
-	(
-		Message[OpenVDBFilter::intpm, HoldForm[OpenVDBFillWithBalls[vdb, filter, expr, rest]], 3];
-		$Failed
-	)
+    (
+        Message[OpenVDBFilter::intpm, HoldForm[OpenVDBFillWithBalls[vdb, filter, expr, rest]], 3];
+        $Failed
+    )
 
 
 mOpenVDBFilter[___] = $Failed;

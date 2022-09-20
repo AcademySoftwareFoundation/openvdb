@@ -48,9 +48,9 @@ OpenVDBImage3D[args___] /; !CheckArgs[OpenVDBImage3D[args], {1, 2}] = $Failed;
 
 
 OpenVDBImage3D[args___] :=
-	With[{res = iOpenVDBImage3D[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBImage3D[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBImage3D[args___] := mOpenVDBImage3D[args]
@@ -64,22 +64,22 @@ Options[iOpenVDBImage3D] = Options[OpenVDBImage3D];
 
 
 iOpenVDBImage3D[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ, OptionsPattern[]] :=
-	Block[{bdsindex, scaling, resampling, vdbscaled, im3d},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		scaling = parseImage3DScaling[OptionValue["ScalingFactor"], bdsindex];
-		resampling = OptionValue[Resampling];
-		(
-			bdsindex = regimeConvert[vdb, scaling * bds, regime -> $indexregime];
-			vdbscaled = scaleVDB[vdb, scaling, resampling];
-			(
-				im3d = vdbscaled["gridImage3D"[bdsindex]];
-				
-				im3d /; ImageQ[im3d]
-				
-			) /; OpenVDBGridQ[vdbscaled]
-			
-		) /; scaling > 0
-	]
+    Block[{bdsindex, scaling, resampling, vdbscaled, im3d},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        scaling = parseImage3DScaling[OptionValue["ScalingFactor"], bdsindex];
+        resampling = OptionValue[Resampling];
+        (
+            bdsindex = regimeConvert[vdb, scaling * bds, regime -> $indexregime];
+            vdbscaled = scaleVDB[vdb, scaling, resampling];
+            (
+                im3d = vdbscaled["gridImage3D"[bdsindex]];
+                
+                im3d /; ImageQ[im3d]
+                
+            ) /; OpenVDBGridQ[vdbscaled]
+            
+        ) /; scaling > 0
+    ]
 
 
 iOpenVDBImage3D[vdb_?carefulPixelGridQ, opts:OptionsPattern[]] := iOpenVDBImage3D[vdb, vdb["IndexBoundingBox"] -> $indexregime, opts]
@@ -92,11 +92,11 @@ iOpenVDBImage3D[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bspec] || 
 
 
 iOpenVDBImage3D[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ, opts:OptionsPattern[]] :=
-	Block[{bds2d},
-		bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-		
-		iOpenVDBImage3D[vdb, Append[bds2d, int] -> regime, opts] /; bounds2DQ[bds2d]
-	]
+    Block[{bds2d},
+        bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
+        
+        iOpenVDBImage3D[vdb, Append[bds2d, int] -> regime, opts] /; bounds2DQ[bds2d]
+    ]
 
 
 iOpenVDBImage3D[___] = $Failed;
@@ -138,11 +138,11 @@ scaleVDB[vdb_, s_ /; s == 1.0, _] := vdb
 
 
 scaleVDB[vdb_, s_, resamp_] :=
-	Block[{vdbscaled},
-		vdbscaled = OpenVDBTransform[vdb, s, Resampling -> resamp];
-		
-		vdbscaled /; OpenVDBGridQ[vdbscaled]
-	]
+    Block[{vdbscaled},
+        vdbscaled = OpenVDBTransform[vdb, s, Resampling -> resamp];
+        
+        vdbscaled /; OpenVDBGridQ[vdbscaled]
+    ]
 
 
 scaleVDB[___] = $Failed;
@@ -165,13 +165,13 @@ mOpenVDBImage3D[_, bbox_, ___] /; message3DBBoxQ[bbox, OpenVDBImage3D] = $Failed
 
 
 mOpenVDBImage3D[__, OptionsPattern[]] :=
-	Block[{s},
-		s = parseImage3DScaling[OptionValue["ScalingFactor"], {{0,1},{0,1},{0,1}}];
-		(
-			Message[OpenVDBImage3D::scale];
-			$Failed
-		) /; s === $Failed
-	]
+    Block[{s},
+        s = parseImage3DScaling[OptionValue["ScalingFactor"], {{0,1},{0,1},{0,1}}];
+        (
+            Message[OpenVDBImage3D::scale];
+            $Failed
+        ) /; s === $Failed
+    ]
 
 
 mOpenVDBImage3D[___] = $Failed;
@@ -196,9 +196,9 @@ OpenVDBDepthImage[args___] /; !CheckArgs[OpenVDBDepthImage[args], {1, 4}] = $Fai
 
 
 OpenVDBDepthImage[args___] :=
-	With[{res = iOpenVDBDepthImage[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDepthImage[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDepthImage[args___] := mOpenVDBDepthImage[args]
@@ -209,13 +209,13 @@ OpenVDBDepthImage[args___] := mOpenVDBDepthImage[args]
 
 
 iOpenVDBDepthImage[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ, \[Gamma]_?Positive, mnmx_] /; Length[mnmx] == 2 && VectorQ[mnmx, NumericQ] :=
-	Block[{bdsindex, im},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		
-		im = vdb["depthMap"[bdsindex, \[Gamma], mnmx[[1]], mnmx[[2]]]];
-			
-		im /; ImageQ[im]
-	]
+    Block[{bdsindex, im},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        
+        im = vdb["depthMap"[bdsindex, \[Gamma], mnmx[[1]], mnmx[[2]]]];
+            
+        im /; ImageQ[im]
+    ]
 
 
 iOpenVDBDepthImage[vdb_] := iOpenVDBDepthImage[vdb, Automatic]
@@ -228,11 +228,11 @@ iOpenVDBDepthImage[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bspec] 
 
 
 iOpenVDBDepthImage[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ, args___] :=
-	Block[{bds2d},
-		bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-		
-		iOpenVDBDepthImage[vdb, Append[bds2d, int] -> regime, args] /; bounds2DQ[bds2d]
-	]
+    Block[{bds2d},
+        bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
+        
+        iOpenVDBDepthImage[vdb, Append[bds2d, int] -> regime, args] /; bounds2DQ[bds2d]
+    ]
 
 
 iOpenVDBDepthImage[vdb_, bdspec_] := iOpenVDBDepthImage[vdb, bdspec, 0.5]
@@ -271,17 +271,17 @@ mOpenVDBDepthImage[_, bbox_, ___] /; message3DBBoxQ[bbox, OpenVDBDepthImage] = $
 
 
 mOpenVDBDepthImage[_, _, \[Gamma]_, ___] /; !TrueQ[\[Gamma] > 0] :=
-	(
-		Message[OpenVDBDepthImage::gamma, \[Gamma], 3];
-		$Failed
-	)
+    (
+        Message[OpenVDBDepthImage::gamma, \[Gamma], 3];
+        $Failed
+    )
 
 
 mOpenVDBDepthImage[_, _, _, mnmx_] /; !MatchQ[mnmx, {a_, b_} /; 0 <= a <= b] :=
-	(
-		Message[OpenVDBDepthImage::range, mnmx, 4];
-		$Failed
-	)
+    (
+        Message[OpenVDBDepthImage::range, mnmx, 4];
+        $Failed
+    )
 
 
 mOpenVDBDepthImage[___] = $Failed;
@@ -307,9 +307,9 @@ OpenVDBProjectionImage[args___] /; !CheckArgs[OpenVDBProjectionImage[args], {1, 
 
 
 OpenVDBProjectionImage[args___] :=
-	With[{res = iOpenVDBProjectionImage[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBProjectionImage[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBProjectionImage[args___] := mOpenVDBProjectionImage[args]
@@ -320,19 +320,19 @@ OpenVDBProjectionImage[args___] := mOpenVDBProjectionImage[args]
 
 
 iOpenVDBProjectionImage[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ] :=
-	Block[{bdsindex, im},
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		
-		im = vdb["depthMap"[bdsindex, 1.0, 1.0, 1.0]];
-			
-		(
-			If[fogVolumeQ[vdb],
-				Image[im, "Byte"],
-				Image[im, "Bit"]
-			]
-			
-		) /; ImageQ[im]
-	]
+    Block[{bdsindex, im},
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        
+        im = vdb["depthMap"[bdsindex, 1.0, 1.0, 1.0]];
+            
+        (
+            If[fogVolumeQ[vdb],
+                Image[im, "Byte"],
+                Image[im, "Bit"]
+            ]
+            
+        ) /; ImageQ[im]
+    ]
 
 
 iOpenVDBProjectionImage[vdb_] := iOpenVDBProjectionImage[vdb, Automatic]
@@ -345,11 +345,11 @@ iOpenVDBProjectionImage[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bs
 
 
 iOpenVDBProjectionImage[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ] :=
-	Block[{bds2d},
-		bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-		
-		iOpenVDBProjectionImage[vdb, Append[bds2d, int] -> regime] /; bounds2DQ[bds2d]
-	]
+    Block[{bds2d},
+        bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
+        
+        iOpenVDBProjectionImage[vdb, Append[bds2d, int] -> regime] /; bounds2DQ[bds2d]
+    ]
 
 
 iOpenVDBProjectionImage[___] = $Failed;
@@ -403,9 +403,9 @@ OpenVDBSliceImage[args___] /; !CheckArgs[OpenVDBSliceImage[args], {1, 3}] = $Fai
 
 
 OpenVDBSliceImage[args___] :=
-	With[{res = iOpenVDBSliceImage[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBSliceImage[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBSliceImage[args___] := mOpenVDBSliceImage[args]
@@ -419,30 +419,30 @@ Options[iOpenVDBSliceImage] = Options[OpenVDBSliceImage];
 
 
 iOpenVDBSliceImage[vdb_?carefulPixelGridQ, z_?NumericQ -> regime_?regimeQ, bds_?bounds2DQ, OptionsPattern[]] :=
-	Block[{mirrorQ, threadedQ, zindex, bdsindex, im},
-		mirrorQ = TrueQ[OptionValue["MirrorSlice"]];
-		threadedQ = True;
-		
-		zindex = regimeConvert[vdb, z, regime -> $indexregime];
-		bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-		
-		im = vdb["gridSliceImage"[zindex, bdsindex, mirrorQ, threadedQ]];
-		
-		im /; ImageQ[im]
-	]
+    Block[{mirrorQ, threadedQ, zindex, bdsindex, im},
+        mirrorQ = TrueQ[OptionValue["MirrorSlice"]];
+        threadedQ = True;
+        
+        zindex = regimeConvert[vdb, z, regime -> $indexregime];
+        bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
+        
+        im = vdb["gridSliceImage"[zindex, bdsindex, mirrorQ, threadedQ]];
+        
+        im /; ImageQ[im]
+    ]
 
 
 iOpenVDBSliceImage[vdb_, z_?NumericQ, args___] := iOpenVDBSliceImage[vdb, z -> $indexregime, args]
 
 
 iOpenVDBSliceImage[vdb_?carefulPixelGridQ, z_ -> regime_, Automatic, opts___] :=
-	Block[{bbox},
-		bbox = If[worldRegimeQ[regime],
-			"WorldBoundingBox",
-			"IndexBoundingBox"
-		];
-		iOpenVDBSliceImage[vdb, z -> regime, Most[vdb[bbox]], opts]
-	]
+    Block[{bbox},
+        bbox = If[worldRegimeQ[regime],
+            "WorldBoundingBox",
+            "IndexBoundingBox"
+        ];
+        iOpenVDBSliceImage[vdb, z -> regime, Most[vdb[bbox]], opts]
+    ]
 
 
 iOpenVDBSliceImage[vdb_, z_, opts:OptionsPattern[]] := iOpenVDBSliceImage[vdb, z, Automatic, opts]
@@ -498,9 +498,9 @@ OpenVDBDynamicSliceImage[args___] /; !CheckArgs[OpenVDBDynamicSliceImage[args], 
 
 
 OpenVDBDynamicSliceImage[args___] :=
-	With[{res = iOpenVDBDynamicSliceImage[args]},
-		res /; res =!= $Failed
-	]
+    With[{res = iOpenVDBDynamicSliceImage[args]},
+        res /; res =!= $Failed
+    ]
 
 
 OpenVDBDynamicSliceImage[args___] := mOpenVDBDynamicSliceImage[args]
@@ -514,52 +514,52 @@ Options[iOpenVDBDynamicSliceImage] = Options[OpenVDBDynamicSliceImage];
 
 
 iOpenVDBDynamicSliceImage[vdb_?carefulPixelGridQ, OptionsPattern[]] /; !emptyVDBQ[vdb] :=
-	DynamicModule[{x1, x2, y1, y2, z1, z2, start, end, ox1, ox2, oy1, oy2, zs, func, imsz, pxmax},
-		{x1, x2, y1, y2, z1, z2} = Flatten[vdb["IndexBoundingBox"]];
-		{x1, x2, y1, y2} += {-3, 3, -3, 3};
-		{ox1, ox2, oy1, oy2} = {x1, x2, y1, y2};
-		zs = Round[(z1+z2)/2];
-		
-		func = OptionValue[DisplayFunction];
-		imsz = OptionValue[ImageSize];
-		
-		pxmax = If[OpenVDBBooleanGridQ[vdb] || OpenVDBMaskGridQ[vdb], 1, 255];
-		
-		Manipulate[
-			If[TrueQ[OpenVDBGridQ[vdb]],
-				Graphics[
-					EventHandler[
-						{
-							Raster[Image`InternalImageData[func[OpenVDBSliceImage[vdb, Round[k], {{ox1, ox2}, {oy1, oy2}}]]], Automatic, {0, pxmax}],
-							Dynamic[If[ListQ[start], {EdgeForm[Directive[AbsoluteThickness[1], Red]], FaceForm[], Rectangle[start, MousePosition["Graphics"]]}, {}]]
-						},
-						{
-							"MouseDown" :> (
-								start = Round[MousePosition["Graphics"]]
-							),
-							"MouseUp" :> (
-								end = Round[MousePosition["Graphics"]];
-								If[start == end,
-									{ox1, ox2, oy1, oy2} = {x1, x2, y1, y2},
-									{ox1, ox2, oy1, oy2} = {ox1, ox1-1, oy2+1, oy2} + Flatten[Sort /@ ({1, -1}Transpose[{start, end}])]
-								];
-								start=.
-							)
-						}
-					],
-					Frame -> True,
-					FrameTicks -> None,
-					ImageMargins -> 0,
-					ImagePadding -> 25,
-					ImageSize -> imsz,
-					PlotRangePadding -> None
-				],
-				""
-			],
-			{{k, zs, "slice"}, z1, z2, 1},
-			FrameMargins -> 0
-		]
-	]
+    DynamicModule[{x1, x2, y1, y2, z1, z2, start, end, ox1, ox2, oy1, oy2, zs, func, imsz, pxmax},
+        {x1, x2, y1, y2, z1, z2} = Flatten[vdb["IndexBoundingBox"]];
+        {x1, x2, y1, y2} += {-3, 3, -3, 3};
+        {ox1, ox2, oy1, oy2} = {x1, x2, y1, y2};
+        zs = Round[(z1+z2)/2];
+        
+        func = OptionValue[DisplayFunction];
+        imsz = OptionValue[ImageSize];
+        
+        pxmax = If[OpenVDBBooleanGridQ[vdb] || OpenVDBMaskGridQ[vdb], 1, 255];
+        
+        Manipulate[
+            If[TrueQ[OpenVDBGridQ[vdb]],
+                Graphics[
+                    EventHandler[
+                        {
+                            Raster[Image`InternalImageData[func[OpenVDBSliceImage[vdb, Round[k], {{ox1, ox2}, {oy1, oy2}}]]], Automatic, {0, pxmax}],
+                            Dynamic[If[ListQ[start], {EdgeForm[Directive[AbsoluteThickness[1], Red]], FaceForm[], Rectangle[start, MousePosition["Graphics"]]}, {}]]
+                        },
+                        {
+                            "MouseDown" :> (
+                                start = Round[MousePosition["Graphics"]]
+                            ),
+                            "MouseUp" :> (
+                                end = Round[MousePosition["Graphics"]];
+                                If[start == end,
+                                    {ox1, ox2, oy1, oy2} = {x1, x2, y1, y2},
+                                    {ox1, ox2, oy1, oy2} = {ox1, ox1-1, oy2+1, oy2} + Flatten[Sort /@ ({1, -1}Transpose[{start, end}])]
+                                ];
+                                start=.
+                            )
+                        }
+                    ],
+                    Frame -> True,
+                    FrameTicks -> None,
+                    ImageMargins -> 0,
+                    ImagePadding -> 25,
+                    ImageSize -> imsz,
+                    PlotRangePadding -> None
+                ],
+                ""
+            ],
+            {{k, zs, "slice"}, z1, z2, 1},
+            FrameMargins -> 0
+        ]
+    ]
 
 
 iOpenVDBDynamicSliceImage[___] = $Failed;
