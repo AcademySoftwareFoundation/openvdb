@@ -63,7 +63,7 @@ iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
         type = If[itype === Automatic, detectVDBType[file, name], itype];
         (
             vdb = OpenVDBCreateGrid[1.0, type];
-            (	
+            (
                 successQ = vdb["importVDB"[file, name]];
 
                 vdb /; successQ
@@ -170,7 +170,7 @@ iOpenVDBExport[File[file_String], args___] := iOpenVDBExport[file, args]
 
 
 iOpenVDBExport[file_String, vdb_?OpenVDBGridQ, OptionsPattern[]] :=
-    If[fileExportQ[file, OptionValue[OverwriteTarget]],		
+    If[fileExportQ[file, OptionValue[OverwriteTarget]],
         vdb["exportVDB"[file]];
         file,
         $Failed

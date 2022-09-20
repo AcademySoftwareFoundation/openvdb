@@ -77,7 +77,7 @@ iOpenVDBUnion[OptionsPattern[]] :=
         (
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 
-            vdb	
+            vdb
 
         ) /; OpenVDBGridQ[vdb]
     ]
@@ -150,7 +150,7 @@ iOpenVDBIntersection[OptionsPattern[]] :=
         (
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 
-            vdb	
+            vdb
 
         ) /; OpenVDBGridQ[vdb]
     ]

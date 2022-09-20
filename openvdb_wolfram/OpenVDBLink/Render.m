@@ -1453,7 +1453,7 @@ messageRenderFunction[head_, vdb_, shading_, opts:OptionsPattern[]] /; !OptionQ[
         assoc = iparseRenderOptions[vdb, shading, opts];
         (
             opt = renderFailureOption[assoc];
-            (	
+            (
                 If[opt === "Shader",
                     Message[head::shaderval, shading],
                     Message[head::renderval, opt -> OptionValue[opt]]

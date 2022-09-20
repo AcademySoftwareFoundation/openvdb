@@ -203,7 +203,7 @@ openVDBSetName[___] = $Failed;
 openVDBSetVoxelSize[vdb_, spacing_?Positive] :=
     (
         vdb["setVoxelSize"[spacing]];
-        N[spacing]	
+        N[spacing]
     )
 
 

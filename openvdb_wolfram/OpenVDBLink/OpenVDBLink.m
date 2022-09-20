@@ -280,7 +280,7 @@ vdbBaseGridMembers[class_] :=
 
 
 vdbBaseGridPixelMembers[class_?pixelClassQ] :=
-{	
+{
     (* ------------ Image ------------ *)
     LFun["depthMap", {{Integer, 2, "Constant"}, Real, Real, Real}, LType["Image", "Real32"]],
     LFun["gridSliceImage", {Integer, {Integer, 2, "Constant"}, "Boolean", "Boolean"}, LType["Image"]],
@@ -314,7 +314,7 @@ With[{
     $matrixinput = matrixInput[type, rank], $matrixoutput = matrixOutput[type, rank],
     $cubeinput   = cubeInput[type, rank],   $cubeoutput   = cubeOutput[type, rank]
 },
-    {	
+    {
         (* ------------ setters ------------ *)
         LFun["setBackgroundValue", {$scalarinput}, "Void"],
         LFun["setValues", {{Integer, 2, "Constant"}, $vectorinput}, "Void"],
