@@ -73,11 +73,11 @@ iOpenVDBImage3D[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ, Optio
             vdbscaled = scaleVDB[vdb, scaling, resampling];
             (
                 im3d = vdbscaled["gridImage3D"[bdsindex]];
-                
+
                 im3d /; ImageQ[im3d]
-                
+
             ) /; OpenVDBGridQ[vdbscaled]
-            
+
         ) /; scaling > 0
     ]
 
@@ -94,7 +94,7 @@ iOpenVDBImage3D[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bspec] || 
 iOpenVDBImage3D[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ, opts:OptionsPattern[]] :=
     Block[{bds2d},
         bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-        
+
         iOpenVDBImage3D[vdb, Append[bds2d, int] -> regime, opts] /; bounds2DQ[bds2d]
     ]
 
@@ -140,7 +140,7 @@ scaleVDB[vdb_, s_ /; s == 1.0, _] := vdb
 scaleVDB[vdb_, s_, resamp_] :=
     Block[{vdbscaled},
         vdbscaled = OpenVDBTransform[vdb, s, Resampling -> resamp];
-        
+
         vdbscaled /; OpenVDBGridQ[vdbscaled]
     ]
 
@@ -211,9 +211,9 @@ OpenVDBDepthImage[args___] := mOpenVDBDepthImage[args]
 iOpenVDBDepthImage[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ, \[Gamma]_?Positive, mnmx_] /; Length[mnmx] == 2 && VectorQ[mnmx, NumericQ] :=
     Block[{bdsindex, im},
         bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-        
+
         im = vdb["depthMap"[bdsindex, \[Gamma], mnmx[[1]], mnmx[[2]]]];
-            
+
         im /; ImageQ[im]
     ]
 
@@ -230,7 +230,7 @@ iOpenVDBDepthImage[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bspec] 
 iOpenVDBDepthImage[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ, args___] :=
     Block[{bds2d},
         bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-        
+
         iOpenVDBDepthImage[vdb, Append[bds2d, int] -> regime, args] /; bounds2DQ[bds2d]
     ]
 
@@ -322,15 +322,15 @@ OpenVDBProjectionImage[args___] := mOpenVDBProjectionImage[args]
 iOpenVDBProjectionImage[vdb_?carefulPixelGridQ, bds_?bounds3DQ -> regime_?regimeQ] :=
     Block[{bdsindex, im},
         bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-        
+
         im = vdb["depthMap"[bdsindex, 1.0, 1.0, 1.0]];
-            
+
         (
             If[fogVolumeQ[vdb],
                 Image[im, "Byte"],
                 Image[im, "Bit"]
             ]
-            
+
         ) /; ImageQ[im]
     ]
 
@@ -347,7 +347,7 @@ iOpenVDBProjectionImage[vdb_, bspec_List, opts:OptionsPattern[]] /; bounds3DQ[bs
 iOpenVDBProjectionImage[vdb_?carefulPixelGridQ, int_?intervalQ -> regime_?regimeQ] :=
     Block[{bds2d},
         bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
-        
+
         iOpenVDBProjectionImage[vdb, Append[bds2d, int] -> regime] /; bounds2DQ[bds2d]
     ]
 
@@ -422,12 +422,12 @@ iOpenVDBSliceImage[vdb_?carefulPixelGridQ, z_?NumericQ -> regime_?regimeQ, bds_?
     Block[{mirrorQ, threadedQ, zindex, bdsindex, im},
         mirrorQ = TrueQ[OptionValue["MirrorSlice"]];
         threadedQ = True;
-        
+
         zindex = regimeConvert[vdb, z, regime -> $indexregime];
         bdsindex = regimeConvert[vdb, bds, regime -> $indexregime];
-        
+
         im = vdb["gridSliceImage"[zindex, bdsindex, mirrorQ, threadedQ]];
-        
+
         im /; ImageQ[im]
     ]
 
@@ -519,12 +519,12 @@ iOpenVDBDynamicSliceImage[vdb_?carefulPixelGridQ, OptionsPattern[]] /; !emptyVDB
         {x1, x2, y1, y2} += {-3, 3, -3, 3};
         {ox1, ox2, oy1, oy2} = {x1, x2, y1, y2};
         zs = Round[(z1+z2)/2];
-        
+
         func = OptionValue[DisplayFunction];
         imsz = OptionValue[ImageSize];
-        
+
         pxmax = If[OpenVDBBooleanGridQ[vdb] || OpenVDBMaskGridQ[vdb], 1, 255];
-        
+
         Manipulate[
             If[TrueQ[OpenVDBGridQ[vdb]],
                 Graphics[

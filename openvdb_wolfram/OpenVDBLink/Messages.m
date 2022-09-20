@@ -250,7 +250,7 @@ messageSameGridTypeQ[args___, head_] :=
         If[TrueQ[$OpenVDBSpacing > 0] && Length[grids] =!= Length[{args}],
             AppendTo[grids, OpenVDBCreateGrid[1.0, "Float"]]
         ];
-        
+
         If[Not[sameGridTypeQ @@ grids],
             Message[head::types];
             True,

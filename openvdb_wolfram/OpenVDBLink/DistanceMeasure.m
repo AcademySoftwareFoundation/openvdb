@@ -72,9 +72,9 @@ iOpenVDBMember[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $indexregime, Optio
         isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
         (
             mems = vdb["gridMember"[pts, isovalue]];
-            
+
             If[fogVolumeQ[vdb], Subtract[1, mems], mems] /; VectorQ[mems, IntegerQ]
-            
+
         ) /; realQ[isovalue]
     ]
 
@@ -151,9 +151,9 @@ iOpenVDBNearest[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, Opti
         isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
         (
             nearest = vdb["gridNearest"[pts, isovalue]];
-            
+
             nearest /; MatrixQ[nearest, NumericQ]
-            
+
         ) /; realQ[isovalue]
     ]
 
@@ -230,9 +230,9 @@ iOpenVDBDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregime, Opt
         isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
         (
             dists = vdb["gridDistance"[pts, isovalue]];
-            
+
             dists /; VectorQ[dists, NumericQ]
-            
+
         ) /; realQ[isovalue]
     ]
 
@@ -305,9 +305,9 @@ iOpenVDBSignedDistance[vdb_?OpenVDBScalarGridQ, pts_?coordinatesQ -> $worldregim
         isovalue = gridIsoValue[OptionValue["IsoValue"], vdb];
         (
             dists = vdb["gridSignedDistance"[pts, isovalue]];
-            
+
             If[fogVolumeQ[vdb], Minus[dists], dists] /; VectorQ[dists, NumericQ]
-            
+
         ) /; realQ[isovalue]
     ]
 
@@ -499,17 +499,17 @@ mOpenVDBFillWithBalls[args__, Longest[OptionsPattern[]]] :=
         If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBFillWithBalls],
             Return[$Failed]
         ];
-        
+
         If[parseBallReturnType[OptionValue["ReturnType"]] === $Failed,
             Message[OpenVDBFillWithBalls::rettype];
             Return[$Failed]
         ];
-        
+
         If[parseBallSeedCount[OptionValue["SeedCount"]] === $Failed,
             Message[OpenVDBFillWithBalls::seedcnt];
             Return[$Failed]
         ];
-        
+
         $Failed
     )
 
@@ -544,7 +544,7 @@ messageCPTFunction[head_, args__, Longest[OptionsPattern[]]] :=
         If[messageIsoValueQ[OptionValue["IsoValue"], head],
             Return[$Failed]
         ];
-        
+
         $Failed
     )
 

@@ -96,9 +96,9 @@ iLevelSetRender[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; lev
         ropts = parseRenderOptions[vdb, shading, opts];
         (
             res = oLevelSetRender[vdb, ropts];
-            
+
             res /; res =!= $Failed
-            
+
         ) /; AssociationQ[ropts]
     ]
 
@@ -134,7 +134,7 @@ oLevelSetRender[vdb_, ropts_] /; emptyVDBQ[vdb] || (!fogVolume[vdb] && vdb["Back
         bg = RGBColor @@ ropts["Background"];
         res = ropts["Resolution"];
         ires = ropts["ImageResolution"];
-        
+
         ConstantImage[bg, res, "Byte", ImageResolution -> ires]
     ]
 
@@ -146,7 +146,7 @@ oLevelSetRender[vdb_, ropts_] /; KeyExistsQ[materialParameters, ropts["Shader"]]
         pbrparams = materialParameters[ropts["Shader"]];
         (
             im = vdb["renderGridPBR"[##]]& @@ Join[args, Values[pbrparams][[4 ;; -1]]];
-            
+
             Image[im, ImageResolution -> ires] /; ImageQ[im]
         ) /; AssociationQ[pbrparams]
     ]
@@ -157,7 +157,7 @@ oLevelSetRender[vdb_, ropts_] :=
         ires = ropts["ImageResolution"];
         args = Lookup[ropts, $renderLevelSetArgumentKeys];
         im = vdb["renderGrid"[##]]& @@ args;
-        
+
         Image[im, ImageResolution -> ires] /; ImageQ[im]
     ]
 
@@ -207,7 +207,7 @@ iLevelSetViewer[vdb_?OpenVDBScalarGridQ, shading_, opts:OptionsPattern[]] /; lev
         ropts = parseRenderOptions[vdb, shading, opts];
         (
             iDynamicRender[vdb, shading, ropts, opts]
-            
+
         ) /; AssociationQ[ropts]
     ]
 
@@ -243,40 +243,40 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
         td\[Delta], \[Delta], shader, oshader, vrng, ovrng, volQ, ivolQ, projection, oprojection, origprojection, oframe, ooframe, c1, oc1, c2, oc2, c3, oc3, bg, obg, clp, im, antialq, oantialq},
         {t, l, b} = Lookup[iropts, {"Translate", "LookAt", "Bounds"}];
         td\[Delta] = {0.005, 0.005, 0.1}*Max[Abs[Subtract @@@ b]];
-        
+
         {vp, vv} = OptionValue[{ViewPoint, ViewVertical}];
         va = constructViewAngle[OptionValue[ViewAngle], t, l, b];
         vc = parseRenderViewCenter[OptionValue[ViewCenter], t, l, {{0, 1}, {0, 1}, {0, 1}}];
-        
+
         origvc = vc;
         origvp = ovp = vp;
         origvv = ovv = vv;
         origva = ova = va;
-        
+
         origvr = ovrng = initialViewRange[OptionValue[ViewRange], vp, vc, vv, va, b];
         volQ = ivolQ = TrueQ[OptionValue["ClosedClipping"]];
-        
+
         ir = OptionValue[ImageResolution];
         sz = initialImageSize[iropts["ImageSize"], OptionValue[ImageSize]];
         oshader = canonicalizeShader[shading][[1]];
-        
+
         projection = Replace[OptionValue[ViewProjection], Automatic -> "Perspective", {0}];
         origprojection = oprojection = projection;
         oframe = orthographicSphericalFrame[b];
         ooframe = oframe;
-        
+
         {c1, c2, c3, bg} = If[TrueQ[customColorQ[oshader]],
             RGBColor @@@ Lookup[iropts, {"BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background"}],
             $renderColorThemes["Default"]
         ];
         {oc1, oc2, oc3, obg} = {c1, c2, c3, bg};
-        
+
         oiso = iropts["IsoValue"];
         {mniso, mxiso} = {-1, 1}Ramp[vdb["BackgroundValue"] - 1.5voxelSize[vdb]];
         mem = Quotient[vdb["MemoryUsage"], Replace[$ProcessorCount, Except[_Integer?Positive] -> 1, {0}]];
-        
+
         oantialq = OptionValue[PerformanceGoal] =!= "Speed";
-                
+
         Manipulate[
             Which[
                 dz != 0,
@@ -534,13 +534,13 @@ zoomViewPoint[vp_, vc_, dz_, vv_, va_, bds_] :=
         translate = parseRenderViewPoint[vp, bds];
         lookat = parseRenderViewCenter[vc, translate, vv, va, bds];
         dir = Min[.1dz*Power[Norm[Subtract[lookat, translate]], 1.25], 1.5]Normalize[Subtract[lookat, translate]];
-        
+
         translate += dir;
         lookat    += dir;
-        
+
         center = Mean /@ bds;
         mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
-        
+
         Divide[Subtract[translate, center], mx]
     ]
 
@@ -582,7 +582,7 @@ Options[parseRenderOptions] = Join[Options[iLevelSetRender], {"BoundingBox" -> A
 parseRenderOptions[vdb_, shading_, opts:OptionsPattern[]] :=
     Block[{res},
         res = iparseRenderOptions[vdb, shading, opts];
-        
+
         res /; AssociationQ[res] && NoneTrue[res, FailureQ]
     ]
 
@@ -600,19 +600,19 @@ Options[iparseRenderOptions] = Options[parseRenderOptions];
 iparseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
     Block[{bds, translate, lookat1, \[Alpha], lookat, up, transdist, depthdata, imgresolution, shader, ropts},
         bds = parseBoundingBox[vdb, OptionValue["BoundingBox"]];
-        
+
         translate = parseRenderViewPoint[OptionValue[ViewPoint], bds];
         up = parseRenderViewVertical[OptionValue[ViewVertical], OptionValue[ViewPoint]];
-        
+
         lookat1 = parseRenderViewCenterNoOffset[OptionValue[ViewCenter], bds];
         \[Alpha] = constructViewAngle[OptionValue[ViewAngle], translate, lookat1, bds];
         lookat = parseRenderViewCenter[OptionValue[ViewCenter], translate, up, \[Alpha], bds];
-        
+
         shader = canonicalizeShader[shading];
-        
+
         depthdata = parseDepthParameters[shader];
         imgresolution = parseRenderImageResolution[OptionValue[ImageResolution]];
-        
+
         <|
             "Bounds" -> bds,
             "IsoValue" -> parseIsoValue[OptionValue["IsoValue"]],
@@ -648,21 +648,21 @@ renderFailureOption[assoc_] :=
     (
         If[FailureQ[assoc["Bounds"]], Return["BoundingBox"]];
         If[FailureQ[assoc["IsoValue"]], Return["IsoValue"]];
-        
+
         If[FailureQ[assoc["Shader"]], Return["Shader"]];
         If[FailureQ[assoc["Background"]], Return[Background]];
-        
+
         If[FailureQ[assoc["Translate"]], Return[ViewPoint]];
         If[FailureQ[assoc["Up"]], Return[ViewVertical]];
         If[FailureQ[assoc["FOV"]], Return[ViewAngle]];
         If[FailureQ[assoc["LookAt"]], Return[ViewCenter]];
         If[FailureQ[assoc["Range"]], Return[ViewRange]];
-        
+
         If[FailureQ[assoc["Camera"]], Return[ViewProjection]];
         If[FailureQ[assoc["Samples"]], Return[PerformanceGoal]];
         If[FailureQ[assoc["ImageResolution"]], Return[ImageResolution]];
         If[FailureQ[assoc["ImageSize"]], Return[ImageSize]];
-        
+
         $Failed
     )
 
@@ -797,7 +797,7 @@ parseRenderViewPoint[vp_List, bds_?bounds3DQ] /; VectorQ[vp, NumericQ] && Length
     Block[{vpfinite, mx},
         vpfinite = vp /. inf_DirectedInfinity :> Sign[inf]*1000;
         mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
-        
+
         mx * vpfinite + (Mean /@ bds)
     ]
 
@@ -810,9 +810,9 @@ parseRenderViewPoint[dirs:{(Left|Right|Front|Back|Below|Above)..}, bds_] :=
         canons = canonicalizeViewPoint /@ dirs;
         (
             vps = GatherBy[canons, Unitize][[All, -1]];
-            
+
             Total[parseRenderViewPoint[canonicalizeViewPoint[#], bds]& /@ vps]
-            
+
         ) /; MatrixQ[canons]
     ]
 
@@ -829,11 +829,11 @@ parseRenderViewCenter[{vc_List, {ox_?NumericQ, oy_?NumericQ}}, translate_, up_, 
         (
             v = translate-lookat;
             cross = Cross[v, up];
-            
+
             rot = RotationTransform[(oy-0.5)*\[Alpha], cross, translate] @* RotationTransform[(ox-0.5)*\[Alpha], up, translate];
-            
+
             rot[lookat]
-            
+
         ) /; lookat =!= $Failed
     ]
 parseRenderViewCenter[vc_, __, bds_] := parseRenderViewCenterNoOffset[vc, bds];
@@ -888,7 +888,7 @@ parseRenderViewRange[Scaled[vrng:{min_?NumericQ, max_?NumericQ}], vp_, vc_, bds_
         padding = 0.02*Max[Abs[Subtract @@@ bds]];
         vrmin = Clip[SignedRegionDistance[Cuboid @@ Transpose[bds], vp] - padding, {0.1, \[Infinity]}];
         vrmax = Ramp[Sqrt[Max[Total[Subtract[Transpose[Tuples[bds]], vp]^2, {1}]]] + .11];
-        
+
         vrng*(vrmax-vrmin) + vrmin
     ]
 
@@ -1019,7 +1019,7 @@ parseRenderImageSize[{x_, y_}, res_, vp_List, vv_List, bds_?bounds3DQ] :=
         aspectratio = 1.0;(*viewPointAspectRatio[bds, vp, vv];*)
         w = Round[Replace[x, Automatic -> 360*res/72, {0}]];
         h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
-        
+
         {w, h}
     ]
 parseRenderImageSize[___] = $Failed
@@ -1030,7 +1030,7 @@ viewPointAspectRatio[bds_, vp_, vv_] :=
         rot = RotationTransform[{vp-(Mean /@ bds), {0,0,1}}];
         proj1 = rot[Tuples[bds]][[All, 1;;2]];
         up2d = rot[vv][[1 ;; 2]];
-        
+
         proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
         Divide @@ Clip[Reverse[Abs[Subtract @@@ CoordinateBounds[proj2]]], {0.001, \[Infinity]}]
     ]
@@ -1047,7 +1047,7 @@ parseRenderUnscaledImageSize[{x_, y_}, vp_List, vv_List, bds_?bounds3DQ] :=
         aspectratio = viewPointAspectRatio[bds, vp, vv];
         w = Round[Replace[x, Automatic -> 360, {0}]];
         h = Round[Replace[y, Automatic -> w*aspectratio, {0}]];
-        
+
         {w, h}
     ]
 parseRenderUnscaledImageSize[___] = $Failed
@@ -1066,7 +1066,7 @@ parseOrthographicFrame["Orthographic", Automatic, vp_, vc_, vv_, bds_] :=
         rot = RotationTransform[{vp-vc, {0,0,1}}];
         proj1 = rot[Tuples[bds]][[All, 1;;2]];
         up2d = rot[vv][[1 ;; 2]];
-        
+
         proj2 = RotationTransform[{up2d, {0, 1}}][proj1];
         Clip[Abs[Subtract @@@ CoordinateBounds[proj2]][[1]], {0.001, \[Infinity]}]
     ]
@@ -1459,9 +1459,9 @@ messageRenderFunction[head_, vdb_, shading_, opts:OptionsPattern[]] /; !OptionQ[
                     Message[head::renderval, opt -> OptionValue[opt]]
                 ];
                 $Failed
-                
+
             ) /; opt =!= $Failed
-            
+
         ) /; AssociationQ[assoc]
     ]
 

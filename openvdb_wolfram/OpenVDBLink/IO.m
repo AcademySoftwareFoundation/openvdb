@@ -65,11 +65,11 @@ iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
             vdb = OpenVDBCreateGrid[1.0, type];
             (	
                 successQ = vdb["importVDB"[file, name]];
-                
+
                 vdb /; successQ
-                
+
             ) /; OpenVDBGridQ[vdb]
-            
+
         ) /; type =!= $Failed
     ]
 
@@ -95,13 +95,13 @@ detectVDBType[file_, name_] :=
     Block[{vdb, type, wltype},
         (* create a grid of any type since it has the base methods *)
         vdb = OpenVDBCreateGrid[1.0, "Scalar"];
-        
+
         type = vdb["importVDBType"[file, name]];
         (
             wltype = fromInternalType[type];
-            
+
             wltype /; StringQ[wltype]
-        
+
         ) /; StringQ[type]
     ]
 

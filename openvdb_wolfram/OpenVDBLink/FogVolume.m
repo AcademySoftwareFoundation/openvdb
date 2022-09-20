@@ -57,11 +57,11 @@ iOpenVDBToFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; leve
             cutoff,
             halfWidth[vdb]
         ];
-        
+
         wcutoff = regimeConvert[vdb, wcutoff, regime -> $worldregime];
-        
+
         vdb["levelSetToFogVolume"[wcutoff]];
-        
+
         vdb
     ]
 
@@ -128,9 +128,9 @@ OpenVDBFogVolume[args___] := mOpenVDBFogVolume[args]
 iOpenVDBFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] :=
     Block[{vdbcopy},
         vdbcopy = OpenVDBCopyGrid[vdb];
-        
+
         iOpenVDBToFogVolume[vdbcopy, cutoff -> regime];
-        
+
         vdbcopy
     ]
 

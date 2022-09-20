@@ -60,7 +60,7 @@ OpenVDBSetStates[args___] := mOpenVDBSetStates[args]
 iOpenVDBSetStates[vdb_?OpenVDBGridQ, coords_?coordinatesQ -> regime_?regimeQ, states_] /; VectorQ[states, realQ] && Length[coords] === Length[states] :=
     With[{indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime]},
         vdb["setActiveStates"[indexcoordinates, states]];
-        
+
         Unitize[states]
     ]
 
@@ -205,9 +205,9 @@ OpenVDBSetValues[args___] := mOpenVDBSetValues[args]
 iOpenVDBSetValues[vdb_?carefulNonMaskGridQ, coords_?coordinatesQ -> regime_?regimeQ, values_] /; ArrayQ[values, _, realQ] && Length[coords] === Length[values] :=
     Block[{indexcoordinates, res},
         indexcoordinates = regimeConvert[vdb, coords, regime -> $indexregime];
-        
+
         res = Quiet[vdb["setValues"[indexcoordinates, values]]];
-        
+
         Which[
             OpenVDBBooleanGridQ[vdb],
                 Unitize[values],

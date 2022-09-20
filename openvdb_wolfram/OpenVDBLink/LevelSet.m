@@ -66,11 +66,11 @@ pOpenVDBLevelSet[expr_, spacing_?Positive, width_?Positive, OptionsPattern[]] :=
             (
                 OpenVDBSetProperty[vdb, "Creator" -> OptionValue["Creator"]];
                 OpenVDBSetProperty[vdb, "Name" -> OptionValue["Name"]];
-                
+
                 vdb
-                
+
             ) /; OpenVDBScalarGridQ[vdb]
-            
+
         ) /; reg =!= $Failed && validScalarTypeQ[type]
     ]
 
@@ -99,7 +99,7 @@ iOpenVDBLevelSet[{coords_?coordinatesQ, pcells:_List|_Polygon}, args__] :=
 iOpenVDBLevelSet[mr_?surfaceMesh3DQ, args__] :=
     Block[{tri},
         tri = Quiet[laxMeshBlock @ Region`Mesh`TriangulateMeshCells[mr, MaxCellMeasure -> \[Infinity]]];
-        
+
         iOpenVDBLevelSet[tri, args] /; triangleSurfaceMeshQ[tri]
     ]
 
@@ -121,7 +121,7 @@ iOpenVDBLevelSet[{coords_?coordinatesQ, pcells:_List|_Polygon, r_?Positive}, arg
 thickSurfaceSignedDistanceField[coords_, cells_, r_, spacing_, width_, type_, signedQ_] :=
     Block[{vdb = OpenVDBCreateGrid[spacing, type]},
         vdb["offsetSurfaceLevelSet"[coords, cells-1, r, spacing, width, signedQ]];
-        
+
         vdb
     ]
 
@@ -159,9 +159,9 @@ tubeComplexSignedDistanceField[coords_, cells_, r_, spacing_, width_, type_, sig
     Block[{vdb = OpenVDBCreateGrid[spacing, type], coords2, cells2},
         coords2 = Join[coords, coords[[cells[[All, 2]]]] + .0001];
         cells2 = Transpose[Append[Transpose[cells], Range[Length[coords]+1, Length[coords]+Length[cells]]]]-1;
-        
+
         vdb["offsetSurfaceLevelSet"[coords2, cells2, r, spacing, width, signedQ]];
-        
+
         vdb
     ]
 
@@ -175,16 +175,16 @@ iOpenVDBLevelSet[torus:(Torus|FilledTorus)[___]?ConstantRegionQ, spacing_, args_
         torusspec = torusData @@ torus;
         (
             {c, rin, rout} = torusspec;
-            
+
             rmid = N[Mean[{rin, rout}]];
             rtube = 0.5(rout - rin);
             n = Ceiling[2\[Pi]*rmid/spacing];
-            
+
             pts = Append[c[[3]]] /@ CirclePoints[c[[1 ;; 2]], rmid, n];
             AppendTo[pts, First[pts]];
-            
+
             iOpenVDBLevelSet[Tube[pts, rtube], spacing, args]
-            
+
         ) /; torusspec =!= $Failed
     ]
 
@@ -206,9 +206,9 @@ iOpenVDBLevelSet[ball:(Ball|Sphere)[___]?ConstantRegionQ, spacing_, width_, type
             {c, r} = ballspec;
             vdb = OpenVDBCreateGrid[spacing, type];
             vdb["ballLevelSet"[c, r, spacing, width, signedQ]];
-            
+
             vdb
-            
+
         ) /; ballspec =!= $Failed
     ]
 
@@ -232,11 +232,11 @@ iOpenVDBLevelSet[shell:HoldPattern[SphericalShell][___]?ConstantRegionQ, args___
             ballout = iOpenVDBLevelSet[Ball[c, r2], args];
             (
                 ballin = iOpenVDBLevelSet[Ball[c, r1], args];
-                
+
                 OpenVDBDifferenceFrom[ballout, ballin] /; OpenVDBScalarGridQ[ballin]
-                
+
             ) /; OpenVDBScalarGridQ[ballout]
-            
+
         ) /; shellspec =!= $Failed
     ]
 
@@ -260,9 +260,9 @@ iOpenVDBLevelSet[cuboid_Cuboid?ConstantRegionQ, spacing_, width_, type_, signedQ
         (
             vdb = OpenVDBCreateGrid[spacing, type];
             vdb["cuboidLevelSet"[bds, spacing, width, signedQ]];
-            
+
             vdb
-            
+
         ) /; And @@ Less @@@ bds
     ]
 
@@ -278,7 +278,7 @@ iOpenVDBLevelSet[poly_?specialPolyhedonQ, args__] :=
     With[{data = polyhedronTriangleData[poly]},
         (
             triangleSurfaceComplexSignedDistanceField[##, None, args, False]& @@ data
-            
+
         ) /; data =!= $Failed
     ]
 
@@ -309,7 +309,7 @@ iOpenVDBLevelSet[reg:BooleanRegion[bfunc_, regs_]?ConstantRegionQ, args__] /; Re
                 unionRegionSDFs[regs, args],
                 intersectRegionSDFs[regs, args]
             ]
-            
+
         ) /; op =!= $Failed
     ]
 
@@ -334,7 +334,7 @@ booleanRegionSDFs[boolVDB_, regs_, args__] :=
         If[vdb1 === $Failed,
             Return[$Failed]
         ];
-        
+
         Do[
             vdb2 = iOpenVDBLevelSet[reg, args];
             If[vdb2 === $Failed,
@@ -344,7 +344,7 @@ booleanRegionSDFs[boolVDB_, regs_, args__] :=
             vdb1[boolVDB[vdb2[[1]]]];,
             {reg, Rest[regs]}
         ];
-        
+
         vdb1
     ]
 
@@ -373,7 +373,7 @@ iOpenVDBLevelSet[RegionBoundary[reg_], args__, _] := iOpenVDBLevelSet[reg, args,
 iOpenVDBLevelSet[reg_?ConstantRegionQ, args__] /; RegionEmbeddingDimension[reg] == 3 :=
     Block[{bmr},
         bmr = Quiet[laxMeshBlock @ BoundaryDiscretizeRegion[reg]];
-        
+
         iOpenVDBLevelSet[bmr, args] /; BoundaryMeshRegionQ[bmr]
     ]
 
@@ -547,7 +547,7 @@ tubeSegmentData[pts_List] :=
                 Join @@ data[[All, 1]],
                 Join @@ Plus[data[[All, 2]], Prepend[Most[Accumulate[Length /@ data[[All, 1]]]], 0]]
             }
-            
+
         ) /; FreeQ[data, $Failed, {1}]
     ]
 
@@ -601,7 +601,7 @@ platonicSpecs[args___] :=
         center = {0, 0, 0};
         angles = {0, 0};
         l = 1;
-        
+
         Switch[Prepend[If[ListQ[#], Length[#], 0]& /@ data, Length[data]],
             {0}, Null,
             {1, 0}, {l} = data,
@@ -613,7 +613,7 @@ platonicSpecs[args___] :=
             {3, __}, {center, angles, l} = data,
             _, Return[$Failed]
         ];
-        
+
         {center, angles, l}
     ]
 
@@ -624,12 +624,12 @@ rotatePolyhedronCoordinates[coords_, {\[Theta]_, \[Phi]_}, center_] := (Rotation
 cubeTriangleData[args___] :=
     Block[{center, angles, l, cuboidres},
         {center, angles, l} = platonicSpecs[args];
-        
+
         cuboidres = cuboidTriangleData[center - 0.5l{1, 1, 1}, center + 0.5l{1, 1, 1}];
         If[angles =!= {0, 0},
             cuboidres[[1]] = rotatePolyhedronCoordinates[cuboidres[[1]], angles, center];
         ];
-        
+
         cuboidres
     ]
 
@@ -646,18 +646,18 @@ $dodecacoords = {{-1.3763819204711736, 0., 0.2628655560595668}, {1.3763819204711
 dodecahedronTriangleData[args___] :=
     Block[{center, angles, l, dcoords, dcells},
         {center, angles, l} = platonicSpecs[args];
-        
+
         dcoords = Transpose[Transpose[l*$dodecacoords] + center];
         If[angles =!= {0, 0},
             dcoords = rotatePolyhedronCoordinates[dcoords, angles, center];
         ];
-        
+
         dcells = {{15,10,9},{15,9,14},{15,14,1},{2,6,12},{2,12,11},{2,11,5},{5,11,7},
             {5,7,3},{5,3,19},{11,12,8},{11,8,16},{11,16,7},{12,6,20},{12,20,4},{12,4,8},
             {6,2,13},{6,13,18},{6,18,20},{2,5,19},{2,19,17},{2,17,13},{4,20,18},{4,18,10},
             {4,10,15},{18,13,17},{18,17,9},{18,9,10},{17,19,3},{17,3,14},{17,14,9},{3,7,16},
             {3,16,1},{3,1,14},{16,8,4},{16,4,15},{16,15,1}};
-        
+
         {dcoords, dcells}
     ]
 
@@ -669,16 +669,16 @@ $icosacoords = {{0., 0., -0.9510565162951536}, {0., 0., 0.9510565162951536}, {-0
 icosahedronTriangleData[args___] :=
     Block[{center, angles, l, icoords, icells},
         {center, angles, l} = platonicSpecs[args];
-        
+
         icoords = Transpose[Transpose[l*$icosacoords] + center];
         If[angles =!= {0, 0},
             icoords = rotatePolyhedronCoordinates[icoords, angles, center];
         ];
-        
+
         icells = {{2,12,8},{2,8,7},{2,7,11},{2,11,4},{2,4,12},{5,9,1},{6,5,1},{10,6,1},
             {3,10,1},{9,3,1},{12,10,8},{8,3,7},{7,9,11},{11,5,4},{4,6,12},{5,11,9},
             {6,4,5},{10,12,6},{3,8,10},{9,7,3}};
-        
+
         {icoords, icells}
     ]
 
@@ -687,14 +687,14 @@ $octacoords = {{0., 0.7071067811865475, 0.}, {0.7071067811865475, 0., 0.}, {0., 
 octahedronTriangleData[args___] :=
     Block[{center, angles, l, ocoords, ocells},
         {center, angles, l} = platonicSpecs[args];
-        
+
         ocoords = Transpose[Transpose[l*$octacoords] + center];
         If[angles =!= {0, 0},
             ocoords = rotatePolyhedronCoordinates[ocoords, angles, center];
         ];
-        
+
         ocells = {{5,2,1},{5,3,2},{5,4,3},{4,5,1},{2,6,1},{2,3,6},{4,6,3},{1,6,4}};
-        
+
         {ocoords, ocells}
     ]
 
@@ -721,12 +721,12 @@ tetrahedronTriangleData[pts_?MatrixQ] := {pts, {{1,2,4},{1,3,2},{1,4,3},{2,3,4}}
 tetrahedronTriangleData[args___] :=
     Block[{center, angles, l, tetres},
         {center, angles, l} = platonicSpecs[args];
-        
+
         tetres = tetrahedronTriangleData[Transpose[Transpose[l*$tetcoords] + center]];
         If[angles =!= {0, 0},
             tetres[[1]] = rotatePolyhedronCoordinates[tetres[[1]], angles, center];
         ];
-        
+
         tetres
     ]
 
@@ -742,9 +742,9 @@ triangleSurfaceComplexSignedDistanceField[coords_, cells_, C12_, spacing_, width
             nestedComponentHierarchy[coords, cells, C12],
             {cells}
         ];
-        
+
         vdb["meshLevelSet"[coords, nestedcells[[1]] - 1, spacing, width, signedQ]];
-        
+
         Do[
             nestedvdb = OpenVDBCreateGrid[spacing, type];
             nestedvdb["meshLevelSet"[coords, nestedcells[[i]] - 1, spacing, width, signedQ]];
@@ -754,7 +754,7 @@ triangleSurfaceComplexSignedDistanceField[coords_, cells_, C12_, spacing_, width
             ],
             {i, 2, Length[nestedcells]}
         ];
-        
+
         vdb
     ]
 
@@ -763,21 +763,21 @@ nestedComponentHierarchy[coords_, cells_, C12_] :=
     Block[{C22, comps, conncells, n, adj, depths, depthmembers},
         C22 = triangleTriangleConnectivity[coords, cells, C12];
         comps = SparseArray`StronglyConnectedComponents[C22];
-        
+
         (* only one component *)
         If[Length[comps] == 1, Return[{cells}]];
-        
+
         conncells = cells[[#]]& /@ comps;
-        
+
         n = Length[conncells];
         adj = boundaryNestingAdjacency[coords, Polygon /@ conncells];
         depths = nestingDepths[n, adj];
-        
+
         (* multiple components, but none nested *)
         If[Max[depths] == 0, Return[{cells}]];
-        
+
         depthmembers = GatherBy[SortBy[Transpose[{depths, Range[n]}], First], First][[All, All, 2]];
-        
+
         (Join @@ conncells[[#]])& /@ depthmembers
     ]
 
@@ -893,9 +893,9 @@ laxMeshBlock[code_] :=
         Internal`WithLocalSettings[
             bmethod = OptionValue[BoundaryMeshRegion, Method];
             SetOptions[BoundaryMeshRegion, Method -> Join[{"CheckIntersections" -> False}, Replace[bmethod, Except[_List] -> {}, {0}]]];,
-            
+
             code,
-            
+
             SetOptions[BoundaryMeshRegion, Method -> bmethod];
         ]
     ]
@@ -926,22 +926,22 @@ iPolygonCoordinate[lis_List] :=
 
 boundingBoxNesting[{min1_, max1_}, {min2_, max2_}] :=
     Module[{minless, maxless},
-    
+
         If[Or @@ MapThread[Less, {max1, min2}],
             Return["Disjoint"]
         ];
-        
+
         If[Or @@ MapThread[Less, {max2, min1}],
             Return["Disjoint"]
         ];
-        
+
         minless = Union[MapThread[Less, {min1, min2}]];
         maxless = Union[MapThread[Less, {max1, max2}]];
-        
+
         If[Length[minless] > 1 || Length[maxless] > 1 || minless === maxless,
             Return[Indeterminate]
         ];
-        
+
         If[TrueQ[First[minless]],
             {"Inside", 2, 1},
             {"Inside", 1, 2}
@@ -958,12 +958,12 @@ pointInsideQ[polys_, pt_] := OddQ[Region`Mesh`CrossingCount[polys, pt]]
 
 boundaryNestingAdjacency[coords_, cells_] :=
     Block[{np, polycomps, bb, pts, nesting},
-        
+
         np = Length[cells];
         polycomps = Region`Mesh`ToCoordinates[cells, coords];
         bb = polygonBoundingBox /@ polycomps;
         pts = polygonCoordinate /@ polycomps;
-        
+
         nesting = Reap[
             Do[
                 Switch[
@@ -992,19 +992,19 @@ boundaryNestingAdjacency[coords_, cells_] :=
                 {j, i + 1, np}
             ]
         ][[-1]];
-        
+
         Sort[Flatten[nesting, 1]]
 ]
 
 
 nestingLevels[np_Integer, adj_] :=
     Block[{depths, roots, depthlist},
-    
+
         (* The number of times a component appears in the second location is its depth in the inclusion tree. *)
         depths = SplitBy[SortBy[Tally[adj[[All, 2]]], Last], Last];
-        
+
         roots = Complement[Range[np], adj[[All, 2]]];
-        
+
         (* creates {{i01, i02, i03, ...}, {i11, i12, i13, ...}, {i21, i22, i23, ...}, ...}, where idj means the index has depth d. *)
         Prepend[depths[[All, All, 1]], roots]
     ]
@@ -1013,10 +1013,10 @@ nestingLevels[np_Integer, adj_] :=
 nestingDepths[np_Integer, adj_] :=
     Block[{depthlist, df},
         depthlist = nestingLevels[np, adj];
-        
+
         df[_] = 0;
         Do[Scan[(df[#] = i)&, depthlist[[i+1]]], {i, 0, Length[depthlist]-1}];
-        
+
         df /@ Range[np]
     ]
 

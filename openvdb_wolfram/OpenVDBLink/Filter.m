@@ -54,11 +54,11 @@ iOpenVDBFilter[vdb_?OpenVDBScalarGridQ, filter_, iter_:1] /; levelSetQ[vdb] && I
         fdata = filteringMethod[filter];
         (
             {method, width} = fdata;
-            
+
             vdb["filterGrid"[method, width, iter]];
-            
+
             vdb
-            
+
         ) /; fdata =!= $Failed
     ]
 

@@ -125,9 +125,9 @@ validReturnFormatQ[___] = False;
                 Through[lookup[vdb]],
                 lookup[vdb]
             ];
-            
+
             res /; res =!= $Failed
-            
+
         ) /; !MissingQ[lookup]
     ]
 
@@ -135,7 +135,7 @@ validReturnFormatQ[___] = False;
 (vdb_OpenVDBGrid)[key:(_List | _String), format_] :=
     Block[{res},
         res = OpenVDBProperty[vdb, key, format];
-        
+
         res /; res =!= $Failed
     ]
 
@@ -174,11 +174,11 @@ iOpenVDBProperty[vdb_?OpenVDBGridQ, props_, format_:Automatic] :=
             measurements = queryVDBProperty[vdb, propfuncs];
             (
                 res = formatProperties[format, props, measurements];
-                
+
                 res /; res =!= $Failed
-                
+
             ) /; measurements =!= $Failed
-            
+
         ) /; propfuncs =!= $Failed
     ]
 
@@ -305,9 +305,9 @@ openVDBGetBoundingBox[vdb_] :=
         griddims = openVDBGetGridBoundingBox[vdb];
         (
             voxsize = openVDBGetVoxelSize[vdb];
-            
+
             voxsize * griddims /; voxsize =!= $Failed
-            
+
         ) /; griddims =!= $Failed
     ]
 
@@ -381,9 +381,9 @@ openVDBGetDimensions[vdb_] :=
         griddims = openVDBGetGridDimensions[vdb];
         (
             voxsize = openVDBGetVoxelSize[vdb];
-            
+
             voxsize * griddims /; voxsize =!= $Failed
-            
+
         ) /; griddims =!= $Failed
     ]
 

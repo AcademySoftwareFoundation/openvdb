@@ -124,9 +124,9 @@ OpenVDBDilation[args___] := mOpenVDBDilation[args]
 iOpenVDBDilation[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
     Block[{offset},
         offset = regimeConvert[vdb, -r, regime -> $worldregime];
-        
+
         vdb["offsetLevelSet"[offset]];
-        
+
         vdb
     ]
 
@@ -184,9 +184,9 @@ OpenVDBErosion[args___] := mOpenVDBErosion[args]
 iOpenVDBErosion[vdb_?OpenVDBScalarGridQ, r_?realQ -> regime_?regimeQ] /; levelSetQ[vdb] :=
     Block[{offset},
         offset = regimeConvert[vdb, r, regime -> $worldregime];
-        
+
         vdb["offsetLevelSet"[offset]];
-        
+
         vdb
     ]
 

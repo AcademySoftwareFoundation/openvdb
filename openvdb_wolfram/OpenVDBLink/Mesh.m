@@ -59,7 +59,7 @@ iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] :=
         type = parseLevelSetMeshType[itype];
         (
             {adaptivity, isovalue, quadQ} = OptionValue[{"Adaptivity", "IsoValue", "ReturnQuads"}];
-            
+
             adaptivity = Clip[adaptivity, {0., 1.}];
             isovalue = gridIsoValue[isovalue, vdb];
             quadQ = TrueQ[quadQ];
@@ -67,13 +67,13 @@ iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] :=
                 data = levelSetMeshData[vdb, isovalue, adaptivity, quadQ];
                 (
                     res = constructLevelSetMesh[data, type];
-                    
+
                     res /; res =!= $Failed
-                    
+
                 ) /; data =!= $Failed
-                
+
             ) /; realQ[isovalue] && 0 <= adaptivity <= 1
-            
+
         ) /; StringQ[type]
     ]
 
@@ -84,9 +84,9 @@ iOpenVDBMesh[vdb_, itype_, bds_List, opts:OptionsPattern[]] /; MatrixQ[bds, real
 iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, bds_List -> regime_?regimeQ, opts:OptionsPattern[]] :=
     Block[{clipopts, clip},
         clipopts = FilterRules[{opts, Options[OpenVDBMesh]}, Options[OpenVDBClip]];
-        
+
         clip = OpenVDBClip[vdb, bds -> regime, Sequence @@ clipopts];
-        
+
         iOpenVDBMesh[clip, itype, opts] /; OpenVDBScalarGridQ[clip]
     ]
 
@@ -141,16 +141,16 @@ levelSetMeshData[vdb_, isovalue_, adaptivity_, quadQ_] :=
         (
             doffset = 3;
             {coordlen, trilen, quadlen} = {3, 3, 4} * rawdata[[1 ;; 3]];
-            
+
             coords = Partition[rawdata[[doffset+1 ;; doffset+coordlen]], 3];
-            
+
             cells = Reverse[Round[#]+1, {2}]& /@ {
                 If[trilen > 0, Partition[rawdata[[doffset+coordlen+1 ;; doffset+coordlen+trilen]], 3], Nothing],
                 If[quadlen > 0, Partition[rawdata[[doffset+coordlen+trilen+1 ;; -1]], 4], Nothing]
             };
-            
+
             {coords, cells}
-            
+
         ) /; ListQ[rawdata] && Length[rawdata] > 3
     ]
 
@@ -173,7 +173,7 @@ constructLevelSetMesh[{coords_, cells:{__}}, type:("MeshRegion"|"BoundaryMeshReg
     Block[{hasQuads, head, mr},
         hasQuads = Max[Length[#[[1]]]& /@ cells] == 4;
         head = If[type === "BoundaryMeshRegion", BoundaryMeshRegion, MeshRegion];
-        
+
         mr = Quiet @ head[
             coords,
             Polygon /@ cells,
@@ -186,7 +186,7 @@ constructLevelSetMesh[{coords_, cells:{__}}, type:("MeshRegion"|"BoundaryMeshReg
                 "TJunction" -> False
             }
         ];
-        
+
         mr /; RegionQ[mr]
     ]
 
@@ -237,12 +237,12 @@ mOpenVDBMesh[__, OptionsPattern[]] :=
         If[messageIsoValueQ[OptionValue["IsoValue"], OpenVDBMesh],
             Return[$Failed]
         ];
-        
+
         If[!TrueQ[0 <= OptionValue["Adaptivity"] <= 1],
             Message[OpenVDBMesh::adapt];
             Return[$Failed]
         ];
-        
+
         $Failed
     )
 

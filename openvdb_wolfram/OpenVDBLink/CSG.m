@@ -76,9 +76,9 @@ iOpenVDBUnion[OptionsPattern[]] :=
         vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
         (
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdb	
-            
+
         ) /; OpenVDBGridQ[vdb]
     ]
 
@@ -87,9 +87,9 @@ iOpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTyp
     Block[{ivdb},
         ivdb = OpenVDBCreateGrid[vdb];
         ivdb["gridUnionCopy"[{vdb, vdbs}[[All, 1]]]];
-        
+
         OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         ivdb
     ]
 
@@ -149,9 +149,9 @@ iOpenVDBIntersection[OptionsPattern[]] :=
         vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
         (
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdb	
-            
+
         ) /; OpenVDBGridQ[vdb]
     ]
 
@@ -160,9 +160,9 @@ iOpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; same
     Block[{ivdb},
         ivdb = OpenVDBCreateGrid[{vdb}[[1]]];
         ivdb["gridIntersectionCopy"[{vdb, vdbs}[[All, 1]]]];
-        
+
         OpenVDBSetProperty[ivdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         ivdb
     ]
 
@@ -222,9 +222,9 @@ iOpenVDBDifference[OptionsPattern[]] :=
         vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
         (
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdb
-                
+
         ) /; OpenVDBGridQ[vdb]
     ]
 
@@ -232,7 +232,7 @@ iOpenVDBDifference[OptionsPattern[]] :=
 iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
     (
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -243,11 +243,11 @@ iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGri
         (
             vdbdiff = OpenVDBCreateGrid[vdb];
             vdbdiff["gridDifferenceCopy"[vdb[[1]], union[[1]]]];
-        
+
             OpenVDBSetProperty[vdbdiff, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdbdiff
-            
+
         ) /; OpenVDBGridQ[union]
     ]
 
@@ -317,7 +317,7 @@ Options[iOpenVDBUnionTo] = Options[OpenVDBUnionTo];
 iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
     (
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -325,9 +325,9 @@ iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
     (
         Scan[vdb["gridUnion"[#]]&, {vdbs}[[All, 1]]];
-        
+
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -385,7 +385,7 @@ Options[iOpenVDBIntersectWith] = Options[OpenVDBIntersectWith];
 iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
     (
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -393,9 +393,9 @@ iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
     (
         Scan[vdb["gridIntersection"[#]]&, {vdbs}[[All, 1]]];
-        
+
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -453,7 +453,7 @@ Options[iOpenVDBDifferenceFrom] = Options[OpenVDBDifferenceFrom];
 iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
     (
         OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-        
+
         vdb
     )
 
@@ -463,9 +463,9 @@ iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sam
         vdbunion = OpenVDBUnionTo[vdbs];
         (
             vdb["gridDifference"[vdbunion[[1]]]];
-            
+
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdb
         ) /; OpenVDBGridQ[vdbunion]
     ]
@@ -533,11 +533,11 @@ pOpenVDBClip[vdb_?OpenVDBScalarGridQ, bspec_List -> regime_?regimeQ, opts:Option
             clip = iOpenVDBClip[vdb, bds, closeQ];
             (
                 OpenVDBSetProperty[clip, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-                
+
                 clip
-                
+
             ) /; OpenVDBGridQ[clip]
-            
+
         ) /; bds =!= $Failed
     ]
 
@@ -575,9 +575,9 @@ iOpenVDBClip[vdb_?levelSetQ, bds_, True] :=
         (
             cube = OpenVDBLevelSet[Cuboid @@ Transpose[bds], voxsize, halfwidth, "ScalarType" -> vdb[[2]]];
             clipvdb = OpenVDBIntersection[vdb, cube];
-            
+
             clipvdb /; OpenVDBGridQ[clipvdb]
-            
+
         ) /; voxsize > 0 && halfwidth > 0
     ]
 
@@ -585,9 +585,9 @@ iOpenVDBClip[vdb_?levelSetQ, bds_, True] :=
 iOpenVDBClip[vdb_, bds_, closeQ_] /; closeQ =!= True || !levelSetQ[vdb] :=
     Block[{inst, bdata, clipvdb},
         clipvdb = OpenVDBCreateGrid[vdb];
-        
+
         clipvdb["clipGrid"[vdb[[1]], bds]];
-        
+
         clipvdb
     ]
 
@@ -605,11 +605,11 @@ parseClipBounds[vdb_, bspec_, regime_] :=
         voxsize = voxelSize[vdb];
         (
             bds = regimeConvert[vdb, bds, regime -> $worldregime];
-            
+
             vdbbbox = voxsize*(vdb["getGridBoundingBox"[]] + {{-2, 2}, {-2, 2}, {-2, 2}});
-            
+
             boundingBoxIntersection[{vdbbbox, bds}]
-            
+
         ) /; MatrixQ[bds] && voxsize > 0
     ]
 
@@ -682,9 +682,9 @@ messageBooleanFunction[head_, vdbs___, OptionsPattern[]] :=
             If[messageScalarGridQ[vdb, head], Throw[$Failed]],
             {vdb, {vdbs}}
         ];
-        
+
         messageSameGridTypeQ[vdbs, head];
-        
+
         $Failed
     ]
 

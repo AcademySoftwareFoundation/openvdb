@@ -50,12 +50,12 @@ iOpenVDBSetProperty[vdb_?OpenVDBGridQ, args__] :=
         parsedargs = setterArguments[args];
         (
             res = MapThread[setVDBProperty[vdb, ##]&, parsedargs];
-            
+
             If[MatchQ[{args}, {_String, _} | {_String -> _}],
                 res[[1]],
                 res
             ]
-            
+
         ) /; parsedargs =!= $Failed
     ]
 

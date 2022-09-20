@@ -84,7 +84,7 @@ OpenVDBGrid[i_, type_][(func_String)[args___]] := typeClass[type][i][func[args]]
 OpenVDBGrid /: MakeBoxes[vdb_OpenVDBGrid?OpenVDBGridQ, fmt_] :=
     Block[{lvlsetQ, class, infos, icon},
         lvlsetQ = levelSetQ[vdb];
-        
+
         infos = {
             If[StringQ[vdb["Name"]], {BoxForm`SummaryItem[{"Name: ", vdb["Name"]}]}, Nothing],
             {BoxForm`SummaryItem[{"Class: ", formatGridClass[vdb]}]},
@@ -93,7 +93,7 @@ OpenVDBGrid /: MakeBoxes[vdb_OpenVDBGrid?OpenVDBGridQ, fmt_] :=
             If[lvlsetQ, {BoxForm`SummaryItem[{"Half width: ", vdb["HalfWidth"]}]}, Nothing],
             {BoxForm`SummaryItem[{"Expression ID: ", vdb[[1]]}]}
         };
-        
+
         icon = Which[
             lvlsetQ,
                 $lvlseticon,
@@ -112,7 +112,7 @@ OpenVDBGrid /: MakeBoxes[vdb_OpenVDBGrid?OpenVDBGridQ, fmt_] :=
             True,
                 None
         ];
-        
+
         BoxForm`ArrangeSummaryBox[
             OpenVDBGrid,
             vdb,
@@ -140,7 +140,7 @@ formatTreeType[type_String] /; StringMatchQ[type, "Tree_" ~~ t__ ~~ ("_" ~~ (Dig
         split = StringSplit[type, "_"];
         t = split[[2]];
         dig = split[[3 ;; -1]];
-        
+
         StringRiffle[dig, {t <> " (", ",", ")"}]
     ]
 formatTreeType[expr_] := expr
@@ -209,7 +209,7 @@ iOpenVDBGrids[type_String?aliasTypeQ] := iOpenVDBGrids[resolveAliasType[type]]
 iOpenVDBGrids[type_String] :=
     Block[{gridlist},
         gridlist = Quiet @ LExpressionList[typeGridName[type]];
-        
+
         If[ListQ[gridlist],
             OpenVDBGrid[#, type]& @@@ gridlist,
             $Failed
@@ -483,7 +483,7 @@ iOpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] :=
     Block[{vdb = newVDB[type]},
         (
             setVDBProperties[vdb, "VoxelSize" -> spacing, opts]
-        
+
         ) /; OpenVDBGridQ[vdb]
     ]
 
@@ -493,7 +493,7 @@ iOpenVDBCreateGrid[ovdb_?OpenVDBGridQ, opts:OptionsPattern[]] :=
         vdbprops = OpenVDBProperty[ovdb, {"VoxelSize", "BackgroundValue", "Creator", "GridClass", "Name"}, "RuleList"];
         (
             setVDBProperties[vdb, opts, Sequence @@ vdbprops]
-        
+
         ) /; OpenVDBGridQ[vdb]
     ]
 
@@ -527,7 +527,7 @@ setVDBProperties[vdb_, OptionsPattern[]] :=
         gclass = OptionValue["GridClass"];
         name = OptionValue["Name"];
         spacing = OptionValue["VoxelSize"];
-        
+
         OpenVDBSetProperty[
             vdb,
             {
@@ -538,7 +538,7 @@ setVDBProperties[vdb_, OptionsPattern[]] :=
                 "VoxelSize" -> spacing
             }
         ];
-        
+
         vdb
     ]
 
@@ -687,11 +687,11 @@ iOpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
         vdbcopy = newVDB[vdb[[2]]];
         (
             vdbcopy["copyGrid"[vdb[[1]]]];
-            
+
             OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
-            
+
             vdbcopy
-            
+
         ) /; OpenVDBGridQ[vdbcopy]
     ]
 

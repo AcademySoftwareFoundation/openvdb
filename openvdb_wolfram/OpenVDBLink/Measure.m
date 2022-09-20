@@ -56,9 +56,9 @@ iOpenVDBArea[vdb_?OpenVDBScalarGridQ, regime_?regimeQ] :=
         area = scalarArea[vdb];
         (
             area = regimeConvert[vdb, area, $worldregime -> regime, 2];
-            
+
             area
-            
+
         ) /; area =!= $Failed
     ]
 
@@ -145,7 +145,7 @@ iOpenVDBEulerCharacteristic[vdb_?OpenVDBScalarGridQ] :=
             emptyVDBQ[vdb], Undefined,
             True, Replace[vdb["levelSetGridEulerCharacteristic"[]], Except[_Integer] -> $Failed, {0}]
         ];
-        
+
         char /; char =!= $Failed
     ]
 
@@ -204,7 +204,7 @@ iOpenVDBGenus[vdb_?OpenVDBScalarGridQ] :=
             emptyVDBQ[vdb], Undefined,
             True, Replace[vdb["levelSetGridGenus"[]], Except[_Integer] -> $Failed, {0}]
         ];
-        
+
         genus /; genus =!= $Failed
     ]
 
@@ -261,9 +261,9 @@ iOpenVDBVolume[vdb_?OpenVDBScalarGridQ, regime_?regimeQ] :=
         volume = scalarVolume[vdb];
         (
             volume = regimeConvert[vdb, volume, $worldregime -> regime, 3];
-            
+
             volume
-            
+
         ) /; volume =!= $Failed
     ]
 
@@ -304,7 +304,7 @@ scalarVolume[vdb_?fogVolumeQ] :=
     With[{tots = OpenVDBActiveVoxelSliceTotals[vdb]},
         (
             Total[tots] * vdb["VoxelSize"]^3
-            
+
         ) /; VectorQ[tots, NumericQ]
     ]
 

@@ -69,17 +69,17 @@ iOpenVDBTransform[vdb_?OpenVDBGridQ, tf_, OptionsPattern[]] :=
             {mat, regime} = ptf;
             vx = voxelSize[vdb];
             tvdb = OpenVDBCreateGrid[vdb];
-            
+
             tfunc = Transpose[mat];
             If[worldRegimeQ[regime],
                 tfunc[[1 ;; 3, 4]] *= vx;
                 tfunc[[4, 1 ;; 3]] /= vx;
             ];
-            
+
             tvdb["transformGrid"[vdb[[1]], tfunc, resampling]];
-            
+
             tvdb
-            
+
         ) /; ListQ[ptf] && Length[ptf] === 2 && resampling =!= $Failed
     ]
 
