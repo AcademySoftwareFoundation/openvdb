@@ -104,14 +104,14 @@ mOpenVDBFilter[expr_, ___] /; messageScalarGridQ[expr, OpenVDBFilter] = $Failed;
 mOpenVDBFilter[expr_, ___] /; messageLevelSetGridQ[expr, OpenVDBFilter] = $Failed;
 
 
-mOpenVDBFilter[_, filter_, ___] /; filteringMethod[filter] === $Failed := 
+mOpenVDBFilter[_, filter_, ___] /; filteringMethod[filter] === $Failed :=
 	(
 		Message[OpenVDBFilter::filter, filter];
 		$Failed
 	)
 
 
-mOpenVDBFilter[vdb_, filter_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] := 
+mOpenVDBFilter[vdb_, filter_, expr_, rest___] /; !IntegerQ[expr] || !TrueQ[expr > 0] :=
 	(
 		Message[OpenVDBFilter::intpm, HoldForm[OpenVDBFillWithBalls[vdb, filter, expr, rest]], 3];
 		$Failed

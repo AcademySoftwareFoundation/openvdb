@@ -28,20 +28,20 @@ OpenVDBGrid<V>::ballLevelSet(mma::RealVectorRef center, double radius,
     double spacing, double bandWidth, bool is_signed)
 {
     scalar_type_assert<V>();
-    
+
     using AbsF = openvdbmma::levelset::AbsOp<ValueT>;
-    
+
     if (center.size() != 3)
         throw mma::LibraryError(LIBRARY_DIMENSION_ERROR);
-    
+
     wlGridPtr grid = openvdb::tools::createLevelSetSphere<wlGridType>(
         radius, Vec3f(center[0], center[1], center[2]), spacing, bandWidth);
-    
+
     if(!is_signed) {
         mma::check_abort();
         transformActiveLeafValues<wlTreeType, AbsF>(grid->tree(), AbsF());
     }
-    
+
     setGrid(grid);
 }
 
@@ -51,23 +51,23 @@ OpenVDBGrid<V>::cuboidLevelSet(
     mma::RealBounds3DRef bounds, double spacing, double bandWidth, bool is_signed)
 {
     scalar_type_assert<V>();
-    
+
     using AbsF = openvdbmma::levelset::AbsOp<ValueT>;
-    
+
     const math::BBox<Vec3f> bbox(
         Vec3f(bounds.xmin(), bounds.ymin(), bounds.zmin()),
         Vec3f(bounds.xmax(), bounds.ymax(), bounds.zmax())
     );
-    
+
     const math::Transform xform(*(math::Transform::createLinearTransform(spacing)));
-    
+
     wlGridPtr grid = openvdb::tools::createLevelSetBox<wlGridType>(bbox, xform, bandWidth);
-    
+
     if (!is_signed) {
         mma::check_abort();
         transformActiveLeafValues<wlTreeType, AbsF>(grid->tree(), AbsF());
     }
-    
+
     setGrid(grid);
 }
 
@@ -78,15 +78,15 @@ OpenVDBGrid<V>::meshLevelSet(
     double spacing, double bandWidth, bool is_signed)
 {
     scalar_type_assert<V>();
-    
+
     if (tri_cells.cols() != 3)
         throw mma::LibraryError(LIBRARY_DIMENSION_ERROR);
-    
+
     const int conversionFlags = is_signed ? 0 : UNSIGNED_DISTANCE_FIELD;
-    
+
     wlGridPtr grid = openvdbmma::levelset::meshToLevelSet<wlGridType>(pts, tri_cells,
         spacing, bandWidth, conversionFlags);
-    
+
     setGrid(grid);
 }
 
@@ -97,12 +97,12 @@ OpenVDBGrid<V>::offsetSurfaceLevelSet(
     double offset, double spacing, double width, bool is_signed)
 {
     scalar_type_assert<V>();
-    
+
     if (tri_cells.cols() != 3)
         throw mma::LibraryError(LIBRARY_DIMENSION_ERROR);
-    
+
     wlGridPtr grid = openvdbmma::levelset::offsetSurfaceLevelSet<wlGridType>(pts,
         tri_cells, offset, spacing, width, is_signed);
-    
+
     setGrid(grid);
 }

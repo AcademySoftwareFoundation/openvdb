@@ -4,16 +4,16 @@
 
 
 /* openvdbmma::distance members
- 
+
  class DistanceMeasurementsMma
- 
+
  public members are
- 
+
  gridMember, which can operate in index or world coordinate inputs
  gridNearest
  gridDistance
  gridSignedDistance
- 
+
 */
 
 
@@ -26,42 +26,42 @@ template<typename GridT>
 class DistanceMeasurementsMma
 {
 public:
-    
+
     using GridPtr = typename GridT::Ptr;
-    
+
     DistanceMeasurementsMma(GridPtr grid, float isovalue)
     : mGrid(grid), mIsovalue(isovalue)
     {
     }
-    
+
     ~DistanceMeasurementsMma() {}
-    
+
     mma::IntVectorRef gridMember(mma::IntCoordinatesRef pts) const;
     mma::IntVectorRef gridMember(mma::RealCoordinatesRef pts) const;
-    
+
     mma::RealCoordinatesRef gridNearest(mma::RealCoordinatesRef pts) const;
-    
+
     mma::RealVectorRef gridDistance(mma::RealCoordinatesRef pts) const;
-    
+
     mma::RealVectorRef gridSignedDistance(mma::RealCoordinatesRef pts) const;
-    
+
 private:
-    
+
     void nearestAndDistance(mma::RealCoordinatesRef pts,
         vector<Vec3R>& vpts, vector<float>& dists) const
     {
         using CSP = typename openvdb::tools::ClosestSurfacePoint<GridT>::Ptr;
-        
+
         mma::interrupt::LLInterrupter interrupt;
-        
+
         CSP csp = openvdb::tools::ClosestSurfacePoint<GridT>::create(*mGrid, mIsovalue, &interrupt);
-        
+
         const mint len = pts.size();
         vpts.resize(len);
         dists.resize(len);
-        
+
         mma::check_abort();
-        
+
         tbb::parallel_for(
             tbb::blocked_range<mint>(0, len),
             [&](tbb::blocked_range<mint> rng)
@@ -71,16 +71,16 @@ private:
                 }
             }
         );
-        
+
         csp->searchAndReplace(vpts, dists);
     }
-    
+
     //////////// private members
-    
+
     float mIsovalue;
-    
+
     GridPtr mGrid;
-    
+
 }; // end of DistanceMeasurementsMma class
 
 
@@ -91,13 +91,13 @@ inline mma::IntVectorRef
 DistanceMeasurementsMma<GridT>::gridMember(mma::IntCoordinatesRef pts) const
 {
     using AccT = typename GridT::Accessor;
-    
+
     const AccT accessor = mGrid->getAccessor();
-    
+
     const mint len = pts.size();
-    
+
     mma::IntVectorRef mem = mma::makeVector<mint>(len);
-    
+
     tbb::parallel_for(
         tbb::blocked_range<mint>(0, len),
         [&](tbb::blocked_range<mint> rng)
@@ -108,7 +108,7 @@ DistanceMeasurementsMma<GridT>::gridMember(mma::IntCoordinatesRef pts) const
             }
         }
     );
-    
+
     return mem;
 }
 
@@ -118,9 +118,9 @@ DistanceMeasurementsMma<GridT>::gridMember(mma::RealCoordinatesRef pts) const
 {
     const float dx = (mGrid->voxelSize())[0];
     const mint len = pts.size();
-    
+
     mma::IntCoordinatesRef intpts = mma::makeCoordinatesList<mint>(len);
-    
+
     tbb::parallel_for(
         tbb::blocked_range<mint>(0, 3*len),
         [&](tbb::blocked_range<mint> rng)
@@ -130,11 +130,11 @@ DistanceMeasurementsMma<GridT>::gridMember(mma::RealCoordinatesRef pts) const
             }
         }
     );
-    
+
     mma::IntVectorRef mems = gridMember(intpts);
-    
+
     intpts.free();
-    
+
     return mems;
 }
 
@@ -144,12 +144,12 @@ DistanceMeasurementsMma<GridT>::gridNearest(mma::RealCoordinatesRef pts) const
 {
     vector<Vec3R> vpts;
     vector<float> dists;
-    
+
     nearestAndDistance(pts, vpts, dists);
-    
+
     const mint len = pts.size();
     mma::RealCoordinatesRef npts = mma::makeCoordinatesList<double>(len);
-    
+
     tbb::parallel_for(
         tbb::blocked_range<mint>(0, len),
         [&](tbb::blocked_range<mint> rng)
@@ -161,7 +161,7 @@ DistanceMeasurementsMma<GridT>::gridNearest(mma::RealCoordinatesRef pts) const
             }
         }
     );
-    
+
     return npts;
 }
 
@@ -171,12 +171,12 @@ DistanceMeasurementsMma<GridT>::gridDistance(mma::RealCoordinatesRef pts) const
 {
     vector<Vec3R> vpts;
     vector<float> dists;
-    
+
     nearestAndDistance(pts, vpts, dists);
-    
+
     const mint len = pts.size();
     mma::RealVectorRef ndists = mma::makeVector<double>(len);
-    
+
     tbb::parallel_for(
         tbb::blocked_range<mint>(0, len),
         [&](tbb::blocked_range<mint> rng)
@@ -185,7 +185,7 @@ DistanceMeasurementsMma<GridT>::gridDistance(mma::RealCoordinatesRef pts) const
                 ndists[i] = dists[i];
         }
     );
-    
+
     return ndists;
 }
 
@@ -195,7 +195,7 @@ DistanceMeasurementsMma<GridT>::gridSignedDistance(mma::RealCoordinatesRef pts) 
 {
     const mma::IntVectorRef mem = gridMember(pts);
     mma::RealVectorRef dists = gridDistance(pts);
-    
+
     tbb::parallel_for(
         tbb::blocked_range<mint>(0, dists.size()),
         [&](tbb::blocked_range<mint> rng)
@@ -205,9 +205,9 @@ DistanceMeasurementsMma<GridT>::gridSignedDistance(mma::RealCoordinatesRef pts) 
                     dists[i] *= -1;
         }
     );
-    
+
     mem.free();
-    
+
     return dists;
 }
 

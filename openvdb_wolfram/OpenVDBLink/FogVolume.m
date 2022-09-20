@@ -51,7 +51,7 @@ OpenVDBToFogVolume[args___] := mOpenVDBToFogVolume[args]
 (*iOpenVDBToFogVolume*)
 
 
-iOpenVDBToFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] := 
+iOpenVDBToFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	Block[{wcutoff},
 		wcutoff = If[TrueQ[Positive[cutoff]],
 			cutoff,
@@ -125,7 +125,7 @@ OpenVDBFogVolume[args___] := mOpenVDBFogVolume[args]
 (*iOpenVDBFogVolume*)
 
 
-iOpenVDBFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] := 
+iOpenVDBFogVolume[vdb_?OpenVDBScalarGridQ, cutoff_ -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	Block[{vdbcopy},
 		vdbcopy = OpenVDBCopyGrid[vdb];
 		

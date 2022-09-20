@@ -30,10 +30,10 @@ OpenVDBGrid<V>::getBooleanMetadata(const char* key) const
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     const bool bval = meta.template getMetadata<bool>(key_string);
-    
+
     return bval;
 }
 
@@ -43,10 +43,10 @@ OpenVDBGrid<V>::getIntegerMetadata(const char* key) const
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     const mint ival = meta.template getMetadata<mint>(key_string);
-    
+
     return ival;
 }
 
@@ -56,10 +56,10 @@ OpenVDBGrid<V>::getRealMetadata(const char* key) const
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     const double rval = meta.template getMetadata<float>(key_string);
-    
+
     return rval;
 }
 
@@ -69,10 +69,10 @@ OpenVDBGrid<V>::getStringMetadata(const char* key)
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     const string sval = meta.template getMetadata<string>(key_string);
-    
+
     //Let the class handle memory management when passing a string to WL
     return WLString(sval);
 }
@@ -83,7 +83,7 @@ OpenVDBGrid<V>::setBooleanMetadata(const char* key, bool value)
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     meta.template setMetadata<bool>(key_string, value);
 }
@@ -94,10 +94,10 @@ OpenVDBGrid<V>::setStringMetadata(const char* key, const char* value)
 {
     const string key_string(key);
     mma::disownString(key);
-    
+
     const string value_string(value);
     mma::disownString(value);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     meta.template setMetadata<string>(key_string, value_string);
 }
@@ -108,7 +108,7 @@ OpenVDBGrid<V>::setDescription(const char* description)
 {
     const string description_string(description);
     mma::disownString(description);
-    
+
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     meta.template setMetadata<string>(META_DESCRIPTION, description_string);
 }

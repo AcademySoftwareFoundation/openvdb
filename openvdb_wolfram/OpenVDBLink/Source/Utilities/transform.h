@@ -4,14 +4,14 @@
 
 
 /* openvdbmma::pngio members
- 
+
  class GridAdjustment
- 
+
  public members are
- 
+
  scalarMultiply
  gammaAdjust
- 
+
 */
 
 
@@ -24,24 +24,24 @@ template<typename GridT, typename T>
 class GridAdjustment
 {
 public:
-    
+
     using ValueT = typename GridT::ValueType;
     using GridPtr = typename GridT::Ptr;
-    
+
     GridAdjustment(GridPtr grid) : mGrid(grid)
     {
     }
-    
+
     ~GridAdjustment() {}
-    
+
     void scalarMultiply(T fac);
-    
+
     void gammaAdjust(T gamma);
-    
+
 private:
-    
+
     //////////// transformation functors
-    
+
     struct ScalarTimes {
         T mFac;
         explicit ScalarTimes(const T fac): mFac(fac) {}
@@ -49,7 +49,7 @@ private:
             return mFac * x;
         }
     };
-    
+
     struct ClampedScalarTimes {
         T mFac;
         explicit ClampedScalarTimes(const T fac): mFac(fac) {}
@@ -57,7 +57,7 @@ private:
             return math::Clamp01(mFac * x);
         }
     };
-    
+
     struct GammaPow {
         T mGamma;
         explicit GammaPow(const T gamma): mGamma(gamma) {}
@@ -65,32 +65,32 @@ private:
             return math::Pow(x, mGamma);
         }
     };
-    
+
     inline bool validGammaAdjustInput(const T gamma) const
     {
         return gamma > 0.0 && mGrid->getGridClass() == GRID_FOG_VOLUME;
     }
-    
+
     void multiplyMetaValue(string key, T fac)
     {
         using MetaIter = openvdb::MetaMap::MetaIterator;
-        
+
         float facold = 1.0;
-        
+
         for (MetaIter iter = mGrid->beginMeta(); iter != mGrid->endMeta(); ++iter)
             if (iter->first == key) {
                 openvdb::Metadata::Ptr metadata = iter->second;
                 facold = static_cast<openvdb::FloatMetadata&>(*metadata).value();
                 break;
             }
-        
+
         mGrid->insertMeta(key, openvdb::FloatMetadata(facold * (float)fac));
     }
-    
+
     //////////// private members
-    
+
     GridPtr mGrid;
-    
+
 }; // end of GridAdjustment class
 
 
@@ -101,9 +101,9 @@ inline void
 GridAdjustment<GridT, T>::scalarMultiply(T fac)
 {
     using TreeT = typename GridT::TreeType;
-    
+
     multiplyMetaValue(META_SCALING_FACTOR, fac);
-    
+
     if (mGrid->getGridClass() == GRID_FOG_VOLUME) {
         transformActiveLeafValues<TreeT, ClampedScalarTimes>(mGrid->tree(),
             ClampedScalarTimes(fac));
@@ -117,12 +117,12 @@ inline void
 GridAdjustment<GridT, T>::gammaAdjust(T gamma)
 {
     using TreeT = typename GridT::TreeType;
-    
+
     if (!validGammaAdjustInput(gamma))
         throw mma::LibraryError(LIBRARY_NUMERICAL_ERROR);
-    
+
     multiplyMetaValue(META_GAMMA_ADJUSTMENT, gamma);
-    
+
     transformActiveLeafValues<TreeT, GammaPow>(mGrid->tree(), GammaPow(gamma));
 }
 

@@ -173,8 +173,8 @@ Block[{alltypes, typetreegroups},
 		MapThread[(typeClass[#1] = Symbol[#3])&, typetreegroups];
 	];
 	
-	KeyValueMap[Function[{k, v}, 
-		If[!MissingQ[v["Alias"]], 
+	KeyValueMap[Function[{k, v},
+		If[!MissingQ[v["Alias"]],
 			aliasTypeQ[v["Alias"]] = True;
 			resolveAliasType[v["Alias"]] = k;
 		]
@@ -295,13 +295,13 @@ vdbBaseGridPixelMembers[___] = {};
 (*BaseNumericGrid template*)
 
 
-LVDBBaseNumericGrid[class_String, type_, rank_, members_List] := 
+LVDBBaseNumericGrid[class_String, type_, rank_, members_List] :=
 	LClass[
-		class, 
+		class,
 		Join[
 			vdbBaseGridMembers[class],
 			vdbBaseGridPixelMembers[class],
-			vdbBaseNumericGridMembers[class, type, rank], 
+			vdbBaseNumericGridMembers[class, type, rank],
 			members
 		]
 	]
@@ -404,11 +404,11 @@ LVDBScalarGridClass[class_, type_] :=
 			LFun["offsetLevelSet", {Real}, "Void"],
 			
 			(* ------------ render ------------ *)
-			LFun["renderGrid", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, 
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer, {Integer, 1, "Constant"}, Real, 
+			LFun["renderGrid", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
+				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer, {Integer, 1, "Constant"}, Real,
 				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],
 			
-			LFun["renderGridPBR", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, 
+			LFun["renderGridPBR", {Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"},
 				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, {Integer, 1, "Constant"}, Real, "Boolean",
 				{Real, 1}, {Real, 1}, {Real, 1},
 				Real, Real, Real, Real,
@@ -416,8 +416,8 @@ LVDBScalarGridClass[class_, type_] :=
 				Real, Real, Real
 			}, LType["Image", "Byte"]],
 			
-			(*LFun["renderGridVectorColor", {Real, LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], {Real, 1, "Constant"}, 
-				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer, 
+			(*LFun["renderGridVectorColor", {Real, LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], LExpressionID[$colorVectorClass], {Real, 1, "Constant"},
+				{Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, Integer, Integer, Integer,
 				{Integer, 1, "Constant"}, Real, {Real, 1, "Constant"}, {Real, 1, "Constant"}, {Real, 1, "Constant"}, "Boolean"}, LType["Image", "Byte"]],*)
 			
 			(* ------------ aggregate data ------------ *)
@@ -430,7 +430,7 @@ LVDBScalarGridClass[class_, type_] :=
 (*IntegerGrid template*)
 
 
-LVDBIntegerGridClass[class_, type_] := 
+LVDBIntegerGridClass[class_, type_] :=
 	LVDBBaseNumericGrid[class, type, 0,
 		{
 			(* ------------ aggregate data ------------ *)
@@ -443,7 +443,7 @@ LVDBIntegerGridClass[class_, type_] :=
 (*VectorGrid template*)
 
 
-LVDBVectorGridClass[class_, type_] := 
+LVDBVectorGridClass[class_, type_] :=
 	LVDBBaseNumericGrid[class, type, 1,
 		{
 		
@@ -461,7 +461,7 @@ $booleanBlackList = {"sliceVoxelValueTotals"};
 deleteNonBooleanFuncs[class_] := class /. {LFun[Alternatives @@ $booleanBlackList, ___] -> Nothing}
 
 
-LVDBBoolGridClass = 
+LVDBBoolGridClass =
 With[{
 	class = $GridClassData[$booleanType, $booleanType, "ClassName"],
 	type = $GridClassData[$booleanType, $booleanType, "WLBaseType"]
@@ -479,7 +479,7 @@ With[{
 (*MaskGrid template*)
 
 
-LVDBMaskGridClass = LVDBBaseGridClass[$GridClassData[$maskType, $maskType, "ClassName"], 
+LVDBMaskGridClass = LVDBBaseGridClass[$GridClassData[$maskType, $maskType, "ClassName"],
 	{
 	
 	}
@@ -527,7 +527,7 @@ OpenVDBLink`Developer`Recompile[printQ_:False] :=
 		
 		SetDirectory[$sourceDirectory];
 		CompileTemplate[
-			$OpenVDBTemplate, 
+			$OpenVDBTemplate,
 			{},
 			Sequence @@ If[TrueQ[printQ],
 				{"ShellCommandFunction" -> Print, "ShellOutputFunction" -> Print},
@@ -595,7 +595,7 @@ OpenVDBLink`Developer`TestOpenVDBLink[iareas_:All] :=
 			
 			results = Map[
 				(PrintTemporary[FileBaseName[#]];
-				TestReport[#, SameTest -> sameExpression])&, 
+				TestReport[#, SameTest -> sameExpression])&,
 				torun
 			];
 			(
@@ -647,7 +647,7 @@ iGridAreas[___] = $Failed;
 (*Assumes no evaluation leaks can happen and ignores Orderless pattern matching.*)
 
 
-sameExpression[expr1_, expr2_] := 
+sameExpression[expr1_, expr2_] :=
 	Block[{Internal`$EqualTolerance = 11, Internal`$SameQTolerance = 11},
 		expr1 === expr2
 	]
@@ -682,8 +682,8 @@ OpenVDBLink`Developer`WLTToNotebook[unitTestName_] := Enclose @ Module[{
 	cells
 },
 	file = FileNameJoin[{
-		$OpenVDBInstallationDirectory, 
-		"UnitTests", "wlt", 
+		$OpenVDBInstallationDirectory,
+		"UnitTests", "wlt",
 		FileBaseName[unitTestName] <> ".wlt"
 	}];
 	ConfirmBy[file, FileExistsQ, "File does not exist"];
@@ -821,7 +821,7 @@ createCellGroup[cells_, section_] :=
 		splitcells = SplitBy[cells, #[[-1]] === section&];
 		(
 			Prepend[
-				CellGroupData[Join[##], Closed]& @@@ Partition[Rest[splitcells], 2], 
+				CellGroupData[Join[##], Closed]& @@@ Partition[Rest[splitcells], 2],
 				splitcells[[1, 1]]
 			]
 		
@@ -860,12 +860,12 @@ PackageScope["addCodeCompletion"]
 addCodeCompletion[sym_Symbol][args___] := addCodeCompletion[SymbolName[sym]][args]
 
 
-addCodeCompletion[function_String][args___] := 
+addCodeCompletion[function_String][args___] :=
 	With[{processed = {args} /. {
-			None -> 0, "AbsoluteFileName" -> 2, "RelativeFileName" -> 3, 
-			"Color" -> 4, "PackageName" -> 7, "DirectoryName" -> 8, 
+			None -> 0, "AbsoluteFileName" -> 2, "RelativeFileName" -> 3,
+			"Color" -> 4, "PackageName" -> 7, "DirectoryName" -> 8,
 			"InterpreterType" -> 9}
-		}, 
+		},
 		FE`Evaluate[FEPrivate`AddSpecialArgCompletion[function -> processed]];
 	]
 
@@ -883,7 +883,7 @@ PackageScope["registerForLevelSet"]
 
 registerForLevelSet[func_Symbol, pos_:{{}}] :=
 	Block[{},
-		func[args__] := 
+		func[args__] :=
 			With[{res = tryToLevelSet[pos, func, args]},
 				res /; res =!= $Failed
 			]
@@ -894,7 +894,7 @@ registerForLevelSet[func_Symbol, pos_:{{}}] :=
 (*level set dispatch*)
 
 
-tryToLevelSet[pos_, func_, args__] /; validTryToLevelSetQ[] := 
+tryToLevelSet[pos_, func_, args__] /; validTryToLevelSetQ[] :=
 	Block[{levelsets, reps, res, $inToLevelSet = True},
 		levelsets = If[pos === {{}},
 			tryOpenVDBLevelSet /@ {args},
@@ -923,7 +923,7 @@ tryToLevelSet[___] := $Failed
 
 tryOpenVDBLevelSet[vdb_?OpenVDBScalarGridQ] := vdb
 tryOpenVDBLevelSet[_?OpenVDBGridQ] = $Failed;
-tryOpenVDBLevelSet[{file_String?FileExistsQ, name_}] := 
+tryOpenVDBLevelSet[{file_String?FileExistsQ, name_}] :=
 	Block[{vdb},
 		vdb = OpenVDBImport[file, name];
 		If[OpenVDBScalarGridQ[vdb],
@@ -935,7 +935,7 @@ tryOpenVDBLevelSet[file_String] := tryOpenVDBLevelSet[{file, Automatic}]
 tryOpenVDBLevelSet[{File[file_], name_}] := tryOpenVDBLevelSet[{file, name}]
 tryOpenVDBLevelSet[File[file_]] := tryOpenVDBLevelSet[{file, Automatic}]
 tryOpenVDBLevelSet[opt_?OptionQ] := opt
-tryOpenVDBLevelSet[expr_] := 
+tryOpenVDBLevelSet[expr_] :=
 	With[{res = Quiet @ OpenVDBLevelSet[expr]},
 		res /; OpenVDBScalarGridQ[res]
 	]

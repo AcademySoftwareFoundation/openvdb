@@ -104,10 +104,10 @@ OpenVDBDefaultSpace[OpenVDBTransform] = $worldregime;
 (*Utilities*)
 
 
-ParseTransformationMatrix[tf_] := 
+ParseTransformationMatrix[tf_] :=
 	Catch[
-		iParseTransformationMatrix @ If[Head[tf] === Rule, 
-			tf, 
+		iParseTransformationMatrix @ If[Head[tf] === Rule,
+			tf,
 			tf -> $worldregime
 		]
 	]
@@ -144,7 +144,7 @@ Options[mOpenVDBTransform] = Options[OpenVDBTransform];
 mOpenVDBTransform[expr_, ___] /; messageGridQ[expr, OpenVDBTransform] = $Failed;
 
 
-mOpenVDBTransform[_, tf_, ___] /; ParseTransformationMatrix[tf] === $Failed := 
+mOpenVDBTransform[_, tf_, ___] /; ParseTransformationMatrix[tf] === $Failed :=
 	(
 		Message[OpenVDBTransform::trans, tf, 2];
 		$Failed
@@ -198,9 +198,9 @@ OpenVDBMultiply[args___] := mOpenVDBMultiply[args]
 (*iOpenVDBMultiply*)
 
 
-iOpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] := 
+iOpenVDBMultiply[vdb_?OpenVDBScalarGridQ, s_?realQ] :=
 	(
-		If[s != 1.0, 
+		If[s != 1.0,
 			vdb["scalarMultiply"[s]]
 		];
 		vdb
@@ -227,7 +227,7 @@ SyntaxInformation[OpenVDBMultiply] = {"ArgumentsPattern" -> {_, _}};
 mOpenVDBMultiply[expr_, ___] /; messageScalarGridQ[expr, OpenVDBMultiply] = $Failed;
 
 
-mOpenVDBMultiply[_, s_] /; !realQ[s] := 
+mOpenVDBMultiply[_, s_] /; !realQ[s] :=
 	(
 		Message[OpenVDBMultiply::real, s, 2];
 		$Failed
@@ -264,9 +264,9 @@ OpenVDBGammaAdjust[args___] := mOpenVDBGammaAdjust[args]
 (*iOpenVDBGammaAdjust*)
 
 
-iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vdb] := 
+iOpenVDBGammaAdjust[vdb_?OpenVDBScalarGridQ, \[Gamma]_?Positive] /; fogVolumeQ[vdb] :=
 	(
-		If[\[Gamma] != 1.0, 
+		If[\[Gamma] != 1.0,
 			vdb["gammaAdjustment"[\[Gamma]]]
 		];
 		vdb
@@ -300,7 +300,7 @@ SyntaxInformation[OpenVDBGammaAdjust] = {"ArgumentsPattern" -> {_, _}};
 mOpenVDBGammaAdjust[expr_, ___] /; messageScalarGridQ[expr, OpenVDBGammaAdjust] = $Failed;
 
 
-mOpenVDBGammaAdjust[_, \[Gamma]_] /; !TrueQ[\[Gamma] > 0] := 
+mOpenVDBGammaAdjust[_, \[Gamma]_] /; !TrueQ[\[Gamma] > 0] :=
 	(
 		Message[OpenVDBGammaAdjust::pos, \[Gamma], 2];
 		$Failed

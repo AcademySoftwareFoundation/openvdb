@@ -86,7 +86,7 @@ pOpenVDBLevelSet[___] = $Failed;
 (*Surface mesh / complex*)
 
 
-iOpenVDBLevelSet[mr_?triangleSurfaceMeshQ, args__] := 
+iOpenVDBLevelSet[mr_?triangleSurfaceMeshQ, args__] :=
 	triangleSurfaceComplexSignedDistanceField[MeshCoordinates[mr], Join @@ MeshCells[mr, 2, "Multicells" -> True][[All, 1]], mr["ConnectivityMatrix"[1, 2]], args]
 
 
@@ -170,7 +170,7 @@ tubeComplexSignedDistanceField[coords_, cells_, r_, spacing_, width_, type_, sig
 (*Torus*)
 
 
-iOpenVDBLevelSet[torus:(Torus|FilledTorus)[___]?ConstantRegionQ, spacing_, args__] := 
+iOpenVDBLevelSet[torus:(Torus|FilledTorus)[___]?ConstantRegionQ, spacing_, args__] :=
 	Block[{torusspec, c, rin, rout, rmid, rtube, n, pts},
 		torusspec = torusData @@ torus;
 		(
@@ -199,7 +199,7 @@ torusData[___] = $Failed;
 (*Ball*)
 
 
-iOpenVDBLevelSet[ball:(Ball|Sphere)[___]?ConstantRegionQ, spacing_, width_, type_, signedQ_] /; RegionEmbeddingDimension[ball] == 3 := 
+iOpenVDBLevelSet[ball:(Ball|Sphere)[___]?ConstantRegionQ, spacing_, width_, type_, signedQ_] /; RegionEmbeddingDimension[ball] == 3 :=
 	Block[{ballspec, c, r, vdb},
 		ballspec = singleBallData @@ ball;
 		(
@@ -224,7 +224,7 @@ singleBallData[___] = $Failed;
 (*SphericalShell*)
 
 
-iOpenVDBLevelSet[shell:HoldPattern[SphericalShell][___]?ConstantRegionQ, args___] /; RegionEmbeddingDimension[shell] == 3 := 
+iOpenVDBLevelSet[shell:HoldPattern[SphericalShell][___]?ConstantRegionQ, args___] /; RegionEmbeddingDimension[shell] == 3 :=
 	Block[{shellspec, c, r1, r2, ballout, ballin},
 		shellspec = sphericalShellData @@ shell;
 		(
@@ -254,7 +254,7 @@ sphericalShellData[___] = $Failed;
 (*Cuboid*)
 
 
-iOpenVDBLevelSet[cuboid_Cuboid?ConstantRegionQ, spacing_, width_, type_, signedQ_] := 
+iOpenVDBLevelSet[cuboid_Cuboid?ConstantRegionQ, spacing_, width_, type_, signedQ_] :=
 	Block[{bds, vdb},
 		bds = RegionBounds[cuboid];
 		(
@@ -274,7 +274,7 @@ iOpenVDBLevelSet[hex_Hexahedron?ConstantRegionQ, args__] /; Volume[hex] == Volum
 (*Special polyhedra*)
 
 
-iOpenVDBLevelSet[poly_?specialPolyhedonQ, args__] := 
+iOpenVDBLevelSet[poly_?specialPolyhedonQ, args__] :=
 	With[{data = polyhedronTriangleData[poly]},
 		(
 			triangleSurfaceComplexSignedDistanceField[##, None, args, False]& @@ data
@@ -475,7 +475,7 @@ validLineCellsQ[cells_, max_] := MatrixQ[cells, IntegerQ] && Length[cells[[1]]] 
 
 
 stripPolygonCells[Polygon[cells_]] := cells
-stripPolygonCells[pcells:{__Polygon}] := 
+stripPolygonCells[pcells:{__Polygon}] :=
 	With[{cells = pcells[[All, 1]]},
 		Which[
 			VectorQ[cells, VectorQ], cells,
@@ -488,7 +488,7 @@ stripPolygonCells[expr_] := expr
 
 
 stripLineCells[Line[cells_]] := cells
-stripLineCells[lcells:{__Line}] := 
+stripLineCells[lcells:{__Line}] :=
 	With[{cells = lcells[[All, 1]]},
 		Which[
 			VectorQ[cells, VectorQ], cells,
@@ -505,7 +505,7 @@ stripLineCells[expr_] := expr
 (*processSDFInput*)
 
 
-processSDFInput[expr_] := 
+processSDFInput[expr_] :=
 	With[{res = Join @@ expandMultisetRegion /@ If[ListQ[expr], Identity, List][expr]},
 		If[Length[res] == 1,
 			First[res],
@@ -533,9 +533,9 @@ expandMultisetRegion[reg_] := {reg}
 tubeSegmentData[pts_List] /; MatrixQ[pts, realQ] && Length[pts[[1]]] == 3 := {pts, Partition[Range[Length[pts]], 2, 1]}
 
 
-tubeSegmentData[pts_List] /; VectorQ[pts, MatrixQ[#, realQ] && Length[#[[1]]] == 3&] := 
+tubeSegmentData[pts_List] /; VectorQ[pts, MatrixQ[#, realQ] && Length[#[[1]]] == 3&] :=
 	{
-		Join @@ pts, 
+		Join @@ pts,
 		Join @@ Plus[Partition[Range[Length[#]], 2, 1]& /@ pts, Prepend[Most[Accumulate[Length /@ pts]], 0]]
 	}
 
@@ -621,7 +621,7 @@ platonicSpecs[args___] :=
 rotatePolyhedronCoordinates[coords_, {\[Theta]_, \[Phi]_}, center_] := (RotationTransform[\[Phi], {0, 1, 0}, center] @* RotationTransform[\[Theta], {0, 0, 1}, center])[coords]
 
 
-cubeTriangleData[args___] := 
+cubeTriangleData[args___] :=
 	Block[{center, angles, l, cuboidres},
 		{center, angles, l} = platonicSpecs[args];
 		
@@ -635,7 +635,7 @@ cubeTriangleData[args___] :=
 
 
 cuboidTriangleData[l_] := cuboidTriangleData[l, l+1]
-cuboidTriangleData[l_, u_] := 
+cuboidTriangleData[l_, u_] :=
 	{
 		Tuples[Transpose[{l, u}]],
 		{{1,2,4},{1,4,3},{1,5,6},{1,6,2},{1,7,5},{1,3,7},{2,8,4},{2,6,8},{3,4,8},{3,8,7},{5,7,6},{6,7,8}}
@@ -699,7 +699,7 @@ octahedronTriangleData[args___] :=
 	]
 
 
-parallelepipedTriangleData[center_, {v1_, v2_, v3_}] := 
+parallelepipedTriangleData[center_, {v1_, v2_, v3_}] :=
 	{
 		Transpose[Transpose[{{0,0,0}, v1, v2, v1+v2, v3, v1+v3, v2+v3, v1+v2+v3}] + center],
 		{{1,2,4},{1,4,3},{1,5,6},{1,6,2},{1,7,5},{1,3,7},{2,8,4},{2,6,8},{3,4,8},{3,8,7},{5,7,6},{6,7,8}}
@@ -718,7 +718,7 @@ simplexTriangleData[pts_] := tetrahedronTriangleData[pts]
 
 $tetcoords = {{0., 0., 0.6123724356957945}, {-0.2886751345948129, -0.5, -0.20412414523193154}, {-0.2886751345948129, 0.5, -0.20412414523193154}, {0.5773502691896258, 0., -0.20412414523193154}};
 tetrahedronTriangleData[pts_?MatrixQ] := {pts, {{1,2,4},{1,3,2},{1,4,3},{2,3,4}}}
-tetrahedronTriangleData[args___] := 
+tetrahedronTriangleData[args___] :=
 	Block[{center, angles, l, tetres},
 		{center, angles, l} = platonicSpecs[args];
 		
@@ -759,7 +759,7 @@ triangleSurfaceComplexSignedDistanceField[coords_, cells_, C12_, spacing_, width
 	]
 
 
-nestedComponentHierarchy[coords_, cells_, C12_] := 
+nestedComponentHierarchy[coords_, cells_, C12_] :=
 	Block[{C22, comps, conncells, n, adj, depths, depthmembers},
 		C22 = triangleTriangleConnectivity[coords, cells, C12];
 		comps = SparseArray`StronglyConnectedComponents[C22];
@@ -785,7 +785,7 @@ nestedComponentHierarchy[coords_, cells_, C12_] :=
 triangleTriangleConnectivity[_, _, C12_SparseArray] := Transpose[C12] . C12
 
 
-triangleTriangleConnectivity[coords_, cells_, _] := 
+triangleTriangleConnectivity[coords_, cells_, _] :=
 	With[{C12 = edgeTriangleAdjacencyMatrix[coords, cells]},
 		Transpose[C12] . C12
 	]
@@ -795,7 +795,7 @@ triangleTriangleConnectivity[coords_, cells_, _] :=
 (*https://mathematica.stackexchange.com/a/160444/4346*)
 
 
-getEdgesFromTriangles = Compile[{{f, _Integer, 1}}, 
+getEdgesFromTriangles = Compile[{{f, _Integer, 1}},
 	{
 		Sort[{Compile`GetElement[f, 1], Compile`GetElement[f, 2]}],
 		Sort[{Compile`GetElement[f, 2], Compile`GetElement[f, 3]}],
@@ -810,7 +810,7 @@ takeSortedThread = Compile[{{data, _Integer, 1}, {ran, _Integer, 1}},
 	Parallelization -> True
    ];
 extractIntegerFromSparseMatrix = Compile[
-   {{vals, _Integer, 1}, {rp, _Integer, 1}, {ci, _Integer, 
+   {{vals, _Integer, 1}, {rp, _Integer, 1}, {ci, _Integer,
      1}, {background, _Integer},
     {i, _Integer}, {j, _Integer}},
    Block[{k},
@@ -823,14 +823,14 @@ extractIntegerFromSparseMatrix = Compile[
    ];
 
 
-edgeTriangleAdjacencyMatrix[coords_, cells_] := 
+edgeTriangleAdjacencyMatrix[coords_, cells_] :=
  Module[{edgesfrompolygons, edges, edgelookupcontainer,
     polyranges, polygonsneighedges, edgepolygonadjacencymatrix, acc},
   edgesfrompolygons = Flatten[getEdgesFromTriangles[cells], 1];
  edges = DeleteDuplicates[edgesfrompolygons];
-  edgelookupcontainer = 
+  edgelookupcontainer =
    SparseArray[
-    Rule[Join[edges, Transpose[Transpose[edges][[{2, 1}]]]], 
+    Rule[Join[edges, Transpose[Transpose[edges][[{2, 1}]]]],
      Join[Range[1, Length[edges]], Range[1, Length[edges]]]], {Length[coords], Length[coords]}];
   acc = Range[0, 3Length[cells], 3];
   polyranges = Transpose[{Most[acc] + 1, Rest[acc]}];
@@ -846,7 +846,7 @@ edgeTriangleAdjacencyMatrix[coords_, cells_] :=
       n = Length[edges], m = Length[cells],
       data = Flatten[polygonsneighedges]
       },
-     SparseArray @@ {Automatic, {m, n}, 
+     SparseArray @@ {Automatic, {m, n},
        0, {1, {acc, Transpose[{data}]}, ConstantArray[1, Length[data]]}}
      ]
   ]
@@ -917,14 +917,14 @@ polygonCoordinate[Polygon[data_]] := iPolygonCoordinate[data];
 polygonCoordinate[data_List] := polygonCoordinate[First[data]];
 
 
-iPolygonCoordinate[lis_List] := 
-	If[Length[lis] == 3 && VectorQ[lis, NumericQ], 
-		lis, 
+iPolygonCoordinate[lis_List] :=
+	If[Length[lis] == 3 && VectorQ[lis, NumericQ],
+		lis,
 		iPolygonCoordinate[lis[[1]]]
 	]
 
 
-boundingBoxNesting[{min1_, max1_}, {min2_, max2_}] := 
+boundingBoxNesting[{min1_, max1_}, {min2_, max2_}] :=
 	Module[{minless, maxless},
 	
 		If[Or @@ MapThread[Less, {max1, min2}],
@@ -956,7 +956,7 @@ pointInsideQ[polys_, pt_] := OddQ[Region`Mesh`CrossingCount[polys, pt]]
 (*Returns {{i1, j1}, {i2, j2}, ...} where the i1 component contains the j1 component, etc.*)
 
 
-boundaryNestingAdjacency[coords_, cells_] := 
+boundaryNestingAdjacency[coords_, cells_] :=
 	Block[{np, polycomps, bb, pts, nesting},
 		
 		np = Length[cells];

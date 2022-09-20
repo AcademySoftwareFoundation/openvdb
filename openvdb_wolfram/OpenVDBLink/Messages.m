@@ -58,9 +58,9 @@ messageGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 		Which[
 			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::grid, expr];
-				True, 
+				True,
 			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
+				False,
 			True,
 				Message[head::grid2, expr];
 				True
@@ -93,9 +93,9 @@ messageScalarGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 		Which[
 			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::scalargrid, expr];
-				True, 
+				True,
 			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
+				False,
 			True,
 				Message[head::scalargrid2, expr];
 				True
@@ -128,9 +128,9 @@ messageLevelSetGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 		Which[
 			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::lvlsetgrid, expr];
-				True, 
+				True,
 			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
+				False,
 			True,
 				Message[head::lvlsetgrid2, expr];
 				True
@@ -189,9 +189,9 @@ messagePixelGridQ[expr_, head_, tryToLevelSetQ_:True] :=
 		Which[
 			!tryToLevelSetQ || !TrueQ[$OpenVDBSpacing > 0],
 				Message[head::npxl, expr];
-				True, 
+				True,
 			TrueQ[$OpenVDBSpacing > 0] && regionQ,
-				False, 
+				False,
 			True,
 				Message[head::npxl2, expr];
 				True
@@ -332,7 +332,7 @@ General::gridspace = "`1` is not one of \"Index\" or \"World\".";
 messageZSpecQ[zspec_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || messageZSpecQ[zspec, head]
 
 
-messageZSpecQ[zspec_, head_] := 
+messageZSpecQ[zspec_, head_] :=
 	If[!MatchQ[zspec, Automatic|({z1_, z2_} /; z1 <= z2)],
 		Message[head::zspec, zspec];
 		True,
@@ -361,7 +361,7 @@ General::zspec = "`1` does not represent valid z\[Hyphen]bounds.";
 messageZSliceQ[z_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || messageZSliceQ[z, head]
 
 
-messageZSliceQ[z_, head_] := 
+messageZSliceQ[z_, head_] :=
 	If[!realQ[z],
 		Message[head::zslice, z];
 		True,
@@ -390,7 +390,7 @@ General::zslice = "`1` does not represent a valid z\[Hyphen]slice.";
 message2DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || message2DBBoxQ[bbox, head]
 
 
-message2DBBoxQ[bbox_, head_] := 
+message2DBBoxQ[bbox_, head_] :=
 	If[!bounds2DQ[bbox] && bbox =!= Automatic,
 		Message[head::bbox2d, bbox];
 		True,
@@ -419,7 +419,7 @@ General::bbox2d = "`1` does not represent valid 2D bunding box.";
 message3DBBoxQ[bbox_List -> regime_, head_] := messageRegimeSpecQ[regime, head] || message3DBBoxQ[bbox, head]
 
 
-message3DBBoxQ[bbox_, head_] := 
+message3DBBoxQ[bbox_, head_] :=
 	If[!bounds3DQ[bbox] && bbox =!= Automatic,
 		Message[head::bbox3d, bbox];
 		True,
@@ -449,7 +449,7 @@ General::bbox3d = "`1` does not represent valid 3D bunding box.";
 (*Main*)
 
 
-messageIsoValueQ[iso_, head_] := 
+messageIsoValueQ[iso_, head_] :=
 	If[!realQ[iso] && iso =!= Automatic,
 		Message[head::isoval];
 		True,

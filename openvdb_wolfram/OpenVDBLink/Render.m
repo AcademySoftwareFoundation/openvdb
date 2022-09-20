@@ -66,8 +66,8 @@ $renderColorThemes = <|
 
 
 Options[OpenVDBLevelSetRender] = Join[
-	{Background -> Automatic, "ClosedClipping" -> False, "FrameTranslation" -> Automatic, ImageResolution -> Automatic, 
-		"IsoValue" -> 0.0, "OrthographicFrame" -> Automatic, PerformanceGoal :> $PerformanceGoal}, 
+	{Background -> Automatic, "ClosedClipping" -> False, "FrameTranslation" -> Automatic, ImageResolution -> Automatic,
+		"IsoValue" -> 0.0, "OrthographicFrame" -> Automatic, PerformanceGoal :> $PerformanceGoal},
 	Options[Graphics3D, {ImageSize, ViewAngle, ViewCenter, ViewPoint, ViewProjection, ViewRange, ViewVertical}]
 ];
 
@@ -287,10 +287,10 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
 			Overlay[
 				{
 					Dynamic @ Image[im = iRender[
-						vdb, makeShader[shader, c1, c2, c3], "BoundingBox" -> b, ViewPoint -> vp, ViewVertical -> vv, ViewAngle -> va, ViewCenter -> vc, 
+						vdb, makeShader[shader, c1, c2, c3], "BoundingBox" -> b, ViewPoint -> vp, ViewVertical -> vv, ViewAngle -> va, ViewCenter -> vc,
 						ViewRange -> Scaled[vrng], ViewProjection -> projection, "OrthographicFrame" -> oframe, Background -> bg,
 						ImageSize -> dRenderImageSize[sz, \[Delta], OptionValue[PerformanceGoal], mem], "IsoValue" -> Clip[iso, .999{mniso, mxiso}],
-						PerformanceGoal -> If[antialq && !$ControlActiveSetting, "Quality", "Speed"], ImageResolution -> ir, 
+						PerformanceGoal -> If[antialq && !$ControlActiveSetting, "Quality", "Speed"], ImageResolution -> ir,
 						"ClosedClipping" -> volQ, opts
 					], ImageSize -> sz],
 					Graphics3D[{},
@@ -304,7 +304,7 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
 			OpenerView[{
 			Style["Appearance", Medium],
 				Column[{
-					Control[{{shader, oshader, "shading"}, 
+					Control[{{shader, oshader, "shading"},
 						KeyValueMap[#1 -> Row[{If[#2 === Automatic, Dynamic[c1], #2], ToLowerCase[#1]}, Spacer[2]]&, $dynamicRenderShaders],
 						ControlType -> PopupMenu
 					}],
@@ -325,21 +325,21 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
 						}, Spacer[10]],
 						!volQ,
 						Row[{
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}], 
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}], 
+							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
+							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
 							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
 							If[c1 =!= c2, themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], Nothing]
 						}, Spacer[1]],
 						c1 === c2 === c3,
 						Row[{
-							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}], 
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}], 
+							Control[{{bg, obg, "background"}, obg, ControlType -> ColorSetter}],
+							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
 							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}],
 							Control[{{c3, oc3, "closed face"}, oc3, ControlType -> ColorSetter}]
 						}, Spacer[1]],
 						True,
 						Grid[{{
-							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}], 
+							Control[{{c1, oc1, "front face"}, oc1, ControlType -> ColorSetter}],
 							Control[{{c2, oc2, "back face"}, oc2, ControlType -> ColorSetter}], Spacer[3],
 							If[c1 =!= c2, Row[{themeButton["flip faces", If[c1 === c3, c3 = c2]; {c1, c2} = {c2, c1}], ""}], Nothing]
 						}, {
@@ -393,12 +393,12 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
 			OpenerView[{
 			Style["General", Medium],
 				Row[{
-					Button["Copy image", 
+					Button["Copy image",
 						CopyToClipboard[im]],
-					Button["Copy view settings", 
-						CopyToClipboard[copyString @ {If[projection =!= "Orthographic", ViewAngle -> va, "OrthographicFrame" -> oframe], ViewCenter -> vc, 
+					Button["Copy view settings",
+						CopyToClipboard[copyString @ {If[projection =!= "Orthographic", ViewAngle -> va, "OrthographicFrame" -> oframe], ViewCenter -> vc,
 							ViewRange -> unscaledViewRange[vrng, vp, vc, vv, va, b], ViewPoint -> vp, ViewProjection -> projection, ViewVertical -> vv}]],
-					Button["Reset view settings", 
+					Button["Reset view settings",
 						va = origva; vc = origvc; vrng = origvr; vp = origvp; vv = origvv; projection = origprojection; oframe = ooframe;]
 				}]
 			}, Method -> "Active"]
@@ -415,7 +415,7 @@ iDynamicRender[vdb_, shading_, iropts_, opts:OptionsPattern[]] :=
 Options[iRender] = Options[iLevelSetRender];
 
 
-iRender[args__] := 
+iRender[args__] :=
 	With[{res = Quiet[iLevelSetRender[args]]},
 		res /; ImageQ[res]
 	]
@@ -451,11 +451,11 @@ $rainbowSwatch = Image[ImagePad[Image[Table[With[{r = Sqrt[x^2 + y^2], \[Theta] 
 $depthSwatch = Image[ImagePad[Image[Table[With[{r = Sqrt[x^2 + y^2], \[Theta] = ArcTan[.0000001-y, x]}, Hue[0, 0, Clip[1-r, {0,1}]^0.5]], {x, -1., 1., .1}, {y, -1., 1., .1}]], 1], "Byte", ImageSize -> 11];
 
 
-makeShader[shader_, colors__] := 
-	If[TrueQ[customColorQ[shader]] || !KeyExistsQ[materialParameters, shader], 
-		{shader, colors}, 
+makeShader[shader_, colors__] :=
+	If[TrueQ[customColorQ[shader]] || !KeyExistsQ[materialParameters, shader],
+		{shader, colors},
 		Prepend[Lookup[materialParameters[shader], {"BaseColorFront", "BaseColorBack", "BaseColorClosed"}], shader]
-	] 
+	]
 
 
 initialViewRange[{min_?NumericQ, max_?NumericQ}, vp_, vc_, vv_, va_, bds_] /; min <= max :=
@@ -486,7 +486,7 @@ initialImageSize[{sx_, _}, Automatic] := {sx, sx}
 initialImageSize[sz_, _] := sz
 
 
-dRenderImageSize[sz_, \[Delta]_, pgoal_, mem_] := 
+dRenderImageSize[sz_, \[Delta]_, pgoal_, mem_] :=
 	With[{s = sz*\[Delta]},
 		Clip[Round[dPGoalFactor[pgoal, s, mem]*s], {1, \[Infinity]}]
 	]
@@ -496,9 +496,9 @@ dRenderImageSize[sz_, \[Delta]_, pgoal_, mem_] :=
 (*TODO figure out when rotating becomes laggy. I think it's some function of image size, vdb memory footprint, and average depth of the first layer.*)
 
 
-dPGoalFactor["Speed", sz_, mem_] := 
-	If[TrueQ[(Times @@ sz) > Min[450^2, Divide[500000000.*720^2, mem]] && $ControlActiveSetting], 
-		0.5, 
+dPGoalFactor["Speed", sz_, mem_] :=
+	If[TrueQ[(Times @@ sz) > Min[450^2, Divide[500000000.*720^2, mem]] && $ControlActiveSetting],
+		0.5,
 		1.0
 	]
 dPGoalFactor[__] = 1.0;
@@ -507,7 +507,7 @@ dPGoalFactor[__] = 1.0;
 panSlider[var_, opts___] := Slider[var, {-1, 1}, opts, Appearance -> "UpArrow", ImageSize -> {75, 22}]
 
 
-orthographicSphericalFrame[bds_] := 
+orthographicSphericalFrame[bds_] :=
 	With[{reg = BoundingRegion[Tuples[bds], "MinBall"]},
 		2reg[[2]] /; MatchQ[reg, Ball[_, _Real]]
 	]
@@ -560,11 +560,11 @@ mLevelSetViewer[args___] := messageRenderFunction[OpenVDBLevelSetViewer, args]
 (*$renderLevelSetArgumentKeys*)
 
 
-$renderLevelSetArgumentKeys = {"IsoValue", "BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background", "Translate", "LookAt", "Up", 
+$renderLevelSetArgumentKeys = {"IsoValue", "BaseColorFront", "BaseColorBack", "BaseColorClosed", "Background", "Translate", "LookAt", "Up",
 	"Range", "FOV", "Shader", "Camera", "Samples", "Resolution", "Frame", "DepthParameters", "Lighting", "Step", "IsClosed"};
 
 
-$PBRrenderLevelSetArgumentKeys = {"IsoValue", "Background", "Translate", "LookAt", "Up", 
+$PBRrenderLevelSetArgumentKeys = {"IsoValue", "Background", "Translate", "LookAt", "Up",
 	"Range", "FOV", "Camera", "Samples", "Resolution", "Frame", "IsClosed", "BaseColorFront", "BaseColorBack", "BaseColorClosed"};
 
 
@@ -628,7 +628,7 @@ iparseRenderOptions[vdb_, shading_, OptionsPattern[]] :=
 			"Resolution" -> parseRenderImageSize[OptionValue[ImageSize], imgresolution, translate, up, bds],
 			"ImageSize" -> parseRenderUnscaledImageSize[OptionValue[ImageSize], translate, up, bds],
 			"ImageResolution" -> imgresolution,
-			"Frame" -> parseOrthographicFrame[OptionValue[ViewProjection], OptionValue["OrthographicFrame"], translate, lookat, up, bds], 
+			"Frame" -> parseOrthographicFrame[OptionValue[ViewProjection], OptionValue["OrthographicFrame"], translate, lookat, up, bds],
 			"DepthParameters" -> depthdata,
 			"Lighting" -> RotationTransform[0.25, {-1, 1, 1}][translate - lookat],
 			"Step" -> {1.0, 2.0},
@@ -687,13 +687,13 @@ canonicalizeShader[shader:("Depth"|{"Depth", _?NumericQ, __})] := {shader, RGBCo
 canonicalizeShader[{shader_, theme_String}] := {shader, theme}
 
 
-canonicalizeShader[{shader_, icolor_?ColorQ}] := 
+canonicalizeShader[{shader_, icolor_?ColorQ}] :=
 	With[{color = ColorConvert[icolor, "RGB"][[1 ;; 3]]},
 		{shader, color, color, color}
 	]
 
 
-canonicalizeShader[{shader_, icolorf_?ColorQ, icolorb_?ColorQ}] := 
+canonicalizeShader[{shader_, icolorf_?ColorQ, icolorb_?ColorQ}] :=
 	With[{
 			colorf = ColorConvert[icolorf, "RGB"][[1 ;; 3]],
 			colorb = ColorConvert[icolorb, "RGB"][[1 ;; 3]]
@@ -702,7 +702,7 @@ canonicalizeShader[{shader_, icolorf_?ColorQ, icolorb_?ColorQ}] :=
 	]
 
 
-canonicalizeShader[{shader_, colorf_?ColorQ, colorb_?ColorQ, colorc_?ColorQ}] := 
+canonicalizeShader[{shader_, colorf_?ColorQ, colorb_?ColorQ, colorc_?ColorQ}] :=
 	{shader, ColorConvert[colorf, "RGB"][[1 ;; 3]], ColorConvert[colorb, "RGB"][[1 ;; 3]], ColorConvert[colorc, "RGB"][[1 ;; 3]]}
 
 
@@ -742,8 +742,8 @@ parseIsoValue[___] = $Failed;
 
 
 parseRenderColor[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
-parseRenderColor[{_, theme_String}] := 
-	With[{color = $renderColorThemes[theme][[1]]}, 
+parseRenderColor[{_, theme_String}] :=
+	With[{color = $renderColorThemes[theme][[1]]},
 		List @@ color /; ColorQ[color]
 	]
 parseRenderColor[{_, color_?ColorQ, _, _}] := List @@ color
@@ -751,8 +751,8 @@ parseRenderColor[___] = $Failed;
 
 
 parseRenderColor2[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
-parseRenderColor2[{_, theme_String}] := 
-	With[{color = $renderColorThemes[theme][[2]]}, 
+parseRenderColor2[{_, theme_String}] :=
+	With[{color = $renderColorThemes[theme][[2]]},
 		List @@ color /; ColorQ[color]
 	]
 parseRenderColor2[{_, _, color_?ColorQ, _}] := List @@ color
@@ -760,8 +760,8 @@ parseRenderColor2[___] = $Failed;
 
 
 parseRenderColor3[{"Normal"|"NormalClosed"|"Position"|"PositionClosed", __}] = {1.0, 1.0, 1.0};
-parseRenderColor3[{_, theme_String}] := 
-	With[{color = $renderColorThemes[theme][[3]]}, 
+parseRenderColor3[{_, theme_String}] :=
+	With[{color = $renderColorThemes[theme][[3]]},
 		List @@ color /; ColorQ[color]
 	]
 parseRenderColor3[{_, _, _, color_?ColorQ}] := List @@ color
@@ -793,7 +793,7 @@ canonicalizeViewPoint[Above] = {0,0, 2};
 canonicalizeViewPoint[vp_] := vp
 
 
-parseRenderViewPoint[vp_List, bds_?bounds3DQ] /; VectorQ[vp, NumericQ] && Length[vp] === 3 := 
+parseRenderViewPoint[vp_List, bds_?bounds3DQ] /; VectorQ[vp, NumericQ] && Length[vp] === 3 :=
 	Block[{vpfinite, mx},
 		vpfinite = vp /. inf_DirectedInfinity :> Sign[inf]*1000;
 		mx = Replace[Max[Abs[Subtract @@@ bds]], _?NonPositive -> 1.0, {0}];
@@ -805,7 +805,7 @@ parseRenderViewPoint[vp_List, bds_?bounds3DQ] /; VectorQ[vp, NumericQ] && Length
 parseRenderViewPoint[dir:(Left|Right|Front|Back|Below|Above),  bds_] := parseRenderViewPoint[canonicalizeViewPoint[dir], bds]
 
 
-parseRenderViewPoint[dirs:{(Left|Right|Front|Back|Below|Above)..}, bds_] := 
+parseRenderViewPoint[dirs:{(Left|Right|Front|Back|Below|Above)..}, bds_] :=
 	Block[{canons, vps},
 		canons = canonicalizeViewPoint /@ dirs;
 		(
@@ -824,7 +824,7 @@ parseRenderViewPoint[___] = $Failed;
 (*parseRenderViewCenter*)
 
 
-parseRenderViewCenter[{vc_List, {ox_?NumericQ, oy_?NumericQ}}, translate_, up_, \[Alpha]_, bds_?bounds3DQ] := 
+parseRenderViewCenter[{vc_List, {ox_?NumericQ, oy_?NumericQ}}, translate_, up_, \[Alpha]_, bds_?bounds3DQ] :=
 	Block[{lookat = parseRenderViewCenterNoOffset[vc, bds], v, cross, rot},
 		(
 			v = translate-lookat;
@@ -849,7 +849,7 @@ parseRenderViewCenterNoOffset[___] = $Failed;
 (*parseRenderViewVertical*)
 
 
-parseRenderViewVertical[vv_List, vp_] /; VectorQ[vp, NumericQ] && Length[vp] === 3 := 
+parseRenderViewVertical[vv_List, vp_] /; VectorQ[vp, NumericQ] && Length[vp] === 3 :=
 	If[degenerateViewVerticalQ[vv, vp],
 		fixDegenerateViewVertical[vp],
 		vv
@@ -861,7 +861,7 @@ parseRenderViewVertical[___] = $Failed;
 (*parseRenderViewRange*)
 
 
-parseRenderViewRange[Automatic|All, vp_, vc_, bds_] := 
+parseRenderViewRange[Automatic|All, vp_, vc_, bds_] :=
 	Block[{corners, inview, far},
 		corners = Tuples[bds];
 		inview = Pick[corners, RegionMember[HalfSpace[vp-vc, vp], corners]];
@@ -873,7 +873,7 @@ parseRenderViewRange[Automatic|All, vp_, vc_, bds_] :=
 	]
 
 
-parseRenderViewRange[{min_?NumericQ, max_?NumericQ}, ___] /; min <= max := 
+parseRenderViewRange[{min_?NumericQ, max_?NumericQ}, ___] /; min <= max :=
 	Block[{clip},
 		clip = Clip[{min, max}, {.001, \[Infinity]}];
 		If[Equal @@ clip,
@@ -921,7 +921,7 @@ constructViewAngle[All, translate_, lookat_, bds_] :=
 	With[{v = lookat - translate},
 		2.0*Max[VectorAngle[v, # - translate]& /@ Tuples[bds]]
 	];
-constructViewAngle[Automatic, args__] := 
+constructViewAngle[Automatic, args__] :=
 	With[{\[Alpha] = constructViewAngle[All, args]},
 		Min[35.0*Degree, \[Alpha]] /; \[Alpha] =!= $Failed
 	];
@@ -989,7 +989,7 @@ iParseDepthParameters[___] = $Failed;
 
 parseRenderViewProjection["Perspective", _]  = 0;
 parseRenderViewProjection["Orthographic", _] = 1;
-parseRenderViewProjection[Automatic, vp_] := 
+parseRenderViewProjection[Automatic, vp_] :=
 	With[{p = If[FreeQ[vp, _DirectedInfinity], "Perspective", "Orthographic"]},
 		parseRenderViewProjection[p, vp]
 	]
@@ -1014,7 +1014,7 @@ imageResolution[] := Replace[Max[Quiet[CurrentValue[{"ConnectedDisplays", "Resol
 
 parseRenderImageSize[x:(_Integer|Automatic), args__] := parseRenderImageSize[{x, Automatic}, args]
 parseRenderImageSize[{x_Integer?Positive, y_Integer?Positive}, res_, __] := res/72*{x, y}
-parseRenderImageSize[{x_, y_}, res_, vp_List, vv_List, bds_?bounds3DQ] := 
+parseRenderImageSize[{x_, y_}, res_, vp_List, vv_List, bds_?bounds3DQ] :=
 	Block[{aspectratio, w, h},
 		aspectratio = 1.0;(*viewPointAspectRatio[bds, vp, vv];*)
 		w = Round[Replace[x, Automatic -> 360*res/72, {0}]];
@@ -1042,7 +1042,7 @@ viewPointAspectRatio[bds_, vp_, vv_] :=
 
 parseRenderUnscaledImageSize[x:(_Integer|Automatic), args__] := parseRenderUnscaledImageSize[{x, Automatic}, args]
 parseRenderUnscaledImageSize[{x_Integer?Positive, y_Integer?Positive}, __] := {x, y}
-parseRenderUnscaledImageSize[{x_, y_}, vp_List, vv_List, bds_?bounds3DQ] := 
+parseRenderUnscaledImageSize[{x_, y_}, vp_List, vv_List, bds_?bounds3DQ] :=
 	Block[{aspectratio, w, h},
 		aspectratio = viewPointAspectRatio[bds, vp, vv];
 		w = Round[Replace[x, Automatic -> 360, {0}]];

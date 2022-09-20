@@ -23,35 +23,35 @@ OpenVDBGrid<V>::transformGrid(OpenVDBGrid<V>& vdb,
 {
     if (mat.rows() != 4 || mat.cols() != 4)
         throw mma::LibraryError(LIBRARY_DIMENSION_ERROR);
-    
+
     wlGridPtr gridsource = vdb.grid();
     wlGridPtr gridtarget = grid();
-    
+
     const Mat4R xform(mat.data());
     GridTransformer transformer(xform);
-    
+
     mma::interrupt::LLInterrupter interrupt;
     transformer.setInterrupter(interrupt);
-    
+
     switch(resampling) {
-            
+
         case RS_NEAREST:
             transformer.transformGrid<PointSampler, wlGridType>(*gridsource, *gridtarget);
             break;
-            
+
         case RS_LINEAR:
             transformer.transformGrid<BoxSampler, wlGridType>(*gridsource, *gridtarget);
             break;
-        
+
         case RS_QUADRATIC:
             transformer.transformGrid<QuadraticSampler, wlGridType>(*gridsource, *gridtarget);
             break;
-        
+
         default:
             throw mma::LibraryError(LIBRARY_FUNCTION_ERROR);
             break;
     }
-    
+
     setLastModified();
 }
 
@@ -60,11 +60,11 @@ void
 OpenVDBGrid<V>::scalarMultiply(double fac)
 {
     scalar_type_assert<V>();
-    
+
     openvdbmma::transform::GridAdjustment<wlGridType, ValueT> adjuster(grid());
-    
+
     adjuster.scalarMultiply(fac);
-    
+
     setLastModified();
 }
 
@@ -73,10 +73,10 @@ void
 OpenVDBGrid<V>::gammaAdjustment(double gamma)
 {
     scalar_type_assert<V>();
-    
+
     openvdbmma::transform::GridAdjustment<wlGridType, ValueT> adjuster(grid());
-    
+
     adjuster.gammaAdjust(gamma);
-    
+
     setLastModified();
 }

@@ -89,7 +89,7 @@ OpenVDBDefaultSpace[OpenVDBArea] = $worldregime;
 scalarArea[vdb_?emptyVDBQ] = 0.
 
 
-scalarArea[vdb_?levelSetQ] := 
+scalarArea[vdb_?levelSetQ] :=
 	With[{vol = vdb["levelSetGridArea"[]]},
 		vol /; NumericQ[vol]
 	]
@@ -294,13 +294,13 @@ OpenVDBDefaultSpace[OpenVDBVolume] = $worldregime;
 scalarVolume[vdb_?emptyVDBQ] := If[TrueQ[Negative[vdb["getBackgroundValue"[]]]], \[Infinity], 0.]
 
 
-scalarVolume[vdb_?levelSetQ] := 
+scalarVolume[vdb_?levelSetQ] :=
 	With[{vol = vdb["levelSetGridVolume"[]]},
 		vol /; NumericQ[vol]
 	]
 
 
-scalarVolume[vdb_?fogVolumeQ] := 
+scalarVolume[vdb_?fogVolumeQ] :=
 	With[{tots = OpenVDBActiveVoxelSliceTotals[vdb]},
 		(
 			Total[tots] * vdb["VoxelSize"]^3

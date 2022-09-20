@@ -2,14 +2,14 @@
 
 
 /* openvdbmma::metadata members
- 
+
  class GridMetadata
- 
+
  public members are
- 
+
  getMetadata
  setMetadata
- 
+
 */
 
 namespace openvdbmma {
@@ -21,24 +21,24 @@ template<typename GridT>
 class GridMetadata
 {
 public:
-    
+
     using GridPtr = typename GridT::Ptr;
-    
+
     GridMetadata(GridPtr grid) : mGrid(grid)
     {
     }
-    
+
     GridMetadata() {}
-    
+
     template<typename T>
     T getMetadata(string key) const
     {
         using MetaIter = openvdb::MetaMap::MetaIterator;
-        
+
         openvdb::Metadata::Ptr metadata;
         bool seen = false;
         T val;
-        
+
         for (MetaIter iter = mGrid->beginMeta(); iter != mGrid->endMeta(); ++iter) {
             if(iter->first == key){
                 openvdb::Metadata::Ptr metadata = iter->second;
@@ -47,23 +47,23 @@ public:
                 break;
             }
         }
-        
+
         if(!seen)
             throw mma::LibraryError(LIBRARY_FUNCTION_ERROR);
-        
+
         return val;
     }
-    
+
     template<typename T>
     void setMetadata(string key, T val)
     {
         mGrid->insertMeta(key, TypedMetadata<T>(val));
     }
-    
+
 private:
-    
+
     GridPtr mGrid;
-    
+
 }; // end of GridMetadata class
 
 } // namespace metadata

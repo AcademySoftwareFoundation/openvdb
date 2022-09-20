@@ -241,7 +241,7 @@ OpenVDBClosing[args___] := mOpenVDBClosing[args]
 (*iOpenVDBClosing*)
 
 
-iOpenVDBClosing[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
+iOpenVDBClosing[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	iOpenVDBErosion[iOpenVDBDilation[vdb, r -> regime], r -> regime]
 
 
@@ -295,7 +295,7 @@ OpenVDBOpening[args___] := mOpenVDBOpening[args]
 (*iOpenVDBOpening*)
 
 
-iOpenVDBOpening[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] := 
+iOpenVDBOpening[vdb_?OpenVDBScalarGridQ, r_?NonNegative -> regime_?regimeQ] /; levelSetQ[vdb] :=
 	iOpenVDBDilation[iOpenVDBErosion[vdb, r -> regime], r -> regime]
 
 

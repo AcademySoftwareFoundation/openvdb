@@ -13,7 +13,7 @@ mma::IntVectorRef getActiveStates(mma::IntCoordinatesRef coords)
 mint getActiveLeafVoxelCount()
 
 mint getActiveTileCount()
- 
+
 mint getActiveVoxelCount()
 
 GlueScalar getBackgroundValue()
@@ -27,7 +27,7 @@ mma::IntMatrixRef getGridBoundingBox()
 mma::IntVectorRef getGridDimensions()
 
 const char* getGridType()
- 
+
 double getHalfwidth()
 
 bool getHasUniformVoxels()
@@ -53,17 +53,17 @@ mma::IntVectorRef
 OpenVDBGrid<V>::getActiveStates(mma::IntCoordinatesRef coords) const
 {
     typename wlGridType::Accessor accessor = grid()->getAccessor();
-    
+
     int n = coords.size();
     Coord xyz(0, 0, 0);
-    
+
     mma::IntVectorRef states = mma::makeVector<mint>(n);
-    
+
     for (int i = 0; i < n; i++) {
         xyz.reset(coords.x(i), coords.y(i), coords.z(i));
         states[i] = accessor.isValueOn(xyz);
     }
-    
+
     return states;
 }
 
@@ -84,7 +84,7 @@ typename OpenVDBGrid<V>::GlueScalar
 OpenVDBGrid<V>::getBackgroundValue() const
 {
     openvdbmma::types::non_mask_type_assert<V>();
-    
+
     return GScalar(grid()->background()).mmaData();
 }
 
@@ -94,16 +94,16 @@ mint
 OpenVDBGrid<V>::getGridClass() const
 {
     int grid_class_id;
-    
+
     GridClass grid_class = grid()->getGridClass();
-    
+
     if (grid_class == GRID_LEVEL_SET)
         grid_class_id = GC_LEVELSET;
     else if (grid_class == GRID_FOG_VOLUME)
         grid_class_id = GC_FOGVOLUME;
     else
         grid_class_id = GC_UNKNOWN;
-    
+
     return grid_class_id;
 }
 
@@ -121,10 +121,10 @@ OpenVDBGrid<V>::getGridBoundingBox() const
 {
     CoordBBox gbbox = grid()->evalActiveVoxelBoundingBox();
     Coord p1 = gbbox.min(), p2 = gbbox.max();
-    
+
     mma::IntMatrixRef bbox = mma::makeMatrix<mint>(
         {{p1.x(), p2.x()}, {p1.y(), p2.y()}, {p1.z(), p2.z()}});
-    
+
     return bbox;
 }
 
@@ -133,9 +133,9 @@ mma::IntVectorRef
 OpenVDBGrid<V>::getGridDimensions() const
 {
     const Coord gdims = grid()->evalActiveVoxelDim();
-    
+
     mma::IntVectorRef dims = mma::makeVector<mint>({gdims.x(), gdims.y(), gdims.z()});
-    
+
     return dims;
 }
 
@@ -171,14 +171,14 @@ mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
 OpenVDBGrid<V>::getMinMaxValues() const
 {
     openvdbmma::types::non_mask_type_assert<V>();
-    
+
     openvdb::math::MinMax<ValueT> extrema = openvdb::tools::minMax(grid()->tree());
-    
+
     GVector minmax(2);
-    
+
     minmax.template setValue<V>(0, extrema.min());
     minmax.template setValue<V>(1, extrema.max());
-    
+
     return minmax.mmaData();
 }
 
@@ -195,18 +195,18 @@ mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
 OpenVDBGrid<V>::getValues(mma::IntCoordinatesRef coords) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
-    
+
     const typename wlGridType::Accessor accessor = grid()->getAccessor();
     const int n = coords.size();
     Coord xyz(0, 0, 0);
-    
+
     GVector values(n);
-    
+
     for (int i = 0; i < n; ++i) {
         xyz.reset(coords.x(i), coords.y(i), coords.z(i));
         values.template setValue<V>(i, accessor.getValue(xyz));
     }
-    
+
     return values.mmaData();
 }
 

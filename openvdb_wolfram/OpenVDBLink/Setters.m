@@ -77,14 +77,14 @@ SyntaxInformation[OpenVDBSetProperty] = {"ArgumentsPattern" -> {_, _, _.}};
 mOpenVDBSetProperty[expr_, ___] /; messageGridQ[expr, OpenVDBSetProperty, False] = $Failed;
 
 
-mOpenVDBSetProperty[_, args__] /; setterArguments[args] === $Failed := 
+mOpenVDBSetProperty[_, args__] /; setterArguments[args] === $Failed :=
 	(
 		Message[OpenVDBSetProperty::spec];
 		$Failed
 	)
 
 
-mOpenVDBSetProperty[_, args__] := 
+mOpenVDBSetProperty[_, args__] :=
 	Block[{parsed, props},
 		parsed = setterArguments[args][[1]];
 		props = Pick[parsed, Lookup[$setterPropertyAssoc, parsed, $Failed], $Failed];
@@ -240,7 +240,7 @@ $setterPropertyAssoc = <|
 |>;
 
 
-setVDBProperty[id_, prop_, val_] := 
+setVDBProperty[id_, prop_, val_] :=
 	With[{setter = Lookup[$setterPropertyAssoc, prop, $Failed]},
 		setter[id, val] /; setter =!= $Failed
 	]

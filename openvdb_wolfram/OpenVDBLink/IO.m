@@ -57,7 +57,7 @@ iOpenVDBImport[File[file_String], args___] := iOpenVDBImport[file, args]
 iOpenVDBImport[file_String] := iOpenVDBImport[file, Automatic]
 
 
-iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] := 
+iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
 	Block[{name, type, vdb, id, successQ},
 		name = If[StringQ[iname], iname, ""];
 		type = If[itype === Automatic, detectVDBType[file, name], itype];
@@ -169,7 +169,7 @@ Options[iOpenVDBExport] = Options[OpenVDBExport];
 iOpenVDBExport[File[file_String], args___] := iOpenVDBExport[file, args]
 
 
-iOpenVDBExport[file_String, vdb_?OpenVDBGridQ, OptionsPattern[]] := 
+iOpenVDBExport[file_String, vdb_?OpenVDBGridQ, OptionsPattern[]] :=
 	If[fileExportQ[file, OptionValue[OverwriteTarget]],		
 		vdb["exportVDB"[file]];
 		file,
@@ -194,7 +194,7 @@ SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
 (*fileExportQ*)
 
 
-fileExportQ[filename_, overwriteQ_] := 
+fileExportQ[filename_, overwriteQ_] :=
 	If[!FileExistsQ[filename],
 		True,
 		If[TrueQ[overwriteQ],

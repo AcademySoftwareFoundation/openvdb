@@ -151,34 +151,34 @@ struct TransformAllValues
 {
     using RootT = typename TreeType::RootNodeType;
     using LeafT = typename TreeType::LeafNodeType;
-    
+
     explicit TransformAllValues(const XForm& f) : op(f) {}
-    
+
     TransformAllValues(const TransformAllValues& other, tbb::split) : op(other.op) {}
-    
+
     void operator()(RootT& node) const
     {
         for (auto iter = node.beginValueAll(); iter; ++iter)
             iter.setValueOnly(op(*iter));
     }
-    
+
     template<typename NodeT>
     void operator()(NodeT& node) const
     {
         for (auto iter = node.beginValueAll(); iter; ++iter)
             iter.setValueOnly(op(*iter));
     }
-    
+
     void operator()(LeafT& leaf) const
     {
         for (auto iter = leaf.beginValueAll(); iter; ++iter)
             iter.setValueOnly(op(*iter));
     }
-    
+
     void join(const TransformAllValues& other) {}
-    
+
 private:
-    
+
     XForm op;
 };
 
@@ -186,14 +186,14 @@ template<typename TreeType, typename XForm>
 struct TransformActiveLeafValues
 {
     TransformActiveLeafValues(const XForm& f) : op(f) {}
-    
+
     template <typename LeafNodeType>
     void operator()(LeafNodeType& leaf, size_t) const
     {
         for (auto iter = leaf.beginValueOn(); iter; ++iter)
             iter.setValue(op(*iter));
     }
-    
+
 private:
 
     XForm op;
@@ -203,16 +203,16 @@ template<typename TreeType, typename XForm>
 void transformAllValues(TreeType& tree, XForm xop)
 {
     TransformAllValues<TreeType, XForm> op(xop);
-    
+
     tree::NodeManager<TreeType> node(tree);
     node.reduceTopDown(op);
 }
-    
+
 template<typename TreeType, typename XForm>
 void transformActiveLeafValues(TreeType& tree, XForm xop)
 {
     TransformActiveLeafValues<TreeType, XForm> op(xop);
-    
+
     tree::LeafManager<TreeType> leafNodes(tree);
     leafNodes.foreach(op);
 }
@@ -229,17 +229,17 @@ namespace interrupt {
 struct LLInterrupter
 {
     LLInterrupter () { wlLibData = mma::libData; }
-    
+
     LLInterrupter (WolframLibraryData libData) : wlLibData(libData) {}
-    
+
     void start(const char* name = nullptr) { (void)name; }
-    
+
     void end() {}
-    
+
     inline bool wasInterrupted(int percent = -1) { (void)percent; return wlLibData->AbortQ(); }
-    
+
 private:
-    
+
     WolframLibraryData wlLibData;
 };
 
@@ -258,7 +258,7 @@ template<typename T>
 class VectorRef : public TensorRef<T>
 {
     mint nelems;
-    
+
 public:
     VectorRef(const TensorRef<T> &tr) : TensorRef<T>(tr)
     {
@@ -267,11 +267,11 @@ public:
         const mint *dims = TensorRef<T>::dimensions();
         nelems = dims[0];
     }
-    
+
     mint size() const { return nelems; }
-    
+
     mint rank() const { return 1; }
-    
+
     T & operator () (mint i) const { return (*this)[i]; }
 };
 
@@ -303,7 +303,7 @@ public:
 
     /// Number of slices in the tesseract
     mint slices() const { return nslices; }
-    
+
     /// Number of hyper slices in the tesseract
     mint hyper_slices() const { return nhslices; }
 
@@ -332,12 +332,12 @@ public:
             throw LibraryError("RGB: rank 1 tensor expected.");
         if (TensorRef<double>::size() != 3)
             throw LibraryError("RGB: length 3 vector expected.");
-        
+
         (*this)[0] = (*this)[0] < 0.0 ? 0.0 : (*this)[0] > 1.0 ? 1.0 : (*this)[0];
         (*this)[1] = (*this)[1] < 0.0 ? 0.0 : (*this)[1] > 1.0 ? 1.0 : (*this)[1];
         (*this)[2] = (*this)[2] < 0.0 ? 0.0 : (*this)[2] > 1.0 ? 1.0 : (*this)[2];
     }
-    
+
     inline double r() const { return (*this)[0]; }
     inline double g() const { return (*this)[1]; }
     inline double b() const { return (*this)[2]; }
@@ -348,7 +348,7 @@ template<typename T>
 class CoordinatesRef : public TensorRef<T>
 {
     mint ncoords;
-    
+
 public:
     CoordinatesRef(const TensorRef<T> &tr) : TensorRef<T>(tr)
     {
@@ -359,9 +359,9 @@ public:
             throw LibraryError("CoordinatesRef: 3D coordinates expected.");
         ncoords = dims[0];
     }
-    
+
     mint size() const { return ncoords; }
-    
+
     T x(mint i) const { return (*this)[3*i]; }
     T y(mint i) const { return (*this)[3*i+1]; }
     T z(mint i) const { return (*this)[3*i+2]; }
@@ -385,23 +385,23 @@ public:
         if (dims[0] != 3 || dims[1] != 2)
             throw LibraryError("Bounds3DRef: 3D bounding box expected.");
     }
-    
+
     inline T xmin() const { return (*this)[0]; }
     inline T xmax() const { return (*this)[1]; }
     inline T ymin() const { return (*this)[2]; }
     inline T ymax() const { return (*this)[3]; }
     inline T zmin() const { return (*this)[4]; }
     inline T zmax() const { return (*this)[5]; }
-    
+
     inline T xDim() const { return (*this)[1] - (*this)[0] + 1; }
     inline T yDim() const { return (*this)[3] - (*this)[2] + 1; }
     inline T zDim() const { return (*this)[5] - (*this)[4] + 1; }
-    
+
     inline CoordBBox toCoordBBox() const
     {
         return CoordBBox(xmin(), ymin(), zmin(), xmax(), ymax(), zmax());
     }
-    
+
     inline bool isDegenerate() const {
         return xmin() > xmax() || ymin() > ymax() || zmin() > zmax();
     }
@@ -426,20 +426,20 @@ public:
         if (dims[0] != 2 || dims[1] != 2)
             throw LibraryError("Bounds2DRef: 2D bounding box expected.");
     }
-    
+
     inline T xmin() const { return (*this)[0]; }
     inline T xmax() const { return (*this)[1]; }
     inline T ymin() const { return (*this)[2]; }
     inline T ymax() const { return (*this)[3]; }
-    
+
     inline T xDim() const { return (*this)[1] - (*this)[0] + 1; }
     inline T yDim() const { return (*this)[3] - (*this)[2] + 1; }
-    
+
     inline CoordBBox toCoordBBox() const
     {
         return CoordBBox(xmin(), ymin(), 0, xmax(), ymax(), 0);
     }
-    
+
     inline bool isDegenerate() const {
         return xmin() > xmax() || ymin() > ymax();
     }
@@ -460,7 +460,7 @@ inline VectorT toVDB(const VectorRef<T> mmavec)
     VectorT vec;
     for (int i = 0; i < vec.size; ++i)
         vec[i] = mmavec[i];
-    
+
     return vec;
 }
 
@@ -474,7 +474,7 @@ inline VectorT toVDB(const MatrixRef<T> mmamat, const int i)
     for (int j = 0; j < vec.size; ++j) {
         vec[j] = mmamat(i, j);
     }
-    
+
     return vec;
 }
 

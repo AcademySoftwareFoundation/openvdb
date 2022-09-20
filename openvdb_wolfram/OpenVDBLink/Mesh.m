@@ -54,7 +54,7 @@ Options[iOpenVDBMesh] = Options[OpenVDBMesh];
 iOpenVDBMesh[expr_, opts:OptionsPattern[]] := iOpenVDBMesh[expr, Automatic, opts]
 
 
-iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] := 
+iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] :=
 	Block[{type, adaptivity, isovalue, quadQ, data, res},
 		type = parseLevelSetMeshType[itype];
 		(
@@ -81,7 +81,7 @@ iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, OptionsPattern[]] :=
 iOpenVDBMesh[vdb_, itype_, bds_List, opts:OptionsPattern[]] /; MatrixQ[bds, realQ] := iOpenVDBMesh[vdb, itype, bds -> $worldregime, opts]
 
 
-iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, bds_List -> regime_?regimeQ, opts:OptionsPattern[]] := 
+iOpenVDBMesh[vdb_?OpenVDBScalarGridQ, itype_, bds_List -> regime_?regimeQ, opts:OptionsPattern[]] :=
 	Block[{clipopts, clip},
 		clipopts = FilterRules[{opts, Options[OpenVDBMesh]}, Options[OpenVDBClip]];
 		
@@ -158,8 +158,8 @@ levelSetMeshData[vdb_, isovalue_, adaptivity_, quadQ_] :=
 levelSetMeshData[vdb_, isovalue_, __] := makeFacelessRegion[vdb, isovalue]
 
 
-makeFacelessRegion[vdb_, isovalue_] := 
-	If[TrueQ[vdb["getBackgroundValue"[]] < isovalue], 
+makeFacelessRegion[vdb_, isovalue_] :=
+	If[TrueQ[vdb["getBackgroundValue"[]] < isovalue],
 		FullRegion[3],
 		EmptyRegion[3]
 	]
@@ -169,7 +169,7 @@ makeFacelessRegion[vdb_, isovalue_] :=
 (*constructLevelSetMesh*)
 
 
-constructLevelSetMesh[{coords_, cells:{__}}, type:("MeshRegion"|"BoundaryMeshRegion")] := 
+constructLevelSetMesh[{coords_, cells:{__}}, type:("MeshRegion"|"BoundaryMeshRegion")] :=
 	Block[{hasQuads, head, mr},
 		hasQuads = Max[Length[#[[1]]]& /@ cells] == 4;
 		head = If[type === "BoundaryMeshRegion", BoundaryMeshRegion, MeshRegion];
@@ -181,8 +181,8 @@ constructLevelSetMesh[{coords_, cells:{__}}, type:("MeshRegion"|"BoundaryMeshReg
 				If[type === "BoundaryMeshRegion", "CheckIntersections" -> False, Nothing],
 				If[hasQuads, "CoplanarityTolerance" -> 14, Nothing],
 				"DeleteDuplicateCells" -> False,
-				"DeleteDuplicateCoordinates" -> False, 
-				"EliminateUnusedCoordinates" -> False, 
+				"DeleteDuplicateCoordinates" -> False,
+				"EliminateUnusedCoordinates" -> False,
 				"TJunction" -> False
 			}
 		];
@@ -222,7 +222,7 @@ Options[mOpenVDBMesh] = Options[OpenVDBMesh];
 mOpenVDBMesh[expr_, ___] /; messageScalarGridQ[expr, OpenVDBMesh] = $Failed;
 
 
-mOpenVDBMesh[_, type_, ___] /; parseLevelSetMeshType[type] === $Failed := 
+mOpenVDBMesh[_, type_, ___] /; parseLevelSetMeshType[type] === $Failed :=
 	(
 		Message[OpenVDBMesh::ret, type, 2];
 		$Failed

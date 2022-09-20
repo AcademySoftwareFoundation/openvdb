@@ -274,7 +274,7 @@ iOpenVDBData[vdb_, Automatic] := iOpenVDBData[vdb, vdb["IndexBoundingBox"] -> $i
 iOpenVDBData[vdb_, bspec_List] /; bounds3DQ[bspec] || intervalQ[bspec] := iOpenVDBData[vdb, bspec -> $indexregime]
 
 
-iOpenVDBData[vdb_?carefulNonMaskGridQ, int_?intervalQ -> regime_?regimeQ] := 
+iOpenVDBData[vdb_?carefulNonMaskGridQ, int_?intervalQ -> regime_?regimeQ] :=
 	Block[{bds2d},
 		bds2d = regimeConvert[vdb, Most[vdb["IndexBoundingBox"]], $indexregime -> regime];
 		
@@ -538,14 +538,14 @@ mOpenVDBActiveVoxels[expr_, ___] /; messageGridQ[expr, OpenVDBActiveVoxels] = $F
 mOpenVDBActiveVoxels[_, bbox_, ___] /; message3DBBoxQ[bbox, OpenVDBActiveVoxels] = $Failed;
 
 
-mOpenVDBActiveVoxels[_, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Positions"|"Values"|Automatic] := 
+mOpenVDBActiveVoxels[_, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Positions"|"Values"|Automatic] :=
 	(
 		Message[OpenVDBActiveVoxels::rettype, 3];
 		$Failed
 	)
 
 
-mOpenVDBActiveVoxels[_?OpenVDBMaskGridQ, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Values"] := 
+mOpenVDBActiveVoxels[_?OpenVDBMaskGridQ, _, ret_, ___] /; !MatchQ[ret, "SparseArray"|"Values"] :=
 	(
 		Message[OpenVDBActiveVoxels::mask];
 		$Failed

@@ -117,7 +117,7 @@ validReturnFormatQ[___] = False;
 (*OpenVDBGrid overload*)
 
 
-(vdb_OpenVDBGrid)[key:(_List | _String)] := 
+(vdb_OpenVDBGrid)[key:(_List | _String)] :=
 	Block[{lookup, res},
 		lookup = Lookup[$getterPropertyAssoc, key];
 		(
@@ -212,9 +212,9 @@ addCodeCompletion[OpenVDBProperty][None, Keys[$getterPropertyAssoc], None];
 mOpenVDBProperty[expr_, ___] /; messageGridQ[expr, OpenVDBProperty] = $Failed;
 
 
-mOpenVDBProperty[_, props_, ___] /; getterPropertyFunctions[props] === $Failed := 
+mOpenVDBProperty[_, props_, ___] /; getterPropertyFunctions[props] === $Failed :=
 	(
-		If[ListQ[props], 
+		If[ListQ[props],
 			Message[OpenVDBProperty::props, props],
 			Message[OpenVDBProperty::prop, props]
 		];
@@ -222,7 +222,7 @@ mOpenVDBProperty[_, props_, ___] /; getterPropertyFunctions[props] === $Failed :
 	)
 
 
-mOpenVDBProperty[_, _, format_] /; !validReturnFormatQ[format] := 
+mOpenVDBProperty[_, _, format_] /; !validReturnFormatQ[format] :=
 	(
 		Message[OpenVDBProperty::frmt, format, 3];
 		$Failed
@@ -615,11 +615,11 @@ openVDBGetProperties[_] := Keys[$getterPropertyAssoc]
 (*openVDBGetPropertyValueGrid*)
 
 
-openVDBGetPropertyValueGrid[vdb_] := 
+openVDBGetPropertyValueGrid[vdb_] :=
 	Grid[
-		DeleteCases[List @@@ OpenVDBProperty[vdb, All, "RuleList"], {_, Missing["NotApplicable"]}], 
-		Alignment -> {{Right, Left}}, 
-		Frame -> All, 
+		DeleteCases[List @@@ OpenVDBProperty[vdb, All, "RuleList"], {_, Missing["NotApplicable"]}],
+		Alignment -> {{Right, Left}},
+		Frame -> All,
 		Spacings -> {1, 0.75}
 	]
 

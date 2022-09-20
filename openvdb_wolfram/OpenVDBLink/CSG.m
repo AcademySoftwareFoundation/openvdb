@@ -71,7 +71,7 @@ OpenVDBUnion[args___] := mOpenVDBUnion[args]
 Options[iOpenVDBUnion] = Options[OpenVDBUnion];
 
 
-iOpenVDBUnion[OptionsPattern[]] := 
+iOpenVDBUnion[OptionsPattern[]] :=
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -83,7 +83,7 @@ iOpenVDBUnion[OptionsPattern[]] :=
 	]
 
 
-iOpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBUnion[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	Block[{ivdb},
 		ivdb = OpenVDBCreateGrid[vdb];
 		ivdb["gridUnionCopy"[{vdb, vdbs}[[All, 1]]]];
@@ -144,7 +144,7 @@ OpenVDBIntersection[args___] := mOpenVDBIntersection[args]
 Options[iOpenVDBIntersection] = Options[OpenVDBIntersection];
 
 
-iOpenVDBIntersection[OptionsPattern[]] := 
+iOpenVDBIntersection[OptionsPattern[]] :=
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -156,7 +156,7 @@ iOpenVDBIntersection[OptionsPattern[]] :=
 	]
 
 
-iOpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBIntersection[vdb_?OpenVDBScalarGridQ, vdbs___, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	Block[{ivdb},
 		ivdb = OpenVDBCreateGrid[{vdb}[[1]]];
 		ivdb["gridIntersectionCopy"[{vdb, vdbs}[[All, 1]]]];
@@ -217,7 +217,7 @@ OpenVDBDifference[args___] := mOpenVDBDifference[args]
 Options[iOpenVDBDifference] = Options[OpenVDBDifference];
 
 
-iOpenVDBDifference[OptionsPattern[]] := 
+iOpenVDBDifference[OptionsPattern[]] :=
 	Block[{vdb},
 		vdb = OpenVDBCreateGrid["GridClass" -> "LevelSet"];
 		(
@@ -229,7 +229,7 @@ iOpenVDBDifference[OptionsPattern[]] :=
 	]
 
 
-iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -237,7 +237,7 @@ iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBDifference[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	Block[{union, vdbdiff},
 		union = vdbUnion[vdbs];
 		(
@@ -314,7 +314,7 @@ OpenVDBUnionTo[args___] := mOpenVDBUnionTo[args]
 Options[iOpenVDBUnionTo] = Options[OpenVDBUnionTo];
 
 
-iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -322,7 +322,7 @@ iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBUnionTo[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	(
 		Scan[vdb["gridUnion"[#]]&, {vdbs}[[All, 1]]];
 		
@@ -382,7 +382,7 @@ OpenVDBIntersectWith[args___] := mOpenVDBIntersectWith[args]
 Options[iOpenVDBIntersectWith] = Options[OpenVDBIntersectWith];
 
 
-iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -390,7 +390,7 @@ iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBIntersectWith[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	(
 		Scan[vdb["gridIntersection"[#]]&, {vdbs}[[All, 1]]];
 		
@@ -450,7 +450,7 @@ OpenVDBDifferenceFrom[args___] := mOpenVDBDifferenceFrom[args]
 Options[iOpenVDBDifferenceFrom] = Options[OpenVDBDifferenceFrom];
 
 
-iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] := 
+iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	(
 		OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
 		
@@ -458,7 +458,7 @@ iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, OptionsPattern[]] :=
 	)
 
 
-iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] := 
+iOpenVDBDifferenceFrom[vdb_?OpenVDBScalarGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
 	Block[{vdbunion},
 		vdbunion = OpenVDBUnionTo[vdbs];
 		(
@@ -599,7 +599,7 @@ iOpenVDBClip[___] = $Failed;
 (*Utilities*)
 
 
-parseClipBounds[vdb_, bspec_, regime_] := 
+parseClipBounds[vdb_, bspec_, regime_] :=
 	Block[{bds, voxsize, vdbbbox},
 		bds = iParseClipBounds[bspec];
 		voxsize = voxelSize[vdb];
@@ -619,7 +619,7 @@ parseClipBounds[___] = $Failed;
 iParseClipBounds[bds_?bounds3DQ] := bds
 
 
-iParseClipBounds[l_List] := 
+iParseClipBounds[l_List] :=
 	With[{res = iParseClipBounds /@ l},
 		boundingBoxIntersection[res] /; FreeQ[res, $Failed, {1}]
 	]
@@ -628,7 +628,7 @@ iParseClipBounds[l_List] :=
 iParseClipBounds[(dir_Integer) -> {v1_, v2_}] /; 1 <= dir <= 3 && -\[Infinity] <= v1 < v2 <= \[Infinity] := Insert[{{-\[Infinity], \[Infinity]}, {-\[Infinity], \[Infinity]}}, {v1, v2}, dir]
 
 
-iParseClipBounds[(dir_Integer) -> v_?NumericQ] /; 1 <= Abs[dir] <= 3 := 
+iParseClipBounds[(dir_Integer) -> v_?NumericQ] /; 1 <= Abs[dir] <= 3 :=
 	If[dir < 0,
 		iParseClipBounds[Minus[dir] -> {v, \[Infinity]}],
 		iParseClipBounds[dir -> {-\[Infinity], v}]
@@ -644,7 +644,7 @@ iParseClipBounds[Cuboid[lo_, hi_]?ConstantRegionQ] := Transpose[{lo, hi}]
 iParseClipBounds[___] = $Failed;
 
 
-boundingBoxIntersection[bds_] := 
+boundingBoxIntersection[bds_] :=
 	Developer`ToPackedArray @ {
 		{Max[bds[[All, 1, 1]]], Min[bds[[All, 1, 2]]]},
 		{Max[bds[[All, 2, 1]]], Min[bds[[All, 2, 2]]]},
@@ -679,7 +679,7 @@ Options[messageBooleanFunction] = Options[OpenVDBUnion];
 messageBooleanFunction[head_, vdbs___, OptionsPattern[]] :=
 	Catch[
 		Do[
-			If[messageScalarGridQ[vdb, head], Throw[$Failed]], 
+			If[messageScalarGridQ[vdb, head], Throw[$Failed]],
 			{vdb, {vdbs}}
 		];
 		

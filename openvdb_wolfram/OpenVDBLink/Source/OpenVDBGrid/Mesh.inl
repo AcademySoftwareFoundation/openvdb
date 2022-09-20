@@ -17,12 +17,12 @@ mma::IntVectorRef
 OpenVDBGrid<V>::meshCellCount(double isovalue, double adaptivity, bool tri_only) const
 {
     scalar_type_assert<V>();
-    
+
     openvdbmma::mesh::VolumeToMmaMesh mesher(isovalue, adaptivity);
     mesher.operator()<wlGridType>(*grid());
-    
+
     mma::IntVectorRef meshcounts = mesher.meshCellCounts(tri_only);
-    
+
     return meshcounts;
 }
 
@@ -35,13 +35,13 @@ mma::RealVectorRef
 OpenVDBGrid<V>::meshData(double isovalue, double adaptivity, bool tri_only) const
 {
     scalar_type_assert<V>();
-    
+
     openvdbmma::mesh::VolumeToMmaMesh mesher(isovalue, adaptivity);
     mesher.operator()<wlGridType>(*grid());
-    
+
     mma::check_abort();
-    
+
     mma::RealVectorRef meshdata = mesher.meshData(tri_only);
-    
+
     return meshdata;
 }

@@ -3,15 +3,15 @@
 
 
 /* OpenVDBGrid public member function list
- 
+
  double levelSetGridArea()
- 
+
  mint levelSetGridEulerCharacteristic()
- 
+
  mint levelSetGridGenus()
- 
+
  double levelSetGridVolume()
- 
+
  */
 
 
@@ -22,7 +22,7 @@ double
 OpenVDBGrid<V>::levelSetGridArea() const
 {
     scalar_type_assert<V>();
-    
+
     return levelSetArea(*grid(), true /* world space */);
 }
 
@@ -31,7 +31,7 @@ mint
 OpenVDBGrid<V>::levelSetGridEulerCharacteristic() const
 {
     scalar_type_assert<V>();
-    
+
     return levelSetEulerCharacteristic(*grid());
 }
 
@@ -40,7 +40,7 @@ mint
 OpenVDBGrid<V>::levelSetGridGenus() const
 {
     scalar_type_assert<V>();
-    
+
     return levelSetGenus(*grid());
 }
 
@@ -49,6 +49,6 @@ double
 OpenVDBGrid<V>::levelSetGridVolume() const
 {
     scalar_type_assert<V>();
-    
+
     return levelSetVolume(*grid(), true /* world space */);
 }

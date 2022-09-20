@@ -95,9 +95,9 @@ OpenVDBGrid /: MakeBoxes[vdb_OpenVDBGrid?OpenVDBGridQ, fmt_] :=
 		};
 		
 		icon = Which[
-			lvlsetQ,  
+			lvlsetQ,
 				$lvlseticon,
-			fogVolumeQ[vdb], 
+			fogVolumeQ[vdb],
 				$fogvolicon,
 			OpenVDBScalarGridQ[vdb],
 				$scalargridicon,
@@ -109,7 +109,7 @@ OpenVDBGrid /: MakeBoxes[vdb_OpenVDBGrid?OpenVDBGridQ, fmt_] :=
 				$boolgridicon,
 			OpenVDBMaskGridQ[vdb],
 				$maskgridicon,
-			True, 
+			True,
 				None
 		];
 		
@@ -197,7 +197,7 @@ iOpenVDBGrids[] := iOpenVDBGrids[Automatic]
 iOpenVDBGrids[Automatic] := Select[iOpenVDBGrids[All], Length[#] > 0&]
 
 
-iOpenVDBGrids[All] := 
+iOpenVDBGrids[All] :=
 	With[{typesnoaliases = Join @@ Keys /@ $GridClassData},
 		Association[# -> iOpenVDBGrids[#]& /@ typesnoaliases]
 	]
@@ -210,14 +210,14 @@ iOpenVDBGrids[type_String] :=
 	Block[{gridlist},
 		gridlist = Quiet @ LExpressionList[typeGridName[type]];
 		
-		If[ListQ[gridlist], 
+		If[ListQ[gridlist],
 			OpenVDBGrid[#, type]& @@@ gridlist,
 			$Failed
 		]
 	]
 
 
-iOpenVDBGrids[types:{___String}] := 
+iOpenVDBGrids[types:{___String}] :=
 	With[{grids = iOpenVDBGrids /@ types},
 		AssociationThread[types, grids] /; FreeQ[grids, $Failed]
 	]
@@ -479,7 +479,7 @@ iOpenVDBCreateGrid[opts:OptionsPattern[]] := iOpenVDBCreateGrid[$OpenVDBSpacing,
 iOpenVDBCreateGrid[spacing_?Positive, opts:OptionsPattern[]] := iOpenVDBCreateGrid[spacing, $gridTypeList[[1]], opts]
 
 
-iOpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] := 
+iOpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] :=
 	Block[{vdb = newVDB[type]},
 		(
 			setVDBProperties[vdb, "VoxelSize" -> spacing, opts]
@@ -488,7 +488,7 @@ iOpenVDBCreateGrid[spacing_?Positive, type_String, opts:OptionsPattern[]] :=
 	]
 
 
-iOpenVDBCreateGrid[ovdb_?OpenVDBGridQ, opts:OptionsPattern[]] := 
+iOpenVDBCreateGrid[ovdb_?OpenVDBGridQ, opts:OptionsPattern[]] :=
 	Block[{vdb = newVDB[ovdb[[2]]], vdbprops},
 		vdbprops = OpenVDBProperty[ovdb, {"VoxelSize", "BackgroundValue", "Creator", "GridClass", "Name"}, "RuleList"];
 		(
@@ -504,7 +504,7 @@ iOpenVDBCreateGrid[___] = $Failed;
 newVDB[type_?aliasTypeQ] := newVDB[resolveAliasType[type]]
 
 
-newVDB[type_String] := 
+newVDB[type_String] :=
 	With[{res = Quiet @ CreateManagedLibraryExpression[typeGridName[type], OpenVDBGrid[#, type]&]},
 		res /; res =!= $Failed
 	]
@@ -560,7 +560,7 @@ addCodeCompletion[OpenVDBCreateGrid][None, $gridTypeList];
 Options[mOpenVDBCreateGrid] = Options[OpenVDBCreateGrid];
 
 
-mOpenVDBCreateGrid[OptionsPattern[]] /; !TrueQ[$OpenVDBSpacing > 0] := 
+mOpenVDBCreateGrid[OptionsPattern[]] /; !TrueQ[$OpenVDBSpacing > 0] :=
 	(
 		Message[OpenVDBCreateGrid::novoxsz];
 		$Failed
@@ -618,7 +618,7 @@ OpenVDBDeleteGrid[args___] := mOpenVDBDeleteGrid[args]
 SetAttributes[iOpenVDBDeleteGrid, Listable];
 
 
-iOpenVDBDeleteGrid[vdb_?OpenVDBGridQ] := 
+iOpenVDBDeleteGrid[vdb_?OpenVDBGridQ] :=
 	(
 		vdb["createEmptyGrid"[]];
 		vdb
@@ -682,7 +682,7 @@ OpenVDBCopyGrid[args___] := mOpenVDBCopyGrid[args]
 Options[iOpenVDBCopyGrid] = Options[OpenVDBCopyGrid];
 
 
-iOpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] := 
+iOpenVDBCopyGrid[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
 	Block[{vdbcopy},
 		vdbcopy = newVDB[vdb[[2]]];
 		(
@@ -728,19 +728,19 @@ mOpenVDBCopyGrid[___] = $Failed;
 (*OpenVDB uses default spacing of 1.0. We leave $OpenVDBSpacing initially unset to prevent confusion.*)
 
 
-$OpenVDBSpacing /: SetDelayed[$OpenVDBSpacing, expr_] := 
+$OpenVDBSpacing /: SetDelayed[$OpenVDBSpacing, expr_] :=
 	(
 		OwnValues[$OpenVDBSpacing] = {HoldPattern[$OpenVDBSpacing] :> With[{w = expr}, w /; Positive[w]]};
 	)
 
 
-$OpenVDBSpacing /: Set[$OpenVDBSpacing, w_?Positive] := 
+$OpenVDBSpacing /: Set[$OpenVDBSpacing, w_?Positive] :=
 	(
 		OwnValues[$OpenVDBSpacing] = {HoldPattern[$OpenVDBSpacing] :> w};
 		w
 	)
 
-$OpenVDBSpacing /: Set[$OpenVDBSpacing, _] := 
+$OpenVDBSpacing /: Set[$OpenVDBSpacing, _] :=
 	(
 		Message[$OpenVDBSpacing::setpos];
 		$Failed
@@ -754,19 +754,19 @@ $OpenVDBSpacing::setpos = "$OpenVDBSpacing must be set to a positive number.";
 (*$OpenVDBHalfWidth*)
 
 
-$OpenVDBHalfWidth /: SetDelayed[$OpenVDBHalfWidth, expr_] := 
+$OpenVDBHalfWidth /: SetDelayed[$OpenVDBHalfWidth, expr_] :=
 	(
 		OwnValues[$OpenVDBHalfWidth] = {HoldPattern[$OpenVDBHalfWidth] :> With[{w = expr}, w /; w >= 1.05]};
 	)
 
 
-$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, w_ /; w > 0] := 
+$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, w_ /; w > 0] :=
 	(
 		OwnValues[$OpenVDBHalfWidth] = {HoldPattern[$OpenVDBHalfWidth] :> w};
 		w
 	)
 
-$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, e_] := 
+$OpenVDBHalfWidth /: Set[$OpenVDBHalfWidth, e_] :=
 	(
 		Message[$OpenVDBHalfWidth::setpos];
 		$Failed
@@ -789,19 +789,19 @@ If[!ValueQ[$OpenVDBHalfWidth],
 (*$OpenVDBCreator*)
 
 
-$OpenVDBCreator /: SetDelayed[$OpenVDBCreator, expr_] := 
+$OpenVDBCreator /: SetDelayed[$OpenVDBCreator, expr_] :=
 	(
 		OwnValues[$OpenVDBCreator] = {HoldPattern[$OpenVDBCreator] :> With[{c = expr}, c /; StringQ[c] || c === None]};
 	)
 
 
-$OpenVDBCreator /: Set[$OpenVDBCreator, c_ /; StringQ[c] || c === None] := 
+$OpenVDBCreator /: Set[$OpenVDBCreator, c_ /; StringQ[c] || c === None] :=
 	(
 		OwnValues[$OpenVDBCreator] = {HoldPattern[$OpenVDBCreator] :> c};
 		c
 	)
 
-$OpenVDBCreator /: Set[$OpenVDBCreator, _] := 
+$OpenVDBCreator /: Set[$OpenVDBCreator, _] :=
 	(
 		Message[$OpenVDBCreator::badset];
 		$Failed
@@ -903,8 +903,8 @@ fnXckupraYjB+Mz0g8opbYfNizKzphIPF59TS6l1C5dyEWYowoFXcFmy0SyJ
 KxEVt/MrXoO2bniMtB2v7Hi7vHtSYvsN2HPCqEvETdPWlnPl/yw+zlLulOn8
 E8YTvLLa5qx3+gLxqaPbnjZvE7oXXszPi3pz7Xpa2VS85HtZsVO0+8n9+FWQ
 Z/di0f4F3vXLehry9bmN5ZMe3LEvvNutYOU/t/iVWg==
-"], {{0, 0}, {80., 80.}}, {0, 255}, ColorFunction -> GrayLevel], 
-ImageSize -> Dynamic[{Automatic, 3.5 Divide[CurrentValue["FontCapHeight"], AbsoluteCurrentValue[Magnification]]}], 
+"], {{0, 0}, {80., 80.}}, {0, 255}, ColorFunction -> GrayLevel],
+ImageSize -> Dynamic[{Automatic, 3.5 Divide[CurrentValue["FontCapHeight"], AbsoluteCurrentValue[Magnification]]}],
 PlotRange -> {{0, 80.}, {0, 80.}}
 ];
 
@@ -947,7 +947,7 @@ $intgridicon = Show[
 
 $vecgridicon = Graphics[
 	{Arrowheads[0.2], Thickness[0.03],
-	Uncompress["1:eJyV1XswXGcUAPBdj3omgla8aohWyEx34hGkIt9ukCYaGUFElDQ23lGSQzCtDBLZ6EwSKqp02kbbtBVDjEdEE9wNIR6LehVZFNtYQ8MKZcNa/XZGOpObP677z537zbn3u78559zzWXDjfML1GAxGvAq+HImKTwhXem2lrFipK1acA25xMXEA/oOdnvaW0wi8L8tawrIaEIiqOKPa6dMonKl4WBVfOABxSaSdXlvBOT8zuROSEvA2R2oXWy0nSPGWfgkjdEyND4k+6m7pjpp8Spcpenpxol2EoNY5YBpsxhE4KwvXHQkRLZe5QcGX1+VtBAynWB2f3i4ju/aNCI6yChcJyHGYt228okXtGjdOElrvxxzrqyvCIfkYgvmsjKaquj9ouVoME8JmXZYQTE2xj9l7rJFdafH1RUacWgTX5KJKs7lN5Mu4OjWwLGkSwc9fJK5+rvIUga6xjt5cwhQtF29qvrsjWoMNMs/vlVJbmaTvwiLLNCh0178IVKzFJ/e2qFG7AsRGQ/yTwwjYYx0ud9txvixKS5MiWU0EHZek16raxUZEwIcp25WzK2fI+VL5OFGvfI8yHzevNFByf5WgdJ29wcNF70GQWWbwqOo+di2xnI36jP+m5UoJ5ifkFc0iaPVaJALsJWTXRpwAp/ezv/v01EtqV8ux043C67h8U+sL3Ipa7KoWLOpo5/fQcu0eNLM1HFNmQ6a1qkCrYJnsYt/KcLmVijdP9kzNLpHOU7vyDD7RzcvFb/zVIdzRsYBv6h+NzeeXNtHqr9yfZsO4fvh/+3Nhv77RUCsixavvqnd09mvwX8WpXenF7jEB/p0IIvRHYsNrsOvHU8llgodiWvnSjo/iJoTiXTqTi0PU9z4m54vL8rp2Q7BKvIojSldDp8Axn4n7y8KmLYKv6C+/21ea6k/Q6y9WX60VowjPifNO5UU1o2Kyy7zOLnct9d7/cWrXr/ooq1FtAsFxoa1YpoUHWe9SX6VSwwCtOqpr5mXKtfGcmLMbKWS6jpJdkpneWaVJPCc24tSurSs6yILVhyCmuMuBo8jXu3tqQirrx2nla8huRSe4cpqAtH2T0cNBDDYp7hnPrLX2ZfKBsRi3Zb1snNo1PiCZ4Fi1IChRTrtg8jt2qVrz3DxiZ2i56pDj7FtXhwgA5wOziQ+YZNdGHME5/PFd8YPUrraczJnD73UjSJfHyl4o8nXGp83E/vQzWq72ZCco4OI50eMo8z3o/pz8P/aa7nD69gLulm9O8Oy+nlvZRH+5HvIvzHyG4E71kmrdwVEEsmZJec6cmFZ/TZ0xyTh8e40A6XTXEwdzbXK+tI++cBV+oMqHbduibNREm3A1q7SaD0TgducdMt/5FRPf6MbcjH7HtoeWK1JkVSFSf05A11lf78CyN1z5pkNepssTBHC3cg1rH7+kdnEjY90b8/H5eL5kuPlhB67jPe9fCtdkDbTqqHHzQUHOpXHFaQYhR354w7Uc4xH+2UV8Tkl4lksDk5twXQ6+tLCzX4hgS13CR0FPsKv7zj+7he2ttFzhhZZKdYVqbMhInagITdYkuxyImtUr9VIE0kk339/s5Og/Yy52Jw=="]}, 
+	Uncompress["1:eJyV1XswXGcUAPBdj3omgla8aohWyEx34hGkIt9ukCYaGUFElDQ23lGSQzCtDBLZ6EwSKqp02kbbtBVDjEdEE9wNIR6LehVZFNtYQ8MKZcNa/XZGOpObP677z537zbn3u78559zzWXDjfML1GAxGvAq+HImKTwhXem2lrFipK1acA25xMXEA/oOdnvaW0wi8L8tawrIaEIiqOKPa6dMonKl4WBVfOABxSaSdXlvBOT8zuROSEvA2R2oXWy0nSPGWfgkjdEyND4k+6m7pjpp8Spcpenpxol2EoNY5YBpsxhE4KwvXHQkRLZe5QcGX1+VtBAynWB2f3i4ju/aNCI6yChcJyHGYt228okXtGjdOElrvxxzrqyvCIfkYgvmsjKaquj9ouVoME8JmXZYQTE2xj9l7rJFdafH1RUacWgTX5KJKs7lN5Mu4OjWwLGkSwc9fJK5+rvIUga6xjt5cwhQtF29qvrsjWoMNMs/vlVJbmaTvwiLLNCh0178IVKzFJ/e2qFG7AsRGQ/yTwwjYYx0ud9txvixKS5MiWU0EHZek16raxUZEwIcp25WzK2fI+VL5OFGvfI8yHzevNFByf5WgdJ29wcNF70GQWWbwqOo+di2xnI36jP+m5UoJ5ifkFc0iaPVaJALsJWTXRpwAp/ezv/v01EtqV8ux043C67h8U+sL3Ipa7KoWLOpo5/fQcu0eNLM1HFNmQ6a1qkCrYJnsYt/KcLmVijdP9kzNLpHOU7vyDD7RzcvFb/zVIdzRsYBv6h+NzeeXNtHqr9yfZsO4fvh/+3Nhv77RUCsixavvqnd09mvwX8WpXenF7jEB/p0IIvRHYsNrsOvHU8llgodiWvnSjo/iJoTiXTqTi0PU9z4m54vL8rp2Q7BKvIojSldDp8Axn4n7y8KmLYKv6C+/21ea6k/Q6y9WX60VowjPifNO5UU1o2Kyy7zOLnct9d7/cWrXr/ooq1FtAsFxoa1YpoUHWe9SX6VSwwCtOqpr5mXKtfGcmLMbKWS6jpJdkpneWaVJPCc24tSurSs6yILVhyCmuMuBo8jXu3tqQirrx2nla8huRSe4cpqAtH2T0cNBDDYp7hnPrLX2ZfKBsRi3Zb1snNo1PiCZ4Fi1IChRTrtg8jt2qVrz3DxiZ2i56pDj7FtXhwgA5wOziQ+YZNdGHME5/PFd8YPUrraczJnD73UjSJfHyl4o8nXGp83E/vQzWq72ZCco4OI50eMo8z3o/pz8P/aa7nD69gLulm9O8Oy+nlvZRH+5HvIvzHyG4E71kmrdwVEEsmZJec6cmFZ/TZ0xyTh8e40A6XTXEwdzbXK+tI++cBV+oMqHbduibNREm3A1q7SaD0TgducdMt/5FRPf6MbcjH7HtoeWK1JkVSFSf05A11lf78CyN1z5pkNepssTBHC3cg1rH7+kdnEjY90b8/H5eL5kuPlhB67jPe9fCtdkDbTqqHHzQUHOpXHFaQYhR354w7Uc4xH+2UV8Tkl4lksDk5twXQ6+tLCzX4hgS13CR0FPsKv7zj+7he2ttFzhhZZKdYVqbMhInagITdYkuxyImtUr9VIE0kk339/s5Og/Yy52Jw=="]},
 	ImageSize -> Dynamic[{Automatic, 3.5 Divide[CurrentValue["FontCapHeight"], AbsoluteCurrentValue[Magnification]]}],
 	PlotRange->{{-3,3},{-3,3}},
 	PlotRangePadding->Scaled[.05]
