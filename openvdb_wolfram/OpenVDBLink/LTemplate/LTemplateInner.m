@@ -310,7 +310,7 @@ $indent = "    ";
 TranslateTemplate[tem_] :=
     With[{t = NormalizeTemplate[tem]},
       If[validateTemplate[t],
-        ToCCodeString[transTemplate[t], "Indent" -> $indent],
+        StringReplace[ToCCodeString[transTemplate[t], "Indent" -> $indent], Longest[" "..] ~~ "\n" -> "\n"],
         $Failed
       ]
     ]

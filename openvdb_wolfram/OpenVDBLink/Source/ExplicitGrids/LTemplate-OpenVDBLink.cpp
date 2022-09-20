@@ -581,7 +581,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_createEmptyGrid(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBDoubleGrid_collection[id])->createEmptyGrid();
@@ -601,7 +601,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_createEmptyGrid(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -612,7 +612,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_deleteGrid(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBDoubleGrid_collection[id])->deleteGrid();
@@ -632,7 +632,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_deleteGrid(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -643,11 +643,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_copyGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -665,7 +665,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_copyGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -676,12 +676,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_importVDBType(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBDoubleGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -700,7 +700,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_importVDBType(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -711,12 +711,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_importVDB(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBDoubleGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -735,7 +735,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_importVDB(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -746,11 +746,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_exportVDB(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -768,7 +768,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_exportVDB(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -779,12 +779,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setActiveStates(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -802,7 +802,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setActiveStates(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -813,11 +813,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setGridClass(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -835,7 +835,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setGridClass(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -846,11 +846,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setCreator(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -868,7 +868,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setCreator(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -879,11 +879,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setName(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -901,7 +901,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setName(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -912,11 +912,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setVoxelSize(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -934,7 +934,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setVoxelSize(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -945,11 +945,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveStates(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -968,7 +968,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveStates(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -979,7 +979,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveLeafVoxelCount(WolframLibrar
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->getActiveLeafVoxelCount();
@@ -1000,7 +1000,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveLeafVoxelCount(WolframLibrar
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1011,7 +1011,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveTileCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->getActiveTileCount();
@@ -1032,7 +1032,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveTileCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1043,7 +1043,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveVoxelCount(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->getActiveVoxelCount();
@@ -1064,7 +1064,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getActiveVoxelCount(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1075,7 +1075,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridClass(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->getGridClass();
@@ -1096,7 +1096,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridClass(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1107,7 +1107,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getCreator(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBDoubleGrid_collection[id])->getCreator();
@@ -1128,7 +1128,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getCreator(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1139,7 +1139,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridBoundingBox(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->getGridBoundingBox();
@@ -1160,7 +1160,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridBoundingBox(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1171,7 +1171,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridDimensions(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->getGridDimensions();
@@ -1192,7 +1192,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridDimensions(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1203,7 +1203,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridType(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBDoubleGrid_collection[id])->getGridType();
@@ -1224,7 +1224,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getGridType(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1235,7 +1235,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getHasUniformVoxels(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBDoubleGrid_collection[id])->getHasUniformVoxels();
@@ -1256,7 +1256,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getHasUniformVoxels(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1267,7 +1267,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getIsEmpty(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBDoubleGrid_collection[id])->getIsEmpty();
@@ -1288,7 +1288,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getIsEmpty(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1299,7 +1299,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getMemoryUsage(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->getMemoryUsage();
@@ -1320,7 +1320,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getMemoryUsage(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1331,7 +1331,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getName(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBDoubleGrid_collection[id])->getName();
@@ -1352,7 +1352,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getName(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1363,7 +1363,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getVoxelSize(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBDoubleGrid_collection[id])->getVoxelSize();
@@ -1384,7 +1384,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getVoxelSize(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1395,11 +1395,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getBooleanMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBDoubleGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -1418,7 +1418,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getBooleanMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1429,11 +1429,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getIntegerMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBDoubleGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -1452,7 +1452,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getIntegerMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1463,11 +1463,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getRealMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBDoubleGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -1486,7 +1486,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getRealMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1497,11 +1497,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getStringMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBDoubleGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -1520,7 +1520,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getStringMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1531,12 +1531,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setBooleanMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -1554,7 +1554,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setBooleanMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1565,12 +1565,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setStringMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -1588,7 +1588,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setStringMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1599,11 +1599,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setDescription(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -1621,7 +1621,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setDescription(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1632,13 +1632,13 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_transformGrid(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -1656,7 +1656,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_transformGrid(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1667,12 +1667,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_sliceVoxelCounts(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -1691,7 +1691,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_sliceVoxelCounts(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1702,12 +1702,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeTiles(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -1726,7 +1726,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeTiles(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1737,11 +1737,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxelPositions(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -1760,7 +1760,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxelPositions(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1771,14 +1771,14 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_depthMap(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
-        
+
         mma::ImageRef<mma::im_real32_t> res = (OpenVDBDoubleGrid_collection[id])->depthMap(var1, var2, var3, var4);
         mma::detail::setImage<mma::im_real32_t>(Res, res);
     }
@@ -1797,7 +1797,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_depthMap(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::depthMap()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1808,14 +1808,14 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSliceImage(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::GenericImageRef res = (OpenVDBDoubleGrid_collection[id])->gridSliceImage(var1, var2, var3, var4);
         mma::detail::setGenericImage(Res, res);
     }
@@ -1834,7 +1834,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSliceImage(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridSliceImage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1845,11 +1845,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridImage3D(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::GenericImage3DRef res = (OpenVDBDoubleGrid_collection[id])->gridImage3D(var1);
         mma::detail::setGenericImage3D(Res, res);
     }
@@ -1868,7 +1868,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridImage3D(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridImage3D()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1879,11 +1879,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setBackgroundValue(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -1901,7 +1901,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setBackgroundValue(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1912,12 +1912,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setValues(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -1935,7 +1935,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_setValues(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1946,7 +1946,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getBackgroundValue(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBDoubleGrid_collection[id])->getBackgroundValue();
@@ -1967,7 +1967,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getBackgroundValue(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -1978,7 +1978,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getMinMaxValues(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->getMinMaxValues();
@@ -1999,7 +1999,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getMinMaxValues(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2010,11 +2010,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getValues(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2033,7 +2033,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getValues(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2044,12 +2044,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_sliceVoxelValueTotals(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2068,7 +2068,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_sliceVoxelValueTotals(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2079,11 +2079,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxelValues(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2102,7 +2102,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxelValues(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2113,14 +2113,14 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSlice(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2139,7 +2139,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSlice(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2150,11 +2150,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridData(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2173,7 +2173,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridData(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2184,7 +2184,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getHalfwidth(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBDoubleGrid_collection[id])->getHalfwidth();
@@ -2205,7 +2205,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getHalfwidth(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::getHalfwidth()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2216,11 +2216,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridUnion(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridUnion(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -2238,7 +2238,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridUnion(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridUnion()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2249,11 +2249,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridIntersection(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridIntersection(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -2271,7 +2271,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridIntersection(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridIntersection()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2282,11 +2282,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDifference(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridDifference(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -2304,7 +2304,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDifference(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridDifference()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2315,11 +2315,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridUnionCopy(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridUnionCopy(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -2337,7 +2337,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridUnionCopy(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridUnionCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2348,11 +2348,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridIntersectionCopy(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridIntersectionCopy(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -2370,7 +2370,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridIntersectionCopy(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridIntersectionCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2381,12 +2381,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDifferenceCopy(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
         OpenVDBDoubleGrid & var2 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gridDifferenceCopy(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -2404,7 +2404,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDifferenceCopy(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridDifferenceCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2415,12 +2415,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_clipGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->clipGrid(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -2438,7 +2438,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_clipGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::clipGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2449,7 +2449,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_ballLevelSet(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -2457,7 +2457,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_ballLevelSet(WolframLibraryData libDa
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
         bool var5 = MArgument_getBoolean(Args[5]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->ballLevelSet(var1, var2, var3, var4, var5);
     }
     catch (const mma::LibraryError & libErr)
@@ -2475,7 +2475,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_ballLevelSet(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::ballLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2486,14 +2486,14 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_cuboidLevelSet(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->cuboidLevelSet(var1, var2, var3, var4);
     }
     catch (const mma::LibraryError & libErr)
@@ -2511,7 +2511,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_cuboidLevelSet(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::cuboidLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2522,7 +2522,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshLevelSet(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -2530,7 +2530,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshLevelSet(WolframLibraryData libDa
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
         bool var5 = MArgument_getBoolean(Args[5]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->meshLevelSet(var1, var2, var3, var4, var5);
     }
     catch (const mma::LibraryError & libErr)
@@ -2548,7 +2548,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshLevelSet(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::meshLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2559,7 +2559,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_offsetSurfaceLevelSet(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -2568,7 +2568,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_offsetSurfaceLevelSet(WolframLibraryD
         double var4 = MArgument_getReal(Args[4]);
         double var5 = MArgument_getReal(Args[5]);
         bool var6 = MArgument_getBoolean(Args[6]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->offsetSurfaceLevelSet(var1, var2, var3, var4, var5, var6);
     }
     catch (const mma::LibraryError & libErr)
@@ -2586,7 +2586,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_offsetSurfaceLevelSet(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::offsetSurfaceLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2597,7 +2597,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridArea(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBDoubleGrid_collection[id])->levelSetGridArea();
@@ -2618,7 +2618,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridArea(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::levelSetGridArea()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2629,7 +2629,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridEulerCharacteristic(Wolfr
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->levelSetGridEulerCharacteristic();
@@ -2650,7 +2650,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridEulerCharacteristic(Wolfr
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::levelSetGridEulerCharacteristic()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2661,7 +2661,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridGenus(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBDoubleGrid_collection[id])->levelSetGridGenus();
@@ -2682,7 +2682,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridGenus(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::levelSetGridGenus()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2693,7 +2693,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridVolume(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBDoubleGrid_collection[id])->levelSetGridVolume();
@@ -2714,7 +2714,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetGridVolume(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::levelSetGridVolume()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2725,12 +2725,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridMember(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->gridMember(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -2749,7 +2749,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridMember(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridMember()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2760,12 +2760,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridNearest(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->gridNearest(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2784,7 +2784,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridNearest(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridNearest()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2795,12 +2795,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDistance(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->gridDistance(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2819,7 +2819,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridDistance(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridDistance()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2830,12 +2830,12 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSignedDistance(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->gridSignedDistance(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2854,7 +2854,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridSignedDistance(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridSignedDistance()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2865,7 +2865,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_fillWithBalls(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
@@ -2875,7 +2875,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_fillWithBalls(WolframLibraryData libD
         double var5 = MArgument_getReal(Args[5]);
         double var6 = MArgument_getReal(Args[6]);
         mint var7 = MArgument_getInteger(Args[7]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->fillWithBalls(var1, var2, var3, var4, var5, var6, var7);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -2894,7 +2894,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_fillWithBalls(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::fillWithBalls()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2905,13 +2905,13 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_filterGrid(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->filterGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -2929,7 +2929,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_filterGrid(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::filterGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2940,13 +2940,13 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshCellCount(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBDoubleGrid_collection[id])->meshCellCount(var1, var2, var3);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -2965,7 +2965,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshCellCount(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::meshCellCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -2976,13 +2976,13 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshData(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
-        
+
         mma::TensorRef<double> res = (OpenVDBDoubleGrid_collection[id])->meshData(var1, var2, var3);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -3001,7 +3001,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_meshData(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::meshData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3012,11 +3012,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetToFogVolume(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->levelSetToFogVolume(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3034,7 +3034,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_levelSetToFogVolume(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::levelSetToFogVolume()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3045,11 +3045,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_scalarMultiply(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->scalarMultiply(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3067,7 +3067,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_scalarMultiply(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::scalarMultiply()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3078,11 +3078,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gammaAdjustment(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->gammaAdjustment(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3100,7 +3100,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_gammaAdjustment(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gammaAdjustment()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3111,11 +3111,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_resizeBandwidth(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->resizeBandwidth(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3133,7 +3133,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_resizeBandwidth(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::resizeBandwidth()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3144,11 +3144,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_offsetLevelSet(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBDoubleGrid_collection[id])->offsetLevelSet(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3166,7 +3166,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_offsetLevelSet(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::offsetLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3177,7 +3177,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGrid(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
@@ -3199,7 +3199,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGrid(WolframLibraryData libData
         mma::TensorRef<double> var17 = mma::detail::getTensor<double>(Args[17]);
         mma::TensorRef<double> var18 = mma::detail::getTensor<double>(Args[18]);
         bool var19 = MArgument_getBoolean(Args[19]);
-        
+
         mma::ImageRef<mma::im_byte_t> res = (OpenVDBDoubleGrid_collection[id])->renderGrid(var1, var2, var3, var4, var5, var6, var7, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19);
         mma::detail::setImage<mma::im_byte_t>(Res, res);
     }
@@ -3218,7 +3218,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGrid(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::renderGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3229,7 +3229,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGridPBR(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
@@ -3258,7 +3258,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGridPBR(WolframLibraryData libD
         double var24 = MArgument_getReal(Args[24]);
         double var25 = MArgument_getReal(Args[25]);
         double var26 = MArgument_getReal(Args[26]);
-        
+
         mma::ImageRef<mma::im_byte_t> res = (OpenVDBDoubleGrid_collection[id])->renderGridPBR(var1, var2, var3, var4, var5, var6, var7, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20, var21, var22, var23, var24, var25, var26);
         mma::detail::setImage<mma::im_byte_t>(Res, res);
     }
@@ -3277,7 +3277,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_renderGridPBR(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::renderGridPBR()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3288,11 +3288,11 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxels(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<double> res = (OpenVDBDoubleGrid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<double>(Res, res);
     }
@@ -3311,7 +3311,7 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_activeVoxels(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3322,7 +3322,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBFloatGrid_collection[id])->createEmptyGrid();
@@ -3342,7 +3342,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3353,7 +3353,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBFloatGrid_collection[id])->deleteGrid();
@@ -3373,7 +3373,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3384,11 +3384,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3406,7 +3406,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3417,12 +3417,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBFloatGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -3441,7 +3441,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3452,12 +3452,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBFloatGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -3476,7 +3476,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3487,11 +3487,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3509,7 +3509,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3520,12 +3520,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -3543,7 +3543,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3554,11 +3554,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3576,7 +3576,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3587,11 +3587,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3609,7 +3609,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3620,11 +3620,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3642,7 +3642,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3653,11 +3653,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -3675,7 +3675,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3686,11 +3686,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -3709,7 +3709,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3720,7 +3720,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->getActiveLeafVoxelCount();
@@ -3741,7 +3741,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3752,7 +3752,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->getActiveTileCount();
@@ -3773,7 +3773,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3784,7 +3784,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->getActiveVoxelCount();
@@ -3805,7 +3805,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3816,7 +3816,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->getGridClass();
@@ -3837,7 +3837,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3848,7 +3848,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBFloatGrid_collection[id])->getCreator();
@@ -3869,7 +3869,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3880,7 +3880,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->getGridBoundingBox();
@@ -3901,7 +3901,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3912,7 +3912,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->getGridDimensions();
@@ -3933,7 +3933,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3944,7 +3944,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBFloatGrid_collection[id])->getGridType();
@@ -3965,7 +3965,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -3976,7 +3976,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBFloatGrid_collection[id])->getHasUniformVoxels();
@@ -3997,7 +3997,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4008,7 +4008,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBFloatGrid_collection[id])->getIsEmpty();
@@ -4029,7 +4029,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4040,7 +4040,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->getMemoryUsage();
@@ -4061,7 +4061,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4072,7 +4072,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBFloatGrid_collection[id])->getName();
@@ -4093,7 +4093,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4104,7 +4104,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBFloatGrid_collection[id])->getVoxelSize();
@@ -4125,7 +4125,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4136,11 +4136,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBFloatGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -4159,7 +4159,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4170,11 +4170,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBFloatGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -4193,7 +4193,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4204,11 +4204,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBFloatGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -4227,7 +4227,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4238,11 +4238,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBFloatGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -4261,7 +4261,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4272,12 +4272,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -4295,7 +4295,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4306,12 +4306,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -4329,7 +4329,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4340,11 +4340,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -4362,7 +4362,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4373,13 +4373,13 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBFloatGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -4397,7 +4397,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4408,12 +4408,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -4432,7 +4432,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4443,12 +4443,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -4467,7 +4467,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4478,11 +4478,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -4501,7 +4501,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4512,14 +4512,14 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_depthMap(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
-        
+
         mma::ImageRef<mma::im_real32_t> res = (OpenVDBFloatGrid_collection[id])->depthMap(var1, var2, var3, var4);
         mma::detail::setImage<mma::im_real32_t>(Res, res);
     }
@@ -4538,7 +4538,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_depthMap(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::depthMap()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4549,14 +4549,14 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSliceImage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::GenericImageRef res = (OpenVDBFloatGrid_collection[id])->gridSliceImage(var1, var2, var3, var4);
         mma::detail::setGenericImage(Res, res);
     }
@@ -4575,7 +4575,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSliceImage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridSliceImage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4586,11 +4586,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridImage3D(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::GenericImage3DRef res = (OpenVDBFloatGrid_collection[id])->gridImage3D(var1);
         mma::detail::setGenericImage3D(Res, res);
     }
@@ -4609,7 +4609,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridImage3D(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridImage3D()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4620,11 +4620,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -4642,7 +4642,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4653,12 +4653,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -4676,7 +4676,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4687,7 +4687,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBFloatGrid_collection[id])->getBackgroundValue();
@@ -4708,7 +4708,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4719,7 +4719,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->getMinMaxValues();
@@ -4740,7 +4740,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4751,11 +4751,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -4774,7 +4774,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4785,12 +4785,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -4809,7 +4809,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4820,11 +4820,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -4843,7 +4843,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4854,14 +4854,14 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -4880,7 +4880,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4891,11 +4891,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -4914,7 +4914,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4925,7 +4925,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getHalfwidth(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBFloatGrid_collection[id])->getHalfwidth();
@@ -4946,7 +4946,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getHalfwidth(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getHalfwidth()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4957,11 +4957,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridUnion(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridUnion(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -4979,7 +4979,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridUnion(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridUnion()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -4990,11 +4990,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridIntersection(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridIntersection(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5012,7 +5012,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridIntersection(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridIntersection()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5023,11 +5023,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDifference(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridDifference(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5045,7 +5045,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDifference(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridDifference()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5056,11 +5056,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridUnionCopy(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridUnionCopy(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5078,7 +5078,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridUnionCopy(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridUnionCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5089,11 +5089,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridIntersectionCopy(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridIntersectionCopy(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5111,7 +5111,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridIntersectionCopy(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridIntersectionCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5122,12 +5122,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDifferenceCopy(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
         OpenVDBFloatGrid & var2 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gridDifferenceCopy(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -5145,7 +5145,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDifferenceCopy(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridDifferenceCopy()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5156,12 +5156,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_clipGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBFloatGrid_collection[id])->clipGrid(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -5179,7 +5179,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_clipGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::clipGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5190,7 +5190,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_ballLevelSet(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -5198,7 +5198,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_ballLevelSet(WolframLibraryData libDat
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
         bool var5 = MArgument_getBoolean(Args[5]);
-        
+
         (OpenVDBFloatGrid_collection[id])->ballLevelSet(var1, var2, var3, var4, var5);
     }
     catch (const mma::LibraryError & libErr)
@@ -5216,7 +5216,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_ballLevelSet(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::ballLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5227,14 +5227,14 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_cuboidLevelSet(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         (OpenVDBFloatGrid_collection[id])->cuboidLevelSet(var1, var2, var3, var4);
     }
     catch (const mma::LibraryError & libErr)
@@ -5252,7 +5252,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_cuboidLevelSet(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::cuboidLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5263,7 +5263,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshLevelSet(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -5271,7 +5271,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshLevelSet(WolframLibraryData libDat
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
         bool var5 = MArgument_getBoolean(Args[5]);
-        
+
         (OpenVDBFloatGrid_collection[id])->meshLevelSet(var1, var2, var3, var4, var5);
     }
     catch (const mma::LibraryError & libErr)
@@ -5289,7 +5289,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshLevelSet(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::meshLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5300,7 +5300,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_offsetSurfaceLevelSet(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
@@ -5309,7 +5309,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_offsetSurfaceLevelSet(WolframLibraryDa
         double var4 = MArgument_getReal(Args[4]);
         double var5 = MArgument_getReal(Args[5]);
         bool var6 = MArgument_getBoolean(Args[6]);
-        
+
         (OpenVDBFloatGrid_collection[id])->offsetSurfaceLevelSet(var1, var2, var3, var4, var5, var6);
     }
     catch (const mma::LibraryError & libErr)
@@ -5327,7 +5327,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_offsetSurfaceLevelSet(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::offsetSurfaceLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5338,7 +5338,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridArea(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBFloatGrid_collection[id])->levelSetGridArea();
@@ -5359,7 +5359,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridArea(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::levelSetGridArea()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5370,7 +5370,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridEulerCharacteristic(Wolfra
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->levelSetGridEulerCharacteristic();
@@ -5391,7 +5391,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridEulerCharacteristic(Wolfra
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::levelSetGridEulerCharacteristic()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5402,7 +5402,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridGenus(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBFloatGrid_collection[id])->levelSetGridGenus();
@@ -5423,7 +5423,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridGenus(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::levelSetGridGenus()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5434,7 +5434,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridVolume(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBFloatGrid_collection[id])->levelSetGridVolume();
@@ -5455,7 +5455,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetGridVolume(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::levelSetGridVolume()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5466,12 +5466,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridMember(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->gridMember(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -5490,7 +5490,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridMember(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridMember()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5501,12 +5501,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridNearest(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->gridNearest(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -5525,7 +5525,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridNearest(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridNearest()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5536,12 +5536,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDistance(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->gridDistance(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -5560,7 +5560,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridDistance(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridDistance()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5571,12 +5571,12 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSignedDistance(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->gridSignedDistance(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -5595,7 +5595,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gridSignedDistance(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridSignedDistance()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5606,7 +5606,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_fillWithBalls(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
@@ -5616,7 +5616,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_fillWithBalls(WolframLibraryData libDa
         double var5 = MArgument_getReal(Args[5]);
         double var6 = MArgument_getReal(Args[6]);
         mint var7 = MArgument_getInteger(Args[7]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->fillWithBalls(var1, var2, var3, var4, var5, var6, var7);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -5635,7 +5635,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_fillWithBalls(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::fillWithBalls()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5646,13 +5646,13 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_filterGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBFloatGrid_collection[id])->filterGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -5670,7 +5670,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_filterGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::filterGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5681,13 +5681,13 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshCellCount(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBFloatGrid_collection[id])->meshCellCount(var1, var2, var3);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -5706,7 +5706,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshCellCount(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::meshCellCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5717,13 +5717,13 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
-        
+
         mma::TensorRef<double> res = (OpenVDBFloatGrid_collection[id])->meshData(var1, var2, var3);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -5742,7 +5742,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_meshData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::meshData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5753,11 +5753,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetToFogVolume(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->levelSetToFogVolume(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5775,7 +5775,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_levelSetToFogVolume(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::levelSetToFogVolume()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5786,11 +5786,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_scalarMultiply(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->scalarMultiply(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5808,7 +5808,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_scalarMultiply(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::scalarMultiply()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5819,11 +5819,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gammaAdjustment(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->gammaAdjustment(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5841,7 +5841,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_gammaAdjustment(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gammaAdjustment()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5852,11 +5852,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_resizeBandwidth(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->resizeBandwidth(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5874,7 +5874,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_resizeBandwidth(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::resizeBandwidth()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5885,11 +5885,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_offsetLevelSet(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBFloatGrid_collection[id])->offsetLevelSet(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -5907,7 +5907,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_offsetLevelSet(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::offsetLevelSet()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5918,7 +5918,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
@@ -5940,7 +5940,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGrid(WolframLibraryData libData,
         mma::TensorRef<double> var17 = mma::detail::getTensor<double>(Args[17]);
         mma::TensorRef<double> var18 = mma::detail::getTensor<double>(Args[18]);
         bool var19 = MArgument_getBoolean(Args[19]);
-        
+
         mma::ImageRef<mma::im_byte_t> res = (OpenVDBFloatGrid_collection[id])->renderGrid(var1, var2, var3, var4, var5, var6, var7, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19);
         mma::detail::setImage<mma::im_byte_t>(Res, res);
     }
@@ -5959,7 +5959,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::renderGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -5970,7 +5970,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGridPBR(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
@@ -5999,7 +5999,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGridPBR(WolframLibraryData libDa
         double var24 = MArgument_getReal(Args[24]);
         double var25 = MArgument_getReal(Args[25]);
         double var26 = MArgument_getReal(Args[26]);
-        
+
         mma::ImageRef<mma::im_byte_t> res = (OpenVDBFloatGrid_collection[id])->renderGridPBR(var1, var2, var3, var4, var5, var6, var7, var8, var9, var10, var11, var12, var13, var14, var15, var16, var17, var18, var19, var20, var21, var22, var23, var24, var25, var26);
         mma::detail::setImage<mma::im_byte_t>(Res, res);
     }
@@ -6018,7 +6018,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_renderGridPBR(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::renderGridPBR()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6029,11 +6029,11 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxels(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<double> res = (OpenVDBFloatGrid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<double>(Res, res);
     }
@@ -6052,7 +6052,7 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_activeVoxels(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6063,7 +6063,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_createEmptyGrid(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBByteGrid_collection[id])->createEmptyGrid();
@@ -6083,7 +6083,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_createEmptyGrid(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6094,7 +6094,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_deleteGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBByteGrid_collection[id])->deleteGrid();
@@ -6114,7 +6114,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_deleteGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6125,11 +6125,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_copyGrid(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBByteGrid & var1 = mma::detail::getObject<OpenVDBByteGrid>(OpenVDBByteGrid_collection)(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6147,7 +6147,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_copyGrid(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6158,12 +6158,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_importVDBType(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBByteGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -6182,7 +6182,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_importVDBType(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6193,12 +6193,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_importVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBByteGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -6217,7 +6217,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_importVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6228,11 +6228,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_exportVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6250,7 +6250,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_exportVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6261,12 +6261,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBByteGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -6284,7 +6284,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6295,11 +6295,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6317,7 +6317,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6328,11 +6328,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6350,7 +6350,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6361,11 +6361,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6383,7 +6383,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6394,11 +6394,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -6416,7 +6416,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6427,11 +6427,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -6450,7 +6450,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6461,7 +6461,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveLeafVoxelCount(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getActiveLeafVoxelCount();
@@ -6482,7 +6482,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveLeafVoxelCount(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6493,7 +6493,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveTileCount(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getActiveTileCount();
@@ -6514,7 +6514,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveTileCount(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6525,7 +6525,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveVoxelCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getActiveVoxelCount();
@@ -6546,7 +6546,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getActiveVoxelCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6557,7 +6557,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getGridClass();
@@ -6578,7 +6578,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6589,7 +6589,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBByteGrid_collection[id])->getCreator();
@@ -6610,7 +6610,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6621,7 +6621,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridBoundingBox(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->getGridBoundingBox();
@@ -6642,7 +6642,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridBoundingBox(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6653,7 +6653,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridDimensions(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->getGridDimensions();
@@ -6674,7 +6674,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridDimensions(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6685,7 +6685,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridType(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBByteGrid_collection[id])->getGridType();
@@ -6706,7 +6706,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getGridType(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6717,7 +6717,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getHasUniformVoxels(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBByteGrid_collection[id])->getHasUniformVoxels();
@@ -6738,7 +6738,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getHasUniformVoxels(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6749,7 +6749,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getIsEmpty(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBByteGrid_collection[id])->getIsEmpty();
@@ -6770,7 +6770,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getIsEmpty(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6781,7 +6781,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getMemoryUsage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getMemoryUsage();
@@ -6802,7 +6802,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getMemoryUsage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6813,7 +6813,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBByteGrid_collection[id])->getName();
@@ -6834,7 +6834,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6845,7 +6845,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBByteGrid_collection[id])->getVoxelSize();
@@ -6866,7 +6866,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6877,11 +6877,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBByteGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -6900,7 +6900,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6911,11 +6911,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getIntegerMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBByteGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -6934,7 +6934,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getIntegerMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6945,11 +6945,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getRealMetadata(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBByteGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -6968,7 +6968,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getRealMetadata(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -6979,11 +6979,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBByteGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -7002,7 +7002,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7013,12 +7013,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBByteGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -7036,7 +7036,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7047,12 +7047,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBByteGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -7070,7 +7070,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7081,11 +7081,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setDescription(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7103,7 +7103,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setDescription(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7114,13 +7114,13 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_transformGrid(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBByteGrid & var1 = mma::detail::getObject<OpenVDBByteGrid>(OpenVDBByteGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBByteGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -7138,7 +7138,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_transformGrid(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7149,12 +7149,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_sliceVoxelCounts(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7173,7 +7173,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_sliceVoxelCounts(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7184,12 +7184,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeTiles(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7208,7 +7208,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeTiles(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7219,11 +7219,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxelPositions(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7242,7 +7242,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxelPositions(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7253,14 +7253,14 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_depthMap(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
-        
+
         mma::ImageRef<mma::im_real32_t> res = (OpenVDBByteGrid_collection[id])->depthMap(var1, var2, var3, var4);
         mma::detail::setImage<mma::im_real32_t>(Res, res);
     }
@@ -7279,7 +7279,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_depthMap(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::depthMap()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7290,14 +7290,14 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridSliceImage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::GenericImageRef res = (OpenVDBByteGrid_collection[id])->gridSliceImage(var1, var2, var3, var4);
         mma::detail::setGenericImage(Res, res);
     }
@@ -7316,7 +7316,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridSliceImage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridSliceImage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7327,11 +7327,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridImage3D(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::GenericImage3DRef res = (OpenVDBByteGrid_collection[id])->gridImage3D(var1);
         mma::detail::setGenericImage3D(Res, res);
     }
@@ -7350,7 +7350,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridImage3D(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridImage3D()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7361,11 +7361,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setBackgroundValue(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBByteGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7383,7 +7383,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setBackgroundValue(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7394,12 +7394,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setValues(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBByteGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -7417,7 +7417,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_setValues(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7428,7 +7428,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getBackgroundValue(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBByteGrid_collection[id])->getBackgroundValue();
@@ -7449,7 +7449,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getBackgroundValue(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7460,7 +7460,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getMinMaxValues(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->getMinMaxValues();
@@ -7481,7 +7481,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getMinMaxValues(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7492,11 +7492,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getValues(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7515,7 +7515,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getValues(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7526,12 +7526,12 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_sliceVoxelValueTotals(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7550,7 +7550,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_sliceVoxelValueTotals(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7561,11 +7561,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxelValues(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7584,7 +7584,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxelValues(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7595,14 +7595,14 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridSlice(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7621,7 +7621,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridSlice(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7632,11 +7632,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridData(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBByteGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -7655,7 +7655,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_gridData(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7666,11 +7666,11 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxels(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<mint> res = (OpenVDBByteGrid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<mint>(Res, res);
     }
@@ -7689,7 +7689,7 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_activeVoxels(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7700,7 +7700,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBInt32Grid_collection[id])->createEmptyGrid();
@@ -7720,7 +7720,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7731,7 +7731,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBInt32Grid_collection[id])->deleteGrid();
@@ -7751,7 +7751,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7762,11 +7762,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBInt32Grid & var1 = mma::detail::getObject<OpenVDBInt32Grid>(OpenVDBInt32Grid_collection)(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7784,7 +7784,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7795,12 +7795,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBInt32Grid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -7819,7 +7819,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7830,12 +7830,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBInt32Grid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -7854,7 +7854,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7865,11 +7865,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7887,7 +7887,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7898,12 +7898,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -7921,7 +7921,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7932,11 +7932,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7954,7 +7954,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7965,11 +7965,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -7987,7 +7987,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -7998,11 +7998,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -8020,7 +8020,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8031,11 +8031,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -8053,7 +8053,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8064,11 +8064,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -8087,7 +8087,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8098,7 +8098,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getActiveLeafVoxelCount();
@@ -8119,7 +8119,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8130,7 +8130,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getActiveTileCount();
@@ -8151,7 +8151,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8162,7 +8162,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getActiveVoxelCount();
@@ -8183,7 +8183,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8194,7 +8194,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getGridClass();
@@ -8215,7 +8215,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8226,7 +8226,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt32Grid_collection[id])->getCreator();
@@ -8247,7 +8247,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8258,7 +8258,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->getGridBoundingBox();
@@ -8279,7 +8279,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8290,7 +8290,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->getGridDimensions();
@@ -8311,7 +8311,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8322,7 +8322,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt32Grid_collection[id])->getGridType();
@@ -8343,7 +8343,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8354,7 +8354,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBInt32Grid_collection[id])->getHasUniformVoxels();
@@ -8375,7 +8375,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8386,7 +8386,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBInt32Grid_collection[id])->getIsEmpty();
@@ -8407,7 +8407,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8418,7 +8418,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getMemoryUsage();
@@ -8439,7 +8439,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8450,7 +8450,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt32Grid_collection[id])->getName();
@@ -8471,7 +8471,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8482,7 +8482,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBInt32Grid_collection[id])->getVoxelSize();
@@ -8503,7 +8503,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8514,11 +8514,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBInt32Grid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -8537,7 +8537,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8548,11 +8548,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBInt32Grid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -8571,7 +8571,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8582,11 +8582,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBInt32Grid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -8605,7 +8605,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8616,11 +8616,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBInt32Grid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -8639,7 +8639,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8650,12 +8650,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -8673,7 +8673,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8684,12 +8684,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -8707,7 +8707,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8718,11 +8718,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -8740,7 +8740,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8751,13 +8751,13 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBInt32Grid & var1 = mma::detail::getObject<OpenVDBInt32Grid>(OpenVDBInt32Grid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBInt32Grid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -8775,7 +8775,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8786,12 +8786,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -8810,7 +8810,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8821,12 +8821,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -8845,7 +8845,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8856,11 +8856,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -8879,7 +8879,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8890,11 +8890,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -8912,7 +8912,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8923,12 +8923,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBInt32Grid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -8946,7 +8946,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8957,7 +8957,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt32Grid_collection[id])->getBackgroundValue();
@@ -8978,7 +8978,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -8989,7 +8989,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->getMinMaxValues();
@@ -9010,7 +9010,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9021,11 +9021,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9044,7 +9044,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9055,12 +9055,12 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9079,7 +9079,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9090,11 +9090,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9113,7 +9113,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9124,14 +9124,14 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9150,7 +9150,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9161,11 +9161,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt32Grid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9184,7 +9184,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9195,11 +9195,11 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxels(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<mint> res = (OpenVDBInt32Grid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<mint>(Res, res);
     }
@@ -9218,7 +9218,7 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_activeVoxels(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9229,7 +9229,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBInt64Grid_collection[id])->createEmptyGrid();
@@ -9249,7 +9249,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9260,7 +9260,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBInt64Grid_collection[id])->deleteGrid();
@@ -9280,7 +9280,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9291,11 +9291,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBInt64Grid & var1 = mma::detail::getObject<OpenVDBInt64Grid>(OpenVDBInt64Grid_collection)(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9313,7 +9313,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9324,12 +9324,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBInt64Grid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -9348,7 +9348,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9359,12 +9359,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBInt64Grid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -9383,7 +9383,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9394,11 +9394,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9416,7 +9416,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9427,12 +9427,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -9450,7 +9450,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9461,11 +9461,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9483,7 +9483,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9494,11 +9494,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9516,7 +9516,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9527,11 +9527,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9549,7 +9549,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9560,11 +9560,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -9582,7 +9582,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9593,11 +9593,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -9616,7 +9616,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9627,7 +9627,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getActiveLeafVoxelCount();
@@ -9648,7 +9648,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9659,7 +9659,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getActiveTileCount();
@@ -9680,7 +9680,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9691,7 +9691,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getActiveVoxelCount();
@@ -9712,7 +9712,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9723,7 +9723,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getGridClass();
@@ -9744,7 +9744,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9755,7 +9755,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt64Grid_collection[id])->getCreator();
@@ -9776,7 +9776,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9787,7 +9787,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->getGridBoundingBox();
@@ -9808,7 +9808,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9819,7 +9819,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->getGridDimensions();
@@ -9840,7 +9840,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9851,7 +9851,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt64Grid_collection[id])->getGridType();
@@ -9872,7 +9872,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9883,7 +9883,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBInt64Grid_collection[id])->getHasUniformVoxels();
@@ -9904,7 +9904,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9915,7 +9915,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBInt64Grid_collection[id])->getIsEmpty();
@@ -9936,7 +9936,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9947,7 +9947,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getMemoryUsage();
@@ -9968,7 +9968,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -9979,7 +9979,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBInt64Grid_collection[id])->getName();
@@ -10000,7 +10000,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10011,7 +10011,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBInt64Grid_collection[id])->getVoxelSize();
@@ -10032,7 +10032,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10043,11 +10043,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBInt64Grid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -10066,7 +10066,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10077,11 +10077,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBInt64Grid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -10100,7 +10100,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10111,11 +10111,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBInt64Grid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -10134,7 +10134,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10145,11 +10145,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBInt64Grid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -10168,7 +10168,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10179,12 +10179,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -10202,7 +10202,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10213,12 +10213,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -10236,7 +10236,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10247,11 +10247,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -10269,7 +10269,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10280,13 +10280,13 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBInt64Grid & var1 = mma::detail::getObject<OpenVDBInt64Grid>(OpenVDBInt64Grid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBInt64Grid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -10304,7 +10304,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10315,12 +10315,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10339,7 +10339,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10350,12 +10350,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10374,7 +10374,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10385,11 +10385,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10408,7 +10408,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10419,11 +10419,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -10441,7 +10441,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10452,12 +10452,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBInt64Grid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -10475,7 +10475,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10486,7 +10486,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBInt64Grid_collection[id])->getBackgroundValue();
@@ -10507,7 +10507,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10518,7 +10518,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->getMinMaxValues();
@@ -10539,7 +10539,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10550,11 +10550,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10573,7 +10573,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10584,12 +10584,12 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10608,7 +10608,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10619,11 +10619,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10642,7 +10642,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10653,14 +10653,14 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10679,7 +10679,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10690,11 +10690,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBInt64Grid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -10713,7 +10713,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10724,11 +10724,11 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxels(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<mint> res = (OpenVDBInt64Grid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<mint>(Res, res);
     }
@@ -10747,7 +10747,7 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_activeVoxels(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10758,7 +10758,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_createEmptyGrid(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBUInt32Grid_collection[id])->createEmptyGrid();
@@ -10778,7 +10778,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_createEmptyGrid(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10789,7 +10789,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_deleteGrid(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBUInt32Grid_collection[id])->deleteGrid();
@@ -10809,7 +10809,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_deleteGrid(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10820,11 +10820,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_copyGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBUInt32Grid & var1 = mma::detail::getObject<OpenVDBUInt32Grid>(OpenVDBUInt32Grid_collection)(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -10842,7 +10842,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_copyGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10853,12 +10853,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_importVDBType(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBUInt32Grid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -10877,7 +10877,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_importVDBType(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10888,12 +10888,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_importVDB(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBUInt32Grid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -10912,7 +10912,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_importVDB(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10923,11 +10923,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_exportVDB(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -10945,7 +10945,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_exportVDB(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10956,12 +10956,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setActiveStates(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -10979,7 +10979,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setActiveStates(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -10990,11 +10990,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setGridClass(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11012,7 +11012,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setGridClass(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11023,11 +11023,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setCreator(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11045,7 +11045,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setCreator(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11056,11 +11056,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setName(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11078,7 +11078,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setName(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11089,11 +11089,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setVoxelSize(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11111,7 +11111,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setVoxelSize(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11122,11 +11122,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveStates(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -11145,7 +11145,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveStates(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11156,7 +11156,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveLeafVoxelCount(WolframLibrar
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getActiveLeafVoxelCount();
@@ -11177,7 +11177,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveLeafVoxelCount(WolframLibrar
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11188,7 +11188,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveTileCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getActiveTileCount();
@@ -11209,7 +11209,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveTileCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11220,7 +11220,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveVoxelCount(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getActiveVoxelCount();
@@ -11241,7 +11241,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getActiveVoxelCount(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11252,7 +11252,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridClass(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getGridClass();
@@ -11273,7 +11273,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridClass(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11284,7 +11284,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getCreator(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBUInt32Grid_collection[id])->getCreator();
@@ -11305,7 +11305,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getCreator(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11316,7 +11316,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridBoundingBox(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->getGridBoundingBox();
@@ -11337,7 +11337,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridBoundingBox(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11348,7 +11348,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridDimensions(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->getGridDimensions();
@@ -11369,7 +11369,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridDimensions(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11380,7 +11380,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridType(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBUInt32Grid_collection[id])->getGridType();
@@ -11401,7 +11401,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getGridType(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11412,7 +11412,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getHasUniformVoxels(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBUInt32Grid_collection[id])->getHasUniformVoxels();
@@ -11433,7 +11433,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getHasUniformVoxels(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11444,7 +11444,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getIsEmpty(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBUInt32Grid_collection[id])->getIsEmpty();
@@ -11465,7 +11465,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getIsEmpty(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11476,7 +11476,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getMemoryUsage(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getMemoryUsage();
@@ -11497,7 +11497,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getMemoryUsage(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11508,7 +11508,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getName(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBUInt32Grid_collection[id])->getName();
@@ -11529,7 +11529,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getName(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11540,7 +11540,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getVoxelSize(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBUInt32Grid_collection[id])->getVoxelSize();
@@ -11561,7 +11561,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getVoxelSize(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11572,11 +11572,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getBooleanMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBUInt32Grid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -11595,7 +11595,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getBooleanMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11606,11 +11606,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getIntegerMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBUInt32Grid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -11629,7 +11629,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getIntegerMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11640,11 +11640,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getRealMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBUInt32Grid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -11663,7 +11663,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getRealMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11674,11 +11674,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getStringMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBUInt32Grid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -11697,7 +11697,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getStringMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11708,12 +11708,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setBooleanMetadata(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -11731,7 +11731,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setBooleanMetadata(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11742,12 +11742,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setStringMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -11765,7 +11765,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setStringMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11776,11 +11776,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setDescription(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11798,7 +11798,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setDescription(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11809,13 +11809,13 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_transformGrid(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBUInt32Grid & var1 = mma::detail::getObject<OpenVDBUInt32Grid>(OpenVDBUInt32Grid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -11833,7 +11833,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_transformGrid(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11844,12 +11844,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_sliceVoxelCounts(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -11868,7 +11868,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_sliceVoxelCounts(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11879,12 +11879,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeTiles(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -11903,7 +11903,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeTiles(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11914,11 +11914,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxelPositions(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -11937,7 +11937,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxelPositions(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11948,11 +11948,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setBackgroundValue(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -11970,7 +11970,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setBackgroundValue(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -11981,12 +11981,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setValues(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBUInt32Grid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -12004,7 +12004,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_setValues(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12015,7 +12015,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getBackgroundValue(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBUInt32Grid_collection[id])->getBackgroundValue();
@@ -12036,7 +12036,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getBackgroundValue(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12047,7 +12047,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getMinMaxValues(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->getMinMaxValues();
@@ -12068,7 +12068,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getMinMaxValues(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12079,11 +12079,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getValues(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12102,7 +12102,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getValues(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12113,12 +12113,12 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_sliceVoxelValueTotals(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12137,7 +12137,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_sliceVoxelValueTotals(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12148,11 +12148,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxelValues(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12171,7 +12171,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxelValues(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12182,14 +12182,14 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridSlice(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12208,7 +12208,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridSlice(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12219,11 +12219,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridData(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBUInt32Grid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12242,7 +12242,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridData(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12253,11 +12253,11 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxels(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<mint> res = (OpenVDBUInt32Grid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<mint>(Res, res);
     }
@@ -12276,7 +12276,7 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_activeVoxels(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12287,7 +12287,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2DGrid_collection[id])->createEmptyGrid();
@@ -12307,7 +12307,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12318,7 +12318,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2DGrid_collection[id])->deleteGrid();
@@ -12338,7 +12338,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12349,11 +12349,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2DGrid & var1 = mma::detail::getObject<OpenVDBVec2DGrid>(OpenVDBVec2DGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12371,7 +12371,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12382,12 +12382,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec2DGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -12406,7 +12406,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12417,12 +12417,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec2DGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -12441,7 +12441,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12452,11 +12452,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12474,7 +12474,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12485,12 +12485,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -12508,7 +12508,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12519,11 +12519,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12541,7 +12541,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12552,11 +12552,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12574,7 +12574,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12585,11 +12585,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12607,7 +12607,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12618,11 +12618,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -12640,7 +12640,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12651,11 +12651,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -12674,7 +12674,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12685,7 +12685,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2DGrid_collection[id])->getActiveLeafVoxelCount();
@@ -12706,7 +12706,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12717,7 +12717,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2DGrid_collection[id])->getActiveTileCount();
@@ -12738,7 +12738,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12749,7 +12749,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2DGrid_collection[id])->getActiveVoxelCount();
@@ -12770,7 +12770,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12781,7 +12781,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2DGrid_collection[id])->getGridClass();
@@ -12802,7 +12802,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12813,7 +12813,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2DGrid_collection[id])->getCreator();
@@ -12834,7 +12834,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12845,7 +12845,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->getGridBoundingBox();
@@ -12866,7 +12866,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12877,7 +12877,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->getGridDimensions();
@@ -12898,7 +12898,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12909,7 +12909,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2DGrid_collection[id])->getGridType();
@@ -12930,7 +12930,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12941,7 +12941,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2DGrid_collection[id])->getHasUniformVoxels();
@@ -12962,7 +12962,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -12973,7 +12973,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2DGrid_collection[id])->getIsEmpty();
@@ -12994,7 +12994,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13005,7 +13005,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2DGrid_collection[id])->getMemoryUsage();
@@ -13026,7 +13026,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13037,7 +13037,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2DGrid_collection[id])->getName();
@@ -13058,7 +13058,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13069,7 +13069,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec2DGrid_collection[id])->getVoxelSize();
@@ -13090,7 +13090,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13101,11 +13101,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec2DGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -13124,7 +13124,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13135,11 +13135,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec2DGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -13158,7 +13158,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13169,11 +13169,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec2DGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -13192,7 +13192,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13203,11 +13203,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec2DGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -13226,7 +13226,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13237,12 +13237,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -13260,7 +13260,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13271,12 +13271,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -13294,7 +13294,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13305,11 +13305,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -13327,7 +13327,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13338,13 +13338,13 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2DGrid & var1 = mma::detail::getObject<OpenVDBVec2DGrid>(OpenVDBVec2DGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -13362,7 +13362,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13373,12 +13373,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -13397,7 +13397,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13408,12 +13408,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -13432,7 +13432,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13443,11 +13443,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2DGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -13466,7 +13466,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13477,11 +13477,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -13499,7 +13499,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13510,12 +13510,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBVec2DGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -13533,7 +13533,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13544,7 +13544,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->getBackgroundValue();
@@ -13565,7 +13565,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13576,7 +13576,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->getMinMaxValues();
@@ -13597,7 +13597,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13608,11 +13608,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -13631,7 +13631,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13642,12 +13642,12 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -13666,7 +13666,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13677,11 +13677,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -13700,7 +13700,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13711,14 +13711,14 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -13737,7 +13737,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13748,11 +13748,11 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2DGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -13771,7 +13771,7 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13782,7 +13782,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2IGrid_collection[id])->createEmptyGrid();
@@ -13802,7 +13802,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13813,7 +13813,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2IGrid_collection[id])->deleteGrid();
@@ -13833,7 +13833,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13844,11 +13844,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2IGrid & var1 = mma::detail::getObject<OpenVDBVec2IGrid>(OpenVDBVec2IGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -13866,7 +13866,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13877,12 +13877,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec2IGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -13901,7 +13901,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13912,12 +13912,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec2IGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -13936,7 +13936,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13947,11 +13947,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -13969,7 +13969,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -13980,12 +13980,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -14003,7 +14003,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14014,11 +14014,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14036,7 +14036,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14047,11 +14047,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14069,7 +14069,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14080,11 +14080,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14102,7 +14102,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14113,11 +14113,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14135,7 +14135,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14146,11 +14146,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -14169,7 +14169,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14180,7 +14180,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2IGrid_collection[id])->getActiveLeafVoxelCount();
@@ -14201,7 +14201,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14212,7 +14212,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2IGrid_collection[id])->getActiveTileCount();
@@ -14233,7 +14233,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14244,7 +14244,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2IGrid_collection[id])->getActiveVoxelCount();
@@ -14265,7 +14265,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14276,7 +14276,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2IGrid_collection[id])->getGridClass();
@@ -14297,7 +14297,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14308,7 +14308,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2IGrid_collection[id])->getCreator();
@@ -14329,7 +14329,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14340,7 +14340,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getGridBoundingBox();
@@ -14361,7 +14361,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14372,7 +14372,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getGridDimensions();
@@ -14393,7 +14393,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14404,7 +14404,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2IGrid_collection[id])->getGridType();
@@ -14425,7 +14425,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14436,7 +14436,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2IGrid_collection[id])->getHasUniformVoxels();
@@ -14457,7 +14457,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14468,7 +14468,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2IGrid_collection[id])->getIsEmpty();
@@ -14489,7 +14489,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14500,7 +14500,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2IGrid_collection[id])->getMemoryUsage();
@@ -14521,7 +14521,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14532,7 +14532,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2IGrid_collection[id])->getName();
@@ -14553,7 +14553,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14564,7 +14564,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec2IGrid_collection[id])->getVoxelSize();
@@ -14585,7 +14585,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14596,11 +14596,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec2IGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -14619,7 +14619,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14630,11 +14630,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec2IGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -14653,7 +14653,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14664,11 +14664,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec2IGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -14687,7 +14687,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14698,11 +14698,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec2IGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -14721,7 +14721,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14732,12 +14732,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -14755,7 +14755,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14766,12 +14766,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -14789,7 +14789,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14800,11 +14800,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14822,7 +14822,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14833,13 +14833,13 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2IGrid & var1 = mma::detail::getObject<OpenVDBVec2IGrid>(OpenVDBVec2IGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -14857,7 +14857,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14868,12 +14868,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -14892,7 +14892,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14903,12 +14903,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -14927,7 +14927,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14938,11 +14938,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -14961,7 +14961,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -14972,11 +14972,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -14994,7 +14994,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15005,12 +15005,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec2IGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -15028,7 +15028,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15039,7 +15039,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getBackgroundValue();
@@ -15060,7 +15060,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15071,7 +15071,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getMinMaxValues();
@@ -15092,7 +15092,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15103,11 +15103,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15126,7 +15126,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15137,12 +15137,12 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15161,7 +15161,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15172,11 +15172,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15195,7 +15195,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15206,14 +15206,14 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15232,7 +15232,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15243,11 +15243,11 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2IGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15266,7 +15266,7 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15277,7 +15277,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2SGrid_collection[id])->createEmptyGrid();
@@ -15297,7 +15297,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15308,7 +15308,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec2SGrid_collection[id])->deleteGrid();
@@ -15328,7 +15328,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15339,11 +15339,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2SGrid & var1 = mma::detail::getObject<OpenVDBVec2SGrid>(OpenVDBVec2SGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15361,7 +15361,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15372,12 +15372,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec2SGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -15396,7 +15396,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15407,12 +15407,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec2SGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -15431,7 +15431,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15442,11 +15442,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15464,7 +15464,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15475,12 +15475,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -15498,7 +15498,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15509,11 +15509,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15531,7 +15531,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15542,11 +15542,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15564,7 +15564,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15575,11 +15575,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15597,7 +15597,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15608,11 +15608,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -15630,7 +15630,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15641,11 +15641,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -15664,7 +15664,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15675,7 +15675,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2SGrid_collection[id])->getActiveLeafVoxelCount();
@@ -15696,7 +15696,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15707,7 +15707,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2SGrid_collection[id])->getActiveTileCount();
@@ -15728,7 +15728,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15739,7 +15739,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2SGrid_collection[id])->getActiveVoxelCount();
@@ -15760,7 +15760,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15771,7 +15771,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2SGrid_collection[id])->getGridClass();
@@ -15792,7 +15792,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15803,7 +15803,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2SGrid_collection[id])->getCreator();
@@ -15824,7 +15824,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15835,7 +15835,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->getGridBoundingBox();
@@ -15856,7 +15856,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15867,7 +15867,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->getGridDimensions();
@@ -15888,7 +15888,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15899,7 +15899,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2SGrid_collection[id])->getGridType();
@@ -15920,7 +15920,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15931,7 +15931,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2SGrid_collection[id])->getHasUniformVoxels();
@@ -15952,7 +15952,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15963,7 +15963,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec2SGrid_collection[id])->getIsEmpty();
@@ -15984,7 +15984,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -15995,7 +15995,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec2SGrid_collection[id])->getMemoryUsage();
@@ -16016,7 +16016,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16027,7 +16027,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec2SGrid_collection[id])->getName();
@@ -16048,7 +16048,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16059,7 +16059,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec2SGrid_collection[id])->getVoxelSize();
@@ -16080,7 +16080,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16091,11 +16091,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec2SGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -16114,7 +16114,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16125,11 +16125,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec2SGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -16148,7 +16148,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16159,11 +16159,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec2SGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -16182,7 +16182,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16193,11 +16193,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec2SGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -16216,7 +16216,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16227,12 +16227,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -16250,7 +16250,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16261,12 +16261,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -16284,7 +16284,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16295,11 +16295,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -16317,7 +16317,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16328,13 +16328,13 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec2SGrid & var1 = mma::detail::getObject<OpenVDBVec2SGrid>(OpenVDBVec2SGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -16352,7 +16352,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16363,12 +16363,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -16387,7 +16387,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16398,12 +16398,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -16422,7 +16422,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16433,11 +16433,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec2SGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -16456,7 +16456,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16467,11 +16467,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -16489,7 +16489,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16500,12 +16500,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBVec2SGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -16523,7 +16523,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16534,7 +16534,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->getBackgroundValue();
@@ -16555,7 +16555,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16566,7 +16566,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->getMinMaxValues();
@@ -16587,7 +16587,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16598,11 +16598,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -16621,7 +16621,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16632,12 +16632,12 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -16656,7 +16656,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16667,11 +16667,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -16690,7 +16690,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16701,14 +16701,14 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -16727,7 +16727,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16738,11 +16738,11 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec2SGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -16761,7 +16761,7 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16772,7 +16772,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3DGrid_collection[id])->createEmptyGrid();
@@ -16792,7 +16792,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16803,7 +16803,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3DGrid_collection[id])->deleteGrid();
@@ -16823,7 +16823,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16834,11 +16834,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3DGrid & var1 = mma::detail::getObject<OpenVDBVec3DGrid>(OpenVDBVec3DGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -16856,7 +16856,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16867,12 +16867,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec3DGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -16891,7 +16891,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16902,12 +16902,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec3DGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -16926,7 +16926,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16937,11 +16937,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -16959,7 +16959,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -16970,12 +16970,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -16993,7 +16993,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17004,11 +17004,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17026,7 +17026,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17037,11 +17037,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17059,7 +17059,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17070,11 +17070,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17092,7 +17092,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17103,11 +17103,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17125,7 +17125,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17136,11 +17136,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -17159,7 +17159,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17170,7 +17170,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3DGrid_collection[id])->getActiveLeafVoxelCount();
@@ -17191,7 +17191,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17202,7 +17202,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3DGrid_collection[id])->getActiveTileCount();
@@ -17223,7 +17223,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17234,7 +17234,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3DGrid_collection[id])->getActiveVoxelCount();
@@ -17255,7 +17255,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17266,7 +17266,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3DGrid_collection[id])->getGridClass();
@@ -17287,7 +17287,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17298,7 +17298,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3DGrid_collection[id])->getCreator();
@@ -17319,7 +17319,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17330,7 +17330,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->getGridBoundingBox();
@@ -17351,7 +17351,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17362,7 +17362,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->getGridDimensions();
@@ -17383,7 +17383,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17394,7 +17394,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3DGrid_collection[id])->getGridType();
@@ -17415,7 +17415,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17426,7 +17426,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3DGrid_collection[id])->getHasUniformVoxels();
@@ -17447,7 +17447,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17458,7 +17458,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3DGrid_collection[id])->getIsEmpty();
@@ -17479,7 +17479,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17490,7 +17490,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3DGrid_collection[id])->getMemoryUsage();
@@ -17511,7 +17511,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17522,7 +17522,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3DGrid_collection[id])->getName();
@@ -17543,7 +17543,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17554,7 +17554,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec3DGrid_collection[id])->getVoxelSize();
@@ -17575,7 +17575,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17586,11 +17586,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec3DGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -17609,7 +17609,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17620,11 +17620,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec3DGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -17643,7 +17643,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17654,11 +17654,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec3DGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -17677,7 +17677,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17688,11 +17688,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec3DGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -17711,7 +17711,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17722,12 +17722,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -17745,7 +17745,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17756,12 +17756,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -17779,7 +17779,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17790,11 +17790,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17812,7 +17812,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17823,13 +17823,13 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3DGrid & var1 = mma::detail::getObject<OpenVDBVec3DGrid>(OpenVDBVec3DGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -17847,7 +17847,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17858,12 +17858,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -17882,7 +17882,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17893,12 +17893,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -17917,7 +17917,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17928,11 +17928,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3DGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -17951,7 +17951,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17962,11 +17962,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -17984,7 +17984,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -17995,12 +17995,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBVec3DGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -18018,7 +18018,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18029,7 +18029,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->getBackgroundValue();
@@ -18050,7 +18050,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18061,7 +18061,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->getMinMaxValues();
@@ -18082,7 +18082,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18093,11 +18093,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -18116,7 +18116,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18127,12 +18127,12 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -18151,7 +18151,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18162,11 +18162,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -18185,7 +18185,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18196,14 +18196,14 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -18222,7 +18222,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18233,11 +18233,11 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3DGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -18256,7 +18256,7 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18267,7 +18267,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3IGrid_collection[id])->createEmptyGrid();
@@ -18287,7 +18287,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18298,7 +18298,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3IGrid_collection[id])->deleteGrid();
@@ -18318,7 +18318,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18329,11 +18329,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3IGrid & var1 = mma::detail::getObject<OpenVDBVec3IGrid>(OpenVDBVec3IGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18351,7 +18351,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18362,12 +18362,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec3IGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -18386,7 +18386,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18397,12 +18397,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec3IGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -18421,7 +18421,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18432,11 +18432,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18454,7 +18454,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18465,12 +18465,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -18488,7 +18488,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18499,11 +18499,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18521,7 +18521,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18532,11 +18532,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18554,7 +18554,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18565,11 +18565,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18587,7 +18587,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18598,11 +18598,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -18620,7 +18620,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18631,11 +18631,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -18654,7 +18654,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18665,7 +18665,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3IGrid_collection[id])->getActiveLeafVoxelCount();
@@ -18686,7 +18686,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18697,7 +18697,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3IGrid_collection[id])->getActiveTileCount();
@@ -18718,7 +18718,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18729,7 +18729,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3IGrid_collection[id])->getActiveVoxelCount();
@@ -18750,7 +18750,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18761,7 +18761,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3IGrid_collection[id])->getGridClass();
@@ -18782,7 +18782,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18793,7 +18793,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3IGrid_collection[id])->getCreator();
@@ -18814,7 +18814,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18825,7 +18825,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getGridBoundingBox();
@@ -18846,7 +18846,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18857,7 +18857,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getGridDimensions();
@@ -18878,7 +18878,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18889,7 +18889,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3IGrid_collection[id])->getGridType();
@@ -18910,7 +18910,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18921,7 +18921,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3IGrid_collection[id])->getHasUniformVoxels();
@@ -18942,7 +18942,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18953,7 +18953,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3IGrid_collection[id])->getIsEmpty();
@@ -18974,7 +18974,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -18985,7 +18985,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3IGrid_collection[id])->getMemoryUsage();
@@ -19006,7 +19006,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19017,7 +19017,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3IGrid_collection[id])->getName();
@@ -19038,7 +19038,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19049,7 +19049,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec3IGrid_collection[id])->getVoxelSize();
@@ -19070,7 +19070,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19081,11 +19081,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec3IGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -19104,7 +19104,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19115,11 +19115,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec3IGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -19138,7 +19138,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19149,11 +19149,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec3IGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -19172,7 +19172,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19183,11 +19183,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec3IGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -19206,7 +19206,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19217,12 +19217,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -19240,7 +19240,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19251,12 +19251,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -19274,7 +19274,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19285,11 +19285,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -19307,7 +19307,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19318,13 +19318,13 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3IGrid & var1 = mma::detail::getObject<OpenVDBVec3IGrid>(OpenVDBVec3IGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -19342,7 +19342,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19353,12 +19353,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19377,7 +19377,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19388,12 +19388,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19412,7 +19412,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19423,11 +19423,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19446,7 +19446,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19457,11 +19457,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -19479,7 +19479,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19490,12 +19490,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec3IGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -19513,7 +19513,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19524,7 +19524,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getBackgroundValue();
@@ -19545,7 +19545,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19556,7 +19556,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getMinMaxValues();
@@ -19577,7 +19577,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19588,11 +19588,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19611,7 +19611,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19622,12 +19622,12 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19646,7 +19646,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19657,11 +19657,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19680,7 +19680,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19691,14 +19691,14 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19717,7 +19717,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19728,11 +19728,11 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3IGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -19751,7 +19751,7 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19762,7 +19762,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_createEmptyGrid(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3SGrid_collection[id])->createEmptyGrid();
@@ -19782,7 +19782,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_createEmptyGrid(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19793,7 +19793,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_deleteGrid(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBVec3SGrid_collection[id])->deleteGrid();
@@ -19813,7 +19813,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_deleteGrid(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19824,11 +19824,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_copyGrid(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3SGrid & var1 = mma::detail::getObject<OpenVDBVec3SGrid>(OpenVDBVec3SGrid_collection)(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -19846,7 +19846,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_copyGrid(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19857,12 +19857,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_importVDBType(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBVec3SGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -19881,7 +19881,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_importVDBType(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19892,12 +19892,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_importVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBVec3SGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -19916,7 +19916,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_importVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19927,11 +19927,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_exportVDB(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -19949,7 +19949,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_exportVDB(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19960,12 +19960,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -19983,7 +19983,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -19994,11 +19994,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20016,7 +20016,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20027,11 +20027,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20049,7 +20049,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20060,11 +20060,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20082,7 +20082,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20093,11 +20093,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20115,7 +20115,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20126,11 +20126,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveStates(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -20149,7 +20149,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveStates(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20160,7 +20160,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveLeafVoxelCount(WolframLibrary
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3SGrid_collection[id])->getActiveLeafVoxelCount();
@@ -20181,7 +20181,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveLeafVoxelCount(WolframLibrary
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20192,7 +20192,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveTileCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3SGrid_collection[id])->getActiveTileCount();
@@ -20213,7 +20213,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveTileCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20224,7 +20224,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveVoxelCount(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3SGrid_collection[id])->getActiveVoxelCount();
@@ -20245,7 +20245,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getActiveVoxelCount(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20256,7 +20256,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridClass(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3SGrid_collection[id])->getGridClass();
@@ -20277,7 +20277,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridClass(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20288,7 +20288,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getCreator(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3SGrid_collection[id])->getCreator();
@@ -20309,7 +20309,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getCreator(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20320,7 +20320,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridBoundingBox(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->getGridBoundingBox();
@@ -20341,7 +20341,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridBoundingBox(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20352,7 +20352,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridDimensions(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->getGridDimensions();
@@ -20373,7 +20373,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridDimensions(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20384,7 +20384,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridType(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3SGrid_collection[id])->getGridType();
@@ -20405,7 +20405,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getGridType(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20416,7 +20416,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getHasUniformVoxels(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3SGrid_collection[id])->getHasUniformVoxels();
@@ -20437,7 +20437,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getHasUniformVoxels(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20448,7 +20448,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getIsEmpty(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBVec3SGrid_collection[id])->getIsEmpty();
@@ -20469,7 +20469,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getIsEmpty(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20480,7 +20480,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getMemoryUsage(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBVec3SGrid_collection[id])->getMemoryUsage();
@@ -20501,7 +20501,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getMemoryUsage(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20512,7 +20512,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getName(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBVec3SGrid_collection[id])->getName();
@@ -20533,7 +20533,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getName(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20544,7 +20544,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getVoxelSize(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBVec3SGrid_collection[id])->getVoxelSize();
@@ -20565,7 +20565,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getVoxelSize(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20576,11 +20576,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBVec3SGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -20599,7 +20599,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20610,11 +20610,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getIntegerMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBVec3SGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -20633,7 +20633,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getIntegerMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20644,11 +20644,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getRealMetadata(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBVec3SGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -20667,7 +20667,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getRealMetadata(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20678,11 +20678,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBVec3SGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -20701,7 +20701,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20712,12 +20712,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setBooleanMetadata(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -20735,7 +20735,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setBooleanMetadata(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20746,12 +20746,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setStringMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -20769,7 +20769,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setStringMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20780,11 +20780,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setDescription(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20802,7 +20802,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setDescription(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20813,13 +20813,13 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_transformGrid(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBVec3SGrid & var1 = mma::detail::getObject<OpenVDBVec3SGrid>(OpenVDBVec3SGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -20837,7 +20837,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_transformGrid(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20848,12 +20848,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_sliceVoxelCounts(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -20872,7 +20872,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_sliceVoxelCounts(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20883,12 +20883,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeTiles(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -20907,7 +20907,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeTiles(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20918,11 +20918,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeVoxelPositions(WolframLibraryDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBVec3SGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -20941,7 +20941,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeVoxelPositions(WolframLibraryDat
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20952,11 +20952,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> var1 = mma::detail::getTensor<double>(Args[1]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -20974,7 +20974,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -20985,12 +20985,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
-        
+
         (OpenVDBVec3SGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -21008,7 +21008,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_setValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21019,7 +21019,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getBackgroundValue(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->getBackgroundValue();
@@ -21040,7 +21040,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getBackgroundValue(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21051,7 +21051,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getMinMaxValues(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->getMinMaxValues();
@@ -21072,7 +21072,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getMinMaxValues(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21083,11 +21083,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getValues(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -21106,7 +21106,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getValues(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21117,12 +21117,12 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_sliceVoxelValueTotals(WolframLibraryDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->sliceVoxelValueTotals(var1, var2);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -21141,7 +21141,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_sliceVoxelValueTotals(WolframLibraryDa
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::sliceVoxelValueTotals()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21152,11 +21152,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeVoxelValues(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -21175,7 +21175,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_activeVoxelValues(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21186,14 +21186,14 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridSlice(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -21212,7 +21212,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridSlice(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21223,11 +21223,11 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridData(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<double> res = (OpenVDBVec3SGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<double>(Res, res);
     }
@@ -21246,7 +21246,7 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridData(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21257,7 +21257,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_createEmptyGrid(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBBoolGrid_collection[id])->createEmptyGrid();
@@ -21277,7 +21277,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_createEmptyGrid(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21288,7 +21288,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_deleteGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBBoolGrid_collection[id])->deleteGrid();
@@ -21308,7 +21308,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_deleteGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21319,11 +21319,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_copyGrid(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBBoolGrid & var1 = mma::detail::getObject<OpenVDBBoolGrid>(OpenVDBBoolGrid_collection)(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21341,7 +21341,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_copyGrid(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21352,12 +21352,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_importVDBType(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBBoolGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -21376,7 +21376,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_importVDBType(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21387,12 +21387,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_importVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBBoolGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -21411,7 +21411,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_importVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21422,11 +21422,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_exportVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21444,7 +21444,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_exportVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21455,12 +21455,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -21478,7 +21478,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21489,11 +21489,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21511,7 +21511,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21522,11 +21522,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21544,7 +21544,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21555,11 +21555,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21577,7 +21577,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21588,11 +21588,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -21610,7 +21610,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21621,11 +21621,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -21644,7 +21644,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21655,7 +21655,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveLeafVoxelCount(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getActiveLeafVoxelCount();
@@ -21676,7 +21676,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveLeafVoxelCount(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21687,7 +21687,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveTileCount(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getActiveTileCount();
@@ -21708,7 +21708,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveTileCount(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21719,7 +21719,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveVoxelCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getActiveVoxelCount();
@@ -21740,7 +21740,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getActiveVoxelCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21751,7 +21751,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getGridClass();
@@ -21772,7 +21772,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21783,7 +21783,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBBoolGrid_collection[id])->getCreator();
@@ -21804,7 +21804,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21815,7 +21815,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridBoundingBox(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->getGridBoundingBox();
@@ -21836,7 +21836,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridBoundingBox(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21847,7 +21847,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridDimensions(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->getGridDimensions();
@@ -21868,7 +21868,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridDimensions(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21879,7 +21879,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridType(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBBoolGrid_collection[id])->getGridType();
@@ -21900,7 +21900,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getGridType(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21911,7 +21911,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getHasUniformVoxels(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBBoolGrid_collection[id])->getHasUniformVoxels();
@@ -21932,7 +21932,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getHasUniformVoxels(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21943,7 +21943,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getIsEmpty(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBBoolGrid_collection[id])->getIsEmpty();
@@ -21964,7 +21964,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getIsEmpty(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -21975,7 +21975,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getMemoryUsage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getMemoryUsage();
@@ -21996,7 +21996,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getMemoryUsage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22007,7 +22007,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBBoolGrid_collection[id])->getName();
@@ -22028,7 +22028,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22039,7 +22039,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBBoolGrid_collection[id])->getVoxelSize();
@@ -22060,7 +22060,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22071,11 +22071,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBBoolGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -22094,7 +22094,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22105,11 +22105,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getIntegerMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBBoolGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -22128,7 +22128,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getIntegerMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22139,11 +22139,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getRealMetadata(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBBoolGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -22162,7 +22162,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getRealMetadata(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22173,11 +22173,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBBoolGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -22196,7 +22196,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22207,12 +22207,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -22230,7 +22230,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22241,12 +22241,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -22264,7 +22264,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22275,11 +22275,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setDescription(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -22297,7 +22297,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setDescription(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22308,13 +22308,13 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_transformGrid(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBBoolGrid & var1 = mma::detail::getObject<OpenVDBBoolGrid>(OpenVDBBoolGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBBoolGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -22332,7 +22332,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_transformGrid(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22343,12 +22343,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_sliceVoxelCounts(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22367,7 +22367,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_sliceVoxelCounts(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22378,12 +22378,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeTiles(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22402,7 +22402,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeTiles(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22413,11 +22413,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxelPositions(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22436,7 +22436,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxelPositions(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22447,14 +22447,14 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_depthMap(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
-        
+
         mma::ImageRef<mma::im_real32_t> res = (OpenVDBBoolGrid_collection[id])->depthMap(var1, var2, var3, var4);
         mma::detail::setImage<mma::im_real32_t>(Res, res);
     }
@@ -22473,7 +22473,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_depthMap(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::depthMap()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22484,14 +22484,14 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridSliceImage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::GenericImageRef res = (OpenVDBBoolGrid_collection[id])->gridSliceImage(var1, var2, var3, var4);
         mma::detail::setGenericImage(Res, res);
     }
@@ -22510,7 +22510,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridSliceImage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridSliceImage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22521,11 +22521,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridImage3D(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::GenericImage3DRef res = (OpenVDBBoolGrid_collection[id])->gridImage3D(var1);
         mma::detail::setGenericImage3D(Res, res);
     }
@@ -22544,7 +22544,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridImage3D(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridImage3D()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22555,11 +22555,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setBackgroundValue(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setBackgroundValue(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -22577,7 +22577,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setBackgroundValue(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22588,12 +22588,12 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setValues(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBBoolGrid_collection[id])->setValues(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -22611,7 +22611,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_setValues(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::setValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22622,7 +22622,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getBackgroundValue(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBBoolGrid_collection[id])->getBackgroundValue();
@@ -22643,7 +22643,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getBackgroundValue(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getBackgroundValue()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22654,7 +22654,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getMinMaxValues(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->getMinMaxValues();
@@ -22675,7 +22675,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getMinMaxValues(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getMinMaxValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22686,11 +22686,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getValues(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->getValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22709,7 +22709,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getValues(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22720,11 +22720,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxelValues(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->activeVoxelValues(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22743,7 +22743,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxelValues(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::activeVoxelValues()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22754,14 +22754,14 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridSlice(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->gridSlice(var1, var2, var3, var4);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22780,7 +22780,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridSlice(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridSlice()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22791,11 +22791,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridData(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBBoolGrid_collection[id])->gridData(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -22814,7 +22814,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_gridData(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridData()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22825,11 +22825,11 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxels(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::SparseArrayRef<mint> res = (OpenVDBBoolGrid_collection[id])->activeVoxels(var1);
         mma::detail::setSparseArray<mint>(Res, res);
     }
@@ -22848,7 +22848,7 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_activeVoxels(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::activeVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22859,7 +22859,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_createEmptyGrid(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBMaskGrid_collection[id])->createEmptyGrid();
@@ -22879,7 +22879,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_createEmptyGrid(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::createEmptyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22890,7 +22890,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_deleteGrid(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         (OpenVDBMaskGrid_collection[id])->deleteGrid();
@@ -22910,7 +22910,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_deleteGrid(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::deleteGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22921,11 +22921,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_copyGrid(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBMaskGrid & var1 = mma::detail::getObject<OpenVDBMaskGrid>(OpenVDBMaskGrid_collection)(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->copyGrid(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -22943,7 +22943,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_copyGrid(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::copyGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22954,12 +22954,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_importVDBType(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         const char * res = (OpenVDBMaskGrid_collection[id])->importVDBType(var1, var2);
         mma::detail::setString(Res, res);
     }
@@ -22978,7 +22978,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_importVDBType(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::importVDBType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -22989,12 +22989,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_importVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         bool res = (OpenVDBMaskGrid_collection[id])->importVDB(var1, var2);
         MArgument_setBoolean(Res, res);
     }
@@ -23013,7 +23013,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_importVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::importVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23024,11 +23024,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_exportVDB(WolframLibraryData libData, m
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->exportVDB(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23046,7 +23046,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_exportVDB(WolframLibraryData libData, m
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::exportVDB()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23057,12 +23057,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setActiveStates(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -23080,7 +23080,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23091,11 +23091,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setGridClass(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23113,7 +23113,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23124,11 +23124,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setCreator(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23146,7 +23146,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23157,11 +23157,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setName(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23179,7 +23179,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23190,11 +23190,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double var1 = MArgument_getReal(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setVoxelSize(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23212,7 +23212,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23223,11 +23223,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveStates(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->getActiveStates(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -23246,7 +23246,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveStates(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getActiveStates()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23257,7 +23257,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveLeafVoxelCount(WolframLibraryD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBMaskGrid_collection[id])->getActiveLeafVoxelCount();
@@ -23278,7 +23278,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveLeafVoxelCount(WolframLibraryD
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getActiveLeafVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23289,7 +23289,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveTileCount(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBMaskGrid_collection[id])->getActiveTileCount();
@@ -23310,7 +23310,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveTileCount(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getActiveTileCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23321,7 +23321,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveVoxelCount(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBMaskGrid_collection[id])->getActiveVoxelCount();
@@ -23342,7 +23342,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getActiveVoxelCount(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getActiveVoxelCount()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23353,7 +23353,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridClass(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBMaskGrid_collection[id])->getGridClass();
@@ -23374,7 +23374,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridClass(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getGridClass()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23385,7 +23385,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getCreator(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBMaskGrid_collection[id])->getCreator();
@@ -23406,7 +23406,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getCreator(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getCreator()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23417,7 +23417,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridBoundingBox(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->getGridBoundingBox();
@@ -23438,7 +23438,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridBoundingBox(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getGridBoundingBox()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23449,7 +23449,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridDimensions(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->getGridDimensions();
@@ -23470,7 +23470,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridDimensions(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getGridDimensions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23481,7 +23481,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridType(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBMaskGrid_collection[id])->getGridType();
@@ -23502,7 +23502,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getGridType(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getGridType()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23513,7 +23513,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getHasUniformVoxels(WolframLibraryData 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBMaskGrid_collection[id])->getHasUniformVoxels();
@@ -23534,7 +23534,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getHasUniformVoxels(WolframLibraryData 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getHasUniformVoxels()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23545,7 +23545,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getIsEmpty(WolframLibraryData libData, 
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         bool res = (OpenVDBMaskGrid_collection[id])->getIsEmpty();
@@ -23566,7 +23566,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getIsEmpty(WolframLibraryData libData, 
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getIsEmpty()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23577,7 +23577,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getMemoryUsage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint res = (OpenVDBMaskGrid_collection[id])->getMemoryUsage();
@@ -23598,7 +23598,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getMemoryUsage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getMemoryUsage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23609,7 +23609,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getName(WolframLibraryData libData, min
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * res = (OpenVDBMaskGrid_collection[id])->getName();
@@ -23630,7 +23630,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getName(WolframLibraryData libData, min
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getName()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23641,7 +23641,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getVoxelSize(WolframLibraryData libData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         double res = (OpenVDBMaskGrid_collection[id])->getVoxelSize();
@@ -23662,7 +23662,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getVoxelSize(WolframLibraryData libData
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getVoxelSize()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23673,11 +23673,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         bool res = (OpenVDBMaskGrid_collection[id])->getBooleanMetadata(var1);
         MArgument_setBoolean(Res, res);
     }
@@ -23696,7 +23696,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23707,11 +23707,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getIntegerMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         mint res = (OpenVDBMaskGrid_collection[id])->getIntegerMetadata(var1);
         MArgument_setInteger(Res, res);
     }
@@ -23730,7 +23730,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getIntegerMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getIntegerMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23741,11 +23741,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getRealMetadata(WolframLibraryData libD
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         double res = (OpenVDBMaskGrid_collection[id])->getRealMetadata(var1);
         MArgument_setReal(Res, res);
     }
@@ -23764,7 +23764,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getRealMetadata(WolframLibraryData libD
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getRealMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23775,11 +23775,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         const char * res = (OpenVDBMaskGrid_collection[id])->getStringMetadata(var1);
         mma::detail::setString(Res, res);
     }
@@ -23798,7 +23798,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23809,12 +23809,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setBooleanMetadata(WolframLibraryData l
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setBooleanMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -23832,7 +23832,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setBooleanMetadata(WolframLibraryData l
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setBooleanMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23843,12 +23843,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setStringMetadata(WolframLibraryData li
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
         const char * var2 = mma::detail::getString(Args[2]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setStringMetadata(var1, var2);
     }
     catch (const mma::LibraryError & libErr)
@@ -23866,7 +23866,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setStringMetadata(WolframLibraryData li
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setStringMetadata()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23877,11 +23877,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setDescription(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         const char * var1 = mma::detail::getString(Args[1]);
-        
+
         (OpenVDBMaskGrid_collection[id])->setDescription(var1);
     }
     catch (const mma::LibraryError & libErr)
@@ -23899,7 +23899,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_setDescription(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::setDescription()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23910,13 +23910,13 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_transformGrid(WolframLibraryData libDat
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         OpenVDBMaskGrid & var1 = mma::detail::getObject<OpenVDBMaskGrid>(OpenVDBMaskGrid_collection)(Args[1]);
         mma::TensorRef<double> var2 = mma::detail::getTensor<double>(Args[2]);
         mint var3 = MArgument_getInteger(Args[3]);
-        
+
         (OpenVDBMaskGrid_collection[id])->transformGrid(var1, var2, var3);
     }
     catch (const mma::LibraryError & libErr)
@@ -23934,7 +23934,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_transformGrid(WolframLibraryData libDat
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::transformGrid()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23945,12 +23945,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_sliceVoxelCounts(WolframLibraryData lib
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mint var2 = MArgument_getInteger(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->sliceVoxelCounts(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -23969,7 +23969,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_sliceVoxelCounts(WolframLibraryData lib
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::sliceVoxelCounts()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -23980,12 +23980,12 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_activeTiles(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         bool var2 = MArgument_getBoolean(Args[2]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->activeTiles(var1, var2);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -24004,7 +24004,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_activeTiles(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::activeTiles()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -24015,11 +24015,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_activeVoxelPositions(WolframLibraryData
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::TensorRef<mint> res = (OpenVDBMaskGrid_collection[id])->activeVoxelPositions(var1);
         mma::detail::setTensor<mint>(Res, res);
     }
@@ -24038,7 +24038,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_activeVoxelPositions(WolframLibraryData
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::activeVoxelPositions()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -24049,14 +24049,14 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_depthMap(WolframLibraryData libData, mi
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
         double var2 = MArgument_getReal(Args[2]);
         double var3 = MArgument_getReal(Args[3]);
         double var4 = MArgument_getReal(Args[4]);
-        
+
         mma::ImageRef<mma::im_real32_t> res = (OpenVDBMaskGrid_collection[id])->depthMap(var1, var2, var3, var4);
         mma::detail::setImage<mma::im_real32_t>(Res, res);
     }
@@ -24075,7 +24075,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_depthMap(WolframLibraryData libData, mi
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::depthMap()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -24086,14 +24086,14 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_gridSliceImage(WolframLibraryData libDa
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mint var1 = MArgument_getInteger(Args[1]);
         mma::TensorRef<mint> var2 = mma::detail::getTensor<mint>(Args[2]);
         bool var3 = MArgument_getBoolean(Args[3]);
         bool var4 = MArgument_getBoolean(Args[4]);
-        
+
         mma::GenericImageRef res = (OpenVDBMaskGrid_collection[id])->gridSliceImage(var1, var2, var3, var4);
         mma::detail::setGenericImage(Res, res);
     }
@@ -24112,7 +24112,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_gridSliceImage(WolframLibraryData libDa
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::gridSliceImage()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
@@ -24123,11 +24123,11 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_gridImage3D(WolframLibraryData libData,
     if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
     const mint id = MArgument_getInteger(Args[0]);
     if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
-    
+
     try
     {
         mma::TensorRef<mint> var1 = mma::detail::getTensor<mint>(Args[1]);
-        
+
         mma::GenericImage3DRef res = (OpenVDBMaskGrid_collection[id])->gridImage3D(var1);
         mma::detail::setGenericImage3D(Res, res);
     }
@@ -24146,7 +24146,7 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_gridImage3D(WolframLibraryData libData,
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::gridImage3D()");
         return LIBRARY_FUNCTION_ERROR;
     }
-    
+
     return LIBRARY_NO_ERROR;
 }
 
