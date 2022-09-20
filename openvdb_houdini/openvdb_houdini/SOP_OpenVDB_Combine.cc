@@ -1303,7 +1303,7 @@ struct SOP_OpenVDB_Combine::CombineOp
             case OP_DIFFERENCE:
                 MulAdd<GridT>(aMult).process(*aGrid, resultGrid);
                 MulAdd<GridT>(bMult).process(*bGrid, tempGrid);
-                doDifference(*resultGrid, *tempGrid, 
+                doDifference(*resultGrid, *tempGrid,
                         self->evalInt("prunedegenerate", 0, self->getTime()));
                 break;
 
