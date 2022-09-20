@@ -6491,16 +6491,17 @@ TEST_F(TestNanoVDB, ChannelIndexGridBuilder)
     };
 }// ChannelIndexGridBuilder
 
-TEST_F(TestNanoVDB, HelloWorld_IndexGrid)
+TEST_F(TestNanoVDB, HelloWorld_IndexGrid_Dense)
 {
     const nanovdb::Coord ijk(101,0,0);
     auto handle1 = nanovdb::createLevelSetSphere<float>();
     auto *fltGrid = handle1.grid<float>();
     EXPECT_TRUE(fltGrid);
+    //std::cerr << "Grid<float> size: " << (fltGrid->gridSize() >> 20) << " MB\n";
     EXPECT_EQ(1.0f, fltGrid->tree().getValue(ijk));
 
     {// create an IndexGrid with an internal channel and write it to file
-        nanovdb::IndexGridBuilder<float> builder(*fltGrid, false, false);
+        nanovdb::IndexGridBuilder<float> builder(*fltGrid, true, true);// include stats and inactive values
         auto tmp = builder.getHandle("IndexGrid_test", 1u);// 1 channel
         nanovdb::io::writeGrid("data/index_grid.nvdb", tmp);
     }
@@ -6508,6 +6509,8 @@ TEST_F(TestNanoVDB, HelloWorld_IndexGrid)
         auto tmp = nanovdb::io::readGrid("data/index_grid.nvdb");
         auto *idxGrid = tmp.grid<nanovdb::ValueIndex>();
         EXPECT_TRUE(idxGrid);
+        //std::cerr << "Dense IndexGrid size: " << (idxGrid->gridSize() >> 20) << " MB\n";
+        EXPECT_GT(idxGrid->gridSize(), fltGrid->gridSize());
         nanovdb::ChannelAccessor<float> acc(*idxGrid, 0u);// channel ID = 0
         EXPECT_EQ(1.0f, acc(ijk));
 
@@ -6523,7 +6526,44 @@ TEST_F(TestNanoVDB, HelloWorld_IndexGrid)
         stencil.moveTo(ijk);// re-populates the stencil cache
         EXPECT_EQ(nanovdb::Vec3f(0.5f,0.0f,0.0f), stencil.gradient());
     }
-}// HelloWorld_IndexGrid
+}// HelloWorld_IndexGrid_Dense
+
+TEST_F(TestNanoVDB, HelloWorld_IndexGrid_Sparse)
+{
+    const nanovdb::Coord ijk(101,0,0);
+    auto handle1 = nanovdb::createLevelSetSphere<float>();
+    auto *fltGrid = handle1.grid<float>();
+    EXPECT_TRUE(fltGrid);
+    //std::cerr << "Grid<float> size: " << (fltGrid->gridSize() >> 20) << " MB\n";
+    EXPECT_EQ(1.0f, fltGrid->tree().getValue(ijk));
+
+    {// create an IndexGrid with an internal channel and write it to file
+        nanovdb::IndexGridBuilder<float> builder(*fltGrid, false, false);// no stats, no inactive values
+        auto tmp = builder.getHandle("IndexGrid_test", 1u);// 1 channel
+        nanovdb::io::writeGrid("data/index_grid.nvdb", tmp);
+    }
+    {// read and test IndexGrid
+        auto tmp = nanovdb::io::readGrid("data/index_grid.nvdb");
+        auto *idxGrid = tmp.grid<nanovdb::ValueIndex>();
+        EXPECT_TRUE(idxGrid);
+        //std::cerr << "Sparse IndexGrid size: " << (idxGrid->gridSize() >> 20) << " MB\n";
+        EXPECT_LT(idxGrid->gridSize(), fltGrid->gridSize());
+        nanovdb::ChannelAccessor<float> acc(*idxGrid, 0u);// channel ID = 0
+        EXPECT_EQ(1.0f, acc(ijk));
+
+        // compute the gradient from channel ID 0
+        nanovdb::GradStencil<nanovdb::ChannelAccessor<float>> stencil(acc);
+        stencil.moveTo(ijk);
+        EXPECT_EQ(nanovdb::Vec3f(1.0f,0.0f,0.0f), stencil.gradient());
+
+        EXPECT_EQ(0.0f, acc(100,0,0));
+        acc(100,0,0) = 1.0f;// legal since acc was template on "float" and not "const float"
+        EXPECT_EQ(1.0f, acc(100,0,0));
+        EXPECT_EQ(nanovdb::Vec3f(1.0f,0.0f,0.0f), stencil.gradient());// since stencil caches
+        stencil.moveTo(ijk);// re-populates the stencil cache
+        EXPECT_EQ(nanovdb::Vec3f(0.5f,0.0f,0.0f), stencil.gradient());
+    }
+}// HelloWorld_IndexGrid_Sparse
 
 TEST_F(TestNanoVDB, writeReadUncompressedGrid)
 {

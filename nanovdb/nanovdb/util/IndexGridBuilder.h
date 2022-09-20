@@ -226,7 +226,7 @@ void IndexGridBuilder<SrcValueT>::countValues()
     for (size_t i=1; i<mValIdx0.size(); ++i) mValIdx0[i] += mValIdx0[i-1];// pre-fixed sum
 
     mValueCount = mValIdx0.back();
-}
+}// countValues
 
 
 //================================================================================================
@@ -465,7 +465,7 @@ void IndexGridBuilder<SrcValueT>::processRoot()
     dstData->mAverage    = 3u;
     dstData->mStdDevi    = 4u;
 
-    uint64_t valueCount = 1;// background is always first in the buffer
+    uint64_t valueCount = 5u;// this is always the first available index
     for (uint32_t tileID = 0, childID = 0; tileID < dstData->mTableSize; ++tileID) {
         auto *srcTile = srcData->tile(tileID);
         auto *dstTile = dstData->tile(tileID);
