@@ -302,12 +302,15 @@ validateName[name_String] :=
 
 
 
+$indent = "    ";
+
+
 (***********  Translate template to library code  **********)
 
 TranslateTemplate[tem_] :=
     With[{t = NormalizeTemplate[tem]},
       If[validateTemplate[t],
-        ToCCodeString[transTemplate[t], "Indent" -> 1],
+        ToCCodeString[transTemplate[t], "Indent" -> $indent],
         $Failed
       ]
     ]
@@ -346,16 +349,16 @@ setupCollection[classname_String] := {
     CInlineCode@StringTemplate[ (* TODO: Check if id exists, use assert *)
       "\
 if (mode == 0) { // create
-\t`collection`[id] = new `class`();
+`indent``collection`[id] = new `class`();
 } else {  // destroy
-\tif (`collection`.find(id) == `collection`.end()) {
-\t\tlibData->Message(\"noinst\");
-\t\treturn;
-\t}
-\tdelete `collection`[id];
-\t`collection`.erase(id);
+`indent`if (`collection`.find(id) == `collection`.end()) {
+`indent``indent`libData->Message(\"noinst\");
+`indent``indent`return;
+`indent`}
+`indent`delete `collection`[id];
+`indent``collection`.erase(id);
 }\
-"][<|"collection" -> collectionName[classname], "class" -> classname|>]
+"][<|"collection" -> collectionName[classname], "class" -> classname, "indent" -> $indent|>]
   ],
   "",
   CFunction[libFunRet, classname <> "_get_collection", libFunArgs,
@@ -520,16 +523,16 @@ int id;
 int args = 2;
 
 if (! MLTestHeadWithArgCount(mlp, \"List\", &args))
-\treturn LIBRARY_FUNCTION_ERROR;
+`indent`return LIBRARY_FUNCTION_ERROR;
 if (! MLGetInteger(mlp, &id))
-\treturn LIBRARY_FUNCTION_ERROR;
+`indent`return LIBRARY_FUNCTION_ERROR;
 if (`collection`.find(id) == `collection`.end()) {
-\tlibData->Message(\"noinst\");
-\treturn LIBRARY_FUNCTION_ERROR;
+`indent`libData->Message(\"noinst\");
+`indent`return LIBRARY_FUNCTION_ERROR;
 }
 `collection`[id]->`funname`(mlp);
 "
-              ][<| "collection" -> collectionName[classname], "funname" -> name |>]
+              ][<| "collection" -> collectionName[classname], "funname" -> name, "indent" -> $indent |>]
             }
           ],
           (* catch *)
