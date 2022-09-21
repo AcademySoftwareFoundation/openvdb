@@ -519,7 +519,7 @@ __hostdev__ inline static T* alignPtr(T* p)
 {
     NANOVDB_ASSERT(p);
     return reinterpret_cast<T*>( (uint8_t*)p + alignmentPadding(p) );
-};
+}
 
 /// @brief offset the specified pointer so it is aligned.
 template <typename T>
@@ -527,7 +527,7 @@ __hostdev__ inline static const T* alignPtr(const T* p)
 {
     NANOVDB_ASSERT(p);
     return reinterpret_cast<const T*>( (const uint8_t*)p + alignmentPadding(p) );
-};
+}
 
 // --------------------------> PtrDiff  PtrAdd <------------------------------------
 
