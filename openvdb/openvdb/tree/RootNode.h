@@ -2697,6 +2697,7 @@ RootNode<ChildT>::addNode(NodeT* node)
         return child->addChild(node);
     }
 }
+// Note this method is currently private and could be accelerated with multi-threading
 template<typename ChildT>
 inline bool
 RootNode<ChildT>::setOrigin(Coord origin)
@@ -2724,9 +2725,9 @@ RootNode<ChildT>::setOrigin(Coord origin)
                 child->mChildMask.setOff();
                 delete child;
             } else {// transfer child=leaf node
-                this->addNode(child, Tile(mBackground, false));
+                this->addChild(child);
             }
-            t.second.child = nullptr;
+            t.second.child = nullptr;// was either deleted or transferred
         } else {// tile of the root (rare)
             const auto &tile = t.tile;
             if (tile.value==mBackground) continue;// ignore background tiles
