@@ -2716,12 +2716,9 @@ RootNode<ChildT>::setOrigin(Coord origin)
                 for (Index i = 0; i < ChildT::NUM_VALUES; ++i) {
                     if (child->mChildMask.isOn(i)) {
                         this->addNode(child->mTable[i].child);
-                    } else {// transfer grand child tiles
-                        auto &v = child->mTable[i].value;
-                        if (v!=mBackground) {
-                            auto ijk =child->offsetToGlobalCoord(i);
-                            this->addTile(LEVEL-1, ijk, v, child->mValueMask.isOn(i));
-                        }
+                    } else if (child->mTable[i].value != mBackground) {// transfer grand child tiles
+                        const Coord ijk = child->offsetToGlobalCoord(i);
+                        this->addTile(LEVEL-1, ijk, child->mTable[i].value, child->mValueMask.isOn(i));
                     }
                 }
                 child->mChildMask.setOff();
