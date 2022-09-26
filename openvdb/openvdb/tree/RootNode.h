@@ -918,8 +918,25 @@ private:
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
 
-    /// Return a MapType key for the given coordinates.
-    static Coord coordToKey(const Coord& xyz) { return xyz & ~(ChildType::DIM - 1); }
+
+#if OPENVDB_ABI_VERSION_NUMBER < 10
+    /// Static method that returns a MapType key for the given coordinates.
+    static Coord coordToKey(const Coord& xyz) {return xyz & ~(ChildType::DIM - 1); }
+#else
+    /// Return a MapType key for the given coordinates, offset by the mOrigin.
+    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
+    /// Return the grid index coordinates of this node's local origin.
+    const Coord& origin() const { return mOrigin; }
+    /// @brief change the origin on this root node
+    /// @param origin the index coordinated of the new alignment
+    bool setOrigin(Coord origin);
+    /// @brief Add a template cchild node type to this root node
+    /// @tparam NodeT Type of the node to be added
+    /// @param node pointer to the node that will be added
+    /// @return true if the node was added
+    template <typename NodeT>
+    bool addNode(NodeT *node);
+#endif
 
     /// Insert this node's mTable keys into the given set.
     void insertKeys(CoordSet&) const;
@@ -971,6 +988,9 @@ private:
 
     MapType mTable;
     ValueType mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    Coord mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Transient Data (not serialized)
     Index32 mTransientData = 0;
@@ -1037,7 +1057,11 @@ struct SameRootConfig<ChildT1, RootNode<ChildT2> > {
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
+RootNode<ChildT>::RootNode()
+    : mBackground(zeroVal<ValueType>())
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1045,7 +1069,11 @@ RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(const ValueType& background): mBackground(background)
+RootNode<ChildT>::RootNode(const ValueType& background)
+    : mBackground(background)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1057,6 +1085,9 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, const ValueType& foregd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
@@ -1082,6 +1113,9 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
@@ -1143,6 +1177,9 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         };
 
         self.mBackground = Local::convertValue(other.mBackground);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        self.mOrigin = other.mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         self.mTransientData = other.mTransientData;
 #endif
@@ -1172,6 +1209,9 @@ RootNode<ChildT>::operator=(const RootNode& other)
 {
     if (&other != this) {
         mBackground = other.mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mOrigin = other.mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
 #endif
@@ -2628,6 +2668,81 @@ RootNode<ChildT>::addChild(ChildT* child)
     }
     return true;
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename ChildT>
+template<typename NodeT>
+inline bool
+RootNode<ChildT>::addNode(NodeT* node)
+{
+    if (node==nullptr) return false;
+    if constexpr(std::is_same<NodeT,ChildT>::value) {
+        return this->addChild(node);
+    } else if constexpr(std::is_same<NodeT,LeafNodeType>::value) {
+        this->addLeaf(node);
+        return true;
+    } else {
+        static_assert(std::is_same<NodeT, typename ChildT::ChildNodeType>::value, "RootNode::addNode expects child, grand child or leaf nodes");
+        const Coord key = this->coordToKey(node->origin());
+        MapIter iter = mTable.find(key);
+        ChildT *child = nullptr;
+        if (iter == mTable.end()) {//background
+            child = new ChildT(key + mOrigin, mBackground, false);
+            mTable[key] = NodeStruct(*child);
+        } else if (!(child = iter->second.child)) {// tile
+            child = new ChildT(key + mOrigin, iter->second.value, iter->second.state);
+            setChild(iter, *child);
+        }
+        assert(child);
+        return child->addChild(node);
+    }
+}
+template<typename ChildT>
+inline bool
+RootNode<ChildT>::setOrigin(Coord origin)
+{
+    static_assert(LEVEL >= 1, "Expected RootNode::LEVEL >= 1");
+    if constexpr(LEVEL>1) {
+        origin &= ~(ChildT::ChildNodeType::DIM-1);// align with grand-child nodes
+    } else {// no internal nodes, only leaf nodes (very rare)
+        origin &= ~(ChildT::DIM-1);// align with child nodes
+    }
+    if (mOrigin == origin) return false;
+    mOrigin = origin;// round down to align with child or grand child nodes
+    auto table = std::move(mTable);
+    for (auto &t : table) {
+        if (ChildT *child = t.second.child) {// child node of the root
+            if constexpr(LEVEL>1) {// transfer grand child nodes and tiles
+                for (Index i = 0; i < ChildT::NUM_VALUES; ++i) {
+                    if (child->mChildMask.isOn(i)) {
+                        this->addNode(child->mTable[i].child);
+                    } else {// transfer grand child tiles
+                        auto &v = child->mTable[i].value;
+                        if (v!=mBackground) {
+                            auto ijk =child->offsetToGlobalCoord(i);
+                            this->addTile(LEVEL-1, ijk, v, child->mValueMask.isOn(i));
+                        }
+                    }
+                }
+                child->mChildMask.setOff();
+                delete child;
+            } else {// transfer child=leaf node
+                this->addNode(child, Tile(mBackground, false));
+            }
+            t.second.child = nullptr;
+        } else {// tile of the root (rare)
+            const auto &tile = t.tile;
+            if (tile.value==mBackground) continue;// ignore background tiles
+            if constexpr(LEVEL>1) {// slow but large root-level tiles are also very rare
+                this->fill(CoordBBox::createCube(t.first, ChildT::DIM), tile.value, tile.active);
+            } else {// transfer child=leaf level tile
+                this->addTile(t.first, tile.value, tile.active);
+            }
+        }
+    }
+    return true;
+}
+#endif
 
 template<typename ChildT>
 inline void
