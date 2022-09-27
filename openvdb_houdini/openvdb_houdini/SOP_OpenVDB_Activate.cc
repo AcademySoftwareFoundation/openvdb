@@ -367,8 +367,8 @@ inactive.)"));
         .addOptionalInput("Bounds to Activate")
         .setVerb(SOP_NodeVerb::COOK_INPLACE, []() { return new SOP_VDBActivate::Cache; })
         .setDocumentation(
-R"(#icon: COMMON/openvdb
-#tags: vdb
+R"(#icon: COMMON/openvdb)"
+R"(#tags: vdb
 
 = OpenVDB Activate =
 
@@ -549,9 +549,7 @@ public:
                     continue;
 
                 // Inside, activate!
-                const openvdb::Coord xyz(node.offsetToGlobalCoord(iter.pos()));
-                openvdb::CoordBBox vdbtilebbox(xyz, xyz.offsetBy(ChildT::DIM-1));
-                node.fill(vdbtilebbox, myNegBackground, /*active=*/true);
+                node.addTile(iter.pos(), myNegBackground, /*active=*/true);
             }
         }
 
@@ -638,11 +636,11 @@ public:
                 case GEO_PrimVDB::ACTIVATE_INTERSECT:
                     break;
                 case GEO_PrimVDB::ACTIVATE_SUBTRACT:
-                    node.fill(coordbbox, myBackground, /*active=*/false);
+                    node = NodeT(node.origin(), myBackground, /*active=*/false);
                     break;
                 case GEO_PrimVDB::ACTIVATE_UNION:
                 case GEO_PrimVDB::ACTIVATE_COPY:
-                    node.fill(coordbbox, myValue, /*active=*/true);
+                    node = NodeT(node.origin(), myValue, /*active=*/true);
                     break;
             }
             return false;
@@ -659,7 +657,7 @@ public:
             {
                 case GEO_PrimVDB::ACTIVATE_COPY:
                 case GEO_PrimVDB::ACTIVATE_INTERSECT:
-                    node.fill(coordbbox, myBackground, /*active=*/false);
+                    node = NodeT(node.origin(), myBackground, /*active=*/false);
                     break;
                 case GEO_PrimVDB::ACTIVATE_SUBTRACT:
                 case GEO_PrimVDB::ACTIVATE_UNION:
@@ -754,8 +752,8 @@ public:
             if (!child)
             {
                 // We are in the grey-zone so have to densify.
-                auto *child = new ChildT(xyz, value, node.isValueMaskOn(iter.pos()));
-                node.addChild(child);
+                auto *newchild = new ChildT(xyz, value, node.isValueMaskOn(iter.pos()));
+                node.addChild(newchild);
             }
         }
 
