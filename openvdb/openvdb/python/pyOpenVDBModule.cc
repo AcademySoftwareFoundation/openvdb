@@ -836,7 +836,7 @@ BOOST_PYTHON_MODULE(PY_OPENVDB_MODULE_NAME)
 #ifdef PY_OPENVDB_USE_NUMPY
     // Initialize NumPy.
 #ifdef PY_OPENVDB_USE_BOOST_PYTHON_NUMPY
-    boost::python::numpy::initialize();
+    py::numpy::initialize();
 #else
 #if PY_MAJOR_VERSION >= 3
     if (_import_array()) {}

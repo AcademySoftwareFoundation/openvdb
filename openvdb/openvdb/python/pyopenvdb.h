@@ -13,10 +13,10 @@
 /// #include <boost/python.hpp>
 ///
 /// // Implementation of a Python function that processes pyOpenVDB grids
-/// boost::python::object
-/// processGrid(boost::python::object inObj)
+/// py::object
+/// processGrid(py::object inObj)
 /// {
-///     boost::python::object outObj;
+///     py::object outObj;
 ///     try {
 ///         // Extract an OpenVDB grid from the input argument.
 ///         if (openvdb::GridBase::Ptr grid =
@@ -31,7 +31,7 @@
 ///         }
 ///     } catch (openvdb::TypeError& e) {
 ///         PyErr_Format(PyExc_TypeError, e.what());
-///         boost::python::throw_error_already_set();
+///         py::throw_error_already_set();
 ///     }
 ///     return outObj;
 /// }
@@ -41,7 +41,7 @@
 ///     openvdb::initialize();
 ///
 ///     // Definition of a Python function that processes pyOpenVDB grids
-///     boost::python::def(/*name=*/"processGrid", &processGrid, /*argname=*/"grid");
+///     py::def(/*name=*/"processGrid", &processGrid, /*argname=*/"grid");
 /// }
 /// @endcode
 /// Then, from Python,
@@ -60,6 +60,7 @@
 #include <boost/python.hpp>
 #include <openvdb/Grid.h>
 
+namespace py = boost::python;
 
 namespace pyopenvdb {
 
@@ -68,14 +69,14 @@ namespace pyopenvdb {
 /// @throw openvdb::TypeError if the Python object is not one of the pyOpenVDB grid types.
 ///     (See the Python module's GridTypes global variable for the list of supported grid types.)
 openvdb::GridBase::Ptr getGridFromPyObject(PyObject*);
-openvdb::GridBase::Ptr getGridFromPyObject(const boost::python::object&);
+openvdb::GridBase::Ptr getGridFromPyObject(const py::object&);
 //@}
 
 /// @brief Return a new Python object that holds the given OpenVDB grid.
 /// @return @c None if the given grid pointer is null.
 /// @throw openvdb::TypeError if the grid is not of a supported type.
 ///     (See the Python module's GridTypes global variable for the list of supported grid types.)
-boost::python::object getPyObjectFromGrid(const openvdb::GridBase::Ptr&);
+py::object getPyObjectFromGrid(const openvdb::GridBase::Ptr&);
 
 } // namespace pyopenvdb
 

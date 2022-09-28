@@ -84,7 +84,7 @@ getPyObjectFromGrid(const GridBase::Ptr& grid)
 
 
 inline openvdb::GridBase::Ptr
-getGridFromPyObject(const boost::python::object& gridObj)
+getGridFromPyObject(const py::object& gridObj)
 {
     if (!gridObj) return GridBase::Ptr();
 
@@ -721,7 +721,7 @@ inline void
 copyFromArray(GridType&, const py::object&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
 }
 
 template<typename GridType>
@@ -729,7 +729,7 @@ inline void
 copyToArray(GridType&, const py::object&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
 }
 
 #else // if defined(PY_OPENVDB_USE_NUMPY)
@@ -962,7 +962,7 @@ public:
         } catch (openvdb::TypeError&) {
             PyErr_Format(PyExc_TypeError,
                 "unsupported NumPy data type %s", mArrayTypeName.c_str());
-            boost::python::throw_error_already_set();
+            py::throw_error_already_set();
         }
     }
 
@@ -1021,7 +1021,7 @@ protected:
             os << "expected 3-dimensional array, found "
                 << this->mArrayDims.size() << "-dimensional array";
             PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            py::throw_error_already_set();
         }
     }
 
@@ -1086,7 +1086,7 @@ protected:
             os << "expected 4-dimensional array, found "
                 << this->mArrayDims.size() << "-dimensional array";
             PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            py::throw_error_already_set();
         }
         if (this->mArrayDims[3] != 3) {
             std::ostringstream os;
@@ -1095,7 +1095,7 @@ protected:
                 << "x" << this->mArrayDims[1] << "x" << this->mArrayDims[2]
                 << "x" << this->mArrayDims[3] << " array";
             PyErr_SetString(PyExc_ValueError, os.str().c_str());
-            boost::python::throw_error_already_set();
+            py::throw_error_already_set();
         }
     }
 
@@ -1187,7 +1187,7 @@ copyFromArray(points::PointDataGrid& /*grid*/, py::object /*arrayObj*/,
 {
     PyErr_SetString(PyExc_NotImplementedError,
         "copying NumPy arrays for PointDataGrids is not supported");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
 }
 
 
@@ -1197,7 +1197,7 @@ copyToArray(points::PointDataGrid& /*grid*/, py::object /*arrayObj*/, py::object
 {
     PyErr_SetString(PyExc_NotImplementedError,
         "copying NumPy arrays for PointDataGrids is not supported");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
 }
 
 
@@ -1214,7 +1214,7 @@ inline typename GridType::Ptr
 meshToLevelSet(py::object, py::object, py::object, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
     return typename GridType::Ptr();
 }
 
@@ -1223,7 +1223,7 @@ inline py::object
 volumeToQuadMesh(const GridType&, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
     return py::object();
 }
 
@@ -1232,7 +1232,7 @@ inline py::object
 volumeToMesh(const GridType&, py::object, py::object)
 {
     PyErr_SetString(PyExc_NotImplementedError, "this module was built without NumPy support");
-    boost::python::throw_error_already_set();
+    py::throw_error_already_set();
     return py::object();
 }
 
