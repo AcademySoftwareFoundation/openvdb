@@ -577,7 +577,7 @@ class TestOpenVDB(unittest.TestCase):
                 (ARRAY_DIM, ARRAY_DIM, ARRAY_DIM),      # scalar array
                 (ARRAY_DIM, ARRAY_DIM, ARRAY_DIM, 3)    # vec3 array
             ):
-                for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, np.bool):
+                for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, bool):
                     # Create a NumPy array, fill it with the background value,
                     # then set some elements to the foreground value.
                     arr = np.ndarray(shape, dtype)
@@ -676,7 +676,7 @@ class TestOpenVDB(unittest.TestCase):
                 (ARRAY_DIM, ARRAY_DIM, ARRAY_DIM),      # scalar array
                 (ARRAY_DIM, ARRAY_DIM, ARRAY_DIM, 3)    # vec3 array
             ):
-                for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, np.bool):
+                for dtype in (np.float32, np.int32, np.float64, np.int64, np.uint32, bool):
                     # Return a new NumPy array.
                     arr = np.ndarray(shape, dtype)
                     arr.fill(-100)
@@ -787,15 +787,12 @@ class TestOpenVDB(unittest.TestCase):
         # Vector-valued grids can't be used to store level sets.
         self.assertRaises(TypeError, lambda: openvdb.Vec3SGrid.createLevelSetFromPolygons(
             cubePoints, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
-        # The "points" argument to createLevelSetFromPolygons() must be a NumPy array.
-        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
-            cubeVertices, quads=cubeQuads, transform=xform, halfWidth=halfWidth))
-        # The "points" argument to createLevelSetFromPolygons() must be a NumPy float or int array.
-        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
-            np.array(cubeVertices, bool), quads=cubeQuads, transform=xform, halfWidth=halfWidth))
+        # The "points" argument to createLevelSetFromPolygons() can be a regular array.
+        openvdb.FloatGrid.createLevelSetFromPolygons(cubeVertices, quads=cubeQuads, transform=xform, halfWidth=halfWidth)
+        # The "points" argument to createLevelSetFromPolygons() can be an array that's implicitly convertible to float
+        openvdb.FloatGrid.createLevelSetFromPolygons(np.array(cubeVertices, bool), quads=cubeQuads, transform=xform, halfWidth=halfWidth)
         # The "triangles" argument to createLevelSetFromPolygons() must be an N x 3 NumPy array.
-        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(
-            cubePoints, triangles=cubeQuads, transform=xform, halfWidth=halfWidth))
+        self.assertRaises(TypeError, lambda: openvdb.FloatGrid.createLevelSetFromPolygons(cubePoints, triangles=cubeQuads, transform=xform, halfWidth=halfWidth))
 
         # Test volume to mesh conversion.
 
