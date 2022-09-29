@@ -330,7 +330,7 @@ template<typename T, Index Log2Dim>
 inline bool
 LeafBuffer<T, Log2Dim>::deallocate()
 {
-    if (mData != nullptr && !this->isOutOfCore()) {
+    if (!this->isOutOfCore()) {
         delete[] mData;
         mData = nullptr;
         return true;

@@ -189,11 +189,9 @@ init(const std::string& progName, bool background)
     if (background) {
         if (sThreadMgr == nullptr) {
             std::lock_guard<std::mutex> lock(sLock);
-            if (sThreadMgr == nullptr) {
-                OPENVDB_START_THREADSAFE_STATIC_WRITE
-                sThreadMgr = new ThreadManager;
-                OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
-            }
+            OPENVDB_START_THREADSAFE_STATIC_WRITE
+            sThreadMgr = new ThreadManager;
+            OPENVDB_FINISH_THREADSAFE_STATIC_WRITE
         }
     } else {
         if (sThreadMgr != nullptr) {

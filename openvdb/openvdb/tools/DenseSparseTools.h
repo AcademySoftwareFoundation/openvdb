@@ -371,7 +371,7 @@ public:
 
         // Clean up an unused leaf.
 
-        if (leaf != nullptr) delete leaf;
+        delete leaf;
     }
 
     void join(SparseExtractor& rhs) {
@@ -530,7 +530,7 @@ public:
 
         // Clean up an unused leaf.
 
-        if (leaf != nullptr) delete leaf;
+        delete leaf;
     }
 
     void join(SparseMaskedExtractor& rhs) {
