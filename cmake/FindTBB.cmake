@@ -93,7 +93,7 @@ may be provided to tell this module where to look.
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 include(GNUInstallDirs)
 
 
@@ -169,6 +169,8 @@ if(NOT Tbb_INCLUDE_DIR)
     PATHS ${_TBB_INCLUDE_SEARCH_DIRS}
     PATH_SUFFIXES ${CMAKE_INSTALL_INCLUDEDIR} include
   )
+else()
+  set(Tbb_LEGACY_INCLUDE_DIR ${Tbb_INCLUDE_DIR})
 endif()
 
 # Look for a new tbb header installation

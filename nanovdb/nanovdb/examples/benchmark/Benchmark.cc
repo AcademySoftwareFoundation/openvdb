@@ -31,6 +31,7 @@
 #include <openvdb/tools/RayIntersector.h>
 #include <openvdb/math/Ray.h>
 #include <openvdb/math/Transform.h>
+#include <openvdb/math/Math.h>
 #endif
 
 #if defined(NANOVDB_USE_TBB)
@@ -452,7 +453,7 @@ TEST_F(Benchmark, OpenVDB_CPU)
                                 0.5 * (bbox.max()[2] + bbox.min()[2]));
     const Vec3T          lookat = srcGrid->indexToWorld(center), up(0, -1, 0);
     auto                 eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * M_PI / 180.0f;
+        const RealT theta = angle * openvdb::math::pi<RealT>() / 180.0f;
         return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
     };
 
@@ -536,7 +537,7 @@ TEST_F(Benchmark, DenseGrid_CPU)
     const auto  bbox = grid->worldBBox();
     const Vec3T lookat(0.5 * (bbox.min() + bbox.max())), up(0, -1, 0);
     auto        eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * M_PI / 180.0f;
+        const RealT theta = angle * openvdb::math::pi<RealT>() / 180.0f;
         return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
     };
 
@@ -677,7 +678,7 @@ TEST_F(Benchmark, NanoVDB_GPU)
     const auto  bbox = grid->worldBBox();
     const Vec3T lookat(0.5 * (bbox.min() + bbox.max())), up(0, -1, 0);
     auto        eye = [&lookat, &radius](int angle) {
-        const RealT theta = angle * M_PI / 180.0f;
+        const RealT theta = angle * openvdb::math::pi<RealT>() / 180.0f;
         return lookat + radius * Vec3T(sin(theta), 0, cos(theta));
     };
     CameraT *host_camera, *dev_camera;

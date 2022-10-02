@@ -7,7 +7,7 @@
 
 #]=======================================================================]
 
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.18)
 project(NanoVDB LANGUAGES C CXX)
 
 include(GNUInstallDirs)
@@ -239,6 +239,10 @@ if(NANOVDB_USE_CUDA)
     target_compile_options(nanovdb INTERFACE
       "$<$<COMPILE_LANG_AND_ID:CUDA,NVIDIA>:-arch=sm_75>")
   endif()
+
+  # Add CUDA includes to any C++ units which use NanoVDB
+  target_include_directories(nanovdb INTERFACE
+    ${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 endif()
 
 if(NANOVDB_USE_MAGICAVOXEL)

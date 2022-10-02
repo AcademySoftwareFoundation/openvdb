@@ -78,7 +78,7 @@ openvdb::math::Transform::Ptr linearTransform =
 // Rotate the transform by 90 degrees about the X axis.
 // As a result the j-index will now map into the -z physical direction,
 // and the k-index will map to the +y physical direction.
-linearTransform->preRotate(M_PI/2, openvdb::math::X_AXIS);
+linearTransform->preRotate(openvdb::math::pi<double>()/2.0, openvdb::math::X_AXIS);
 @endcode
 
 @subsection sFrustumTransforms Frustum Transforms
@@ -302,7 +302,7 @@ convention of right-multiplication of the matrix against a vector:
 openvdb::math::Mat4d transform = openvdb::math::Mat4d::identity();
 transform.preScale(openvdb::math::Vec3d(2,3,2));
 transform.postTranslate(openvdb::math::Vec3d(1,0,0));
-transform.postRotate(openvdb::math::X_AXIS, M_PI/3.0);
+transform.postRotate(openvdb::math::X_AXIS, openvdb::math::pi<double>()/3.0);
 
 // Location of a point in index space
 openvdb::math::Vec3d indexSpace(1,2,3);

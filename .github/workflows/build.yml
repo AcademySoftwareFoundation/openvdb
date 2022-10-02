@@ -43,6 +43,11 @@ on:
         required: true
         default: 'all'
 
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-vfx:
     # VFX platform jobs. These are run on the appropriate CentOS images from
@@ -65,16 +70,16 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Release' }
-          - { cxx: clang++, image: '2022-clang11', abi: '9', build: 'Debug'   }
-          - { cxx: clang++, image: '2021', abi: '8', build: 'Release' }
-          - { cxx: clang++, image: '2020', abi: '7', build: 'Release' }
-          - { cxx: g++,     image: '2022-clang11', abi: '9', build: 'Release' }
-          - { cxx: g++,     image: '2021', abi: '8', build: 'Release' }
-          - { cxx: g++,     image: '2020', abi: '7', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '10', build: 'Debug'   }
+          - { cxx: g++,     image: '2022-clang11', abi: '10', build: 'Release' }
+          - { cxx: clang++, image: '2022-clang11', abi: '9',  build: 'Release' }
+          - { cxx: g++,     image: '2022-clang11', abi: '9',  build: 'Release' }
+          - { cxx: clang++, image: '2021',         abi: '8',  build: 'Release' }
+          - { cxx: g++,     image: '2021',         abi: '8',  build: 'Release' }
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: timestamp
       id: timestamp
       shell: bash
@@ -125,14 +130,15 @@ jobs:
           # Boost as both shared and static libs are installed.
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
-          - { vc: 'x64-windows-static', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          - { vc: 'x64-windows-static', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
-          - { vc: 'x64-windows',        build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
+          # @note  Commented out the static debug build due to linker OOM LNK1102
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: path
       run: |
         # note: system path must be modified in a previous step to it's use
@@ -146,7 +152,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --config=${{ matrix.config.build }}
-        --components=\"core,bin,view,render,test\"
+        --components=${{ matrix.config.components }}
         --cargs=\'
         ${{ matrix.config.cmake }}
         -DMSVC_COMPRESS_PDB=ON
@@ -166,7 +172,7 @@ jobs:
       if: contains(github.event.schedule, '0 7 * * 1') || matrix.config.build == 'Release'
       run: cd build && ctest -V -C ${{ matrix.config.build }}
 
-  testmacos11:
+  macos:
     if: |
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
@@ -175,7 +181,7 @@ jobs:
     env:
       CXX: clang++
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: install
       shell: bash
       # brew boost-python3 installs a "Keg-only" version of python which is
@@ -183,9 +189,6 @@ jobs:
       # required python installation to CMake through a hint variable which
       # is exported in install_macos.sh
       run: ./ci/install_macos.sh
-    - name: install
-      shell: bash
-      run: ./ci/install_blosc.sh 1.5.0
     - name: build
       shell: bash
       # Also need to disable compiler warnings for ABI 6 and above due to
@@ -194,7 +197,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,view,render,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=9 -DOPENVDB_SIMD=SSE42\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
       run: cd build && ctest -V

@@ -242,7 +242,7 @@ Function::cast(std::vector<llvm::Value*>& args,
                 llvm::Type* strType = LLVMType<codegen::String>::get(C);
                 if (type->getContainedType(0) == strType) {
                     value = B.CreateStructGEP(strType, value, 0); // char**
-                    value = B.CreateLoad(value); // char*
+                    value = ir_load(B, value); // char*
                 }
             }
         }
@@ -265,7 +265,12 @@ Function::flattenAttrs(llvm::LLVMContext& C) const
         return set;
     };
 
+#if LLVM_VERSION_MAJOR <= 13
     llvm::AttrBuilder ab;
+#else
+    llvm::AttrBuilder ab(C);
+#endif
+
     const llvm::AttributeSet fn = buildSetFromKinds(ab, mAttributes->mFnAttrs);
     const llvm::AttributeSet ret = buildSetFromKinds(ab, mAttributes->mRetAttrs);
 

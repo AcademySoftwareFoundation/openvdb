@@ -677,6 +677,7 @@ struct TreeParms
     bool visualize = false;
     UT_Ramp colorRamp;
     double colorMin = 0.0f;
+    double colorMax = 1.0f;
     double colorRange = 1.0f;
     double* cachedOffset = nullptr;
     double* cachedOffsetWS = nullptr;
@@ -1181,8 +1182,12 @@ struct TreeVisualizer::RenderPointsOp
     void setColorByRamp(size_t idx, const ValueT& value, size_t count = 1) const
     {
         const double min = mParent.mParms.colorMin;
+        const double max = mParent.mParms.colorMax;
         const double range = mParent.mParms.colorRange;
-        const double remap = (value - min) * range;
+        // remap input value and clamp to not exceed min or max
+        double remap = (value - min) * range;
+        if (range < 0)  remap = openvdb::math::Clamp(remap, max, min);
+        else            remap = openvdb::math::Clamp(remap, min, max);
 
         float values[4];
         mParent.mParms.colorRamp.getColor(remap, values);
@@ -2053,8 +2058,12 @@ SOP_OpenVDB_Visualize::Cache::cookVDBSop(OP_Context& context)
                 }
             }
             treeParms.colorMin = evalFloat("visrange", 0, time);
-            double colorMax = evalFloat("visrange", 1, time);
-            treeParms.colorRange = 1.0 / (colorMax - treeParms.colorMin);
+            treeParms.colorMax = evalFloat("visrange", 1, time);
+            treeParms.colorRange = 1.0;
+            const double range = treeParms.colorMax - treeParms.colorMin;
+            if (range != 0.0) {
+                treeParms.colorRange /= range;
+            }
         }
 
         const bool drawTree = (treeParms.internalStyle || treeParms.tileStyle

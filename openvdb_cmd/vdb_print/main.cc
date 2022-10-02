@@ -215,7 +215,7 @@ printShortListing(const StringVec& filenames, bool metadata)
 #else
             using ListT = openvdb::GridTypes;
 #endif
-            bool success =
+            const bool success =
                 grid->apply<ListT>([&](const auto& typed){
                     // @todo combine these methods to avoid iterating across the tree twice
                     const openvdb::Index64 incore = openvdb::tools::memUsage(typed.tree());
@@ -225,6 +225,7 @@ printShortListing(const StringVec& filenames, bool metadata)
                     std::cout << " " << std::right << std::setw(6) << bytesAsString(total) << " (Total)";
                 });
 
+            (void)success;
 #if OPENVDB_ABI_VERSION_NUMBER < 10
             if (!success) {
                 // could be a points grid, print in-core memory only

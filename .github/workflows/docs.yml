@@ -23,9 +23,14 @@ on:
   workflow_dispatch:
     inputs:
       deploy:
-        description: 'Deploy docs?'
+        description: 'Deploy to openvdb-website (docs/coverage)?'
         required: true
-        default: 'false'
+        default: 'none'
+
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   doxygen:
@@ -33,9 +38,11 @@ jobs:
     env:
       CXX: g++
     container:
+      # @note We can't update this as epydoc doesn't support python3. We'll
+      # need to re-write the python docs to use sphinx
       image: aswf/ci-openvdb:2019
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: install_doxygen
       run: ./ci/install_doxygen.sh 1_8_11
     - name: install_epydoc
@@ -43,7 +50,7 @@ jobs:
     - name: install_latex
       run: yum -y install texlive-latex-bin texlive-dvips texlive-collection-fontsrecommended texlive-collection-latexrecommended
     - name: install_cmake
-      run: ./ci/install_cmake.sh 3.15.0
+      run: ./ci/install_cmake.sh 3.18.0
     - name: build
       run: >
         ./ci/build.sh -v
@@ -73,15 +80,69 @@ jobs:
       if: |
         github.repository_owner == 'AcademySoftwareFoundation' &&
         github.event_name == 'workflow_dispatch' &&
-        github.event.inputs.deploy == 'true'
+        github.event.inputs.deploy == 'docs'
       uses: peaceiris/actions-gh-pages@v3
       with:
         deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
         publish_dir: /usr/local/share/doc/OpenVDB/html
         destination_dir: documentation/doxygen
         external_repository: AcademySoftwareFoundation/openvdb-website
-        publish_branch: doxygen
+        publish_branch: master
         full_commit_message: "Automatic doxygen documentation update
           - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
 
           Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+
+  #############################################################################
+  ################################ Coverage ###################################
+  #############################################################################
+
+  linux-coverage:
+    if: |
+      github.repository_owner == 'AcademySoftwareFoundation' &&
+      github.event_name == 'workflow_dispatch' &&
+      github.event.inputs.deploy == 'coverage'
+    runs-on: ubuntu-latest
+    container:
+      image: aswf/ci-openvdb:2022
+    env:
+      CXX: g++
+    steps:
+    - uses: actions/checkout@v3
+    - name: install_gtest
+      run: ./ci/install_gtest.sh 1.10.0
+    - name: install_gcovr
+      run: pip install gcovr
+    - name: build
+      run: >
+        ./ci/build.sh -v
+        --build-type=coverage
+        --components="core,axcore,test,axtest"
+        --cargs=\"-DOPENVDB_CORE_STATIC=OFF -DOPENVDB_AX_STATIC=OFF\"
+    - name: test_and_gcov
+      run: |
+        cd build
+        ctest -V
+        make gcov_html
+    - name: pre_deploy
+      # Overwrite global SSH configuration
+      #  https://github.com/peaceiris/actions-gh-pages/issues/719
+      #  https://linuxhint.com/ssh-stricthostkeychecking/
+      run: >
+        echo "Host *
+          StrictHostKeyChecking no
+          UserKnownHostsFile=/dev/null
+        " > /etc/ssh/ssh_config
+    - name: deploy
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        deploy_key: ${{ secrets.ACTIONS_DEPLOY_KEY }}
+        publish_dir: ./build/gcov_html
+        destination_dir: documentation/code_coverage
+        external_repository: AcademySoftwareFoundation/openvdb-website
+        publish_branch: master
+        full_commit_message: "Automatic code coverage update
+          - Deployed from: AcademySoftwareFoundation/openvdb ${{ github.sha }}
+
+          Signed-off-by: ${{ github.actor }} <${{ github.actor }}@users.noreply.github.com>"
+

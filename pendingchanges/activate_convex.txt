@@ -1,0 +1,3 @@
+Houdini:
+    - Add convex hull activation for VDB Activate SOP (requires 19.5)
+    - Improved SDF activation to use dynamic node manager.

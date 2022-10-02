@@ -3,6 +3,7 @@
 
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Maps.h>
+#include <openvdb/math/Math.h>
 #include <openvdb/util/MapsUtil.h>
 #include <gtest/gtest.h>
 
@@ -35,7 +36,7 @@ TEST_F(TestMaps, testApproxInverse)
     }
     {
         Mat4d rot = Mat4d::identity();
-        rot.setToRotation(X_AXIS, M_PI/4.);
+        rot.setToRotation(X_AXIS, openvdb::math::pi<double>()/4.);
 
         Mat4d rotInv = rot.inverse();
         Mat4d mat = rotInv * singular * rot;
@@ -629,7 +630,7 @@ TEST_F(TestMaps, testJacobians)
         AffineMap affine;
 
         const int n = 10;
-        const double dtheta = M_PI / n;
+        const double dtheta = openvdb::math::pi<double>() / n;
 
         const Vec3d test(1,2,3);
         const Vec3d origin(0,0,0);

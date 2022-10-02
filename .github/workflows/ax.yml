@@ -38,6 +38,11 @@ on:
         required: true
         default: 'all'
 
+# Allow subsequent pushes to the same PR or REF to cancel any previous jobs.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   linux-ax:
     if: |
@@ -56,14 +61,14 @@ jobs:
       matrix:
         config:
           # Unified
-          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,bin,axcore,axbin,axtest' }
-          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'clang++', build: 'Release', j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2021-clang10', cxx: 'g++',     build: 'Release', j: '1', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Debug',   j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'clang++', build: 'Release', j: '2', components: 'core,python,bin,axcore,axbin,axtest' }
+          - { image: '2022-clang11', cxx: 'g++',     build: 'Release', j: '1', components: 'core,python,bin,axcore,axbin,axtest' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: timestamp
         id: timestamp
         shell: bash
@@ -126,21 +131,19 @@ jobs:
       matrix:
         config:
           #@note llvm10 never got its own brew formula...
-          - { runner: 'macos-10.15',  cxx: 'clang++', build: 'Release', llvm: '7'  }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '8'  }
-          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '9'  }
           - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '11' }
           - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '12' }
+          - { runner: 'macos-11', cxx: 'clang++', build: 'Release', llvm: '13' }
       fail-fast: false
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
       - name: install_deps
         run: ./ci/install_macos_ax.sh ${{ matrix.config.llvm }}
       - name: build
         run: >
           ./ci/build.sh -v
           --build-type=${{ matrix.config.build }}
-          --components="core,bin,axcore,axbin,axtest"
+          --components="core,python,bin,axcore,axbin,axtest"
           --cargs=\"
           -DOPENVDB_AX_TEST_CMD_DOWNLOADS=ON
           -DUSE_EXPLICIT_INSTANTIATION=OFF
@@ -157,9 +160,9 @@ jobs:
       github.event.inputs.type == 'grammar'
     runs-on: ubuntu-latest
     container:
-      image: aswf/ci-openvdb:2021-clang10
+      image: aswf/ci-openvdb:2022-clang11
     steps:
-    - uses: actions/checkout@v2
+    - uses: actions/checkout@v3
     - name: build
       run: ./ci/build.sh -v --components=axgr --target=openvdb_ax_grammar --cargs=\"-DOPENVDB_AX_GRAMMAR_NO_LINES=ON\"
     - name: upload grammar

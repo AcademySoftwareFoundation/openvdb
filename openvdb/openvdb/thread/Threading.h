@@ -29,7 +29,8 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace thread {
 
-inline bool cancelGroupExecution()
+/// @note  This UBSAN suppression may not be needed when we transition to TBB21
+inline OPENVDB_UBSAN_SUPPRESS("vptr") bool cancelGroupExecution()
 {
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().
@@ -41,7 +42,8 @@ inline bool cancelGroupExecution()
 #endif
 }
 
-inline bool isGroupExecutionCancelled()
+/// @note  This UBSAN suppression may not be needed when we transition to TBB21
+inline OPENVDB_UBSAN_SUPPRESS("vptr") bool isGroupExecutionCancelled()
 {
     // @note 12000 was the 2021.1-beta05 release. The 2021.1-beta08 release
     //   introduced current_context().

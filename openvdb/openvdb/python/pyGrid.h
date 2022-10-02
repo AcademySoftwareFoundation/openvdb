@@ -1395,8 +1395,16 @@ meshToLevelSet(py::object pointsObj, py::object trianglesObj, py::object quadsOb
     return tools::meshToLevelSet<GridType>(*xform, points, triangles, quads, halfWidth);
 }
 
+template<typename GridType,
+    typename std::enable_if<!std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
+inline py::object
+volumeToQuadMesh(const GridType&, py::object)
+{
+    OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
+}
 
-template<typename GridType>
+template<typename GridType,
+    typename std::enable_if<std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
 inline py::object
 volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
 {
@@ -1452,8 +1460,16 @@ volumeToQuadMesh(const GridType& grid, py::object isovalueObj)
     return py::make_tuple(pointArrayObj, quadArrayObj);
 }
 
+template<typename GridType,
+    typename std::enable_if<!std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
+inline py::object
+volumeToMesh(const GridType&, py::object, py::object)
+{
+    OPENVDB_THROW(TypeError, "volume to mesh conversion is supported only for scalar grids");
+}
 
-template<typename GridType>
+template<typename GridType,
+    typename std::enable_if<std::is_scalar<typename GridType::ValueType>::value>::type* = nullptr>
 inline py::object
 volumeToMesh(const GridType& grid, py::object isovalueObj, py::object adaptivityObj)
 {

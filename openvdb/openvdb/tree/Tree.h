@@ -767,10 +767,8 @@ public:
     /// @endcode
     template<typename CombineOp>
     void combine(Tree& other, CombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename CombineOp>
     void combine(Tree& other, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine(), but with
     /// @param other  a tree of the same type as this tree
@@ -812,10 +810,8 @@ public:
     /// @endcode
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, ExtendedCombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename ExtendedCombineOp>
     void combineExtended(Tree& other, const ExtendedCombineOp& op, bool prune = false);
-#endif
 
     /// For a given function @c f, use sparse traversal to compute <tt>f(a, b)</tt> over all
     /// corresponding pairs of values (tile or voxel) of trees A and B and store the result
@@ -847,10 +843,8 @@ public:
     /// @endcode
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, CombineOp& op, bool prune = false);
-#ifndef _WIN32
     template<typename CombineOp, typename OtherTreeType /*= Tree*/>
     void combine2(const Tree& a, const OtherTreeType& b, const CombineOp& op, bool prune = false);
-#endif
 
     /// Like combine2(), but with
     /// @param a,b    two trees with the same configuration (levels and node dimensions)
@@ -928,11 +922,9 @@ public:
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, ExtendedCombineOp& op,
         bool prune = false);
-#ifndef _WIN32
     template<typename ExtendedCombineOp, typename OtherTreeType /*= Tree*/>
     void combine2Extended(const Tree& a, const OtherTreeType& b, const ExtendedCombineOp&,
         bool prune = false);
-#endif
 
     template<typename BBoxOp>
     OPENVDB_DEPRECATED_MESSAGE("Use tools::visitNodesDepthFirst or DynamicNodeManager instead")
@@ -1760,7 +1752,6 @@ Tree<RootNodeType>::combine(Tree& other, CombineOp& op, bool prune)
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combine(bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp>
 inline void
@@ -1769,7 +1760,6 @@ Tree<RootNodeType>::combine(Tree& other, const CombineOp& op, bool prune)
     CombineOpAdapter<ValueType, const CombineOp> extendedOp(op);
     this->combineExtended(other, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1784,7 +1774,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, ExtendedCombineOp& op, bool pru
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>aTree.combineExtended(bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp>
 inline void
@@ -1793,7 +1782,6 @@ Tree<RootNodeType>::combineExtended(Tree& other, const ExtendedCombineOp& op, bo
     this->clearAllAccessors();
     mRoot.template combine<const ExtendedCombineOp>(other.mRoot, op, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1808,7 +1796,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, CombineOp& o
 
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like this: <tt>tree.combine2(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename CombineOp, typename OtherTreeType>
 inline void
@@ -1817,7 +1804,6 @@ Tree<RootNodeType>::combine2(const Tree& a, const OtherTreeType& b, const Combin
     CombineOpAdapter<ValueType, const CombineOp, typename OtherTreeType::ValueType> extendedOp(op);
     this->combine2Extended(a, b, extendedOp, prune);
 }
-#endif
 
 
 template<typename RootNodeType>
@@ -1834,7 +1820,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
 /// @internal This overload is needed (for ICC and GCC, but not for VC) to disambiguate
 /// code like the following, where the functor argument is a temporary:
 /// <tt>tree.combine2Extended(aTree, bTree, MyCombineOp(...))</tt>.
-#ifndef _WIN32
 template<typename RootNodeType>
 template<typename ExtendedCombineOp, typename OtherTreeType>
 inline void
@@ -1844,7 +1829,6 @@ Tree<RootNodeType>::combine2Extended(const Tree& a, const OtherTreeType& b,
     this->clearAllAccessors();
     mRoot.template combine2<const ExtendedCombineOp>(a.root(), b.root(), op, prune);
 }
-#endif
 
 
 ////////////////////////////////////////

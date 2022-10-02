@@ -1,0 +1,4 @@
+Improvements:
+    - Major updates to the command line interface of the vdb_ax binary, exposing
+    more controls such as tile streaming, value iterator types and attribute
+    bindings.

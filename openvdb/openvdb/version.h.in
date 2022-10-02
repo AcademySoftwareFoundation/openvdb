@@ -92,6 +92,11 @@
 /// @hideinitializer
 #define OPENVDB_LIBRARY_VERSION_NUMBER ${OPENVDB_PACKED_VERSION}
 
+/// @brief Where this version was compiled from if it comes from a
+/// git repo.
+#define OPENVDB_PACKAGE_URL "@OPENVDB_PACKAGE_URL@"
+#define OPENVDB_PACKAGE_REVISION "@OPENVDB_PACKAGE_REVISION@"
+
 /// @brief The version namespace name for this library version
 /// @hideinitializer
 ///
@@ -159,10 +164,10 @@
     // This can be suppressed by defining OPENVDB_USE_FUTURE_ABI_<VERSION>=ON.
     // Note that, whilst the VDB CMake does not allow this option to be hit,
     // it exists to propagate this message to downstream targets
-    #if OPENVDB_ABI_VERSION_NUMBER == 10
-        #ifndef OPENVDB_USE_FUTURE_ABI_10
-            PRAGMA(message("NOTE: ABI = 10 is still in active development and has not been finalized, "
-                "define OPENVDB_USE_FUTURE_ABI_10 to suppress this message"))
+    #if OPENVDB_ABI_VERSION_NUMBER == 11
+        #ifndef OPENVDB_USE_FUTURE_ABI_11
+            PRAGMA(message("NOTE: ABI = 11 is still in active development and has not been finalized, "
+                "define OPENVDB_USE_FUTURE_ABI_11 to suppress this message"))
         #endif
     #else
         #error expected OPENVDB_ABI_VERSION_NUMBER <= OPENVDB_LIBRARY_MAJOR_VERSION_NUMBER
@@ -173,15 +178,15 @@
 // directive. This can be suppressed by defining OPENVDB_USE_DEPRECATED_ABI_<VERSION>.
 // Note that, whilst the VDB CMake does not allow this option to be hit,
 // it exists to propagate this message to downstream targets
-#ifndef OPENVDB_USE_DEPRECATED_ABI_7
-    #if OPENVDB_ABI_VERSION_NUMBER == 7
-        PRAGMA(message("NOTE: ABI = 7 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_7 "
+#ifndef OPENVDB_USE_DEPRECATED_ABI_8
+    #if OPENVDB_ABI_VERSION_NUMBER == 8
+        PRAGMA(message("NOTE: ABI = 8 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_7 "
             "to suppress this message"))
     #endif
 #endif
-#ifndef OPENVDB_USE_DEPRECATED_ABI_8
-    #if OPENVDB_ABI_VERSION_NUMBER == 8
-        PRAGMA(message("NOTE: ABI = 8 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_8 "
+#ifndef OPENVDB_USE_DEPRECATED_ABI_9
+    #if OPENVDB_ABI_VERSION_NUMBER == 9
+        PRAGMA(message("NOTE: ABI = 9 is deprecated, define OPENVDB_USE_DEPRECATED_ABI_8 "
             "to suppress this message"))
     #endif
 #endif
@@ -256,6 +261,8 @@ inline constexpr const char* getLibraryVersionString() { return OPENVDB_LIBRARY_
 inline constexpr const char* getLibraryAbiVersionString() {
     return OPENVDB_LIBRARY_ABI_VERSION_STRING;
 }
+inline constexpr const char* getPackageUrl() { return OPENVDB_PACKAGE_URL; }
+inline constexpr const char* getPackageRevision() { return OPENVDB_PACKAGE_REVISION; }
 
 
 struct VersionId {

@@ -54,12 +54,6 @@
 
 /// Windows defines
 #ifdef _WIN32
-    // Math constants are not included in <cmath> unless _USE_MATH_DEFINES is
-    // defined on MSVC
-    // https://docs.microsoft.com/en-us/cpp/c-runtime-library/math-constants
-    #ifndef _USE_MATH_DEFINES
-        #define _USE_MATH_DEFINES
-    #endif
     ///Disable the non-portable Windows definitions of min() and max() macros
     #ifndef NOMINMAX
         #define NOMINMAX
@@ -76,6 +70,14 @@
     #if !defined(OPENVDB_OPENEXR_STATICLIB) && !defined(OPENEXR_DLL)
         #define OPENEXR_DLL
     #endif
+#endif
+
+/// Macros to suppress undefined behaviour sanitizer warnings. Should be used
+/// sparingly, primarily to suppress issues in upstream dependencies.
+#if defined(__clang__)
+#define OPENVDB_UBSAN_SUPPRESS(X) __attribute__((no_sanitize(X)))
+#else
+#define OPENVDB_UBSAN_SUPPRESS(X)
 #endif
 
 /// Bracket code with OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN/_END,
