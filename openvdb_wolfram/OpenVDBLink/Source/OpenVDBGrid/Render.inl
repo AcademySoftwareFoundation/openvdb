@@ -4,7 +4,7 @@
 /* OpenVDBGrid public member function list
 
 mma::ImageRef<mma::im_byte_t> renderGrid(
-    double isovalue, mma::RGB color, mma::RGB color2, mma::RGB color3, mma::RGB background,
+    double isovalue, mma::RGBRef color, mma::RGBRef color2, mma::RGBRef color3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint shader, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, mma::RealVectorRef depthParams,
@@ -12,19 +12,19 @@ mma::ImageRef<mma::im_byte_t> renderGrid(
 )
 
 mma::ImageRef<mma::im_byte_t> renderGridPBR(
-    double isovalue, mma::RGB background,
+    double isovalue, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, bool is_closed,
-    mma::RGB baseColorFront, mma::RGB baseColorBack, mma::RGB baseColorClosed,
+    mma::RGBRef baseColorFront, mma::RGBRef baseColorBack, mma::RGBRef baseColorClosed,
     double metallic, double rough, double ani, double ref,
-    mma::RGB coatColor, double coatRough, double coatAni, double coatRef,
+    mma::RGBRef coatColor, double coatRough, double coatAni, double coatRef,
     double fac_spec, double fac_diff, double fac_coat
 )
 
 mma::ImageRef<mma::im_byte_t> renderGridVectorColor(
     double isovalue, OpenVDBGrid<Vec3s> cGrid,
-    OpenVDBGrid<Vec3s> cGrid2, OpenVDBGrid<Vec3s> cGrid3, mma::RGB background,
+    OpenVDBGrid<Vec3s> cGrid2, OpenVDBGrid<Vec3s> cGrid3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint shader, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, mma::RealVectorRef depthParams,
@@ -39,7 +39,7 @@ mma::ImageRef<mma::im_byte_t> renderGridVectorColor(
 template<typename V>
 mma::ImageRef<mma::im_byte_t>
 OpenVDBGrid<V>::renderGrid(
-    double isovalue, mma::RGB color, mma::RGB color2, mma::RGB color3, mma::RGB background,
+    double isovalue, mma::RGBRef color, mma::RGBRef color2, mma::RGBRef color3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint shader, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, mma::RealVectorRef depthParams,
@@ -96,13 +96,13 @@ OpenVDBGrid<V>::renderGrid(
 template<typename V>
 mma::ImageRef<mma::im_byte_t>
 OpenVDBGrid<V>::renderGridPBR(
-    double isovalue, mma::RGB background,
+    double isovalue, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, bool is_closed,
-    mma::RGB baseColorFront, mma::RGB baseColorBack, mma::RGB baseColorClosed,
+    mma::RGBRef baseColorFront, mma::RGBRef baseColorBack, mma::RGBRef baseColorClosed,
     double metallic, double rough, double ani, double ref,
-    mma::RGB coatColor, double coatRough, double coatAni, double coatRef,
+    mma::RGBRef coatColor, double coatRough, double coatAni, double coatRef,
     double fac_spec, double fac_diff, double fac_coat) const
 {
     scalar_type_assert<V>();
@@ -159,7 +159,7 @@ template<typename V>
 mma::ImageRef<mma::im_byte_t>
 OpenVDBGrid<V>::renderGridVectorColor(
     double isovalue, OpenVDBGrid<Vec3s> cGrid,
-    OpenVDBGrid<Vec3s> cGrid2, OpenVDBGrid<Vec3s> cGrid3, mma::RGB background,
+    OpenVDBGrid<Vec3s> cGrid2, OpenVDBGrid<Vec3s> cGrid3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint shader, mint camera, mint samples,
     mma::IntVectorRef resolution, double frame, mma::RealVectorRef depthParams,

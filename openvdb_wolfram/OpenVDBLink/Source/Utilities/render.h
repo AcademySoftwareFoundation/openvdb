@@ -678,10 +678,10 @@ public:
         std::unique_ptr<tools::BaseCamera> camera;
         if (mOpts.camera == CAMERA_PERSPECTIVE) {
             camera.reset(new tools::PerspectiveCamera(film, mOpts.rotate, mOpts.translate,
-                mOpts.focal, mOpts.aperture, mOpts.near, mOpts.far));
+                mOpts.focal, mOpts.aperture, mOpts.rng_near, mOpts.rng_far));
         } else {
             camera.reset(new tools::OrthographicCamera(film, mOpts.rotate, mOpts.translate,
-                mOpts.frame, mOpts.near, mOpts.far));
+                mOpts.frame, mOpts.rng_near, mOpts.rng_far));
         }
         camera->lookAt(mOpts.lookat, mOpts.up);
 
@@ -740,8 +740,8 @@ public:
         setNear(range[0]);
         setFar(range[1]);
     }
-    inline void setNear(float near) { mOpts.near = near; }
-    inline void setFar(float far) { mOpts.far = far; }
+    inline void setNear(float rng_near) { mOpts.rng_near = rng_near; }
+    inline void setFar(float rng_far) { mOpts.rng_far = rng_far; }
 
     inline void setFOV(mma::RealVectorRef fov)
     {
@@ -926,7 +926,7 @@ private:
 
     struct RenderOpts
     {
-        float aperture, focal, frame, isovalue, near, far, gamma, min_intensity, max_intensity;
+        float aperture, focal, frame, isovalue, rng_near, rng_far, gamma, min_intensity, max_intensity;
         ColorPtr color, color2, color3;
         tools::Film::RGBA background;
         Vec3d rotate, translate, lookat, up, lightdir;
@@ -945,8 +945,8 @@ private:
         focal(50.0f),
         frame(1.0f),
         isovalue(0.0),
-        near(1.0e-3f),
-        far(std::numeric_limits<float>::max()),
+        rng_near(1.0e-3f),
+        rng_far(std::numeric_limits<float>::max()),
         gamma(1.0),
         min_intensity(0.0),
         max_intensity(1.0),
@@ -1012,7 +1012,7 @@ RenderGridMma<GridT, ColorT, ColorPtr>::renderLevelSet(std::unique_ptr<tools::Ba
         case SHADER_POSITION:
         {
             const Vec3R cpt = mOpts.translate +
-                mOpts.near * ((mOpts.lookat - mOpts.translate).unitSafe());
+                mOpts.rng_near * ((mOpts.lookat - mOpts.translate).unitSafe());
             const CoordBBox bbox = mGrid->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*(mGrid->transform().baseMap()));
@@ -1023,7 +1023,7 @@ RenderGridMma<GridT, ColorT, ColorPtr>::renderLevelSet(std::unique_ptr<tools::Ba
         {
             shader.reset(new DepthShader<ColorT>(
                 mOpts.translate - mOpts.lookat, mOpts.translate,
-                Vec2d(mOpts.near, mOpts.far), *mOpts.color, *mOpts.color2,
+                Vec2d(mOpts.rng_near, mOpts.rng_far), *mOpts.color, *mOpts.color2,
                 *mOpts.color3, mOpts.is_closed,
                 Vec2d(mOpts.min_intensity, mOpts.max_intensity), mOpts.gamma));
             break;
@@ -1083,7 +1083,7 @@ RenderGridMma<GridT, ColorT, ColorPtr>::filmImage(tools::Film& film) const
 }
 
 
-inline tools::Film::RGBA mmaRGBToColor(mma::RGB color)
+inline tools::Film::RGBA mmaRGBToColor(mma::RGBRef color)
 {
     return tools::Film::RGBA(color.r(), color.g(), color.b(), 1.0);
 }

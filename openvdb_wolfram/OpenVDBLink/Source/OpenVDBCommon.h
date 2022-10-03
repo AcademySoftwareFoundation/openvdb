@@ -322,15 +322,15 @@ inline TesseractRef<T> makeTesseract(mint nhslice, mint nslice, mint nrow, mint 
 }
 
 
-class RGB : public TensorRef<double>
+class RGBRef : public TensorRef<double>
 {
 public:
-    RGB(const TensorRef<double> &tr) : TensorRef<double>(tr)
+    RGBRef(const TensorRef<double> &tr) : TensorRef<double>(tr)
     {
         if (TensorRef<double>::rank() != 1)
-            throw LibraryError("RGB: rank 1 tensor expected.");
+            throw LibraryError("RGBRef: rank 1 tensor expected.");
         if (TensorRef<double>::size() != 3)
-            throw LibraryError("RGB: length 3 vector expected.");
+            throw LibraryError("RGBRef: length 3 vector expected.");
 
         (*this)[0] = (*this)[0] < 0.0 ? 0.0 : (*this)[0] > 1.0 ? 1.0 : (*this)[0];
         (*this)[1] = (*this)[1] < 0.0 ? 0.0 : (*this)[1] > 1.0 ? 1.0 : (*this)[1];
