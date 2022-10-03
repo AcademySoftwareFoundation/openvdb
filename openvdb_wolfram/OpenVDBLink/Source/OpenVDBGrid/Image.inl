@@ -47,7 +47,7 @@ OpenVDBGrid<V>::depthMap(mma::IntBounds3DRef bds,
     const int y = bds.yDim();
     const int z = bds.zDim();
 
-    vector<float> intensities(z);
+    std::vector<float> intensities(z);
     const double igmin = math::Pow(imin, 1/gamma), igmax = math::Pow(imax, 1/gamma);
     const double idelta = (igmax - igmin)/(z > 1 ? z-1 : 1);
 

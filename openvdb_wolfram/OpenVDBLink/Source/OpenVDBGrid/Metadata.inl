@@ -28,7 +28,7 @@ template<typename V>
 bool
 OpenVDBGrid<V>::getBooleanMetadata(const char* key) const
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
@@ -41,7 +41,7 @@ template<typename V>
 mint
 OpenVDBGrid<V>::getIntegerMetadata(const char* key) const
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
@@ -54,7 +54,7 @@ template<typename V>
 double
 OpenVDBGrid<V>::getRealMetadata(const char* key) const
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
@@ -67,13 +67,13 @@ template<typename V>
 const char*
 OpenVDBGrid<V>::getStringMetadata(const char* key)
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
-    const string sval = meta.template getMetadata<string>(key_string);
+    const std::string sval = meta.template getMetadata<std::string>(key_string);
 
-    //Let the class handle memory management when passing a string to WL
+    //Let the class handle memory management when passing a std::string to WL
     return WLString(sval);
 }
 
@@ -81,7 +81,7 @@ template<typename V>
 void
 OpenVDBGrid<V>::setBooleanMetadata(const char* key, bool value)
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
@@ -92,23 +92,23 @@ template<typename V>
 void
 OpenVDBGrid<V>::setStringMetadata(const char* key, const char* value)
 {
-    const string key_string(key);
+    const std::string key_string(key);
     mma::disownString(key);
 
-    const string value_string(value);
+    const std::string value_string(value);
     mma::disownString(value);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
-    meta.template setMetadata<string>(key_string, value_string);
+    meta.template setMetadata<std::string>(key_string, value_string);
 }
 
 template<typename V>
 void
 OpenVDBGrid<V>::setDescription(const char* description)
 {
-    const string description_string(description);
+    const std::string description_string(description);
     mma::disownString(description);
 
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
-    meta.template setMetadata<string>(META_DESCRIPTION, description_string);
+    meta.template setMetadata<std::string>(META_DESCRIPTION, description_string);
 }

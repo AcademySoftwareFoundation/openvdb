@@ -2,6 +2,8 @@
 
 #include <openvdb/tools/VolumeToSpheres.h>
 
+#include <vector>
+
 
 /* OpenVDBGrid public member function list
 
@@ -81,7 +83,7 @@ OpenVDBGrid<V>::fillWithBalls(mint bmin, mint bmax, bool overlapping, float rmin
     if (instanceCount <= 0)
         throw mma::LibraryError(LIBRARY_FUNCTION_ERROR);
 
-    vector<openvdb::Vec4s> spheres;
+    std::vector<openvdb::Vec4s> spheres;
     const Vec2i sphereCount(bmin, bmax);
 
     mma::interrupt::LLInterrupter interrupt;

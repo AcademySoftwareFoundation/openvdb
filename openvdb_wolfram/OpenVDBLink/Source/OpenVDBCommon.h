@@ -15,7 +15,6 @@
 
 #include "LTemplate.h"
 
-using namespace std;
 using namespace openvdb;
 using namespace openvdb::tools;
 using namespace openvdb::math;

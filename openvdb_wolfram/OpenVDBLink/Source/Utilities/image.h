@@ -294,7 +294,7 @@ struct DepthMap
     using RootT  = typename TreeType::RootNodeType;
     using LeafT  = typename TreeType::LeafNodeType;
 
-    explicit DepthMap(const CoordBBox& bbox, vector<float> ints, const bool& mv)
+    explicit DepthMap(const CoordBBox& bbox, std::vector<float> ints, const bool& mv)
     : im(openvdbmma::image::makeEmptyImage<mma::im_real32_t>(bbox.dim().x(), bbox.dim().y()))
     , mBBox(bbox), mIntensities(ints), mMultiply(mv), mOz(bbox.min().z())
     , mXlen(bbox.max().x() - bbox.min().x()), mOx(bbox.min().x())
@@ -391,7 +391,7 @@ private:
     const CoordBBox mBBox;
     const int mOx, mOy, mOz;
     const int mXlen, mYlen;
-    const vector<float> mIntensities;
+    const std::vector<float> mIntensities;
     const bool mMultiply;
 };
 

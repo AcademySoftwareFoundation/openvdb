@@ -37,7 +37,7 @@ OpenVDBGrid<V>::sliceVoxelCounts(const mint zmin, const mint zmax) const
     tree::DynamicNodeManager<const wlTreeType> nodeManager(grid()->tree());
     nodeManager.reduceTopDown(op, true);
 
-    vector<openvdb::Index64> vcounts = op.counts;
+    std::vector<openvdb::Index64> vcounts = op.counts;
 
     mma::IntTensorRef counts = mma::makeVector<mint>(vcounts.size());
     for(int i = 0; i < counts.size(); i++)

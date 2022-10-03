@@ -13,7 +13,6 @@
 #include <ctime>
 #include <vector>
 
-using namespace std;
 using namespace openvdb;
 using namespace openvdb::tools;
 using namespace openvdbmma::types;
@@ -338,7 +337,7 @@ protected:
         mGrid->insertMeta(META_LAST_MODIFIED, openvdb::Int64Metadata((long int)(time(NULL))));
     }
 
-    inline char* WLString(string str)
+    inline char* WLString(std::string str)
     {
         const int n = str.length();
         //delete mString;

@@ -71,7 +71,7 @@ private:
         return gamma > 0.0 && mGrid->getGridClass() == GRID_FOG_VOLUME;
     }
 
-    void multiplyMetaValue(string key, T fac)
+    void multiplyMetaValue(std::string key, T fac)
     {
         using MetaIter = openvdb::MetaMap::MetaIterator;
 

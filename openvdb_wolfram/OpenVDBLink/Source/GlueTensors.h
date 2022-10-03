@@ -10,8 +10,6 @@
 
 #include <vector>
 
-using namespace std;
-
 
 // ------------ Scalar classes ------------ //
 
@@ -95,7 +93,7 @@ public:
     }
 
     template<typename S>
-    GlueVector0(const vector<S> &vec)
+    GlueVector0(const std::vector<S> &vec)
     : mVec(mma::makeVector<M>(vec.size()))
     {
         tbb::parallel_for(
@@ -157,7 +155,7 @@ public:
     }
 
     template<typename VectorT>
-    GlueVector1(const vector<VectorT> &mat)
+    GlueVector1(const std::vector<VectorT> &mat)
     : mMat(mma::makeMatrix<M>(mat.size(), m))
     {
         tbb::parallel_for(
@@ -228,7 +226,7 @@ public:
     }
 
     template<typename VectorT>
-    GlueMatrix0(const vector<VectorT> &vec)
+    GlueMatrix0(const std::vector<VectorT> &vec)
     : mMat(mma::makeMatrix<M>(vec.size(), vec[0].size))
     {
         const int m = vec[0].size;

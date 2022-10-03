@@ -48,7 +48,7 @@ public:
 private:
 
     void nearestAndDistance(mma::RealCoordinatesRef pts,
-        vector<Vec3R>& vpts, vector<float>& dists) const
+        std::vector<Vec3R>& vpts, std::vector<float>& dists) const
     {
         using CSP = typename openvdb::tools::ClosestSurfacePoint<GridT>::Ptr;
 
@@ -142,8 +142,8 @@ template<typename GridT>
 inline mma::RealCoordinatesRef
 DistanceMeasurementsMma<GridT>::gridNearest(mma::RealCoordinatesRef pts) const
 {
-    vector<Vec3R> vpts;
-    vector<float> dists;
+    std::vector<Vec3R> vpts;
+    std::vector<float> dists;
 
     nearestAndDistance(pts, vpts, dists);
 
@@ -169,8 +169,8 @@ template<typename GridT>
 inline mma::RealVectorRef
 DistanceMeasurementsMma<GridT>::gridDistance(mma::RealCoordinatesRef pts) const
 {
-    vector<Vec3R> vpts;
-    vector<float> dists;
+    std::vector<Vec3R> vpts;
+    std::vector<float> dists;
 
     nearestAndDistance(pts, vpts, dists);
 

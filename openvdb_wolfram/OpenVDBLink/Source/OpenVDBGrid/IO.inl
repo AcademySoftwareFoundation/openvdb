@@ -19,10 +19,10 @@ OpenVDBGrid<V>::importVDBType(const char* file_path, const char* grid_name)
     using NameIter = openvdb::io::File::NameIterator;
 
     openvdb::io::File file(file_path);
-    const string filename(file_path);
+    const std::string filename(file_path);
     mma::disownString(file_path);
 
-    const string name(grid_name);
+    const std::string name(grid_name);
     mma::disownString(grid_name);
 
     if (!file.open())
@@ -54,10 +54,10 @@ OpenVDBGrid<V>::importVDB(const char* file_path, const char* grid_name)
     using NameIter = openvdb::io::File::NameIterator;
 
     openvdb::io::File file(file_path);
-    const string filename(file_path);
+    const std::string filename(file_path);
     mma::disownString(file_path);
 
-    const string name(grid_name);
+    const std::string name(grid_name);
     mma::disownString(grid_name);
 
     if (!file.open())

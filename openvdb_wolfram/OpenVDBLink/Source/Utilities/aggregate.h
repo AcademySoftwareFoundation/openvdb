@@ -44,13 +44,13 @@ struct SliceActiveVoxelCounts
     explicit SliceActiveVoxelCounts(const int& zmin, const int& zmax)
     : mZmin(zmin), mZmax(zmax)
     {
-        counts = vector<openvdb::Index64>(mZmax - mZmin + 1, 0);
+        counts = std::vector<openvdb::Index64>(mZmax - mZmin + 1, 0);
     }
 
     SliceActiveVoxelCounts(const SliceActiveVoxelCounts& other, tbb::split)
     : mZmin(other.mZmin), mZmax(other.mZmax)
     {
-        counts = vector<openvdb::Index64>(mZmax - mZmin + 1, 0);
+        counts = std::vector<openvdb::Index64>(mZmax - mZmin + 1, 0);
     }
 
     // accumulate all voxels in active tile children bounded by the bbox
@@ -129,7 +129,7 @@ struct SliceActiveVoxelCounts
             other.counts.begin(), counts.begin(), std::plus<openvdb::Index64>());
     }
 
-    vector<openvdb::Index64> counts;
+    std::vector<openvdb::Index64> counts;
 
 private:
 
@@ -164,13 +164,13 @@ struct SliceActiveVoxelValueTotals
     explicit SliceActiveVoxelValueTotals(const int& zmin, const int& zmax)
     : mZmin(zmin), mZmax(zmax)
     {
-        totals = vector<ValueT>(mZmax - mZmin + 1, (ValueT)0);
+        totals = std::vector<ValueT>(mZmax - mZmin + 1, (ValueT)0);
     }
 
     SliceActiveVoxelValueTotals(const SliceActiveVoxelValueTotals& other, tbb::split)
     : mZmin(other.mZmin), mZmax(other.mZmax)
     {
-        totals = vector<ValueT>(mZmax - mZmin + 1, (ValueT)0);
+        totals = std::vector<ValueT>(mZmax - mZmin + 1, (ValueT)0);
     }
 
     // accumulate all voxels in active tile children bounded by the bbox
@@ -246,7 +246,7 @@ struct SliceActiveVoxelValueTotals
             other.totals.begin(), totals.begin(), std::plus<ValueT>());
     }
 
-    vector<ValueT> totals;
+    std::vector<ValueT> totals;
 
 private:
 
@@ -538,7 +538,7 @@ struct ActiveTiles
         );
     }
 
-    vector<int> tile_vec;
+    std::vector<int> tile_vec;
 
 private:
 
@@ -616,8 +616,8 @@ struct ActiveVoxelData
         }
     }
 
-    vector<int> pos_vec;
-    vector<ValueT> val_vec;
+    std::vector<int> pos_vec;
+    std::vector<ValueT> val_vec;
 
 private:
 

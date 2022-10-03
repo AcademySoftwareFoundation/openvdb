@@ -83,7 +83,7 @@ template<typename V>
 void
 OpenVDBGrid<V>::setCreator(const char* creator)
 {
-    grid()->setCreator(string(creator));
+    grid()->setCreator(std::string(creator));
     mma::disownString(creator);
 
     setLastModified();
@@ -93,7 +93,7 @@ template<typename V>
 void
 OpenVDBGrid<V>::setName(const char* name)
 {
-    grid()->setName(string(name));
+    grid()->setName(std::string(name));
     mma::disownString(name);
 
     setLastModified();

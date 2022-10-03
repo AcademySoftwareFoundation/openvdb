@@ -70,7 +70,7 @@ struct AbsOp {
 
 void
 meshTensorsToVectors(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
-    vector<Vec3s> &pvec, vector<Vec3I> &cvec)
+    std::vector<Vec3s> &pvec, std::vector<Vec3I> &cvec)
 {
     pvec.resize(pts.size());
     cvec.resize(tri_cells.rows());
@@ -103,7 +103,7 @@ meshTensorsToVectors(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
 
 template<typename GridT>
 typename GridT::Ptr
-meshToLevelSet(vector<Vec3s> &pvec, vector<Vec3I> &cvec,
+meshToLevelSet(std::vector<Vec3s> &pvec, std::vector<Vec3I> &cvec,
     double spacing, double halfWidth, const int flags)
 {
     using MeshDataAdapter = QuadAndTriangleDataAdapter<Vec3s, Vec3I>;
@@ -133,8 +133,8 @@ typename GridT::Ptr
 meshToLevelSet(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
     double spacing, double halfWidth, const int flags)
 {
-    vector<Vec3s> pvec;
-    vector<Vec3I> cvec;
+    std::vector<Vec3s> pvec;
+    std::vector<Vec3I> cvec;
     meshTensorsToVectors(pts, tri_cells, pvec, cvec);
 
     return meshToLevelSet<GridT>(pvec, cvec, spacing, halfWidth, flags);
@@ -142,7 +142,7 @@ meshToLevelSet(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
 
 template<typename GridT>
 typename GridT::Ptr
-offsetSurfaceLevelSet(vector<Vec3s> &pvec, vector<Vec3I> &cvec,
+offsetSurfaceLevelSet(std::vector<Vec3s> &pvec, std::vector<Vec3I> &cvec,
     double offset, double spacing, double width, bool is_signed)
 {
     using ValueT = typename GridT::ValueType;
@@ -191,8 +191,8 @@ typename GridT::Ptr
 offsetSurfaceLevelSet(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
     double offset, double spacing, double width, bool is_signed)
 {
-    vector<Vec3s> pvec;
-    vector<Vec3I> cvec;
+    std::vector<Vec3s> pvec;
+    std::vector<Vec3I> cvec;
     meshTensorsToVectors(pts, tri_cells, pvec, cvec);
 
     return offsetSurfaceLevelSet<GridT>(pvec, cvec, offset, spacing, width, is_signed);

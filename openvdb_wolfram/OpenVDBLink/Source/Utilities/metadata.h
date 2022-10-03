@@ -31,7 +31,7 @@ public:
     GridMetadata() {}
 
     template<typename T>
-    T getMetadata(string key) const
+    T getMetadata(std::string key) const
     {
         using MetaIter = openvdb::MetaMap::MetaIterator;
 
@@ -55,7 +55,7 @@ public:
     }
 
     template<typename T>
-    void setMetadata(string key, T val)
+    void setMetadata(std::string key, T val)
     {
         mGrid->insertMeta(key, TypedMetadata<T>(val));
     }
