@@ -930,12 +930,12 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
         for (auto leafIter = r.begin(); leafIter; ++leafIter) {
             for (auto voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                 const SdfValueT v = *voxelIter;
-                const SdfValueT fltMinDif = std::abs(v + std::numeric_limits<SdfValueT>::max());
-                const SdfValueT fltMaxDif = std::abs(v - std::numeric_limits<SdfValueT>::max());
-                if (v < mMin && fltMinDif >= 1.0e-4f) mMin = v;
-                if (v > mMax && fltMaxDif >= 1.0e-4f) mMax = v;
-                if (fltMinDif < 1.0e-4f) mFltMinExists = true;
-                if (fltMaxDif < 1.0e-4f) mFltMaxExists = true;
+                const bool vEqFltMin = v == - std::numeric_limits<SdfValueT>::max();
+                const bool vEqFltMax = v == std::numeric_limits<SdfValueT>::max();
+                if (v < mMin && !vEqFltMin) mMin = v;
+                if (v > mMax && !vEqFltMax) mMax = v;
+                if (vEqFltMin) mFltMinExists = true;
+                if (vEqFltMax) mFltMaxExists = true;
             }
         }
     }
