@@ -930,7 +930,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
         for (auto leafIter = r.begin(); leafIter; ++leafIter) {
             for (auto voxelIter = leafIter->beginValueOn(); voxelIter; ++voxelIter) {
                 const SdfValueT v = *voxelIter;
-                const bool vEqFltMin = v == - std::numeric_limits<SdfValueT>::max();
+                const bool vEqFltMin = v == -std::numeric_limits<SdfValueT>::max();
                 const bool vEqFltMax = v == std::numeric_limits<SdfValueT>::max();
                 if (v < mMin && !vEqFltMin) mMin = v;
                 if (v > mMax && !vEqFltMax) mMax = v;
@@ -952,7 +952,7 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
     bool mFltMinExists, mFltMaxExists;
 };// FastSweeping::MinMaxKernel
 
-/// Private class of FastSweeping to prune sdf value that is near float max or
+/// Private class of FastSweeping to prune sdf value that is equal to float max or
 /// float min.
 template <typename SdfGridT, typename ExtValueT>
 struct FastSweeping<SdfGridT, ExtValueT>::PruneMinMaxFltKernel {
@@ -960,10 +960,10 @@ struct FastSweeping<SdfGridT, ExtValueT>::PruneMinMaxFltKernel {
   PruneMinMaxFltKernel(SdfValueT min, SdfValueT max) : mMin(min), mMax(max) {}
 
   inline void operator()(const typename SdfGridT::ValueAllIter &iter) const {
-    if (std::abs(*iter + std::numeric_limits<SdfValueT>::max()) < 1.0e-4f) {
+    if (*iter == -std::numeric_limits<SdfValueT>::max()) {
       iter.setValue(mMin);
     }
-    if (std::abs(*iter - std::numeric_limits<SdfValueT>::max()) < 1.0e-4f) {
+    if (*iter == std::numeric_limits<SdfValueT>::max()) {
       iter.setValue(mMax);
     }
   }
