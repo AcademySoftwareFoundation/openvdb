@@ -34,6 +34,9 @@ class NodeManagerHandle;
 ///
 /// @param grid grid whose nodes will be accessed sequentially
 /// @param buffer buffer from which to allocate the output handle
+///
+/// @note This is the only way to create a NodeManager since it's using
+///       managed memory pointed to by a NodeManagerHandle.
 template <typename BuildT, typename BufferT = HostBuffer>
 NodeManagerHandle<BufferT> createNodeManager(const NanoGrid<BuildT> &grid,
                                              const BufferT& buffer = BufferT());
