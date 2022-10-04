@@ -67,6 +67,11 @@ class CudaDeviceBuffer
             if (abort)
                 exit(1);
         }
+        if (uint64_t(ptr) % NANOVDB_DATA_ALIGNMENT) {
+            fprintf(stderr, "Alignment pointer error: %s %s %d\n", msg, file, line);
+            if (abort)
+                exit(1);
+        }
     }
 #else
     static inline void ptrAssert(void*, const char*, const char*, int, bool = true)
@@ -162,7 +167,7 @@ inline void CudaDeviceBuffer::init(uint64_t size)
     if (size == 0)
         return;
     mSize = size;
-    cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!)
+    cudaCheck(cudaMallocHost((void**)&mCpuData, size)); // un-managed pinned memory on the host (can be slow to access!). Always 32B aligned
     checkPtr(mCpuData, "failed to allocate host data");
 } // CudaDeviceBuffer::init
 
@@ -170,7 +175,7 @@ inline void CudaDeviceBuffer::deviceUpload(void* stream, bool sync) const
 {
     checkPtr(mCpuData, "uninitialized cpu data");
     if (mGpuData == nullptr)
-        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device
+        cudaCheck(cudaMalloc((void**)&mGpuData, mSize)); // un-managed memory on the device, always 32B aligned!
     checkPtr(mGpuData, "uninitialized gpu data");
     cudaCheck(cudaMemcpyAsync(mGpuData, mCpuData, mSize, cudaMemcpyHostToDevice, reinterpret_cast<cudaStream_t>(stream)));
     if (sync)

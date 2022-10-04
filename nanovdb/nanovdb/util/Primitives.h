@@ -1221,11 +1221,13 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
         return s * Vec3T(rand(), rand(), rand()) - Vec3T(0.5);
     };
     const auto& srcTree = srcGrid.tree();
-    auto srcMgr = createLeafMgr(srcGrid);
+    auto srcMgrHandle = createNodeManager(srcGrid);
+    auto *srcMgr = srcMgrHandle.template mgr<ValueT>();
+    assert(srcMgr);
     for (uint32_t i = 0, end = srcTree.nodeCount(0); i < end; ++i) {
-        auto* srcLeaf = srcMgr[i];
-        auto* dstLeaf = dstAcc.setValue(srcLeaf->origin(), pointsPerVoxel); // allocates leaf node
-        dstLeaf->mValueMask = srcLeaf->valueMask();
+        auto& srcLeaf = srcMgr->leaf(i);;
+        auto* dstLeaf = dstAcc.setValue(srcLeaf.origin(), pointsPerVoxel); // allocates leaf node
+        dstLeaf->mValueMask = srcLeaf.valueMask();
         for (uint32_t j = 0, m = 0; j < 512; ++j) {
             if (dstLeaf->mValueMask.isOn(j)) {
                 for (int n = 0; n < pointsPerVoxel; ++n, ++m) {
@@ -1242,13 +1244,12 @@ createPointScatter(const NanoGrid<ValueT>& srcGrid, // origin of grid in world u
     auto handle = builder.template getHandle<AbsDiff, BufferT>(srcGrid.map(), name, dummy, buffer);
     assert(handle);
     auto* dstGrid = handle.template grid<uint32_t>();
-    assert(dstGrid);
+    assert(dstGrid && dstGrid->template isSequential<0>());
     auto& dstTree = dstGrid->tree();
     if (dstTree.nodeCount(0) == 0) {
         throw std::runtime_error("Expect leaf nodes!");
     }
-    auto dstMgr = createLeafMgr(*dstGrid);
-    auto* leafData = dstMgr[0]->data();
+    auto *leafData = dstTree.getFirstLeaf()->data();
     leafData[0].mMinimum = 0; // start of prefix sum
     for (uint32_t i = 1, n = dstTree.nodeCount(0); i < n; ++i) {
         leafData[i].mMinimum = leafData[i - 1].mMinimum + leafData[i - 1].mMaximum;
