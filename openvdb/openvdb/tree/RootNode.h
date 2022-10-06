@@ -901,7 +901,7 @@ public:
     /// Return the grid index coordinates of this node's local origin.
     const Coord& origin() const { return mOrigin; }
     /// @brief change the origin on this root node
-    /// @param origin the index coordinated of the new alignment
+    /// @param origin the index coordinates of the new alignment
     ///
     /// @warning This method will throw if the origin is non-zero, since
     ///          other tools do not yet support variable offsets.
@@ -1085,7 +1085,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, const ValueType& foregd, TopologyCopy)
     : mBackground(backgd)
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
-    , mOrigin(0, 0, 0)
+    , mOrigin(other.mOrigin)
 #endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
@@ -1093,6 +1093,11 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 {
     using OtherRootT = RootNode<OtherChildType>;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode: non-zero offsets are currently not supported");
+    }
+#endif
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(foregd, true);
@@ -1177,6 +1182,9 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
 
         self.mBackground = Local::convertValue(other.mBackground);
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if (other.mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNodeCopyHelper::copyWithValueConversion: non-zero offsets are currently not supported");
+        }
         self.mOrigin = other.mOrigin;
 #endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
@@ -2675,7 +2683,7 @@ RootNode<ChildT>::setOrigin(const Coord &origin)
 {
     mOrigin = origin;
     if (mOrigin != Coord(0,0,0)) {
-        OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are still not supported");
+        OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are currently not supported");
     }
 }
 #endif
