@@ -210,9 +210,9 @@ class Processor
     template <typename OpT>
     void a(OpT op){
         union {std::int32_t i; float x;} A;
-        if (is_int(mCallStack.top(), A.i)) {
+        if (isInt(mCallStack.top(), A.i)) {
             mCallStack.top() = std::to_string(op(A.i));
-        } else if (is_flt(mCallStack.top(), A.x)) {
+        } else if (isFloat(mCallStack.top(), A.x)) {
             mCallStack.top() = std::to_string(op(A.x));
         } else {
             throw std::invalid_argument("a: invalid argument \"" + mCallStack.top() + "\"");
@@ -224,9 +224,9 @@ class Processor
     void ab(OpT op){
         union {std::int32_t i; float x;} A, B;
         const std::string str = mCallStack.pop();
-        if (is_int(mCallStack.top(), A.i) && is_int(str, B.i)) {
+        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
             mCallStack.top() = std::to_string(op(A.i, B.i));
-        } else if (is_flt(mCallStack.top(), A.x) && is_flt(str, B.x)) {
+        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
             mCallStack.top() = std::to_string(op(A.x, B.x));
         } else {
             throw std::invalid_argument("ab: invalid arguments \"" + mCallStack.top() + "\" and \"" + str + "\"");
@@ -235,12 +235,12 @@ class Processor
 
     /// @brief apply a boolean test, e.g. a == b, to the two top elements, assuming they are floats, integers or strings
     template <typename T>
-    void boolian(T test){
+    void boolean(T test){
         union {std::int32_t i; float x;} A, B;
         const std::string str = mCallStack.pop();
-        if (is_int(mCallStack.top(), A.i) && is_int(str, B.i)) {
+        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
             mCallStack.top() = test(A.i, B.i) ? "1" : "0";
-        } else if (is_flt(mCallStack.top(), A.x) && is_flt(str, B.x)) {
+        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
             mCallStack.top() = test(A.x, B.x) ? "1" : "0";
         } else {// string
             mCallStack.top() = test(mCallStack.top(), str) ? "1" : "0";
@@ -280,23 +280,23 @@ public:
 
         // boolean operations
         add("==","returns true if the two top enteries on the stack compare equal, e.g. {1:2:==} -> {0}",
-            [&](){this->boolian(std::equal_to<>());});
+            [&](){this->boolean(std::equal_to<>());});
         add("!=","returns true if the two top enteries on the stack are not equal, e.g. {1:2:!=} -> {1}",
-            [&](){this->boolian(std::not_equal_to<>());});
+            [&](){this->boolean(std::not_equal_to<>());});
         add("<=","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
-            [&](){this->boolian(std::less_equal<>());});
+            [&](){this->boolean(std::less_equal<>());});
         add(">=","returns true if the two top enteries on the stack are greater than or equal, e.g. {1:2:>=} -> {0}",
-            [&](){this->boolian(std::greater_equal<>());});
+            [&](){this->boolean(std::greater_equal<>());});
         add("<","returns true if the two top enteries on the stack are less than, e.g. {1:2:<} -> {1}",
-            [&](){this->boolian(std::less<>());});
+            [&](){this->boolean(std::less<>());});
         add(">","returns true if the two top enteries on the stack are less than or equal, e.g. {1:2:<=} -> {1}",
-            [&](){this->boolian(std::greater<>());});
+            [&](){this->boolean(std::greater<>());});
         add("!","logical negation, e.g. {1:!} -> {0}",
-            [&](){this->set(!str2bool(mCallStack.top()));});
+            [&](){this->set(!strToBool(mCallStack.top()));});
         add("|","logical or, e.g. {1:0:|} -> {1}",
-            [&](){bool b=str2bool(mCallStack.pop());this->set(str2bool(mCallStack.top())||b);});
+            [&](){bool b=strToBool(mCallStack.pop());this->set(strToBool(mCallStack.top())||b);});
         add("&","logical and, e.g. {1:0:&} -> {0}",
-            [&](){bool b=str2bool(mCallStack.pop());this->set(str2bool(mCallStack.top())&&b);});
+            [&](){bool b=strToBool(mCallStack.pop());this->set(strToBool(mCallStack.top())&&b);});
 
         // math operations
         add("+","adds two top stack entries, e.g. {1:2:+} -> {3}",
@@ -332,35 +332,35 @@ public:
         add("sign","sign of value, e.g. {-2:neg} -> {-1}",
             [&](){this->a([](auto& x){return (x > 0) - (x < 0);});});
         add("sin","sine of value, e.g. {$pi:sin} -> {0.0}",
-            [&](){this->set(std::sin(str2float(mCallStack.top())));});
+            [&](){this->set(std::sin(strToFloat(mCallStack.top())));});
         add("cos","cosine of value, e.g. {$pi:cos} -> {-1.0}",
-            [&](){this->set(std::cos(str2float(mCallStack.top())));});
+            [&](){this->set(std::cos(strToFloat(mCallStack.top())));});
         add("tan","tangent of value, e.g. {$pi:tan} -> {0.0}",
-            [&](){this->set(std::tan(str2float(mCallStack.top())));});
+            [&](){this->set(std::tan(strToFloat(mCallStack.top())));});
         add("asin","inverse sine of value, e.g. {1:asin} -> {1.570796}",
-            [&](){this->set(std::asin(str2float(mCallStack.top())));});
+            [&](){this->set(std::asin(strToFloat(mCallStack.top())));});
         add("acos","inverse cosine of value, e.g. {1:acos} -> {0.0}",
-            [&](){this->set(std::acos(str2float(mCallStack.top())));});
+            [&](){this->set(std::acos(strToFloat(mCallStack.top())));});
         add("atan","inverse tangent of value, e.g. {1:atan} -> {0.785398}",
-            [&](){this->set(std::atan(str2float(mCallStack.top())));});
+            [&](){this->set(std::atan(strToFloat(mCallStack.top())));});
         add("r2d","radian to degrees, e.g. {$pi:r2d} -> {180.0}",
-            [&](){this->set(180.0f*str2float(mCallStack.top())/math::pi<float>());});
+            [&](){this->set(180.0f*strToFloat(mCallStack.top())/math::pi<float>());});
         add("d2r","degrees to radian, e.g. {180:d2r} -> {3.141593}",
-            [&](){this->set(math::pi<float>()*str2float(mCallStack.top())/180.0f);});
+            [&](){this->set(math::pi<float>()*strToFloat(mCallStack.top())/180.0f);});
         add("inv","inverse of value, e.g. {5:inv} -> {0.2}",
-            [&](){this->set(1.0f/str2float(mCallStack.top()));});
+            [&](){this->set(1.0f/strToFloat(mCallStack.top()));});
         add("exp","exponential of value, e.g. {1:exp} -> {2.718282}",
-            [&](){this->set(std::exp(str2float(mCallStack.top())));});
+            [&](){this->set(std::exp(strToFloat(mCallStack.top())));});
         add("ln","natural log of value, e.g. {1:ln} -> {0.0}",
-            [&](){this->set(std::log(str2float(mCallStack.top())));});
+            [&](){this->set(std::log(strToFloat(mCallStack.top())));});
         add("log","10 base log of value, e.g. {1:log} -> {0.0}",
-            [&](){this->set(std::log10(str2float(mCallStack.top())));});
+            [&](){this->set(std::log10(strToFloat(mCallStack.top())));});
         add("sqrt","squareroot of value, e.g. {2:sqrt} -> {1.414214}",
-            [&](){this->set(std::sqrt(str2float(mCallStack.top())));});
+            [&](){this->set(std::sqrt(strToFloat(mCallStack.top())));});
         add("to_int","convert value to integer, e.g. {1.2:to_int} -> {1}",
-            [&](){this->set(int(str2float(mCallStack.top())));});
+            [&](){this->set(int(strToFloat(mCallStack.top())));});
         add("to_float","convert value to floating point, e.g. {1:to_float} -> {1.0}",
-            [&](){this->set(str2float(mCallStack.top()));});
+            [&](){this->set(strToFloat(mCallStack.top()));});
 
         // stack operations
         add("dup","duplicates the top, i.e. pushes the top entry onto the stack, e.g. {x:dup} -> {x:x}",
@@ -393,9 +393,9 @@ public:
 
         // string operations
         add("lower","convert all characters in a string to lower case, e.g. {HeLlO:lower} -> {hello}",
-            [&](){to_lower_case(mCallStack.top());});
+            [&](){toLowerCase(mCallStack.top());});
         add("upper","convert all characters in a string to upper case, e.g. {HeLlO:upper} -> {HELLO}",
-            [&](){to_upper_case(mCallStack.top());});
+            [&](){toUpperCase(mCallStack.top());});
         add("length","push the number of characters in a string onto the stack, e.g. {foo bar:length} -> {7}",
             [&](){this->set(mCallStack.top().length());});
         add("replace","replace words in string, e.g. {for bar:a:b:replace} -> {foo bbr}",
@@ -422,7 +422,7 @@ public:
         add("is_set","returns true if a string has an associated value, e.g. {pi:is_set} ->{1}",
             [&](){this->set(mMemory.isSet(mCallStack.top()));});
         add("pad0","add zero-padding of a specified with to a string, e.g. {12:4:pad0} -> {0012}",
-            [&](){const int w = str2int(mCallStack.pop());
+            [&](){const int w = strToInt(mCallStack.pop());
                   std::stringstream ss;
                   ss << std::setfill('0') << std::setw(w) << mCallStack.top();
                   mCallStack.top() = ss.str();
@@ -474,13 +474,13 @@ public:
                     if (str[i]!=')') throw std::invalid_argument("Processor():: missing \")\" in if-statement \""+str.substr(q)+"\"");
                     const auto v = tokenize(str.substr(q+3, i-q-3), "?");
                     if (v.size() == 1) {
-                        if (str2bool(mCallStack.pop())) {
+                        if (strToBool(mCallStack.pop())) {
                             str.replace(q, i - q + 1, v[0]);
                         } else {
                             str.erase(q - 1, i - q + 2);// also erase the leading ':' character
                         }
                     } else if (v.size() == 2) {
-                        str.replace(q, i - q + 1, v[str2bool(mCallStack.pop()) ? 0 : 1]);
+                        str.replace(q, i - q + 1, v[strToBool(mCallStack.pop()) ? 0 : 1]);
                     } else {
                         throw std::invalid_argument("Processor():: invalid if-statement \""+str.substr(q)+"\"");
                     }
@@ -573,7 +573,7 @@ struct BaseLoop
     virtual bool valid() = 0;
     virtual bool next() = 0;
     template <typename T>
-    T get() const { return str2<T>(memory.get(name)); }
+    T get() const { return strTo<T>(memory.get(name)); }
     template <typename T>
     void set(T v){
         memory.set(name, v);
@@ -657,7 +657,7 @@ struct Parser {
 
     inline std::string getStr(const std::string &name) const;
     template <typename T>
-    T get(const std::string &name) const {return str2<T>(this->getStr(name));}
+    T get(const std::string &name) const {return strTo<T>(this->getStr(name));}
     template <typename T>
     inline math::Vec3<T> getVec3(const std::string &name, const char* delimiters = "(),") const;
     template <typename T>
@@ -716,7 +716,7 @@ std::vector<T> Parser::getVec(const std::string &name, const char* delimiters) c
 {
     VecS v = this->getVec<std::string>(name, delimiters);
     std::vector<T> vec(v.size());
-    for (int i=0; i<v.size(); ++i) vec[i] = str2<T>(v[i]);
+    for (int i=0; i<v.size(); ++i) vec[i] = strTo<T>(v[i]);
     return vec;
 }
 
@@ -727,7 +727,7 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
 {
     VecS v = this->getVec<std::string>(name, delimiters);
     if (v.size()!=3) throw std::invalid_argument(iter->name+": Parser::getVec3: not a valid input "+name);
-    return math::Vec3<T>(str2<T>(v[0]), str2<T>(v[1]), str2<T>(v[2]));
+    return math::Vec3<T>(strTo<T>(v[0]), strTo<T>(v[1]), strTo<T>(v[2]));
 }
 
 // ==============================================================================================================

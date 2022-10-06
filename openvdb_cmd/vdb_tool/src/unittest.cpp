@@ -3,6 +3,10 @@
 
 #define _USE_MATH_DEFINES
 
+#include "Tool.h"
+#include "Parser.h"
+#include "Util.h"
+
 #include <stdio.h>// for std::remove
 #include <string>
 #include <fstream>
@@ -15,8 +19,6 @@ int mkdir_wrapper(const char *dirname) { return _mkdir(dirname); }
 #include <sys/stat.h>// for mkdir
 int mkdir_wrapper(const char *dirname) { return mkdir(dirname, 0777); }
 #endif
-
-#include "Tool.h"
 
 #include "gtest/gtest.h"
 
@@ -33,7 +35,7 @@ protected:
 
     void SetUp() override
     {
-        if (!openvdb::vdb_tool::file_exists("data")) {
+        if (!openvdb::vdb_tool::fileExists("data")) {
             if (mkdir_wrapper("data") == -1) {
                 std::cerr << "Test_vdb_tool::SetUp: Failed to create \"data\" directory :  " << strerror(errno) << std::endl;
             } else {
@@ -78,19 +80,19 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ(4, openvdb::vdb_tool::findMatch("aa", {"abc,o", "a,b,c", "ab,k,j", "abc,d,aa,w"}));
       EXPECT_EQ(2, openvdb::vdb_tool::findMatch("aaa", {"abc,o", "a,aaa,c,aa", "ab,k,j", "abc,d,bb,w"}));
     }
-    {// find_all
-      auto vec = openvdb::vdb_tool::find_all("%1234%678%0123%");
+    {// findAll
+      auto vec = openvdb::vdb_tool::findAll("%1234%678%0123%");
       EXPECT_EQ( 4, vec.size());
       EXPECT_EQ( 0, vec[0]);
       EXPECT_EQ( 5, vec[1]);
       EXPECT_EQ( 9, vec[2]);
       EXPECT_EQ(14, vec[3]);
     }
-    {// to_lower_case
-      EXPECT_EQ(" abc=", openvdb::vdb_tool::to_lower_case(" AbC="));
+    {// toLowerCase
+      EXPECT_EQ(" abc=", openvdb::vdb_tool::toLowerCase(" AbC="));
     }
-    {// to_upper_case
-      EXPECT_EQ(" ABC=", openvdb::vdb_tool::to_upper_case(" AbC="));
+    {// toUpperCase
+      EXPECT_EQ(" ABC=", openvdb::vdb_tool::toUpperCase(" AbC="));
     }
     {// contains
       EXPECT_TRUE( openvdb::vdb_tool::contains("path/base.ext", "base"));
@@ -131,15 +133,15 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_EQ(0, openvdb::vdb_tool::findFileExt("path/file_002.ext", {"abc", "efg", "ab"}));
     }
 
-    {// starts_with
-      EXPECT_TRUE(openvdb::vdb_tool::starts_with("vfxvfxvfx",  "vfx"));
-      EXPECT_FALSE(openvdb::vdb_tool::starts_with("vvfxvfxvfx", "vfx"));
+    {// startsWith
+      EXPECT_TRUE(openvdb::vdb_tool::startsWith("vfxvfxvfx",  "vfx"));
+      EXPECT_FALSE(openvdb::vdb_tool::startsWith("vvfxvfxvfx", "vfx"));
     }
 
-    {// ends_with
-      EXPECT_TRUE(openvdb::vdb_tool::ends_with("vfxvfxvfx",  "vfx"));
-      EXPECT_TRUE(openvdb::vdb_tool::ends_with("vvfxvfxvfx", "vfx"));
-      EXPECT_TRUE(openvdb::vdb_tool::ends_with("file.ext", "ext"));
+    {// endsWith
+      EXPECT_TRUE(openvdb::vdb_tool::endsWith("vfxvfxvfx",  "vfx"));
+      EXPECT_TRUE(openvdb::vdb_tool::endsWith("vvfxvfxvfx", "vfx"));
+      EXPECT_TRUE(openvdb::vdb_tool::endsWith("file.ext", "ext"));
     }
 
     {// tokenize
@@ -213,82 +215,82 @@ TEST_F(Test_vdb_tool, Util)
       EXPECT_THROW(openvdb::vdb_tool::findArg({"v=foo", "val"}, "val"), std::invalid_argument);
     }
 
-    {// is_int
+    {// isInt
       int i=-1;
-      EXPECT_FALSE(openvdb::vdb_tool::is_int("", i));
+      EXPECT_FALSE(openvdb::vdb_tool::isInt("", i));
       EXPECT_EQ(-1, i);
-      EXPECT_TRUE(openvdb::vdb_tool::is_int("-5", i));
+      EXPECT_TRUE(openvdb::vdb_tool::isInt("-5", i));
       EXPECT_EQ(-5, i);
-      EXPECT_FALSE(openvdb::vdb_tool::is_int("-6.0", i));
+      EXPECT_FALSE(openvdb::vdb_tool::isInt("-6.0", i));
     }
 
-    {// str2int
+    {// strToInt
       EXPECT_NO_THROW({
-        EXPECT_EQ( 1, openvdb::vdb_tool::str2int("1"));
-        EXPECT_EQ(-5, openvdb::vdb_tool::str2int("-5"));
+        EXPECT_EQ( 1, openvdb::vdb_tool::strToInt("1"));
+        EXPECT_EQ(-5, openvdb::vdb_tool::strToInt("-5"));
       });
-      EXPECT_THROW(openvdb::vdb_tool::str2int("1.0"), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2int("1 "),  std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToInt("1.0"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToInt("1 "),  std::invalid_argument);
     }
 
-    {// is_flt
+    {// isFloat
       float v=-1.0f;
-      EXPECT_FALSE(openvdb::vdb_tool::is_flt("", v));
+      EXPECT_FALSE(openvdb::vdb_tool::isFloat("", v));
       EXPECT_EQ(-1.0f, v);
-      EXPECT_TRUE(openvdb::vdb_tool::is_flt("-5", v));
+      EXPECT_TRUE(openvdb::vdb_tool::isFloat("-5", v));
       EXPECT_EQ(-5.0f, v);
-      EXPECT_TRUE(openvdb::vdb_tool::is_flt("-6.0", v));
+      EXPECT_TRUE(openvdb::vdb_tool::isFloat("-6.0", v));
       EXPECT_EQ(-6.0, v);
-      EXPECT_FALSE(openvdb::vdb_tool::is_flt("-7.0f", v));
+      EXPECT_FALSE(openvdb::vdb_tool::isFloat("-7.0f", v));
     }
 
-    {// str2float
+    {// strToFloat
       EXPECT_NO_THROW({
-        EXPECT_EQ(0.02f, openvdb::vdb_tool::str2float("0.02"));
-        EXPECT_EQ( 1.0f, openvdb::vdb_tool::str2float("1"));
-        EXPECT_EQ(-5.0f, openvdb::vdb_tool::str2float("-5.0"));
+        EXPECT_EQ(0.02f, openvdb::vdb_tool::strToFloat("0.02"));
+        EXPECT_EQ( 1.0f, openvdb::vdb_tool::strToFloat("1"));
+        EXPECT_EQ(-5.0f, openvdb::vdb_tool::strToFloat("-5.0"));
       });
-      EXPECT_THROW(openvdb::vdb_tool::str2float(""), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2float("1.0f"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToFloat(""), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToFloat("1.0f"), std::invalid_argument);
     }
 
-    {// str2double
+    {// strToDouble
       EXPECT_NO_THROW({
-        EXPECT_EQ(0.02, openvdb::vdb_tool::str2double("0.02"));
-        EXPECT_EQ( 1.0, openvdb::vdb_tool::str2double("1"));
-        EXPECT_EQ(-5.0, openvdb::vdb_tool::str2double("-5.0"));
+        EXPECT_EQ(0.02, openvdb::vdb_tool::strToDouble("0.02"));
+        EXPECT_EQ( 1.0, openvdb::vdb_tool::strToDouble("1"));
+        EXPECT_EQ(-5.0, openvdb::vdb_tool::strToDouble("-5.0"));
       });
-      EXPECT_THROW(openvdb::vdb_tool::str2double(""), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2double("1.0f"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToDouble(""), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToDouble("1.0f"), std::invalid_argument);
     }
 
-    {// str2bool
+    {// strToBool
       EXPECT_NO_THROW({
-        EXPECT_TRUE(openvdb::vdb_tool::str2bool("1"));
-        EXPECT_TRUE(openvdb::vdb_tool::str2bool("true"));
-        EXPECT_TRUE(openvdb::vdb_tool::str2bool("TRUE"));
-        EXPECT_TRUE(openvdb::vdb_tool::str2bool("TrUe"));
-        EXPECT_FALSE(openvdb::vdb_tool::str2bool("0"));
-        EXPECT_FALSE(openvdb::vdb_tool::str2bool("false"));
-        EXPECT_FALSE(openvdb::vdb_tool::str2bool("FALSE"));
-        EXPECT_FALSE(openvdb::vdb_tool::str2bool("FaLsE"));
+        EXPECT_TRUE(openvdb::vdb_tool::strToBool("1"));
+        EXPECT_TRUE(openvdb::vdb_tool::strToBool("true"));
+        EXPECT_TRUE(openvdb::vdb_tool::strToBool("TRUE"));
+        EXPECT_TRUE(openvdb::vdb_tool::strToBool("TrUe"));
+        EXPECT_FALSE(openvdb::vdb_tool::strToBool("0"));
+        EXPECT_FALSE(openvdb::vdb_tool::strToBool("false"));
+        EXPECT_FALSE(openvdb::vdb_tool::strToBool("FALSE"));
+        EXPECT_FALSE(openvdb::vdb_tool::strToBool("FaLsE"));
       });
-      EXPECT_THROW(openvdb::vdb_tool::str2bool(""), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2bool("2"), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2bool("t"), std::invalid_argument);
-      EXPECT_THROW(openvdb::vdb_tool::str2bool("f"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToBool(""), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToBool("2"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToBool("t"), std::invalid_argument);
+      EXPECT_THROW(openvdb::vdb_tool::strToBool("f"), std::invalid_argument);
     }
 
-    {// is_number
+    {// isNumber
       int i=0;
       float v=0;
-      EXPECT_FALSE(openvdb::vdb_tool::is_number("", i, v));
+      EXPECT_FALSE(openvdb::vdb_tool::isNumber("", i, v));
       EXPECT_EQ(0, i);
-      EXPECT_EQ(1, openvdb::vdb_tool::is_number("-5",i,  v));
+      EXPECT_EQ(1, openvdb::vdb_tool::isNumber("-5",i,  v));
       EXPECT_EQ(-5, i);
-      EXPECT_EQ(2, openvdb::vdb_tool::is_number("-6.0", i, v));
+      EXPECT_EQ(2, openvdb::vdb_tool::isNumber("-6.0", i, v));
       EXPECT_EQ(-6.0, v);
-      EXPECT_FALSE(openvdb::vdb_tool::is_number("-7.0f", i, v));
+      EXPECT_FALSE(openvdb::vdb_tool::isNumber("-7.0f", i, v));
     }
 
     {// uuid
@@ -669,8 +671,8 @@ TEST_F(Test_vdb_tool, Processor)
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2:atan}"));
     EXPECT_EQ(std::to_string(atan(2.0f)), proc("{2.0:atan}"));
 
-    EXPECT_NEAR(openvdb::math::pi<float>(), str2float(proc("{180.0:d2r}")), 1e-4);
-    EXPECT_NEAR(180.0f, str2float(proc("{$pi:r2d}")), 1e-4);
+    EXPECT_NEAR(openvdb::math::pi<float>(), strToFloat(proc("{180.0:d2r}")), 1e-4);
+    EXPECT_NEAR(180.0f, strToFloat(proc("{$pi:r2d}")), 1e-4);
 
     EXPECT_EQ(std::to_string(1.0f/2.0f), proc("{2:inv}"));
     EXPECT_EQ(std::to_string(1.0f), proc("{1.0:inv}"));
@@ -821,12 +823,12 @@ TEST_F(Test_vdb_tool, ToolBasic)
 {
     using namespace openvdb::vdb_tool;
 
-    EXPECT_TRUE(file_exists("data"));
+    EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere.ply");
     std::remove("data/config.txt");
 
-    EXPECT_FALSE(file_exists("data/sphere.ply"));
-    EXPECT_FALSE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -sphere r=1.1 -ls2mesh -write data/sphere.ply data/config.txt");
@@ -834,20 +836,20 @@ TEST_F(Test_vdb_tool, ToolBasic)
       vdb_tool.run();
     });
 
-    EXPECT_TRUE(file_exists("data/sphere.ply"));
-    EXPECT_TRUE(file_exists("data/config.txt"));
+    EXPECT_TRUE(fileExists("data/sphere.ply"));
+    EXPECT_TRUE(fileExists("data/config.txt"));
 }// ToolBasic
 
 TEST_F(Test_vdb_tool, Counter)
 {
     using namespace openvdb::vdb_tool;
 
-    EXPECT_TRUE(file_exists("data"));
+    EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere_1.ply");
     std::remove("data/config_2.txt");
 
-    EXPECT_FALSE(file_exists("data/sphere_1.ply"));
-    EXPECT_FALSE(file_exists("data/config_2.txt"));
+    EXPECT_FALSE(fileExists("data/sphere_1.ply"));
+    EXPECT_FALSE(fileExists("data/config_2.txt"));
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -eval {1:@G} -sphere r=1.1 -ls2mesh -write data/sphere_{$G}.ply data/config_{$G:++}.txt");
@@ -855,8 +857,8 @@ TEST_F(Test_vdb_tool, Counter)
       vdb_tool.run();
     });
 
-    EXPECT_TRUE(file_exists("data/sphere_1.ply"));
-    EXPECT_TRUE(file_exists("data/config_2.txt"));
+    EXPECT_TRUE(fileExists("data/sphere_1.ply"));
+    EXPECT_TRUE(fileExists("data/config_2.txt"));
 }// Counter
 
 TEST_F(Test_vdb_tool, ToolForLoop)
@@ -864,11 +866,11 @@ TEST_F(Test_vdb_tool, ToolForLoop)
     using namespace openvdb::vdb_tool;
 
     std::remove("data/config.txt");
-    EXPECT_FALSE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
     for (int i=0; i<4; ++i) {
       const std::string name("data/sphere_"+std::to_string(i)+".ply");
       std::remove(name.c_str());
-      EXPECT_FALSE(file_exists(name));
+      EXPECT_FALSE(fileExists(name));
     }
 
     // test single for-loop
@@ -878,7 +880,7 @@ TEST_F(Test_vdb_tool, ToolForLoop)
       vdb_tool.run();
     });
 
-    for (int i=1; i<4; ++i) EXPECT_TRUE(file_exists("data/sphere_"+std::to_string(i)+".ply"));
+    for (int i=1; i<4; ++i) EXPECT_TRUE(fileExists("data/sphere_"+std::to_string(i)+".ply"));
 
     // test two nested for-loops
     EXPECT_NO_THROW({
@@ -887,19 +889,19 @@ TEST_F(Test_vdb_tool, ToolForLoop)
       vdb_tool.run();
     });
 
-    EXPECT_TRUE(file_exists("data/test.vdb"));
+    EXPECT_TRUE(fileExists("data/test.vdb"));
 }// ToolForLoop
 
 TEST_F(Test_vdb_tool, ToolError)
 {
     using namespace openvdb::vdb_tool;
 
-    EXPECT_TRUE(file_exists("data"));
+    EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere.ply");
     std::remove("data/config.txt");
 
-    EXPECT_FALSE(file_exists("data/sphere.ply"));
-    EXPECT_FALSE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
 
     EXPECT_THROW({
       auto args = getArgs("vdb_tool -sphere bla=3 -ls2mesh -write data/sphere.ply data/config.txt -quiet");
@@ -907,22 +909,22 @@ TEST_F(Test_vdb_tool, ToolError)
       vdb_tool.run();
     }, std::invalid_argument);
 
-    EXPECT_FALSE(file_exists("data/sphere.ply"));
-    EXPECT_FALSE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
 }
 
 TEST_F(Test_vdb_tool, ToolKeep)
 {
     using namespace openvdb::vdb_tool;
 
-    EXPECT_TRUE(file_exists("data"));
+    EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere.vdb");
     std::remove("data/sphere.ply");
     std::remove("data/config.txt");
 
-    EXPECT_FALSE(file_exists("data/sphere.vdb"));
-    EXPECT_FALSE(file_exists("data/sphere.ply"));
-    EXPECT_FALSE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/sphere.vdb"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_FALSE(fileExists("data/config.txt"));
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -default keep=1 -sphere r=2 -ls2mesh vdb=0 -write vdb=0 geo=0 data/sphere.vdb data/sphere.ply data/config.txt");
@@ -930,22 +932,22 @@ TEST_F(Test_vdb_tool, ToolKeep)
       vdb_tool.run();
     });
 
-    EXPECT_TRUE(file_exists("data/sphere.vdb"));
-    EXPECT_TRUE(file_exists("data/sphere.ply"));
-    EXPECT_TRUE(file_exists("data/config.txt"));
+    EXPECT_TRUE(fileExists("data/sphere.vdb"));
+    EXPECT_TRUE(fileExists("data/sphere.ply"));
+    EXPECT_TRUE(fileExists("data/config.txt"));
 }
 
 TEST_F(Test_vdb_tool, ToolConfig)
 {
     using namespace openvdb::vdb_tool;
 
-    EXPECT_TRUE(file_exists("data"));
+    EXPECT_TRUE(fileExists("data"));
     std::remove("data/sphere.vdb");
     std::remove("data/sphere.ply");
 
-    EXPECT_FALSE(file_exists("data/sphere.vdb"));
-    EXPECT_FALSE(file_exists("data/sphere.ply"));
-    EXPECT_TRUE(file_exists("data/config.txt"));
+    EXPECT_FALSE(fileExists("data/sphere.vdb"));
+    EXPECT_FALSE(fileExists("data/sphere.ply"));
+    EXPECT_TRUE(fileExists("data/config.txt"));
 
     EXPECT_NO_THROW({
       auto args = getArgs("vdb_tool -quiet -config data/config.txt");
@@ -953,9 +955,9 @@ TEST_F(Test_vdb_tool, ToolConfig)
       vdb_tool.run();
     });
 
-    EXPECT_TRUE(file_exists("data/sphere.vdb"));
-    EXPECT_TRUE(file_exists("data/sphere.ply"));
-    EXPECT_TRUE(file_exists("data/config.txt"));
+    EXPECT_TRUE(fileExists("data/sphere.vdb"));
+    EXPECT_TRUE(fileExists("data/sphere.ply"));
+    EXPECT_TRUE(fileExists("data/config.txt"));
 }
 
 

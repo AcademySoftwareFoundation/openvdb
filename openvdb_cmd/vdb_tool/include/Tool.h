@@ -315,9 +315,9 @@ struct Tool::Header {
     Header(const std::string &line) : magic("vdb_tool") {
       const VecS header = tokenize(line, " .");
       if (header.size()!=4 || header[0]!=magic ||
-         !is_int(header[1], major) ||
-         !is_int(header[2], minor) ||
-         !is_int(header[3], patch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
+         !isInt(header[1], major) ||
+         !isInt(header[2], minor) ||
+         !isInt(header[3], patch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
     }
     std::string str() const {
       return magic+" "+std::to_string(major)+"."+std::to_string(minor)+"."+std::to_string(patch);
@@ -736,52 +736,52 @@ void Tool::init()
 
   // operations related to VDB grids
   proc.add("voxelSize", "voxel size of specified vdb grid, e.g. {0:voxelSize} -> {0.01}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->voxelSize()[0]);});
 
   proc.add("voxelCount", "number of active voxels of specified VDB grid, e.g. {0:voxelCount} -> {3269821}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->activeVoxelCount());});
 
   proc.add("gridCount", "push the number of loaded VDB grids onto the stack, e.g. {gridCount} -> {1}",
       [&](){proc.push(mGrid.size());});
 
   proc.add("gridName", "name of a specified VDB grid, e.g. {0:gridName} -> {sphere}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->getName());});
 
   proc.add("isGridEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->empty());});
 
   proc.add("gridType", "value type of a specified VDB grid, e.g. {0:gridType} -> {float}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->valueType());});
 
   proc.add("gridClass", "class of a specified VDB grid, e.g. {0:gridClass} -> {ls}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             switch ((*it)->getGridClass()) {
                 case GRID_LEVEL_SET: proc.set("ls"); break;
                 case GRID_FOG_VOLUME: proc.set("fog"); break;
                 default: proc.set("unknown");}});
 
   proc.add("isLS", "test if a specified VDB grid is a level set or not, e.g. {0:isLS} -> {1}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->getGridClass()==GRID_LEVEL_SET);});
 
   proc.add("isFOG", "test if a specified VDB grid is a fog volume or not, e.g. {0:isFOG} -> {0}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             proc.set((*it)->getGridClass()==GRID_FOG_VOLUME);});
 
   proc.add("gridDim", "voxel dimension of specified VDB grid, e.g. {0:gridDim} -> {[255,255,255]}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             std::stringstream ss;
             ss << bbox.dim();
             proc.set(ss.str());});
 
   proc.add("gridBBox", "world space bounding box of specified VDB grid, e.g. {0:gridBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
@@ -792,7 +792,7 @@ void Tool::init()
             proc.set(ss.str());});
 
   proc.add("gridCenter", "world space center of bounding box of specified VDB grid, e.g. {0:gridCenter} -> {[0.0,0.0,0.0]}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
@@ -802,7 +802,7 @@ void Tool::init()
             proc.set(ss.str());});
 
   proc.add("gridRadius", "world space radius of bounding box of specified VDB grid, e.g. {0:gridRadius} -> {1.73}",
-      [&](){auto it = this->getGrid(str2int(proc.get()));
+      [&](){auto it = this->getGrid(strToInt(proc.get()));
             const CoordBBox bbox = (*it)->evalActiveVoxelBoundingBox();
             const math::BBox<Vec3d> bboxIndex(bbox.min().asVec3d(), bbox.max().asVec3d());
             const math::BBox<Vec3R> bboxWorld = bboxIndex.applyMap(*((*it)->transform().baseMap()));
@@ -810,26 +810,26 @@ void Tool::init()
 
   // operations related to geometry
   proc.add("vtxCount", "number of voxels of a specified geometry, e.g. {0:vtxCount} -> {2461023}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             proc.set((*it)->vtxCount());});
 
   proc.add("polyCount", "number of polygons of a specified geometry, e.g. {0:polyCount} -> {23560}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             proc.set((*it)->polyCount());});
 
   proc.add("geomCount", "push the number of loaded geometries onto the stack, e.g. {geomCount} -> {1}",
       [&](){proc.push(mGrid.size());});
 
   proc.add("geomName", "name of a specified geometry, e.g. {0:geomName} -> {bunny}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             proc.set((*it)->getName());});
 
   proc.add("isGeomEmpty", "test if a specified VDB grid is empty or not, e.g. {0:isGridEmpty} -> {0}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             proc.set((*it)->isEmpty());});
 
   proc.add("geomClass", "class of a specified geometry, e.g. {0:geomClass} -> {points}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             if ((*it)->isPoints()) {
                 proc.set("points");
             } else if ((*it)->isMesh()) {
@@ -838,7 +838,7 @@ void Tool::init()
                 proc.set("unknown");}});
 
   proc.add("geomBBox", "world space bounding box of specified geometry, e.g. {0:geomBBox} -> {[-1.016,-1.016,-1.016] [1.016,1.016,1.016]}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             const auto &min = (*it)->bbox().min(), &max = (*it)->bbox().max();
             std::stringstream ss;
             ss << "["<<min[0]<<","<<min[1]<<","<<min[2]<<"] "
@@ -846,14 +846,14 @@ void Tool::init()
             proc.set(ss.str());});
 
   proc.add("geomCenter", "world space center of bounding box of specified geometry, e.g. {0:geomCenter} -> {[0.0,0.0,0.0]}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             const auto center = 0.5*((*it)->bbox().max() + (*it)->bbox().min());
             std::stringstream ss;
             ss << "["<<center[0]<<","<<center[1]<<","<<center[2]<<"]";
             proc.set(ss.str());});
 
   proc.add("geomRadius", "world space radius of bounding box of specified geometry, e.g. {0:geomRadius} -> {1.73}",
-      [&](){auto it = this->getGeom(str2int(proc.get()));
+      [&](){auto it = this->getGeom(strToInt(proc.get()));
             proc.set(0.5*((*it)->bbox().max() - (*it)->bbox().min()).length());});
 
 }// Tool::init()
@@ -1143,7 +1143,7 @@ void Tool::writeVDB(const std::string &fileName)
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    const std::string codec = to_lower_case(mParser.get<std::string>("codec"));
+    const std::string codec = toLowerCase(mParser.get<std::string>("codec"));
     bool half;
     switch (mParser.get<int>("bits")) {
       case 16:
@@ -1209,7 +1209,7 @@ void Tool::writeNVDB(const std::string &fileName)
     mParser.printAction();
     const std::string age = mParser.get<std::string>("vdb");
     const bool keep = mParser.get<bool>("keep");
-    const std::string codec_str = to_lower_case(mParser.get<std::string>("codec"));
+    const std::string codec_str = toLowerCase(mParser.get<std::string>("codec"));
     const std::string bits = mParser.get<std::string>("bits");
     const bool dither = mParser.get<bool>("dither");
     const bool absolute = mParser.get<bool>("absolute");
@@ -2665,9 +2665,9 @@ void Tool::render()
     if (!colorgridPtr) throw std::invalid_argument("render: no colorgrid of type Vec3f with age "+std::to_string(colorgrid));
   }
   std::unique_ptr<tools::BaseCamera> camera;
-  if (starts_with(camType, "persp")) {
+  if (startsWith(camType, "persp")) {
     camera.reset(new tools::PerspectiveCamera(film, rotate, translate, focal, aperture, znear, zfar));
-  } else if (starts_with(camType, "ortho")) {
+  } else if (startsWith(camType, "ortho")) {
     camera.reset(new tools::OrthographicCamera(film, rotate, translate, frame, znear, zfar));
   } else {
     throw std::invalid_argument("render: expected perspective or orthographic camera, got \""+camType+"\"");

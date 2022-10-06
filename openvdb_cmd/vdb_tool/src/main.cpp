@@ -33,7 +33,7 @@ int main(int argc, char *argv[])
 
         OPENVDB_LOG_FATAL("Tool: exception of unknown type caught");
         exitStatus = EXIT_FAILURE;
-        std::unexpected();
+        std::terminate();
 
     }
 
