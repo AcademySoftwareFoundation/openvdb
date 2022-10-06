@@ -92,6 +92,11 @@
 /// @hideinitializer
 #define OPENVDB_LIBRARY_VERSION_NUMBER ${OPENVDB_PACKED_VERSION}
 
+/// @brief Where this version was compiled from if it comes from a
+/// git repo.
+#define OPENVDB_PACKAGE_URL "@OPENVDB_PACKAGE_URL@"
+#define OPENVDB_PACKAGE_REVISION "@OPENVDB_PACKAGE_REVISION@"
+
 /// @brief The version namespace name for this library version
 /// @hideinitializer
 ///
@@ -256,6 +261,8 @@ inline constexpr const char* getLibraryVersionString() { return OPENVDB_LIBRARY_
 inline constexpr const char* getLibraryAbiVersionString() {
     return OPENVDB_LIBRARY_ABI_VERSION_STRING;
 }
+inline constexpr const char* getPackageUrl() { return OPENVDB_PACKAGE_URL; }
+inline constexpr const char* getPackageRevision() { return OPENVDB_PACKAGE_REVISION; }
 
 
 struct VersionId {
