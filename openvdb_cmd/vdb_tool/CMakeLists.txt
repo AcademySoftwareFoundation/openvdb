@@ -158,6 +158,6 @@ if(BUILD_TEST)
   find_package(GTest CONFIG REQUIRED)
 
   add_executable(vdb_tool_test src/unittest.cpp)
-  target_include_directories(test PRIVATE vdb_tool_common)
-  target_link_libraries(test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
+  target_include_directories(vdb_tool_test PRIVATE vdb_tool_common)
+  target_link_libraries(vdb_tool_test PRIVATE vdb_tool_common GTest::gmock GTest::gtest GTest::gmock_main GTest::gtest_main)
 endif()
