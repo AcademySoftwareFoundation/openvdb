@@ -88,6 +88,31 @@ namespace vdb_tool {
 
 class Tool
 {
+public:
+
+    /// @brief Constructor from command-line arguments
+    Tool(int argc, char *argv[]);
+
+    Tool(const Tool&) = delete;// disallow copy construction
+    Tool(Tool&&) = delete;// disallow move construction
+    Tool& operator=(const Tool&) = delete;// disallow assignment
+    Tool& operator=(Tool&&) = delete;// disallow move assignment
+
+    /// @brief Executes all the actions defined during construction
+    void run();
+
+    /// @brief prints information to the terminal about the current stack of VDB grids and Geometry
+    void print(std::ostream& os = std::cerr) const;
+    void print_args(std::ostream& os = std::cerr) const;
+
+    /// @brief return a string with the current version number of this tool
+    static std::string version() {return std::to_string(sMajor)+"."+std::to_string(sMinor)+"."+std::to_string(sPatch);}
+    static int major() {return sMajor;}
+    static int minor() {return sMinor;}
+    static int patch() {return sPatch;}
+
+private:
+
     static const int sMajor =10;// incremented for incompatible changes options or file.
     static const int sMinor = 6;// incremented for new functionality that is backwards-compatible.
     static const int sPatch = 1;// incremented for backwards-compatible bug fixes.
@@ -218,29 +243,6 @@ class Tool
     inline auto getGrid(size_t age) const;
     inline auto getGeom(size_t age) const;
 
-public:
-
-    /// @brief Constructor from command-line arguments
-    Tool(int argc, char *argv[]);
-
-    Tool(const Tool&) = delete;// disallow copy construction
-    Tool(Tool&&) = delete;// disallow move construction
-    Tool& operator=(const Tool&) = delete;// disallow assignment
-    Tool& operator=(Tool&&) = delete;// disallow move assignment
-
-    /// @brief Executes all the actions defined during construction
-    void run();
-
-    /// @brief prints information to the terminal about the current stack of VDB grids and Geometry
-    void print(std::ostream& os = std::cerr) const;
-    void print_args(std::ostream& os = std::cerr) const;
-
-    /// @brief return a string with the current version number of this tool
-    static std::string version() {return std::to_string(sMajor)+"."+std::to_string(sMinor)+"."+std::to_string(sPatch);}
-    static int major() {return sMajor;}
-    static int minor() {return sMinor;}
-    static int patch() {return sPatch;}
-
 };// Tool class
 
 // ==============================================================================================================
@@ -259,7 +261,7 @@ Tool::Tool(int argc, char *argv[])
     this->init();// fast: less than 1 ms
     mParser.finalize();
     mParser.parse(argc, argv);// extremely fast
-}
+}// Tool::Tool
 
 // ==============================================================================================================
 
@@ -269,7 +271,7 @@ auto Tool::getGrid(size_t age) const
     auto it = mGrid.crbegin();
     std::advance(it, age);
     return it;
-}
+}// Tool::getGrid
 
 // ==============================================================================================================
 
@@ -279,7 +281,7 @@ auto Tool::getGeom(size_t age) const
     auto it = mGeom.crbegin();
     std::advance(it, age);
     return it;
-}
+}// Tool::getGeom
 
 // ==============================================================================================================
 
@@ -293,7 +295,7 @@ void Tool::run()
         std::exit(EXIT_FAILURE);
     }
     if (mParser.verbose>1) this->print();
-}
+}// Tool::run
 
 // ==============================================================================================================
 
@@ -303,14 +305,12 @@ void Tool::warning(const std::string &msg, std::ostream& os) const
         os << "\n" << std::setw(msg.size()) << std::setfill('*') << "\n" << msg
            << "\n" << std::setw(msg.size()) << std::setfill('*') << "\n";
     }
-}
+}// Tool::warning
 
 // ==============================================================================================================
 
 /// @brief Private struct for the header of config files
 struct Tool::Header {
-    std::string magic;
-    int major, minor, patch;
     Header() : magic("vdb_tool"), major(sMajor), minor(sMinor), patch(sPatch) {}
     Header(const std::string &line) : magic("vdb_tool") {
       const VecS header = tokenize(line, " .");
@@ -323,6 +323,9 @@ struct Tool::Header {
       return magic+" "+std::to_string(major)+"."+std::to_string(minor)+"."+std::to_string(patch);
     }
     bool isCompatible() const {return major == sMajor;}
+
+    std::string magic;
+    int major, minor, patch;
 };// Header struct
 
 // ==============================================================================================================
@@ -330,10 +333,12 @@ struct Tool::Header {
 /// @brief Private wrapper struct for points required by particlesToSdf
 struct Tool::Points {
     using PosType = Vec3R;
-    const std::vector<Vec3s> &mPoints;
+
     Points(const std::vector<Vec3s> &vtx) : mPoints(vtx) {}
     size_t size() const { return mPoints.size(); }
     void getPos(size_t n, PosType &p) const { p = mPoints[n]; }
+
+    const std::vector<Vec3s> &mPoints;
 };// Points struct
 
 // ==============================================================================================================

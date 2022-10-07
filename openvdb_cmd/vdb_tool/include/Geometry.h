@@ -57,18 +57,14 @@ OPENVDB_USE_VERSION_NAMESPACE
 namespace OPENVDB_VERSION_NAME {
 namespace vdb_tool {
 
+/// @brief Class that encapsulates (explicit) geometry, i.e. vertices/points,
+///        triangles and quads. It is used to represent points and polygon meshes
 class Geometry
 {
-    using PosT  = Vec3f;
-    using BBoxT = math::BBox<PosT>;
-    std::vector<PosT>  mVtx;
-    std::vector<Vec3I> mTri;
-    std::vector<Vec4I> mQuad;
-    mutable BBoxT      mBBox;
-    std::string        mName;
-
 public:
 
+    using PosT  = Vec3f;
+    using BBoxT = math::BBox<PosT>;
     using Ptr = std::shared_ptr<Geometry>;
     struct Header;
 
@@ -136,6 +132,14 @@ public:
     size_t write(std::ostream &os) const;
     size_t read(std::istream &is);
 
+private:
+
+    std::vector<PosT>  mVtx;
+    std::vector<Vec3I> mTri;
+    std::vector<Vec4I> mQuad;
+    mutable BBoxT      mBBox;
+    std::string        mName;
+
 };// Geometry class
 
 struct Geometry::Header
@@ -157,7 +161,7 @@ size_t Geometry::write(std::ostream &os) const
     os.write((const char*)mTri.data(),  sizeof(Vec3I)*mTri.size());
     os.write((const char*)mQuad.data(), sizeof(Vec4I)*mQuad.size());
     return header.size();
-}
+}// Geometry::write
 
 size_t Geometry::read(std::istream &is)
 {
@@ -177,7 +181,7 @@ size_t Geometry::read(std::istream &is)
     is.read((char*)mTri.data(), sizeof(Vec3I)*mTri.size());
     is.read((char*)mQuad.data(), sizeof(Vec4I)*mQuad.size());
     return header.size();
-}
+}// Geometry::read
 
 void Geometry::clear()
 {
@@ -186,7 +190,7 @@ void Geometry::clear()
     mVtx.clear();
     mTri.clear();
     mQuad.clear();
-}
+}// Geometry::clear
 
 const math::BBox<Vec3s>& Geometry::bbox() const
 {
@@ -206,7 +210,7 @@ const math::BBox<Vec3s>& Geometry::bbox() const
     mBBox = tmp.bbox;
 #endif
     return mBBox;
-}
+}// Geometry::bbox
 
 void Geometry::write(const std::string &fileName) const
 {

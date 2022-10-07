@@ -44,19 +44,13 @@ namespace vdb_tool {
 
 /// @brief This class defines string attributes for options, i.e. arguments for actions
 struct Option {
-    std::string name, value, example, documentation;
     void append(const std::string &v) {value = value.empty() ? v : value + "," + v;}
+
+    std::string name, value, example, documentation;
 };
 
 // ==============================================================================================================
 struct Action {
-    std::string            name;// primary name of action, eg "read"
-    std::string            alias;// alternate name for action, eg "i"
-    std::string            documentation;// documentation e.g. "read", "i", "files", "read files"
-    size_t                 anonymous;// index of the option to which the value of un-named option will be appended, e.g. files
-    std::vector<Option>    options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
-    std::function<void()>  init, run;// callback functions
-
     /// @brief c-tor
     Action(std::string _name,
            std::string _alias,
@@ -77,6 +71,13 @@ struct Action {
     /// @brief Sets the options of this actions
     void setOption(const std::string &str);
     void print(std::ostream& os = std::cerr) const;
+
+    std::string            name;// primary name of action, eg "read"
+    std::string            alias;// alternate name for action, eg "i"
+    std::string            documentation;// documentation e.g. "read", "i", "files", "read files"
+    size_t                 anonymous;// index of the option to which the value of un-named option will be appended, e.g. files
+    std::vector<Option>    options;// e.g. {{"grids", "density,sphere"}, {"files", "path/base.ext"}}
+    std::function<void()>  init, run;// callback functions
 };// Action struct
 
 // ==============================================================================================================
@@ -92,8 +93,8 @@ using VecS = std::vector<std::string>;// vector of strings
 /// @brief Class that stores values by name
 class Memory
 {
-    std::unordered_map<std::string, std::string> mData;
 public:
+
     Memory() = default;
     std::string get(const std::string &name) {
         auto it = mData.find(name);
@@ -120,13 +121,17 @@ public:
     }
     size_t size() const {return mData.size();}
     bool isSet(const std::string &name) const {return mData.find(name)!=mData.end();}
+
+private:
+
+    std::unordered_map<std::string, std::string> mData;
 };// Memory
 
 // ==============================================================================================================
 
 class Stack {
-    std::vector<std::string> mData;
 public:
+
     Stack(){mData.reserve(10);}
     Stack(std::initializer_list<std::string> d) : mData(d.begin(), d.end()) {}
     size_t depth() const {return mData.size();}
@@ -190,6 +195,10 @@ public:
         os << mData[0];
         for (size_t i=1; i<mData.size(); ++i) os << "," << mData[i];
     }
+
+private:
+
+    std::vector<std::string> mData;
 };// Stack
 
 // ==============================================================================================================
@@ -199,55 +208,8 @@ public:
 ///          paring of the command-line arguments (options to be precise).
 class Processor
 {
-    struct Instruction {std::string doc; std::function<void()> callback;};// documentation and callback for instruction
-    using Instructions = std::unordered_map<std::string, Instruction>;
-
-    Stack        mCallStack;// processor stack for data and instructions
-    Instructions mInstructions;// map of all supported instructions
-    Memory       mMemory;
-
-    /// @brief apply functor to the top element, assuming it's either a float or integer
-    template <typename OpT>
-    void a(OpT op){
-        union {std::int32_t i; float x;} A;
-        if (isInt(mCallStack.top(), A.i)) {
-            mCallStack.top() = std::to_string(op(A.i));
-        } else if (isFloat(mCallStack.top(), A.x)) {
-            mCallStack.top() = std::to_string(op(A.x));
-        } else {
-            throw std::invalid_argument("a: invalid argument \"" + mCallStack.top() + "\"");
-        }
-    }
-
-    /// @brief apply functor to the two top element, assuming they are both floats or integers
-    template <typename OpT>
-    void ab(OpT op){
-        union {std::int32_t i; float x;} A, B;
-        const std::string str = mCallStack.pop();
-        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
-            mCallStack.top() = std::to_string(op(A.i, B.i));
-        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
-            mCallStack.top() = std::to_string(op(A.x, B.x));
-        } else {
-            throw std::invalid_argument("ab: invalid arguments \"" + mCallStack.top() + "\" and \"" + str + "\"");
-        }
-    }
-
-    /// @brief apply a boolean test, e.g. a == b, to the two top elements, assuming they are floats, integers or strings
-    template <typename T>
-    void boolean(T test){
-        union {std::int32_t i; float x;} A, B;
-        const std::string str = mCallStack.pop();
-        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
-            mCallStack.top() = test(A.i, B.i) ? "1" : "0";
-        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
-            mCallStack.top() = test(A.x, B.x) ? "1" : "0";
-        } else {// string
-            mCallStack.top() = test(mCallStack.top(), str) ? "1" : "0";
-        }
-    }
-
 public:
+
     template <typename T>
     void push(const T &t) {mCallStack.push(std::to_string(t));}
     void push(const std::string &s) {mCallStack.push(s);}
@@ -554,6 +516,56 @@ public:
             }
         }
     }
+
+private:
+
+    struct Instruction {std::string doc; std::function<void()> callback;};// documentation and callback for instruction
+    using Instructions = std::unordered_map<std::string, Instruction>;
+
+    Stack        mCallStack;// processor stack for data and instructions
+    Instructions mInstructions;// map of all supported instructions
+    Memory       mMemory;
+
+    /// @brief apply functor to the top element, assuming it's either a float or integer
+    template <typename OpT>
+    void a(OpT op){
+        union {std::int32_t i; float x;} A;
+        if (isInt(mCallStack.top(), A.i)) {
+            mCallStack.top() = std::to_string(op(A.i));
+        } else if (isFloat(mCallStack.top(), A.x)) {
+            mCallStack.top() = std::to_string(op(A.x));
+        } else {
+            throw std::invalid_argument("a: invalid argument \"" + mCallStack.top() + "\"");
+        }
+    }
+
+    /// @brief apply functor to the two top element, assuming they are both floats or integers
+    template <typename OpT>
+    void ab(OpT op){
+        union {std::int32_t i; float x;} A, B;
+        const std::string str = mCallStack.pop();
+        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
+            mCallStack.top() = std::to_string(op(A.i, B.i));
+        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
+            mCallStack.top() = std::to_string(op(A.x, B.x));
+        } else {
+            throw std::invalid_argument("ab: invalid arguments \"" + mCallStack.top() + "\" and \"" + str + "\"");
+        }
+    }
+
+    /// @brief apply a boolean test, e.g. a == b, to the two top elements, assuming they are floats, integers or strings
+    template <typename T>
+    void boolean(T test){
+        union {std::int32_t i; float x;} A, B;
+        const std::string str = mCallStack.pop();
+        if (isInt(mCallStack.top(), A.i) && isInt(str, B.i)) {
+            mCallStack.top() = test(A.i, B.i) ? "1" : "0";
+        } else if (isFloat(mCallStack.top(), A.x) && isFloat(str, B.x)) {
+            mCallStack.top() = test(A.x, B.x) ? "1" : "0";
+        } else {// string
+            mCallStack.top() = test(mCallStack.top(), str) ? "1" : "0";
+        }
+    }
 };// Processor class
 
 // ==============================================================================================================
@@ -561,10 +573,6 @@ public:
 /// @brief Abstract base class
 struct BaseLoop
 {
-    Memory&     memory;
-    ActIterT    begin;// marks the start of the for loop
-    std::string name;
-    size_t      pos;// loop counter starting at zero
     BaseLoop(Memory &s, ActIterT i, const std::string &n) : memory(s), begin(i), name(n), pos(0) {}
     virtual ~BaseLoop() {
         memory.clear(name);
@@ -582,6 +590,11 @@ struct BaseLoop
     void print(std::ostream& os = std::cerr) const {
         os << "Processing: " << name << " = " << memory.get(name) << ", counter #" << name << " = " << pos <<std::endl;
     }
+
+    Memory&     memory;
+    ActIterT    begin;// marks the start of the for loop
+    std::string name;
+    size_t      pos;// loop counter starting at zero
 };// BaseLoop struct
 
 // ==============================================================================================================
@@ -589,9 +602,8 @@ struct BaseLoop
 template <typename T>
 struct ForLoop : public BaseLoop
 {
-    using BaseLoop::pos;
-    math::Vec3<T> vec;
 public:
+
     ForLoop(Memory &s, ActIterT i, const std::string &n, const std::vector<T> &v) : BaseLoop(s, i, n), vec(1) {
         if (v.size()!=2 && v.size()!=3)  throw std::invalid_argument("ForLoop: expected two or three arguments, i=1,9 or i=1,9,2");
         for (size_t i=0; i<v.size(); ++i) vec[i] = v[i];
@@ -605,15 +617,19 @@ public:
         if (vec[0] < vec[1]) this->set(vec[0]);
         return vec[0] < vec[1];
     }
+
+private:
+
+    using BaseLoop::pos;
+    math::Vec3<T> vec;
 };// ForLoop struct
 
 // ==============================================================================================================
 
 class EachLoop : public BaseLoop
 {
-    using BaseLoop::pos;
-    const VecS vec;// list of all string values
 public:
+
     EachLoop(Memory &s, ActIterT i, const std::string &n, const VecS &v) : BaseLoop(s,i,n), vec(v.begin(), v.end()){
         if (this->valid()) this->set(vec[0]);
     }
@@ -623,6 +639,11 @@ public:
         if (++pos < vec.size()) this->set(vec[pos]);
         return pos < vec.size();
     }
+
+private:
+
+    using BaseLoop::pos;
+    const VecS vec;// list of all string values
 };// EachLoop class
 
 // ==============================================================================================================
@@ -630,6 +651,7 @@ public:
 class IfLoop : public BaseLoop
 {
 public:
+
     IfLoop(Memory &s, ActIterT i) : BaseLoop(s,i,"") {}
     virtual ~IfLoop() {}
     bool valid() override {return true;}
@@ -639,15 +661,6 @@ public:
 // ==============================================================================================================
 
 struct Parser {
-    ActListT            available, actions;
-    ActIterT            iter;// iterator pointing to the current actions being processed
-    std::unordered_map<std::string, ActIterT> hashMap;
-    std::list<std::shared_ptr<BaseLoop>> loops;
-    std::vector<Option> defaults;
-    int                 verbose;
-    mutable size_t      counter;// loop counter used to validate matching "-for/each" and "-end" actions
-    mutable Processor   processor;// responsible for storing local variables and executing string expressions
-
     Parser(std::vector<Option> &&def);
     void parse(int argc, char *argv[]);
     inline void finalize();
@@ -681,6 +694,15 @@ struct Parser {
     Action& getAction() {return *iter;}
     const Action& getAction() const {return *iter;}
     void printAction() const {if (verbose>1) iter->print();}
+
+    ActListT            available, actions;
+    ActIterT            iter;// iterator pointing to the current actions being processed
+    std::unordered_map<std::string, ActIterT> hashMap;
+    std::list<std::shared_ptr<BaseLoop>> loops;
+    std::vector<Option> defaults;
+    int                 verbose;
+    mutable size_t      counter;// loop counter used to validate matching "-for/each" and "-end" actions
+    mutable Processor   processor;// responsible for storing local variables and executing string expressions
 };// Parser struct
 
 // ==============================================================================================================
@@ -694,7 +716,7 @@ std::string Parser::getStr(const std::string &name) const
       return str;
   }
   throw std::invalid_argument(iter->name+": Parser::getStr: no option named \""+name+"\"");
-}
+}// Parser::getStr
 
 // ==============================================================================================================
 
@@ -707,7 +729,7 @@ template <>
 std::vector<std::string> Parser::getVec<std::string>(const std::string &name, const char* delimiters) const
 {
     return tokenize(this->getStr(name), delimiters);
-}
+}// Parser::getVec
 
 // ==============================================================================================================
 
@@ -718,7 +740,7 @@ std::vector<T> Parser::getVec(const std::string &name, const char* delimiters) c
     std::vector<T> vec(v.size());
     for (int i=0; i<v.size(); ++i) vec[i] = strTo<T>(v[i]);
     return vec;
-}
+}// Parser::getVec
 
 // ==============================================================================================================
 
@@ -728,7 +750,7 @@ math::Vec3<T> Parser::getVec3(const std::string &name, const char* delimiters) c
     VecS v = this->getVec<std::string>(name, delimiters);
     if (v.size()!=3) throw std::invalid_argument(iter->name+": Parser::getVec3: not a valid input "+name);
     return math::Vec3<T>(strTo<T>(v[0]), strTo<T>(v[1]), strTo<T>(v[2]));
-}
+}// Parser::getVec3
 
 // ==============================================================================================================
 
@@ -763,7 +785,7 @@ void Action::print(std::ostream& os) const
     os << "-" << name;
     for (auto &a : options) os << " " << a.name << "=" << a.value;
     os << std::endl;
-}
+}// Action::print
 
 // ==============================================================================================================
 
@@ -826,7 +848,7 @@ Parser::Parser(std::vector<Option> &&def)
     // Note, this function assumes that -for,-each,-if all have a matching -end, which
     // was enforced during parsing by increasing and decreasing "counter" and checking
     // that it never becomes negative and always ends up with a value of zero.
-    auto skip2end = [](auto &it){
+    auto skipToEnd = [](auto &it){
         for (int i = 1; i > 0;) {
             const std::string &name = (++it)->name;
             if (name == "end") {
@@ -855,7 +877,7 @@ Parser::Parser(std::vector<Option> &&def)
                 loops.push_back(loop);
                 if (verbose) loop->print();
             } else {
-                skip2end(iter);// skip to matching -end
+                skipToEnd(iter);// skip to matching -end
             }
         }
     );
@@ -872,7 +894,7 @@ Parser::Parser(std::vector<Option> &&def)
                 loops.push_back(loop);
                 if (verbose) loop->print();
             } else {
-                skip2end(iter);// skip to matching -end
+                skipToEnd(iter);// skip to matching -end
             }
         }, 0
     );
@@ -886,7 +908,7 @@ Parser::Parser(std::vector<Option> &&def)
             if (this->get<bool>("test")) {
                 loops.push_back(std::make_shared<IfLoop>(processor.memory(), iter));
             } else {
-                skip2end(iter);// skip to matching -end
+                skipToEnd(iter);// skip to matching -end
             }
         }, 0
     );
@@ -913,7 +935,7 @@ Parser::Parser(std::vector<Option> &&def)
 void Parser::run()
 {
     for (iter=actions.begin();iter!=actions.end();++iter) iter->run();
-}
+}// Parser::run(
 
 // ==============================================================================================================
 
@@ -927,7 +949,7 @@ void Parser::finalize()
         hashMap.insert({it->name, it});
         if (it->alias!="") hashMap.insert({it->alias, it});
     }
-}
+}// Parser::finalize
 
 // ==============================================================================================================
 
@@ -962,7 +984,7 @@ void Parser::usage(const VecS &actions, bool brief) const
         if (search == hashMap.end()) throw std::invalid_argument(iter->name+": Parser:::usage: unsupported action \""+str+"\"\n");
         std::cerr << this->usage(*search->second, brief);
     }
-}
+}// Parser::usage
 
 // ==============================================================================================================
 
@@ -972,8 +994,7 @@ std::string Parser::usage(const Action &action, bool brief) const
     const static int w = 17;
     auto op = [&](std::string line, size_t width, bool isSentence) {
         if (isSentence) {
-            line[0] = std::toupper(line[0]);// capitalize
-            if (line.back()!='.') line.append(1,'.');// punctuate
+            line[0] = std::toupper(line[0]);// capitalizestd::string name, value, example, documentation;');// punctuate
         }
         width += w;
         const VecS words = tokenize(line, " ");
@@ -1030,7 +1051,7 @@ void Parser::setDefaults()
             }
         }
     }
-}
+}// Parser::setDefaults
 
 // ==============================================================================================================
 
