@@ -133,15 +133,19 @@ add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4267>")
 # Truncation from 'int' to 'bool'
 #add_compile_options("$<$<COMPILE_LANG_AND_ID:CXX,MSVC>:/wd4305>")
 
-find_package(OpenVDB)
-if(NOT OpenVDB_FOUND)
-  message(FATAL_ERROR
-  " Couldn't find OpenVDB\n"
-  " Set OPENVDB_CMAKE_PATH to <OpenVDB install path>/lib/cmake/OpenVDB")
+if(OPENVDB_BUILD_CORE)
+    target_link_libraries(vdb_tool_common INTERFACE ${OPENVDB_BINARIES_DEPENDENT_LIBS})
+else()
+    find_package(OpenVDB)
+    if(NOT OpenVDB_FOUND)
+        message(FATAL_ERROR
+        " Couldn't find OpenVDB\n"
+        " Set OPENVDB_CMAKE_PATH to <OpenVDB install path>/lib/cmake/OpenVDB")
+    endif()
+    target_link_libraries(vdb_tool_common INTERFACE TBB::tbb OpenVDB::openvdb)
 endif()
 
 target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
-target_link_libraries(vdb_tool_common INTERFACE TBB::tbb OpenVDB::openvdb)
 
 # vdb_tool
 add_executable(vdb_tool src/main.cpp)
