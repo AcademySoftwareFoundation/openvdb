@@ -372,7 +372,7 @@ void Tool::init()
       "write", "o", "Write list of geometry, VDB or config files to disk or STDOUT",
     {{"files", "", "{file|stdout}.{obj|ply|stl|vdb|nvdb}", "list of files or the output stream, e.g. file.vdb or stdin.vdb. Note that \"files=\" is optional since any argument without the \"=\" character is intrepreted as a file and appended to \"files\"."},
      {"geo", "0", "0|1...", "geometry to write (defaults to \"0\" which is the latest)."},
-     {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all availabe grids)."},
+     {"vdb", "*", "0,1,...", "list of VDB grids to write (defaults to \"*\", i.e. all available grids)."},
      {"keep", "", "1|0|true|false", "toggle wether to preserved or deleted geometry and grids after they have been written."},
      {"codec", "", "none|zip|blosc|active", "compression codec for the file or stream"},
      {"bits", "32", "32|16|8|4|N", "bit-width of floating point numbers during quantization of VDB and NanoVDB grids, i.e. 32 is full, 16, is half (defaults to 32). NanoVDB also supports 8, 4 and N which is adaptive bit-width"},// VDB: 32, 16 + for NVDB 8, 4 or N
@@ -412,7 +412,7 @@ void Tool::init()
      [&](){mParser.setDefaults();}, [&](){this->meshToLevelSet();});
 
   mParser.addAction(
-      "ls2mesh", "l2m", "Convert a level set to an adaptive polygen mesh",
+      "ls2mesh", "l2m", "Convert a level set to an adaptive polygon mesh",
     {{"adapt", "0.0", "0.9", "normalized metric for the adaptive meshing. 0 is uniform and 1 is fully adaptive mesh. Defaults to 0."},
      {"iso", "0.0", "0.1", "iso-value used to define the implicit surface. Defaults to zero."},
      {"vdb", "0", "0", "age (i.e. stack index) of the level set VDB grid to be meshed. Defaults to 0, i.e. most recently inserted VDB."},
@@ -878,17 +878,17 @@ void Tool::help()
     if (actions.empty()) {
       if (mParser.actions.size()==1) {// ./vdb_tool -help
         if (!brief) {
-          std::cerr << "\nThis is a command-line tool that can perform a use-defined\n"
-                    << "(possibly non-linear) sequence of high-level tasks available\n"
-                    << "in openvdb. For instance, it can convert polygon meshes and\n"
-                    << "particles to level sets, and perform a large number of operations\n"
-                    << "on these level set surfaces. It can also generate adaptive polygon\n"
-                    << "meshes from level sets, write them to disk or render them to image files.\n\n"
+          std::cerr << "\nThis command-line tool can perform a use-defined, and possibly\n"
+                    << "non-linear, sequence of high-level tasks available in openvdb.\n"
+                    << "For instance, it can convert polygon meshes and particles to level\n"
+                    << "sets, and subsequently perform a large number of operations on these\n"
+                    << "level set surfaces. It can also generate adaptive polygon meshes from\n"
+                    << "level sets, write them to disk and even render them to image files.\n\n"
                     << "Version: " + Tool::version() + "\n" + this->examples() + "\n";
         }
         mParser.usage_all(brief);
         if (!brief) {
-          std::cerr << "\nNote that actions always start with one or more \"-\", and (excpet for file names)\n"
+          std::cerr << "\nNote that actions always start with one or more \"-\", and (except for file names)\n"
                     << "its options always contain a \"=\" and an optional number of characters\n"
                     << "used for identification, e.g. \"-erode r=2\" is identical to \"-erode radius=2.0\"\n"
                     << "but \"-erode rr=2\" will produce an error since \"rr\" does not match\n"
