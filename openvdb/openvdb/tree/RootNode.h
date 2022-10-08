@@ -1095,9 +1095,10 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
     if (mOrigin != Coord(0,0,0)) {
-        OPENVDB_THROW(ValueError, "RootNode: non-zero offsets are currently not supported");
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
     }
 #endif
+
     enforceSameConfiguration(other);
 
     const Tile bgTile(backgd, /*active=*/false), fgTile(foregd, true);
@@ -1118,13 +1119,19 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, TopologyCopy)
     : mBackground(backgd)
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
-    , mOrigin(0, 0, 0)
+    , mOrigin(other.mOrigin)
 #endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
+
+if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
+    }
+#endif
 
     enforceSameConfiguration(other);
 
@@ -1218,6 +1225,9 @@ RootNode<ChildT>::operator=(const RootNode& other)
         mBackground = other.mBackground;
 #if OPENVDB_ABI_VERSION_NUMBER >= 10
         mOrigin = other.mOrigin;
+        if (mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNode::operator=: non-zero offsets are currently not supported");
+        }
 #endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
