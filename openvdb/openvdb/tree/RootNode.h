@@ -1127,7 +1127,7 @@ RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
 {
     using OtherRootT = RootNode<OtherChildType>;
 
-if OPENVDB_ABI_VERSION_NUMBER >= 10
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
     if (mOrigin != Coord(0,0,0)) {
         OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
     }
