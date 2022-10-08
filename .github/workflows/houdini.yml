@@ -41,7 +41,7 @@ jobs:
     # Check that valid github secrets have been set. This isn't needed to retrieve
     # the cache, but ensures that the job doens't start with an empty cache
     name: Verify Houdini Secrets
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     outputs:
       HOUDINI_SECRETS: ${{ steps.check.outputs.HOUDINI_SECRETS }}
     steps:
@@ -60,7 +60,7 @@ jobs:
 #      ${{ needs.checksecret.outputs.HOUDINI_SECRETS == 'true' ||
 #          github.repository_owner == 'AcademySoftwareFoundation' }}
     if: ${{ false }}  # disable for now
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: hou:${{ matrix.config.hou }}-vfx:${{ matrix.config.image }}-cxx:${{ matrix.config.cxx }}
     container:
       image: aswf/ci-base:${{ matrix.config.image }}
@@ -70,11 +70,11 @@ jobs:
     strategy:
       matrix:
         config:
-          - { cxx: clang++, image: '2021', hou: '19_5', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2021', hou: '19_5', j: '8', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'OFF' }
           # Houdini 19 is technically on VFX 2020, but we need 2021 dependencies for VDB 10
-          - { cxx: clang++, image: '2021', hou: '19_0', j: '2', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'ON' }
-          - { cxx: clang++, image: '2021', hou: '19_5', j: '2', build: 'Debug',   components: 'core,hou', disable_checks: 'OFF' }
-          - { cxx: g++,     image: '2021', hou: '19_5', j: '1', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
+          - { cxx: clang++, image: '2021', hou: '19_0', j: '8', build: 'Release', components: 'core,hou,bin,view,render,python,test,axcore,axbin,axtest', disable_checks: 'ON' }
+          - { cxx: clang++, image: '2021', hou: '19_5', j: '8', build: 'Debug',   components: 'core,hou', disable_checks: 'OFF' }
+          - { cxx: g++,     image: '2021', hou: '19_5', j: '8', build: 'Release', components: 'core,hou', disable_checks: 'OFF' }
       fail-fast: false
     steps:
     - uses: actions/checkout@v3

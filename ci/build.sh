@@ -29,9 +29,9 @@ declare -A PARMS
 PARMS[--components]=core,bin
 PARMS[--target]=install
 PARMS[--build-dir]=build
-# github actions runners have 2 threads
+# github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
-PARMS[-j]=2
+PARMS[-j]=8
 
 # Available options for --components
 declare -A COMPONENTS
@@ -155,7 +155,7 @@ fi
 
 ################################################
 
-# github actions runners have 2 threads
+# github actions runners have 8 threads
 # https://help.github.com/en/actions/reference/virtual-environments-for-github-hosted-runners
 export CMAKE_BUILD_PARALLEL_LEVEL=${PARMS[-j]}
 echo "Build using ${CMAKE_BUILD_PARALLEL_LEVEL} threads"
