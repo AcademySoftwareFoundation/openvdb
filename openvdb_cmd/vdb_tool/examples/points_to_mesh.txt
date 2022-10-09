@@ -1,4 +1,4 @@
-vdb_tool 10.0.0
+vdb_tool 10.6.1
 
 # This examples demonstrates how points, e.g. from a fluid
 # simulation, can be surfaced and converted into a mesh surface.

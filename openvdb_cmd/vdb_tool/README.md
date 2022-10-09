@@ -106,7 +106,7 @@ cmake -DOPENVDB_CMAKE_PATH=/usr/local/lib/cmake/OpenVDB -DUSE_ALL=ON -DBUILD_TES
 ```
 Update the OpenVDB cmake path above as needed.
 
-To build in debug mode, add `-DCMAKE_BUILD_TYPE=Debug` to the cmake command above.
+To build in debug mode, add `-DCMAKE_BUILD_TYPE=Debug` to the cmake command above. To build `vdb_tool` with NanoVDB support, pass in the `-DOPENVDB_BUILD_NANOVDB=ON` argument.
 
 To build use
 ```bash
@@ -149,6 +149,7 @@ cd build
 cmake -DVCPKG_TARGET_TRIPLET=x64-windows -DCMAKE_TOOLCHAIN_FILE=<path to vcpkg root>\scripts\buildsystems\vcpkg.cmake -A x64 -DOPENVDB_CMAKE_PATH=<OpenVDB install path>\lib\cmake\OpenVDB ..
 cmake --build . --config Release --parallel 2
 ```
+To build `vdb_tool` with NanoVDB support, pass in the `-DOPENVDB_BUILD_NANOVDB=ON` argument.
 
 
 # Examples
