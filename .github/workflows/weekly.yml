@@ -44,8 +44,8 @@ jobs:
         run: echo "HOUDINI_CLIENT_ID and HOUDINI_SECRET_KEY GitHub Action Secrets needs to be set to install Houdini builds"
 
   # download the latest production version of Houdini X, strip out headers,
-  # libraries and binaries required for building OpenVDB and if the build
-  # succeeds, put it into the GitHub Actions cache
+  # libraries and binaries required for building OpenVDB and put it into
+  # the GitHub Actions cache
   linux_houdini:
     needs: [checksecret]
     if: |
@@ -81,16 +81,6 @@ jobs:
         mkdir $HOME/houdini_install
         cp hou/hou.tar.gz $HOME/houdini_install/hou.tar.gz
         cd $HOME/houdini_install && tar -xzf hou.tar.gz && cd -
-    - name: build
-      shell: bash
-      run: >
-        cd $HOME/houdini_install/hou && source houdini_setup_bash && cd - &&
-        ./ci/build.sh -v
-        --build-type=Release
-        --components="core,hou,bin,view,render,python,test,axcore,axbin,axtest"
-        --cargs=\"-DDISABLE_DEPENDENCY_VERSION_CHECKS=ON -DDISABLE_CMAKE_SEARCH_PATHS=ON -DOPENVDB_BUILD_HOUDINI_ABITESTS=ON -DOPENVDB_HOUDINI_INSTALL_PREFIX=/tmp\"
-    - name: test
-      run: cd build && ctest -V
     - name: write_houdini_cache
       uses: actions/cache@v2
       with:
