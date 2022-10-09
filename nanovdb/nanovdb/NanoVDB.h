@@ -161,7 +161,7 @@ typedef unsigned long long uint64_t;
 #include <stdint.h> //    for types like int32_t etc
 #include <stddef.h> //    for size_t type
 #include <cassert> //     for assert
-#include <cstdio> //      for sprinf
+#include <cstdio> //      for snprintf
 #include <cmath> //       for sqrt and fma
 #include <limits> //      for numeric_limits
 #include <utility>//      for std::move
@@ -673,8 +673,8 @@ public:
 #ifndef __CUDACC_RTC__
     const char* c_str() const
     {
-        char *buffer = (char*)malloc(4 + 1 + 4 + 1 + 4 + 1);// xxxx.xxxx.xxxx\n
-        sprintf(buffer, "%d.%d.%d", this->getMajor(), this->getMinor(), this->getPatch());
+        char *buffer = (char*)malloc(4 + 1 + 4 + 1 + 4 + 1);// xxxx.xxxx.xxxx\0
+        snprintf(buffer, 4 + 1 + 4 + 1 + 4 + 1, "%d.%d.%d", this->getMajor(), this->getMinor(), this->getPatch()); // Prevents overflows by enforcing a fixed size of buffer
         return buffer;
     }
 #endif
@@ -5688,7 +5688,7 @@ void writeUncompressedGrid(StreamT &os, const void *buffer)
       if (*(const uint32_t*)(grid+24) >= *(const uint32_t*)(grid+28) - 1) break;
       grid += gridSize;
     }
-}
+}// writeUncompressedGrid
 
 /// @brief  write multiple NanoVDB grids to a single file, without compression.
 template<typename GridHandleT, template<typename...> class VecT>
@@ -5709,7 +5709,7 @@ void writeUncompressedGrids(const char* fileName, const VecT<GridHandleT>& handl
         fprintf(stderr, "nanovdb::writeUncompressedGrids: Unable to open file \"%s\"for output\n",fileName); exit(EXIT_FAILURE);
     }
     for (auto &handle : handles) writeUncompressedGrid(os, handle.data());
-}
+}// writeUncompressedGrids
 
 /// @brief read all uncompressed grids from a stream and return their handles.
 ///
@@ -5741,7 +5741,7 @@ VecT<GridHandleT> readUncompressedGrids(StreamT& is, const typename GridHandleT:
     }
   }
   return handles;
-}
+}// readUncompressedGrids
 
 /// @brief Read a multiple un-compressed NanoVDB grids from a file and return them as a vector.
 template<typename GridHandleT, template<typename...> class VecT>
@@ -5767,7 +5767,7 @@ VecT<GridHandleT> readUncompressedGrids(const char *fileName, const typename Gri
     fprintf(stderr, "nanovdb::readUncompressedGrids: Unable to open file \"%s\"for input\n",fileName); exit(EXIT_FAILURE);
   }
   return readUncompressedGrids<GridHandleT, StreamT, VecT>(is, buffer);
-}
+}// readUncompressedGrids
 
 } // namespace io
 
