@@ -897,6 +897,17 @@ public:
     template<typename OtherRootNodeType, typename VisitorOp>
     void visit2(OtherRootNodeType& other, VisitorOp&) const;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    /// Return the grid index coordinates of this node's local origin.
+    const Coord& origin() const { return mOrigin; }
+    /// @brief change the origin on this root node
+    /// @param origin the index coordinates of the new alignment
+    ///
+    /// @warning This method will throw if the origin is non-zero, since
+    ///          other tools do not yet support variable offsets.
+    void setOrigin(const Coord &origin);
+#endif
+
 private:
     /// During topology-only construction, access is needed
     /// to protected/private members of other template instances.
@@ -918,8 +929,13 @@ private:
     Index getActiveTileCount() const;
     Index getInactiveTileCount() const;
 
-    /// Return a MapType key for the given coordinates.
-    static Coord coordToKey(const Coord& xyz) { return xyz & ~(ChildType::DIM - 1); }
+#if OPENVDB_ABI_VERSION_NUMBER < 10
+    /// Static method that returns a MapType key for the given coordinates.
+    static Coord coordToKey(const Coord& xyz) {return xyz & ~(ChildType::DIM - 1); }
+#else
+    /// Return a MapType key for the given coordinates, offset by the mOrigin.
+    Coord coordToKey(const Coord& xyz) const { return (xyz - mOrigin) & ~(ChildType::DIM - 1); }
+#endif
 
     /// Insert this node's mTable keys into the given set.
     void insertKeys(CoordSet&) const;
@@ -971,6 +987,9 @@ private:
 
     MapType mTable;
     ValueType mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    Coord mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     /// Transient Data (not serialized)
     Index32 mTransientData = 0;
@@ -1037,7 +1056,11 @@ struct SameRootConfig<ChildT1, RootNode<ChildT2> > {
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
+RootNode<ChildT>::RootNode()
+    : mBackground(zeroVal<ValueType>())
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1045,7 +1068,11 @@ RootNode<ChildT>::RootNode(): mBackground(zeroVal<ValueType>())
 
 template<typename ChildT>
 inline
-RootNode<ChildT>::RootNode(const ValueType& background): mBackground(background)
+RootNode<ChildT>::RootNode(const ValueType& background)
+    : mBackground(background)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(0, 0, 0)
+#endif
 {
     this->initTable();
 }
@@ -1057,11 +1084,20 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, const ValueType& foregd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(other.mOrigin)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
+    }
+#endif
 
     enforceSameConfiguration(other);
 
@@ -1082,11 +1118,20 @@ inline
 RootNode<ChildT>::RootNode(const RootNode<OtherChildType>& other,
     const ValueType& backgd, TopologyCopy)
     : mBackground(backgd)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , mOrigin(other.mOrigin)
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
     , mTransientData(other.mTransientData)
 #endif
 {
     using OtherRootT = RootNode<OtherChildType>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::RootNode: non-zero offsets are currently not supported");
+    }
+#endif
 
     enforceSameConfiguration(other);
 
@@ -1143,6 +1188,12 @@ struct RootNodeCopyHelper<RootT, OtherRootT, /*Compatible=*/true>
         };
 
         self.mBackground = Local::convertValue(other.mBackground);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if (other.mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNodeCopyHelper::copyWithValueConversion: non-zero offsets are currently not supported");
+        }
+        self.mOrigin = other.mOrigin;
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         self.mTransientData = other.mTransientData;
 #endif
@@ -1172,6 +1223,12 @@ RootNode<ChildT>::operator=(const RootNode& other)
 {
     if (&other != this) {
         mBackground = other.mBackground;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mOrigin = other.mOrigin;
+        if (mOrigin != Coord(0,0,0)) {
+            OPENVDB_THROW(ValueError, "RootNode::operator=: non-zero offsets are currently not supported");
+        }
+#endif
 #if OPENVDB_ABI_VERSION_NUMBER >= 9
         mTransientData = other.mTransientData;
 #endif
@@ -2628,6 +2685,18 @@ RootNode<ChildT>::addChild(ChildT* child)
     }
     return true;
 }
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+template<typename ChildT>
+inline void
+RootNode<ChildT>::setOrigin(const Coord &origin)
+{
+    mOrigin = origin;
+    if (mOrigin != Coord(0,0,0)) {
+        OPENVDB_THROW(ValueError, "RootNode::setOrigin: non-zero offsets are currently not supported");
+    }
+}
+#endif
 
 template<typename ChildT>
 inline void
