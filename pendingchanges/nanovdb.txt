@@ -19,3 +19,4 @@ Bug Fixes:
     - Fixed a bug in nanovdb::HostBuffer that could produce crashes due to misaligned CPU memory allocations.
     - Fixed bug related to uninitialized memory in nanovdb::Grid which could confuse CRC32 checksum validation.
     - Fixed bugs related to the use of intrinsic functions for fast bit-counting in nanovdb.
+    - Fixed a potential security vulnerability in NanoVDB.h related to buffer overflow exploits.
