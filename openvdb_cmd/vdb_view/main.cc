@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <openvdb/openvdb.h>
+#include <openvdb/io/Stream.h>
 #include "Viewer.h"
 #include <boost/algorithm/string/classification.hpp> // for boost::is_any_of()
 #include <boost/algorithm/string/predicate.hpp> // for boost::starts_with()
@@ -12,6 +13,10 @@
 #include <stdexcept>
 #include <string>
 #include <vector>
+#if !defined(_WIN32) && !defined(__WIN32__) && !defined(WIN32)
+#include <unistd.h>
+#endif
+#include <stdio.h>
 
 
 inline void
@@ -88,7 +93,11 @@ main(int argc, char *argv[])
                 usage(progName, EXIT_FAILURE);
             }
         }
-
+#if defined(_WIN32) || defined(__WIN32__) || defined(WIN32)
+        const bool hasInput = false;
+#else
+        const bool hasInput = !isatty(fileno(stdin));
+#endif
         const size_t numFiles = filenames.size();
 
         if (printVersionInfo) {
@@ -98,9 +107,9 @@ main(int argc, char *argv[])
                 << openvdb::OPENVDB_FILE_VERSION << std::endl;
             // If there are no files to view, don't print the OpenGL version,
             // since that would require opening a viewer window.
-            if (numFiles == 0) return EXIT_SUCCESS;
+            if (!hasInput && numFiles == 0) return EXIT_SUCCESS;
         }
-        if (numFiles == 0 && !printGLInfo) usage(progName, EXIT_FAILURE);
+        if (!hasInput && numFiles == 0 && !printGLInfo) usage(progName, EXIT_FAILURE);
 
         openvdb_viewer::Viewer viewer = openvdb_viewer::init(progName, /*bg=*/false);
 
@@ -124,13 +133,32 @@ main(int argc, char *argv[])
                     }
                 }
             }
-            if (numFiles == 0) return EXIT_SUCCESS;
+            if (!hasInput && numFiles == 0) return EXIT_SUCCESS;
         }
+
+        std::string indent(numFiles == 1 ? "" : "    ");
+
+        auto print_info = [&](openvdb::GridPtrVecPtr grids){
+            for (size_t i = 0; i < grids->size(); ++i) {
+                const std::string name = (*grids)[i]->getName();
+                openvdb::Coord dim = (*grids)[i]->evalActiveVoxelDim();
+                std::cout << indent << (name.empty() ? "<unnamed>" : name)
+                          << " (" << dim[0] << " x " << dim[1] << " x " << dim[2]
+                          << " voxels)" << std::endl;
+            }
+        };
 
         openvdb::GridCPtrVec allGrids;
 
-        // Load VDB files.
-        std::string indent(numFiles == 1 ? "" : "    ");
+        // Load VDB grids from stdin stream
+        if (hasInput) {
+            openvdb::io::Stream s(std::cin);
+            openvdb::GridPtrVecPtr grids = s.getGrids();
+            if (printInfo) print_info(grids);
+            allGrids.insert(allGrids.end(), grids->begin(), grids->end());
+        }
+
+        // Load VDB grid from files.
         for (size_t n = 0; n < numFiles; ++n) {
             openvdb::io::File file(filenames[n]);
             file.open();
@@ -144,13 +172,7 @@ main(int argc, char *argv[])
 
             if (printInfo) {
                 if (numFiles > 1) std::cout << filenames[n] << ":\n";
-                for (size_t i = 0; i < grids->size(); ++i) {
-                    const std::string name = (*grids)[i]->getName();
-                    openvdb::Coord dim = (*grids)[i]->evalActiveVoxelDim();
-                    std::cout << indent << (name.empty() ? "<unnamed>" : name)
-                        << " (" << dim[0] << " x " << dim[1] << " x " << dim[2]
-                        << " voxels)" << std::endl;
-                }
+                print_info(grids);
             }
         }
 

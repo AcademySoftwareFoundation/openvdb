@@ -1,0 +1,2 @@
+New Features:
+    Introducing a new command-line tool, dubbed vdb_tool, that can combine any number of the of high-level tools available in openvdb/tools. For instance, it can convert a sequence of polygon meshes and particles to level sets, perform a large number of operations on these level set surfaces and export them as adaptive polyon meshes.

@@ -1,0 +1,14 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how to create a narrow-band
+# level set of a sphere and save it to an OpenVDB file.
+
+# create a narrow-band level set of a sphere
+# the dimension is 256 voxels (default value)
+# the radius is 100 world units (default value)
+# the half width of the narrow band is 3 voxels (default value)
+# the sphere is centered at (0,0,0) in world (and voxel) space (default value)
+sphere dim=256 radius=100 width=3 center=(0,0,0)
+
+# write level set to file
+write sphere.vdb
