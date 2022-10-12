@@ -1427,7 +1427,7 @@ public:
     bool operator!=(const PointIndexLeafNode& other) const { return !(other == *this); }
 
     template<MergePolicy Policy> void merge(const PointIndexLeafNode& rhs) {
-        BaseLeaf::merge<Policy>(rhs);
+        BaseLeaf::template merge<Policy>(rhs);
     }
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive) {
          BaseLeaf::template merge<Policy>(tileValue, tileActive);

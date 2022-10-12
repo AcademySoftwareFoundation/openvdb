@@ -1,0 +1,2 @@
+Bug Fixes:
+    - Fixed a bug in math/Tuple.h that prevented compilation with VS2017.

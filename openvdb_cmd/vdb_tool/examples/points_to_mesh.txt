@@ -1,0 +1,49 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how points, e.g. from a fluid
+# simulation, can be surfaced and converted into a mesh surface.
+# The specific sequence of operation are: 1) read polygon mesh,
+# 2) convert in into a level set, 3) dilate the level set, 4)
+# smooth the level set, 5) erode the level set, 6) convert the
+# level set into an adaptive mesh, and 7) finally write the mesh
+# to a ply file. These operations have prove (from VFX production)
+# to produce high-quality surfaces. See the following for details:
+# https://ken.museth.org/Publications_files/meis2013_abstract_museth.pdf
+
+# read OpenVDB file with points
+read /Users/ken/dev/data/vdb/fluid_points.0100.vdb
+
+# Extract the points from the VDB grid
+vdb2points
+
+# Convert point to a narrow-band level set
+# dimension is 256 voxels
+# particle radius is 2.0 voxels
+# half-width of the narrow-band level set is 3 voxels
+points2ls dim=256 radius=2 width=3
+
+# Dilate level set
+# radius of dilation is 1.0 voxels
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+dilate radius=1 space=5 time=1
+
+# Gaussian filtering of level set
+# number of iterations is 1
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+# size of the filter kernel is 1.0 voxels
+gauss iter=1 space=5 time=1 size=1
+
+# Erode level set
+# radius of erosion is 1.0 voxels
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+erode radius=1 space=5 time=1
+
+# Level set to polygon mesh conversion
+# Mesh adaptivity is 0.1 %
+ls2mesh adapt=0.1
+
+# write polygon mesh to binary ply file
+write surface.ply
