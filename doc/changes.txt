@@ -1010,8 +1010,7 @@ API changes:
 - @vdblink{tools::VolumeToMesh::pointList(),VolumeToMesh::pointList} and
   @vdblink{tools::VolumeToMesh::polygonPoolList(),VolumeToMesh::polygonPoolList}
   now return a std::unique_ptr instead of a boost::scoped_array.
-- @vdblink::points::AttributeArray::copyUncompressed() AttributeArray::copyUncompressed@endlink
-  is now deprecated.
+- AttributeArray::copyUncompressed is now deprecated.
 
 @par
 Python:
@@ -1342,9 +1341,8 @@ Improvements:
   @vdblink::points::AttributeArray AttributeArray@endlink now errors.
 - Updated point deletion to use faster batch copying for ABI=6+.
 - Methods relating to in-memory Blosc compression for
-  @vdblink::points::AttributeArray::compress() AttributeArray@endlink
-  now do nothing and have been marked deprecated resulting in memory savings
-  for ABI=6+.
+  AttributeArray::compress() now do nothing and have been marked deprecated
+  resulting in memory savings for ABI=6+.
 
 @par
 Bug fixes:
@@ -1365,8 +1363,8 @@ API changes:
 - Removed a number of methods that were deprecated in version&nbsp;5.0.0 or
   earlier.
 - Removed the experimental @b ValueAccessor::newSetValue method.
-- Deprecated @vdblink::points::AttributeArray::compress()
-  AttributeArray@endlink methods relating to in-memory Blosc compression.
+- Deprecated AttributeArray::compress() methods relating to in-memory Blosc
+  compression.
 
 @par
 Houdini:
