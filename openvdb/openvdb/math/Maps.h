@@ -713,10 +713,10 @@ public:
     static Name mapType() { return Name("ScaleMap"); }
 
     /// Return @c true (a ScaleMap is always linear).
-    bool isLinear() const OPENVDB_MAP_FUNC_SPECIFIER { return true; }
+    bool isLinear() const final { return true; }
 
     /// Return @c true if the values have the same magitude (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const OPENVDB_MAP_FUNC_SPECIFIER
+    bool hasUniformScale() const final
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -726,7 +726,7 @@ public:
     }
 
     /// Return the image of @c in under the map
-    Vec3d applyMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Vec3d applyMap(const Vec3d& in) const final
     {
         return Vec3d(
             in.x() * mScaleValues.x(),
@@ -734,7 +734,7 @@ public:
             in.z() * mScaleValues.z());
     }
     /// Return the pre-image of @c in under the map
-    Vec3d applyInverseMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Vec3d applyInverseMap(const Vec3d& in) const final
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -742,38 +742,38 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const final {
         return applyJacobian(in);
     }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyMap(in); }
+    Vec3d applyJacobian(const Vec3d& in) const final { return applyMap(in); }
 
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const final {
         return applyInverseJacobian(in);
     }
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyInverseJacobian(const Vec3d& in) const final {
         return applyInverseMap(in);
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
     /// @details This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJT(in); }
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const final { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyMap(in); }
+    Vec3d applyJT(const Vec3d& in) const final { return applyMap(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in.
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const final {
         return applyIJT(in);
     }
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyInverseMap(in); }
+    Vec3d applyIJT(const Vec3d& in) const final { return applyInverseMap(in); }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Mat3d applyIJC(const Mat3d& in) const final
     {
         Mat3d tmp;
         for (int i = 0; i < 3; i++) {
@@ -784,13 +784,13 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d&) const final {
         return applyIJC(in);
     }
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return determinant(); }
+    double determinant(const Vec3d&) const final { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const OPENVDB_MAP_FUNC_SPECIFIER {
+    double determinant() const final {
         return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
     }
 
@@ -808,8 +808,8 @@ public:
     /// @brief Return the lengths of the images of the segments
     /// (0,0,0) &minus; 1,0,0), (0,0,0) &minus; (0,1,0) and (0,0,0) &minus; (0,0,1).
     /// @details This is equivalent to the absolute values of the scale values
-    Vec3d voxelSize() const OPENVDB_MAP_FUNC_SPECIFIER { return mVoxelSize; }
-    Vec3d voxelSize(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return voxelSize(); }
+    Vec3d voxelSize() const final { return mVoxelSize; }
+    Vec3d voxelSize(const Vec3d&) const final { return voxelSize(); }
     //@}
 
     /// read serialization
@@ -1243,11 +1243,11 @@ public:
     static Name mapType() { return Name("ScaleTranslateMap"); }
 
     /// Return @c true (a ScaleTranslateMap is always linear).
-    bool isLinear() const OPENVDB_MAP_FUNC_SPECIFIER { return true; }
+    bool isLinear() const final { return true; }
 
     /// @brief Return @c true if the scale values have the same magnitude
     /// (eg. -1, 1, -1 would be a rotation).
-    bool hasUniformScale() const OPENVDB_MAP_FUNC_SPECIFIER
+    bool hasUniformScale() const final
     {
         bool value = isApproxEqual(
             std::abs(mScaleValues.x()), std::abs(mScaleValues.y()), double(5e-7));
@@ -1257,7 +1257,7 @@ public:
     }
 
     /// Return the image of @c under the map
-    Vec3d applyMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Vec3d applyMap(const Vec3d& in) const final
     {
         return Vec3d(
             in.x() * mScaleValues.x() + mTranslation.x(),
@@ -1265,7 +1265,7 @@ public:
             in.z() * mScaleValues.z() + mTranslation.z());
     }
     /// Return the pre-image of @c under the map
-    Vec3d applyInverseMap(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Vec3d applyInverseMap(const Vec3d& in) const final
     {
         return Vec3d(
             (in.x() - mTranslation.x() ) * mScaleValuesInverse.x(),
@@ -1274,36 +1274,36 @@ public:
     }
 
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyJacobian(const Vec3d& in, const Vec3d&) const final {
         return applyJacobian(in);
     }
     /// Return the Jacobian of the map applied to @a in.
-    Vec3d applyJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return in * mScaleValues; }
+    Vec3d applyJacobian(const Vec3d& in) const final { return in * mScaleValues; }
 
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyInverseJacobian(const Vec3d& in, const Vec3d&) const final {
         return applyInverseJacobian(in);
     }
     /// @brief Return the Inverse Jacobian of the map applied to @a in
     /// (i.e. inverse map with out translation)
-    Vec3d applyInverseJacobian(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyInverseJacobian(const Vec3d& in) const final {
         return in * mScaleValuesInverse;
     }
 
     /// @brief Return the Jacobian Transpose of the map applied to @a in.
     /// @details This tranforms range-space gradients to domain-space gradients
-    Vec3d applyJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJT(in); }
+    Vec3d applyJT(const Vec3d& in, const Vec3d&) const final { return applyJT(in); }
     /// Return the Jacobian Transpose of the map applied to @a in.
-    Vec3d applyJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER { return applyJacobian(in); }
+    Vec3d applyJT(const Vec3d& in) const final { return applyJacobian(in); }
 
     /// @brief Return the transpose of the inverse Jacobian of the map applied to @a in
     /// @details Ignores second argument
-    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Vec3d applyIJT(const Vec3d& in, const Vec3d&) const final {
         return applyIJT(in);
     }
     /// Return the transpose of the inverse Jacobian of the map applied to @c in
-    Vec3d applyIJT(const Vec3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Vec3d applyIJT(const Vec3d& in) const final
     {
         return Vec3d(
             in.x() * mScaleValuesInverse.x(),
@@ -1311,7 +1311,7 @@ public:
             in.z() * mScaleValuesInverse.z());
     }
     /// Return the Jacobian Curvature: zero for a linear map
-    Mat3d applyIJC(const Mat3d& in) const OPENVDB_MAP_FUNC_SPECIFIER
+    Mat3d applyIJC(const Mat3d& in) const final
     {
         Mat3d tmp;
         for (int i=0; i<3; i++){
@@ -1322,20 +1322,20 @@ public:
         }
         return tmp;
     }
-    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const OPENVDB_MAP_FUNC_SPECIFIER {
+    Mat3d applyIJC(const Mat3d& in, const Vec3d&, const Vec3d& ) const final {
         return applyIJC(in);
     }
 
     /// Return the product of the scale values, ignores argument
-    double determinant(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return determinant(); }
+    double determinant(const Vec3d&) const final { return determinant(); }
     /// Return the product of the scale values
-    double determinant() const OPENVDB_MAP_FUNC_SPECIFIER {
+    double determinant() const final {
         return mScaleValues.x() * mScaleValues.y() * mScaleValues.z();
     }
     /// Return the absolute values of the scale values
-    Vec3d voxelSize() const OPENVDB_MAP_FUNC_SPECIFIER { return mVoxelSize;}
+    Vec3d voxelSize() const final { return mVoxelSize;}
     /// Return the absolute values of the scale values, ignores argument
-    Vec3d voxelSize(const Vec3d&) const OPENVDB_MAP_FUNC_SPECIFIER { return voxelSize();}
+    Vec3d voxelSize(const Vec3d&) const final { return voxelSize();}
 
     /// Returns the scale values
     const Vec3d& getScale() const { return mScaleValues; }
