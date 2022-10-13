@@ -113,6 +113,12 @@ else()
   set(LLVM_LIBS "${_llvm_libs}")
 endif()
 
+if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
+  # https://llvm.org/docs/OpaquePointers.html
+  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to
+    opaque pointer changes. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
+endif()
+
 if(MINIMUM_LLVM_VERSION)
   if(LLVM_PACKAGE_VERSION VERSION_LESS MINIMUM_LLVM_VERSION)
     message(FATAL_ERROR "Could NOT find LLVM: Found unsuitable version \"${LLVM_PACKAGE_VERSION}\", "
