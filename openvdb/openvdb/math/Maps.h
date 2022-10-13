@@ -293,14 +293,9 @@ private:
 ////////////////////////////////////////
 
 
-/// @note Macro to use a final specifier from ABI=8 onwards.
-#define OPENVDB_MAP_CLASS_SPECIFIER final
-#define OPENVDB_MAP_FUNC_SPECIFIER final
-
 /// @brief A general linear transform using homogeneous coordinates to perform
 /// rotation, scaling, shear and translation
-/// @note This class is marked final with ABI=8
-class OPENVDB_API AffineMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
+class OPENVDB_API AffineMap final: public MapBase
 {
 public:
     using Ptr = SharedPtr<AffineMap>;
@@ -910,8 +905,7 @@ private:
 
 /// @brief A specialized Affine transform that scales along the principal axis
 /// the scaling is uniform in the three-directions
-/// @note This class is marked final with ABI=8
-class OPENVDB_API UniformScaleMap OPENVDB_MAP_CLASS_SPECIFIER: public ScaleMap
+class OPENVDB_API UniformScaleMap final: public ScaleMap
 {
 public:
     using Ptr = SharedPtr<UniformScaleMap>;
@@ -983,8 +977,7 @@ ScaleMap::postScale(const Vec3d& v) const
 
 
 /// @brief A specialized linear transform that performs a translation
-/// @note This class is marked final with ABI=8
-class OPENVDB_API TranslationMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
+class OPENVDB_API TranslationMap final: public MapBase
 {
 public:
     using Ptr = SharedPtr<TranslationMap>;
@@ -1485,8 +1478,7 @@ ScaleMap::preTranslate(const Vec3d& t) const
 
 /// @brief A specialized Affine transform that uniformaly scales along the principal axis
 /// and then translates the result.
-/// @note This class is marked final with ABI=8
-class OPENVDB_API UniformScaleTranslateMap OPENVDB_MAP_CLASS_SPECIFIER: public ScaleTranslateMap
+class OPENVDB_API UniformScaleTranslateMap final: public ScaleTranslateMap
 {
 public:
     using Ptr = SharedPtr<UniformScaleTranslateMap>;
@@ -1628,8 +1620,7 @@ ScaleTranslateMap::postScale(const Vec3d& v) const
 
 /// @brief A specialized linear transform that performs a unitary maping
 /// i.e. rotation  and or reflection.
-/// @note This class is marked final with ABI=8
-class OPENVDB_API UnitaryMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
+class OPENVDB_API UnitaryMap final: public MapBase
 {
 public:
     using Ptr = SharedPtr<UnitaryMap>;
@@ -1900,8 +1891,7 @@ private:
 /// Then this frustum is transformed by an internal second map: most often a uniform scale,
 /// but other effects can be achieved by accumulating translation, shear and rotation: these
 /// are all applied to the second map
-/// @note This class is marked final with ABI=8
-class OPENVDB_API NonlinearFrustumMap OPENVDB_MAP_CLASS_SPECIFIER: public MapBase
+class OPENVDB_API NonlinearFrustumMap final: public MapBase
 {
 public:
     using Ptr = SharedPtr<NonlinearFrustumMap>;
