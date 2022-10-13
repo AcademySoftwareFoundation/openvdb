@@ -386,21 +386,21 @@ jobs:
         cd abi-compliance-checker && git checkout 7c175c45a8ba9ac41b8e47d8ebbab557b623b18e && cd -
     - name: build_latest
       run: >
-        CXXFLAGS=-Og ./ci/build.sh -v
+        sudo ./ci/build.sh -v
         --build-dir=build_latest
         --build-type=Debug
         --target=openvdb_shared
         --components=\"core\"
-        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\'
     - name: checkout_baseline
       run: git checkout v${VDB_MAJOR_VERSION}.0.0
     - name: build_baseline
       run: >
-        CXXFLAGS=-Og ./ci/build.sh -v
+        sudo ./ci/build.sh -v
         --build-type=Debug
         --target=openvdb_shared
         --components=\"core\"
-        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF\'
+        --cargs=\'-DUSE_EXPLICIT_INSTANTIATION=OFF -DDISABLE_DEPENDENCY_VERSION_CHECKS=ON\'
     - name: abi_dump
       run: |
         abi-dumper/abi-dumper.pl build_latest/openvdb/openvdb/libopenvdb.so -o ABI-1.dump -lver 1
