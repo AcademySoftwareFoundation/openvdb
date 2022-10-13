@@ -5,7 +5,7 @@
 #include <openvdb/math/Math.h> // for math::Random01
 #include <openvdb/tools/PointsToMask.h>
 #include <openvdb/util/CpuTimer.h>
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 #include <vector>
 #include <algorithm>
 #include <cmath>

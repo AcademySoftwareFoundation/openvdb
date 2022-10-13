@@ -29,13 +29,14 @@
 
 //#define BENCHMARK_FAST_SWEEPING
 
+#include <openvdb/openvdb.h>
 #include <openvdb/Platform.h>
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
+
 #include "LevelSetUtil.h"
 #include "Morphology.h"
-#include <openvdb/openvdb.h>
 
 #include "Statistics.h"
 #ifdef BENCHMARK_FAST_SWEEPING

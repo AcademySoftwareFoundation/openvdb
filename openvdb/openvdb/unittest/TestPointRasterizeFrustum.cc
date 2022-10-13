@@ -19,7 +19,7 @@
 #include <openvdb/util/CpuTimer.h>
 #endif
 
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 using namespace openvdb;
 using namespace openvdb::points;

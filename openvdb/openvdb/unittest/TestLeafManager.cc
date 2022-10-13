@@ -5,7 +5,7 @@
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/util/CpuTimer.h>
 #include "util.h" // for unittest_util::makeSphere()
-#include "gtest/gtest.h"
+#include <gtest/gtest.h>
 
 
 class TestLeafManager: public ::testing::Test
