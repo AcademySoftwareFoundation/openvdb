@@ -692,25 +692,6 @@ public:
     template<typename CombineOp, typename OtherNodeT /*= LeafNode*/>
     void combine2(const LeafNode& b0, const OtherNodeT& b1, CombineOp&);
 
-    /// @brief Calls the templated functor BBoxOp with bounding box
-    /// information. An additional level argument is provided to the
-    /// callback.
-    ///
-    /// @note The bounding boxes are guaranteed to be non-overlapping.
-    template<typename BBoxOp> void visitActiveBBox(BBoxOp&) const;
-
-    template<typename VisitorOp> void visit(VisitorOp&);
-    template<typename VisitorOp> void visit(VisitorOp&) const;
-
-    template<typename OtherLeafNodeType, typename VisitorOp>
-    void visit2Node(OtherLeafNodeType& other, VisitorOp&);
-    template<typename OtherLeafNodeType, typename VisitorOp>
-    void visit2Node(OtherLeafNodeType& other, VisitorOp&) const;
-    template<typename IterT, typename VisitorOp>
-    void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false);
-    template<typename IterT, typename VisitorOp>
-    void visit2(IterT& otherIter, VisitorOp&, bool otherIsLHS = false) const;
-
     //@{
     /// This function exists only to enable template instantiation.
     void prune(const ValueType& /*tolerance*/ = zeroVal<ValueType>()) {}
@@ -888,17 +869,6 @@ protected:
 
     /// Compute the origin of the leaf node that contains the voxel with the given coordinates.
     static void evalNodeOrigin(Coord& xyz) { xyz &= ~(DIM - 1); }
-
-    template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
-    static inline void doVisit(NodeT&, VisitorOp&);
-
-    template<typename NodeT, typename OtherNodeT, typename VisitorOp,
-             typename ChildAllIterT, typename OtherChildAllIterT>
-    static inline void doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp&);
-
-    template<typename NodeT, typename VisitorOp,
-             typename ChildAllIterT, typename OtherChildAllIterT>
-    static inline void doVisit2(NodeT& self, OtherChildAllIterT&, VisitorOp&, bool otherIsLHS);
 
 private:
     /// Buffer containing the actual data values
@@ -1844,148 +1814,6 @@ LeafNode<T, Log2Dim>::combine2(const LeafNode& b0, const OtherNodeT& b1, Combine
             .setBIsActive(b1.valueMask().isOn(i))
             .setResultRef(mBuffer[i]));
         mValueMask.set(i, args.resultIsActive());
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-template<typename BBoxOp>
-inline void
-LeafNode<T, Log2Dim>::visitActiveBBox(BBoxOp& op) const
-{
-    if (op.template descent<LEVEL>()) {
-        for (ValueOnCIter i=this->cbeginValueOn(); i; ++i) {
-            op.template operator()<LEVEL>(CoordBBox::createCube(i.getCoord(), 1));
-        }
-    } else {
-        op.template operator()<LEVEL>(this->getNodeBoundingBox());
-    }
-}
-
-
-template<typename T, Index Log2Dim>
-template<typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit(VisitorOp& op)
-{
-    doVisit<LeafNode, VisitorOp, ChildAllIter>(*this, op);
-}
-
-
-template<typename T, Index Log2Dim>
-template<typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit(VisitorOp& op) const
-{
-    doVisit<const LeafNode, VisitorOp, ChildAllCIter>(*this, op);
-}
-
-
-template<typename T, Index Log2Dim>
-template<typename NodeT, typename VisitorOp, typename ChildAllIterT>
-inline void
-LeafNode<T, Log2Dim>::doVisit(NodeT& self, VisitorOp& op)
-{
-    for (ChildAllIterT iter = self.beginChildAll(); iter; ++iter) {
-        op(iter);
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-template<typename OtherLeafNodeType, typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit2Node(OtherLeafNodeType& other, VisitorOp& op)
-{
-    doVisit2Node<LeafNode, OtherLeafNodeType, VisitorOp, ChildAllIter,
-        typename OtherLeafNodeType::ChildAllIter>(*this, other, op);
-}
-
-
-template<typename T, Index Log2Dim>
-template<typename OtherLeafNodeType, typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit2Node(OtherLeafNodeType& other, VisitorOp& op) const
-{
-    doVisit2Node<const LeafNode, OtherLeafNodeType, VisitorOp, ChildAllCIter,
-        typename OtherLeafNodeType::ChildAllCIter>(*this, other, op);
-}
-
-
-template<typename T, Index Log2Dim>
-template<
-    typename NodeT,
-    typename OtherNodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
-inline void
-LeafNode<T, Log2Dim>::doVisit2Node(NodeT& self, OtherNodeT& other, VisitorOp& op)
-{
-    // Allow the two nodes to have different ValueTypes, but not different dimensions.
-    static_assert(OtherNodeT::SIZE == NodeT::SIZE,
-        "can't visit nodes of different sizes simultaneously");
-    static_assert(OtherNodeT::LEVEL == NodeT::LEVEL,
-        "can't visit nodes at different tree levels simultaneously");
-
-    ChildAllIterT iter = self.beginChildAll();
-    OtherChildAllIterT otherIter = other.beginChildAll();
-
-    for ( ; iter && otherIter; ++iter, ++otherIter) {
-        op(iter, otherIter);
-    }
-}
-
-
-////////////////////////////////////////
-
-
-template<typename T, Index Log2Dim>
-template<typename IterT, typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit2(IterT& otherIter, VisitorOp& op, bool otherIsLHS)
-{
-    doVisit2<LeafNode, VisitorOp, ChildAllIter, IterT>(
-        *this, otherIter, op, otherIsLHS);
-}
-
-
-template<typename T, Index Log2Dim>
-template<typename IterT, typename VisitorOp>
-inline void
-LeafNode<T, Log2Dim>::visit2(IterT& otherIter, VisitorOp& op, bool otherIsLHS) const
-{
-    doVisit2<const LeafNode, VisitorOp, ChildAllCIter, IterT>(
-        *this, otherIter, op, otherIsLHS);
-}
-
-
-template<typename T, Index Log2Dim>
-template<
-    typename NodeT,
-    typename VisitorOp,
-    typename ChildAllIterT,
-    typename OtherChildAllIterT>
-inline void
-LeafNode<T, Log2Dim>::doVisit2(NodeT& self, OtherChildAllIterT& otherIter,
-    VisitorOp& op, bool otherIsLHS)
-{
-    if (!otherIter) return;
-
-    if (otherIsLHS) {
-        for (ChildAllIterT iter = self.beginChildAll(); iter; ++iter) {
-            op(otherIter, iter);
-        }
-    } else {
-        for (ChildAllIterT iter = self.beginChildAll(); iter; ++iter) {
-            op(iter, otherIter);
-        }
     }
 }
 
