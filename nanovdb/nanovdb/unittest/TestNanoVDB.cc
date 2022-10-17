@@ -6042,7 +6042,7 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder1)
     EXPECT_EQ(1.0f, fltGrid->tree().getValue(ijk));
     EXPECT_EQ(0.0f, fltGrid->tree().getValue(nanovdb::Coord(0,0,0)));
 
-    nanovdb::IndexGridBuilder<float> builder2(*fltGrid, false, false);
+    nanovdb::IndexGridBuilder<float> builder2(*fltGrid, false, false);// no stats and no inactive values
     auto handle2 = builder2.getHandle();
     auto *idxGrid = handle2.grid<nanovdb::ValueIndex>();
     EXPECT_TRUE(idxGrid);
@@ -6057,17 +6057,18 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder1)
     EXPECT_EQ(1u, idxGrid->tree().root().tileCount());
     EXPECT_EQ(1u, idxGrid->activeVoxelCount());
     EXPECT_EQ(0u, idxGrid->tree().root().background());
-    EXPECT_EQ(1u, idxGrid->tree().root().minimum());
-    EXPECT_EQ(2u, idxGrid->tree().root().maximum());
-    EXPECT_EQ(3u, idxGrid->tree().root().average());
-    EXPECT_EQ(4u, idxGrid->tree().root().stdDeviation());
+    EXPECT_EQ(0u, idxGrid->tree().root().minimum());
+    EXPECT_EQ(0u, idxGrid->tree().root().maximum());
+    EXPECT_EQ(0u, idxGrid->tree().root().average());
+    EXPECT_EQ(0u, idxGrid->tree().root().stdDeviation());
+    EXPECT_EQ(2u, idxGrid->valueCount());// background + ijk(0,0,1)
     EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
 
     EXPECT_FALSE(idxGrid->tree().isActive(nanovdb::Coord(0,0,0)));
     EXPECT_TRUE(idxGrid->tree().isActive(ijk));
 
     EXPECT_EQ(0u, idxGrid->tree().getValue(nanovdb::Coord(0,0,0)));
-    EXPECT_EQ(5u, idxGrid->tree().getValue(nanovdb::Coord(0,0,1)));
+    EXPECT_EQ(1u, idxGrid->tree().getValue(nanovdb::Coord(0,0,1)));
     EXPECT_EQ(0u, idxGrid->tree().getValue(nanovdb::Coord(0,0,7)));
     EXPECT_EQ(0u, idxGrid->tree().getValue(nanovdb::Coord(7,7,7)));
     EXPECT_EQ(0u, idxGrid->tree().getValue(nanovdb::Coord(-1,0,0)));
@@ -6083,7 +6084,7 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder1)
 
     auto idxAcc = idxGrid->getAccessor();
     EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(0,0,0)));
-    EXPECT_EQ(5u, idxAcc.getValue(nanovdb::Coord(0,0,1)));
+    EXPECT_EQ(1u, idxAcc.getValue(nanovdb::Coord(0,0,1)));
     EXPECT_EQ(0u, idxAcc.getValue(nanovdb::Coord(0,0,7)));
     EXPECT_EQ(nanovdb::Coord(0), idxAcc.getNode<0>()->origin());
     EXPECT_EQ(nanovdb::Coord(0), idxAcc.getNode<1>()->origin());
@@ -6301,10 +6302,10 @@ TEST_F(TestNanoVDB, SparseIndexGridBuilder2)
     EXPECT_EQ(fltGrid->activeVoxelCount(), idxGrid->activeVoxelCount());
     EXPECT_EQ(fltGrid->worldBBox(), idxGrid->worldBBox());
     EXPECT_EQ(fltGrid->indexBBox(), idxGrid->indexBBox());
-    EXPECT_EQ(1u, idxRoot.minimum());
-    EXPECT_EQ(2u, idxRoot.maximum());
-    EXPECT_EQ(3u, idxRoot.average());
-    EXPECT_EQ(4u, idxRoot.stdDeviation());
+    EXPECT_EQ(0u, idxRoot.minimum());
+    EXPECT_EQ(0u, idxRoot.maximum());
+    EXPECT_EQ(0u, idxRoot.average());
+    EXPECT_EQ(0u, idxRoot.stdDeviation());
     EXPECT_EQ(idxGrid->valueCount(), builder2.getValueCount());
     //(idxAcc.valueCount(), builder2.getValueCount());
     EXPECT_TRUE(idxGrid->valueCount()>0);// this is the number of values pointed to by the indexGrid

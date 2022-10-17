@@ -122,7 +122,7 @@
 
 #define NANOVDB_MAJOR_VERSION_NUMBER 32 // reflects changes to the ABI and hence also the file format
 #define NANOVDB_MINOR_VERSION_NUMBER 4 //  reflects changes to the API but not ABI
-#define NANOVDB_PATCH_VERSION_NUMBER 1 //  reflects changes that does not affect the ABI or API
+#define NANOVDB_PATCH_VERSION_NUMBER 2 //  reflects changes that does not affect the ABI or API
 
 // This replaces a Coord key at the root level with a single uint64_t
 #define USE_SINGLE_ROOT_KEY
@@ -4208,10 +4208,10 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndex, CoordT, MaskT,
 
     __hostdev__ static uint64_t memUsage() { return sizeof(LeafData); }
 
-    __hostdev__ uint64_t getMin() const { return mStatsOff + 0; }
-    __hostdev__ uint64_t getMax() const { return mStatsOff + 1; }
-    __hostdev__ uint64_t getAvg() const { return mStatsOff + 2; }
-    __hostdev__ uint64_t getDev() const { return mStatsOff + 3; }
+    __hostdev__ uint64_t getMin() const { NANOVDB_ASSERT(mStatsOff); return mStatsOff + 0; }
+    __hostdev__ uint64_t getMax() const { NANOVDB_ASSERT(mStatsOff); return mStatsOff + 1; }
+    __hostdev__ uint64_t getAvg() const { NANOVDB_ASSERT(mStatsOff); return mStatsOff + 2; }
+    __hostdev__ uint64_t getDev() const { NANOVDB_ASSERT(mStatsOff); return mStatsOff + 3; }
     __hostdev__ void setValue(uint32_t offset, uint64_t)
     {
         mValueMask.setOn(offset);
@@ -4226,13 +4226,13 @@ struct NANOVDB_ALIGN(NANOVDB_DATA_ALIGNMENT) LeafData<ValueIndex, CoordT, MaskT,
     }
 
     template <typename T>
-    __hostdev__ void setMin(const T &min, T *p) { p[mStatsOff + 0] = min; }
+    __hostdev__ void setMin(const T &min, T *p) { NANOVDB_ASSERT(mStatsOff); p[mStatsOff + 0] = min; }
     template <typename T>
-    __hostdev__ void setMax(const T &max, T *p) { p[mStatsOff + 1] = max; }
+    __hostdev__ void setMax(const T &max, T *p) { NANOVDB_ASSERT(mStatsOff); p[mStatsOff + 1] = max; }
     template <typename T>
-    __hostdev__ void setAvg(const T &avg, T *p) { p[mStatsOff + 2] = avg; }
+    __hostdev__ void setAvg(const T &avg, T *p) { NANOVDB_ASSERT(mStatsOff); p[mStatsOff + 2] = avg; }
     template <typename T>
-    __hostdev__ void setDev(const T &dev, T *p) { p[mStatsOff + 3] = dev; }
+    __hostdev__ void setDev(const T &dev, T *p) { NANOVDB_ASSERT(mStatsOff); p[mStatsOff + 3] = dev; }
     template <typename T>
     __hostdev__ void setOrigin(const T &ijk) { mBBoxMin = ijk; }
 

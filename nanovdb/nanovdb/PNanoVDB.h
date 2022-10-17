@@ -632,7 +632,7 @@ PNANOVDB_FORCE_INLINE float pnanovdb_read_half(pnanovdb_buf_t buf, pnanovdb_addr
 
 #define PNANOVDB_MAJOR_VERSION_NUMBER 32// reflects changes to the ABI
 #define PNANOVDB_MINOR_VERSION_NUMBER  4// reflects changes to the API but not ABI
-#define PNANOVDB_PATCH_VERSION_NUMBER  1// reflects bug-fixes with no ABI or API changes
+#define PNANOVDB_PATCH_VERSION_NUMBER  2// reflects bug-fixes with no ABI or API changes
 
 #define PNANOVDB_GRID_TYPE_UNKNOWN 0
 #define PNANOVDB_GRID_TYPE_FLOAT 1
