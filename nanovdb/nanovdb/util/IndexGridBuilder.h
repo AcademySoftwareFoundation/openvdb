@@ -160,7 +160,7 @@ void IndexGridBuilder<SrcValueT>::countValues()
 {
     const uint64_t stats = mIncludeStats ? 4u : 0u;
 
-    uint64_t valueCount = 1 + stats;//background, [minimum, maximum, average, and deviation]
+    uint64_t valueCount = 1u + stats;//background, [minimum, maximum, average, and deviation]
 
     // root values
     if (mIsSparse) {
@@ -243,7 +243,7 @@ uint64_t IndexGridBuilder<SrcValueT>::copyValues(SrcValueT *buffer, size_t maxVa
     }
     {// copy root tile values
         auto *srcData = mSrcMgr->root().data();
-        SrcValueT *v = buffer + (mIncludeStats ? 5 : 1);
+        SrcValueT *v = buffer + (mIncludeStats ? 5u : 1u);
         for (uint32_t tileID = 0; tileID < srcData->mTableSize; ++tileID) {
             auto *srcTile = srcData->tile(tileID);
             if (srcTile->isChild() ||(mIsSparse&&!srcTile->state)) continue;
