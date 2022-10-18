@@ -18,7 +18,6 @@
 
 #include "GridHandle.h"
 #include "NodeManager.h"
-//#include "GridStats.h"
 #include "Range.h"
 #include "ForEach.h"
 
@@ -151,8 +150,6 @@ getHandle(const std::string &name, uint32_t channels, const BufferT &buffer)
 
     this->processChannels(channels);
 
-    //gridStats(*this->getGrid(), StatsMode::BBox);
-
     return handle;
 } // IndexGridBuilder::getHandle
 
@@ -161,7 +158,9 @@ getHandle(const std::string &name, uint32_t channels, const BufferT &buffer)
 template<typename SrcValueT>
 void IndexGridBuilder<SrcValueT>::countValues()
 {
-    uint64_t valueCount = 5;//background, minimum, maximum, average, and deviation
+    const uint64_t stats = mIncludeStats ? 4u : 0u;
+
+    uint64_t valueCount = 1u + stats;//background, [minimum, maximum, average, and deviation]
 
     // root values
     if (mIsSparse) {
@@ -169,8 +168,6 @@ void IndexGridBuilder<SrcValueT>::countValues()
     } else {
         for (auto it = mSrcMgr->root().beginValue(); it; ++it) ++valueCount;
     }
-
-    const uint64_t stats = mIncludeStats ? 4u : 0u;
 
     // tile values in upper internal nodes
     mValIdx2.resize(mSrcMgr->nodeCount(2) + 1);
@@ -238,14 +235,15 @@ uint64_t IndexGridBuilder<SrcValueT>::copyValues(SrcValueT *buffer, size_t maxVa
 
     // Value array always starts with these entries
     buffer[0] = mSrcMgr->root().background();
-    buffer[1] = mSrcMgr->root().minimum();
-    buffer[2] = mSrcMgr->root().maximum();
-    buffer[3] = mSrcMgr->root().average();
-    buffer[4] = mSrcMgr->root().stdDeviation();
-
+    if (mIncludeStats) {
+        buffer[1] = mSrcMgr->root().minimum();
+        buffer[2] = mSrcMgr->root().maximum();
+        buffer[3] = mSrcMgr->root().average();
+        buffer[4] = mSrcMgr->root().stdDeviation();
+    }
     {// copy root tile values
         auto *srcData = mSrcMgr->root().data();
-        SrcValueT *v = buffer + 5;
+        SrcValueT *v = buffer + (mIncludeStats ? 5u : 1u);
         for (uint32_t tileID = 0; tileID < srcData->mTableSize; ++tileID) {
             auto *srcTile = srcData->tile(tileID);
             if (srcTile->isChild() ||(mIsSparse&&!srcTile->state)) continue;
@@ -460,12 +458,20 @@ void IndexGridBuilder<SrcValueT>::processRoot()
     dstData->mBBox = srcData->mBBox;
     dstData->mTableSize = srcData->mTableSize;
     dstData->mBackground = 0u;
-    dstData->mMinimum    = 1u;
-    dstData->mMaximum    = 2u;
-    dstData->mAverage    = 3u;
-    dstData->mStdDevi    = 4u;
-
-    uint64_t valueCount = 5u;// this is always the first available index
+    uint64_t valueCount = 1u;// the first entry is always the background value
+    if (mIncludeStats) {
+        valueCount += 4u;
+        dstData->mMinimum = 1u;
+        dstData->mMaximum = 2u;
+        dstData->mAverage = 3u;
+        dstData->mStdDevi = 4u;
+    } else if (dstData->padding()==0) {
+        dstData->mMinimum = 0u;
+        dstData->mMaximum = 0u;
+        dstData->mAverage = 0u;
+        dstData->mStdDevi = 0u;
+    }
+    //uint64_t valueCount = 5u;// this is always the first available index
     for (uint32_t tileID = 0, childID = 0; tileID < dstData->mTableSize; ++tileID) {
         auto *srcTile = srcData->tile(tileID);
         auto *dstTile = dstData->tile(tileID);
@@ -508,10 +514,10 @@ void IndexGridBuilder<SrcValueT>::processUpper()
                 dstData2->mAverage = n++;
                 dstData2->mStdDevi = n++;
             } else {
-                dstData2->mMinimum = 1u;
-                dstData2->mMaximum = 2u;
-                dstData2->mAverage = 3u;
-                dstData2->mStdDevi = 4u;
+                dstData2->mMinimum = 0u;
+                dstData2->mMaximum = 0u;
+                dstData2->mAverage = 0u;
+                dstData2->mStdDevi = 0u;
             }
             for (uint32_t j = 0; j != 32768; ++j) {
                 if (dstData2->isChild(j)) {
@@ -554,10 +560,10 @@ void IndexGridBuilder<SrcValueT>::processLower()
                 dstData1->mAverage = n++;
                 dstData1->mStdDevi = n++;
             } else {
-                dstData1->mMinimum = 1u;
-                dstData1->mMaximum = 2u;
-                dstData1->mAverage = 3u;
-                dstData1->mStdDevi = 4u;
+                dstData1->mMinimum = 0u;
+                dstData1->mMaximum = 0u;
+                dstData1->mAverage = 0u;
+                dstData1->mStdDevi = 0u;
             }
             for (uint32_t j = 0; j != 4096; ++j) {
                 if (dstData1->isChild(j)) {
@@ -599,7 +605,7 @@ void IndexGridBuilder<SrcValueT>::processLeafs()
                 dstData0->mStatsOff = mValIdx0[i];// first 4 entries are leaf stats
                 dstData0->mValueOff = mValIdx0[i] + 4u;
             } else {
-                dstData0->mStatsOff = 1u;// statistics associated with the root node
+                dstData0->mStatsOff = 0u;// set to background which indicates no stats!
                 dstData0->mValueOff = mValIdx0[i];
             }
         }
