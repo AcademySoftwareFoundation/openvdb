@@ -4,8 +4,8 @@
 #ifndef OPENVDB_PYUTIL_HAS_BEEN_INCLUDED
 #define OPENVDB_PYUTIL_HAS_BEEN_INCLUDED
 
-#include "openvdb/openvdb.h"
-#include "openvdb/points/PointDataGrid.h"
+#include <openvdb/openvdb.h>
+#include <openvdb/points/PointDataGrid.h>
 #include <boost/python.hpp>
 #include <mutex>
 #include <sstream>

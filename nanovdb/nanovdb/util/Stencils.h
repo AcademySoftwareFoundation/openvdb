@@ -99,7 +99,7 @@ public:
     using ValueType = typename GridT::ValueType;
     using GridType  = GridT;
     using TreeType  = typename GridT::TreeType;
-    using AccessorType = ReadAccessor<ValueType>;
+    using AccessorType = typename GridT::AccessorType;// ReadAccessor<ValueType>;
 
     /// @brief Initialize the stencil buffer with the values of voxel (i, j, k)
     /// and its neighbors.
@@ -225,13 +225,13 @@ public:
     }
     struct Mask {
         uint8_t bits;
-        Mask() : bits(0u) {}
-        void set(int i) { bits |= (1 << i); }
-        bool test(int i) const { return bits & (1 << i); }
-        bool any() const  { return bits >  0u; }
-        bool all() const  { return bits == 255u; }
-        bool none() const { return bits == 0u; }
-        int count() const { return CountOn(bits); }
+        __hostdev__ Mask() : bits(0u) {}
+        __hostdev__ void set(int i) { bits |= (1 << i); }
+        __hostdev__ bool test(int i) const { return bits & (1 << i); }
+        __hostdev__ bool any() const  { return bits >  0u; }
+        __hostdev__ bool all() const  { return bits == 255u; }
+        __hostdev__ bool none() const { return bits == 0u; }
+        __hostdev__ int count() const { return CountOn(bits); }
     };// Mask
 
     /// @brief Return true a bit-mask where the 6 lower bits indicates if the
@@ -244,7 +244,7 @@ public:
     /// ther return value from this function. To check if there are any
     /// intersections use mask!=0u, and for no intersections use mask==0u.
     /// To count the number of intersections use __builtin_popcount(mask).
-    inline Mask intersectionMask(ValueType isoValue = ValueType(0)) const
+    __hostdev__ inline Mask intersectionMask(ValueType isoValue = ValueType(0)) const
     {
         Mask mask;
         const bool less = this->getValue< 0, 0, 0>() < isoValue;
@@ -269,7 +269,7 @@ protected:
     // Constructor is protected to prevent direct instantiation.
     __hostdev__ BaseStencil(const GridType& grid)
         : mGrid(&grid)
-        , mAcc(grid.tree().root())
+        , mAcc(grid)
         , mCenter(Coord::max())
     {
     }

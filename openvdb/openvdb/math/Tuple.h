@@ -79,8 +79,8 @@ public:
     // non-integer types that were castable to 'int' (such as floating point type).
     // The above templates allow for any integer type to be used as an offset into
     // the tuple data.
-    T operator[](int i) const { return this->operator[]<int>(i); }
-    T& operator[](int i) { return this->operator[]<int>(i); }
+    T operator[](int i) const { return this->template operator[]<int>(i); }
+    T& operator[](int i) { return this->template operator[]<int>(i); }
 
     /// @name Compatibility
     /// These are mostly for backwards compatibility with functions that take

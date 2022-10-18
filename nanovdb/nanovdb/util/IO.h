@@ -445,6 +445,8 @@ inline void Segment::add(const GridHandle<BufferT>& h)
         meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<ValueMask>()) {
         meta.emplace_back(h.size(), header.codec, *grid);
+    } else if (auto* grid = h.template grid<ValueIndex>()) {
+        meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<bool>()) {
         meta.emplace_back(h.size(), header.codec, *grid);
     } else if (auto* grid = h.template grid<Rgba8>()) {
@@ -636,7 +638,7 @@ GridHandle<BufferT> readGrid(std::istream& is, const std::string& gridName, cons
     while (s.read(is)) {
         std::streamoff seek = 0;
         for (auto& m : s.meta) {
-            if (m.nameKey == key && m.gridName == gridName) { // check for hask key collision
+            if (m.nameKey == key && m.gridName == gridName) { // check for hash key collision
                 GridHandle<BufferT> handle(BufferT::create(m.gridSize, &buffer));
                 is.seekg(seek, std::ios_base::cur); // rewind
                 Internal::read(is, handle, s.header.codec);

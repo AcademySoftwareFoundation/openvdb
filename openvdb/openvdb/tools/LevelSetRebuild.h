@@ -8,11 +8,13 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/math/Math.h>
 #include <openvdb/math/Transform.h>
-#include <openvdb/tools/VolumeToMesh.h>
-#include <openvdb/tools/MeshToVolume.h>
 #include <openvdb/util/NullInterrupter.h>
 #include <openvdb/util/Util.h>
 #include <openvdb/openvdb.h>
+
+#include "VolumeToMesh.h"
+#include "MeshToVolume.h"
+
 #include <tbb/blocked_range.h>
 #include <tbb/parallel_for.h>
 #include <type_traits>

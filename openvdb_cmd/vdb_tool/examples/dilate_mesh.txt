@@ -1,0 +1,27 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how to read a polygon mesh from a ply file,
+# converting it into a narrow-band level set, dilating the level set,
+# converting the level set into an adaptive polygon mesh and writing out
+# the mesh to a binary ply file.
+
+# read mesh
+read bunny.ply
+
+# Mesh to level set conversion
+# dimension is 256 voxels
+# narrow-band level set width is 3 voxel units
+mesh2ls dim=256 width=3
+
+# Dilate level set
+# radius of dilation is 5.0 voxels
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+dilate radius=5 space=5 time=1
+
+# Level set to polygon mesh conversion
+# Mesh adaptivity is 0.1 %
+ls2mesh adapt=0.1
+
+# write polygon mesh to binary ply file
+write bunny_dilated.ply

@@ -25,6 +25,7 @@
 #ifndef OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_MULTIRESGRID_HAS_BEEN_INCLUDED
 
+#include <openvdb/openvdb.h>
 #include <openvdb/Grid.h>
 #include <openvdb/math/FiniteDifference.h>
 #include <openvdb/math/Math.h>
@@ -33,12 +34,12 @@
 #include <openvdb/Metadata.h>
 #include <openvdb/tree/LeafManager.h>
 #include <openvdb/tree/NodeManager.h>
+
 #include "Interpolation.h"
 #include "Morphology.h"
 #include "Prune.h"
 #include "SignedFloodFill.h"
 #include "ValueTransformer.h"
-#include <openvdb/openvdb.h>
 
 #include <tbb/blocked_range.h>
 #include <tbb/enumerable_thread_specific.h>

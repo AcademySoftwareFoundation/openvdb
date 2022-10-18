@@ -19,10 +19,11 @@
 #include "Activate.h" // backwards compatibility
 #include "Prune.h"
 #include "ValueTransformer.h"
-#include "openvdb/Types.h"
-#include "openvdb/Grid.h"
-#include "openvdb/tree/ValueAccessor.h"
-#include "openvdb/tree/LeafManager.h"
+
+#include <openvdb/Types.h>
+#include <openvdb/Grid.h>
+#include <openvdb/tree/ValueAccessor.h>
+#include <openvdb/tree/LeafManager.h>
 #include <openvdb/openvdb.h>
 #include <openvdb/points/PointDataGrid.h>
 
