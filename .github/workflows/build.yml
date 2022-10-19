@@ -97,7 +97,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=${{ matrix.config.build }}
-        --components=\"core,python,bin,view,render,test\"
+        --components=\"core,python,bin,view,render,cmd_tool,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=ON -DOPENVDB_ABI_VERSION_NUMBER=${{ matrix.config.abi }}\"
     - name: test
       # Always run tests on weekly builds but skip Debug on commits as they take a while.
@@ -131,10 +131,10 @@ jobs:
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
           # @note  Commented out the static debug build due to linker OOM LNK1102
-          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,cmd_tool,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,cmd_tool,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,cmd_tool,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,cmd_tool,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:
@@ -196,7 +196,7 @@ jobs:
       run: >
         ./ci/build.sh -v
         --build-type=Release
-        --components=\"core,python,bin,view,render,test\"
+        --components=\"core,python,bin,view,render,cmd_tool,test\"
         --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42\"
     - name: test
       shell: bash
