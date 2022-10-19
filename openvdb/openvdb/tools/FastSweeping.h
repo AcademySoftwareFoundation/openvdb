@@ -34,11 +34,10 @@
 #include <openvdb/math/Math.h> // for Abs() and isExactlyEqual()
 #include <openvdb/math/Stencils.h> // for GradStencil
 #include <openvdb/tree/LeafManager.h>
+#include <openvdb/tree/NodeManager.h> // for PruneMinMaxFltKernel
 
 #include "LevelSetUtil.h"
 #include "Morphology.h"
-#include "ValueTransformer.h" // for PruneMinMaxFltKernel
-#include <openvdb/openvdb.h>
 
 #include "Statistics.h"
 #ifdef BENCHMARK_FAST_SWEEPING
@@ -893,7 +892,9 @@ void FastSweeping<SdfGridT, ExtValueT>::sweep(int nIter, bool finalize)
       auto e = kernel.run(*mSdfGrid);//multi-threaded
       //auto e = extrema(mGrid->beginValueOn());// 100x slower!!!!
       if (kernel.mFltMinExists || kernel.mFltMaxExists) {
-          openvdb::tools::foreach (mSdfGrid->beginValueAll(), PruneMinMaxFltKernel(e.min(), e.max()));
+          tree::NodeManager<SdfTreeT> nodeManager(mSdfGrid->tree());
+          PruneMinMaxFltKernel op(e.min(), e.max());
+          nodeManager.foreachTopDown(op, true /* = threaded*/, 1 /* = grainSize*/);
       }
 #ifdef BENCHMARK_FAST_SWEEPING
       std::cerr << "Min = " << e.min() << " Max = " << e.max() << std::endl;
@@ -958,18 +959,37 @@ struct FastSweeping<SdfGridT, ExtValueT>::MinMaxKernel
 /// float min.
 template <typename SdfGridT, typename ExtValueT>
 struct FastSweeping<SdfGridT, ExtValueT>::PruneMinMaxFltKernel {
+    PruneMinMaxFltKernel(SdfValueT min, SdfValueT max) : mMin(min), mMax(max) {}
 
-  PruneMinMaxFltKernel(SdfValueT min, SdfValueT max) : mMin(min), mMax(max) {}
+    // Do nothing for the root node
+    void operator()(typename SdfTreeT::RootNodeType&, size_t = 1) const { }
 
-  inline void operator()(const typename SdfGridT::ValueAllIter &iter) const {
-    if (*iter == -std::numeric_limits<SdfValueT>::max()) {
-      iter.setValue(mMin);
+    // Internal nodes
+    template<typename NodeT>
+    void operator()(NodeT& node, size_t idx = 1) const
+    {
+        for (auto iter = node.beginValueAll(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
     }
-    if (*iter == std::numeric_limits<SdfValueT>::max()) {
-      iter.setValue(mMax);
-    }
-  }
 
+    // Leaf nodes
+    void operator()(typename SdfTreeT::LeafNodeType& leaf, size_t idx = 1) const
+    {
+        for (auto iter = leaf.beginValueOn(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
+    }
   SdfValueT mMin, mMax;
 };// FastSweeping::PruneMinMaxFltKernel
 
