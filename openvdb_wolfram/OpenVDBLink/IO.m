@@ -187,7 +187,7 @@ iOpenVDBExport[___] = $Failed;
 registerForLevelSet[iOpenVDBExport, 2];
 
 
-SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _}};
+SyntaxInformation[OpenVDBExport] = {"ArgumentsPattern" -> {_, _, OptionsPattern[]}};
 
 
 (* ::Subsubsection::Closed:: *)
