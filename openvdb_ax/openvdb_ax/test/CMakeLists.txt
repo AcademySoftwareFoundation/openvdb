@@ -112,7 +112,9 @@ add_executable(vdb_ax_test
 #  frontend. This causes a difference to how AX generated (a*b)+c. For now, turn
 #  of fused instructions in tests where it matters.
 if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
-  set_source_files_properties(integration/TestBinary.cc
+  set_source_files_properties(
+      integration/TestBinary.cc
+      integration/TestStandardFunctions.cc
     PROPERTIES
       COMPILE_OPTIONS "-ffp-contract=off")
 endif()
