@@ -115,8 +115,8 @@ endif()
 
 if(LLVM_PACKAGE_VERSION VERSION_GREATER_EQUAL 15.0.0)
   # https://llvm.org/docs/OpaquePointers.html
-  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to
-    opaque pointer changes. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
+  message(FATAL_ERROR "OpenVDB AX does not currently support LLVM versions >= 15 due to \
+    opaque pointer changes in LLVM. Found unsuitable LLVM version \"${LLVM_PACKAGE_VERSION}\"")
 endif()
 
 if(MINIMUM_LLVM_VERSION)
