@@ -1,3 +1,6 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+
 #ifndef OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED
 #define OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED
 

@@ -1,3 +1,6 @@
+// Copyright Contributors to the OpenVDB Project
+// SPDX-License-Identifier: MPL-2.0
+
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetTracker.h>
 #include <openvdb/tools/Interpolation.h>
