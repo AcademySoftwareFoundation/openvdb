@@ -16,9 +16,9 @@
 #ifndef OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 #define OPENVDB_TOOLS_POINT_INDEX_GRID_HAS_BEEN_INCLUDED
 
-#include "openvdb/thread/Threading.h"
 #include "PointPartitioner.h"
 
+#include <openvdb/thread/Threading.h>
 #include <openvdb/version.h>
 #include <openvdb/Exceptions.h>
 #include <openvdb/Grid.h>
@@ -1427,7 +1427,7 @@ public:
     bool operator!=(const PointIndexLeafNode& other) const { return !(other == *this); }
 
     template<MergePolicy Policy> void merge(const PointIndexLeafNode& rhs) {
-        BaseLeaf::merge<Policy>(rhs);
+        BaseLeaf::template merge<Policy>(rhs);
     }
     template<MergePolicy Policy> void merge(const ValueType& tileValue, bool tileActive) {
          BaseLeaf::template merge<Policy>(tileValue, tileActive);

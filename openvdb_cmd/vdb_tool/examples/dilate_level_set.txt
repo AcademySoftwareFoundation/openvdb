@@ -1,0 +1,17 @@
+vdb_tool 10.6.1
+
+# This examples demonstrates how to read a narrow-band level set
+# from an OpenVDB file, dilating it, and writing out the level set
+# to a different OpenVDB file.
+
+# read level set from openvdb file
+read bunny.vdb
+
+# Dilate level set
+# radius of dilation is 5.0 voxels
+# spatial discretization is 5'th order WENO
+# temporal discretization is 1'th order TVD-RK
+dilate radius=5 space=5 time=1
+
+# write level set to file
+write bunny_dilated.vdb

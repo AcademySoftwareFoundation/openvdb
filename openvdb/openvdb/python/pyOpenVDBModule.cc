@@ -9,7 +9,7 @@
 #include <boost/python.hpp>
 #include <boost/python/stl_iterator.hpp>
 #include <boost/python/exception_translator.hpp>
-#include "openvdb/openvdb.h"
+#include <openvdb/openvdb.h>
 #include "pyopenvdb.h"
 #include "pyGrid.h"
 #include "pyutil.h"

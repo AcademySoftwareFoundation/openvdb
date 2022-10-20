@@ -1,0 +1,13 @@
+vdb_tool 10.6.1
+
+# This example demonstrates how to convert points
+# in an OpenVDB PointDataGrid to a binary ply file.
+
+# read OpenVDB file with points
+read points.vdb
+
+# extract point from VDB grid
+vdb2points
+
+# write points to binary ply file
+write points.ply

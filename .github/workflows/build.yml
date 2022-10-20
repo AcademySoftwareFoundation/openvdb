@@ -56,7 +56,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'linux'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04-8c-32g-300h
     name: >
       linux-vfx:${{ matrix.config.image }}-
       abi:${{ matrix.config.abi }}-
@@ -118,7 +118,7 @@ jobs:
       github.event_name != 'workflow_dispatch' ||
       github.event.inputs.type == 'all' ||
       github.event.inputs.type == 'win'
-    runs-on: windows-2019
+    runs-on: windows-2022-8c-32g-300h
     name: windows-vc:${{ matrix.config.vc }}-type:${{ matrix.config.build }}
     env:
       VCPKG_DEFAULT_TRIPLET: ${{ matrix.config.vc }}
@@ -131,10 +131,10 @@ jobs:
           # USE_EXPLICIT_INSTANTIATION is disabled for debug static libraries
           # due to disk space constraints
           # @note  Commented out the static debug build due to linker OOM LNK1102
-          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
-          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
-          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 16 2019\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows-static', components: 'core,bin,view,render,test',       build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON' }
+          #- { vc: 'x64-windows-static', components: 'core,bin,view,render,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_SHARED=OFF -DUSE_STATIC_DEPENDENCIES=ON -DBLOSC_USE_EXTERNAL_SOURCES=ON -DUSE_EXPLICIT_INSTANTIATION=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Release', cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
+          - { vc: 'x64-windows',        components: 'core,bin,view,render,python,test', build: 'Debug',   cmake: '-A x64 -G \"Visual Studio 17 2022\" -DOPENVDB_CORE_STATIC=OFF' }
           #- { vc: 'x64-windows',        build: 'Release', cmake: '-G \"MinGW Makefiles\" -DOPENVDB_CORE_STATIC=OFF' }
       fail-fast: false
     steps:

@@ -16,11 +16,12 @@
 #include <algorithm>
 #include <vector>                          // for std::vector
 #include <bitset>                          // for std::bitset
-#include <openvdb/math/Math.h>             // for Pow2, needed by WENO and Godunov
 #include <openvdb/Types.h>                 // for Real
-#include <openvdb/math/Coord.h>            // for Coord
-#include <openvdb/math/FiniteDifference.h> // for WENO5 and GodunovsNormSqrd
 #include <openvdb/tree/ValueAccessor.h>
+
+#include "Math.h"             // for Pow2, needed by WENO and Godunov
+#include "Coord.h"            // for Coord
+#include "FiniteDifference.h" // for WENO5 and GodunovsNormSqrd
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE

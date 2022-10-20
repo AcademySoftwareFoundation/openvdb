@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MPL-2.0
 
 #include <boost/python.hpp>
-#include "openvdb/openvdb.h"
+#include <openvdb/openvdb.h>
 #include "pyutil.h"
 
 namespace py = boost::python;

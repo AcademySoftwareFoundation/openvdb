@@ -5,7 +5,7 @@
 #define OPENVDB_PYACCESSOR_HAS_BEEN_INCLUDED
 
 #include <boost/python.hpp>
-#include "openvdb/openvdb.h"
+#include <openvdb/openvdb.h>
 #include "pyutil.h"
 
 namespace pyAccessor {

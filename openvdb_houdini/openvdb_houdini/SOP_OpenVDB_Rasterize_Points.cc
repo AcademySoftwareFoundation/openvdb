@@ -1401,7 +1401,7 @@ struct WeightedAverageOp
     {
     }
 
-    ~WeightedAverageOp() { if (mNode) delete mNode; }
+    ~WeightedAverageOp() { delete mNode; }
 
     const char* getName() const { return mHandle.getAttribute()->getName(); }
 
@@ -1693,7 +1693,7 @@ struct Attribute
         clearNodes();
 
         for (size_t n = 0, N = mOutputNodes.size(); n < N; ++n) {
-            if (mOutputNodes[n] != nullptr) delete mOutputNodes[n];
+            delete mOutputNodes[n];
         }
     }
 
@@ -1702,7 +1702,7 @@ private:
     void clearNodes()
     {
         for (size_t n = 0; n < mNodeCount; ++n) {
-            if (mNodes[n] != nullptr) delete mNodes[n];
+            delete mNodes[n];
         }
     }
 

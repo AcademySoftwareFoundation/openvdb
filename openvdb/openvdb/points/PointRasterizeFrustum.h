@@ -16,8 +16,8 @@
 #include <openvdb/thread/Threading.h>
 #include <openvdb/tools/GridTransformer.h> // for tools::resampleToMatch()
 #include <openvdb/tools/Interpolation.h>
-#include <openvdb/points/PointCount.h>
-#include <openvdb/points/PointDataGrid.h>
+#include "PointCount.h"
+#include "PointDataGrid.h"
 
 namespace openvdb {
 OPENVDB_USE_VERSION_NAMESPACE
