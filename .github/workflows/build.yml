@@ -197,7 +197,7 @@ jobs:
         ./ci/build.sh -v
         --build-type=Release
         --components=\"core,python,bin,view,render,test\"
-        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42\"
+        --cargs=\"-DOPENVDB_CXX_STRICT=OFF -DOPENVDB_ABI_VERSION_NUMBER=10 -DOPENVDB_SIMD=SSE42 -v\"
     - name: test
       shell: bash
       run: cd build && ctest -V
