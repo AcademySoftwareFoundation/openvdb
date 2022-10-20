@@ -1595,7 +1595,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
     throw std::invalid_argument("estimateVoxelSize: invalid maxDim");
   }
   const auto d = bbox.extents()[bbox.maxExtent()];// longest extent of bbox along any coordinate axis
-  return float(d/(maxDim - int(2*halfWidth)));
+  return float(d/(static_cast<float>(maxDim) - int(2*halfWidth)));
 }// Tool::estimateVoxelSize
 
 // ==============================================================================================================
@@ -2117,7 +2117,7 @@ void Tool::levelSetSphere()
     const Vec3f center = mParser.getVec3<float>("center");
     const float width = mParser.get<float>("width");
     const std::string grid_name = mParser.get<std::string>("name");
-    if (voxel == 0.0f) voxel = 2.0f*radius/(dim - 2.0f*width);
+    if (voxel == 0.0f) voxel = 2.0f*radius/(static_cast<float>(dim) - 2.0f*width);
     if (mParser.verbose) mTimer.start("Create sphere");
     GridT::Ptr grid = tools::createLevelSetSphere<GridT>(radius, center, voxel, width);
     if (mParser.verbose) mTimer.stop();
@@ -2143,7 +2143,7 @@ void Tool::levelSetPlatonic()
     const Vec3f center = mParser.getVec3<float>("center");
     const float width = mParser.get<float>("width");
     const std::string grid_name = mParser.get<std::string>("name");
-    if (voxel == 0.0f) voxel = 2.0f*scale/(dim - 2*width);
+    if (voxel == 0.0f) voxel = 2.0f*scale/(static_cast<float>(dim) - 2*width);
     std::string shape;
     switch (faces) {// TETRAHEDRON=4, CUBE=6, OCTAHEDRON=8, DODECAHEDRON=12, ICOSAHEDRON=20
       case  4: shape = "Tetrahedron"; break;
@@ -2344,7 +2344,7 @@ void Tool::scatter()
       tools::UniformPointScatter<PointWrapper, RandGenT> tmp(points, density, mtRand);
       tmp(*grid);
     }   else if (pointsPerVoxel>0) {// dense uniform scattering
-      tools::DenseUniformPointScatter<PointWrapper, RandGenT> tmp(points, pointsPerVoxel, mtRand);
+      tools::DenseUniformPointScatter<PointWrapper, RandGenT> tmp(points, static_cast<float>(pointsPerVoxel), mtRand);
       tmp(*grid);
     } else {
       throw std::invalid_argument("scatter: internal error");
