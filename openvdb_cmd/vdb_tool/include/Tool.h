@@ -311,21 +311,21 @@ void Tool::warning(const std::string &msg, std::ostream& os) const
 
 /// @brief Private struct for the header of config files
 struct Tool::Header {
-    Header() : magic("vdb_tool"), major(sMajor), minor(sMinor), patch(sPatch) {}
-    Header(const std::string &line) : magic("vdb_tool") {
+    Header() : mMagic("vdb_tool"), mMajor(sMajor), mMinor(sMinor), mPatch(sPatch) {}
+    Header(const std::string &line) : mMagic("vdb_tool") {
       const VecS header = tokenize(line, " .");
-      if (header.size()!=4 || header[0]!=magic ||
-         !isInt(header[1], major) ||
-         !isInt(header[2], minor) ||
-         !isInt(header[3], patch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
+      if (header.size()!=4 || header[0]!=mMagic ||
+         !isInt(header[1], mMajor) ||
+         !isInt(header[2], mMinor) ||
+         !isInt(header[3], mPatch)) throw std::invalid_argument("Header: incompatible: \""+line+"\"");
     }
     std::string str() const {
-      return magic+" "+std::to_string(major)+"."+std::to_string(minor)+"."+std::to_string(patch);
+      return mMagic+" "+std::to_string(mMajor)+"."+std::to_string(mMinor)+"."+std::to_string(mPatch);
     }
-    bool isCompatible() const {return major == sMajor;}
+    bool isCompatible() const {return mMajor == sMajor;}
 
-    std::string magic;
-    int major, minor, patch;
+    std::string mMagic;
+    int mMajor, mMinor, mPatch;
 };// Header struct
 
 // ==============================================================================================================
@@ -1097,7 +1097,7 @@ void Tool::config()
             if (!getline (file,line)) throw std::invalid_argument("readConf: empty file \""+fileName+"\"");
             Header header(line);
             if (!header.isCompatible()) throw std::invalid_argument("readConf: incompatible version \""+line+"\"");
-            std::vector<char*> args({&header.magic[0]});//parser is expecting first argument to the name of the executable
+            std::vector<char*> args({&header.mMagic[0]});//parser is expecting first argument to the name of the executable
             while (getline(file, line)) {
                 if (line.empty() || contains("#/%!", line[0])) continue;// skip empty lines and comments
                 VecS tmp = vdb_tool::tokenize(line, " ");
