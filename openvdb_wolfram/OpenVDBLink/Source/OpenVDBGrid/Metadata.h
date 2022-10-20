@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_OPENVDBGRID_METADATA_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_METADATA_HAS_BEEN_INCLUDED
 
 #include "../Utilities/Metadata.h"
 
@@ -112,3 +113,5 @@ OpenVDBGrid<V>::setDescription(const char* description)
     openvdbmma::metadata::GridMetadata<wlGridType> meta(grid());
     meta.template setMetadata<std::string>(META_DESCRIPTION, description_string);
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_METADATA_HAS_BEEN_INCLUDED

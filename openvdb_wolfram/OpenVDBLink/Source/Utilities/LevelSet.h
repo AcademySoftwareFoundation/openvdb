@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_LEVELSET_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_LEVELSET_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -200,3 +201,5 @@ offsetSurfaceLevelSet(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
 
 } // namespace levelset
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_LEVELSET_HAS_BEEN_INCLUDED

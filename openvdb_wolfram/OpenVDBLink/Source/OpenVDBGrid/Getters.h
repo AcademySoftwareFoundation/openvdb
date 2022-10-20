@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED
 
 #include <openvdb/tools/LevelSetUtil.h>
 
@@ -213,3 +214,5 @@ OpenVDBGrid<V>::getValues(mma::IntCoordinatesRef coords) const
 template<typename V>
 inline double
 OpenVDBGrid<V>::getVoxelSize() const { return (grid()->voxelSize())[0]; }
+
+#endif // OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED

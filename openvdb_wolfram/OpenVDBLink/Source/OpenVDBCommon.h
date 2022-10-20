@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_OPENVDBCOMMON_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBCOMMON_HAS_BEEN_INCLUDED
 
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/LevelSetUtil.h>
@@ -481,3 +482,5 @@ template<typename T, typename S>
 inline S toVDB(const VectorRef<T> mmavec, const int i) { return (S)mmavec[i]; }
 
 } // namespace mma
+
+#endif // OPENVDBLINK_OPENVDBCOMMON_HAS_BEEN_INCLUDED

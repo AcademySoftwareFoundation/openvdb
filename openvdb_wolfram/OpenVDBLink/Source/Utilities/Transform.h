@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_TRANSFORM_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_TRANSFORM_HAS_BEEN_INCLUDED
 
 #include <openvdb/math/Transform.h>
 
@@ -128,3 +129,5 @@ GridAdjustment<GridT, T>::gammaAdjust(T gamma)
 
 } // namespace transform
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_TRANSFORM_HAS_BEEN_INCLUDED

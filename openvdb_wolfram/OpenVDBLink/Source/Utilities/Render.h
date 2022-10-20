@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_RENDER_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_RENDER_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -1090,3 +1091,5 @@ inline tools::Film::RGBA mmaRGBToColor(mma::RGBRef color)
 
 } // namespace render
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_RENDER_HAS_BEEN_INCLUDED

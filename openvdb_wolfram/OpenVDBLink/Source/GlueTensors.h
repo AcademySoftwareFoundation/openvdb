@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_GLUETENSORS_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_GLUETENSORS_HAS_BEEN_INCLUDED
 
 #include "OpenVDBCommon.h"
 #include "LTemplate.h"
@@ -412,3 +413,5 @@ private:
     mma::TesseractRef<M> mTess;
 
 }; // GlueCube1
+
+#endif // OPENVDBLINK_GLUETENSORS_HAS_BEEN_INCLUDED

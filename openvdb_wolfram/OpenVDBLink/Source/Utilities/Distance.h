@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_DISTANCE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_DISTANCE_HAS_BEEN_INCLUDED
 
 #include <openvdb/tools/VolumeToSpheres.h>
 
@@ -213,3 +214,5 @@ DistanceMeasurementsMma<GridT>::gridSignedDistance(mma::RealCoordinatesRef pts) 
 
 } // namespace distance
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_DISTANCE_HAS_BEEN_INCLUDED

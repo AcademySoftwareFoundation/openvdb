@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_MESH_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_MESH_HAS_BEEN_INCLUDED
 
 #include <openvdb/tools/VolumeToMesh.h>
 
@@ -143,3 +144,5 @@ VolumeToMmaMesh::meshData(const bool tri_only) const
 
 } // namespace mesh
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_MESH_HAS_BEEN_INCLUDED

@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_IMAGE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_IMAGE_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -562,3 +563,5 @@ private:
 
 } // namespace image
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_IMAGE_HAS_BEEN_INCLUDED

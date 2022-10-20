@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_OPENVDBGRID_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_HAS_BEEN_INCLUDED
 
 #include "GlueTensors.h"
 
@@ -430,3 +431,5 @@ private:
 #include "OpenVDBGrid/Render.h"
 #include "OpenVDBGrid/Setters.h"
 #include "OpenVDBGrid/Transform.h"
+
+#endif // OPENVDBLINK_OPENVDBGRID_HAS_BEEN_INCLUDED

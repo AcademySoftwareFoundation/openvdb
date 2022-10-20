@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_METADATA_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_METADATA_HAS_BEEN_INCLUDED
 
 
 /* openvdbmma::metadata members
@@ -68,3 +69,5 @@ private:
 
 } // namespace metadata
 } // namespace openvdbmesh
+
+#endif // OPENVDBLINK_UTILITIES_METADATA_HAS_BEEN_INCLUDED

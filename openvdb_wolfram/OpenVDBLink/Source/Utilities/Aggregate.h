@@ -1,4 +1,5 @@
-#pragma once
+#ifndef OPENVDBLINK_UTILITIES_AGGREGATE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_UTILITIES_AGGREGATE_HAS_BEEN_INCLUDED
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>
@@ -688,3 +689,5 @@ activeVoxelSparseArray(TreeT &tree, mma::IntBounds3DRef bds)
 
 } // namespace aggregate
 } // namespace openvdbmma
+
+#endif // OPENVDBLINK_UTILITIES_AGGREGATE_HAS_BEEN_INCLUDED
