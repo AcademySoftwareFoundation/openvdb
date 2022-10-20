@@ -57,7 +57,7 @@ iOpenVDBImport[File[file_String], args___] := iOpenVDBImport[file, args]
 iOpenVDBImport[file_String] := iOpenVDBImport[file, Automatic]
 
 
-iOpenVDBImport[url_?URLStringQ, args___] := 
+iOpenVDBImport[url_?URLStringQ, args___] :=
     Block[{extension, tempfile, dl, res},
         extension = urlExtension[url];
         tempfile = FileNameJoin[{$TemporaryDirectory, "temp." <> extension}];
@@ -76,7 +76,7 @@ iOpenVDBImport[url_?URLStringQ, args___] :=
     ]
 
 
-iOpenVDBImport[file_?zipFileQ, args___] := 
+iOpenVDBImport[file_?zipFileQ, args___] :=
     Block[{vdbfile, res},
         vdbfile = extractVDBZIP[file];
         (
