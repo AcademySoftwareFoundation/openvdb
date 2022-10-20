@@ -569,14 +569,14 @@ public:
     Rgba8(Rgba8&&) = default;
     Rgba8& operator=(Rgba8&&) = default;
     Rgba8& operator=(const Rgba8&) = default;
-    __hostdev__ Rgba8() : mData{0,0,0,0} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
-    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{r, g, b, a} {}
+    __hostdev__ Rgba8() : mData{{0,0,0,0}} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
+    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{{r, g, b, a}} {}
     explicit __hostdev__ Rgba8(uint8_t v) : Rgba8(v,v,v,v) {}
     __hostdev__ Rgba8(float r, float g, float b, float a = 1.0f)
-        : mData{(uint8_t(0.5f + r * 255.0f)),// round to nearest
+        : mData{{(uint8_t(0.5f + r * 255.0f)),// round to nearest
                 (uint8_t(0.5f + g * 255.0f)),// round to nearest
                 (uint8_t(0.5f + b * 255.0f)),// round to nearest
-                (uint8_t(0.5f + a * 255.0f))}// round to nearest
+                (uint8_t(0.5f + a * 255.0f))}}// round to nearest
     {
     }
     __hostdev__ bool operator<(const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
@@ -1139,9 +1139,9 @@ public:
 
     /// @brief Return the octant of this Coord
     //__hostdev__ size_t octant() const { return (uint32_t(mVec[0])>>31) | ((uint32_t(mVec[1])>>31)<<1) | ((uint32_t(mVec[2])>>31)<<2); }
-    __hostdev__ uint8_t octant() const { return (uint8_t(bool(mVec[0] & (1u << 31)))) |
+    __hostdev__ uint8_t octant() const { return uint8_t((uint8_t(bool(mVec[0] & (1u << 31)))) |
                                                 (uint8_t(bool(mVec[1] & (1u << 31))) << 1) |
-                                                (uint8_t(bool(mVec[2] & (1u << 31))) << 2); }
+                                                (uint8_t(bool(mVec[2] & (1u << 31))) << 2)); }
 
     /// @brief Return a single precision floating-point vector of this coordinate
     __hostdev__ inline Vec3<float> asVec3s() const;
