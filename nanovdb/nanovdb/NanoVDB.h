@@ -569,14 +569,14 @@ public:
     Rgba8(Rgba8&&) = default;
     Rgba8& operator=(Rgba8&&) = default;
     Rgba8& operator=(const Rgba8&) = default;
-    __hostdev__ Rgba8() : mData{{0,0,0,0}} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
-    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{{r, g, b, a}} {}
+    __hostdev__ Rgba8() : mData{0,0,0,0} {static_assert(sizeof(uint32_t) == sizeof(Rgba8),"Unexpected sizeof");}
+    __hostdev__ Rgba8(uint8_t r, uint8_t g, uint8_t b, uint8_t a = 255u) : mData{r, g, b, a} {}
     explicit __hostdev__ Rgba8(uint8_t v) : Rgba8(v,v,v,v) {}
     __hostdev__ Rgba8(float r, float g, float b, float a = 1.0f)
-        : mData{{(uint8_t(0.5f + r * 255.0f)),// round to nearest
+        : mData{(uint8_t(0.5f + r * 255.0f)),// round to nearest
                 (uint8_t(0.5f + g * 255.0f)),// round to nearest
                 (uint8_t(0.5f + b * 255.0f)),// round to nearest
-                (uint8_t(0.5f + a * 255.0f))}}// round to nearest
+                (uint8_t(0.5f + a * 255.0f))}// round to nearest
     {
     }
     __hostdev__ bool operator<(const Rgba8& rhs) const { return mData.packed < rhs.mData.packed; }
