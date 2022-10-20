@@ -193,7 +193,7 @@ inline bool isInt(const std::string &s, int &i)
 inline int strToInt(const std::string &str)
 {
     size_t pos = 0;
-    int i;
+    int i = 0;
     try{
         i = stoi(str, &pos); // might throw
     } catch (const std::invalid_argument &) {
@@ -207,7 +207,7 @@ inline int strToInt(const std::string &str)
 inline float strToFloat(const std::string &str)
 {
     size_t pos = 0;
-    float v;
+    float v = 0.f;
     try {
         v = stof(str, &pos); // might throw
     } catch (const std::invalid_argument &){
@@ -221,7 +221,7 @@ inline float strToFloat(const std::string &str)
 inline double strToDouble(const std::string &str)
 {
     size_t pos = 0;
-    double v;
+    double v = 0.0;
     try {
         v = stod(str, &pos); // might throw
     } catch (const std::invalid_argument &) {
@@ -373,7 +373,7 @@ std::vector<float> findFltN(const std::vector<std::string> &args, const std::str
 /// @brief return true if the device on which it is executed uses little-endian bit ordering
 inline bool isLittleEndian()
 {
-    const unsigned int tmp = 1;
+    unsigned int tmp = 1;
     return (*(char *)&tmp == 1);
 }
 
