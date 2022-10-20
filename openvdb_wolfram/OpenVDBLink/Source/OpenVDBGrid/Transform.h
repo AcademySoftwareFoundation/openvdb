@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_TRANSFORM_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_TRANSFORM_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Transform.h"
 
 #include <openvdb/tools/GridTransformer.h>
@@ -21,7 +24,7 @@ void gammaAdjustment(double gamma)
 
 template<typename V>
 void
-OpenVDBGrid<V>::transformGrid(OpenVDBGrid<V>& vdb,
+openvdbmma::OpenVDBGrid<V>::transformGrid(OpenVDBGrid<V>& vdb,
     mma::RealMatrixRef mat, mint resampling)
 {
     if (mat.rows() != 4 || mat.cols() != 4)
@@ -60,7 +63,7 @@ OpenVDBGrid<V>::transformGrid(OpenVDBGrid<V>& vdb,
 
 template<typename V>
 void
-OpenVDBGrid<V>::scalarMultiply(double fac)
+openvdbmma::OpenVDBGrid<V>::scalarMultiply(double fac)
 {
     scalar_type_assert<V>();
 
@@ -73,7 +76,7 @@ OpenVDBGrid<V>::scalarMultiply(double fac)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gammaAdjustment(double gamma)
+openvdbmma::OpenVDBGrid<V>::gammaAdjustment(double gamma)
 {
     scalar_type_assert<V>();
 
@@ -83,3 +86,5 @@ OpenVDBGrid<V>::gammaAdjustment(double gamma)
 
     setLastModified();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_TRANSFORM_HAS_BEEN_INCLUDED

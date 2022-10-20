@@ -30,7 +30,7 @@ void setDescription(const char* description)
 
 template<typename V>
 bool
-OpenVDBGrid<V>::getBooleanMetadata(const char* key) const
+openvdbmma::OpenVDBGrid<V>::getBooleanMetadata(const char* key) const
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -43,7 +43,7 @@ OpenVDBGrid<V>::getBooleanMetadata(const char* key) const
 
 template<typename V>
 mint
-OpenVDBGrid<V>::getIntegerMetadata(const char* key) const
+openvdbmma::OpenVDBGrid<V>::getIntegerMetadata(const char* key) const
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -56,7 +56,7 @@ OpenVDBGrid<V>::getIntegerMetadata(const char* key) const
 
 template<typename V>
 double
-OpenVDBGrid<V>::getRealMetadata(const char* key) const
+openvdbmma::OpenVDBGrid<V>::getRealMetadata(const char* key) const
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -69,7 +69,7 @@ OpenVDBGrid<V>::getRealMetadata(const char* key) const
 
 template<typename V>
 const char*
-OpenVDBGrid<V>::getStringMetadata(const char* key)
+openvdbmma::OpenVDBGrid<V>::getStringMetadata(const char* key)
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -83,7 +83,7 @@ OpenVDBGrid<V>::getStringMetadata(const char* key)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setBooleanMetadata(const char* key, bool value)
+openvdbmma::OpenVDBGrid<V>::setBooleanMetadata(const char* key, bool value)
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -94,7 +94,7 @@ OpenVDBGrid<V>::setBooleanMetadata(const char* key, bool value)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setStringMetadata(const char* key, const char* value)
+openvdbmma::OpenVDBGrid<V>::setStringMetadata(const char* key, const char* value)
 {
     const std::string key_string(key);
     mma::disownString(key);
@@ -108,7 +108,7 @@ OpenVDBGrid<V>::setStringMetadata(const char* key, const char* value)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setDescription(const char* description)
+openvdbmma::OpenVDBGrid<V>::setDescription(const char* description)
 {
     const std::string description_string(description);
     mma::disownString(description);

@@ -9,6 +9,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBMaskGrid = OpenVDBGrid<openvdb::ValueMask>;
+using OpenVDBMaskGrid = openvdbmma::OpenVDBGrid<openvdb::ValueMask>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBMASKGRID_HAS_BEEN_INCLUDED

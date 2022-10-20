@@ -8,6 +8,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBVec2SGrid = OpenVDBGrid<Vec2s>;
+using OpenVDBVec2SGrid = openvdbmma::OpenVDBGrid<Vec2s>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBVEC2SGRID_HAS_BEEN_INCLUDED

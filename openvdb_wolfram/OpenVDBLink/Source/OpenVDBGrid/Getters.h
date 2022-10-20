@@ -54,7 +54,7 @@ double getVoxelSize()
 
 template<typename V>
 mma::IntVectorRef
-OpenVDBGrid<V>::getActiveStates(mma::IntCoordinatesRef coords) const
+openvdbmma::OpenVDBGrid<V>::getActiveStates(mma::IntCoordinatesRef coords) const
 {
     typename wlGridType::Accessor accessor = grid()->getAccessor();
 
@@ -73,19 +73,28 @@ OpenVDBGrid<V>::getActiveStates(mma::IntCoordinatesRef coords) const
 
 template<typename V>
 mint
-OpenVDBGrid<V>::getActiveLeafVoxelCount() const { return grid()->tree().activeLeafVoxelCount(); }
+openvdbmma::OpenVDBGrid<V>::getActiveLeafVoxelCount() const
+{
+    return grid()->tree().activeLeafVoxelCount();
+}
 
 template<typename V>
 inline mint
-OpenVDBGrid<V>::getActiveTileCount() const { return grid()->tree().activeTileCount(); }
+openvdbmma::OpenVDBGrid<V>::getActiveTileCount() const
+{
+    return grid()->tree().activeTileCount();
+}
 
 template<typename V>
 inline mint
-OpenVDBGrid<V>::getActiveVoxelCount() const { return grid()->activeVoxelCount(); }
+openvdbmma::OpenVDBGrid<V>::getActiveVoxelCount() const
+{
+    return grid()->activeVoxelCount();
+}
 
 template<typename V>
-typename OpenVDBGrid<V>::GlueScalar
-OpenVDBGrid<V>::getBackgroundValue() const
+typename openvdbmma::OpenVDBGrid<V>::GlueScalar
+openvdbmma::OpenVDBGrid<V>::getBackgroundValue() const
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -95,7 +104,7 @@ OpenVDBGrid<V>::getBackgroundValue() const
 
 template<typename V>
 mint
-OpenVDBGrid<V>::getGridClass() const
+openvdbmma::OpenVDBGrid<V>::getGridClass() const
 {
     int grid_class_id;
 
@@ -113,7 +122,7 @@ OpenVDBGrid<V>::getGridClass() const
 
 template<typename V>
 const char*
-OpenVDBGrid<V>::getCreator()
+openvdbmma::OpenVDBGrid<V>::getCreator()
 {
     //Let the class handle memory management when passing a string to WL
     return WLString(grid()->getCreator());
@@ -121,7 +130,7 @@ OpenVDBGrid<V>::getCreator()
 
 template<typename V>
 mma::IntMatrixRef
-OpenVDBGrid<V>::getGridBoundingBox() const
+openvdbmma::OpenVDBGrid<V>::getGridBoundingBox() const
 {
     CoordBBox gbbox = grid()->evalActiveVoxelBoundingBox();
     Coord p1 = gbbox.min(), p2 = gbbox.max();
@@ -134,7 +143,7 @@ OpenVDBGrid<V>::getGridBoundingBox() const
 
 template<typename V>
 mma::IntVectorRef
-OpenVDBGrid<V>::getGridDimensions() const
+openvdbmma::OpenVDBGrid<V>::getGridDimensions() const
 {
     const Coord gdims = grid()->evalActiveVoxelDim();
 
@@ -145,7 +154,7 @@ OpenVDBGrid<V>::getGridDimensions() const
 
 template<typename V>
 const char*
-OpenVDBGrid<V>::getGridType()
+openvdbmma::OpenVDBGrid<V>::getGridType()
 {
     //Let the class handle memory management when passing a string to WL
     return WLString(grid()->gridType());
@@ -153,26 +162,35 @@ OpenVDBGrid<V>::getGridType()
 
 template<typename V>
 inline double
-OpenVDBGrid<V>::getHalfwidth() const
+openvdbmma::OpenVDBGrid<V>::getHalfwidth() const
 {
     return this->getBackgroundValue()/this->getVoxelSize();
 }
 
 template<typename V>
 inline bool
-OpenVDBGrid<V>::getHasUniformVoxels() const { return grid()->hasUniformVoxels(); }
+openvdbmma::OpenVDBGrid<V>::getHasUniformVoxels() const
+{
+    return grid()->hasUniformVoxels();
+}
 
 template<typename V>
 inline bool
-OpenVDBGrid<V>::getIsEmpty() const { return grid()->empty(); }
+openvdbmma::OpenVDBGrid<V>::getIsEmpty() const
+{
+    return grid()->empty();
+}
 
 template<typename V>
 inline mint
-OpenVDBGrid<V>::getMemoryUsage() const { return grid()->memUsage(); }
+openvdbmma::OpenVDBGrid<V>::getMemoryUsage() const
+{
+    return grid()->memUsage();
+}
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::getMinMaxValues() const
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::getMinMaxValues() const
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -188,15 +206,15 @@ OpenVDBGrid<V>::getMinMaxValues() const
 
 template<typename V>
 const char*
-OpenVDBGrid<V>::getName()
+openvdbmma::OpenVDBGrid<V>::getName()
 {
     //Let the class handle memory management when passing a string to WL
     return WLString(grid()->getName());
 }
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::getValues(mma::IntCoordinatesRef coords) const
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::getValues(mma::IntCoordinatesRef coords) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -216,6 +234,9 @@ OpenVDBGrid<V>::getValues(mma::IntCoordinatesRef coords) const
 
 template<typename V>
 inline double
-OpenVDBGrid<V>::getVoxelSize() const { return (grid()->voxelSize())[0]; }
+openvdbmma::OpenVDBGrid<V>::getVoxelSize() const
+{
+    return (grid()->voxelSize())[0];
+}
 
 #endif // OPENVDBLINK_OPENVDBGRID_GETTERS_HAS_BEEN_INCLUDED

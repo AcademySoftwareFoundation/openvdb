@@ -1,6 +1,8 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_IO_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_IO_HAS_BEEN_INCLUDED
 
 /* OpenVDBGrid public member function list
 
@@ -17,7 +19,7 @@ void exportVDB(const char* file_path)
 
 template<typename V>
 const char*
-OpenVDBGrid<V>::importVDBType(const char* file_path, const char* grid_name)
+openvdbmma::OpenVDBGrid<V>::importVDBType(const char* file_path, const char* grid_name)
 {
     using NameIter = openvdb::io::File::NameIterator;
 
@@ -52,7 +54,7 @@ OpenVDBGrid<V>::importVDBType(const char* file_path, const char* grid_name)
 
 template<typename V>
 bool
-OpenVDBGrid<V>::importVDB(const char* file_path, const char* grid_name)
+openvdbmma::OpenVDBGrid<V>::importVDB(const char* file_path, const char* grid_name)
 {
     using NameIter = openvdb::io::File::NameIterator;
 
@@ -94,10 +96,12 @@ OpenVDBGrid<V>::importVDB(const char* file_path, const char* grid_name)
 
 template<typename V>
 void
-OpenVDBGrid<V>::exportVDB(const char* file_path) const
+openvdbmma::OpenVDBGrid<V>::exportVDB(const char* file_path) const
 {
     // How can we determine of vdb export is successful?
     openvdb::io::File(file_path).write({grid()});
 
     mma::disownString(file_path);
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_IO_HAS_BEEN_INCLUDED

@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_MESH_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_MESH_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Mesh.h"
 
 
@@ -17,7 +20,7 @@ mma::RealVectorRef meshData(double isovalue, double adaptivity, bool tri_only)
 
 template<typename V>
 mma::IntVectorRef
-OpenVDBGrid<V>::meshCellCount(double isovalue, double adaptivity, bool tri_only) const
+openvdbmma::OpenVDBGrid<V>::meshCellCount(double isovalue, double adaptivity, bool tri_only) const
 {
     scalar_type_assert<V>();
 
@@ -35,7 +38,7 @@ OpenVDBGrid<V>::meshCellCount(double isovalue, double adaptivity, bool tri_only)
 
 template<typename V>
 mma::RealVectorRef
-OpenVDBGrid<V>::meshData(double isovalue, double adaptivity, bool tri_only) const
+openvdbmma::OpenVDBGrid<V>::meshData(double isovalue, double adaptivity, bool tri_only) const
 {
     scalar_type_assert<V>();
 
@@ -48,3 +51,5 @@ OpenVDBGrid<V>::meshData(double isovalue, double adaptivity, bool tri_only) cons
 
     return meshdata;
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_MESH_HAS_BEEN_INCLUDED

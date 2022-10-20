@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_RENDER_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_RENDER_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Render.h"
 
 
@@ -41,7 +44,7 @@ mma::ImageRef<mma::im_byte_t> renderGridVectorColor(
 
 template<typename V>
 mma::ImageRef<mma::im_byte_t>
-OpenVDBGrid<V>::renderGrid(
+openvdbmma::OpenVDBGrid<V>::renderGrid(
     double isovalue, mma::RGBRef color, mma::RGBRef color2, mma::RGBRef color3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint shader, mint camera, mint samples,
@@ -98,7 +101,7 @@ OpenVDBGrid<V>::renderGrid(
 
 template<typename V>
 mma::ImageRef<mma::im_byte_t>
-OpenVDBGrid<V>::renderGridPBR(
+openvdbmma::OpenVDBGrid<V>::renderGridPBR(
     double isovalue, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
     mma::RealVectorRef range, mma::RealVectorRef fov, mint camera, mint samples,
@@ -160,7 +163,7 @@ OpenVDBGrid<V>::renderGridPBR(
 
 template<typename V>
 mma::ImageRef<mma::im_byte_t>
-OpenVDBGrid<V>::renderGridVectorColor(
+openvdbmma::OpenVDBGrid<V>::renderGridVectorColor(
     double isovalue, OpenVDBGrid<Vec3s> cGrid,
     OpenVDBGrid<Vec3s> cGrid2, OpenVDBGrid<Vec3s> cGrid3, mma::RGBRef background,
     mma::RealVectorRef translate, mma::RealVectorRef lookat, mma::RealVectorRef up,
@@ -214,3 +217,5 @@ OpenVDBGrid<V>::renderGridVectorColor(
 
     return renderer.renderImage();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_RENDER_HAS_BEEN_INCLUDED

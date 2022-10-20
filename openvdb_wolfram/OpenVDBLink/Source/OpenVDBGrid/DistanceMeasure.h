@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_DISTANCEMEASURE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_DISTANCEMEASURE_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Distance.h"
 
 #include <openvdb/tools/VolumeToSpheres.h>
@@ -28,7 +31,7 @@ mma::RealMatrixRef fillWithBalls(mint bmin, mint bmax, bool overlapping, float r
 
 template<typename V>
 mma::IntVectorRef
-OpenVDBGrid<V>::gridMember(mma::IntCoordinatesRef pts, double isovalue) const
+openvdbmma::OpenVDBGrid<V>::gridMember(mma::IntCoordinatesRef pts, double isovalue) const
 {
     scalar_type_assert<V>();
 
@@ -39,7 +42,7 @@ OpenVDBGrid<V>::gridMember(mma::IntCoordinatesRef pts, double isovalue) const
 
 template<typename V>
 mma::RealCoordinatesRef
-OpenVDBGrid<V>::gridNearest(mma::RealCoordinatesRef pts, double isovalue) const
+openvdbmma::OpenVDBGrid<V>::gridNearest(mma::RealCoordinatesRef pts, double isovalue) const
 {
     scalar_type_assert<V>();
 
@@ -50,7 +53,7 @@ OpenVDBGrid<V>::gridNearest(mma::RealCoordinatesRef pts, double isovalue) const
 
 template<typename V>
 mma::RealVectorRef
-OpenVDBGrid<V>::gridDistance(mma::RealCoordinatesRef pts, double isovalue) const
+openvdbmma::OpenVDBGrid<V>::gridDistance(mma::RealCoordinatesRef pts, double isovalue) const
 {
     scalar_type_assert<V>();
 
@@ -61,7 +64,7 @@ OpenVDBGrid<V>::gridDistance(mma::RealCoordinatesRef pts, double isovalue) const
 
 template<typename V>
 mma::RealVectorRef
-OpenVDBGrid<V>::gridSignedDistance(mma::RealCoordinatesRef pts, double isovalue) const
+openvdbmma::OpenVDBGrid<V>::gridSignedDistance(mma::RealCoordinatesRef pts, double isovalue) const
 {
     scalar_type_assert<V>();
 
@@ -72,8 +75,8 @@ OpenVDBGrid<V>::gridSignedDistance(mma::RealCoordinatesRef pts, double isovalue)
 
 template<typename V>
 mma::RealMatrixRef
-OpenVDBGrid<V>::fillWithBalls(mint bmin, mint bmax, bool overlapping, float rmin, float rmax,
-    float isovalue, mint instanceCount) const
+openvdbmma::OpenVDBGrid<V>::fillWithBalls(mint bmin, mint bmax, bool overlapping,
+    float rmin, float rmax, float isovalue, mint instanceCount) const
 {
     scalar_type_assert<V>();
 
@@ -105,3 +108,5 @@ OpenVDBGrid<V>::fillWithBalls(mint bmin, mint bmax, bool overlapping, float rmin
 
     return balldata;
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_DISTANCEMEASURE_HAS_BEEN_INCLUDED

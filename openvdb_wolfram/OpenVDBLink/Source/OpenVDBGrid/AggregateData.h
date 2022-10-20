@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_AGGREGATEDATA_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_AGGREGATEDATA_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Aggregate.h"
 
 #include <tbb/parallel_for.h>
@@ -34,7 +37,7 @@ GlueCube gridData(mma::IntBounds3DRef bds)
 
 template<typename V>
 mma::IntTensorRef
-OpenVDBGrid<V>::sliceVoxelCounts(const mint zmin, const mint zmax) const
+openvdbmma::OpenVDBGrid<V>::sliceVoxelCounts(const mint zmin, const mint zmax) const
 {
     openvdbmma::aggregate::SliceActiveVoxelCounts<wlTreeType> op(zmin, zmax);
     tree::DynamicNodeManager<const wlTreeType> nodeManager(grid()->tree());
@@ -50,8 +53,8 @@ OpenVDBGrid<V>::sliceVoxelCounts(const mint zmin, const mint zmax) const
 }
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::sliceVoxelValueTotals(const mint zmin, const mint zmax) const
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::sliceVoxelValueTotals(const mint zmin, const mint zmax) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
     openvdbmma::types::non_bool_type_assert<V>();
@@ -65,7 +68,7 @@ OpenVDBGrid<V>::sliceVoxelValueTotals(const mint zmin, const mint zmax) const
 
 template<typename V>
 mma::IntCubeRef
-OpenVDBGrid<V>::activeTiles(mma::IntBounds3DRef bds, const bool partial_overlap) const
+openvdbmma::OpenVDBGrid<V>::activeTiles(mma::IntBounds3DRef bds, const bool partial_overlap) const
 {
     if(bds.isDegenerate())
         return mma::makeCube<mint>(0, 2, 3);
@@ -92,8 +95,8 @@ OpenVDBGrid<V>::activeTiles(mma::IntBounds3DRef bds, const bool partial_overlap)
 }
 
 template<typename V>
-mma::SparseArrayRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::activeVoxels(mma::IntBounds3DRef bds) const
+mma::SparseArrayRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::activeVoxels(mma::IntBounds3DRef bds) const
 {
     using BaseT = typename OpenVDBGrid<V>::mmaBaseValT;
 
@@ -102,7 +105,7 @@ OpenVDBGrid<V>::activeVoxels(mma::IntBounds3DRef bds) const
 
 template<typename V>
 mma::IntCoordinatesRef
-OpenVDBGrid<V>::activeVoxelPositions(mma::IntBounds3DRef bds) const
+openvdbmma::OpenVDBGrid<V>::activeVoxelPositions(mma::IntBounds3DRef bds) const
 {
     if(bds.isDegenerate())
         throw mma::LibraryError(LIBRARY_FUNCTION_ERROR);
@@ -133,8 +136,8 @@ OpenVDBGrid<V>::activeVoxelPositions(mma::IntBounds3DRef bds) const
 }
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::activeVoxelValues(mma::IntBounds3DRef bds) const
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::activeVoxelValues(mma::IntBounds3DRef bds) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -153,8 +156,8 @@ OpenVDBGrid<V>::activeVoxelValues(mma::IntBounds3DRef bds) const
 }
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::gridSlice(const mint z, mma::IntBounds2DRef bds,
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::gridSlice(const mint z, mma::IntBounds2DRef bds,
     const bool mirror_slice, const bool threaded) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
@@ -181,8 +184,8 @@ OpenVDBGrid<V>::gridSlice(const mint z, mma::IntBounds2DRef bds,
 }
 
 template<typename V>
-mma::TensorRef<typename OpenVDBGrid<V>::mmaBaseValT>
-OpenVDBGrid<V>::gridData(mma::IntBounds3DRef bds) const
+mma::TensorRef<typename openvdbmma::OpenVDBGrid<V>::mmaBaseValT>
+openvdbmma::OpenVDBGrid<V>::gridData(mma::IntBounds3DRef bds) const
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -205,3 +208,5 @@ OpenVDBGrid<V>::gridData(mma::IntBounds3DRef bds) const
 
     return data.mmaData();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_AGGREGATEDATA_HAS_BEEN_INCLUDED

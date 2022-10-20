@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_FOGVOLUME_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_FOGVOLUME_HAS_BEEN_INCLUDED
+
 #include <openvdb/tools/LevelSetUtil.h>
 
 /* OpenVDBGrid public member function list
@@ -14,7 +17,7 @@ void levelSetToFogVolume(double cutoff)
 
 template<typename V>
 void
-OpenVDBGrid<V>::levelSetToFogVolume(double cutoff)
+openvdbmma::OpenVDBGrid<V>::levelSetToFogVolume(double cutoff)
 {
     scalar_type_assert<V>();
 
@@ -29,3 +32,5 @@ OpenVDBGrid<V>::levelSetToFogVolume(double cutoff)
     grid()->insertMeta(META_GAMMA_ADJUSTMENT, openvdb::FloatMetadata(1.0f));
     grid()->insertMeta(META_SCALING_FACTOR, openvdb::FloatMetadata(1.0f));
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_FOGVOLUME_HAS_BEEN_INCLUDED

@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_FILTER_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_FILTER_HAS_BEEN_INCLUDED
+
 #include <openvdb/tools/LevelSetFilter.h>
 #include <openvdb/tools/LevelSetTracker.h>
 #include <openvdb/tools/Interpolation.h>
@@ -21,7 +24,7 @@ void filterGrid(mint filter_type, mint width, mint iter)
 
 template<typename V>
 void
-OpenVDBGrid<V>::filterGrid(mint filter_type, mint width, mint iter)
+openvdbmma::OpenVDBGrid<V>::filterGrid(mint filter_type, mint width, mint iter)
 {
     scalar_type_assert<V>();
 
@@ -71,3 +74,5 @@ OpenVDBGrid<V>::filterGrid(mint filter_type, mint width, mint iter)
 
     setLastModified();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_FILTER_HAS_BEEN_INCLUDED

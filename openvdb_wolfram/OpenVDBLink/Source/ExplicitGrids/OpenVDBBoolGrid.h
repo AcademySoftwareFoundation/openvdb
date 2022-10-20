@@ -6,6 +6,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBBoolGrid = OpenVDBGrid<bool>;
+using OpenVDBBoolGrid = openvdbmma::OpenVDBGrid<bool>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBBOOLGRID_HAS_BEEN_INCLUDED

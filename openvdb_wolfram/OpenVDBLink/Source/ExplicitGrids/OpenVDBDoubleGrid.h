@@ -6,6 +6,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBDoubleGrid = OpenVDBGrid<double>;
+using OpenVDBDoubleGrid = openvdbmma::OpenVDBGrid<double>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBDOUBLEGRID_HAS_BEEN_INCLUDED

@@ -6,6 +6,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBUInt32Grid = OpenVDBGrid<uint32_t>;
+using OpenVDBUInt32Grid = openvdbmma::OpenVDBGrid<uint32_t>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBUINT32GRID_HAS_BEEN_INCLUDED

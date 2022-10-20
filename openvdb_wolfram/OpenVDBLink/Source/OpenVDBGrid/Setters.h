@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_SETTERS_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_SETTERS_HAS_BEEN_INCLUDED
+
 #include <openvdb/math/Coord.h>
 #include <openvdb/math/Transform.h>
 
@@ -28,7 +31,8 @@ void setVoxelSize(double spacing)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setActiveStates(mma::IntCoordinatesRef coords, mma::IntVectorRef states)
+openvdbmma::OpenVDBGrid<V>::setActiveStates(
+    mma::IntCoordinatesRef coords, mma::IntVectorRef states)
 {
     typename wlGridType::Accessor accessor = grid()->getAccessor();
 
@@ -48,7 +52,7 @@ OpenVDBGrid<V>::setActiveStates(mma::IntCoordinatesRef coords, mma::IntVectorRef
 
 template<typename V>
 void
-OpenVDBGrid<V>::setBackgroundValue(GlueScalar bg)
+openvdbmma::OpenVDBGrid<V>::setBackgroundValue(GlueScalar bg)
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -62,7 +66,7 @@ OpenVDBGrid<V>::setBackgroundValue(GlueScalar bg)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setGridClass(mint grid_class)
+openvdbmma::OpenVDBGrid<V>::setGridClass(mint grid_class)
 {
     switch (grid_class) {
 
@@ -84,7 +88,7 @@ OpenVDBGrid<V>::setGridClass(mint grid_class)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setCreator(const char* creator)
+openvdbmma::OpenVDBGrid<V>::setCreator(const char* creator)
 {
     grid()->setCreator(std::string(creator));
     mma::disownString(creator);
@@ -94,7 +98,7 @@ OpenVDBGrid<V>::setCreator(const char* creator)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setName(const char* name)
+openvdbmma::OpenVDBGrid<V>::setName(const char* name)
 {
     grid()->setName(std::string(name));
     mma::disownString(name);
@@ -104,7 +108,7 @@ OpenVDBGrid<V>::setName(const char* name)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setValues(mma::IntCoordinatesRef coords, GlueVector vals)
+openvdbmma::OpenVDBGrid<V>::setValues(mma::IntCoordinatesRef coords, GlueVector vals)
 {
     openvdbmma::types::non_mask_type_assert<V>();
 
@@ -126,10 +130,12 @@ OpenVDBGrid<V>::setValues(mma::IntCoordinatesRef coords, GlueVector vals)
 
 template<typename V>
 void
-OpenVDBGrid<V>::setVoxelSize(double spacing)
+openvdbmma::OpenVDBGrid<V>::setVoxelSize(double spacing)
 {
     math::Transform xform(*(math::Transform::createLinearTransform(spacing)));
     grid()->setTransform(xform.copy());
 
     setLastModified();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_SETTERS_HAS_BEEN_INCLUDED

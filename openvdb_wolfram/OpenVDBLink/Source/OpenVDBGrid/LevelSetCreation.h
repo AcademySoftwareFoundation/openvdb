@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_LEVELSETCREATION_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_LEVELSETCREATION_HAS_BEEN_INCLUDED
+
 #include "../Utilities/LevelSet.h"
 
 #include <openvdb/tools/LevelSetSphere.h>
@@ -27,7 +30,7 @@ void offsetSurfaceLevelSet(mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_ce
 
 template<typename V>
 void
-OpenVDBGrid<V>::ballLevelSet(mma::RealVectorRef center, double radius,
+openvdbmma::OpenVDBGrid<V>::ballLevelSet(mma::RealVectorRef center, double radius,
     double spacing, double bandWidth, bool is_signed)
 {
     scalar_type_assert<V>();
@@ -50,7 +53,7 @@ OpenVDBGrid<V>::ballLevelSet(mma::RealVectorRef center, double radius,
 
 template<typename V>
 void
-OpenVDBGrid<V>::cuboidLevelSet(
+openvdbmma::OpenVDBGrid<V>::cuboidLevelSet(
     mma::RealBounds3DRef bounds, double spacing, double bandWidth, bool is_signed)
 {
     scalar_type_assert<V>();
@@ -76,7 +79,7 @@ OpenVDBGrid<V>::cuboidLevelSet(
 
 template<typename V>
 void
-OpenVDBGrid<V>::meshLevelSet(
+openvdbmma::OpenVDBGrid<V>::meshLevelSet(
     mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
     double spacing, double bandWidth, bool is_signed)
 {
@@ -95,7 +98,7 @@ OpenVDBGrid<V>::meshLevelSet(
 
 template<typename V>
 void
-OpenVDBGrid<V>::offsetSurfaceLevelSet(
+openvdbmma::OpenVDBGrid<V>::offsetSurfaceLevelSet(
     mma::RealCoordinatesRef pts, mma::IntMatrixRef tri_cells,
     double offset, double spacing, double width, bool is_signed)
 {
@@ -109,3 +112,5 @@ OpenVDBGrid<V>::offsetSurfaceLevelSet(
 
     setGrid(grid);
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_LEVELSETCREATION_HAS_BEEN_INCLUDED

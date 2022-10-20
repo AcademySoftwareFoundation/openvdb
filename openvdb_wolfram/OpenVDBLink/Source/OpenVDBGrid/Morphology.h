@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_MORPHOLOGY_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_MORPHOLOGY_HAS_BEEN_INCLUDED
+
 #include <openvdb/tools/LevelSetFilter.h>
 
 
@@ -17,7 +20,7 @@ void offsetLevelSet(double r)
 
 template<typename V>
 void
-OpenVDBGrid<V>::resizeBandwidth(double width)
+openvdbmma::OpenVDBGrid<V>::resizeBandwidth(double width)
 {
     scalar_type_assert<V>();
 
@@ -34,7 +37,7 @@ OpenVDBGrid<V>::resizeBandwidth(double width)
 
 template<typename V>
 void
-OpenVDBGrid<V>::offsetLevelSet(double r)
+openvdbmma::OpenVDBGrid<V>::offsetLevelSet(double r)
 {
     scalar_type_assert<V>();
 
@@ -48,3 +51,5 @@ OpenVDBGrid<V>::offsetLevelSet(double r)
 
     setLastModified();
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_MORPHOLOGY_HAS_BEEN_INCLUDED

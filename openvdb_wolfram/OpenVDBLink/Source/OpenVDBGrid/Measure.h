@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_MEASURE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_MEASURE_HAS_BEEN_INCLUDED
+
 #include <openvdb/tools/GridOperators.h>
 #include <openvdb/tools/LevelSetMeasure.h>
 
@@ -22,7 +25,7 @@
 
 template<typename V>
 double
-OpenVDBGrid<V>::levelSetGridArea() const
+openvdbmma::OpenVDBGrid<V>::levelSetGridArea() const
 {
     scalar_type_assert<V>();
 
@@ -31,7 +34,7 @@ OpenVDBGrid<V>::levelSetGridArea() const
 
 template<typename V>
 mint
-OpenVDBGrid<V>::levelSetGridEulerCharacteristic() const
+openvdbmma::OpenVDBGrid<V>::levelSetGridEulerCharacteristic() const
 {
     scalar_type_assert<V>();
 
@@ -40,7 +43,7 @@ OpenVDBGrid<V>::levelSetGridEulerCharacteristic() const
 
 template<typename V>
 mint
-OpenVDBGrid<V>::levelSetGridGenus() const
+openvdbmma::OpenVDBGrid<V>::levelSetGridGenus() const
 {
     scalar_type_assert<V>();
 
@@ -49,9 +52,11 @@ OpenVDBGrid<V>::levelSetGridGenus() const
 
 template<typename V>
 double
-OpenVDBGrid<V>::levelSetGridVolume() const
+openvdbmma::OpenVDBGrid<V>::levelSetGridVolume() const
 {
     scalar_type_assert<V>();
 
     return levelSetVolume(*grid(), true /* world space */);
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_MEASURE_HAS_BEEN_INCLUDED

@@ -23,6 +23,9 @@ using namespace openvdbmma::types;
 using namespace openvdbmma::utils;
 
 
+namespace openvdbmma {
+
+
 template<typename ValueType>
 class OpenVDBGrid {
 
@@ -417,6 +420,8 @@ private:
         return mma::getInstance<OpenVDBGrid>(id).grid();
     }
 };
+
+} // namespace openvdbmma
 
 #include "OpenVDBGrid/AggregateData.h"
 #include "OpenVDBGrid/CSG.h"

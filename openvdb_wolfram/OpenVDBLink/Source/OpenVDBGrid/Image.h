@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_IMAGE_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_IMAGE_HAS_BEEN_INCLUDED
+
 #include "../Utilities/Image.h"
 
 #include <tbb/parallel_for.h>
@@ -30,7 +33,7 @@ mma::ImageRef<mma::im_real32_t> depthMap(mma::IntBounds3DRef bds,
 
 template<typename V>
 mma::ImageRef<mma::im_real32_t>
-OpenVDBGrid<V>::depthMap(mma::IntBounds3DRef bds,
+openvdbmma::OpenVDBGrid<V>::depthMap(mma::IntBounds3DRef bds,
     const double gamma, const double imin, const double imax) const
 {
     pixel_type_assert<V>();
@@ -81,7 +84,7 @@ OpenVDBGrid<V>::depthMap(mma::IntBounds3DRef bds,
 
 template<typename V>
 mma::GenericImageRef
-OpenVDBGrid<V>::gridSliceImage(const mint z, mma::IntBounds2DRef bds,
+openvdbmma::OpenVDBGrid<V>::gridSliceImage(const mint z, mma::IntBounds2DRef bds,
     const bool mirror_image, const bool threaded) const
 {
     pixel_type_assert<V>();
@@ -110,7 +113,7 @@ OpenVDBGrid<V>::gridSliceImage(const mint z, mma::IntBounds2DRef bds,
 
 template<typename V>
 mma::GenericImage3DRef
-OpenVDBGrid<V>::gridImage3D(mma::IntBounds3DRef bds) const
+openvdbmma::OpenVDBGrid<V>::gridImage3D(mma::IntBounds3DRef bds) const
 {
     pixel_type_assert<V>();
 
@@ -128,3 +131,5 @@ OpenVDBGrid<V>::gridImage3D(mma::IntBounds3DRef bds) const
 
     return op.im;
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_IMAGE_HAS_BEEN_INCLUDED

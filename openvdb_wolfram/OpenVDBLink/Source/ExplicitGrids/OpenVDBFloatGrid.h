@@ -6,6 +6,6 @@
 
 #include "../OpenVDBGrid.h"
 
-using OpenVDBFloatGrid = OpenVDBGrid<float>;
+using OpenVDBFloatGrid = openvdbmma::OpenVDBGrid<float>;
 
 #endif // OPENVDBLINK_EXPLICITGRIDS_OPENVDBFLOATGRID_HAS_BEEN_INCLUDED

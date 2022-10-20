@@ -1,6 +1,9 @@
 // Copyright Contributors to the OpenVDB Project
 // SPDX-License-Identifier: MPL-2.0
 
+#ifndef OPENVDBLINK_OPENVDBGRID_CSG_HAS_BEEN_INCLUDED
+#define OPENVDBLINK_OPENVDBGRID_CSG_HAS_BEEN_INCLUDED
+
 #include <openvdb/tools/Clip.h>
 #include <openvdb/tools/Composite.h>
 
@@ -28,7 +31,7 @@ void clipGrid(OpenVDBGrid& vdb, mma::RealBounds3DRef bds)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridUnion(OpenVDBGrid<V>& vdb)
+openvdbmma::OpenVDBGrid<V>::gridUnion(OpenVDBGrid<V>& vdb)
 {
     scalar_type_assert<V>();
 
@@ -43,7 +46,7 @@ OpenVDBGrid<V>::gridUnion(OpenVDBGrid<V>& vdb)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridIntersection(OpenVDBGrid<V>& vdb)
+openvdbmma::OpenVDBGrid<V>::gridIntersection(OpenVDBGrid<V>& vdb)
 {
     scalar_type_assert<V>();
 
@@ -58,7 +61,7 @@ OpenVDBGrid<V>::gridIntersection(OpenVDBGrid<V>& vdb)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridDifference(OpenVDBGrid<V>& vdb)
+openvdbmma::OpenVDBGrid<V>::gridDifference(OpenVDBGrid<V>& vdb)
 {
     scalar_type_assert<V>();
 
@@ -73,7 +76,7 @@ OpenVDBGrid<V>::gridDifference(OpenVDBGrid<V>& vdb)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridUnionCopy(mma::IntTensorRef ids)
+openvdbmma::OpenVDBGrid<V>::gridUnionCopy(mma::IntTensorRef ids)
 {
     scalar_type_assert<V>();
 
@@ -100,7 +103,7 @@ OpenVDBGrid<V>::gridUnionCopy(mma::IntTensorRef ids)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridIntersectionCopy(mma::IntTensorRef ids)
+openvdbmma::OpenVDBGrid<V>::gridIntersectionCopy(mma::IntTensorRef ids)
 {
     scalar_type_assert<V>();
 
@@ -127,7 +130,7 @@ OpenVDBGrid<V>::gridIntersectionCopy(mma::IntTensorRef ids)
 
 template<typename V>
 void
-OpenVDBGrid<V>::gridDifferenceCopy(OpenVDBGrid<V>& vdb1, OpenVDBGrid<V>& vdb2)
+openvdbmma::OpenVDBGrid<V>::gridDifferenceCopy(OpenVDBGrid<V>& vdb1, OpenVDBGrid<V>& vdb2)
 {
     scalar_type_assert<V>();
 
@@ -139,7 +142,7 @@ OpenVDBGrid<V>::gridDifferenceCopy(OpenVDBGrid<V>& vdb1, OpenVDBGrid<V>& vdb2)
 
 template<typename V>
 void
-OpenVDBGrid<V>::clipGrid(OpenVDBGrid<V>& vdb, mma::RealBounds3DRef bds)
+openvdbmma::OpenVDBGrid<V>::clipGrid(OpenVDBGrid<V>& vdb, mma::RealBounds3DRef bds)
 {
     scalar_type_assert<V>();
 
@@ -152,3 +155,5 @@ OpenVDBGrid<V>::clipGrid(OpenVDBGrid<V>& vdb, mma::RealBounds3DRef bds)
 
     setGrid(gridclipped, false);
 }
+
+#endif // OPENVDBLINK_OPENVDBGRID_CSG_HAS_BEEN_INCLUDED
