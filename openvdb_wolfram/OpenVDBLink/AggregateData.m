@@ -8,6 +8,11 @@
 (*Data such as slice totals, slices, or dense grids, etc.*)
 
 
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
+
+
 (* ::Section:: *)
 (*Initialization & Usage*)
 

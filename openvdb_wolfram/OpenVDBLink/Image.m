@@ -8,6 +8,11 @@
 (*Image representation through slices, depth map, projection, and Image3D.*)
 
 
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
+
+
 (* ::Section:: *)
 (*Initialization & Usage*)
 

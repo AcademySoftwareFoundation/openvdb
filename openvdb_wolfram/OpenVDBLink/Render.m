@@ -8,6 +8,11 @@
 (*Various rendering techniques on grids.*)
 
 
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
+
+
 (* ::Section:: *)
 (*Initialization & Usage*)
 

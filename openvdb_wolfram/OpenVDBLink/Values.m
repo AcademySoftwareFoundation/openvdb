@@ -8,6 +8,11 @@
 (*Set and retrieve states and values.*)
 
 
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
+
+
 (* ::Section:: *)
 (*Initialization & Usage*)
 

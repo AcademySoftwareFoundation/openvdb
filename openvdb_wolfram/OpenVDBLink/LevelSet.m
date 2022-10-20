@@ -8,6 +8,11 @@
 (*Create a level set representation of a region.*)
 
 
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
+
+
 (* ::Section:: *)
 (*Initialization & Usage*)
 

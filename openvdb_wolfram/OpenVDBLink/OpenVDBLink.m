@@ -9,11 +9,16 @@
 
 
 (* ::Subsubtitle:: *)
-(*ghurst@unither.com*)
+(*ghurst588@gmail.com*)
 
 
 (* ::Subsubtitle:: *)
 (*2021 - 2022*)
+
+
+(* ::Text:: *)
+(*Copyright Contributors to the OpenVDB Project*)
+(*SPDX-License-Identifier: MPL-2.0*)
 
 
 (* ::Section:: *)
