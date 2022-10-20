@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Utilities/metadata.h"
+#include "../Utilities/Metadata.h"
 
 
 /* OpenVDBGrid public member function list

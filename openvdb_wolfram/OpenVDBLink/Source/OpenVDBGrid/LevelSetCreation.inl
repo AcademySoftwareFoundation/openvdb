@@ -1,4 +1,4 @@
-#include "../Utilities/levelset.h"
+#include "../Utilities/LevelSet.h"
 
 #include <openvdb/tools/LevelSetSphere.h>
 

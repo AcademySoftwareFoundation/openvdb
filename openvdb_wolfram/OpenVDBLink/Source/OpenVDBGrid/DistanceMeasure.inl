@@ -1,4 +1,4 @@
-#include "../Utilities/distance.h"
+#include "../Utilities/Distance.h"
 
 #include <openvdb/tools/VolumeToSpheres.h>
 

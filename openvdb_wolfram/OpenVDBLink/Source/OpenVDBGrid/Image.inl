@@ -1,4 +1,4 @@
-#include "../Utilities/image.h"
+#include "../Utilities/Image.h"
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>

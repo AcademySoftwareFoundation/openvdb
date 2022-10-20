@@ -1,4 +1,4 @@
-#include "../Utilities/aggregate.h"
+#include "../Utilities/Aggregate.h"
 
 #include <tbb/parallel_for.h>
 #include <tbb/parallel_reduce.h>

@@ -1,4 +1,4 @@
-#include "../Utilities/transform.h"
+#include "../Utilities/Transform.h"
 
 #include <openvdb/tools/GridTransformer.h>
 

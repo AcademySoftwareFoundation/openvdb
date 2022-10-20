@@ -1,4 +1,4 @@
-#include "../Utilities/mesh.h"
+#include "../Utilities/Mesh.h"
 
 
 /* OpenVDBGrid public member function list
