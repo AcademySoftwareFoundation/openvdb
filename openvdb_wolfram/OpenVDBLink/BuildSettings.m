@@ -16,7 +16,7 @@ Switch[$OperatingSystem,
         $vcpkgDir = $HomeDirectory; (* change this to the location of vcpkg *)
         $vcpkgInstalled = FileNameJoin[{$vcpkgDir, "vcpkg", "installed", "x64-windows"}];
         $vcpkgLib = FileNameJoin[{$vcpkgInstalled, "lib"}];
-        
+
         $buildSettings = {
             "CompileOptions" -> {"/EHsc", "/GL", "/wd4244", "/DNOMINMAX"},
             "Compiler" -> CCompilerDriver`VisualStudioCompiler`VisualStudioCompiler,
