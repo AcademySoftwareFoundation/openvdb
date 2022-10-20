@@ -58,35 +58,35 @@ iOpenVDBImport[file_String] := iOpenVDBImport[file, Automatic]
 
 
 iOpenVDBImport[url_?URLStringQ, args___] := 
-	Block[{extension, tempfile, dl, res},
-		extension = urlExtension[url];
-		tempfile = FileNameJoin[{$TemporaryDirectory, "temp." <> extension}];
-		If[FileExistsQ[tempfile],
-			Quiet[DeleteFile[tempfile]];
-		];
-		
-		dl = Quiet[URLDownload[url, tempfile]];
-		(
-			res = iOpenVDBImport[tempfile, args];
-			Quiet[DeleteFile[tempfile]];
-			
-			res /; OpenVDBGridQ[res]
-			
-		) /; FileExistsQ[tempfile]
-	]
+    Block[{extension, tempfile, dl, res},
+        extension = urlExtension[url];
+        tempfile = FileNameJoin[{$TemporaryDirectory, "temp." <> extension}];
+        If[FileExistsQ[tempfile],
+            Quiet[DeleteFile[tempfile]];
+        ];
+
+        dl = Quiet[URLDownload[url, tempfile]];
+        (
+            res = iOpenVDBImport[tempfile, args];
+            Quiet[DeleteFile[tempfile]];
+
+            res /; OpenVDBGridQ[res]
+
+        ) /; FileExistsQ[tempfile]
+    ]
 
 
 iOpenVDBImport[file_?zipFileQ, args___] := 
-	Block[{vdbfile, res},
-		vdbfile = extractVDBZIP[file];
-		(
-			res = iOpenVDBImport[vdbfile, args];
-			Quiet[DeleteFile[vdbfile]];
-			
-			res /; OpenVDBGridQ[res]
-			
-		) /; FileExistsQ[vdbfile]
-	]
+    Block[{vdbfile, res},
+        vdbfile = extractVDBZIP[file];
+        (
+            res = iOpenVDBImport[vdbfile, args];
+            Quiet[DeleteFile[vdbfile]];
+
+            res /; OpenVDBGridQ[res]
+
+        ) /; FileExistsQ[vdbfile]
+    ]
 
 
 iOpenVDBImport[file_String?FileExistsQ, iname_, itype_:Automatic] :=
@@ -162,15 +162,15 @@ vdbFileQ[___] = False;
 
 
 extractVDBZIP[file_] :=
-	Block[{files, vdbfiles},
-		files = Quiet[Import[file, "FileNames"]];
-		(
-			vdbfiles = Quiet[ExtractArchive[file, $TemporaryDirectory]];
-			
-			vdbfiles[[1]] /; MatchQ[vdbfiles, {_?StringQ}] && FileExistsQ[vdbfiles[[1]]]
-			
-		) /; MatchQ[files, {_?vdbFileQ}]
-	]
+    Block[{files, vdbfiles},
+        files = Quiet[Import[file, "FileNames"]];
+        (
+            vdbfiles = Quiet[ExtractArchive[file, $TemporaryDirectory]];
+
+            vdbfiles[[1]] /; MatchQ[vdbfiles, {_?StringQ}] && FileExistsQ[vdbfiles[[1]]]
+
+        ) /; MatchQ[files, {_?vdbFileQ}]
+    ]
 
 
 extractVDBZIP[___] = $Failed;
