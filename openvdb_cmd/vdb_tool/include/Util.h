@@ -129,7 +129,7 @@ inline int findMatch(const std::string &word, const std::vector<std::string> &ve
         do {
             ++p;
             const size_t q = vec[i].find(',', p);
-            if (vec[i].compare(p, q - p, word) == 0) return i + 1; // 1-based return value
+            if (vec[i].compare(p, q - p, word) == 0) return static_cast<int>(i + 1); // 1-based return value
             p = q;
         } while (p != std::string::npos);
     }
@@ -237,7 +237,7 @@ inline bool strToBool(const std::string &str)
     if (str == "1" || toLowerCase(str) == "true") return true;
     if (str == "0" || toLowerCase(str) == "false") return false;
     throw std::invalid_argument("strToBool: invalid bool \"" + str + "\"");
-    return "strToBool: internal error"; // should never happen
+    return false; // "strToBool: internal error" should never happen
 }
 
 template <typename T>
@@ -357,7 +357,7 @@ inline std::vector<int> findIntN(const std::vector<std::string> &args, const std
 {
     const auto t = tokenize(findArg(args, option), " ,");
     std::vector<int> v(t.size());
-    for (int i = 0; i < t.size(); ++i) v[i] = strToInt(t[i]);
+    for (size_t i = 0; i < t.size(); ++i) v[i] = strToInt(t[i]);
     return v; // move semantics
 }
 
@@ -366,7 +366,7 @@ std::vector<float> findFltN(const std::vector<std::string> &args, const std::str
 {
     const auto t = tokenize(findArg(args, option), " ,");
     std::vector<float> v(t.size());
-    for (int i = 0; i < t.size(); ++i) v[i] = strToFloat(t[i]);
+    for (size_t i = 0; i < t.size(); ++i) v[i] = strToFloat(t[i]);
     return v; // move semantics
 }
 
