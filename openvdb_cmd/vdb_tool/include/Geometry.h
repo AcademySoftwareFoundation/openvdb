@@ -520,20 +520,20 @@ void Geometry::readPLY(std::istream &is)
                             } else {// e.g. nx, ny, nz, intensity, s, t etc
                                 if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex float property interlaced with coordinates");
                                 vtx_skip[m].count += 1;
-                                vtx_skip[m].bytes += sizeof(float);
+                                vtx_skip[m].bytes += static_cast<int>(sizeof(float));
                             }
                         } else if ( test(1, {"int16", "uint16"}) ) {// e.g. material_index etc
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int16 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(int16_t);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(int16_t));
                         } else if ( test(1, {"int", "int32"}) ) {// e.g. material_index etc
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int32 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(int32_t);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(int32_t));
                         } else if ( test(1, {"uchar", "int8"}) ) {// eg red, green, blue, alpha
                             if (n!=0 && n!=3) error("vdb_tool::readPLY: vertex int8 property interlaced with coordinates is not supported");
                             vtx_skip[m].count += 1;
-                            vtx_skip[m].bytes += sizeof(unsigned char);
+                            vtx_skip[m].bytes += static_cast<int>(sizeof(unsigned char));
                         } else {
                             error("vdb_tool::readPLY: invalid vertex property");
                         }
