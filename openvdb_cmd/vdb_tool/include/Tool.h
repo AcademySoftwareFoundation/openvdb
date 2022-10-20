@@ -1595,7 +1595,7 @@ float Tool::estimateVoxelSize(int maxDim,  float halfWidth, int geo_age)
     throw std::invalid_argument("estimateVoxelSize: invalid maxDim");
   }
   const auto d = bbox.extents()[bbox.maxExtent()];// longest extent of bbox along any coordinate axis
-  return float(d/(static_cast<float>(maxDim) - int(2*halfWidth)));
+  return static_cast<float>(static_cast<float>(d)/static_cast<float>(maxDim - static_cast<int>(2.f * halfWidth)));
 }// Tool::estimateVoxelSize
 
 // ==============================================================================================================
