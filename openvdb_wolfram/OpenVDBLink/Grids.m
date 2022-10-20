@@ -28,7 +28,7 @@ PackageExport["OpenVDBVectorGridQ"]
 PackageExport["OpenVDBBooleanGridQ"]
 PackageExport["OpenVDBMaskGridQ"]
 PackageExport["OpenVDBCreateGrid"]
-PackageExport["OpenVDBDeleteGrid"]
+PackageExport["OpenVDBClearGrid"]
 PackageExport["OpenVDBCopyGrid"]
 PackageExport["$OpenVDBSpacing"]
 PackageExport["$OpenVDBHalfWidth"]
@@ -50,7 +50,7 @@ OpenVDBMaskGridQ::usage = "OpenVDBMaskGridQ[expr] returns True if expr represent
 
 
 OpenVDBCreateGrid::usage = "OpenVDBCreateGrid[] creates an instance of an OpenVDB grid.";
-OpenVDBDeleteGrid::usage = "OpenVDBDeleteGrid[expr] removes an instance of an OpenVDB grid, freeing up memory.";
+OpenVDBClearGrid::usage = "OpenVDBClearGrid[expr] clears all data in an OpenVDB grid, effectively leaving the grid empty.";
 OpenVDBCopyGrid::usage = "OpenVDBCopyGrid[expr] creates a copy of an OpenVDB grid.";
 
 
@@ -592,64 +592,64 @@ OpenVDBCreateGrid::type = "`1` is not a supported grid type. Evaluate OpenVDBGri
 
 
 (* ::Subsection::Closed:: *)
-(*OpenVDBDeleteGrid*)
+(*OpenVDBClearGrid*)
 
 
 (* ::Subsubsection::Closed:: *)
 (*Main*)
 
 
-OpenVDBDeleteGrid[args___] /; !CheckArgs[OpenVDBDeleteGrid[args], 1] = $Failed;
+OpenVDBClearGrid[args___] /; !CheckArgs[OpenVDBClearGrid[args], 1] = $Failed;
 
 
-OpenVDBDeleteGrid[args___] :=
-    With[{res = iOpenVDBDeleteGrid[args]},
+OpenVDBClearGrid[args___] :=
+    With[{res = iOpenVDBClearGrid[args]},
         res /; res =!= $Failed
     ]
 
 
-OpenVDBDeleteGrid[args___] := mOpenVDBDeleteGrid[args]
+OpenVDBClearGrid[args___] := mOpenVDBClearGrid[args]
 
 
 (* ::Subsubsection::Closed:: *)
-(*iOpenVDBDeleteGrid*)
+(*iOpenVDBClearGrid*)
 
 
-SetAttributes[iOpenVDBDeleteGrid, Listable];
+SetAttributes[iOpenVDBClearGrid, Listable];
 
 
-iOpenVDBDeleteGrid[vdb_?OpenVDBGridQ] :=
+iOpenVDBClearGrid[vdb_?OpenVDBGridQ] :=
     (
         vdb["createEmptyGrid"[]];
         vdb
     )
 
 
-iOpenVDBDeleteGrid[___] = $Failed;
+iOpenVDBClearGrid[___] = $Failed;
 
 
 (* ::Subsubsection::Closed:: *)
 (*Argument conform & completion*)
 
 
-SyntaxInformation[OpenVDBDeleteGrid] = {"ArgumentsPattern" -> {_}};
+SyntaxInformation[OpenVDBClearGrid] = {"ArgumentsPattern" -> {_}};
 
 
 (* ::Subsubsection::Closed:: *)
 (*Messages*)
 
 
-mOpenVDBDeleteGrid[expr_] /; !OpenVDBGridQ[expr] && !VectorQ[expr, OpenVDBGridQ] :=
+mOpenVDBClearGrid[expr_] /; !OpenVDBGridQ[expr] && !VectorQ[expr, OpenVDBGridQ] :=
     (
-        Message[OpenVDBDeleteGrid::grids, expr];
+        Message[OpenVDBClearGrid::grids, expr];
         $Failed
     )
 
 
-mOpenVDBDeleteGrid[___] = $Failed;
+mOpenVDBClearGrid[___] = $Failed;
 
 
-OpenVDBDeleteGrid::grids = "`1` is not a grid or list of grids.";
+OpenVDBClearGrid::grids = "`1` is not a grid or list of grids.";
 
 
 (* ::Subsection::Closed:: *)
