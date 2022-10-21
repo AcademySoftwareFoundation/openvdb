@@ -160,7 +160,7 @@ private:
 
         Filter(LevelSetFilter* parent, const MaskType* mask) : mParent(parent), mMask(mask) {}
         Filter(const Filter&) = default;
-        ~Filter() {}
+        inline virtual ~Filter() {}
 
         void box(int width);
         void median(int width);
