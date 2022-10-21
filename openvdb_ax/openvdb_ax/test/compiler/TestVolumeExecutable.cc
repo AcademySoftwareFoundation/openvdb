@@ -578,11 +578,13 @@ TestVolumeExecutable::testActiveTileStreaming()
     }
 
     // test spatially varying voxelization for string grids which use specialized implementations
+    // Note: StringGrids are no longer registered by default
     {
-OPENVDB_NO_DEPRECATION_WARNING_BEGIN
-        openvdb::StringGrid grid;
+        using StringTree = openvdb::tree::Tree4<std::string, 5, 4, 3>::Type;
+        using StringGrid = openvdb::Grid<openvdb::tree::Tree4<std::string, 5, 4, 3>::Type>;
+        StringGrid grid;
         grid.setName("test");
-        openvdb::StringTree& tree = grid.tree();
+        StringTree& tree = grid.tree();
         tree.addTile(2, openvdb::Coord(NodeT1::DIM*0, 0, 0), "foo", /*active*/true); // NodeT1 tile
         tree.addTile(2, openvdb::Coord(NodeT1::DIM*1, 0, 0), "foo", /*active*/true); // NodeT1 tile
         tree.addTile(2, openvdb::Coord(NodeT1::DIM*2, 0, 0), "foo", /*active*/true); // NodeT1 tile
@@ -599,14 +601,14 @@ OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             executable->getActiveTileStreaming("empty", openvdb::ax::ast::tokens::CoreType::FLOAT));
         executable->getTreeExecutionLevel(min,max);
         CPPUNIT_ASSERT_EQUAL(openvdb::Index(0), min);
-        CPPUNIT_ASSERT_EQUAL(openvdb::Index(openvdb::StringTree::DEPTH-1), max);
+        CPPUNIT_ASSERT_EQUAL(openvdb::Index(StringTree::DEPTH-1), max);
 
         executable->execute(grid);
 
         const openvdb::Index64 face = NodeT1::DIM * NodeT1::DIM; // face voxel count of NodeT2 x==0
         const openvdb::Index64 leafs = // expected leaf nodes that need to be created
-            (face * openvdb::StringTree::LeafNodeType::DIM) /
-            openvdb::StringTree::LeafNodeType::NUM_VOXELS;
+            (face * StringTree::LeafNodeType::DIM) /
+            StringTree::LeafNodeType::NUM_VOXELS;
 
         // number of child nodes in NodeT1;
         const openvdb::Index64 n1ChildAxisCount = NodeT1::DIM / NodeT1::getChildDim();
@@ -618,10 +620,10 @@ OPENVDB_NO_DEPRECATION_WARNING_BEGIN
 
         CPPUNIT_ASSERT_EQUAL(openvdb::Index32(leafs), tree.leafCount());
         CPPUNIT_ASSERT_EQUAL(openvdb::Index64(tiles), tree.activeTileCount());
-        CPPUNIT_ASSERT_EQUAL(int(openvdb::StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*1, 0, 0)));
-        CPPUNIT_ASSERT_EQUAL(int(openvdb::StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*2, 0, 0)));
-        CPPUNIT_ASSERT_EQUAL(int(openvdb::StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*3, 0, 0)));
-        CPPUNIT_ASSERT_EQUAL(int(openvdb::StringTree::DEPTH-2), tree.getValueDepth(openvdb::Coord(NodeT2::DIM)));
+        CPPUNIT_ASSERT_EQUAL(int(StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*1, 0, 0)));
+        CPPUNIT_ASSERT_EQUAL(int(StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*2, 0, 0)));
+        CPPUNIT_ASSERT_EQUAL(int(StringTree::DEPTH-3), tree.getValueDepth(openvdb::Coord(NodeT1::DIM*3, 0, 0)));
+        CPPUNIT_ASSERT_EQUAL(int(StringTree::DEPTH-2), tree.getValueDepth(openvdb::Coord(NodeT2::DIM)));
         CPPUNIT_ASSERT_EQUAL((openvdb::Index64(NodeT1::NUM_VOXELS)*4) +
             openvdb::Index64(NodeT0::NUM_VOXELS), tree.activeVoxelCount());
 
@@ -630,7 +632,6 @@ OPENVDB_NO_DEPRECATION_WARNING_BEGIN
             if (coord.x() == 0) CPPUNIT_ASSERT_EQUAL(*it, std::string("bar"));
             else                CPPUNIT_ASSERT_EQUAL(*it, std::string("foo"));
         });
-OPENVDB_NO_DEPRECATION_WARNING_END
     }
 
     // test streaming with an OFF iterator (no streaming behaviour) and an ALL iterator (streaming behaviour for ON values only)
