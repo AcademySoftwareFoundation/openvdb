@@ -146,9 +146,9 @@ openvdbmma::OpenVDBGrid<V>::gridMax(openvdbmma::OpenVDBGrid<V>& vdb)
 {
     const wlGridPtr grid1 = grid();
     const wlGridPtr grid2 = vdb.grid();
-    
+
     openvdb::tools::compMax(*grid1, *grid2);
-    
+
     vdb.deleteGrid();
     setLastModified();
 }
@@ -159,9 +159,9 @@ openvdbmma::OpenVDBGrid<V>::gridMin(openvdbmma::OpenVDBGrid<V>& vdb)
 {
     const wlGridPtr grid1 = grid();
     const wlGridPtr grid2 = vdb.grid();
-    
+
     openvdb::tools::compMin(*grid1, *grid2);
-    
+
     vdb.deleteGrid();
     setLastModified();
 }

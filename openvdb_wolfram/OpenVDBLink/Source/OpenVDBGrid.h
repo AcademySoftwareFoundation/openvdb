@@ -197,9 +197,9 @@ public:
     void gridIntersectionCopy(mma::IntTensorRef ids);
 
     void gridDifferenceCopy(mmaGridT& vdb1, mmaGridT& vdb2);
-    
+
     void gridMax(mmaGridT& vdb);
-    
+
     void gridMin(mmaGridT& vdb);
 
     void clipGrid(mmaGridT& vdb, mma::RealBounds3DRef bds);
