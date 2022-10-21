@@ -65,16 +65,20 @@ class OpenVDBGrid {
     /* ------------ glue tensor classes ------------ */
 
     using GScalar = std::conditional_t<ValueLength == 0,
-        GlueScalar0<mmaBaseValT>, GlueScalar1<mmaBaseValT, ValueLength>>;
+        openvdbmma::glue::GlueScalar0<mmaBaseValT>,
+        openvdbmma::glue::GlueScalar1<mmaBaseValT, ValueLength>>;
 
     using GVector = std::conditional_t<ValueLength == 0,
-        GlueVector0<mmaBaseValT>, GlueVector1<mmaBaseValT, ValueLength>>;
+        openvdbmma::glue::GlueVector0<mmaBaseValT>,
+        openvdbmma::glue::GlueVector1<mmaBaseValT, ValueLength>>;
 
     using GMatrix = std::conditional_t<ValueLength == 0,
-        GlueMatrix0<mmaBaseValT>, GlueMatrix1<mmaBaseValT, ValueLength>>;
+        openvdbmma::glue::GlueMatrix0<mmaBaseValT>,
+        openvdbmma::glue::GlueMatrix1<mmaBaseValT, ValueLength>>;
 
     using GCube = std::conditional_t<ValueLength == 0,
-        GlueCube0<mmaBaseValT>, GlueCube1<mmaBaseValT, ValueLength>>;
+        openvdbmma::glue::GlueCube0<mmaBaseValT>,
+        openvdbmma::glue::GlueCube1<mmaBaseValT, ValueLength>>;
 
 public:
 

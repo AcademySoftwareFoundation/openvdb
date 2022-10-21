@@ -14,6 +14,9 @@
 
 #include <vector>
 
+namespace openvdbmma {
+namespace glue {
+
 
 // ------------ Scalar classes ------------ //
 
@@ -416,5 +419,8 @@ private:
     mma::TesseractRef<M> mTess;
 
 }; // GlueCube1
+
+} // namespace openvdbmma
+} // namespace glue
 
 #endif // OPENVDBLINK_GLUETENSORS_HAS_BEEN_INCLUDED
