@@ -149,7 +149,7 @@ endif()
 target_include_directories(vdb_tool_common INTERFACE "${Boost_INCLUDE_DIRS}" "${OpenVDB_INCLUDE_DIRS}" "include")
 
 # vdb_tool
-set(CMAKE_EXE_LINKER_FLAGS "-Wl,--verbose")
+set(CMAKE_EXE_LINKER_FLAGS "-Wl")
 add_executable(vdb_tool src/main.cpp)
 target_include_directories(vdb_tool PRIVATE vdb_tool_common)
 target_link_libraries(vdb_tool PRIVATE vdb_tool_common)
