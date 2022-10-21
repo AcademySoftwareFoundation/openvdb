@@ -103,6 +103,22 @@ add_executable(vdb_ax_test
   ${TEST_SOURCE_FILES}
 )
 
+# @note  From Clang 14, fp-contract has been switched to ON by default. Docs in
+#  Clang versions before 14 state that fp-contract is ON, but it is in fact off.
+#  This options effects the emmission on fmuladd instructions in the Clang
+#  driver. Because this behaviour requires statement contexts (these instructions
+#  are only emitted on intermediate floating point results, not across statements)
+#  it cannot be an optimization pass in LLVM and must be emitted in the Clang
+#  frontend. This causes a difference to how AX generated (a*b)+c. For now, turn
+#  of fused instructions in tests where it matters.
+if(CMAKE_CXX_COMPILER_ID STREQUAL "Clang" OR CMAKE_CXX_COMPILER_ID STREQUAL "AppleClang")
+  set_source_files_properties(
+      integration/TestBinary.cc
+      integration/TestStandardFunctions.cc
+    PROPERTIES
+      COMPILE_OPTIONS "-ffp-contract=off")
+endif()
+
 target_link_libraries(vdb_ax_test
   ${OPENVDBAX_LIB}
   CppUnit::cppunit

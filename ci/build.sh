@@ -147,8 +147,7 @@ if [ $(uname) == "Linux" ]; then
         $CI_DIR/install_blosc.sh 1.17.0
     elif [ $(get_ver_as_int $BLOSC_VERSION) -eq $(get_ver_as_int "1.17.0") ]; then
         # Remind us to remove this code
-        echo "FAIL: Blosc has been updated to 1.17.0 - this logic in build.sh should be removed!!"
-        exit 1
+        echo "WARNING: Blosc has been updated to 1.17.0 - this logic in build.sh should be removed!!"
     fi
 fi
 ###### TEMPORARY CHANGE: always install blosc 1.17.0 as it's not available on the docker images yet

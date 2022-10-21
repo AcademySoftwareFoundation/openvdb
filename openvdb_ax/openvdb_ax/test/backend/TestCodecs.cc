@@ -362,8 +362,8 @@ void TestCodecs::testFxptCodec()
 
     // test truncate encoders
 
-    using  FloatToFxpt = void(IntT*, float*);
-    using VFloatToFxpt = void(math::Vec3<IntT>*, math::Vec3<float>*);
+    using  FloatToFxpt = void(*)(IntT*, float*);
+    using VFloatToFxpt = void(*)(math::Vec3<IntT>*, math::Vec3<float>*);
 
     const std::vector<float> floatInputs {
         1.0f, 0.0f, -1.0f,
@@ -384,7 +384,7 @@ void TestCodecs::testFxptCodec()
     {
         const int64_t address = EE->getFunctionAddress(encoder->list()[0]->symbol());
         CPPUNIT_ASSERT(address);
-        const auto fxptEncodeFloat = reinterpret_cast<typename std::add_pointer<FloatToFxpt>::type>(address);
+        const auto fxptEncodeFloat = reinterpret_cast<FloatToFxpt>(address);
 
         IntT result1, result2;
 
@@ -401,7 +401,7 @@ void TestCodecs::testFxptCodec()
     {
         const int64_t address = EE->getFunctionAddress(encoder->list()[1]->symbol());
         CPPUNIT_ASSERT(address);
-        const auto fxptEncodeVFloat = reinterpret_cast<typename std::add_pointer<VFloatToFxpt>::type>(address);
+        const auto fxptEncodeVFloat = reinterpret_cast<VFloatToFxpt>(address);
 
         math::Vec3<IntT> result1, result2;
 
@@ -417,8 +417,8 @@ void TestCodecs::testFxptCodec()
 
     // test truncate decoders
 
-    using  FxptToFloat = void(float*, IntT*);
-    using VFxptToFloat = void(math::Vec3<float>*, math::Vec3<IntT>*);
+    using  FxptToFloat = void(*)(float*, IntT*);
+    using VFxptToFloat = void(*)(math::Vec3<float>*, math::Vec3<IntT>*);
 
     std::vector<IntT> uintInputs = {
         0, 1, 2,
@@ -441,7 +441,7 @@ void TestCodecs::testFxptCodec()
     {
         const int64_t address = EE->getFunctionAddress(decoder->list()[0]->symbol());
         CPPUNIT_ASSERT(address);
-        const auto fxptDecodeUint8 = reinterpret_cast<typename std::add_pointer<FxptToFloat>::type>(address);
+        const auto fxptDecodeUint8 = reinterpret_cast<FxptToFloat>(address);
 
         float result1, result2;
 
@@ -458,7 +458,7 @@ void TestCodecs::testFxptCodec()
     {
         const int64_t address = EE->getFunctionAddress(decoder->list()[1]->symbol());
         CPPUNIT_ASSERT(address);
-        const auto fxptDecodeVuint8 = reinterpret_cast<typename std::add_pointer<VFxptToFloat>::type>(address);
+        const auto fxptDecodeVuint8 = reinterpret_cast<VFxptToFloat>(address);
 
         math::Vec3<float> result1, result2;
 
