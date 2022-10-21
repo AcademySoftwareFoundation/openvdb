@@ -832,9 +832,9 @@ compileTemplate[tem: LTemplate[libname_String, classes_], sources_, opt : Option
                 OptionValue[driver, "SystemCompileOptions"],
                 Switch[{$OperatingSystem, driver["Name"][]},
                   {"Windows", "Visual Studio"}, {},
-                  {"Windows", "Intel Compiler"}, "/Qstd=c++11",
-                  {"MacOSX", "Clang"}, {If[$VersionNumber <= 10.3, "-mmacosx-version-min=10.9", Unevaluated@Sequence[]], "-std=c++11"},
-                  {_, _}, "-std=c++11"
+                  {"Windows", "Intel Compiler"}, {},
+                  {"MacOSX", "Clang"}, {},
+                  {_, _}, {}
                 ]
               }
             ];

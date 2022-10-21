@@ -8,7 +8,7 @@
 Switch[$OperatingSystem,
     "MacOSX",
         $buildSettings = {
-            "CompileOptions" -> {"-std=c++14 -ltbb -lHalf -lopenvdb -flto"},
+            "CompileOptions" -> {"-std=c++14 -ltbb -lopenvdb -flto"},
             "Compiler" -> CCompilerDriver`ClangCompiler`ClangCompiler
         };
         $libraryName = "OpenVDBLink.dylib",
@@ -18,7 +18,7 @@ Switch[$OperatingSystem,
         $vcpkgLib = FileNameJoin[{$vcpkgInstalled, "lib"}];
 
         $buildSettings = {
-            "CompileOptions" -> {"/EHsc", "/GL", "/wd4244", "/DNOMINMAX"},
+            "CompileOptions" -> {"/std:c++14", "/EHsc", "/GL", "/wd4244", "/DNOMINMAX"},
             "Compiler" -> CCompilerDriver`VisualStudioCompiler`VisualStudioCompiler,
             "IncludeDirectories" -> {
                 FileNameJoin[{"C:", "Program Files", "OpenVDB", "include"}],
@@ -35,7 +35,14 @@ Switch[$OperatingSystem,
             ]
         };
         $libraryName = "OpenVDBLink.dll",
-    _, (* TODO "Unix", etc. *)
+    "Unix",
+        $buildSettings = {
+            "CompileOptions" -> {"-std=c++14 -ltbb -lopenvdb -flto"},
+            "Compiler" -> CCompilerDriver`GCCCompiler`GCCCompiler,
+            "CompilerName" -> "g++"
+        };
+        $libraryName = "OpenVDBLink.so",
+    _,
         $buildSettings = None;
         $libraryName = ""
 ];
