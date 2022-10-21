@@ -26,6 +26,10 @@ PackageExport["OpenVDBDifferenceFrom"]
 PackageExport["OpenVDBUnion"]
 PackageExport["OpenVDBIntersection"]
 PackageExport["OpenVDBDifference"]
+PackageExport["OpenVDBMaxOf"]
+PackageExport["OpenVDBMinOf"]
+PackageExport["OpenVDBMax"]
+PackageExport["OpenVDBMin"]
 PackageExport["OpenVDBClip"]
 
 
@@ -37,6 +41,14 @@ OpenVDBDifferenceFrom::usage = "OpenVDBDifferenceFrom[expr1, expr2, \[Ellipsis]]
 OpenVDBUnion::usage = "OpenVDBUnion[expr1, expr2, \[Ellipsis]] performs the union of OpenVDB grids and stores the result to a new OpenVDB grid.";
 OpenVDBIntersection::usage = "OpenVDBIntersection[expr1, expr2, \[Ellipsis]] performs the intersection of OpenVDB grids and stores the result to a new OpenVDB grid.";
 OpenVDBDifference::usage = "OpenVDBDifference[expr1, expr2, \[Ellipsis]] subtracts OpenVDB grids expr2, \[Ellipsis] from expr1 and stores the result to a new OpenVDB grid.";
+
+
+OpenVDBMaxOf::usage = "OpenVDBMaxOf[expr1, expr2, \[Ellipsis]] performs the voxelwise maximum of OpenVDB grids and stores the result to expr1, deleting all other expri.";
+OpenVDBMinOf::usage = "OpenVDBMinOf[expr1, expr2, \[Ellipsis]] performs the voxelwise minimum of OpenVDB grids and stores the result to expr1, deleting all other expri.";
+
+
+OpenVDBMax::usage = "OpenVDBMax[expr1, expr2, \[Ellipsis]] performs the voxelwise maximum of OpenVDB grids and stores the result to a new OpenVDB grid.";
+OpenVDBMin::usage = "OpenVDBMin[expr1, expr2, \[Ellipsis]] performs the voxelwise minimum of OpenVDB grids and stores the result to a new OpenVDB grid.";
 
 
 OpenVDBClip::usage = "OpenVDBClip[expr, bds] clips an OpenVDB grid over bounds bds.";
@@ -494,6 +506,296 @@ SyntaxInformation[OpenVDBDifferenceFrom] = {"ArgumentsPattern" -> {_, ___, Optio
 
 
 mOpenVDBDifferenceFrom[args___] := messageBooleanFunction[OpenVDBUnion, args]
+
+
+(* ::Section:: *)
+(*Composite operations*)
+
+
+(* ::Subsection::Closed:: *)
+(*OpenVDBMax*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+Options[OpenVDBMax] = {"Creator" -> Inherited, "Name" -> Inherited};
+
+
+OpenVDBMax[args___] /; !CheckArguments[OpenVDBMax[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBMax[args___] :=
+    With[{res = iOpenVDBMax[args]},
+        res /; res =!= $Failed
+    ]
+
+
+OpenVDBMax[args___] := mOpenVDBMax[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBMax*)
+
+
+Options[iOpenVDBMax] = Options[OpenVDBMax];
+
+
+iOpenVDBMax[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
+    Block[{vdbcopy},
+        vdbcopy = OpenVDBCopyGrid[vdb];
+
+        OpenVDBSetProperty[vdbcopy, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdbcopy
+    ]
+
+
+iOpenVDBMax[vdb_?OpenVDBGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
+    Block[{vdbcopy},
+        vdbcopy = OpenVDBCopyGrid[vdb];
+
+        (* don't copy all grids at once, instead pass one at a time and destroy the copy *)
+        Do[iOpenVDBMaxOf[vdbcopy, OpenVDBCopyGrid[v]], {v, {vdbs}}];
+
+        OpenVDBSetProperty[vdbcopy, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdbcopy
+    ]
+
+
+iOpenVDBMax[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+registerForLevelSet[iOpenVDBMax];
+
+
+SyntaxInformation[OpenVDBMax] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBMax[args___] = $Failed;
+
+
+(* ::Subsection::Closed:: *)
+(*OpenVDBMin*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+Options[OpenVDBMin] = {"Creator" -> Inherited, "Name" -> Inherited};
+
+
+OpenVDBMin[args___] /; !CheckArguments[OpenVDBMin[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBMin[args___] :=
+    With[{res = iOpenVDBMin[args]},
+        res /; res =!= $Failed
+    ]
+
+
+OpenVDBMin[args___] := mOpenVDBMin[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBMin*)
+
+
+Options[iOpenVDBMin] = Options[OpenVDBMin];
+
+
+iOpenVDBMin[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
+    Block[{vdbcopy},
+        vdbcopy = OpenVDBCopyGrid[vdb];
+
+        OpenVDBSetProperty[vdbcopy, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdbcopy
+    ]
+
+
+iOpenVDBMin[vdb_?OpenVDBGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
+    Block[{vdbcopy},
+        vdbcopy = OpenVDBCopyGrid[vdb];
+
+        (* don't copy all grids at once, instead pass one at a time and destroy the copy *)
+        Do[iOpenVDBMinOf[vdbcopy, OpenVDBCopyGrid[v]], {v, {vdbs}}];
+
+        OpenVDBSetProperty[vdbcopy, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdbcopy
+    ]
+
+
+iOpenVDBMin[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+registerForLevelSet[iOpenVDBMin];
+
+
+SyntaxInformation[OpenVDBMin] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBMin[args___] = $Failed;
+
+
+(* ::Section:: *)
+(*In place Composite operations*)
+
+
+(* ::Subsection::Closed:: *)
+(*OpenVDBMaxOf*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+Options[OpenVDBMaxOf] = {"Creator" -> Inherited, "Name" -> Inherited};
+
+
+OpenVDBMaxOf[args___] /; !CheckArguments[OpenVDBMaxOf[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBMaxOf[args___] :=
+    With[{res = iOpenVDBMaxOf[args]},
+        res /; res =!= $Failed
+    ]
+
+
+OpenVDBMaxOf[args___] := mOpenVDBMaxOf[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBMaxOf*)
+
+
+Options[iOpenVDBMaxOf] = Options[OpenVDBMaxOf];
+
+
+iOpenVDBMaxOf[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdb
+    )
+
+
+iOpenVDBMaxOf[vdb_?OpenVDBGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
+    (
+        Scan[vdb["gridMax"[#]]&, {vdbs}[[All, 1]]];
+
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdb
+    )
+
+
+iOpenVDBMaxOf[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+registerForLevelSet[iOpenVDBMaxOf];
+
+
+SyntaxInformation[OpenVDBMaxOf] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBMaxOf[args___] = $Failed;
+
+
+(* ::Subsection::Closed:: *)
+(*OpenVDBMinOf*)
+
+
+(* ::Subsubsection::Closed:: *)
+(*Main*)
+
+
+Options[OpenVDBMinOf] = {"Creator" -> Inherited, "Name" -> Inherited};
+
+
+OpenVDBMinOf[args___] /; !CheckArguments[OpenVDBMinOf[args], {1, \[Infinity]}] = $Failed;
+
+
+OpenVDBMinOf[args___] :=
+    With[{res = iOpenVDBMinOf[args]},
+        res /; res =!= $Failed
+    ]
+
+
+OpenVDBMinOf[args___] := mOpenVDBMinOf[args]
+
+
+(* ::Subsubsection::Closed:: *)
+(*iOpenVDBMinOf*)
+
+
+Options[iOpenVDBMinOf] = Options[OpenVDBMinOf];
+
+
+iOpenVDBMinOf[vdb_?OpenVDBGridQ, OptionsPattern[]] :=
+    (
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdb
+    )
+
+
+iOpenVDBMinOf[vdb_?OpenVDBGridQ, vdbs__, OptionsPattern[]] /; sameGridTypeQ[vdb, vdbs] :=
+    (
+        Scan[vdb["gridMin"[#]]&, {vdbs}[[All, 1]]];
+
+        OpenVDBSetProperty[vdb, {"Creator", "Name"}, OptionValue[{"Creator", "Name"}]];
+
+        vdb
+    )
+
+
+iOpenVDBMinOf[___] = $Failed;
+
+
+(* ::Subsubsection::Closed:: *)
+(*Argument conform & completion*)
+
+
+registerForLevelSet[iOpenVDBMinOf];
+
+
+SyntaxInformation[OpenVDBMinOf] = {"ArgumentsPattern" -> {_, ___, OptionsPattern[]}};
+
+
+(* ::Subsubsection::Closed:: *)
+(*Messages*)
+
+
+mOpenVDBMinOf[args___] = $Failed;
 
 
 (* ::Section:: *)

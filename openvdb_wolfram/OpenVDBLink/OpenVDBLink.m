@@ -265,6 +265,10 @@ vdbBaseGridMembers[class_] :=
         LFun["getName", {}, "UTF8String"],
         LFun["getVoxelSize", {}, Real],
 
+        (* ------------ CSG ------------ *)
+        LFun["gridMax", {LExpressionID[class]}, "Void"],
+        LFun["gridMin", {LExpressionID[class]}, "Void"],
+
         (* ------------ Metadata ------------ *)
         LFun["getBooleanMetadata", {"UTF8String"}, "Boolean"],
         LFun["getIntegerMetadata", {"UTF8String"}, Integer],

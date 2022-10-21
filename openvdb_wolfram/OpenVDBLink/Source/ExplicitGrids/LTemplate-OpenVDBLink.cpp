@@ -1389,6 +1389,72 @@ extern "C" DLLEXPORT int OpenVDBDoubleGrid_getVoxelSize(WolframLibraryData libDa
 }
 
 
+extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
+
+        (OpenVDBDoubleGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBDoubleGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBDoubleGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBDoubleGrid_collection.find(id) == OpenVDBDoubleGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBDoubleGrid & var1 = mma::detail::getObject<OpenVDBDoubleGrid>(OpenVDBDoubleGrid_collection)(Args[1]);
+
+        (OpenVDBDoubleGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBDoubleGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBDoubleGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBDoubleGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -4123,6 +4189,72 @@ extern "C" DLLEXPORT int OpenVDBFloatGrid_getVoxelSize(WolframLibraryData libDat
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBFloatGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
+
+        (OpenVDBFloatGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBFloatGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBFloatGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBFloatGrid_collection.find(id) == OpenVDBFloatGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBFloatGrid & var1 = mma::detail::getObject<OpenVDBFloatGrid>(OpenVDBFloatGrid_collection)(Args[1]);
+
+        (OpenVDBFloatGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBFloatGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBFloatGrid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
@@ -6871,6 +7003,72 @@ extern "C" DLLEXPORT int OpenVDBByteGrid_getVoxelSize(WolframLibraryData libData
 }
 
 
+extern "C" DLLEXPORT int OpenVDBByteGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBByteGrid & var1 = mma::detail::getObject<OpenVDBByteGrid>(OpenVDBByteGrid_collection)(Args[1]);
+
+        (OpenVDBByteGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBByteGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBByteGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBByteGrid_collection.find(id) == OpenVDBByteGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBByteGrid & var1 = mma::detail::getObject<OpenVDBByteGrid>(OpenVDBByteGrid_collection)(Args[1]);
+
+        (OpenVDBByteGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBByteGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBByteGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBByteGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -8508,6 +8706,72 @@ extern "C" DLLEXPORT int OpenVDBInt32Grid_getVoxelSize(WolframLibraryData libDat
 }
 
 
+extern "C" DLLEXPORT int OpenVDBInt32Grid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBInt32Grid & var1 = mma::detail::getObject<OpenVDBInt32Grid>(OpenVDBInt32Grid_collection)(Args[1]);
+
+        (OpenVDBInt32Grid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBInt32Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBInt32Grid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBInt32Grid_collection.find(id) == OpenVDBInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBInt32Grid & var1 = mma::detail::getObject<OpenVDBInt32Grid>(OpenVDBInt32Grid_collection)(Args[1]);
+
+        (OpenVDBInt32Grid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBInt32Grid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBInt32Grid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBInt32Grid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -10030,6 +10294,72 @@ extern "C" DLLEXPORT int OpenVDBInt64Grid_getVoxelSize(WolframLibraryData libDat
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBInt64Grid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBInt64Grid & var1 = mma::detail::getObject<OpenVDBInt64Grid>(OpenVDBInt64Grid_collection)(Args[1]);
+
+        (OpenVDBInt64Grid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBInt64Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBInt64Grid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBInt64Grid_collection.find(id) == OpenVDBInt64Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBInt64Grid & var1 = mma::detail::getObject<OpenVDBInt64Grid>(OpenVDBInt64Grid_collection)(Args[1]);
+
+        (OpenVDBInt64Grid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBInt64Grid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBInt64Grid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
@@ -11566,6 +11896,72 @@ extern "C" DLLEXPORT int OpenVDBUInt32Grid_getVoxelSize(WolframLibraryData libDa
 }
 
 
+extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBUInt32Grid & var1 = mma::detail::getObject<OpenVDBUInt32Grid>(OpenVDBUInt32Grid_collection)(Args[1]);
+
+        (OpenVDBUInt32Grid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBUInt32Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBUInt32Grid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBUInt32Grid_collection.find(id) == OpenVDBUInt32Grid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBUInt32Grid & var1 = mma::detail::getObject<OpenVDBUInt32Grid>(OpenVDBUInt32Grid_collection)(Args[1]);
+
+        (OpenVDBUInt32Grid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBUInt32Grid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBUInt32Grid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBUInt32Grid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -13095,6 +13491,72 @@ extern "C" DLLEXPORT int OpenVDBVec2DGrid_getVoxelSize(WolframLibraryData libDat
 }
 
 
+extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2DGrid & var1 = mma::detail::getObject<OpenVDBVec2DGrid>(OpenVDBVec2DGrid_collection)(Args[1]);
+
+        (OpenVDBVec2DGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2DGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec2DGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2DGrid_collection.find(id) == OpenVDBVec2DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2DGrid & var1 = mma::detail::getObject<OpenVDBVec2DGrid>(OpenVDBVec2DGrid_collection)(Args[1]);
+
+        (OpenVDBVec2DGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2DGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2DGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBVec2DGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -14583,6 +15045,72 @@ extern "C" DLLEXPORT int OpenVDBVec2IGrid_getVoxelSize(WolframLibraryData libDat
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2IGrid & var1 = mma::detail::getObject<OpenVDBVec2IGrid>(OpenVDBVec2IGrid_collection)(Args[1]);
+
+        (OpenVDBVec2IGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2IGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec2IGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2IGrid_collection.find(id) == OpenVDBVec2IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2IGrid & var1 = mma::detail::getObject<OpenVDBVec2IGrid>(OpenVDBVec2IGrid_collection)(Args[1]);
+
+        (OpenVDBVec2IGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2IGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2IGrid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
@@ -16085,6 +16613,72 @@ extern "C" DLLEXPORT int OpenVDBVec2SGrid_getVoxelSize(WolframLibraryData libDat
 }
 
 
+extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2SGrid & var1 = mma::detail::getObject<OpenVDBVec2SGrid>(OpenVDBVec2SGrid_collection)(Args[1]);
+
+        (OpenVDBVec2SGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2SGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec2SGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec2SGrid_collection.find(id) == OpenVDBVec2SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec2SGrid & var1 = mma::detail::getObject<OpenVDBVec2SGrid>(OpenVDBVec2SGrid_collection)(Args[1]);
+
+        (OpenVDBVec2SGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec2SGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec2SGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBVec2SGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -17573,6 +18167,72 @@ extern "C" DLLEXPORT int OpenVDBVec3DGrid_getVoxelSize(WolframLibraryData libDat
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3DGrid & var1 = mma::detail::getObject<OpenVDBVec3DGrid>(OpenVDBVec3DGrid_collection)(Args[1]);
+
+        (OpenVDBVec3DGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3DGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec3DGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3DGrid_collection.find(id) == OpenVDBVec3DGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3DGrid & var1 = mma::detail::getObject<OpenVDBVec3DGrid>(OpenVDBVec3DGrid_collection)(Args[1]);
+
+        (OpenVDBVec3DGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3DGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3DGrid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
@@ -19075,6 +19735,72 @@ extern "C" DLLEXPORT int OpenVDBVec3IGrid_getVoxelSize(WolframLibraryData libDat
 }
 
 
+extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3IGrid & var1 = mma::detail::getObject<OpenVDBVec3IGrid>(OpenVDBVec3IGrid_collection)(Args[1]);
+
+        (OpenVDBVec3IGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3IGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec3IGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3IGrid_collection.find(id) == OpenVDBVec3IGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3IGrid & var1 = mma::detail::getObject<OpenVDBVec3IGrid>(OpenVDBVec3IGrid_collection)(Args[1]);
+
+        (OpenVDBVec3IGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3IGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3IGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBVec3IGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -20570,6 +21296,72 @@ extern "C" DLLEXPORT int OpenVDBVec3SGrid_getVoxelSize(WolframLibraryData libDat
 }
 
 
+extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3SGrid & var1 = mma::detail::getObject<OpenVDBVec3SGrid>(OpenVDBVec3SGrid_collection)(Args[1]);
+
+        (OpenVDBVec3SGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3SGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBVec3SGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBVec3SGrid_collection.find(id) == OpenVDBVec3SGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBVec3SGrid & var1 = mma::detail::getObject<OpenVDBVec3SGrid>(OpenVDBVec3SGrid_collection)(Args[1]);
+
+        (OpenVDBVec3SGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBVec3SGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBVec3SGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
 extern "C" DLLEXPORT int OpenVDBVec3SGrid_getBooleanMetadata(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
 {
     mma::detail::MOutFlushGuard flushguard;
@@ -22058,6 +22850,72 @@ extern "C" DLLEXPORT int OpenVDBBoolGrid_getVoxelSize(WolframLibraryData libData
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBBoolGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBBoolGrid & var1 = mma::detail::getObject<OpenVDBBoolGrid>(OpenVDBBoolGrid_collection)(Args[1]);
+
+        (OpenVDBBoolGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBBoolGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBBoolGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBBoolGrid_collection.find(id) == OpenVDBBoolGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBBoolGrid & var1 = mma::detail::getObject<OpenVDBBoolGrid>(OpenVDBBoolGrid_collection)(Args[1]);
+
+        (OpenVDBBoolGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBBoolGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBBoolGrid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
@@ -23660,6 +24518,72 @@ extern "C" DLLEXPORT int OpenVDBMaskGrid_getVoxelSize(WolframLibraryData libData
     catch (...)
     {
         mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::getVoxelSize()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBMaskGrid_gridMax(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBMaskGrid & var1 = mma::detail::getObject<OpenVDBMaskGrid>(OpenVDBMaskGrid_collection)(Args[1]);
+
+        (OpenVDBMaskGrid_collection[id])->gridMax(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBMaskGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::gridMax()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+
+    return LIBRARY_NO_ERROR;
+}
+
+
+extern "C" DLLEXPORT int OpenVDBMaskGrid_gridMin(WolframLibraryData libData, mint Argc, MArgument * Args, MArgument Res)
+{
+    mma::detail::MOutFlushGuard flushguard;
+    if (setjmp(mma::detail::jmpbuf)) { return LIBRARY_FUNCTION_ERROR; }
+    const mint id = MArgument_getInteger(Args[0]);
+    if (OpenVDBMaskGrid_collection.find(id) == OpenVDBMaskGrid_collection.end()) { libData->Message("noinst"); return LIBRARY_FUNCTION_ERROR; }
+
+    try
+    {
+        OpenVDBMaskGrid & var1 = mma::detail::getObject<OpenVDBMaskGrid>(OpenVDBMaskGrid_collection)(Args[1]);
+
+        (OpenVDBMaskGrid_collection[id])->gridMin(var1);
+    }
+    catch (const mma::LibraryError & libErr)
+    {
+        libErr.report();
+        return libErr.error_code();
+    }
+    catch (const std::exception & exc)
+    {
+        mma::detail::handleUnknownException(exc.what(), "OpenVDBMaskGrid::gridMin()");
+        return LIBRARY_FUNCTION_ERROR;
+    }
+    catch (...)
+    {
+        mma::detail::handleUnknownException(NULL, "OpenVDBMaskGrid::gridMin()");
         return LIBRARY_FUNCTION_ERROR;
     }
 
