@@ -35,7 +35,7 @@ Load the package:
 Only during the first time loading the package, it will automatically compile the necessary binary:
 
 ```
-<< OpenVDBLink`
+<<OpenVDBLink`
 ```
 
 After loading this will print in the notebook / console:
@@ -55,9 +55,11 @@ If compilation fails, you may need to add any include/link paths that are not cu
 Once these are set, reload and then recompile. Below the input `True` is optional and tells the system to print the compile command as well as any warnings or errors during compile:
 
 ```
-<< OpenVDBLink`
+<<OpenVDBLink`
 OpenVDBLink`Developer`Recompile[True]
 ```
+
+OpenVDBLink has been compiled and tested on MacOS 10.14 and higher, Windows 10, and Ubuntu 20.04 and higher.
 
 ###  Basic example
 
