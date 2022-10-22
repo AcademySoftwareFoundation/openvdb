@@ -9,12 +9,17 @@
 #include <openvdb/Exceptions.h>
 #include <openvdb/util/logging.h>
 #include <cstdint>
+
+#ifdef OPENVDB_USE_DELAYED_LOADING
 #include <boost/iostreams/copy.hpp>
 #ifndef _WIN32
 #include <sys/types.h>
-#include <sys/stat.h>
 #include <unistd.h>
 #endif
+#endif // OPENVDB_USE_DELAYED_LOADING
+
+#include <sys/stat.h> // stat()
+
 #include <cassert>
 #include <cstdlib> // for getenv(), strtoul()
 #include <cstring> // for strerror_r()
@@ -81,10 +86,6 @@ struct File::Impl
     std::string mFilename;
     // The file-level metadata
     MetaMap::Ptr mMeta;
-    // The memory-mapped file
-    MappedFile::Ptr mFileMapping;
-    // The buffer for the input stream, if it is a memory-mapped file
-    SharedPtr<std::streambuf> mStreamBuf;
     // The file stream that is open for reading
     std::unique_ptr<std::istream> mInStream;
     // File-level stream metadata (file format, compression, etc.)
@@ -92,14 +93,20 @@ struct File::Impl
     // Flag indicating if we have read in the global information (header,
     // metadata, and grid descriptors) for this VDB file
     bool mIsOpen;
-    // File size limit for copying during delayed loading
-    Index64 mCopyMaxBytes;
     // Grid descriptors for all grids stored in the file, indexed by grid name
     NameMap mGridDescriptors;
     // All grids, indexed by unique name (used only when mHasGridOffsets is false)
     Archive::NamedGridMap mNamedGrids;
     // All grids stored in the file (used only when mHasGridOffsets is false)
     GridPtrVecPtr mGrids;
+#ifdef OPENVDB_USE_DELAYED_LOADING
+    // The memory-mapped file
+    MappedFile::Ptr mFileMapping;
+    // The buffer for the input stream, if it is a memory-mapped file
+    SharedPtr<std::streambuf> mStreamBuf;
+    // File size limit for copying during delayed loading
+    Index64 mCopyMaxBytes;
+#endif
 }; // class File::Impl
 
 
@@ -110,7 +117,9 @@ File::File(const std::string& filename): mImpl(new Impl)
 {
     mImpl->mFilename = filename;
     mImpl->mIsOpen = false;
+#ifdef OPENVDB_USE_DELAYED_LOADING
     mImpl->mCopyMaxBytes = Impl::getDefaultCopyMaxBytes();
+#endif
     setInputHasGridOffsets(true);
 }
 
@@ -137,7 +146,9 @@ File::operator=(const File& other)
         mImpl->mFilename = otherImpl.mFilename;
         mImpl->mMeta = otherImpl.mMeta;
         mImpl->mIsOpen = false; // don't want two file objects reading from the same stream
+#ifdef OPENVDB_USE_DELAYED_LOADING
         mImpl->mCopyMaxBytes = otherImpl.mCopyMaxBytes;
+#endif
         mImpl->mGridDescriptors = otherImpl.mGridDescriptors;
         mImpl->mNamedGrids = otherImpl.mNamedGrids;
         mImpl->mGrids = otherImpl.mGrids;
@@ -241,6 +252,7 @@ File::getSize() const
 }
 
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 Index64
 File::copyMaxBytes() const
 {
@@ -253,6 +265,7 @@ File::setCopyMaxBytes(Index64 bytes)
 {
     mImpl->mCopyMaxBytes = bytes;
 }
+#endif
 
 
 ////////////////////////////////////////
@@ -266,7 +279,11 @@ File::isOpen() const
 
 
 bool
+#ifdef OPENVDB_USE_DELAYED_LOADING
 File::open(bool delayLoad, const MappedFile::Notifier& notifier)
+#else
+File::open(bool /*delayLoad = true*/)
+#endif // OPENVDB_USE_DELAYED_LOADING
 {
     if (isOpen()) {
         OPENVDB_THROW(IoError, filename() << " is already open");
@@ -276,10 +293,13 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
     // Open the file.
     std::unique_ptr<std::istream> newStream;
     SharedPtr<std::streambuf> newStreamBuf;
+#ifdef OPENVDB_USE_DELAYED_LOADING
     MappedFile::Ptr newFileMapping;
     if (!delayLoad || !Archive::isDelayedLoadingEnabled()) {
+#endif
         newStream.reset(new std::ifstream(
             filename().c_str(), std::ios_base::in | std::ios_base::binary));
+#ifdef OPENVDB_USE_DELAYED_LOADING
     } else {
         bool isTempFile = false;
         std::string fname = filename();
@@ -318,6 +338,7 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
             OPENVDB_THROW(IoError, ostr.str());
         }
     }
+#endif // OPENVDB_USE_DELAYED_LOADING
 
     if (newStream->fail()) {
         OPENVDB_THROW(IoError, "could not open file " << filename());
@@ -335,9 +356,11 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
         throw;
     }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     mImpl->mFileMapping = newFileMapping;
     if (mImpl->mFileMapping) mImpl->mFileMapping->setNotifier(notifier);
     mImpl->mStreamBuf = newStreamBuf;
+#endif
     mImpl->mInStream.swap(newStream);
 
     // Tag the input stream with the file format and library version numbers
@@ -348,7 +371,9 @@ File::open(bool delayLoad, const MappedFile::Notifier& notifier)
     Archive::setFormatVersion(inputStream());
     Archive::setLibraryVersion(inputStream());
     Archive::setDataCompression(inputStream());
+#ifdef OPENVDB_USE_DELAYED_LOADING
     io::setMappedFilePtr(inputStream(), mImpl->mFileMapping);
+#endif
 
     // Read in the VDB metadata.
     mImpl->mMeta = MetaMap::Ptr(new MetaMap);
@@ -396,9 +421,11 @@ File::close()
     mImpl->mGrids.reset();
     mImpl->mNamedGrids.clear();
     mImpl->mInStream.reset();
-    mImpl->mStreamBuf.reset();
     mImpl->mStreamMetadata.reset();
+#ifdef OPENVDB_USE_DELAYED_LOADING
+    mImpl->mStreamBuf.reset();
     mImpl->mFileMapping.reset();
+#endif
 
     mImpl->mIsOpen = false;
     setInputHasGridOffsets(true);

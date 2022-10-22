@@ -138,6 +138,11 @@
 #cmakedefine OPENVDB_USE_ZLIB
 #endif
 
+/* Denotes whether VDB was built with Delayed Loading support */
+#ifndef OPENVDB_USE_DELAYED_LOADING
+#cmakedefine OPENVDB_USE_DELAYED_LOADING
+#endif
+
 /* Denotes whether VDB was built with explicit template instantiation */
 #ifndef OPENVDB_USE_EXPLICIT_INSTANTIATION
 #cmakedefine OPENVDB_USE_EXPLICIT_INSTANTIATION

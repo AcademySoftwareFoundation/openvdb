@@ -6,6 +6,7 @@
 
 #include <gtest/gtest.h>
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 #ifdef __clang__
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wunused-macros"
@@ -34,6 +35,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #include <sys/stat.h> // for stat()
 #include <unistd.h> // for unlink()
 #endif
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 #include <atomic>
 #include <fstream>
@@ -53,6 +55,7 @@ namespace boost { namespace interprocess { namespace detail {} namespace ipcdeta
 #endif
 #endif
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
 /// @brief io::MappedFile has a private constructor, so this unit tests uses a matching proxy
 class ProxyMappedFile
 {
@@ -99,6 +102,7 @@ private:
     }; // class Impl
     std::unique_ptr<Impl> mImpl;
 }; // class ProxyMappedFile
+#endif // OPENVDB_USE_DELAYED_LOADING
 
 using namespace openvdb;
 using namespace openvdb::compression;
@@ -526,6 +530,8 @@ TestStreamCompression::testPagedStreams()
             EXPECT_EQ(fileout.tellp(), std::streampos(values.size()+sizeof(int)*pages));
 #endif
 
+
+#ifdef OPENVDB_USE_DELAYED_LOADING
             // abuse File being a friend of MappedFile to get around the private constructor
             ProxyMappedFile* proxy = new ProxyMappedFile(filename);
             SharedPtr<io::MappedFile> mappedFile(reinterpret_cast<io::MappedFile*>(proxy));
@@ -617,6 +623,8 @@ TestStreamCompression::testPagedStreams()
             // page should have just one use count (itself)
 
             EXPECT_EQ(page.use_count(), long(1));
+
+#endif // OPENVDB_USE_DELAYED_LOADING
         }
         std::remove(filename.c_str());
     }

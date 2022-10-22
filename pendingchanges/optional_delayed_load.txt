@@ -1,0 +1,1 @@
+- Added OPENVDB_USE_DELAYED_LOAD flag that enables delayed loading and defaults to on.

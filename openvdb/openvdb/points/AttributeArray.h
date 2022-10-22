@@ -1794,10 +1794,12 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
         return;
     }
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     // If this array is being read from a memory-mapped file, delay loading of its data
     // until the data is actually accessed.
     io::MappedFile::Ptr mappedFile = io::getMappedFilePtr(is.getInputStream());
     const bool delayLoad = (mappedFile.get() != nullptr);
+#endif
 
     if (is.sizeOnly())
     {
@@ -1815,14 +1817,22 @@ TypedAttributeArray<ValueType_, Codec_>::readPagedBuffers(compression::PagedInpu
 
     this->deallocate();
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     this->setOutOfCore(delayLoad);
     is.read(mPageHandle, std::streamsize(mPageHandle->size()), delayLoad);
+#else
+    is.read(mPageHandle, std::streamsize(mPageHandle->size()), false);
+#endif // OPENVDB_USE_DELAYED_LOADING
 
+#ifdef OPENVDB_USE_DELAYED_LOADING
     if (!delayLoad) {
+#endif
         std::unique_ptr<char[]> buffer = mPageHandle->read();
         mData.reset(reinterpret_cast<StorageType*>(buffer.release()));
         mPageHandle.reset();
+#ifdef OPENVDB_USE_DELAYED_LOADING
     }
+#endif
 
     // clear page state
 

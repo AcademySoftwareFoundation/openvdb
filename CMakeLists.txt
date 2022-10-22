@@ -79,6 +79,7 @@ option(OPENVDB_BUILD_AX_UNITTESTS "Build the OpenVDB AX unit tests" OFF)
 option(OPENVDB_BUILD_NANOVDB "Build the NanoVDB library. Turns ON if USE_NANOVDB is ON." ${USE_NANOVDB})
 
 option(OPENVDB_BUILD_MAYA_PLUGIN "Build the Maya plugin" OFF)
+option(OPENVDB_USE_DELAYED_LOADING "Build the core OpenVDB library with delayed-loading." ON)
 option(OPENVDB_ENABLE_RPATH "Build with RPATH information" ON)
 option(OPENVDB_CXX_STRICT "Enable or disable pre-defined compiler warnings" OFF)
 
@@ -247,6 +248,7 @@ mark_as_advanced(
   OPENVDB_BUILD_HOUDINI_ABITESTS
   OPENVDB_CXX_STRICT
   OPENVDB_ENABLE_RPATH
+  OPENVDB_USE_DELAYED_LOADING
   OPENVDB_FUTURE_DEPRECATION
   OPENVDB_SIMD
   OPENVDB_USE_DEPRECATED_ABI_7
