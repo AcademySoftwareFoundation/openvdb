@@ -961,8 +961,17 @@ template <typename SdfGridT, typename ExtValueT>
 struct FastSweeping<SdfGridT, ExtValueT>::PruneMinMaxFltKernel {
     PruneMinMaxFltKernel(SdfValueT min, SdfValueT max) : mMin(min), mMax(max) {}
 
-    // Do nothing for the root node
-    void operator()(typename SdfTreeT::RootNodeType&, size_t = 1) const { }
+    // Root node
+    void operator()(typename SdfTreeT::RootNodeType& node, size_t = 1) const {
+        for (auto iter = node.beginValueAll(); iter; ++iter) {
+            if (*iter == -std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMin);
+            }
+            if (*iter == std::numeric_limits<SdfValueT>::max()) {
+                iter.setValue(mMax);
+            }
+        }
+    }
 
     // Internal nodes
     template<typename NodeT>
