@@ -31,10 +31,12 @@
 #ifndef OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 #define OPENVDB_TREE_VALUEACCESSOR_HAS_BEEN_INCLUDED
 
-#include <tbb/null_mutex.h>
-#include <tbb/spin_mutex.h>
 #include <openvdb/version.h>
 #include <openvdb/Types.h>
+
+#include <tbb/null_mutex.h>
+#include <tbb/spin_mutex.h>
+
 #include <cassert>
 #include <limits>
 #include <type_traits>
@@ -54,7 +56,13 @@ template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1>
 class ValueAccessor2;
 template<typename TreeType, bool IsSafe = true, Index L0 = 0, Index L1 = 1, Index L2 = 2>
 class ValueAccessor3;
-template<typename TreeCacheT, typename NodeVecT, bool AtRoot> class CacheItem;
+template<typename TreeCacheT, typename NodeVecT, bool AtRoot
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+, bool BypassLeafAPI =
+        std::is_same<typename NodeVecT::Front, typename NodeVecT::Front::LeafNodeType>::value &&
+        std::is_same<typename NodeVecT::Front::LeafNodeType::Buffer::StorageType, typename NodeVecT::Front::ValueType>::value
+#endif
+> class CacheItem;
 
 
 /// @brief This base class for ValueAccessors manages registration of an accessor
@@ -192,12 +200,20 @@ public:
     using LockT = typename MutexType::scoped_lock;
     using BaseT::IsConstTree;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // If the last node being cached is a leaf node and the storage type matches
+    // the ValueType, we can cache the buffer pointer instead of using the delay
+    // load locked leaf API
+    static constexpr bool BypassLeafAPI = CacheLevels >= 1 &&
+        std::is_same<typename LeafNodeT::Buffer::StorageType, ValueType>::value;
+#endif
+
     ValueAccessor(TreeType& tree): BaseT(tree), mCache(*this)
     {
         mCache.insert(Coord(), &tree.root());
     }
 
-    ValueAccessor(const ValueAccessor& other): BaseT(other), mCache(*this, other.mCache) {}
+    ValueAccessor(const ValueAccessor& other) : BaseT(other), mCache(*this, other.mCache) {}
 
     ValueAccessor& operator=(const ValueAccessor& other)
     {
@@ -516,7 +532,11 @@ public:
 //
 
 // An element of a compile-time linked list of node pointers, ordered from LeafNode to RootNode
-template<typename TreeCacheT, typename NodeVecT, bool AtRoot>
+template<typename TreeCacheT, typename NodeVecT, bool AtRoot
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    , bool BypassLeafAPI
+#endif
+>
 class CacheItem
 {
 public:
@@ -525,21 +545,21 @@ public:
     using LeafNodeType = typename NodeType::LeafNodeType;
     using CoordLimits = std::numeric_limits<Int32>;
 
-    CacheItem(TreeCacheT& parent):
-        mParent(&parent),
-        mHash(CoordLimits::max()),
-        mNode(nullptr),
-        mNext(parent)
+    CacheItem(TreeCacheT& parent)
+        : mParent(&parent)
+        , mHash(CoordLimits::max())
+        , mNode(nullptr)
+        , mNext(parent)
     {
     }
 
     //@{
     /// Copy another CacheItem's node pointers and hash keys, but not its parent pointer.
-    CacheItem(TreeCacheT& parent, const CacheItem& other):
-        mParent(&parent),
-        mHash(other.mHash),
-        mNode(other.mNode),
-        mNext(parent, other.mNext)
+    CacheItem(TreeCacheT& parent, const CacheItem& other)
+        : mParent(&parent)
+        , mHash(other.mHash)
+        , mNode(other.mNode)
+        , mNext(parent, other.mNext)
     {
     }
 
@@ -604,12 +624,18 @@ public:
     void addLeaf(LeafNodeType* leaf)
     {
         static_assert(!TreeCacheT::IsConstTree, "can't add a node to a const tree");
-        if (NodeType::LEVEL == 0) return;
+        if (NodeType::LEVEL == 0) {
+            mNext.addLeaf(leaf);
+            return;
+        }
+
         if (this->isHashed(leaf->origin())) {
             assert(mNode);
             return const_cast<NodeType*>(mNode)->addLeafAndCache(leaf, *mParent);
         }
-        mNext.addLeaf(leaf);
+        else {
+            mNext.addLeaf(leaf);
+        }
     }
 
     void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
@@ -816,13 +842,343 @@ private:
     Coord mHash;
     const NodeType* mNode;
     using RestT = typename NodeVecT::PopFront;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // Next item is never a leaf node as a leaf node is only ever at
+    // the front of the chain
+    CacheItem<TreeCacheT, RestT, /*AtRoot=*/RestT::Size == 1, false> mNext;
+#else
     CacheItem<TreeCacheT, RestT, /*AtRoot=*/RestT::Size == 1> mNext;
+#endif
 };// end of CacheItem
 
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+
+template<typename TreeCacheT, typename NodeVecT>
+class CacheItem<TreeCacheT, NodeVecT, /*AtRoot=*/false, true>
+{
+public:
+    using NodeType = typename NodeVecT::Front;
+    using ValueType = typename NodeType::ValueType;
+    using LeafNodeType = typename NodeType::LeafNodeType;
+    using CoordLimits = std::numeric_limits<Int32>;
+
+    static_assert(std::is_same<NodeType, LeafNodeType>::value);
+
+    CacheItem(TreeCacheT& parent)
+        : mParent(&parent)
+        , mHash(CoordLimits::max())
+        , mNode(nullptr)
+        , mNext(parent)
+        , mBuffer(nullptr)
+    {
+    }
+
+    //@{
+    /// Copy another CacheItem's node pointers and hash keys, but not its parent pointer.
+    CacheItem(TreeCacheT& parent, const CacheItem& other)
+        : mParent(&parent)
+        , mHash(other.mHash)
+        , mNode(other.mNode)
+        , mNext(parent, other.mNext)
+        , mBuffer(other.mBuffer)
+    {
+    }
+
+    CacheItem& copy(TreeCacheT& parent, const CacheItem& other)
+    {
+        mParent = &parent;
+        mHash = other.mHash;
+        mNode = other.mNode;
+        mNext.copy(parent, other.mNext);
+        mBuffer = other.mBuffer;
+        return *this;
+    }
+    //@}
+
+    bool isCached(const Coord& xyz) const
+    {
+        return (this->isHashed(xyz) || mNext.isCached(xyz));
+    }
+
+    /// Cache the given node at this level.
+    void insert(const Coord& xyz, const NodeType* node)
+    {
+        mHash = (node != nullptr) ? xyz & ~(NodeType::DIM-1) : Coord::max();
+        mNode = node;
+        mBuffer = node ? node->buffer().data() : nullptr;
+    }
+    /// Forward the given node to another level of the cache.
+    template<typename OtherNodeType>
+    void insert(const Coord& xyz, const OtherNodeType* node) { mNext.insert(xyz, node); }
+
+    /// Erase the node at this level.
+    void erase(const NodeType*) { mHash = Coord::max(); mNode = nullptr; }
+    /// Erase the node at another level of the cache.
+    template<typename OtherNodeType>
+    void erase(const OtherNodeType* node) { mNext.erase(node); }
+
+    /// Erase the nodes at this and lower levels of the cache.
+    void clear() { mHash = Coord::max(); mNode = nullptr; mNext.clear(); }
+
+    /// Return the cached node (if any) at this level.
+    void getNode(const NodeType*& node) const { node = mNode; }
+    void getNode(const NodeType*& node) { node = mNode; }
+    void getNode(NodeType*& node)
+    {
+        // This combination of a static assertion and a const_cast might not be elegant,
+        // but it is a lot simpler than specializing TreeCache for const Trees.
+        static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
+        node = const_cast<NodeType*>(mNode);
+    }
+    /// Forward the request to another level of the cache.
+    template<typename OtherNodeType>
+    void getNode(OtherNodeType*& node) { mNext.getNode(node); }
+
+    /// Return the value of the voxel at the given coordinates.
+    const ValueType& getValue(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mBuffer[LeafNodeType::coordToOffset(xyz)];
+        }
+        return mNext.getValue(xyz);
+    }
+
+    void addLeaf(LeafNodeType* leaf)
+    {
+        mNext.addLeaf(leaf);
+    }
+
+    void addTile(Index level, const Coord& xyz, const ValueType& value, bool state)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't add a tile to a const tree");
+        if (NodeType::LEVEL < level) return;
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return const_cast<NodeType*>(mNode)->addTileAndCache(
+                level, xyz, value, state, *mParent);
+        }
+        mNext.addTile(level, xyz, value, state);
+    }
+
+    LeafNodeType* touchLeaf(const Coord& xyz)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return const_cast<NodeType*>(mNode)->touchLeafAndCache(xyz, *mParent);
+        }
+        return mNext.touchLeaf(xyz);
+    }
+
+    LeafNodeType* probeLeaf(const Coord& xyz)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return const_cast<NodeType*>(mNode)->probeLeafAndCache(xyz, *mParent);
+        }
+        return mNext.probeLeaf(xyz);
+    }
+
+    const LeafNodeType* probeConstLeaf(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->probeConstLeafAndCache(xyz, *mParent);
+        }
+        return mNext.probeConstLeaf(xyz);
+    }
+
+    template<typename NodeT>
+    NodeT* probeNode(const Coord& xyz)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't get a non-const node from a const tree");
+        if (this->isHashed(xyz)) {
+            if ((std::is_same<NodeT, NodeType>::value)) {
+                assert(mNode);
+                return reinterpret_cast<NodeT*>(const_cast<NodeType*>(mNode));
+            }
+            return const_cast<NodeType*>(mNode)->template probeNodeAndCache<NodeT>(xyz, *mParent);
+        }
+        return mNext.template probeNode<NodeT>(xyz);
+    }
+
+    template<typename NodeT>
+    const NodeT* probeConstNode(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            if ((std::is_same<NodeT, NodeType>::value)) {
+                assert(mNode);
+                return reinterpret_cast<const NodeT*>(mNode);
+            }
+            return mNode->template probeConstNodeAndCache<NodeT>(xyz, *mParent);
+        }
+        return mNext.template probeConstNode<NodeT>(xyz);
+    }
+
+    /// Return the active state of the voxel at the given coordinates.
+    bool isValueOn(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->isValueOnAndCache(xyz, *mParent);
+        }
+        return mNext.isValueOn(xyz);
+    }
+
+    /// Return the active state and value of the voxel at the given coordinates.
+    bool probeValue(const Coord& xyz, ValueType& value)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            assert(mBuffer);
+            const auto offset = LeafNodeType::coordToOffset(xyz);
+            value = mBuffer[offset];
+            return mNode->isValueOn(offset);
+        }
+        return mNext.probeValue(xyz, value);
+    }
+
+     int getValueDepth(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return static_cast<int>(TreeCacheT::RootNodeT::LEVEL) -
+                   static_cast<int>(mNode->getValueLevelAndCache(xyz, *mParent));
+        } else {
+            return mNext.getValueDepth(xyz);
+        }
+    }
+
+    bool isVoxel(const Coord& xyz)
+    {
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            return mNode->getValueLevelAndCache(xyz, *mParent)==0;
+        } else {
+            return mNext.isVoxel(xyz);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as active.
+    void setValue(const Coord& xyz, const ValueType& value)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            assert(mBuffer);
+            const auto offset = LeafNodeType::coordToOffset(xyz);
+            const_cast<ValueType&>(mBuffer[offset]) = value;
+            const_cast<NodeType*>(mNode)->setValueOn(offset);
+        } else {
+            mNext.setValue(xyz, value);
+        }
+    }
+    void setValueOnly(const Coord& xyz, const ValueType& value)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            assert(mBuffer);
+            const auto offset = LeafNodeType::coordToOffset(xyz);
+            const_cast<ValueType&>(mBuffer[offset]) = value;
+        } else {
+            mNext.setValueOnly(xyz, value);
+        }
+    }
+    void setValueOn(const Coord& xyz, const ValueType& value) { this->setValue(xyz, value); }
+
+    /// @brief Apply a functor to the value of the voxel at the given coordinates
+    /// and mark the voxel as active.
+    /// @details See Tree::modifyValue() for details.
+    template<typename ModifyOp>
+    void modifyValue(const Coord& xyz, const ModifyOp& op)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            assert(mBuffer);
+            const auto offset = LeafNodeType::coordToOffset(xyz);
+            op(const_cast<ValueType&>(mBuffer[offset]));
+            const_cast<NodeType*>(mNode)->setActiveState(offset, true);
+        } else {
+            mNext.modifyValue(xyz, op);
+        }
+    }
+
+    /// @brief Apply a functor to the voxel at the given coordinates.
+    /// @details See Tree::modifyValueAndActiveState() for details.
+    template<typename ModifyOp>
+    void modifyValueAndActiveState(const Coord& xyz, const ModifyOp& op)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            assert(mBuffer);
+            const auto offset = LeafNodeType::coordToOffset(xyz);
+            bool state = mNode->isValueOn(offset);
+            op(const_cast<ValueType&>(mBuffer[offset]), state);
+            const_cast<NodeType*>(mNode)->setActiveState(offset, state);
+        } else {
+            mNext.modifyValueAndActiveState(xyz, op);
+        }
+    }
+
+    /// Set the value of the voxel at the given coordinates and mark the voxel as inactive.
+    void setValueOff(const Coord& xyz, const ValueType& value)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            const_cast<NodeType*>(mNode)->setValueOffAndCache(xyz, value, *mParent);
+        } else {
+            mNext.setValueOff(xyz, value);
+        }
+    }
+
+    /// Set the active state of the voxel at the given coordinates.
+    void setActiveState(const Coord& xyz, bool on)
+    {
+        static_assert(!TreeCacheT::IsConstTree, "can't modify a const tree's values");
+        if (this->isHashed(xyz)) {
+            assert(mNode);
+            const_cast<NodeType*>(mNode)->setActiveStateAndCache(xyz, on, *mParent);
+        } else {
+            mNext.setActiveState(xyz, on);
+        }
+    }
+
+private:
+    CacheItem(const CacheItem&);
+    CacheItem& operator=(const CacheItem&);
+
+    bool isHashed(const Coord& xyz) const
+    {
+        return (xyz[0] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[0]
+            && (xyz[1] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[1]
+            && (xyz[2] & ~Coord::ValueType(NodeType::DIM-1)) == mHash[2];
+    }
+
+    TreeCacheT* mParent;
+    Coord mHash;
+    const NodeType* mNode;
+    using RestT = typename NodeVecT::PopFront;
+    CacheItem<TreeCacheT, RestT, /*AtRoot=*/RestT::Size == 1> mNext;
+    const ValueType* mBuffer;
+};// end of CacheItem
+
+#endif
+
 /// The tail of a compile-time list of cached node pointers, ordered from LeafNode to RootNode
 template<typename TreeCacheT, typename NodeVecT>
-class CacheItem<TreeCacheT, NodeVecT, /*AtRoot=*/true>
+class CacheItem<TreeCacheT, NodeVecT, /*AtRoot=*/true
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+, /*BypassLeafAPI=*/false
+#endif
+>
 {
 public:
     using RootNodeType = typename NodeVecT::Front;
@@ -1006,6 +1362,11 @@ public:
     using RootNodeT = typename TreeType::RootNodeType;
     using LeafNodeT = typename TreeType::LeafNodeType;
     using BaseT = ValueAccessorBase<TreeType, IsSafe>;
+
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // No caching, nothing to do
+    static constexpr bool BypassLeafAPI = false;
+#endif
 
     ValueAccessor0(TreeType& tree): BaseT(tree) {}
 
@@ -1224,10 +1585,23 @@ public:
     using InvTreeT = typename RootNodeT::NodeChainType;
     using NodeT0 = typename InvTreeT::template Get<L0>;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // If the last node being cached is a leaf node and the storage type matches
+    // the ValueType, we can cache the buffer pointer instead of using the delay
+    // load locked leaf API
+    static constexpr bool BypassLeafAPI =
+        std::is_same<NodeT0, LeafNodeT>::value &&
+        std::is_same<typename LeafNodeT::Buffer::StorageType, ValueType>::value;
+#endif
+
     /// Constructor from a tree
-    ValueAccessor1(TreeType& tree) : BaseT(tree), mKey0(Coord::max()), mNode0(nullptr)
-    {
-    }
+    ValueAccessor1(TreeType& tree)
+        : BaseT(tree)
+        , mKey0(Coord::max()), mNode0(nullptr)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        , mBuffer(nullptr)
+#endif
+        {}
 
     /// Copy constructor
     ValueAccessor1(const ValueAccessor1& other) : BaseT(other) { this->copy(other); }
@@ -1262,6 +1636,12 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                return mBuffer[LeafNodeT::coordToOffset(xyz)];
+            }
+#endif
             return mNode0->getValueAndCache(xyz, this->self());
         }
         return BaseT::mTree->root().getValueAndCache(xyz, this->self());
@@ -1284,6 +1664,14 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                value = mBuffer[offset];
+                return mNode0->isValueOn(offset);
+            }
+#endif
             return mNode0->probeValueAndCache(xyz, value, this->self());
         }
         return BaseT::mTree->root().probeValueAndCache(xyz, value, this->self());
@@ -1323,6 +1711,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                const_cast<NodeT0*>(mNode0)->setValueOn(offset);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
         } else {
             BaseT::mTree->root().setValueAndCache(xyz, value, *this);
@@ -1338,6 +1735,14 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
         } else {
             BaseT::mTree->root().setValueOnlyAndCache(xyz, value, *this);
@@ -1367,6 +1772,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                op(const_cast<ValueType&>(mBuffer[offset]));
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, true);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndCache(xyz, op, *this);
         } else {
             BaseT::mTree->root().modifyValueAndCache(xyz, op, *this);
@@ -1382,6 +1796,16 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                bool state = mNode0->isValueOn(offset);
+                op(const_cast<ValueType&>(mBuffer[offset]), state);
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, state);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndActiveStateAndCache(xyz, op, *this);
         } else {
             BaseT::mTree->root().modifyValueAndActiveStateAndCache(xyz, op, *this);
@@ -1471,7 +1895,6 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed(xyz)) {
                 assert(mNode0);
@@ -1479,8 +1902,8 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
     LeafNodeT* probeLeaf(const Coord& xyz)
     {
@@ -1493,7 +1916,6 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed(xyz)) {
                 assert(mNode0);
@@ -1501,8 +1923,8 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
     }
     const LeafNodeT* probeConstLeaf(const Coord& xyz) const
     {
@@ -1515,6 +1937,9 @@ public:
     {
         mKey0  = Coord::max();
         mNode0 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
     }
 
 private:
@@ -1533,8 +1958,18 @@ private:
     {
         node = (BaseT::mTree ? &BaseT::mTree->root() : nullptr);
     }
+
     template<typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
+
+    void eraseNode(const NodeT0*)
+    {
+        mKey0 = Coord::max();
+        mNode0 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
+    }
+
     template<typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
 
     /// Private copy method
@@ -1542,6 +1977,9 @@ private:
     {
         mKey0  = other.mKey0;
         mNode0 = other.mNode0;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = other.mBuffer;
+#endif
     }
 
     /// Prevent this accessor from calling Tree::releaseCache() on a tree that
@@ -1560,6 +1998,11 @@ private:
         assert(node);
         mKey0  = xyz & ~(NodeT0::DIM-1);
         mNode0 = node;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if constexpr(BypassLeafAPI) {
+            mBuffer = node->buffer().data();
+        }
+#endif
     }
 
     /// No-op in case a tree traversal attemps to insert a node that
@@ -1572,8 +2015,12 @@ private:
             && (xyz[1] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[1]
             && (xyz[2] & ~Coord::ValueType(NodeT0::DIM-1)) == mKey0[2];
     }
+
     mutable Coord mKey0;
     mutable const NodeT0* mNode0;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    mutable const ValueType* mBuffer;
+#endif
 }; // ValueAccessor1
 
 
@@ -1601,10 +2048,24 @@ public:
     using NodeT0 = typename InvTreeT::template Get<L0>;
     using NodeT1 = typename InvTreeT::template Get<L1>;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // If the last node being cached is a leaf node and the storage type matches
+    // the ValueType, we can cache the buffer pointer instead of using the delay
+    // load locked leaf API
+    static constexpr bool BypassLeafAPI =
+        std::is_same<NodeT0, LeafNodeT>::value &&
+        std::is_same<typename LeafNodeT::Buffer::StorageType, ValueType>::value;
+#endif
+
     /// Constructor from a tree
-    ValueAccessor2(TreeType& tree) : BaseT(tree),
-                                     mKey0(Coord::max()), mNode0(nullptr),
-                                     mKey1(Coord::max()), mNode1(nullptr) {}
+    ValueAccessor2(TreeType& tree)
+        : BaseT(tree)
+        , mKey0(Coord::max()), mNode0(nullptr)
+        , mKey1(Coord::max()), mNode1(nullptr)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        , mBuffer(nullptr)
+#endif
+        {}
 
     /// Copy constructor
     ValueAccessor2(const ValueAccessor2& other) : BaseT(other) { this->copy(other); }
@@ -1639,6 +2100,12 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                return mBuffer[LeafNodeT::coordToOffset(xyz)];
+            }
+#endif
             return mNode0->getValueAndCache(xyz, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1667,6 +2134,14 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                value = mBuffer[offset];
+                return mNode0->isValueOn(offset);
+            }
+#endif
             return mNode0->probeValueAndCache(xyz, value, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1715,6 +2190,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                const_cast<NodeT0*>(mNode0)->setValueOn(offset);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1733,6 +2217,14 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1768,6 +2260,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                op(const_cast<ValueType&>(mBuffer[offset]));
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, true);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndCache(xyz, op, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1786,6 +2287,16 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                bool state = mNode0->isValueOn(offset);
+                op(const_cast<ValueType&>(mBuffer[offset]), state);
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, state);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndActiveStateAndCache(xyz, op, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -1884,6 +2395,7 @@ public:
         }
         return BaseT::mTree->root().touchLeafAndCache(xyz, *this);
     }
+
     /// @brief @return a pointer to the node of the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
     template<typename NodeT>
@@ -1891,7 +2403,6 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
@@ -1908,45 +2419,9 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
-    /// @brief @return a pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
-    LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
-
-    /// @brief @return a const pointer to the node of the specified type that contains
-    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
-    template<typename NodeT>
-    const NodeT* probeConstLeaf(const Coord& xyz) const
-    {
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
-        if ((std::is_same<NodeT, NodeT0>::value)) {
-            if (this->isHashed0(xyz)) {
-                assert(mNode0);
-                return reinterpret_cast<const NodeT*>(mNode0);
-            } else if (this->isHashed1(xyz)) {
-                assert(mNode1);
-                return mNode1->template probeConstNodeAndCache<NodeT>(xyz, this->self());
-            }
-            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
-        } else if ((std::is_same<NodeT, NodeT1>::value)) {
-            if (this->isHashed1(xyz)) {
-                assert(mNode1);
-                return reinterpret_cast<const NodeT*>(mNode1);
-            }
-            return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
-        }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
-    }
-    /// @brief @return a const pointer to the leaf node that contains
-    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
-    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
-    {
-        return this->template probeConstNode<LeafNodeT>(xyz);
-    }
-    const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
 
     /// @brief @return a const pointer to the node of the specified type that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
@@ -1954,7 +2429,6 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
@@ -1971,8 +2445,20 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
+    }
+
+    /// @brief @return a pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
+    LeafNodeT* probeLeaf(const Coord& xyz) { return this->template probeNode<LeafNodeT>(xyz); }
+    const LeafNodeT* probeLeaf(const Coord& xyz) const { return this->probeConstLeaf(xyz); }
+
+    /// @brief @return a const pointer to the leaf node that contains
+    /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
+    const LeafNodeT* probeConstLeaf(const Coord& xyz) const
+    {
+        return this->template probeConstNode<LeafNodeT>(xyz);
     }
 
     /// Remove all the cached nodes and invalidate the corresponding hash-keys.
@@ -1982,6 +2468,9 @@ public:
         mNode0 = nullptr;
         mKey1  = Coord::max();
         mNode1 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
     }
 
 private:
@@ -2003,7 +2492,15 @@ private:
     }
     template<typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
 
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
+    void eraseNode(const NodeT0*)
+    {
+        mKey0 = Coord::max();
+        mNode0 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
+    }
+
     void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = nullptr; }
     template<typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
 
@@ -2014,6 +2511,9 @@ private:
         mNode0 = other.mNode0;
         mKey1  = other.mKey1;
         mNode1 = other.mNode1;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = other.mBuffer;
+#endif
     }
 
     /// Prevent this accessor from calling Tree::releaseCache() on a tree that
@@ -2033,6 +2533,11 @@ private:
         assert(node);
         mKey0  = xyz & ~(NodeT0::DIM-1);
         mNode0 = node;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if constexpr(BypassLeafAPI) {
+            mBuffer = node->buffer().data();
+        }
+#endif
     }
     inline void insert(const Coord& xyz, const NodeT1* node)
     {
@@ -2060,6 +2565,9 @@ private:
     mutable const NodeT0* mNode0;
     mutable Coord mKey1;
     mutable const NodeT1* mNode1;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    mutable const ValueType* mBuffer;
+#endif
 }; // ValueAccessor2
 
 
@@ -2092,11 +2600,25 @@ public:
     using NodeT1 = typename InvTreeT::template Get<L1>;
     using NodeT2 = typename InvTreeT::template Get<L2>;
 
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    // If the last node being cached is a leaf node and the storage type matches
+    // the ValueType, we can cache the buffer pointer instead of using the delay
+    // load locked leaf API
+    static constexpr bool BypassLeafAPI =
+        std::is_same<NodeT0, LeafNodeT>::value &&
+        std::is_same<typename LeafNodeT::Buffer::StorageType, ValueType>::value;
+#endif
+
     /// Constructor from a tree
-    ValueAccessor3(TreeType& tree) : BaseT(tree),
-                                     mKey0(Coord::max()), mNode0(nullptr),
-                                     mKey1(Coord::max()), mNode1(nullptr),
-                                     mKey2(Coord::max()), mNode2(nullptr) {}
+    ValueAccessor3(TreeType& tree)
+        : BaseT(tree)
+        , mKey0(Coord::max()), mNode0(nullptr)
+        , mKey1(Coord::max()), mNode1(nullptr)
+        , mKey2(Coord::max()), mNode2(nullptr)
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        , mBuffer(nullptr)
+#endif
+        {}
 
     /// Copy constructor
     ValueAccessor3(const ValueAccessor3& other) : BaseT(other) { this->copy(other); }
@@ -2131,6 +2653,12 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                return mBuffer[LeafNodeT::coordToOffset(xyz)];
+            }
+#endif
             return mNode0->getValueAndCache(xyz, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2165,6 +2693,14 @@ public:
         assert(BaseT::mTree);
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                value = mBuffer[offset];
+                return mNode0->isValueOn(offset);
+            }
+#endif
             return mNode0->probeValueAndCache(xyz, value, this->self());
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2222,6 +2758,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                const_cast<NodeT0*>(mNode0)->setValueOn(offset);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueAndCache(xyz, value, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2243,6 +2788,14 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                const_cast<ValueType&>(mBuffer[offset]) = value;
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->setValueOnlyAndCache(xyz, value, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2284,6 +2837,15 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                op(const_cast<ValueType&>(mBuffer[offset]));
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, true);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndCache(xyz, op, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2305,6 +2867,16 @@ public:
         static_assert(!BaseT::IsConstTree, "can't modify a const tree's values");
         if (this->isHashed0(xyz)) {
             assert(mNode0);
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+            if constexpr(BypassLeafAPI) {
+                assert(mBuffer);
+                const auto offset = LeafNodeT::coordToOffset(xyz);
+                bool state = mNode0->isValueOn(offset);
+                op(const_cast<ValueType&>(mBuffer[offset]), state);
+                const_cast<NodeT0*>(mNode0)->setActiveState(offset, state);
+                return;
+            }
+#endif
             const_cast<NodeT0*>(mNode0)->modifyValueAndActiveStateAndCache(xyz, op, *this);
         } else if (this->isHashed1(xyz)) {
             assert(mNode1);
@@ -2425,7 +2997,6 @@ public:
     {
         assert(BaseT::mTree);
         static_assert(!BaseT::IsConstTree, "can't get a non-const node from a const tree");
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
@@ -2454,8 +3025,8 @@ public:
             }
             return BaseT::mTree->root().template probeNodeAndCache<NodeT>(xyz, *this);
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeNode<NodeT>(xyz);
     }
     /// @brief @return a pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
@@ -2467,7 +3038,6 @@ public:
     const NodeT* probeConstNode(const Coord& xyz) const
     {
         assert(BaseT::mTree);
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_BEGIN
         if ((std::is_same<NodeT, NodeT0>::value)) {
             if (this->isHashed0(xyz)) {
                 assert(mNode0);
@@ -2496,8 +3066,8 @@ public:
             }
             return BaseT::mTree->root().template probeConstNodeAndCache<NodeT>(xyz, this->self());
         }
-        return nullptr;
-        OPENVDB_NO_UNREACHABLE_CODE_WARNING_END
+        // No point trying to cache as this NodeT isn't part of this accessors chain
+        return BaseT::mTree->root().template probeConstNode<NodeT>(xyz);
     }
     /// @brief @return a const pointer to the leaf node that contains
     /// voxel (x, y, z) and if it doesn't exist, return @c nullptr.
@@ -2516,6 +3086,9 @@ public:
         mNode1 = nullptr;
         mKey2  = Coord::max();
         mNode2 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
     }
 
 private:
@@ -2538,6 +3111,9 @@ private:
         mNode1 = other.mNode1;
         mKey2  = other.mKey2;
         mNode2 = other.mNode2;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = other.mBuffer;
+#endif
     }
 
     /// Prevent this accessor from calling Tree::releaseCache() on a tree that
@@ -2556,7 +3132,15 @@ private:
     }
     template<typename OtherNodeType> void getNode(const OtherNodeType*& node) { node = nullptr; }
 
-    void eraseNode(const NodeT0*) { mKey0 = Coord::max(); mNode0 = nullptr; }
+    void eraseNode(const NodeT0*)
+    {
+        mKey0 = Coord::max();
+        mNode0 = nullptr;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        mBuffer = nullptr;
+#endif
+    }
+
     void eraseNode(const NodeT1*) { mKey1 = Coord::max(); mNode1 = nullptr; }
     void eraseNode(const NodeT2*) { mKey2 = Coord::max(); mNode2 = nullptr; }
     template<typename OtherNodeType> void eraseNode(const OtherNodeType*) {}
@@ -2570,6 +3154,11 @@ private:
         assert(node);
         mKey0  = xyz & ~(NodeT0::DIM-1);
         mNode0 = node;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+        if constexpr(BypassLeafAPI) {
+            mBuffer = node->buffer().data();
+        }
+#endif
     }
     inline void insert(const Coord& xyz, const NodeT1* node)
     {
@@ -2613,6 +3202,9 @@ private:
     mutable const NodeT1* mNode1;
     mutable Coord mKey2;
     mutable const NodeT2* mNode2;
+#if OPENVDB_ABI_VERSION_NUMBER >= 10
+    mutable const ValueType* mBuffer;
+#endif
 }; // ValueAccessor3
 
 } // namespace tree
