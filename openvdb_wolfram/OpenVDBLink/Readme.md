@@ -9,6 +9,7 @@ OpenVDB is an Academy Award-winning open-source C++ library comprising a novel h
 
 * Mathematica version 11.0 or higher
 * OpenVDB itself and any downstream dependencies it has
+* C++17 or higher
 
 ### Documentation
 
